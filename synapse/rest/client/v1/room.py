@@ -175,7 +175,7 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_type, txn_id=None):
-        user, token_id, _ = yield self.auth.get_user_by_req(request)
+        user, token_id, _ = yield self.auth.get_user_by_req(request, allow_guest=True)
         content = _parse_json(request)
 
         msg_handler = self.handlers.message_handler
@@ -220,7 +220,10 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_identifier, txn_id=None):
-        user, token_id, _ = yield self.auth.get_user_by_req(request)
+        user, token_id, is_guest = yield self.auth.get_user_by_req(
+            request,
+            allow_guest=True
+        )
 
         # the identifier could be a room alias or a room id. Try one then the
         # other if it fails to parse, without swallowing other valid
@@ -242,16 +245,20 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
             defer.returnValue((200, ret_dict))
         else:  # room id
             msg_handler = self.handlers.message_handler
+            content = {"membership": Membership.JOIN}
+            if is_guest:
+                content["kind"] = "guest"
             yield msg_handler.create_and_send_event(
                 {
                     "type": EventTypes.Member,
-                    "content": {"membership": Membership.JOIN},
+                    "content": content,
                     "room_id": identifier.to_string(),
                     "sender": user.to_string(),
                     "state_key": user.to_string(),
                 },
                 token_id=token_id,
                 txn_id=txn_id,
+                is_guest=is_guest,
             )
 
             defer.returnValue((200, {"room_id": identifier.to_string()}))

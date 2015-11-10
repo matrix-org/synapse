@@ -369,7 +369,7 @@ class RoomMemberHandler(BaseHandler):
                     remotedomains.add(member.domain)
 
     @defer.inlineCallbacks
-    def change_membership(self, event, context, do_auth=True):
+    def change_membership(self, event, context, do_auth=True, is_guest=False):
         """ Change the membership status of a user in a room.
 
         Args:
@@ -390,6 +390,20 @@ class RoomMemberHandler(BaseHandler):
         # if this HS is not currently in the room, i.e. we have to do the
         # invite/join dance.
         if event.membership == Membership.JOIN:
+            if is_guest:
+                guest_access = context.current_state.get(
+                    (EventTypes.GuestAccess, ""),
+                    None
+                )
+                is_guest_access_allowed = (
+                    guest_access
+                    and guest_access.content
+                    and "guest_access" in guest_access.content
+                    and guest_access.content["guest_access"] == "can_join"
+                )
+                if not is_guest_access_allowed:
+                    raise AuthError(403, "Guest access not allowed")
+
             yield self._do_join(event, context, do_auth=do_auth)
         else:
             if event.membership == Membership.LEAVE:

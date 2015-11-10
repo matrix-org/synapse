@@ -950,7 +950,8 @@ class PresenceHandler(BaseHandler):
                 )
                 while len(self._remote_offline_serials) > MAX_OFFLINE_SERIALS:
                     self._remote_offline_serials.pop()  # remove the oldest
-                del self._user_cachemap[user]
+                if user in self._user_cachemap:
+                    del self._user_cachemap[user]
             else:
                 # Remove the user from remote_offline_serials now that they're
                 # no longer offline
