@@ -831,7 +831,8 @@ class EventsStore(SQLBaseStore):
                 allow_none=True,
             )
             if prev:
-                ev.unsigned["prev_content"] = prev.get_dict()["content"]
+                ev.unsigned["prev_content"] = prev.content
+                ev.unsigned["prev_sender"] = prev.sender
 
         self._get_event_cache.prefill(
             (ev.event_id, check_redacted, get_prev_content), ev
@@ -888,7 +889,8 @@ class EventsStore(SQLBaseStore):
                 get_prev_content=False,
             )
             if prev:
-                ev.unsigned["prev_content"] = prev.get_dict()["content"]
+                ev.unsigned["prev_content"] = prev.content
+                ev.unsigned["prev_sender"] = prev.sender
 
         self._get_event_cache.prefill(
             (ev.event_id, check_redacted, get_prev_content), ev
