@@ -37,8 +37,8 @@ class SearchStore(BackgroundUpdateStore):
 
     @defer.inlineCallbacks
     def _background_reindex_search(self, progress, batch_size):
-        target_min_stream_id = progress["target_min_stream_id"]
-        max_stream_id = progress["max_stream_id"]
+        target_min_stream_id = progress["target_min_stream_id_inclusive"]
+        max_stream_id = progress["max_stream_id_exclusive"]
         rows_inserted = progress.get("rows_inserted", 0)
 
         INSERT_CLUMP_SIZE = 1000
@@ -105,8 +105,8 @@ class SearchStore(BackgroundUpdateStore):
                 txn.execute_many(sql, clump)
 
             progress = {
-                "target_max_stream_id": target_min_stream_id,
-                "max_stream_id": min_stream_id,
+                "target_min_stream_id_inclusive": target_min_stream_id,
+                "max_stream_id_exclusive": min_stream_id,
                 "rows_inserted": rows_inserted + len(event_search_rows)
             }
 
