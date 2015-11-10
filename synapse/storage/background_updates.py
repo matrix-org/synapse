@@ -43,7 +43,7 @@ class BackgroundUpdatePerformance(object):
         self.avg_item_count += 0.1 * (item_count - self.avg_item_count)
         self.avg_duration_ms += 0.1 * (duration_ms - self.avg_duration_ms)
 
-    def average_duration_ms_per_item(self):
+    def average_items_per_ms(self):
         """An estimate of how long it takes to do a single update.
         Returns:
             A duration in ms as a float
@@ -53,7 +53,17 @@ class BackgroundUpdatePerformance(object):
         else:
             # Use the exponential moving average so that we can adapt to
             # changes in how long the update process takes.
-            return float(self.avg_duration_ms) / float(self.avg_item_count)
+            return float(self.avg_item_count) / float(self.avg_duration_ms)
+
+    def total_items_per_ms(self):
+        """An estimate of how long it takes to do a single update.
+        Returns:
+            A duration in ms as a float
+        """
+        if self.total_item_count == 0:
+            return None
+        else:
+            return float(self.total_item_count) / float(self.total_duration_ms)
 
 
 class BackgroundUpdateStore(SQLBaseStore):
@@ -65,12 +75,41 @@ class BackgroundUpdateStore(SQLBaseStore):
 
     MINIMUM_BACKGROUND_BATCH_SIZE = 100
     DEFAULT_BACKGROUND_BATCH_SIZE = 100
+    BACKGROUND_UPDATE_INTERVAL_MS = 1000
+    BACKGROUND_UPDATE_DURATION_MS = 100
 
     def __init__(self, hs):
         super(BackgroundUpdateStore, self).__init__(hs)
         self._background_update_performance = {}
         self._background_update_queue = []
         self._background_update_handlers = {}
+        self._background_update_timer = None
+
+    @defer.inlineCallbacks
+    def start_doing_background_updates(self):
+        while True:
+            if self._background_update_timer is not None:
+                return
+
+            sleep = defer.Deferred()
+            self._background_update_timer = self._clock.call_later(
+                self.BACKGROUND_UPDATE_INTERVAL_MS / 1000., sleep.callback
+            )
+            try:
+                yield sleep
+            finally:
+                self._background_update_timer = None
+
+            result = yield self.do_background_update(
+                self.BACKGROUND_UPDATE_DURATION_MS
+            )
+
+            if result is None:
+                logger.info(
+                    "No more background updates to do."
+                    " Unscheduling background update task."
+                )
+                return
 
     @defer.inlineCallbacks
     def do_background_update(self, desired_duration_ms):
@@ -106,10 +145,10 @@ class BackgroundUpdateStore(SQLBaseStore):
             performance = BackgroundUpdatePerformance(update_name)
             self._background_update_performance[update_name] = performance
 
-        duration_ms_per_item = performance.average_duration_ms_per_item()
+        items_per_ms = performance.average_items_per_ms()
 
-        if duration_ms_per_item is not None:
-            batch_size = int(desired_duration_ms / duration_ms_per_item)
+        if items_per_ms is not None:
+            batch_size = int(desired_duration_ms * items_per_ms)
             # Clamp the batch size so that we always make progress
             batch_size = max(batch_size, self.MINIMUM_BACKGROUND_BATCH_SIZE)
         else:
@@ -130,8 +169,12 @@ class BackgroundUpdateStore(SQLBaseStore):
         duration_ms = time_stop - time_start
 
         logger.info(
-            "Updating %. Updated %r items in %rms",
-            update_name, items_updated, duration_ms
+            "Updating %. Updated %r items in %rms."
+            " (total_rate=%r/ms, current_rate=%r/ms, total_updated=%r)",
+            update_name, items_updated, duration_ms,
+            performance.total_items_per_ms(),
+            performance.average_items_per_ms(),
+            performance.total_item_count,
         )
 
         performance.update(items_updated, duration_ms)

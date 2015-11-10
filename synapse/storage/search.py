@@ -29,6 +29,11 @@ class SearchStore(BackgroundUpdateStore):
 
     EVENT_SEARCH_UPDATE_NAME = "event_search"
 
+    def __init__(self, hs):
+        super(SearchStore, self).__init__(hs)
+        self.register_background_update_handler(
+            self.EVENT_SEARCH_UPDATE_NAME, self._background_reindex_search
+        )
 
     @defer.inlineCallbacks
     def _background_reindex_search(self, progress, batch_size):
@@ -74,7 +79,7 @@ class SearchStore(BackgroundUpdateStore):
                     elif event.type == "m.room.name":
                         key = "content.name"
                         value = content["name"]
-                except Exception:
+                except (KeyError, AttributeError):
                     # If the event is missing a necessary field then
                     # skip over it.
                     continue
@@ -96,7 +101,7 @@ class SearchStore(BackgroundUpdateStore):
                 raise Exception("Unrecognized database engine")
 
             for index in range(0, len(event_search_rows), INSERT_CLUMP_SIZE):
-                clump = event_search_rows[index : index + INSERT_CLUMP_SIZE)
+                clump = event_search_rows[index:index + INSERT_CLUMP_SIZE]
                 txn.execute_many(sql, clump)
 
             progress = {
@@ -116,7 +121,7 @@ class SearchStore(BackgroundUpdateStore):
         )
 
         if result is None:
-            yield _end_background_update(self.EVENT_SEARCH_UPDATE_NAME)
+            yield self._end_background_update(self.EVENT_SEARCH_UPDATE_NAME)
 
         defer.returnValue(result)
 
