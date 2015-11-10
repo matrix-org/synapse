@@ -582,7 +582,6 @@ class RoomMemberHandler(BaseHandler):
             medium,
             address,
             id_server,
-            display_name,
             token_id,
             txn_id
     ):
@@ -609,7 +608,6 @@ class RoomMemberHandler(BaseHandler):
         else:
             yield self._make_and_store_3pid_invite(
                 id_server,
-                display_name,
                 medium,
                 address,
                 room_id,
@@ -673,7 +671,6 @@ class RoomMemberHandler(BaseHandler):
     def _make_and_store_3pid_invite(
             self,
             id_server,
-            display_name,
             medium,
             address,
             room_id,
@@ -681,7 +678,7 @@ class RoomMemberHandler(BaseHandler):
             token_id,
             txn_id
     ):
-        token, public_key, key_validity_url = (
+        token, public_key, key_validity_url, display_name = (
             yield self._ask_id_server_for_third_party_invite(
                 id_server,
                 medium,
@@ -725,10 +722,11 @@ class RoomMemberHandler(BaseHandler):
         # TODO: Check for success
         token = data["token"]
         public_key = data["public_key"]
+        display_name = data["display_name"]
         key_validity_url = "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
             id_server_scheme, id_server,
         )
-        defer.returnValue((token, public_key, key_validity_url))
+        defer.returnValue((token, public_key, key_validity_url, display_name))
 
 
 class RoomListHandler(BaseHandler):
