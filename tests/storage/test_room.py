@@ -73,6 +73,8 @@ class RoomStoreTestCase(unittest.TestCase):
             "room_id": self.room.to_string(),
             "topic": None,
             "aliases": [self.alias.to_string()],
+            "world_readable": False,
+            "guest_can_join": False,
         }, rooms[0])
 
 
