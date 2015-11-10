@@ -243,6 +243,9 @@ class MockClock(object):
             else:
                 self.timers.append(t)
 
+    def advance_time_msec(self, ms):
+        self.advance_time(ms / 1000.)
+
 
 class SQLiteMemoryDbPool(ConnectionPool, object):
     def __init__(self):
