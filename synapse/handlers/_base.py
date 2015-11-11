@@ -175,6 +175,8 @@ class BaseHandler(object):
         if not suppress_auth:
             self.auth.check(event, auth_events=context.current_state)
 
+        yield self.maybe_kick_guest_users(event, context.current_state.values())
+
         if event.type == EventTypes.CanonicalAlias:
             # Check the alias is acually valid (at this time at least)
             room_alias_str = event.content.get("alias", None)
@@ -282,3 +284,58 @@ class BaseHandler(object):
         federation_handler.handle_new_event(
             event, destinations=destinations,
         )
+
+    @defer.inlineCallbacks
+    def maybe_kick_guest_users(self, event, current_state):
+        # Technically this function invalidates current_state by changing it.
+        # Hopefully this isn't that important to the caller.
+        if event.type == EventTypes.GuestAccess:
+            guest_access = event.content.get("guest_access", "forbidden")
+            if guest_access != "can_join":
+                yield self.kick_guest_users(current_state)
+
+    @defer.inlineCallbacks
+    def kick_guest_users(self, current_state):
+        for member_event in current_state:
+            try:
+                if member_event.type != EventTypes.Member:
+                    continue
+
+                if not self.hs.is_mine(UserID.from_string(member_event.state_key)):
+                    continue
+
+                if member_event.content["membership"] not in {
+                    Membership.JOIN,
+                    Membership.INVITE
+                }:
+                    continue
+
+                if (
+                    "kind" not in member_event.content
+                    or member_event.content["kind"] != "guest"
+                ):
+                    continue
+
+                # We make the user choose to leave, rather than have the
+                # event-sender kick them. This is partially because we don't
+                # need to worry about power levels, and partially because guest
+                # users are a concept which doesn't hugely work over federation,
+                # and having homeservers have their own users leave keeps more
+                # of that decision-making and control local to the guest-having
+                # homeserver.
+                message_handler = self.hs.get_handlers().message_handler
+                yield message_handler.create_and_send_event(
+                    {
+                        "type": EventTypes.Member,
+                        "state_key": member_event.state_key,
+                        "content": {
+                            "membership": Membership.LEAVE,
+                            "kind": "guest"
+                        },
+                        "room_id": member_event.room_id,
+                        "sender": member_event.state_key
+                    },
+                    ratelimit=False,
+                )
+            except Exception as e:
+                logger.warn("Error kicking guest user: %s" % (e,))

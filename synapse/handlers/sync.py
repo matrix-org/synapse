@@ -272,7 +272,7 @@ class SyncHandler(BaseHandler):
     def private_user_data_for_room(self, room_id, tags_by_room):
         private_user_data = []
         tags = tags_by_room.get(room_id)
-        if tags:
+        if tags is not None:
             private_user_data.append({
                 "type": "m.tag",
                 "content": {"tags": tags},
@@ -311,8 +311,13 @@ class SyncHandler(BaseHandler):
         ephemeral_by_room = {}
 
         for event in typing:
-            room_id = event.pop("room_id")
-            ephemeral_by_room.setdefault(room_id, []).append(event)
+            # we want to exclude the room_id from the event, but modifying the
+            # result returned by the event source is poor form (it might cache
+            # the object)
+            room_id = event["room_id"]
+            event_copy = {k: v for (k, v) in event.iteritems()
+                          if k != "room_id"}
+            ephemeral_by_room.setdefault(room_id, []).append(event_copy)
 
         receipt_key = since_token.receipt_key if since_token else "0"
 
@@ -328,8 +333,11 @@ class SyncHandler(BaseHandler):
         now_token = now_token.copy_and_replace("receipt_key", receipt_key)
 
         for event in receipts:
-            room_id = event.pop("room_id")
-            ephemeral_by_room.setdefault(room_id, []).append(event)
+            room_id = event["room_id"]
+            # exclude room id, as above
+            event_copy = {k: v for (k, v) in event.iteritems()
+                          if k != "room_id"}
+            ephemeral_by_room.setdefault(room_id, []).append(event_copy)
 
         defer.returnValue((now_token, ephemeral_by_room))
 

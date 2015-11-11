@@ -439,6 +439,7 @@ def setup(config_options):
     hs.get_pusherpool().start()
     hs.get_state_handler().start_caching()
     hs.get_datastore().start_profiling()
+    hs.get_datastore().start_doing_background_updates()
     hs.get_replication_layer().start_get_pdu_cache()
 
     return hs

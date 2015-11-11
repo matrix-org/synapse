@@ -167,7 +167,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def create_and_send_event(self, event_dict, ratelimit=True,
-                              token_id=None, txn_id=None):
+                              token_id=None, txn_id=None, is_guest=False):
         """ Given a dict from a client, create and handle a new event.
 
         Creates an FrozenEvent object, filling out auth_events, prev_events,
@@ -213,7 +213,7 @@ class MessageHandler(BaseHandler):
 
         if event.type == EventTypes.Member:
             member_handler = self.hs.get_handlers().room_member_handler
-            yield member_handler.change_membership(event, context)
+            yield member_handler.change_membership(event, context, is_guest=is_guest)
         else:
             yield self.handle_new_client_event(
                 event=event,

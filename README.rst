@@ -20,8 +20,8 @@ The overall architecture is::
              https://somewhere.org/_matrix      https://elsewhere.net/_matrix
 
 ``#matrix:matrix.org`` is the official support room for Matrix, and can be
-accessed by the web client at http://matrix.org/beta or via an IRC bridge at
-irc://irc.freenode.net/matrix.
+accessed by any client from https://matrix.org/blog/try-matrix-now or via IRC
+bridge at irc://irc.freenode.net/matrix.
 
 Synapse is currently in rapid development, but as of version 0.5 we believe it
 is sufficiently stable to be run as an internet-facing service for real usage!
@@ -77,14 +77,14 @@ Meanwhile, iOS and Android SDKs and clients are available from:
 - https://github.com/matrix-org/matrix-android-sdk
 
 We'd like to invite you to join #matrix:matrix.org (via
-https://matrix.org/beta), run a homeserver, take a look at the Matrix spec at
-https://matrix.org/docs/spec and API docs at https://matrix.org/docs/api,
-experiment with the APIs and the demo clients, and report any bugs via
-https://matrix.org/jira.
+https://matrix.org/blog/try-matrix-now), run a homeserver, take a look at the
+Matrix spec at https://matrix.org/docs/spec and API docs at
+https://matrix.org/docs/api, experiment with the APIs and the demo clients, and
+report any bugs via https://matrix.org/jira.
 
 Thanks for using Matrix!
 
-[1] End-to-end encryption is currently in development
+[1] End-to-end encryption is currently in development - see https://matrix.org/git/olm
 
 Synapse Installation
 ====================

@@ -369,7 +369,7 @@ class RoomMemberHandler(BaseHandler):
                     remotedomains.add(member.domain)
 
     @defer.inlineCallbacks
-    def change_membership(self, event, context, do_auth=True):
+    def change_membership(self, event, context, do_auth=True, is_guest=False):
         """ Change the membership status of a user in a room.
 
         Args:
@@ -390,6 +390,20 @@ class RoomMemberHandler(BaseHandler):
         # if this HS is not currently in the room, i.e. we have to do the
         # invite/join dance.
         if event.membership == Membership.JOIN:
+            if is_guest:
+                guest_access = context.current_state.get(
+                    (EventTypes.GuestAccess, ""),
+                    None
+                )
+                is_guest_access_allowed = (
+                    guest_access
+                    and guest_access.content
+                    and "guest_access" in guest_access.content
+                    and guest_access.content["guest_access"] == "can_join"
+                )
+                if not is_guest_access_allowed:
+                    raise AuthError(403, "Guest access not allowed")
+
             yield self._do_join(event, context, do_auth=do_auth)
         else:
             if event.membership == Membership.LEAVE:
@@ -582,7 +596,6 @@ class RoomMemberHandler(BaseHandler):
             medium,
             address,
             id_server,
-            display_name,
             token_id,
             txn_id
     ):
@@ -609,7 +622,6 @@ class RoomMemberHandler(BaseHandler):
         else:
             yield self._make_and_store_3pid_invite(
                 id_server,
-                display_name,
                 medium,
                 address,
                 room_id,
@@ -673,7 +685,6 @@ class RoomMemberHandler(BaseHandler):
     def _make_and_store_3pid_invite(
             self,
             id_server,
-            display_name,
             medium,
             address,
             room_id,
@@ -681,7 +692,7 @@ class RoomMemberHandler(BaseHandler):
             token_id,
             txn_id
     ):
-        token, public_key, key_validity_url = (
+        token, public_key, key_validity_url, display_name = (
             yield self._ask_id_server_for_third_party_invite(
                 id_server,
                 medium,
@@ -725,10 +736,11 @@ class RoomMemberHandler(BaseHandler):
         # TODO: Check for success
         token = data["token"]
         public_key = data["public_key"]
+        display_name = data["display_name"]
         key_validity_url = "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
             id_server_scheme, id_server,
         )
-        defer.returnValue((token, public_key, key_validity_url))
+        defer.returnValue((token, public_key, key_validity_url, display_name))
 
 
 class RoomListHandler(BaseHandler):
