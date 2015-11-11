@@ -68,7 +68,11 @@ def run_upgrade(cur, database_engine, *args, **kwargs):
         }
         progress_json = ujson.dumps(progress)
 
-        cur.execute(
+        sql = (
             "INSERT into background_updates (update_name, progress_json)"
-            " VALUES (?, ?)", ("event_search", progress_json)
+            " VALUES (?, ?)"
         )
+
+        sql = database_engine.convert_param_style(sql)
+
+        cur.execute(sql, ("event_search", progress_json))
