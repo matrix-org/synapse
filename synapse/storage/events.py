@@ -313,6 +313,8 @@ class EventsStore(SQLBaseStore):
                 self._store_redaction(txn, event)
             elif event.type == EventTypes.RoomHistoryVisibility:
                 self._store_history_visibility_txn(txn, event)
+            elif event.type == EventTypes.GuestAccess:
+                self._store_guest_access_txn(txn, event)
 
         self._store_room_members_txn(
             txn,
