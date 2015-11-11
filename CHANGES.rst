@@ -1,4 +1,4 @@
-Changes in synapse v0.11.0-rc1 (XXXX-XX-XX)
+Changes in synapse v0.11.0-rc1 (2015-11-11)
 ===========================================
 
 * Add Search API (PR #307, #324, #327, #336, #350, #359)
