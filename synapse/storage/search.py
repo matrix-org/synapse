@@ -46,18 +46,18 @@ class SearchStore(BackgroundUpdateStore):
 
         def reindex_search_txn(txn):
             sql = (
-                "SELECT stream_id, event_id FROM events"
+                "SELECT stream_ordering, event_id FROM events"
                 " WHERE ? <= stream_ordering AND stream_ordering < ?"
                 " AND (%s)"
                 " ORDER BY stream_ordering DESC"
                 " LIMIT ?"
-            ) % (" OR ".join("type = '%s'" % TYPES),)
+            ) % (" OR ".join("type = '%s'" % (t,) for t in TYPES),)
 
-            txn.execute(sql, target_min_stream_id, max_stream_id, batch_size)
+            txn.execute(sql, (target_min_stream_id, max_stream_id, batch_size))
 
-            rows = txn.fetch_all()
+            rows = txn.fetchall()
             if not rows:
-                return None
+                return 0
 
             min_stream_id = rows[-1][0]
             event_ids = [row[1] for row in rows]
@@ -102,7 +102,7 @@ class SearchStore(BackgroundUpdateStore):
 
             for index in range(0, len(event_search_rows), INSERT_CLUMP_SIZE):
                 clump = event_search_rows[index:index + INSERT_CLUMP_SIZE]
-                txn.execute_many(sql, clump)
+                txn.executemany(sql, clump)
 
             progress = {
                 "target_min_stream_id_inclusive": target_min_stream_id,
@@ -116,11 +116,11 @@ class SearchStore(BackgroundUpdateStore):
 
             return len(event_search_rows)
 
-        result = yield self.runInteration(
+        result = yield self.runInteraction(
             self.EVENT_SEARCH_UPDATE_NAME, reindex_search_txn
         )
 
-        if result is None:
+        if not result:
             yield self._end_background_update(self.EVENT_SEARCH_UPDATE_NAME)
 
         defer.returnValue(result)

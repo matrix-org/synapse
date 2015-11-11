@@ -93,16 +93,19 @@ class BackgroundUpdateStore(SQLBaseStore):
 
             sleep = defer.Deferred()
             self._background_update_timer = self._clock.call_later(
-                self.BACKGROUND_UPDATE_INTERVAL_MS / 1000., sleep.callback
+                self.BACKGROUND_UPDATE_INTERVAL_MS / 1000., sleep.callback, None
             )
             try:
                 yield sleep
             finally:
                 self._background_update_timer = None
 
-            result = yield self.do_background_update(
-                self.BACKGROUND_UPDATE_DURATION_MS
-            )
+            try:
+                result = yield self.do_background_update(
+                    self.BACKGROUND_UPDATE_DURATION_MS
+                )
+            except:
+                logger.exception("Error doing update")
 
             if result is None:
                 logger.info(
@@ -169,7 +172,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         duration_ms = time_stop - time_start
 
         logger.info(
-            "Updating %. Updated %r items in %rms."
+            "Updating %r. Updated %r items in %rms."
             " (total_rate=%r/ms, current_rate=%r/ms, total_updated=%r)",
             update_name, items_updated, duration_ms,
             performance.total_items_per_ms(),

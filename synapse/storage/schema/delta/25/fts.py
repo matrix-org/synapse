@@ -47,11 +47,10 @@ def run_upgrade(cur, database_engine, *args, **kwargs):
     if isinstance(database_engine, PostgresEngine):
         for statement in get_statements(POSTGRES_TABLE.splitlines()):
             cur.execute(statement)
-        return
-
-    if isinstance(database_engine, Sqlite3Engine):
+    elif isinstance(database_engine, Sqlite3Engine):
         cur.execute(SQLITE_TABLE)
-        return
+    else:
+        raise Exception("Unrecognized database engine")
 
     cur.execute("SELECT MIN(stream_ordering) FROM events")
     rows = cur.fetchall()
