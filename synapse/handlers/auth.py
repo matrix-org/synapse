@@ -298,11 +298,11 @@ class AuthHandler(BaseHandler):
         defer.returnValue((user_id, access_token, refresh_token))
 
     @defer.inlineCallbacks
-    def login_with_user_id(self, user_id):
+    def get_login_tuple_for_user_id(self, user_id):
         """
-        Authenticates the user with the given user ID,
-        it is intended that the authentication of the user has
-        already been verified by other mechanism (e.g. CAS)
+        Gets login tuple for the user with the given user ID.
+        The user is assumed to have been authenticated by some other
+        machanism (e.g. CAS)
 
         Args:
             user_id (str): User ID
