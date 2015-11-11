@@ -765,7 +765,7 @@ class RoomListHandler(BaseHandler):
 
 class RoomContextHandler(BaseHandler):
     @defer.inlineCallbacks
-    def get_event_context(self, user, room_id, event_id, limit):
+    def get_event_context(self, user, room_id, event_id, limit, is_guest):
         """Retrieves events, pagination tokens and state around a given event
         in a room.
 
@@ -789,11 +789,17 @@ class RoomContextHandler(BaseHandler):
         )
 
         results["events_before"] = yield self._filter_events_for_client(
-            user.to_string(), results["events_before"]
+            user.to_string(),
+            results["events_before"],
+            is_guest=is_guest,
+            require_all_visible_for_guests=False
         )
 
         results["events_after"] = yield self._filter_events_for_client(
-            user.to_string(), results["events_after"]
+            user.to_string(),
+            results["events_after"],
+            is_guest=is_guest,
+            require_all_visible_for_guests=False
         )
 
         if results["events_after"]:
