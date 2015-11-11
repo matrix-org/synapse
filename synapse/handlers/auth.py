@@ -47,12 +47,6 @@ class AuthHandler(BaseHandler):
         self.bcrypt_rounds = hs.config.bcrypt_rounds
         self.sessions = {}
         self.INVALID_TOKEN_HTTP_STATUS = 401
-        self._KNOWN_CAVEAT_PREFIXES = set([
-            "gen = ",
-            "type = ",
-            "time < ",
-            "user_id = ",
-        ])
 
     @defer.inlineCallbacks
     def check_auth(self, flows, clientdict, clientip):
@@ -410,7 +404,13 @@ class AuthHandler(BaseHandler):
         return macaroon.serialize()
 
     def validate_short_term_login_token_and_get_user_id(self, login_token):
-        return self._validate_macaroon_and_get_user_id(login_token, "login", True)
+        try:
+            macaroon = pymacaroons.Macaroon.deserialize(login_token)
+            auth_api = self.hs.get_auth()
+            auth_api.validate_macaroon(macaroon, "login", [auth_api.verify_expiry])
+            return self._get_user_from_macaroon(macaroon)
+        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
+            raise AuthError(401, "Invalid token", errcode=Codes.UNKNOWN_TOKEN)
 
     def _generate_base_macaroon(self, user_id):
         macaroon = pymacaroons.Macaroon(
@@ -421,30 +421,6 @@ class AuthHandler(BaseHandler):
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         return macaroon
 
-    def _validate_macaroon_and_get_user_id(self, macaroon_str,
-                                           macaroon_type, validate_expiry):
-        try:
-            macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
-            user_id = self._get_user_from_macaroon(macaroon)
-            v = pymacaroons.Verifier()
-            v.satisfy_exact("gen = 1")
-            v.satisfy_exact("type = " + macaroon_type)
-            v.satisfy_exact("user_id = " + user_id)
-            if validate_expiry:
-                v.satisfy_general(self._verify_expiry)
-
-            v.verify(macaroon, self.hs.config.macaroon_secret_key)
-
-            v = pymacaroons.Verifier()
-            v.satisfy_general(self._verify_recognizes_caveats)
-            v.verify(macaroon, self.hs.config.macaroon_secret_key)
-            return user_id
-        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
-            raise AuthError(
-                self.INVALID_TOKEN_HTTP_STATUS, "Invalid token",
-                errcode=Codes.UNKNOWN_TOKEN
-            )
-
     def _get_user_from_macaroon(self, macaroon):
         user_prefix = "user_id = "
         for caveat in macaroon.caveats:
@@ -454,23 +430,6 @@ class AuthHandler(BaseHandler):
             self.INVALID_TOKEN_HTTP_STATUS, "No user_id found in token",
             errcode=Codes.UNKNOWN_TOKEN
         )
-
-    def _verify_expiry(self, caveat):
-        prefix = "time < "
-        if not caveat.startswith(prefix):
-            return False
-        expiry = int(caveat[len(prefix):])
-        now = self.hs.get_clock().time_msec()
-        return now < expiry
-
-    def _verify_recognizes_caveats(self, caveat):
-        first_space = caveat.find(" ")
-        if first_space < 0:
-            return False
-        second_space = caveat.find(" ", first_space + 1)
-        if second_space < 0:
-            return False
-        return caveat[:second_space + 1] in self._KNOWN_CAVEAT_PREFIXES
 
     @defer.inlineCallbacks
     def set_password(self, user_id, newpassword):
