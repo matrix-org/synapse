@@ -417,12 +417,12 @@ class RoomEventContext(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_id):
-        user, _ = yield self.auth.get_user_by_req(request)
+        user, _, is_guest = yield self.auth.get_user_by_req(request, allow_guest=True)
 
         limit = int(request.args.get("limit", [10])[0])
 
         results = yield self.handlers.room_context_handler.get_event_context(
-            user, room_id, event_id, limit,
+            user, room_id, event_id, limit, is_guest
         )
 
         time_now = self.clock.time_msec()
