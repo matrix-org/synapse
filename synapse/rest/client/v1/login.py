@@ -295,14 +295,14 @@ class CasRedirectServlet(ClientV1RestServlet):
         args = request.args
         if "redirectUrl" not in args:
             return (400, "Redirect URL not specified for CAS auth")
-        clientRedirectUrlParam = urllib.urlencode({
+        client_redirect_url_param = urllib.urlencode({
             "redirectUrl": args["redirectUrl"][0]
         })
-        hsRedirectUrl = self.cas_service_url + "/_matrix/client/api/v1/login/cas/ticket"
-        serviceParam = urllib.urlencode({
-            "service": "%s?%s" % (hsRedirectUrl, clientRedirectUrlParam)
+        hs_redirect_url = self.cas_service_url + "/_matrix/client/api/v1/login/cas/ticket"
+        service_param = urllib.urlencode({
+            "service": "%s?%s" % (hs_redirect_url, client_redirect_url_param)
         })
-        request.redirect("%s?%s" % (self.cas_server_url, serviceParam))
+        request.redirect("%s?%s" % (self.cas_server_url, service_param))
         request.finish()
 
 
