@@ -252,6 +252,8 @@ class SearchStore(BackgroundUpdateStore):
                 " WHERE vector @@ query AND room_id = ?"
             )
         elif isinstance(self.database_engine, Sqlite3Engine):
+            # We use CROSS JOIN here to ensure we use the right indexes.
+            # https://sqlite.org/optoverview.html#crossjoin
             sql = (
                 "SELECT rank(matchinfo) as rank, room_id, event_id,"
                 " topological_ordering, stream_ordering"
