@@ -49,7 +49,7 @@ class TimelineBatch(collections.namedtuple("TimelineBatch", [
 class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
     "room_id",           # str
     "timeline",          # TimelineBatch
-    "state",             # list[FrozenEvent]
+    "state",             # dict[(str, str), FrozenEvent]
     "ephemeral",
     "private_user_data",
 ])):
@@ -70,7 +70,7 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
 class ArchivedSyncResult(collections.namedtuple("JoinedSyncResult", [
     "room_id",            # str
     "timeline",           # TimelineBatch
-    "state",              # list[FrozenEvent]
+    "state",              # dict[(str, str), FrozenEvent]
     "private_user_data",
 ])):
     __slots__ = []
@@ -257,12 +257,11 @@ class SyncHandler(BaseHandler):
         current_state = yield self.state_handler.get_current_state(
             room_id
         )
-        current_state_events = current_state.values()
 
         defer.returnValue(JoinedSyncResult(
             room_id=room_id,
             timeline=batch,
-            state=current_state_events,
+            state=current_state,
             ephemeral=ephemeral_by_room.get(room_id, []),
             private_user_data=self.private_user_data_for_room(
                 room_id, tags_by_room
@@ -361,7 +360,7 @@ class SyncHandler(BaseHandler):
         defer.returnValue(ArchivedSyncResult(
             room_id=room_id,
             timeline=batch,
-            state=leave_state[leave_event_id].values(),
+            state=leave_state[leave_event_id],
             private_user_data=self.private_user_data_for_room(
                 room_id, tags_by_room
             ),
@@ -440,7 +439,10 @@ class SyncHandler(BaseHandler):
 
             for room_id in joined_room_ids:
                 recents = events_by_room_id.get(room_id, [])
-                state = [event for event in recents if event.is_state()]
+                state = {
+                    (event.type, event.state_key): event
+                    for event in recents if event.is_state()}
+
                 if recents:
                     prev_batch = now_token.copy_and_replace(
                         "room_key", recents[0].internal_metadata.before
@@ -575,7 +577,6 @@ class SyncHandler(BaseHandler):
         current_state = yield self.state_handler.get_current_state(
             room_id
         )
-        current_state_events = current_state.values()
 
         state_at_previous_sync = yield self.get_state_at_previous_sync(
             room_id, since_token=since_token
@@ -584,7 +585,7 @@ class SyncHandler(BaseHandler):
         state_events_delta = yield self.compute_state_delta(
             since_token=since_token,
             previous_state=state_at_previous_sync,
-            current_state=current_state_events,
+            current_state=current_state,
         )
 
         state_events_delta, _ = yield self.check_joined_room(
@@ -632,7 +633,7 @@ class SyncHandler(BaseHandler):
             [leave_event.event_id], None
         )
 
-        state_events_at_leave = leave_state[leave_event.event_id].values()
+        state_events_at_leave = leave_state[leave_event.event_id]
 
         state_at_previous_sync = yield self.get_state_at_previous_sync(
             leave_event.room_id, since_token=since_token
@@ -661,7 +662,7 @@ class SyncHandler(BaseHandler):
     def get_state_at_previous_sync(self, room_id, since_token):
         """ Get the room state at the previous sync the client made.
         Returns:
-            A Deferred list of Events.
+            A Deferred map from ((type, state_key)->Event)
         """
         last_events, token = yield self.store.get_recent_events_for_room(
             room_id, end_token=since_token.room_key, limit=1,
@@ -673,11 +674,12 @@ class SyncHandler(BaseHandler):
                 last_event
             )
             if last_event.is_state():
-                state = [last_event] + last_context.current_state.values()
+                state = last_context.current_state.copy()
+                state[(last_event.type, last_event.state_key)] = last_event
             else:
-                state = last_context.current_state.values()
+                state = last_context.current_state
         else:
-            state = ()
+            state = {}
         defer.returnValue(state)
 
     def compute_state_delta(self, since_token, previous_state, current_state):
@@ -685,21 +687,23 @@ class SyncHandler(BaseHandler):
         state the client got when it last performed a sync.
 
         :param str since_token: the point we are comparing against
-        :param list[synapse.events.FrozenEvent] previous_state: the state to
-            compare to
-        :param list[synapse.events.FrozenEvent] current_state: the new state
+        :param dict[(str,str), synapse.events.FrozenEvent] previous_state: the
+            state to compare to
+        :param dict[(str,str), synapse.events.FrozenEvent] current_state: the
+            new state
 
-        :returns: A list of events.
+        :returns A new event dictionary
         """
         # TODO(mjark) Check if the state events were received by the server
         # after the previous sync, since we need to include those state
         # updates even if they occured logically before the previous event.
         # TODO(mjark) Check for new redactions in the state events.
-        previous_dict = {event.event_id: event for event in previous_state}
-        state_delta = []
-        for event in current_state:
-            if event.event_id not in previous_dict:
-                state_delta.append(event)
+
+        state_delta = {}
+        for key, event in current_state.iteritems():
+            if (key not in previous_state or
+                    previous_state[key].event_id != event.event_id):
+                state_delta[key] = event
         return state_delta
 
     @defer.inlineCallbacks
@@ -708,21 +712,25 @@ class SyncHandler(BaseHandler):
         Check if the user has just joined the given room. If so, return the
         full state for the room, instead of the delta since the last sync.
 
+        :param sync_config:
+        :param room_id:
+        :param dict[(str,str), synapse.events.FrozenEvent] state_delta: the
+           difference in state since the last sync
+
         :returns A deferred Tuple (state_delta, limited)
         """
         joined = False
         limited = False
-        for event in state_delta:
-            if (
-                event.type == EventTypes.Member
-                and event.state_key == sync_config.user.to_string()
-            ):
-                if event.content["membership"] == Membership.JOIN:
-                    joined = True
+
+        join_event = state_delta.get((
+            EventTypes.Member, sync_config.user.to_string()), None)
+        if join_event is not None:
+            if join_event.content["membership"] == Membership.JOIN:
+                joined = True
 
         if joined:
-            res = yield self.state_handler.get_current_state(room_id)
-            state_delta = res.values()
+            state_delta = yield self.state_handler.get_current_state(room_id)
+            # the timeline is inherently limited if we've just joined
             limited = True
 
         defer.returnValue((state_delta, limited))

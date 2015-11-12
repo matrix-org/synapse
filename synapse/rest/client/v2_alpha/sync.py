@@ -256,7 +256,7 @@ class SyncRestServlet(RestServlet):
         :rtype: dict[str, object]
         """
         event_map = {}
-        state_events = filter.filter_room_state(room.state)
+        state_events = filter.filter_room_state(room.state.values())
         state_event_ids = []
         for event in state_events:
             # TODO(mjark): Respect formatting requirements in the filter.
