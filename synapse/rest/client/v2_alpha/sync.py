@@ -242,7 +242,7 @@ class SyncRestServlet(RestServlet):
     @staticmethod
     def encode_room(room, filter, time_now, token_id, joined=True):
         """
-        :param JoinedSyncResult|ArchivedSyncResult room: sync result for a 
+        :param JoinedSyncResult|ArchivedSyncResult room: sync result for a
             single room
         :param FilterCollection filter: filters to apply to the results
         :param int time_now: current time - used as a baseline for age
