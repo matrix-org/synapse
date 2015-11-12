@@ -253,11 +253,13 @@ class SearchStore(BackgroundUpdateStore):
             )
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
-                "SELECT rank(matchinfo(event_search)) as rank, room_id, event_id,"
+                "SELECT rank(matchinfo) as rank, room_id, event_id,"
                 " topological_ordering, stream_ordering"
-                " FROM event_search"
-                " NATURAL JOIN events"
-                " WHERE value MATCH ? AND room_id = ?"
+                " FROM (SELECT event_id, matchinfo(event_search) FROM event_search"
+                " WHERE value MATCH"
+                " )"
+                " CROSS JOIN events USING (event_id)"
+                " WHERE room_id = ?"
             )
         else:
             # This should be unreachable.
