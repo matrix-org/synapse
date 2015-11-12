@@ -307,19 +307,23 @@ class StateHandler(object):
 
         We resolve conflicts in the following order:
             1. power levels
-            2. memberships
-            3. other events.
+            2. join rules
+            3. memberships
+            4. other events.
         """
         resolved_state = {}
         power_key = (EventTypes.PowerLevels, "")
-        if power_key in conflicted_state.items():
-            power_levels = conflicted_state[power_key]
-            resolved_state[power_key] = self._resolve_auth_events(power_levels)
+        if power_key in conflicted_state:
+            events = conflicted_state[power_key]
+            logger.debug("Resolving conflicted power levels %r", events)
+            resolved_state[power_key] = self._resolve_auth_events(
+                events, auth_events)
 
         auth_events.update(resolved_state)
 
         for key, events in conflicted_state.items():
             if key[0] == EventTypes.JoinRules:
+                logger.debug("Resolving conflicted join rules %r", events)
                 resolved_state[key] = self._resolve_auth_events(
                     events,
                     auth_events
@@ -329,6 +333,7 @@ class StateHandler(object):
 
         for key, events in conflicted_state.items():
             if key[0] == EventTypes.Member:
+                logger.debug("Resolving conflicted member lists %r", events)
                 resolved_state[key] = self._resolve_auth_events(
                     events,
                     auth_events
@@ -338,6 +343,7 @@ class StateHandler(object):
 
         for key, events in conflicted_state.items():
             if key not in resolved_state:
+                logger.debug("Resolving conflicted state %r:%r", key, events)
                 resolved_state[key] = self._resolve_normal_events(
                     events, auth_events
                 )

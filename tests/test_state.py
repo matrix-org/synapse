@@ -318,6 +318,99 @@ class StateTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
+    def test_branch_have_perms_conflict(self):
+        userid1 = "@user_id:example.com"
+        userid2 = "@user_id2:example.com"
+
+        nodes = {
+            "A1": DictObj(
+                type=EventTypes.Create,
+                state_key="",
+                content={"creator": userid1},
+                depth=1,
+            ),
+            "A2": DictObj(
+                type=EventTypes.Member,
+                state_key=userid1,
+                content={"membership": Membership.JOIN},
+                membership=Membership.JOIN,
+            ),
+            "A3": DictObj(
+                type=EventTypes.Member,
+                state_key=userid2,
+                content={"membership": Membership.JOIN},
+                membership=Membership.JOIN,
+            ),
+            "A4": DictObj(
+                type=EventTypes.PowerLevels,
+                state_key="",
+                content={
+                    "events": {"m.room.name": 50},
+                    "users": {userid1: 100,
+                              userid2: 60},
+                },
+            ),
+            "A5": DictObj(
+                type=EventTypes.Name,
+                state_key="",
+            ),
+            "B": DictObj(
+                type=EventTypes.PowerLevels,
+                state_key="",
+                content={
+                    "events": {"m.room.name": 50},
+                    "users": {userid2: 30},
+                },
+            ),
+            "C": DictObj(
+                type=EventTypes.Name,
+                state_key="",
+                sender=userid2,
+            ),
+            "D": DictObj(
+                type=EventTypes.Message,
+            ),
+        }
+        edges = {
+            "A2": ["A1"],
+            "A3": ["A2"],
+            "A4": ["A3"],
+            "A5": ["A4"],
+            "B": ["A5"],
+            "C": ["A5"],
+            "D": ["B", "C"]
+        }
+        self._add_depths(nodes, edges)
+        graph = Graph(nodes, edges)
+
+        store = StateGroupStore()
+        self.store.get_state_groups.side_effect = store.get_state_groups
+
+        context_store = {}
+
+        for event in graph.walk():
+            context = yield self.state.compute_event_context(event)
+            store.store_state_groups(event, context)
+            context_store[event.event_id] = context
+
+        self.assertSetEqual(
+            {"A1", "A2", "A3", "A5", "B"},
+            {e.event_id for e in context_store["D"].current_state.values()}
+        )
+
+    def _add_depths(self, nodes, edges):
+        def _get_depth(ev):
+            node = nodes[ev]
+            if 'depth' not in node:
+                prevs = edges[ev]
+                depth = max(_get_depth(prev) for prev in prevs) + 1
+                node['depth'] = depth
+            return node['depth']
+
+        for n in nodes:
+            _get_depth(n)
+
+    @defer.inlineCallbacks
     def test_annotate_with_old_message(self):
         event = create_event(type="test_message", name="event")
 
