@@ -254,6 +254,12 @@ class SearchStore(BackgroundUpdateStore):
         elif isinstance(self.database_engine, Sqlite3Engine):
             # We use CROSS JOIN here to ensure we use the right indexes.
             # https://sqlite.org/optoverview.html#crossjoin
+            #
+            # We want to use the full text search index on event_search to
+            # extract all possible matches first, then lookup those matches
+            # in the events table to get the topological ordering. We need
+            # to use the indexes in this order because sqlite refuses to 
+            # MATCH unless it uses the full text search index
             sql = (
                 "SELECT rank(matchinfo) as rank, room_id, event_id,"
                 " topological_ordering, stream_ordering"
