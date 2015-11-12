@@ -164,7 +164,6 @@ class SyncRestServlet(RestServlet):
             formatted.append(event)
         return {"events": filter.filter_presence(formatted)}
 
-
     def encode_joined(self, rooms, filter, time_now, token_id):
         """
         Encode the joined rooms in a sync result
@@ -187,7 +186,6 @@ class SyncRestServlet(RestServlet):
             )
 
         return joined
-
 
     def encode_invited(self, rooms, filter, time_now, token_id):
         """
@@ -244,7 +242,8 @@ class SyncRestServlet(RestServlet):
     @staticmethod
     def encode_room(room, filter, time_now, token_id, joined=True):
         """
-        :param synapse.handlers.sync.JoinedSyncResult|synapse.handlers.sync.ArchivedSyncResult room: sync result for a single room
+        :param JoinedSyncResult|ArchivedSyncResult room: sync result for a 
+            single room
         :param FilterCollection filter: filters to apply to the results
         :param int time_now: current time - used as a baseline for age
             calculations
