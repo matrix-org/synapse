@@ -564,7 +564,7 @@ class FederationHandler(BaseHandler):
 
     @log_function
     @defer.inlineCallbacks
-    def do_invite_join(self, target_hosts, room_id, joinee):
+    def do_invite_join(self, target_hosts, room_id, joinee, content):
         """ Attempts to join the `joinee` to the room `room_id` via the
         server `target_host`.
 
@@ -584,7 +584,8 @@ class FederationHandler(BaseHandler):
             target_hosts,
             room_id,
             joinee,
-            "join"
+            "join",
+            content,
         )
 
         self.room_queues[room_id] = []
@@ -840,12 +841,14 @@ class FederationHandler(BaseHandler):
         defer.returnValue(None)
 
     @defer.inlineCallbacks
-    def _make_and_verify_event(self, target_hosts, room_id, user_id, membership):
+    def _make_and_verify_event(self, target_hosts, room_id, user_id, membership,
+                               content={},):
         origin, pdu = yield self.replication_layer.make_membership_event(
             target_hosts,
             room_id,
             user_id,
-            membership
+            membership,
+            content,
         )
 
         logger.debug("Got response to make_%s: %s", membership, pdu)
