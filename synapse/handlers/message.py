@@ -258,20 +258,29 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _check_in_room_or_world_readable(self, room_id, user_id, is_guest):
-        if is_guest:
-            visibility = yield self.state_handler.get_current_state(
-                room_id, EventTypes.RoomHistoryVisibility, ""
-            )
-            if visibility.content["history_visibility"] == "world_readable":
-                defer.returnValue((Membership.JOIN, None))
-                return
-            else:
-                raise AuthError(
-                    403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
-                )
-        else:
+        try:
+            # check_user_was_in_room will return the most recent membership
+            # event for the user if:
+            #  * The user is a non-guest user, and was ever in the room
+            #  * The user is a guest user, and has joined the room
+            # else it will throw.
             member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
             defer.returnValue((member_event.membership, member_event.event_id))
+            return
+        except AuthError:
+            if not is_guest:
+                raise
+
+        visibility = yield self.state_handler.get_current_state(
+            room_id, EventTypes.RoomHistoryVisibility, ""
+        )
+        if visibility.content["history_visibility"] == "world_readable":
+            defer.returnValue((Membership.JOIN, None))
+            return
+        else:
+            raise AuthError(
+                403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
+            )
 
     @defer.inlineCallbacks
     def get_state_events(self, user_id, room_id, is_guest=False):
