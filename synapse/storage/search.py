@@ -258,7 +258,7 @@ class SearchStore(BackgroundUpdateStore):
             # We want to use the full text search index on event_search to
             # extract all possible matches first, then lookup those matches
             # in the events table to get the topological ordering. We need
-            # to use the indexes in this order because sqlite refuses to 
+            # to use the indexes in this order because sqlite refuses to
             # MATCH unless it uses the full text search index
             sql = (
                 "SELECT rank(matchinfo) as rank, room_id, event_id,"
