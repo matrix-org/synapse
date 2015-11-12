@@ -267,17 +267,18 @@ class MessageHandler(BaseHandler):
             member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
             defer.returnValue((member_event.membership, member_event.event_id))
             return
-        except AuthError:
+        except AuthError, auth_error:
+            visibility = yield self.state_handler.get_current_state(
+                room_id, EventTypes.RoomHistoryVisibility, ""
+            )
+            if (
+                visibility and
+                visibility.content["history_visibility"] == "world_readable"
+            ):
+                defer.returnValue((Membership.JOIN, None))
+                return
             if not is_guest:
-                raise
-
-        visibility = yield self.state_handler.get_current_state(
-            room_id, EventTypes.RoomHistoryVisibility, ""
-        )
-        if visibility.content["history_visibility"] == "world_readable":
-            defer.returnValue((Membership.JOIN, None))
-            return
-        else:
+                raise auth_error
             raise AuthError(
                 403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
             )
