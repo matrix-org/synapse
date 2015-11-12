@@ -255,8 +255,9 @@ class SearchStore(BackgroundUpdateStore):
             sql = (
                 "SELECT rank(matchinfo) as rank, room_id, event_id,"
                 " topological_ordering, stream_ordering"
-                " FROM (SELECT event_id, matchinfo(event_search) FROM event_search"
-                " WHERE value MATCH"
+                " FROM (SELECT key, event_id, matchinfo(event_search) as matchinfo"
+                " FROM event_search"
+                " WHERE value MATCH ?"
                 " )"
                 " CROSS JOIN events USING (event_id)"
                 " WHERE room_id = ?"
