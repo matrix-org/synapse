@@ -59,7 +59,7 @@ class TransactionStore(SQLBaseStore):
             allow_none=True,
         )
 
-        if result and result.response_code:
+        if result and result["response_code"]:
             return result["response_code"], result["response_json"]
         else:
             return None
