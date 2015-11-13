@@ -132,7 +132,9 @@ class SynapseHomeServer(HomeServer):
 
     def build_resource_for_static_content(self):
         # This is old and should go away: not going to bother adding gzip
-        return File("static")
+        return File(
+            os.path.join(os.path.dirname(synapse.__file__), "static")
+        )
 
     def build_resource_for_content_repo(self):
         return ContentRepoResource(
@@ -437,6 +439,7 @@ def setup(config_options):
     hs.get_pusherpool().start()
     hs.get_state_handler().start_caching()
     hs.get_datastore().start_profiling()
+    hs.get_datastore().start_doing_background_updates()
     hs.get_replication_layer().start_get_pdu_cache()
 
     return hs

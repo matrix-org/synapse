@@ -311,6 +311,10 @@ class EventsStore(SQLBaseStore):
                 self._store_room_message_txn(txn, event)
             elif event.type == EventTypes.Redaction:
                 self._store_redaction(txn, event)
+            elif event.type == EventTypes.RoomHistoryVisibility:
+                self._store_history_visibility_txn(txn, event)
+            elif event.type == EventTypes.GuestAccess:
+                self._store_guest_access_txn(txn, event)
 
         self._store_room_members_txn(
             txn,
@@ -827,7 +831,8 @@ class EventsStore(SQLBaseStore):
                 allow_none=True,
             )
             if prev:
-                ev.unsigned["prev_content"] = prev.get_dict()["content"]
+                ev.unsigned["prev_content"] = prev.content
+                ev.unsigned["prev_sender"] = prev.sender
 
         self._get_event_cache.prefill(
             (ev.event_id, check_redacted, get_prev_content), ev
@@ -884,7 +889,8 @@ class EventsStore(SQLBaseStore):
                 get_prev_content=False,
             )
             if prev:
-                ev.unsigned["prev_content"] = prev.get_dict()["content"]
+                ev.unsigned["prev_content"] = prev.content
+                ev.unsigned["prev_sender"] = prev.sender
 
         self._get_event_cache.prefill(
             (ev.event_id, check_redacted, get_prev_content), ev

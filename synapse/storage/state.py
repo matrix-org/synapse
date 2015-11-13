@@ -237,6 +237,20 @@ class StateStore(SQLBaseStore):
 
         defer.returnValue({event: event_to_state[event] for event in event_ids})
 
+    @defer.inlineCallbacks
+    def get_state_for_event(self, event_id, types=None):
+        """
+        Get the state dict corresponding to a particular event
+
+        :param str event_id: event whose state should be returned
+        :param list[(str, str)]|None types: List of (type, state_key) tuples
+            which are used to filter the state fetched. May be None, which
+            matches any key
+        :return: a deferred dict from (type, state_key) -> state_event
+        """
+        state_map = yield self.get_state_for_events([event_id], types)
+        defer.returnValue(state_map[event_id])
+
     @cached(num_args=2, lru=True, max_entries=10000)
     def _get_state_group_for_event(self, room_id, event_id):
         return self._simple_select_one_onecol(

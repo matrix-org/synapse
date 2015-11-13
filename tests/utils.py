@@ -243,6 +243,9 @@ class MockClock(object):
             else:
                 self.timers.append(t)
 
+    def advance_time_msec(self, ms):
+        self.advance_time(ms / 1000.)
+
 
 class SQLiteMemoryDbPool(ConnectionPool, object):
     def __init__(self):
@@ -335,7 +338,7 @@ class MemoryDataStore(object):
         ]
 
     def get_room_events_stream(self, user_id=None, from_key=None, to_key=None,
-                            room_id=None, limit=0, with_feedback=False):
+                            limit=0, with_feedback=False):
         return ([], from_key)  # TODO
 
     def get_joined_hosts_for_room(self, room_id):

@@ -950,7 +950,8 @@ class PresenceHandler(BaseHandler):
                 )
                 while len(self._remote_offline_serials) > MAX_OFFLINE_SERIALS:
                     self._remote_offline_serials.pop()  # remove the oldest
-                del self._user_cachemap[user]
+                if user in self._user_cachemap:
+                    del self._user_cachemap[user]
             else:
                 # Remove the user from remote_offline_serials now that they're
                 # no longer offline
@@ -1142,8 +1143,9 @@ class PresenceEventSource(object):
 
     @defer.inlineCallbacks
     @log_function
-    def get_new_events_for_user(self, user, from_key, limit):
+    def get_new_events(self, user, from_key, room_ids=None, **kwargs):
         from_key = int(from_key)
+        room_ids = room_ids or []
 
         presence = self.hs.get_handlers().presence_handler
         cachemap = presence._user_cachemap
@@ -1161,7 +1163,6 @@ class PresenceEventSource(object):
             user_ids_to_check |= set(
                 UserID.from_string(p["observed_user_id"]) for p in presence_list
             )
-        room_ids = yield presence.get_joined_rooms_for_user(user)
         for room_id in set(room_ids) & set(presence._room_serials):
             if presence._room_serials[room_id] > from_key:
                 joined = yield presence.get_joined_users_for_room_id(room_id)

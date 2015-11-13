@@ -21,7 +21,6 @@ from synapse.api.constants import Membership, EventTypes
 from synapse.types import UserID, RoomAlias
 
 from synapse.util.logcontext import PreserveLoggingContext
-from synapse.util import third_party_invites
 
 import logging
 
@@ -30,6 +29,12 @@ logger = logging.getLogger(__name__)
 
 
 class BaseHandler(object):
+    """
+    Common base class for the event handlers.
+
+    :type store: synapse.storage.events.StateStore
+    :type state_handler: synapse.state.StateHandler
+    """
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -47,37 +52,24 @@ class BaseHandler(object):
         self.event_builder_factory = hs.get_event_builder_factory()
 
     @defer.inlineCallbacks
-    def _filter_events_for_client(self, user_id, events):
-        event_id_to_state = yield self.store.get_state_for_events(
-            frozenset(e.event_id for e in events),
-            types=(
-                (EventTypes.RoomHistoryVisibility, ""),
-                (EventTypes.Member, user_id),
-            )
-        )
+    def _filter_events_for_client(self, user_id, events, is_guest=False,
+                                  require_all_visible_for_guests=True):
+        # Assumes that user has at some point joined the room if not is_guest.
 
-        def allowed(event, state):
-            if event.type == EventTypes.RoomHistoryVisibility:
+        def allowed(event, membership, visibility):
+            if visibility == "world_readable":
                 return True
 
-            membership_ev = state.get((EventTypes.Member, user_id), None)
-            if membership_ev:
-                membership = membership_ev.membership
-            else:
-                membership = Membership.LEAVE
+            if is_guest:
+                return False
 
             if membership == Membership.JOIN:
                 return True
 
-            history = state.get((EventTypes.RoomHistoryVisibility, ''), None)
-            if history:
-                visibility = history.content.get("history_visibility", "shared")
-            else:
-                visibility = "shared"
+            if event.type == EventTypes.RoomHistoryVisibility:
+                return not is_guest
 
-            if visibility == "public":
-                return True
-            elif visibility == "shared":
+            if visibility == "shared":
                 return True
             elif visibility == "joined":
                 return membership == Membership.JOIN
@@ -86,11 +78,46 @@ class BaseHandler(object):
 
             return True
 
-        defer.returnValue([
-            event
-            for event in events
-            if allowed(event, event_id_to_state[event.event_id])
-        ])
+        event_id_to_state = yield self.store.get_state_for_events(
+            frozenset(e.event_id for e in events),
+            types=(
+                (EventTypes.RoomHistoryVisibility, ""),
+                (EventTypes.Member, user_id),
+            )
+        )
+
+        events_to_return = []
+        for event in events:
+            state = event_id_to_state[event.event_id]
+
+            membership_event = state.get((EventTypes.Member, user_id), None)
+            if membership_event:
+                membership = membership_event.membership
+            else:
+                membership = None
+
+            visibility_event = state.get((EventTypes.RoomHistoryVisibility, ""), None)
+            if visibility_event:
+                visibility = visibility_event.content.get("history_visibility", "shared")
+            else:
+                visibility = "shared"
+
+            should_include = allowed(event, membership, visibility)
+            if should_include:
+                events_to_return.append(event)
+
+        if (require_all_visible_for_guests
+                and is_guest
+                and len(events_to_return) < len(events)):
+            # This indicates that some events in the requested range were not
+            # visible to guest users. To be safe, we reject the entire request,
+            # so that we don't have to worry about interpreting visibility
+            # boundaries.
+            raise AuthError(403, "User %s does not have permission" % (
+                user_id
+            ))
+
+        defer.returnValue(events_to_return)
 
     def ratelimit(self, user_id):
         time_now = self.clock.time()
@@ -154,6 +181,8 @@ class BaseHandler(object):
         if not suppress_auth:
             self.auth.check(event, auth_events=context.current_state)
 
+        yield self.maybe_kick_guest_users(event, context.current_state.values())
+
         if event.type == EventTypes.CanonicalAlias:
             # Check the alias is acually valid (at this time at least)
             room_alias_str = event.content.get("alias", None)
@@ -169,16 +198,6 @@ class BaseHandler(object):
                             room_alias_str,
                         )
                     )
-
-        if (
-            event.type == EventTypes.Member and
-            event.content["membership"] == Membership.JOIN and
-            third_party_invites.join_has_third_party_invite(event.content)
-        ):
-            yield third_party_invites.check_key_valid(
-                self.hs.get_simple_http_client(),
-                event
-            )
 
         federation_handler = self.hs.get_handlers().federation_handler
 
@@ -271,3 +290,58 @@ class BaseHandler(object):
         federation_handler.handle_new_event(
             event, destinations=destinations,
         )
+
+    @defer.inlineCallbacks
+    def maybe_kick_guest_users(self, event, current_state):
+        # Technically this function invalidates current_state by changing it.
+        # Hopefully this isn't that important to the caller.
+        if event.type == EventTypes.GuestAccess:
+            guest_access = event.content.get("guest_access", "forbidden")
+            if guest_access != "can_join":
+                yield self.kick_guest_users(current_state)
+
+    @defer.inlineCallbacks
+    def kick_guest_users(self, current_state):
+        for member_event in current_state:
+            try:
+                if member_event.type != EventTypes.Member:
+                    continue
+
+                if not self.hs.is_mine(UserID.from_string(member_event.state_key)):
+                    continue
+
+                if member_event.content["membership"] not in {
+                    Membership.JOIN,
+                    Membership.INVITE
+                }:
+                    continue
+
+                if (
+                    "kind" not in member_event.content
+                    or member_event.content["kind"] != "guest"
+                ):
+                    continue
+
+                # We make the user choose to leave, rather than have the
+                # event-sender kick them. This is partially because we don't
+                # need to worry about power levels, and partially because guest
+                # users are a concept which doesn't hugely work over federation,
+                # and having homeservers have their own users leave keeps more
+                # of that decision-making and control local to the guest-having
+                # homeserver.
+                message_handler = self.hs.get_handlers().message_handler
+                yield message_handler.create_and_send_event(
+                    {
+                        "type": EventTypes.Member,
+                        "state_key": member_event.state_key,
+                        "content": {
+                            "membership": Membership.LEAVE,
+                            "kind": "guest"
+                        },
+                        "room_id": member_event.room_id,
+                        "sender": member_event.state_key
+                    },
+                    ratelimit=False,
+                )
+            except Exception as e:
+                logger.warn("Error kicking guest user: %s" % (e,))

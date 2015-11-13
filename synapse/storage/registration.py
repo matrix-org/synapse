@@ -102,13 +102,14 @@ class RegistrationStore(SQLBaseStore):
                 400, "User ID already taken.", errcode=Codes.USER_IN_USE
             )
 
-        # it's possible for this to get a conflict, but only for a single user
-        # since tokens are namespaced based on their user ID
-        txn.execute(
-            "INSERT INTO access_tokens(id, user_id, token)"
-            " VALUES (?,?,?)",
-            (next_id, user_id, token,)
-        )
+        if token:
+            # it's possible for this to get a conflict, but only for a single user
+            # since tokens are namespaced based on their user ID
+            txn.execute(
+                "INSERT INTO access_tokens(id, user_id, token)"
+                " VALUES (?,?,?)",
+                (next_id, user_id, token,)
+            )
 
     def get_user_by_id(self, user_id):
         return self._simple_select_one(

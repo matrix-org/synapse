@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import SynapseError
+from synapse.api.errors import SynapseError, AuthError, Codes
 from synapse.streams.config import PaginationConfig
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
@@ -71,20 +71,20 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_messages(self, user_id=None, room_id=None, pagin_config=None,
-                     as_client_event=True):
+                     as_client_event=True, is_guest=False):
         """Get messages in a room.
 
         Args:
             user_id (str): The user requesting messages.
             room_id (str): The room they want messages from.
             pagin_config (synapse.api.streams.PaginationConfig): The pagination
-            config rules to apply, if any.
+                config rules to apply, if any.
             as_client_event (bool): True to get events in client-server format.
+            is_guest (bool): Whether the requesting user is a guest (as opposed
+                to a fully registered user).
         Returns:
             dict: Pagination API results
         """
-        member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
-
         data_source = self.hs.get_event_sources().sources["room"]
 
         if pagin_config.from_token:
@@ -107,23 +107,27 @@ class MessageHandler(BaseHandler):
 
         source_config = pagin_config.get_source_config("room")
 
-        if member_event.membership == Membership.LEAVE:
-            # If they have left the room then clamp the token to be before
-            # they left the room
-            leave_token = yield self.store.get_topological_token_for_event(
-                member_event.event_id
-            )
-            leave_token = RoomStreamToken.parse(leave_token)
-            if leave_token.topological < room_token.topological:
-                source_config.from_key = str(leave_token)
+        if not is_guest:
+            member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
+            if member_event.membership == Membership.LEAVE:
+                # If they have left the room then clamp the token to be before
+                # they left the room.
+                # If they're a guest, we'll just 403 them if they're asking for
+                # events they can't see.
+                leave_token = yield self.store.get_topological_token_for_event(
+                    member_event.event_id
+                )
+                leave_token = RoomStreamToken.parse(leave_token)
+                if leave_token.topological < room_token.topological:
+                    source_config.from_key = str(leave_token)
 
-            if source_config.direction == "f":
-                if source_config.to_key is None:
-                    source_config.to_key = str(leave_token)
-                else:
-                    to_token = RoomStreamToken.parse(source_config.to_key)
-                    if leave_token.topological < to_token.topological:
+                if source_config.direction == "f":
+                    if source_config.to_key is None:
                         source_config.to_key = str(leave_token)
+                    else:
+                        to_token = RoomStreamToken.parse(source_config.to_key)
+                        if leave_token.topological < to_token.topological:
+                            source_config.to_key = str(leave_token)
 
         yield self.hs.get_handlers().federation_handler.maybe_backfill(
             room_id, room_token.topological
@@ -146,7 +150,7 @@ class MessageHandler(BaseHandler):
                 "end": next_token.to_string(),
             })
 
-        events = yield self._filter_events_for_client(user_id, events)
+        events = yield self._filter_events_for_client(user_id, events, is_guest=is_guest)
 
         time_now = self.clock.time_msec()
 
@@ -163,7 +167,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def create_and_send_event(self, event_dict, ratelimit=True,
-                              token_id=None, txn_id=None):
+                              token_id=None, txn_id=None, is_guest=False):
         """ Given a dict from a client, create and handle a new event.
 
         Creates an FrozenEvent object, filling out auth_events, prev_events,
@@ -209,7 +213,7 @@ class MessageHandler(BaseHandler):
 
         if event.type == EventTypes.Member:
             member_handler = self.hs.get_handlers().room_member_handler
-            yield member_handler.change_membership(event, context)
+            yield member_handler.change_membership(event, context, is_guest=is_guest)
         else:
             yield self.handle_new_client_event(
                 event=event,
@@ -225,7 +229,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_room_data(self, user_id=None, room_id=None,
-                      event_type=None, state_key=""):
+                      event_type=None, state_key="", is_guest=False):
         """ Get data from a room.
 
         Args:
@@ -235,23 +239,52 @@ class MessageHandler(BaseHandler):
         Raises:
             SynapseError if something went wrong.
         """
-        member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
+        membership, membership_event_id = yield self._check_in_room_or_world_readable(
+            room_id, user_id, is_guest
+        )
 
-        if member_event.membership == Membership.JOIN:
+        if membership == Membership.JOIN:
             data = yield self.state_handler.get_current_state(
                 room_id, event_type, state_key
             )
-        elif member_event.membership == Membership.LEAVE:
+        elif membership == Membership.LEAVE:
             key = (event_type, state_key)
             room_state = yield self.store.get_state_for_events(
-                [member_event.event_id], [key]
+                [membership_event_id], [key]
             )
-            data = room_state[member_event.event_id].get(key)
+            data = room_state[membership_event_id].get(key)
 
         defer.returnValue(data)
 
     @defer.inlineCallbacks
-    def get_state_events(self, user_id, room_id):
+    def _check_in_room_or_world_readable(self, room_id, user_id, is_guest):
+        try:
+            # check_user_was_in_room will return the most recent membership
+            # event for the user if:
+            #  * The user is a non-guest user, and was ever in the room
+            #  * The user is a guest user, and has joined the room
+            # else it will throw.
+            member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
+            defer.returnValue((member_event.membership, member_event.event_id))
+            return
+        except AuthError, auth_error:
+            visibility = yield self.state_handler.get_current_state(
+                room_id, EventTypes.RoomHistoryVisibility, ""
+            )
+            if (
+                visibility and
+                visibility.content["history_visibility"] == "world_readable"
+            ):
+                defer.returnValue((Membership.JOIN, None))
+                return
+            if not is_guest:
+                raise auth_error
+            raise AuthError(
+                403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
+            )
+
+    @defer.inlineCallbacks
+    def get_state_events(self, user_id, room_id, is_guest=False):
         """Retrieve all state events for a given room. If the user is
         joined to the room then return the current state. If the user has
         left the room return the state events from when they left.
@@ -262,15 +295,17 @@ class MessageHandler(BaseHandler):
         Returns:
             A list of dicts representing state events. [{}, {}, {}]
         """
-        member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
+        membership, membership_event_id = yield self._check_in_room_or_world_readable(
+            room_id, user_id, is_guest
+        )
 
-        if member_event.membership == Membership.JOIN:
+        if membership == Membership.JOIN:
             room_state = yield self.state_handler.get_current_state(room_id)
-        elif member_event.membership == Membership.LEAVE:
+        elif membership == Membership.LEAVE:
             room_state = yield self.store.get_state_for_events(
-                [member_event.event_id], None
+                [membership_event_id], None
             )
-            room_state = room_state[member_event.event_id]
+            room_state = room_state[membership_event_id]
 
         now = self.clock.time_msec()
         defer.returnValue(
@@ -321,6 +356,8 @@ class MessageHandler(BaseHandler):
         receipt, _ = yield receipt_stream.get_pagination_rows(
             user, pagination_config.get_source_config("receipt"), None
         )
+
+        tags_by_room = yield self.store.get_tags_for_user(user_id)
 
         public_room_ids = yield self.store.get_public_room_ids()
 
@@ -398,6 +435,15 @@ class MessageHandler(BaseHandler):
                     serialize_event(c, time_now, as_client_event)
                     for c in current_state.values()
                 ]
+
+                private_user_data = []
+                tags = tags_by_room.get(event.room_id)
+                if tags:
+                    private_user_data.append({
+                        "type": "m.tag",
+                        "content": {"tags": tags},
+                    })
+                d["private_user_data"] = private_user_data
             except:
                 logger.exception("Failed to get snapshot")
 
@@ -420,7 +466,7 @@ class MessageHandler(BaseHandler):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def room_initial_sync(self, user_id, room_id, pagin_config=None):
+    def room_initial_sync(self, user_id, room_id, pagin_config=None, is_guest=False):
         """Capture the a snapshot of a room. If user is currently a member of
         the room this will be what is currently in the room. If the user left
         the room this will be what was in the room when they left.
@@ -437,33 +483,47 @@ class MessageHandler(BaseHandler):
             A JSON serialisable dict with the snapshot of the room.
         """
 
-        member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
+        membership, member_event_id = yield self._check_in_room_or_world_readable(
+            room_id,
+            user_id,
+            is_guest
+        )
 
-        if member_event.membership == Membership.JOIN:
+        if membership == Membership.JOIN:
             result = yield self._room_initial_sync_joined(
-                user_id, room_id, pagin_config, member_event
+                user_id, room_id, pagin_config, membership, is_guest
             )
-        elif member_event.membership == Membership.LEAVE:
+        elif membership == Membership.LEAVE:
             result = yield self._room_initial_sync_parted(
-                user_id, room_id, pagin_config, member_event
+                user_id, room_id, pagin_config, membership, member_event_id, is_guest
             )
+
+        private_user_data = []
+        tags = yield self.store.get_tags_for_room(user_id, room_id)
+        if tags:
+            private_user_data.append({
+                "type": "m.tag",
+                "content": {"tags": tags},
+            })
+        result["private_user_data"] = private_user_data
+
         defer.returnValue(result)
 
     @defer.inlineCallbacks
     def _room_initial_sync_parted(self, user_id, room_id, pagin_config,
-                                  member_event):
+                                  membership, member_event_id, is_guest):
         room_state = yield self.store.get_state_for_events(
-            [member_event.event_id], None
+            [member_event_id], None
         )
 
-        room_state = room_state[member_event.event_id]
+        room_state = room_state[member_event_id]
 
         limit = pagin_config.limit if pagin_config else None
         if limit is None:
             limit = 10
 
         stream_token = yield self.store.get_stream_token_for_event(
-            member_event.event_id
+            member_event_id
         )
 
         messages, token = yield self.store.get_recent_events_for_room(
@@ -473,16 +533,16 @@ class MessageHandler(BaseHandler):
         )
 
         messages = yield self._filter_events_for_client(
-            user_id, messages
+            user_id, messages, is_guest=is_guest
         )
 
-        start_token = StreamToken(token[0], 0, 0, 0)
-        end_token = StreamToken(token[1], 0, 0, 0)
+        start_token = StreamToken(token[0], 0, 0, 0, 0)
+        end_token = StreamToken(token[1], 0, 0, 0, 0)
 
         time_now = self.clock.time_msec()
 
         defer.returnValue({
-            "membership": member_event.membership,
+            "membership": membership,
             "room_id": room_id,
             "messages": {
                 "chunk": [serialize_event(m, time_now) for m in messages],
@@ -496,7 +556,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _room_initial_sync_joined(self, user_id, room_id, pagin_config,
-                                  member_event):
+                                  membership, is_guest):
         current_state = yield self.state.get_current_state(
             room_id=room_id,
         )
@@ -528,12 +588,14 @@ class MessageHandler(BaseHandler):
 
         @defer.inlineCallbacks
         def get_presence():
-            states = yield presence_handler.get_states(
-                target_users=[UserID.from_string(m.user_id) for m in room_members],
-                auth_user=auth_user,
-                as_event=True,
-                check_auth=False,
-            )
+            states = {}
+            if not is_guest:
+                states = yield presence_handler.get_states(
+                    target_users=[UserID.from_string(m.user_id) for m in room_members],
+                    auth_user=auth_user,
+                    as_event=True,
+                    check_auth=False,
+                )
 
             defer.returnValue(states.values())
 
@@ -553,7 +615,7 @@ class MessageHandler(BaseHandler):
         ).addErrback(unwrapFirstError)
 
         messages = yield self._filter_events_for_client(
-            user_id, messages
+            user_id, messages, is_guest=is_guest, require_all_visible_for_guests=False
         )
 
         start_token = now_token.copy_and_replace("room_key", token[0])
@@ -561,8 +623,7 @@ class MessageHandler(BaseHandler):
 
         time_now = self.clock.time_msec()
 
-        defer.returnValue({
-            "membership": member_event.membership,
+        ret = {
             "room_id": room_id,
             "messages": {
                 "chunk": [serialize_event(m, time_now) for m in messages],
@@ -572,4 +633,8 @@ class MessageHandler(BaseHandler):
             "state": state,
             "presence": presence,
             "receipts": receipts,
-        })
+        }
+        if not is_guest:
+            ret["membership"] = membership
+
+        defer.returnValue(ret)

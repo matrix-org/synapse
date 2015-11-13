@@ -47,7 +47,14 @@ class NullSource(object):
     def __init__(self, hs):
         pass
 
-    def get_new_events_for_user(self, user, from_key, limit):
+    def get_new_events(
+            self,
+            user,
+            from_key,
+            room_ids=None,
+            limit=None,
+            is_guest=None
+    ):
         return defer.succeed(([], from_key))
 
     def get_current_key(self, direction='f'):
@@ -86,10 +93,11 @@ class PresenceStateTestCase(unittest.TestCase):
             return defer.succeed([])
         self.datastore.get_presence_list = get_presence_list
 
-        def _get_user_by_access_token(token=None):
+        def _get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(myid),
                 "token_id": 1,
+                "is_guest": False,
             }
 
         hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
@@ -173,10 +181,11 @@ class PresenceListTestCase(unittest.TestCase):
             )
         self.datastore.has_presence_state = has_presence_state
 
-        def _get_user_by_access_token(token=None):
+        def _get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(myid),
                 "token_id": 1,
+                "is_guest": False,
             }
 
         hs.handlers.room_member_handler = Mock(
@@ -291,8 +300,8 @@ class PresenceEventStreamTestCase(unittest.TestCase):
 
         hs.get_clock().time_msec.return_value = 1000000
 
-        def _get_user_by_req(req=None):
-            return (UserID.from_string(myid), "")
+        def _get_user_by_req(req=None, allow_guest=False):
+            return (UserID.from_string(myid), "", False)
 
         hs.get_v1auth().get_user_by_req = _get_user_by_req
 
@@ -311,6 +320,9 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         hs.handlers.room_member_handler.get_joined_rooms_for_user = get_rooms_for_user
         hs.handlers.room_member_handler.get_room_members = (
             lambda r: self.room_members if r == "a-room" else []
+        )
+        hs.handlers.room_member_handler._filter_events_for_client = (
+            lambda user_id, events, **kwargs: events
         )
 
         self.mock_datastore = hs.get_datastore()
@@ -369,7 +381,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         # all be ours
 
         # I'll already get my own presence state change
-        self.assertEquals({"start": "0_1_0_0", "end": "0_1_0_0", "chunk": []},
+        self.assertEquals({"start": "0_1_0_0_0", "end": "0_1_0_0_0", "chunk": []},
             response
         )
 
@@ -388,7 +400,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                 "/events?from=s0_1_0&timeout=0", None)
 
         self.assertEquals(200, code)
-        self.assertEquals({"start": "s0_1_0_0", "end": "s0_2_0_0", "chunk": [
+        self.assertEquals({"start": "s0_1_0_0_0", "end": "s0_2_0_0_0", "chunk": [
             {"type": "m.presence",
              "content": {
                  "user_id": "@banana:test",

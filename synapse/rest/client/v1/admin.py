@@ -31,7 +31,7 @@ class WhoisRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         target_user = UserID.from_string(user_id)
-        auth_user, _ = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
         is_admin = yield self.auth.is_server_admin(auth_user)
 
         if not is_admin and target_user != auth_user:

@@ -51,7 +51,7 @@ class AuthTestCase(unittest.TestCase):
         request = Mock(args={})
         request.args["access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = Mock(return_value=[""])
-        (user, _) = yield self.auth.get_user_by_req(request)
+        (user, _, _) = yield self.auth.get_user_by_req(request)
         self.assertEquals(user.to_string(), self.test_user)
 
     def test_get_user_by_req_user_bad_token(self):
@@ -86,7 +86,7 @@ class AuthTestCase(unittest.TestCase):
         request = Mock(args={})
         request.args["access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = Mock(return_value=[""])
-        (user, _) = yield self.auth.get_user_by_req(request)
+        (user, _, _) = yield self.auth.get_user_by_req(request)
         self.assertEquals(user.to_string(), self.test_user)
 
     def test_get_user_by_req_appservice_bad_token(self):
@@ -121,7 +121,7 @@ class AuthTestCase(unittest.TestCase):
         request.args["access_token"] = [self.test_token]
         request.args["user_id"] = [masquerading_user_id]
         request.requestHeaders.getRawHeaders = Mock(return_value=[""])
-        (user, _) = yield self.auth.get_user_by_req(request)
+        (user, _, _) = yield self.auth.get_user_by_req(request)
         self.assertEquals(user.to_string(), masquerading_user_id)
 
     def test_get_user_by_req_appservice_valid_token_bad_user_id(self):
@@ -157,6 +157,25 @@ class AuthTestCase(unittest.TestCase):
         user_info = yield self.auth._get_user_from_macaroon(macaroon.serialize())
         user = user_info["user"]
         self.assertEqual(UserID.from_string(user_id), user)
+
+    @defer.inlineCallbacks
+    def test_get_guest_user_from_macaroon(self):
+        user_id = "@baldrick:matrix.org"
+        macaroon = pymacaroons.Macaroon(
+            location=self.hs.config.server_name,
+            identifier="key",
+            key=self.hs.config.macaroon_secret_key)
+        macaroon.add_first_party_caveat("gen = 1")
+        macaroon.add_first_party_caveat("type = access")
+        macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
+        macaroon.add_first_party_caveat("guest = true")
+        serialized = macaroon.serialize()
+
+        user_info = yield self.auth._get_user_from_macaroon(serialized)
+        user = user_info["user"]
+        is_guest = user_info["is_guest"]
+        self.assertEqual(UserID.from_string(user_id), user)
+        self.assertTrue(is_guest)
 
     @defer.inlineCallbacks
     def test_get_user_from_macaroon_user_db_mismatch(self):

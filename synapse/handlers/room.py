@@ -38,6 +38,8 @@ import string
 
 logger = logging.getLogger(__name__)
 
+id_server_scheme = "https://"
+
 
 class RoomCreationHandler(BaseHandler):
 
@@ -367,7 +369,7 @@ class RoomMemberHandler(BaseHandler):
                     remotedomains.add(member.domain)
 
     @defer.inlineCallbacks
-    def change_membership(self, event, context, do_auth=True):
+    def change_membership(self, event, context, do_auth=True, is_guest=False):
         """ Change the membership status of a user in a room.
 
         Args:
@@ -388,6 +390,20 @@ class RoomMemberHandler(BaseHandler):
         # if this HS is not currently in the room, i.e. we have to do the
         # invite/join dance.
         if event.membership == Membership.JOIN:
+            if is_guest:
+                guest_access = context.current_state.get(
+                    (EventTypes.GuestAccess, ""),
+                    None
+                )
+                is_guest_access_allowed = (
+                    guest_access
+                    and guest_access.content
+                    and "guest_access" in guest_access.content
+                    and guest_access.content["guest_access"] == "can_join"
+                )
+                if not is_guest_access_allowed:
+                    raise AuthError(403, "Guest access not allowed")
+
             yield self._do_join(event, context, do_auth=do_auth)
         else:
             if event.membership == Membership.LEAVE:
@@ -489,7 +505,7 @@ class RoomMemberHandler(BaseHandler):
                 room_hosts,
                 room_id,
                 event.user_id,
-                event.content  # FIXME To get a non-frozen dict
+                event.content,
             )
         else:
             logger.debug("Doing normal join")
@@ -581,7 +597,6 @@ class RoomMemberHandler(BaseHandler):
             medium,
             address,
             id_server,
-            display_name,
             token_id,
             txn_id
     ):
@@ -608,7 +623,6 @@ class RoomMemberHandler(BaseHandler):
         else:
             yield self._make_and_store_3pid_invite(
                 id_server,
-                display_name,
                 medium,
                 address,
                 room_id,
@@ -632,7 +646,7 @@ class RoomMemberHandler(BaseHandler):
         """
         try:
             data = yield self.hs.get_simple_http_client().get_json(
-                "https://%s/_matrix/identity/api/v1/lookup" % (id_server,),
+                "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server,),
                 {
                     "medium": medium,
                     "address": address,
@@ -655,8 +669,8 @@ class RoomMemberHandler(BaseHandler):
             raise AuthError(401, "No signature from server %s" % (server_hostname,))
         for key_name, signature in data["signatures"][server_hostname].items():
             key_data = yield self.hs.get_simple_http_client().get_json(
-                "https://%s/_matrix/identity/api/v1/pubkey/%s" %
-                (server_hostname, key_name,),
+                "%s%s/_matrix/identity/api/v1/pubkey/%s" %
+                (id_server_scheme, server_hostname, key_name,),
             )
             if "public_key" not in key_data:
                 raise AuthError(401, "No public key named %s from %s" %
@@ -672,7 +686,6 @@ class RoomMemberHandler(BaseHandler):
     def _make_and_store_3pid_invite(
             self,
             id_server,
-            display_name,
             medium,
             address,
             room_id,
@@ -680,7 +693,7 @@ class RoomMemberHandler(BaseHandler):
             token_id,
             txn_id
     ):
-        token, public_key, key_validity_url = (
+        token, public_key, key_validity_url, display_name = (
             yield self._ask_id_server_for_third_party_invite(
                 id_server,
                 medium,
@@ -709,7 +722,9 @@ class RoomMemberHandler(BaseHandler):
     @defer.inlineCallbacks
     def _ask_id_server_for_third_party_invite(
             self, id_server, medium, address, room_id, sender):
-        is_url = "https://%s/_matrix/identity/api/v1/store-invite" % (id_server,)
+        is_url = "%s%s/_matrix/identity/api/v1/store-invite" % (
+            id_server_scheme, id_server,
+        )
         data = yield self.hs.get_simple_http_client().post_urlencoded_get_json(
             is_url,
             {
@@ -722,10 +737,11 @@ class RoomMemberHandler(BaseHandler):
         # TODO: Check for success
         token = data["token"]
         public_key = data["public_key"]
-        key_validity_url = "https://%s/_matrix/identity/api/v1/pubkey/isvalid" % (
-            id_server,
+        display_name = data["display_name"]
+        key_validity_url = "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
+            id_server_scheme, id_server,
         )
-        defer.returnValue((token, public_key, key_validity_url))
+        defer.returnValue((token, public_key, key_validity_url, display_name))
 
 
 class RoomListHandler(BaseHandler):
@@ -750,7 +766,7 @@ class RoomListHandler(BaseHandler):
 
 class RoomContextHandler(BaseHandler):
     @defer.inlineCallbacks
-    def get_event_context(self, user, room_id, event_id, limit):
+    def get_event_context(self, user, room_id, event_id, limit, is_guest):
         """Retrieves events, pagination tokens and state around a given event
         in a room.
 
@@ -774,11 +790,17 @@ class RoomContextHandler(BaseHandler):
         )
 
         results["events_before"] = yield self._filter_events_for_client(
-            user.to_string(), results["events_before"]
+            user.to_string(),
+            results["events_before"],
+            is_guest=is_guest,
+            require_all_visible_for_guests=False
         )
 
         results["events_after"] = yield self._filter_events_for_client(
-            user.to_string(), results["events_after"]
+            user.to_string(),
+            results["events_after"],
+            is_guest=is_guest,
+            require_all_visible_for_guests=False
         )
 
         if results["events_after"]:
@@ -807,7 +829,14 @@ class RoomEventSource(object):
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def get_new_events_for_user(self, user, from_key, limit):
+    def get_new_events(
+            self,
+            user,
+            from_key,
+            limit,
+            room_ids,
+            is_guest,
+    ):
         # We just ignore the key for now.
 
         to_key = yield self.get_current_key()
@@ -827,8 +856,9 @@ class RoomEventSource(object):
                 user_id=user.to_string(),
                 from_key=from_key,
                 to_key=to_key,
-                room_id=None,
                 limit=limit,
+                room_ids=room_ids,
+                is_guest=is_guest,
             )
 
         defer.returnValue((events, end_key))
