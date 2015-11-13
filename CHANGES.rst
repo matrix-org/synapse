@@ -1,3 +1,11 @@
+Changes in synapse v0.11.0-rc2 (2015-11-13)
+===========================================
+
+* Various changes to /sync API response format (PR #373)
+* Fix regression when setting display name in newly joined room over
+  federation (PR #368)
+* Fix problem where /search was slow when using SQLite (PR #366)
+
 Changes in synapse v0.11.0-rc1 (2015-11-11)
 ===========================================
 
