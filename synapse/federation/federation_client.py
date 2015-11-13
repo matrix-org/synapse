@@ -357,7 +357,8 @@ class FederationClient(FederationBase):
         defer.returnValue(signed_auth)
 
     @defer.inlineCallbacks
-    def make_membership_event(self, destinations, room_id, user_id, membership):
+    def make_membership_event(self, destinations, room_id, user_id, membership,
+                              content={},):
         """
         Creates an m.room.member event, with context, without participating in the room.
 
@@ -397,6 +398,8 @@ class FederationClient(FederationBase):
                 pdu_dict = ret["event"]
 
                 logger.debug("Got response to make_%s: %s", membership, pdu_dict)
+
+                pdu_dict["content"].update(content)
 
                 defer.returnValue(
                     (destination, self.event_from_pdu_json(pdu_dict))

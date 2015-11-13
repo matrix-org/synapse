@@ -372,12 +372,13 @@ class RoomInitialSyncRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
-        user, _, _ = yield self.auth.get_user_by_req(request)
+        user, _, is_guest = yield self.auth.get_user_by_req(request, allow_guest=True)
         pagination_config = PaginationConfig.from_request(request)
         content = yield self.handlers.message_handler.room_initial_sync(
             room_id=room_id,
             user_id=user.to_string(),
             pagin_config=pagination_config,
+            is_guest=is_guest,
         )
         defer.returnValue((200, content))
 

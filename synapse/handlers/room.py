@@ -504,7 +504,8 @@ class RoomMemberHandler(BaseHandler):
             yield handler.do_invite_join(
                 room_hosts,
                 room_id,
-                event.user_id
+                event.user_id,
+                event.content,
             )
         else:
             logger.debug("Doing normal join")
