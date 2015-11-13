@@ -588,23 +588,28 @@ class MessageHandler(BaseHandler):
 
         @defer.inlineCallbacks
         def get_presence():
-            states = {}
-            if not is_guest:
-                states = yield presence_handler.get_states(
-                    target_users=[UserID.from_string(m.user_id) for m in room_members],
-                    auth_user=auth_user,
-                    as_event=True,
-                    check_auth=False,
-                )
+            states = yield presence_handler.get_states(
+                target_users=[UserID.from_string(m.user_id) for m in room_members],
+                auth_user=auth_user,
+                as_event=True,
+                check_auth=False,
+            )
 
             defer.returnValue(states.values())
 
-        receipts_handler = self.hs.get_handlers().receipts_handler
+        @defer.inlineCallbacks
+        def get_receipts():
+            receipts_handler = self.hs.get_handlers().receipts_handler
+            receipts = yield receipts_handler.get_receipts_for_room(
+                room_id,
+                now_token.receipt_key
+            )
+            defer.returnValue(receipts)
 
         presence, receipts, (messages, token) = yield defer.gatherResults(
             [
                 get_presence(),
-                receipts_handler.get_receipts_for_room(room_id, now_token.receipt_key),
+                get_receipts(),
                 self.store.get_recent_events_for_room(
                     room_id,
                     limit=limit,
