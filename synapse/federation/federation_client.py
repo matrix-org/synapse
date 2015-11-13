@@ -401,6 +401,12 @@ class FederationClient(FederationBase):
 
                 pdu_dict["content"].update(content)
 
+                # The protoevent received over the JSON wire may not have all
+                # the required fields. Lets just gloss over that because
+                # there's some we never care about
+                if "prev_state" not in pdu_dict:
+                    pdu_dict["prev_state"] = []
+
                 defer.returnValue(
                     (destination, self.event_from_pdu_json(pdu_dict))
                 )
