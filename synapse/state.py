@@ -71,7 +71,7 @@ class StateHandler(object):
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
-        """ Returns the current state for the room as a list. This is done by
+        """ Retrieves the current state for the room. This is done by
         calling `get_latest_events_in_room` to get the leading edges of the
         event graph and then resolving any of the state conflicts.
 
@@ -80,6 +80,8 @@ class StateHandler(object):
 
         If `event_type` is specified, then the method returns only the one
         event (or None) with that `event_type` and `state_key`.
+
+        :returns map from (type, state_key) to event
         """
         event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
 
@@ -177,9 +179,10 @@ class StateHandler(object):
         """ Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
 
-        Return format is a tuple: (`state_group`, `state_events`), where the
-        first is the name of a state group if one and only one is involved,
-        otherwise `None`.
+        :returns a Deferred tuple of (`state_group`, `state`, `prev_state`).
+        `state_group` is the name of a state group if one and only one is
+        involved. `state` is a map from (type, state_key) to event, and
+        `prev_state` is a list of event ids.
         """
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
@@ -255,6 +258,11 @@ class StateHandler(object):
             return self._resolve_events(state_sets)
 
     def _resolve_events(self, state_sets, event_type=None, state_key=""):
+        """
+        :returns a tuple (new_state, prev_states). new_state is a map
+        from (type, state_key) to event. prev_states is a list of event_ids.
+        :rtype: (dict[(str, str), synapse.events.FrozenEvent], list[str])
+        """
         state = {}
         for st in state_sets:
             for e in st:
