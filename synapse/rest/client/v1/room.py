@@ -17,7 +17,7 @@
 from twisted.internet import defer
 
 from base import ClientV1RestServlet, client_path_pattern
-from synapse.api.errors import SynapseError, Codes
+from synapse.api.errors import SynapseError, Codes, AuthError
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
 from synapse.types import UserID, RoomID, RoomAlias
@@ -453,7 +453,13 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, membership_action, txn_id=None):
-        user, token_id, _ = yield self.auth.get_user_by_req(request)
+        user, token_id, is_guest = yield self.auth.get_user_by_req(
+            request,
+            allow_guest=True
+        )
+
+        if is_guest and membership_action not in {Membership.JOIN, Membership.LEAVE}:
+            raise AuthError(403, "Guest access not allowed")
 
         content = _parse_json(request)
 
@@ -486,16 +492,21 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
 
         msg_handler = self.handlers.message_handler
 
+        content = {"membership": unicode(membership_action)}
+        if is_guest:
+            content["kind"] = "guest"
+
         yield msg_handler.create_and_send_event(
             {
                 "type": EventTypes.Member,
-                "content": {"membership": unicode(membership_action)},
+                "content": content,
                 "room_id": room_id,
                 "sender": user.to_string(),
                 "state_key": state_key,
             },
             token_id=token_id,
             txn_id=txn_id,
+            is_guest=is_guest,
         )
 
         defer.returnValue((200, {}))
