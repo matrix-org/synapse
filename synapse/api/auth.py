@@ -587,7 +587,10 @@ class Auth(object):
     def _get_user_from_macaroon(self, macaroon_str):
         try:
             macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
-            self._validate_macaroon(macaroon)
+            self.validate_macaroon(
+                macaroon, "access",
+                [lambda c: c.startswith("time < ")]
+            )
 
             user_prefix = "user_id = "
             user = None
@@ -635,26 +638,25 @@ class Auth(object):
                 errcode=Codes.UNKNOWN_TOKEN
             )
 
-    def _validate_macaroon(self, macaroon):
+    def validate_macaroon(self, macaroon, type_string, additional_validation_functions):
         v = pymacaroons.Verifier()
         v.satisfy_exact("gen = 1")
-        v.satisfy_exact("type = access")
+        v.satisfy_exact("type = " + type_string)
         v.satisfy_general(lambda c: c.startswith("user_id = "))
-        v.satisfy_general(self._verify_expiry)
         v.satisfy_exact("guest = true")
+
+        for validation_function in additional_validation_functions:
+            v.satisfy_general(validation_function)
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 
         v = pymacaroons.Verifier()
         v.satisfy_general(self._verify_recognizes_caveats)
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 
-    def _verify_expiry(self, caveat):
+    def verify_expiry(self, caveat):
         prefix = "time < "
         if not caveat.startswith(prefix):
             return False
-        # TODO(daniel): Enable expiry check when clients actually know how to
-        # refresh tokens. (And remember to enable the tests)
-        return True
         expiry = int(caveat[len(prefix):])
         now = self.hs.get_clock().time_msec()
         return now < expiry

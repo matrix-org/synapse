@@ -17,12 +17,11 @@ var submitPassword = function(user, pwd) {
     }).error(errorFunc);
 };
 
-var submitCas = function(ticket, service) {
-    console.log("Logging in with cas...");
+var submitToken = function(loginToken) {
+    console.log("Logging in with login token...");
     var data = {
-        type: "m.login.cas",
-        ticket: ticket,
-        service: service,
+        type: "m.login.token",
+        token: loginToken
     };
     $.post(matrixLogin.endpoint, JSON.stringify(data), function(response) {
         show_login();
@@ -41,23 +40,10 @@ var errorFunc = function(err) {
     }
 };
 
-var getCasURL = function(cb) {
-    $.get(matrixLogin.endpoint + "/cas", function(response) {
-        var cas_url = response.serverUrl;
-
-        cb(cas_url);
-    }).error(errorFunc);
-};
-
-
 var gotoCas = function() {
-    getCasURL(function(cas_url) {
-        var this_page = window.location.origin + window.location.pathname;
-
-        var redirect_url = cas_url + "/login?service=" + encodeURIComponent(this_page);
-
-        window.location.replace(redirect_url);
-    });
+    var this_page = window.location.origin + window.location.pathname;
+    var redirect_url = matrixLogin.endpoint + "/cas/redirect?redirectUrl=" + encodeURIComponent(this_page);
+    window.location.replace(redirect_url);
 }
 
 var setFeedbackString = function(text) {
@@ -111,7 +97,7 @@ var fetch_info = function(cb) {
 
 matrixLogin.onLoad = function() {
     fetch_info(function() {
-        if (!try_cas()) {
+        if (!try_token()) {
             show_login();
         }
     });
@@ -148,20 +134,20 @@ var parseQsFromUrl = function(query) {
     return result;
 };
 
-var try_cas = function() {
+var try_token = function() {
     var pos = window.location.href.indexOf("?");
     if (pos == -1) {
         return false;
     }
     var qs = parseQsFromUrl(window.location.href.substr(pos+1));
 
-    var ticket = qs.ticket;
+    var loginToken = qs.loginToken;
 
-    if (!ticket) {
+    if (!loginToken) {
         return false;
     }
 
-    submitCas(ticket, location.origin);
+    submitToken(loginToken);
 
     return true;
 };
