@@ -18,7 +18,7 @@ from twisted.internet import defer
 from ._base import BaseHandler
 from synapse.api.constants import LoginType
 from synapse.types import UserID
-from synapse.api.errors import LoginError, Codes
+from synapse.api.errors import AuthError, LoginError, Codes
 from synapse.util.async import run_on_reactor
 
 from twisted.web.client import PartialDownloadError
@@ -46,6 +46,7 @@ class AuthHandler(BaseHandler):
         }
         self.bcrypt_rounds = hs.config.bcrypt_rounds
         self.sessions = {}
+        self.INVALID_TOKEN_HTTP_STATUS = 401
 
     @defer.inlineCallbacks
     def check_auth(self, flows, clientdict, clientip):
@@ -297,10 +298,11 @@ class AuthHandler(BaseHandler):
         defer.returnValue((user_id, access_token, refresh_token))
 
     @defer.inlineCallbacks
-    def login_with_cas_user_id(self, user_id):
+    def get_login_tuple_for_user_id(self, user_id):
         """
-        Authenticates the user with the given user ID,
-        intended to have been captured from a CAS response
+        Gets login tuple for the user with the given user ID.
+        The user is assumed to have been authenticated by some other
+        machanism (e.g. CAS)
 
         Args:
             user_id (str): User ID
@@ -393,6 +395,23 @@ class AuthHandler(BaseHandler):
         ))
         return m.serialize()
 
+    def generate_short_term_login_token(self, user_id):
+        macaroon = self._generate_base_macaroon(user_id)
+        macaroon.add_first_party_caveat("type = login")
+        now = self.hs.get_clock().time_msec()
+        expiry = now + (2 * 60 * 1000)
+        macaroon.add_first_party_caveat("time < %d" % (expiry,))
+        return macaroon.serialize()
+
+    def validate_short_term_login_token_and_get_user_id(self, login_token):
+        try:
+            macaroon = pymacaroons.Macaroon.deserialize(login_token)
+            auth_api = self.hs.get_auth()
+            auth_api.validate_macaroon(macaroon, "login", [auth_api.verify_expiry])
+            return self._get_user_from_macaroon(macaroon)
+        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
+            raise AuthError(401, "Invalid token", errcode=Codes.UNKNOWN_TOKEN)
+
     def _generate_base_macaroon(self, user_id):
         macaroon = pymacaroons.Macaroon(
             location=self.hs.config.server_name,
@@ -401,6 +420,16 @@ class AuthHandler(BaseHandler):
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         return macaroon
+
+    def _get_user_from_macaroon(self, macaroon):
+        user_prefix = "user_id = "
+        for caveat in macaroon.caveats:
+            if caveat.caveat_id.startswith(user_prefix):
+                return caveat.caveat_id[len(user_prefix):]
+        raise AuthError(
+            self.INVALID_TOKEN_HTTP_STATUS, "No user_id found in token",
+            errcode=Codes.UNKNOWN_TOKEN
+        )
 
     @defer.inlineCallbacks
     def set_password(self, user_id, newpassword):
