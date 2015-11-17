@@ -56,7 +56,7 @@ incoming_responses_counter = metrics.register_counter(
 )
 
 
-MAX_RETRIES = 4
+MAX_RETRIES = 10
 
 
 class MatrixFederationEndpointFactory(object):
@@ -184,7 +184,8 @@ class MatrixFederationHttpClient(object):
                     )
 
                     if retries_left and not timeout:
-                        delay = 5 ** (MAX_RETRIES + 1 - retries_left)
+                        delay = 4 ** (MAX_RETRIES + 1 - retries_left)
+                        delay = max(delay, 60)
                         delay *= random.uniform(0.8, 1.4)
                         yield sleep(delay)
                         retries_left -= 1
