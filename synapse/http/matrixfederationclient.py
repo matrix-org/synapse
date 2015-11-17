@@ -259,6 +259,8 @@ class MatrixFederationHttpClient(object):
                 the request body. This will be encoded as JSON.
             json_data_callback (callable): A callable returning the dict to
                 use as the request body.
+            long_retries (bool): A boolean that indicates whether we should
+                retry for a short or long time.
 
         Returns:
             Deferred: Succeeds when we get a 2xx HTTP response. The result
