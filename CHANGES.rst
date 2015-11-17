@@ -1,3 +1,9 @@
+Changes in synapse v0.11.0-r1 (2015-11-17)
+==========================================
+
+* Retry more aggressively, but fewer times for federation requests that aren't
+  sending transactions.
+
 Changes in synapse v0.11.0 (2015-11-17)
 =======================================
 
