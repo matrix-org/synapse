@@ -491,6 +491,9 @@ class _JsonProducer(object):
     def stopProducing(self):
         pass
 
+    def resumeProducing(self):
+        pass
+
 
 def _flatten_response_never_received(e):
     if hasattr(e, "reasons"):
