@@ -136,6 +136,7 @@ class TransportLayerClient(object):
             path=PREFIX + "/send/%s/" % transaction.transaction_id,
             data=json_data,
             json_data_callback=json_data_callback,
+            long_retries=True,
         )
 
         logger.debug(

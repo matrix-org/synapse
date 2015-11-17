@@ -56,7 +56,8 @@ incoming_responses_counter = metrics.register_counter(
 )
 
 
-MAX_RETRIES = 10
+MAX_LONG_RETRIES = 10
+MAX_SHORT_RETRIES = 3
 
 
 class MatrixFederationEndpointFactory(object):
@@ -103,7 +104,7 @@ class MatrixFederationHttpClient(object):
     def _create_request(self, destination, method, path_bytes,
                         body_callback, headers_dict={}, param_bytes=b"",
                         query_bytes=b"", retry_on_dns_fail=True,
-                        timeout=None):
+                        timeout=None, long_retries=False):
         """ Creates and sends a request to the given url
         """
         headers_dict[b"User-Agent"] = [self.version_string]
@@ -123,7 +124,10 @@ class MatrixFederationHttpClient(object):
 
         # XXX: Would be much nicer to retry only at the transaction-layer
         # (once we have reliable transactions in place)
-        retries_left = MAX_RETRIES
+        if long_retries:
+            retries_left = MAX_LONG_RETRIES
+        else:
+            retries_left = MAX_SHORT_RETRIES
 
         http_url_bytes = urlparse.urlunparse(
             ("", "", path_bytes, param_bytes, query_bytes, "")
@@ -184,9 +188,15 @@ class MatrixFederationHttpClient(object):
                     )
 
                     if retries_left and not timeout:
-                        delay = 4 ** (MAX_RETRIES + 1 - retries_left)
-                        delay = max(delay, 60)
-                        delay *= random.uniform(0.8, 1.4)
+                        if long_retries:
+                            delay = 4 ** (MAX_LONG_RETRIES + 1 - retries_left)
+                            delay = max(delay, 60)
+                            delay *= random.uniform(0.8, 1.4)
+                        else:
+                            delay = 0.5 * 2 ** (MAX_SHORT_RETRIES - retries_left)
+                            delay = max(delay, 2)
+                            delay *= random.uniform(0.8, 1.4)
+
                         yield sleep(delay)
                         retries_left -= 1
                     else:
@@ -237,7 +247,8 @@ class MatrixFederationHttpClient(object):
         headers_dict[b"Authorization"] = auth_headers
 
     @defer.inlineCallbacks
-    def put_json(self, destination, path, data={}, json_data_callback=None):
+    def put_json(self, destination, path, data={}, json_data_callback=None,
+                 long_retries=False):
         """ Sends the specifed json data using PUT
 
         Args:
@@ -248,6 +259,8 @@ class MatrixFederationHttpClient(object):
                 the request body. This will be encoded as JSON.
             json_data_callback (callable): A callable returning the dict to
                 use as the request body.
+            long_retries (bool): A boolean that indicates whether we should
+                retry for a short or long time.
 
         Returns:
             Deferred: Succeeds when we get a 2xx HTTP response. The result
@@ -273,6 +286,7 @@ class MatrixFederationHttpClient(object):
             path.encode("ascii"),
             body_callback=body_callback,
             headers_dict={"Content-Type": ["application/json"]},
+            long_retries=long_retries,
         )
 
         if 200 <= response.code < 300:

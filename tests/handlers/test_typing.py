@@ -218,6 +218,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                     }
                 ),
                 json_data_callback=ANY,
+                long_retries=True,
             ),
             defer.succeed((200, "OK"))
         )
@@ -284,6 +285,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                     }
                 ),
                 json_data_callback=ANY,
+                long_retries=True,
             ),
             defer.succeed((200, "OK"))
         )
