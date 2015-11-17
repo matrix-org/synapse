@@ -17,7 +17,7 @@ from synapse.appservice.scheduler import AppServiceScheduler
 from synapse.appservice.api import ApplicationServiceApi
 from .register import RegistrationHandler
 from .room import (
-    RoomCreationHandler, RoomMemberHandler, RoomListHandler
+    RoomCreationHandler, RoomMemberHandler, RoomListHandler, RoomContextHandler,
 )
 from .message import MessageHandler
 from .events import EventStreamHandler, EventHandler
@@ -32,6 +32,7 @@ from .sync import SyncHandler
 from .auth import AuthHandler
 from .identity import IdentityHandler
 from .receipts import ReceiptsHandler
+from .search import SearchHandler
 
 
 class Handlers(object):
@@ -68,3 +69,5 @@ class Handlers(object):
         self.sync_handler = SyncHandler(hs)
         self.auth_handler = AuthHandler(hs)
         self.identity_handler = IdentityHandler(hs)
+        self.search_handler = SearchHandler(hs)
+        self.room_context_handler = RoomContextHandler(hs)

@@ -25,16 +25,16 @@ class InitialSyncRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        user, client = yield self.auth.get_user_by_req(request)
-        with_feedback = "feedback" in request.args
+        user, _, _ = yield self.auth.get_user_by_req(request)
         as_client_event = "raw" not in request.args
         pagination_config = PaginationConfig.from_request(request)
         handler = self.handlers.message_handler
+        include_archived = request.args.get("archived", None) == ["true"]
         content = yield handler.snapshot_all_rooms(
             user_id=user.to_string(),
             pagin_config=pagination_config,
-            feedback=with_feedback,
-            as_client_event=as_client_event
+            as_client_event=as_client_event,
+            include_archived=include_archived,
         )
 
         defer.returnValue((200, content))

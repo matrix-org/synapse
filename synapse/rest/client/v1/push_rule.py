@@ -43,7 +43,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         except InvalidRuleException as e:
             raise SynapseError(400, e.message)
 
-        user, _ = yield self.auth.get_user_by_req(request)
+        user, _, _ = yield self.auth.get_user_by_req(request)
 
         if '/' in spec['rule_id'] or '\\' in spec['rule_id']:
             raise SynapseError(400, "rule_id may not contain slashes")
@@ -92,7 +92,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
     def on_DELETE(self, request):
         spec = _rule_spec_from_path(request.postpath)
 
-        user, _ = yield self.auth.get_user_by_req(request)
+        user, _, _ = yield self.auth.get_user_by_req(request)
 
         namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
 
@@ -109,7 +109,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        user, _ = yield self.auth.get_user_by_req(request)
+        user, _, _ = yield self.auth.get_user_by_req(request)
 
         # we build up the full structure and then decide which bits of it
         # to send which means doing unnecessary work sometimes but is

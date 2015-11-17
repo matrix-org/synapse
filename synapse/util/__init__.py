@@ -29,34 +29,6 @@ def unwrapFirstError(failure):
     return failure.value.subFailure
 
 
-def unwrap_deferred(d):
-    """Given a deferred that we know has completed, return its value or raise
-    the failure as an exception
-    """
-    if not d.called:
-        raise RuntimeError("deferred has not finished")
-
-    res = []
-
-    def f(r):
-        res.append(r)
-        return r
-    d.addCallback(f)
-
-    if res:
-        return res[0]
-
-    def f(r):
-        res.append(r)
-        return r
-    d.addErrback(f)
-
-    if res:
-        res[0].raiseException()
-    else:
-        raise RuntimeError("deferred did not call callbacks")
-
-
 class Clock(object):
     """A small utility that obtains current time-of-day so that time may be
     mocked during unit-tests.
@@ -81,6 +53,14 @@ class Clock(object):
         loop.stop()
 
     def call_later(self, delay, callback, *args, **kwargs):
+        """Call something later
+
+        Args:
+            delay(float): How long to wait in seconds.
+            callback(function): Function to call
+            *args: Postional arguments to pass to function.
+            **kwargs: Key arguments to pass to function.
+        """
         current_context = LoggingContext.current_context()
 
         def wrapped_callback(*args, **kwargs):

@@ -20,7 +20,7 @@ class AppServiceConfig(Config):
     def read_config(self, config):
         self.app_service_config_files = config.get("app_service_config_files", [])
 
-    def default_config(cls, config_dir_path, server_name):
+    def default_config(cls, **kwargs):
         return """\
         # A list of application service config file to use
         app_service_config_files: []

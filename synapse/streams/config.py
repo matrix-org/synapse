@@ -34,6 +34,11 @@ class SourcePaginationConfig(object):
         self.direction = 'f' if direction == 'f' else 'b'
         self.limit = int(limit) if limit is not None else None
 
+    def __repr__(self):
+        return (
+            "StreamConfig(from_key=%r, to_key=%r, direction=%r, limit=%r)"
+        ) % (self.from_key, self.to_key, self.direction, self.limit)
+
 
 class PaginationConfig(object):
 
@@ -94,10 +99,10 @@ class PaginationConfig(object):
             logger.exception("Failed to create pagination config")
             raise SynapseError(400, "Invalid request.")
 
-    def __str__(self):
+    def __repr__(self):
         return (
-            "<PaginationConfig from_tok=%s, to_tok=%s, "
-            "direction=%s, limit=%s>"
+            "PaginationConfig(from_tok=%r, to_tok=%r,"
+            " direction=%r, limit=%r)"
         ) % (self.from_token, self.to_token, self.direction, self.limit)
 
     def get_source_config(self, source_name):

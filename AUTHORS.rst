@@ -44,4 +44,7 @@ Eric Myhre <hash at exultant.us>
    repository API.
 
 Muthu Subramanian <muthu.subramanian.karunanidhi at ericsson.com>
- * Add SAML2 support for registration and logins.
+ * Add SAML2 support for registration and login.
+
+Steven Hammerton <steven.hammerton at openmarket.com>
+ * Add CAS support for registration and login.

@@ -1,9 +1,7 @@
 
-from syutil.crypto.jsonsign import verify_signed_json
-from syutil.crypto.signing_key import (
-    decode_verify_key_bytes, write_signing_keys
-)
-from syutil.base64util import decode_base64
+from signedjson.sign import verify_signed_json
+from signedjson.key import decode_verify_key_bytes, write_signing_keys
+from unpaddedbase64 import decode_base64
 
 import urllib2
 import json

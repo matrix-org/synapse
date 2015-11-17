@@ -16,20 +16,31 @@
 
 import sys
 sys.dont_write_bytecode = True
-from synapse.python_dependencies import check_requirements, DEPENDENCY_LINKS
+from synapse.python_dependencies import (
+    check_requirements, DEPENDENCY_LINKS, MissingRequirementError
+)
 
 if __name__ == '__main__':
-    check_requirements()
+    try:
+        check_requirements()
+    except MissingRequirementError as e:
+        message = "\n".join([
+            "Missing Requirement: %s" % (e.message,),
+            "To install run:",
+            "    pip install --upgrade --force \"%s\"" % (e.dependency,),
+            "",
+        ])
+        sys.stderr.writelines(message)
+        sys.exit(1)
 
 from synapse.storage.engines import create_engine, IncorrectDatabaseSetup
-from synapse.storage import (
-    are_all_users_on_domain, UpgradeDatabaseException,
-)
+from synapse.storage import are_all_users_on_domain
+from synapse.storage.prepare_database import UpgradeDatabaseException
 
 from synapse.server import HomeServer
 
 
-from twisted.internet import reactor
+from twisted.internet import reactor, task, defer
 from twisted.application import service
 from twisted.enterprise import adbapi
 from twisted.web.resource import Resource, EncodingResourceWrapper
@@ -70,12 +81,6 @@ import time
 
 
 logger = logging.getLogger("synapse.app.homeserver")
-
-
-class GzipFile(File):
-    def getChild(self, path, request):
-        child = File.getChild(self, path, request)
-        return EncodingResourceWrapper(child, [GzipEncoderFactory()])
 
 
 def gz_wrap(r):
@@ -121,12 +126,15 @@ class SynapseHomeServer(HomeServer):
         # (It can stay enabled for the API resources: they call
         # write() with the whole body and then finish() straight
         # after and so do not trigger the bug.
+        # GzipFile was removed in commit 184ba09
         # return GzipFile(webclient_path)  # TODO configurable?
         return File(webclient_path)  # TODO configurable?
 
     def build_resource_for_static_content(self):
         # This is old and should go away: not going to bother adding gzip
-        return File("static")
+        return File(
+            os.path.join(os.path.dirname(synapse.__file__), "static")
+        )
 
     def build_resource_for_content_repo(self):
         return ContentRepoResource(
@@ -221,7 +229,7 @@ class SynapseHomeServer(HomeServer):
                     listener_config,
                     root_resource,
                 ),
-                self.tls_context_factory,
+                self.tls_server_context_factory,
                 interface=bind_address
             )
         else:
@@ -365,7 +373,6 @@ def setup(config_options):
     Args:
         config_options_options: The options passed to Synapse. Usually
             `sys.argv[1:]`.
-        should_run (bool): Whether to start the reactor.
 
     Returns:
         HomeServer
@@ -388,7 +395,7 @@ def setup(config_options):
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
-    tls_context_factory = context_factory.ServerContextFactory(config)
+    tls_server_context_factory = context_factory.ServerContextFactory(config)
 
     database_engine = create_engine(config.database_config["name"])
     config.database_config["args"]["cp_openfun"] = database_engine.on_new_connection
@@ -396,14 +403,14 @@ def setup(config_options):
     hs = SynapseHomeServer(
         config.server_name,
         db_config=config.database_config,
-        tls_context_factory=tls_context_factory,
+        tls_server_context_factory=tls_server_context_factory,
         config=config,
         content_addr=config.content_addr,
         version_string=version_string,
         database_engine=database_engine,
     )
 
-    logger.info("Preparing database: %r...", config.database_config)
+    logger.info("Preparing database: %s...", config.database_config['name'])
 
     try:
         db_conn = database_engine.module.connect(
@@ -425,13 +432,14 @@ def setup(config_options):
         )
         sys.exit(1)
 
-    logger.info("Database prepared in %r.", config.database_config)
+    logger.info("Database prepared in %s.", config.database_config['name'])
 
     hs.start_listening()
 
     hs.get_pusherpool().start()
     hs.get_state_handler().start_caching()
     hs.get_datastore().start_profiling()
+    hs.get_datastore().start_doing_background_updates()
     hs.get_replication_layer().start_get_pdu_cache()
 
     return hs
@@ -664,6 +672,42 @@ def run(hs):
         from twisted.python.threadpool import ThreadPool
         ThreadPool._worker = profile(ThreadPool._worker)
         reactor.run = profile(reactor.run)
+
+    start_time = hs.get_clock().time()
+
+    @defer.inlineCallbacks
+    def phone_stats_home():
+        now = int(hs.get_clock().time())
+        uptime = int(now - start_time)
+        if uptime < 0:
+            uptime = 0
+
+        stats = {}
+        stats["homeserver"] = hs.config.server_name
+        stats["timestamp"] = now
+        stats["uptime_seconds"] = uptime
+        stats["total_users"] = yield hs.get_datastore().count_all_users()
+
+        all_rooms = yield hs.get_datastore().get_rooms(False)
+        stats["total_room_count"] = len(all_rooms)
+
+        stats["daily_active_users"] = yield hs.get_datastore().count_daily_users()
+        daily_messages = yield hs.get_datastore().count_daily_messages()
+        if daily_messages is not None:
+            stats["daily_messages"] = daily_messages
+
+        logger.info("Reporting stats to matrix.org: %s" % (stats,))
+        try:
+            yield hs.get_simple_http_client().put_json(
+                "https://matrix.org/report-usage-stats/push",
+                stats
+            )
+        except Exception as e:
+            logger.warn("Error reporting stats: %s", e)
+
+    if hs.config.report_stats:
+        phone_home_task = task.LoopingCall(phone_stats_home)
+        phone_home_task.start(60 * 60 * 24, now=False)
 
     def in_thread():
         with LoggingContext("run"):

@@ -20,8 +20,6 @@ from synapse.util.caches.descriptors import (
 
 from twisted.internet import defer
 
-from synapse.util.stringutils import random_string
-
 import logging
 
 logger = logging.getLogger(__name__)
@@ -56,7 +54,7 @@ class StateStore(SQLBaseStore):
             defer.returnValue({})
 
         event_to_groups = yield self._get_state_group_for_events(
-            room_id, event_ids,
+            event_ids,
         )
 
         groups = set(event_to_groups.values())
@@ -210,13 +208,12 @@ class StateStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def get_state_for_events(self, room_id, event_ids, types):
+    def get_state_for_events(self, event_ids, types):
         """Given a list of event_ids and type tuples, return a list of state
         dicts for each event. The state dicts will only have the type/state_keys
         that are in the `types` list.
 
         Args:
-            room_id (str)
             event_ids (list)
             types (list): List of (type, state_key) tuples which are used to
                 filter the state fetched. `state_key` may be None, which matches
@@ -227,7 +224,7 @@ class StateStore(SQLBaseStore):
             The dicts are mappings from (type, state_key) -> state_events
         """
         event_to_groups = yield self._get_state_group_for_events(
-            room_id, event_ids,
+            event_ids,
         )
 
         groups = set(event_to_groups.values())
@@ -239,6 +236,20 @@ class StateStore(SQLBaseStore):
         }
 
         defer.returnValue({event: event_to_state[event] for event in event_ids})
+
+    @defer.inlineCallbacks
+    def get_state_for_event(self, event_id, types=None):
+        """
+        Get the state dict corresponding to a particular event
+
+        :param str event_id: event whose state should be returned
+        :param list[(str, str)]|None types: List of (type, state_key) tuples
+            which are used to filter the state fetched. May be None, which
+            matches any key
+        :return: a deferred dict from (type, state_key) -> state_event
+        """
+        state_map = yield self.get_state_for_events([event_id], types)
+        defer.returnValue(state_map[event_id])
 
     @cached(num_args=2, lru=True, max_entries=10000)
     def _get_state_group_for_event(self, room_id, event_id):
@@ -253,8 +264,8 @@ class StateStore(SQLBaseStore):
         )
 
     @cachedList(cache=_get_state_group_for_event.cache, list_name="event_ids",
-                num_args=2)
-    def _get_state_group_for_events(self, room_id, event_ids):
+                num_args=1)
+    def _get_state_group_for_events(self, event_ids):
         """Returns mapping event_id -> state_group
         """
         def f(txn):
@@ -428,7 +439,3 @@ class StateStore(SQLBaseStore):
             }
 
         defer.returnValue(results)
-
-
-def _make_group_id(clock):
-    return str(int(clock.time_msec())) + random_string(5)

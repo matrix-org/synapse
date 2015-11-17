@@ -13,14 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from ._base import Config, ConfigError
-import syutil.crypto.signing_key
-from syutil.crypto.signing_key import (
-    is_signing_algorithm_supported, decode_verify_key_bytes
-)
-from syutil.base64util import decode_base64
+
 from synapse.util.stringutils import random_string
+from signedjson.key import (
+    generate_signing_key, is_signing_algorithm_supported,
+    decode_signing_key_base64, decode_verify_key_bytes,
+    read_signing_keys, write_signing_keys, NACL_ED25519
+)
+from unpaddedbase64 import decode_base64
+
+import os
 
 
 class KeyConfig(Config):
@@ -37,7 +40,7 @@ class KeyConfig(Config):
             config["perspectives"]
         )
 
-    def default_config(self, config_dir_path, server_name):
+    def default_config(self, config_dir_path, server_name, **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)
         return """\
         ## Signing Keys ##
@@ -83,9 +86,7 @@ class KeyConfig(Config):
     def read_signing_key(self, signing_key_path):
         signing_keys = self.read_file(signing_key_path, "signing_key")
         try:
-            return syutil.crypto.signing_key.read_signing_keys(
-                signing_keys.splitlines(True)
-            )
+            return read_signing_keys(signing_keys.splitlines(True))
         except Exception:
             raise ConfigError(
                 "Error reading signing_key."
@@ -112,22 +113,18 @@ class KeyConfig(Config):
         if not os.path.exists(signing_key_path):
             with open(signing_key_path, "w") as signing_key_file:
                 key_id = "a_" + random_string(4)
-                syutil.crypto.signing_key.write_signing_keys(
-                    signing_key_file,
-                    (syutil.crypto.signing_key.generate_signing_key(key_id),),
+                write_signing_keys(
+                    signing_key_file, (generate_signing_key(key_id),),
                 )
         else:
             signing_keys = self.read_file(signing_key_path, "signing_key")
             if len(signing_keys.split("\n")[0].split()) == 1:
                 # handle keys in the old format.
                 key_id = "a_" + random_string(4)
-                key = syutil.crypto.signing_key.decode_signing_key_base64(
-                    syutil.crypto.signing_key.NACL_ED25519,
-                    key_id,
-                    signing_keys.split("\n")[0]
+                key = decode_signing_key_base64(
+                    NACL_ED25519, key_id, signing_keys.split("\n")[0]
                 )
                 with open(signing_key_path, "w") as signing_key_file:
-                    syutil.crypto.signing_key.write_signing_keys(
-                        signing_key_file,
-                        (key,),
+                    write_signing_keys(
+                        signing_key_file, (key,),
                     )

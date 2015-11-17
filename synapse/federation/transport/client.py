@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from twisted.internet import defer
+from synapse.api.constants import Membership
 
 from synapse.api.urls import FEDERATION_PREFIX as PREFIX
 from synapse.util.logutils import log_function
@@ -160,13 +161,19 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def make_join(self, destination, room_id, user_id, retry_on_dns_fail=True):
-        path = PREFIX + "/make_join/%s/%s" % (room_id, user_id)
+    def make_membership_event(self, destination, room_id, user_id, membership):
+        valid_memberships = {Membership.JOIN, Membership.LEAVE}
+        if membership not in valid_memberships:
+            raise RuntimeError(
+                "make_membership_event called with membership='%s', must be one of %s" %
+                (membership, ",".join(valid_memberships))
+            )
+        path = PREFIX + "/make_%s/%s/%s" % (membership, room_id, user_id)
 
         content = yield self.client.get_json(
             destination=destination,
             path=path,
-            retry_on_dns_fail=retry_on_dns_fail,
+            retry_on_dns_fail=True,
         )
 
         defer.returnValue(content)
@@ -186,6 +193,19 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
+    def send_leave(self, destination, room_id, event_id, content):
+        path = PREFIX + "/send_leave/%s/%s" % (room_id, event_id)
+
+        response = yield self.client.put_json(
+            destination=destination,
+            path=path,
+            data=content,
+        )
+
+        defer.returnValue(response)
+
+    @defer.inlineCallbacks
+    @log_function
     def send_invite(self, destination, room_id, event_id, content):
         path = PREFIX + "/invite/%s/%s" % (room_id, event_id)
 
@@ -193,6 +213,19 @@ class TransportLayerClient(object):
             destination=destination,
             path=path,
             data=content,
+        )
+
+        defer.returnValue(response)
+
+    @defer.inlineCallbacks
+    @log_function
+    def exchange_third_party_invite(self, destination, room_id, event_dict):
+        path = PREFIX + "/exchange_third_party_invite/%s" % (room_id,)
+
+        response = yield self.client.put_json(
+            destination=destination,
+            path=path,
+            data=event_dict,
         )
 
         defer.returnValue(response)

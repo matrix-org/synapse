@@ -56,10 +56,9 @@ if __name__ == '__main__':
 
     js = json.load(args.json)
 
-
     auth = Auth(Mock())
     check_auth(
         auth,
         [FrozenEvent(d) for d in js["auth_chain"]],
-        [FrozenEvent(d) for d in js["pdus"]],
+        [FrozenEvent(d) for d in js.get("pdus", [])],
     )

@@ -69,7 +69,7 @@ class ClientDirectoryServer(ClientV1RestServlet):
 
         try:
             # try to auth as a user
-            user, client = yield self.auth.get_user_by_req(request)
+            user, _, _ = yield self.auth.get_user_by_req(request)
             try:
                 user_id = user.to_string()
                 yield dir_handler.create_association(
@@ -116,7 +116,7 @@ class ClientDirectoryServer(ClientV1RestServlet):
             # fallback to default user behaviour if they aren't an AS
             pass
 
-        user, client = yield self.auth.get_user_by_req(request)
+        user, _, _ = yield self.auth.get_user_by_req(request)
 
         is_admin = yield self.auth.is_server_admin(user)
         if not is_admin:

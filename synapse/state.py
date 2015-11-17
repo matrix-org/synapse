@@ -17,7 +17,6 @@
 from twisted.internet import defer
 
 from synapse.util.logutils import log_function
-from synapse.util.async import run_on_reactor
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
@@ -30,10 +29,6 @@ import logging
 import hashlib
 
 logger = logging.getLogger(__name__)
-
-
-def _get_state_key_from_event(event):
-    return event.state_key
 
 
 KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
@@ -76,7 +71,7 @@ class StateHandler(object):
 
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key=""):
-        """ Returns the current state for the room as a list. This is done by
+        """ Retrieves the current state for the room. This is done by
         calling `get_latest_events_in_room` to get the leading edges of the
         event graph and then resolving any of the state conflicts.
 
@@ -85,6 +80,8 @@ class StateHandler(object):
 
         If `event_type` is specified, then the method returns only the one
         event (or None) with that `event_type` and `state_key`.
+
+        :returns map from (type, state_key) to event
         """
         event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
 
@@ -119,8 +116,6 @@ class StateHandler(object):
         Returns:
             an EventContext
         """
-        yield run_on_reactor()
-
         context = EventContext()
 
         if outlier:
@@ -184,9 +179,10 @@ class StateHandler(object):
         """ Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
 
-        Return format is a tuple: (`state_group`, `state_events`), where the
-        first is the name of a state group if one and only one is involved,
-        otherwise `None`.
+        :returns a Deferred tuple of (`state_group`, `state`, `prev_state`).
+        `state_group` is the name of a state group if one and only one is
+        involved. `state` is a map from (type, state_key) to event, and
+        `prev_state` is a list of event ids.
         """
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
@@ -262,6 +258,11 @@ class StateHandler(object):
             return self._resolve_events(state_sets)
 
     def _resolve_events(self, state_sets, event_type=None, state_key=""):
+        """
+        :returns a tuple (new_state, prev_states). new_state is a map
+        from (type, state_key) to event. prev_states is a list of event_ids.
+        :rtype: (dict[(str, str), synapse.events.FrozenEvent], list[str])
+        """
         state = {}
         for st in state_sets:
             for e in st:
@@ -314,19 +315,23 @@ class StateHandler(object):
 
         We resolve conflicts in the following order:
             1. power levels
-            2. memberships
-            3. other events.
+            2. join rules
+            3. memberships
+            4. other events.
         """
         resolved_state = {}
         power_key = (EventTypes.PowerLevels, "")
-        if power_key in conflicted_state.items():
-            power_levels = conflicted_state[power_key]
-            resolved_state[power_key] = self._resolve_auth_events(power_levels)
+        if power_key in conflicted_state:
+            events = conflicted_state[power_key]
+            logger.debug("Resolving conflicted power levels %r", events)
+            resolved_state[power_key] = self._resolve_auth_events(
+                events, auth_events)
 
         auth_events.update(resolved_state)
 
         for key, events in conflicted_state.items():
             if key[0] == EventTypes.JoinRules:
+                logger.debug("Resolving conflicted join rules %r", events)
                 resolved_state[key] = self._resolve_auth_events(
                     events,
                     auth_events
@@ -336,6 +341,7 @@ class StateHandler(object):
 
         for key, events in conflicted_state.items():
             if key[0] == EventTypes.Member:
+                logger.debug("Resolving conflicted member lists %r", events)
                 resolved_state[key] = self._resolve_auth_events(
                     events,
                     auth_events
@@ -345,6 +351,7 @@ class StateHandler(object):
 
         for key, events in conflicted_state.items():
             if key not in resolved_state:
+                logger.debug("Resolving conflicted state %r:%r", key, events)
                 resolved_state[key] = self._resolve_normal_events(
                     events, auth_events
                 )

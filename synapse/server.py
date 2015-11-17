@@ -19,7 +19,9 @@
 # partial one for unit test mocking.
 
 # Imports required for the default HomeServer() implementation
+from twisted.web.client import BrowserLikePolicyForHTTPS
 from synapse.federation import initialize_http_replication
+from synapse.http.client import SimpleHttpClient,  InsecureInterceptableContextFactory
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
@@ -27,7 +29,6 @@ from synapse.state import StateHandler
 from synapse.storage import DataStore
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
-from synapse.util.lockutils import LockManager
 from synapse.streams.events import EventSources
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.crypto.keyring import Keyring
@@ -68,7 +69,6 @@ class BaseHomeServer(object):
         'auth',
         'rest_servlet_factory',
         'state_handler',
-        'room_lock_manager',
         'notifier',
         'distributor',
         'resource_for_client',
@@ -87,6 +87,8 @@ class BaseHomeServer(object):
         'pusherpool',
         'event_builder_factory',
         'filtering',
+        'http_client_context_factory',
+        'simple_http_client',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -174,6 +176,17 @@ class HomeServer(BaseHomeServer):
     def build_auth(self):
         return Auth(self)
 
+    def build_http_client_context_factory(self):
+        config = self.get_config()
+        return (
+            InsecureInterceptableContextFactory()
+            if config.use_insecure_ssl_client_just_for_testing_do_not_use
+            else BrowserLikePolicyForHTTPS()
+        )
+
+    def build_simple_http_client(self):
+        return SimpleHttpClient(self)
+
     def build_v1auth(self):
         orf = Auth(self)
         # Matrix spec makes no reference to what HTTP status code is returned,
@@ -185,9 +198,6 @@ class HomeServer(BaseHomeServer):
 
     def build_state_handler(self):
         return StateHandler(self)
-
-    def build_room_lock_manager(self):
-        return LockManager()
 
     def build_distributor(self):
         return Distributor()

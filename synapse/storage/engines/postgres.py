@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage import prepare_database
+from synapse.storage.prepare_database import prepare_database
 
 from ._base import IncorrectDatabaseSetup
 

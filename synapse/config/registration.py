@@ -32,9 +32,13 @@ class RegistrationConfig(Config):
             )
 
         self.registration_shared_secret = config.get("registration_shared_secret")
+        self.macaroon_secret_key = config.get("macaroon_secret_key")
+        self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
+        self.allow_guest_access = config.get("allow_guest_access", False)
 
-    def default_config(self, config_dir, server_name):
+    def default_config(self, **kwargs):
         registration_shared_secret = random_string_with_symbols(50)
+        macaroon_secret_key = random_string_with_symbols(50)
         return """\
         ## Registration ##
 
@@ -44,6 +48,18 @@ class RegistrationConfig(Config):
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.
         registration_shared_secret: "%(registration_shared_secret)s"
+
+        macaroon_secret_key: "%(macaroon_secret_key)s"
+
+        # Set the number of bcrypt rounds used to generate password hash.
+        # Larger numbers increase the work factor needed to generate the hash.
+        # The default number of rounds is 12.
+        bcrypt_rounds: 12
+
+        # Allows users to register as guests without a password/email/etc, and
+        # participate in rooms hosted on this server which have been made
+        # accessible to anonymous users.
+        allow_guest_access: False
         """ % locals()
 
     def add_arguments(self, parser):

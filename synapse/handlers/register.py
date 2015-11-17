@@ -25,8 +25,6 @@ import synapse.util.stringutils as stringutils
 from synapse.util.async import run_on_reactor
 from synapse.http.client import CaptchaServerHttpClient
 
-import base64
-import bcrypt
 import logging
 import urllib
 
@@ -66,7 +64,7 @@ class RegistrationHandler(BaseHandler):
             )
 
     @defer.inlineCallbacks
-    def register(self, localpart=None, password=None):
+    def register(self, localpart=None, password=None, generate_token=True):
         """Registers a new client on the server.
 
         Args:
@@ -83,7 +81,7 @@ class RegistrationHandler(BaseHandler):
         yield run_on_reactor()
         password_hash = None
         if password:
-            password_hash = bcrypt.hashpw(password, bcrypt.gensalt())
+            password_hash = self.auth_handler().hash(password)
 
         if localpart:
             yield self.check_username(localpart)
@@ -91,7 +89,9 @@ class RegistrationHandler(BaseHandler):
             user = UserID(localpart, self.hs.hostname)
             user_id = user.to_string()
 
-            token = self.generate_token(user_id)
+            token = None
+            if generate_token:
+                token = self.auth_handler().generate_access_token(user_id)
             yield self.store.register(
                 user_id=user_id,
                 token=token,
@@ -104,14 +104,14 @@ class RegistrationHandler(BaseHandler):
             attempts = 0
             user_id = None
             token = None
-            while not user_id and not token:
+            while not user_id:
                 try:
                     localpart = self._generate_user_id()
                     user = UserID(localpart, self.hs.hostname)
                     user_id = user.to_string()
                     yield self.check_user_id_is_valid(user_id)
-
-                    token = self.generate_token(user_id)
+                    if generate_token:
+                        token = self.auth_handler().generate_access_token(user_id)
                     yield self.store.register(
                         user_id=user_id,
                         token=token,
@@ -161,7 +161,7 @@ class RegistrationHandler(BaseHandler):
                 400, "Invalid user localpart for this application service.",
                 errcode=Codes.EXCLUSIVE
             )
-        token = self.generate_token(user_id)
+        token = self.auth_handler().generate_access_token(user_id)
         yield self.store.register(
             user_id=user_id,
             token=token,
@@ -208,7 +208,7 @@ class RegistrationHandler(BaseHandler):
         user_id = user.to_string()
 
         yield self.check_user_id_is_valid(user_id)
-        token = self.generate_token(user_id)
+        token = self.auth_handler().generate_access_token(user_id)
         try:
             yield self.store.register(
                 user_id=user_id,
@@ -273,13 +273,6 @@ class RegistrationHandler(BaseHandler):
                     errcode=Codes.EXCLUSIVE
                 )
 
-    def generate_token(self, user_id):
-        # urlsafe variant uses _ and - so use . as the separator and replace
-        # all =s with .s so http clients don't quote =s when it is used as
-        # query params.
-        return (base64.urlsafe_b64encode(user_id).replace('=', '.') + '.' +
-                stringutils.random_string(18))
-
     def _generate_user_id(self):
         return "-" + stringutils.random_string(18)
 
@@ -322,3 +315,6 @@ class RegistrationHandler(BaseHandler):
             }
         )
         defer.returnValue(data)
+
+    def auth_handler(self):
+        return self.hs.get_handlers().auth_handler

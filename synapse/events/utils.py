@@ -66,7 +66,6 @@ def prune_event(event):
             "users_default",
             "events",
             "events_default",
-            "events_default",
             "state_default",
             "ban",
             "kick",
@@ -103,7 +102,10 @@ def format_event_raw(d):
 def format_event_for_client_v1(d):
     d["user_id"] = d.pop("sender", None)
 
-    move_keys = ("age", "redacted_because", "replaces_state", "prev_content")
+    move_keys = (
+        "age", "redacted_because", "replaces_state", "prev_content",
+        "invite_room_state",
+    )
     for key in move_keys:
         if key in d["unsigned"]:
             d[key] = d["unsigned"][key]
@@ -152,7 +154,8 @@ def serialize_event(e, time_now_ms, as_client_event=True,
 
     if "redacted_because" in e.unsigned:
         d["unsigned"]["redacted_because"] = serialize_event(
-            e.unsigned["redacted_because"], time_now_ms
+            e.unsigned["redacted_because"], time_now_ms,
+            event_format=event_format
         )
 
     if token_id is not None:

@@ -17,6 +17,7 @@
 from twisted.internet import defer
 
 from .federation_base import FederationBase
+from synapse.api.constants import Membership
 from .units import Edu
 
 from synapse.api.errors import (
@@ -356,19 +357,55 @@ class FederationClient(FederationBase):
         defer.returnValue(signed_auth)
 
     @defer.inlineCallbacks
-    def make_join(self, destinations, room_id, user_id):
+    def make_membership_event(self, destinations, room_id, user_id, membership,
+                              content={},):
+        """
+        Creates an m.room.member event, with context, without participating in the room.
+
+        Does so by asking one of the already participating servers to create an
+        event with proper context.
+
+        Note that this does not append any events to any graphs.
+
+        Args:
+            destinations (str): Candidate homeservers which are probably
+                participating in the room.
+            room_id (str): The room in which the event will happen.
+            user_id (str): The user whose membership is being evented.
+            membership (str): The "membership" property of the event. Must be
+                one of "join" or "leave".
+            content (object): Any additional data to put into the content field
+                of the event.
+        Return:
+            A tuple of (origin (str), event (object)) where origin is the remote
+            homeserver which generated the event.
+        """
+        valid_memberships = {Membership.JOIN, Membership.LEAVE}
+        if membership not in valid_memberships:
+            raise RuntimeError(
+                "make_membership_event called with membership='%s', must be one of %s" %
+                (membership, ",".join(valid_memberships))
+            )
         for destination in destinations:
             if destination == self.server_name:
                 continue
 
             try:
-                ret = yield self.transport_layer.make_join(
-                    destination, room_id, user_id
+                ret = yield self.transport_layer.make_membership_event(
+                    destination, room_id, user_id, membership
                 )
 
                 pdu_dict = ret["event"]
 
-                logger.debug("Got response to make_join: %s", pdu_dict)
+                logger.debug("Got response to make_%s: %s", membership, pdu_dict)
+
+                pdu_dict["content"].update(content)
+
+                # The protoevent received over the JSON wire may not have all
+                # the required fields. Lets just gloss over that because
+                # there's some we never care about
+                if "prev_state" not in pdu_dict:
+                    pdu_dict["prev_state"] = []
 
                 defer.returnValue(
                     (destination, self.event_from_pdu_json(pdu_dict))
@@ -378,8 +415,8 @@ class FederationClient(FederationBase):
                 raise
             except Exception as e:
                 logger.warn(
-                    "Failed to make_join via %s: %s",
-                    destination, e.message
+                    "Failed to make_%s via %s: %s",
+                    membership, destination, e.message
                 )
 
         raise RuntimeError("Failed to send to any server.")
@@ -484,6 +521,33 @@ class FederationClient(FederationBase):
         # FIXME: We should handle signature failures more gracefully.
 
         defer.returnValue(pdu)
+
+    @defer.inlineCallbacks
+    def send_leave(self, destinations, pdu):
+        for destination in destinations:
+            if destination == self.server_name:
+                continue
+
+            try:
+                time_now = self._clock.time_msec()
+                _, content = yield self.transport_layer.send_leave(
+                    destination=destination,
+                    room_id=pdu.room_id,
+                    event_id=pdu.event_id,
+                    content=pdu.get_pdu_json(time_now),
+                )
+
+                logger.debug("Got content: %s", content)
+                defer.returnValue(None)
+            except CodeMessageException:
+                raise
+            except Exception as e:
+                logger.exception(
+                    "Failed to send_leave via %s: %s",
+                    destination, e.message
+                )
+
+        raise RuntimeError("Failed to send to any server.")
 
     @defer.inlineCallbacks
     def query_auth(self, destination, room_id, event_id, local_auth):
@@ -643,3 +707,26 @@ class FederationClient(FederationBase):
         event.internal_metadata.outlier = outlier
 
         return event
+
+    @defer.inlineCallbacks
+    def forward_third_party_invite(self, destinations, room_id, event_dict):
+        for destination in destinations:
+            if destination == self.server_name:
+                continue
+
+            try:
+                yield self.transport_layer.exchange_third_party_invite(
+                    destination=destination,
+                    room_id=room_id,
+                    event_dict=event_dict,
+                )
+                defer.returnValue(None)
+            except CodeMessageException:
+                raise
+            except Exception as e:
+                logger.exception(
+                    "Failed to send_third_party_invite via %s: %s",
+                    destination, e.message
+                )
+
+        raise RuntimeError("Failed to send to any server.")

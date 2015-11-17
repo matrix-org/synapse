@@ -22,7 +22,7 @@ class VoipConfig(Config):
         self.turn_shared_secret = config["turn_shared_secret"]
         self.turn_user_lifetime = self.parse_duration(config["turn_user_lifetime"])
 
-    def default_config(self, config_dir_path, server_name):
+    def default_config(self, **kwargs):
         return """\
         ## Turn ##
 

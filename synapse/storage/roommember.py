@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 RoomsForUser = namedtuple(
     "RoomsForUser",
-    ("room_id", "sender", "membership")
+    ("room_id", "sender", "membership", "event_id", "stream_ordering")
 )
 
 
@@ -110,6 +110,33 @@ class RoomMemberStore(SQLBaseStore):
             membership=membership,
         ).addCallback(self._get_events)
 
+    def get_invites_for_user(self, user_id):
+        """ Get all the invite events for a user
+        Args:
+            user_id (str): The user ID.
+        Returns:
+            A deferred list of event objects.
+        """
+
+        return self.get_rooms_for_user_where_membership_is(
+            user_id, [Membership.INVITE]
+        ).addCallback(lambda invites: self._get_events([
+            invites.event_id for invite in invites
+        ]))
+
+    def get_leave_and_ban_events_for_user(self, user_id):
+        """ Get all the leave events for a user
+        Args:
+            user_id (str): The user ID.
+        Returns:
+            A deferred list of event objects.
+        """
+        return self.get_rooms_for_user_where_membership_is(
+            user_id, (Membership.LEAVE, Membership.BAN)
+        ).addCallback(lambda leaves: self._get_events([
+            leave.event_id for leave in leaves
+        ]))
+
     def get_rooms_for_user_where_membership_is(self, user_id, membership_list):
         """ Get all the rooms for this user where the membership for this user
         matches one in the membership list.
@@ -141,11 +168,13 @@ class RoomMemberStore(SQLBaseStore):
         args.extend(membership_list)
 
         sql = (
-            "SELECT m.room_id, m.sender, m.membership"
-            " FROM room_memberships as m"
-            " INNER JOIN current_state_events as c"
-            " ON m.event_id = c.event_id "
-            " AND m.room_id = c.room_id "
+            "SELECT m.room_id, m.sender, m.membership, m.event_id, e.stream_ordering"
+            " FROM current_state_events as c"
+            " INNER JOIN room_memberships as m"
+            " ON m.event_id = c.event_id"
+            " INNER JOIN events as e"
+            " ON e.event_id = c.event_id"
+            " AND m.room_id = c.room_id"
             " AND m.user_id = c.state_key"
             " WHERE %s"
         ) % (where_clause,)
@@ -175,12 +204,6 @@ class RoomMemberStore(SQLBaseStore):
         )
 
         return joined_domains
-
-    def _get_members_query(self, where_clause, where_values):
-        return self.runInteraction(
-            "get_members_query", self._get_members_events_txn,
-            where_clause, where_values
-        ).addCallbacks(self._get_events)
 
     def _get_members_events_txn(self, txn, room_id, membership=None, user_id=None):
         rows = self._get_members_rows_txn(

@@ -33,6 +33,7 @@ class Codes(object):
     NOT_FOUND = "M_NOT_FOUND"
     MISSING_TOKEN = "M_MISSING_TOKEN"
     UNKNOWN_TOKEN = "M_UNKNOWN_TOKEN"
+    GUEST_ACCESS_FORBIDDEN = "M_GUEST_ACCESS_FORBIDDEN"
     LIMIT_EXCEEDED = "M_LIMIT_EXCEEDED"
     CAPTCHA_NEEDED = "M_CAPTCHA_NEEDED"
     CAPTCHA_INVALID = "M_CAPTCHA_INVALID"
@@ -47,7 +48,6 @@ class CodeMessageException(RuntimeError):
     """An exception with integer code and message string attributes."""
 
     def __init__(self, code, msg):
-        logger.info("%s: %s, %s", type(self).__name__, code, msg)
         super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
         self.code = code
         self.msg = msg
@@ -75,11 +75,6 @@ class SynapseError(CodeMessageException):
             self.msg,
             self.errcode,
         )
-
-
-class RoomError(SynapseError):
-    """An error raised when a room event fails."""
-    pass
 
 
 class RegistrationError(SynapseError):
@@ -123,6 +118,15 @@ class AuthError(SynapseError):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.FORBIDDEN
         super(AuthError, self).__init__(*args, **kwargs)
+
+
+class EventSizeError(SynapseError):
+    """An error raised when an event is too big."""
+
+    def __init__(self, *args, **kwargs):
+        if "errcode" not in kwargs:
+            kwargs["errcode"] = Codes.TOO_LARGE
+        super(EventSizeError, self).__init__(413, *args, **kwargs)
 
 
 class EventStreamError(SynapseError):

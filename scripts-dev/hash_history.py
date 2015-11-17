@@ -6,8 +6,8 @@ from synapse.crypto.event_signing import (
     add_event_pdu_content_hash, compute_pdu_event_reference_hash
 )
 from synapse.api.events.utils import prune_pdu
-from syutil.base64util import encode_base64, decode_base64
-from syutil.jsonutil import encode_canonical_json
+from unpaddedbase64 import encode_base64, decode_base64
+from canonicaljson import encode_canonical_json
 import sqlite3
 import sys
 

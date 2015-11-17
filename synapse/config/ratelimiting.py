@@ -27,7 +27,7 @@ class RatelimitConfig(Config):
         self.federation_rc_reject_limit = config["federation_rc_reject_limit"]
         self.federation_rc_concurrent = config["federation_rc_concurrent"]
 
-    def default_config(self, config_dir_path, server_name):
+    def default_config(self, **kwargs):
         return """\
         ## Ratelimiting ##
 

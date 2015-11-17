@@ -16,57 +16,67 @@
 
 import sys
 import os
+import os.path
 import subprocess
 import signal
 import yaml
 
 SYNAPSE = ["python", "-B", "-m", "synapse.app.homeserver"]
 
-CONFIGFILE = "homeserver.yaml"
-
 GREEN = "\x1b[1;32m"
+RED = "\x1b[1;31m"
 NORMAL = "\x1b[m"
 
-if not os.path.exists(CONFIGFILE):
-    sys.stderr.write(
-        "No config file found\n"
-        "To generate a config file, run '%s -c %s --generate-config"
-        " --server-name=<server name>'\n" % (
-            " ".join(SYNAPSE), CONFIGFILE
-        )
-    )
-    sys.exit(1)
 
-CONFIG = yaml.load(open(CONFIGFILE))
-PIDFILE = CONFIG["pid_file"]
-
-
-def start():
+def start(configfile):
     print "Starting ...",
     args = SYNAPSE
-    args.extend(["--daemonize", "-c", CONFIGFILE])
-    subprocess.check_call(args)
-    print GREEN + "started" + NORMAL
+    args.extend(["--daemonize", "-c", configfile])
+
+    try:
+        subprocess.check_call(args)
+        print GREEN + "started" + NORMAL
+    except subprocess.CalledProcessError as e:
+        print (
+            RED +
+            "error starting (exit code: %d); see above for logs" % e.returncode +
+            NORMAL
+        )
 
 
-def stop():
-    if os.path.exists(PIDFILE):
-        pid = int(open(PIDFILE).read())
+def stop(pidfile):
+    if os.path.exists(pidfile):
+        pid = int(open(pidfile).read())
         os.kill(pid, signal.SIGTERM)
         print GREEN + "stopped" + NORMAL
 
 
 def main():
+    configfile = sys.argv[2] if len(sys.argv) == 3 else "homeserver.yaml"
+
+    if not os.path.exists(configfile):
+        sys.stderr.write(
+            "No config file found\n"
+            "To generate a config file, run '%s -c %s --generate-config"
+            " --server-name=<server name>'\n" % (
+                " ".join(SYNAPSE), configfile
+            )
+        )
+        sys.exit(1)
+
+    config = yaml.load(open(configfile))
+    pidfile = config["pid_file"]
+
     action = sys.argv[1] if sys.argv[1:] else "usage"
     if action == "start":
-        start()
+        start(configfile)
     elif action == "stop":
-        stop()
+        stop(pidfile)
     elif action == "restart":
-        stop()
-        start()
+        stop(pidfile)
+        start(configfile)
     else:
-        sys.stderr.write("Usage: %s [start|stop|restart]\n" % (sys.argv[0],))
+        sys.stderr.write("Usage: %s [start|stop|restart] [configfile]\n" % (sys.argv[0],))
         sys.exit(1)
 
 

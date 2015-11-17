@@ -17,7 +17,7 @@ from twisted.internet import defer
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached
-from syutil.base64util import encode_base64
+from unpaddedbase64 import encode_base64
 
 import logging
 from Queue import PriorityQueue, Empty
@@ -151,98 +151,6 @@ class EventFederationStore(SQLBaseStore):
                 if k == "sha256"
             }
             results.append((event_id, prev_hashes, depth))
-
-        return results
-
-    def _get_latest_state_in_room(self, txn, room_id, type, state_key):
-        event_ids = self._simple_select_onecol_txn(
-            txn,
-            table="state_forward_extremities",
-            keyvalues={
-                "room_id": room_id,
-                "type": type,
-                "state_key": state_key,
-            },
-            retcol="event_id",
-        )
-
-        results = []
-        for event_id in event_ids:
-            hashes = self._get_event_reference_hashes_txn(txn, event_id)
-            prev_hashes = {
-                k: encode_base64(v) for k, v in hashes.items()
-                if k == "sha256"
-            }
-            results.append((event_id, prev_hashes))
-
-        return results
-
-    def _get_prev_events(self, txn, event_id):
-        results = self._get_prev_events_and_state(
-            txn,
-            event_id,
-            is_state=0,
-        )
-
-        return [(e_id, h, ) for e_id, h, _ in results]
-
-    def _get_prev_state(self, txn, event_id):
-        results = self._get_prev_events_and_state(
-            txn,
-            event_id,
-            is_state=True,
-        )
-
-        return [(e_id, h, ) for e_id, h, _ in results]
-
-    def _get_prev_events_and_state(self, txn, event_id, is_state=None):
-        keyvalues = {
-            "event_id": event_id,
-        }
-
-        if is_state is not None:
-            keyvalues["is_state"] = bool(is_state)
-
-        res = self._simple_select_list_txn(
-            txn,
-            table="event_edges",
-            keyvalues=keyvalues,
-            retcols=["prev_event_id", "is_state"],
-        )
-
-        hashes = self._get_prev_event_hashes_txn(txn, event_id)
-
-        results = []
-        for d in res:
-            edge_hash = self._get_event_reference_hashes_txn(txn, d["prev_event_id"])
-            edge_hash.update(hashes.get(d["prev_event_id"], {}))
-            prev_hashes = {
-                k: encode_base64(v)
-                for k, v in edge_hash.items()
-                if k == "sha256"
-            }
-            results.append((d["prev_event_id"], prev_hashes, d["is_state"]))
-
-        return results
-
-    def _get_auth_events(self, txn, event_id):
-        auth_ids = self._simple_select_onecol_txn(
-            txn,
-            table="event_auth",
-            keyvalues={
-                "event_id": event_id,
-            },
-            retcol="auth_id",
-        )
-
-        results = []
-        for auth_id in auth_ids:
-            hashes = self._get_event_reference_hashes_txn(txn, auth_id)
-            prev_hashes = {
-                k: encode_base64(v) for k, v in hashes.items()
-                if k == "sha256"
-            }
-            results.append((auth_id, prev_hashes))
 
         return results
 

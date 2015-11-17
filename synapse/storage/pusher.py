@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore, Table
+from ._base import SQLBaseStore
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 
-from syutil.jsonutil import encode_canonical_json
+from canonicaljson import encode_canonical_json
 
 import logging
 import simplejson as json
@@ -149,5 +149,5 @@ class PusherStore(SQLBaseStore):
         )
 
 
-class PushersTable(Table):
+class PushersTable(object):
     table_name = "pushers"

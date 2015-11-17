@@ -20,12 +20,14 @@ from synapse.http.servlet import (
 )
 from synapse.handlers.sync import SyncConfig
 from synapse.types import StreamToken
+from synapse.events import FrozenEvent
 from synapse.events.utils import (
     serialize_event, format_event_for_client_v2_without_event_id,
 )
-from synapse.api.filtering import Filter
+from synapse.api.filtering import FilterCollection
 from ._base import client_v2_pattern
 
+import copy
 import logging
 
 logger = logging.getLogger(__name__)
@@ -36,100 +38,77 @@ class SyncRestServlet(RestServlet):
 
     GET parameters::
         timeout(int): How long to wait for new events in milliseconds.
-        limit(int): Maxiumum number of events per room to return.
-        gap(bool): Create gaps the message history if limit is exceeded to
-            ensure that the client has the most recent messages. Defaults to
-            "true".
-        sort(str,str): tuple of sort key (e.g. "timeline") and direction
-            (e.g. "asc", "desc"). Defaults to "timeline,asc".
         since(batch_token): Batch token when asking for incremental deltas.
         set_presence(str): What state the device presence should be set to.
             default is "online".
-        backfill(bool): Should the HS request message history from other
-            servers. This may take a long time making it unsuitable for clients
-            expecting a prompt response. Defaults to "true".
         filter(filter_id): A filter to apply to the events returned.
-        filter_*: Filter override parameters.
 
     Response JSON::
         {
-            "next_batch": // batch token for the next /sync
-            "private_user_data": // private events for this user.
-            "public_user_data": // public events for all users including the
-                                // public events for this user.
-            "rooms": [{ // List of rooms with updates.
-                "room_id": // Id of the room being updated
-                "limited": // Was the per-room event limit exceeded?
-                "published": // Is the room published by our HS?
+          "next_batch": // batch token for the next /sync
+          "presence": // presence data for the user.
+          "rooms": {
+            "joined": { // Joined rooms being updated.
+              "${room_id}": { // Id of the room being updated
                 "event_map": // Map of EventID -> event JSON.
-                "events": { // The recent events in the room if gap is "true"
-                            // otherwise the next events in the room.
-                    "batch": [] // list of EventIDs in the "event_map".
-                    "prev_batch": // back token for getting previous events.
+                "timeline": { // The recent events in the room if gap is "true"
+                  "limited": // Was the per-room event limit exceeded?
+                             // otherwise the next events in the room.
+                  "events": [] // list of EventIDs in the "event_map".
+                  "prev_batch": // back token for getting previous events.
                 }
-                "state": [] // list of EventIDs updating the current state to
-                            // be what it should be at the end of the batch.
-                "ephemeral": []
-            }]
+                "state": {"events": []} // list of EventIDs updating the
+                                        // current state to be what it should
+                                        // be at the end of the batch.
+                "ephemeral": {"events": []} // list of event objects
+              }
+            },
+            "invited": {}, // Invited rooms being updated.
+            "archived": {} // Archived rooms being updated.
+          }
         }
     """
 
     PATTERN = client_v2_pattern("/sync$")
-    ALLOWED_SORT = set(["timeline,asc", "timeline,desc"])
-    ALLOWED_PRESENCE = set(["online", "offline", "idle"])
+    ALLOWED_PRESENCE = set(["online", "offline"])
 
     def __init__(self, hs):
         super(SyncRestServlet, self).__init__()
         self.auth = hs.get_auth()
+        self.event_stream_handler = hs.get_handlers().event_stream_handler
         self.sync_handler = hs.get_handlers().sync_handler
         self.clock = hs.get_clock()
         self.filtering = hs.get_filtering()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        user, client = yield self.auth.get_user_by_req(request)
+        user, token_id, _ = yield self.auth.get_user_by_req(request)
 
         timeout = parse_integer(request, "timeout", default=0)
-        limit = parse_integer(request, "limit", required=True)
-        gap = parse_boolean(request, "gap", default=True)
-        sort = parse_string(
-            request, "sort", default="timeline,asc",
-            allowed_values=self.ALLOWED_SORT
-        )
         since = parse_string(request, "since")
         set_presence = parse_string(
             request, "set_presence", default="online",
             allowed_values=self.ALLOWED_PRESENCE
         )
-        backfill = parse_boolean(request, "backfill", default=False)
         filter_id = parse_string(request, "filter", default=None)
+        full_state = parse_boolean(request, "full_state", default=False)
 
         logger.info(
-            "/sync: user=%r, timeout=%r, limit=%r, gap=%r, sort=%r, since=%r,"
-            " set_presence=%r, backfill=%r, filter_id=%r" % (
-                user, timeout, limit, gap, sort, since, set_presence,
-                backfill, filter_id
+            "/sync: user=%r, timeout=%r, since=%r,"
+            " set_presence=%r, filter_id=%r" % (
+                user, timeout, since, set_presence, filter_id
             )
         )
 
-        # TODO(mjark): Load filter and apply overrides.
         try:
             filter = yield self.filtering.get_user_filter(
                 user.localpart, filter_id
             )
         except:
-            filter = Filter({})
-        # filter = filter.apply_overrides(http_request)
-        # if filter.matches(event):
-        #   # stuff
+            filter = FilterCollection({})
 
         sync_config = SyncConfig(
             user=user,
-            client_info=client,
-            gap=gap,
-            limit=limit,
-            sort=sort,
-            backfill=backfill,
             filter=filter,
         )
 
@@ -138,43 +117,154 @@ class SyncRestServlet(RestServlet):
         else:
             since_token = None
 
-        sync_result = yield self.sync_handler.wait_for_sync_for_user(
-            sync_config, since_token=since_token, timeout=timeout
-        )
+        if set_presence == "online":
+            yield self.event_stream_handler.started_stream(user)
+
+        try:
+            sync_result = yield self.sync_handler.wait_for_sync_for_user(
+                sync_config, since_token=since_token, timeout=timeout,
+                full_state=full_state
+            )
+        finally:
+            if set_presence == "online":
+                self.event_stream_handler.stopped_stream(user)
 
         time_now = self.clock.time_msec()
 
+        joined = self.encode_joined(
+            sync_result.joined, filter, time_now, token_id
+        )
+
+        invited = self.encode_invited(
+            sync_result.invited, filter, time_now, token_id
+        )
+
+        archived = self.encode_archived(
+            sync_result.archived, filter, time_now, token_id
+        )
+
         response_content = {
-            "public_user_data": self.encode_user_data(
-                sync_result.public_user_data, filter, time_now
+            "presence": self.encode_presence(
+                sync_result.presence, filter, time_now
             ),
-            "private_user_data": self.encode_user_data(
-                sync_result.private_user_data, filter, time_now
-            ),
-            "rooms": self.encode_rooms(
-                sync_result.rooms, filter, time_now, client.token_id
-            ),
+            "rooms": {
+                "joined": joined,
+                "invited": invited,
+                "archived": archived,
+            },
             "next_batch": sync_result.next_batch.to_string(),
         }
 
         defer.returnValue((200, response_content))
 
-    def encode_user_data(self, events, filter, time_now):
-        return events
+    def encode_presence(self, events, filter, time_now):
+        formatted = []
+        for event in events:
+            event = copy.deepcopy(event)
+            event['sender'] = event['content'].pop('user_id')
+            formatted.append(event)
+        return {"events": filter.filter_presence(formatted)}
 
-    def encode_rooms(self, rooms, filter, time_now, token_id):
-        return [
-            self.encode_room(room, filter, time_now, token_id)
-            for room in rooms
-        ]
+    def encode_joined(self, rooms, filter, time_now, token_id):
+        """
+        Encode the joined rooms in a sync result
+
+        :param list[synapse.handlers.sync.JoinedSyncResult] rooms: list of sync
+            results for rooms this user is joined to
+        :param FilterCollection filter: filters to apply to the results
+        :param int time_now: current time - used as a baseline for age
+            calculations
+        :param int token_id: ID of the user's auth token - used for namespacing
+            of transaction IDs
+
+        :return: the joined rooms list, in our response format
+        :rtype: dict[str, dict[str, object]]
+        """
+        joined = {}
+        for room in rooms:
+            joined[room.room_id] = self.encode_room(
+                room, filter, time_now, token_id
+            )
+
+        return joined
+
+    def encode_invited(self, rooms, filter, time_now, token_id):
+        """
+        Encode the invited rooms in a sync result
+
+        :param list[synapse.handlers.sync.InvitedSyncResult] rooms: list of
+             sync results for rooms this user is joined to
+        :param FilterCollection filter: filters to apply to the results
+        :param int time_now: current time - used as a baseline for age
+            calculations
+        :param int token_id: ID of the user's auth token - used for namespacing
+            of transaction IDs
+
+        :return: the invited rooms list, in our response format
+        :rtype: dict[str, dict[str, object]]
+        """
+        invited = {}
+        for room in rooms:
+            invite = serialize_event(
+                room.invite, time_now, token_id=token_id,
+                event_format=format_event_for_client_v2_without_event_id,
+            )
+            invited_state = invite.get("unsigned", {}).pop("invite_room_state", [])
+            invited_state.append(invite)
+            invited[room.room_id] = {
+                "invite_state": {"events": invited_state}
+            }
+
+        return invited
+
+    def encode_archived(self, rooms, filter, time_now, token_id):
+        """
+        Encode the archived rooms in a sync result
+
+        :param list[synapse.handlers.sync.ArchivedSyncResult] rooms: list of
+             sync results for rooms this user is joined to
+        :param FilterCollection filter: filters to apply to the results
+        :param int time_now: current time - used as a baseline for age
+            calculations
+        :param int token_id: ID of the user's auth token - used for namespacing
+            of transaction IDs
+
+        :return: the invited rooms list, in our response format
+        :rtype: dict[str, dict[str, object]]
+        """
+        joined = {}
+        for room in rooms:
+            joined[room.room_id] = self.encode_room(
+                room, filter, time_now, token_id, joined=False
+            )
+
+        return joined
 
     @staticmethod
-    def encode_room(room, filter, time_now, token_id):
+    def encode_room(room, filter, time_now, token_id, joined=True):
+        """
+        :param JoinedSyncResult|ArchivedSyncResult room: sync result for a
+            single room
+        :param FilterCollection filter: filters to apply to the results
+        :param int time_now: current time - used as a baseline for age
+            calculations
+        :param int token_id: ID of the user's auth token - used for namespacing
+            of transaction IDs
+        :param joined: True if the user is joined to this room - will mean
+            we handle ephemeral events
+
+        :return: the room, encoded in our response format
+        :rtype: dict[str, object]
+        """
         event_map = {}
-        state_events = filter.filter_room_state(room.state)
-        recent_events = filter.filter_room_events(room.events)
+        state_dict = room.state
+        timeline_events = filter.filter_room_timeline(room.timeline.events)
+
+        state_dict = SyncRestServlet._rollback_state_for_timeline(
+            state_dict, timeline_events)
+
+        state_events = filter.filter_room_state(state_dict.values())
         state_event_ids = []
-        recent_event_ids = []
         for event in state_events:
             # TODO(mjark): Respect formatting requirements in the filter.
             event_map[event.event_id] = serialize_event(
@@ -183,25 +273,91 @@ class SyncRestServlet(RestServlet):
             )
             state_event_ids.append(event.event_id)
 
-        for event in recent_events:
+        timeline_event_ids = []
+        for event in timeline_events:
             # TODO(mjark): Respect formatting requirements in the filter.
             event_map[event.event_id] = serialize_event(
                 event, time_now, token_id=token_id,
                 event_format=format_event_for_client_v2_without_event_id,
             )
-            recent_event_ids.append(event.event_id)
+            timeline_event_ids.append(event.event_id)
+
+        private_user_data = filter.filter_room_private_user_data(
+            room.private_user_data
+        )
+
         result = {
-            "room_id": room.room_id,
             "event_map": event_map,
-            "events": {
-                "batch": recent_event_ids,
-                "prev_batch": room.prev_batch.to_string(),
+            "timeline": {
+                "events": timeline_event_ids,
+                "prev_batch": room.timeline.prev_batch.to_string(),
+                "limited": room.timeline.limited,
             },
-            "state": state_event_ids,
-            "limited": room.limited,
-            "published": room.published,
-            "ephemeral": room.ephemeral,
+            "state": {"events": state_event_ids},
+            "private_user_data": {"events": private_user_data},
         }
+
+        if joined:
+            ephemeral_events = filter.filter_room_ephemeral(room.ephemeral)
+            result["ephemeral"] = {"events": ephemeral_events}
+
+        return result
+
+    @staticmethod
+    def _rollback_state_for_timeline(state, timeline):
+        """
+        Wind the state dictionary backwards, so that it represents the
+        state at the start of the timeline, rather than at the end.
+
+        :param dict[(str, str), synapse.events.EventBase] state: the
+            state dictionary. Will be updated to the state before the timeline.
+        :param list[synapse.events.EventBase] timeline: the event timeline
+        :return: updated state dictionary
+        """
+        logger.debug("Processing state dict %r; timeline %r", state,
+                     [e.get_dict() for e in timeline])
+
+        result = state.copy()
+
+        for timeline_event in reversed(timeline):
+            if not timeline_event.is_state():
+                continue
+
+            event_key = (timeline_event.type, timeline_event.state_key)
+
+            logger.debug("Considering %s for removal", event_key)
+
+            state_event = result.get(event_key)
+            if (state_event is None or
+                    state_event.event_id != timeline_event.event_id):
+                # the event in the timeline isn't present in the state
+                # dictionary.
+                #
+                # the most likely cause for this is that there was a fork in
+                # the event graph, and the state is no longer valid. Really,
+                # the event shouldn't be in the timeline. We're going to ignore
+                # it for now, however.
+                logger.warn("Found state event %r in timeline which doesn't "
+                            "match state dictionary", timeline_event)
+                continue
+
+            prev_event_id = timeline_event.unsigned.get("replaces_state", None)
+            logger.debug("Replacing %s with %s in state dict",
+                         timeline_event.event_id, prev_event_id)
+
+            if prev_event_id is None:
+                del result[event_key]
+            else:
+                result[event_key] = FrozenEvent({
+                    "type": timeline_event.type,
+                    "state_key": timeline_event.state_key,
+                    "content": timeline_event.unsigned['prev_content'],
+                    "sender": timeline_event.unsigned['prev_sender'],
+                    "event_id": prev_event_id,
+                    "room_id": timeline_event.room_id,
+                })
+            logger.debug("New value: %r", result.get(event_key))
+
         return result
 
 

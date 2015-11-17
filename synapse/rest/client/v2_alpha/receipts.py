@@ -15,6 +15,7 @@
 
 from twisted.internet import defer
 
+from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet
 from ._base import client_v2_pattern
 
@@ -39,7 +40,10 @@ class ReceiptRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, receipt_type, event_id):
-        user, client = yield self.auth.get_user_by_req(request)
+        user, _, _ = yield self.auth.get_user_by_req(request)
+
+        if receipt_type != "m.read":
+            raise SynapseError(400, "Receipt type must be 'm.read'")
 
         yield self.receipts_handler.received_client_receipt(
             room_id,

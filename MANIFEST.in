@@ -3,13 +3,23 @@ include LICENSE
 include VERSION
 include *.rst
 include demo/README
+include demo/demo.tls.dh
+include demo/*.py
+include demo/*.sh
 
 recursive-include synapse/storage/schema *.sql
 recursive-include synapse/storage/schema *.py
 
-recursive-include demo *.dh
-recursive-include demo *.py
-recursive-include demo *.sh
 recursive-include docs *
 recursive-include scripts *
+recursive-include scripts-dev *
 recursive-include tests *.py
+
+recursive-include synapse/static *.css
+recursive-include synapse/static *.gif
+recursive-include synapse/static *.html
+recursive-include synapse/static *.js
+
+exclude jenkins.sh
+
+prune demo/etc

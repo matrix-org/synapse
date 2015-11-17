@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import argparse
+import errno
 import os
 import yaml
 import sys
@@ -25,6 +26,16 @@ class ConfigError(Exception):
 
 
 class Config(object):
+
+    stats_reporting_begging_spiel = (
+        "We would really appreciate it if you could help our project out by"
+        " reporting anonymized usage statistics from your homeserver. Only very"
+        " basic aggregate data (e.g. number of users) will be reported, but it"
+        " helps us to track the growth of the Matrix community, and helps us to"
+        " make Matrix a success, as well as to convince other networks that they"
+        " should peer with us."
+        "\nThank you."
+    )
 
     @staticmethod
     def parse_size(value):
@@ -81,8 +92,11 @@ class Config(object):
     @classmethod
     def ensure_directory(cls, dir_path):
         dir_path = cls.abspath(dir_path)
-        if not os.path.exists(dir_path):
+        try:
             os.makedirs(dir_path)
+        except OSError, e:
+            if e.errno != errno.EEXIST:
+                raise
         if not os.path.isdir(dir_path):
             raise ConfigError(
                 "%s is not a directory" % (dir_path,)
@@ -111,11 +125,14 @@ class Config(object):
                 results.append(getattr(cls, name)(self, *args, **kargs))
         return results
 
-    def generate_config(self, config_dir_path, server_name):
+    def generate_config(self, config_dir_path, server_name, report_stats=None):
         default_config = "# vim:ft=yaml\n"
 
         default_config += "\n\n".join(dedent(conf) for conf in self.invoke_all(
-            "default_config", config_dir_path, server_name
+            "default_config",
+            config_dir_path=config_dir_path,
+            server_name=server_name,
+            report_stats=report_stats,
         ))
 
         config = yaml.load(default_config)
@@ -138,6 +155,12 @@ class Config(object):
             "--generate-config",
             action="store_true",
             help="Generate a config file for the server name"
+        )
+        config_parser.add_argument(
+            "--report-stats",
+            action="store",
+            help="Stuff",
+            choices=["yes", "no"]
         )
         config_parser.add_argument(
             "--generate-keys",
@@ -189,6 +212,11 @@ class Config(object):
                     config_files.append(config_path)
 
         if config_args.generate_config:
+            if config_args.report_stats is None:
+                config_parser.error(
+                    "Please specify either --report-stats=yes or --report-stats=no\n\n" +
+                    cls.stats_reporting_begging_spiel
+                )
             if not config_files:
                 config_parser.error(
                     "Must supply a config file.\nA config file can be automatically"
@@ -211,7 +239,9 @@ class Config(object):
                     os.makedirs(config_dir_path)
                 with open(config_path, "wb") as config_file:
                     config_bytes, config = obj.generate_config(
-                        config_dir_path, server_name
+                        config_dir_path=config_dir_path,
+                        server_name=server_name,
+                        report_stats=(config_args.report_stats == "yes"),
                     )
                     obj.invoke_all("generate_files", config)
                     config_file.write(config_bytes)
@@ -261,9 +291,20 @@ class Config(object):
             specified_config.update(yaml_config)
 
         server_name = specified_config["server_name"]
-        _, config = obj.generate_config(config_dir_path, server_name)
+        _, config = obj.generate_config(
+            config_dir_path=config_dir_path,
+            server_name=server_name
+        )
         config.pop("log_config")
         config.update(specified_config)
+        if "report_stats" not in config:
+            sys.stderr.write(
+                "Please opt in or out of reporting anonymized homeserver usage "
+                "statistics, by setting the report_stats key in your config file "
+                " ( " + config_path + " ) " +
+                "to either True or False.\n\n" +
+                Config.stats_reporting_begging_spiel + "\n")
+            sys.exit(1)
 
         if generate_keys:
             obj.invoke_all("generate_files", config)

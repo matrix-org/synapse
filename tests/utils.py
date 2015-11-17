@@ -16,7 +16,7 @@
 from synapse.http.server import HttpServer
 from synapse.api.errors import cs_error, CodeMessageException, StoreError
 from synapse.api.constants import EventTypes
-from synapse.storage import prepare_database
+from synapse.storage.prepare_database import prepare_database
 from synapse.storage.engines import create_engine
 from synapse.server import HomeServer
 
@@ -27,6 +27,7 @@ from twisted.enterprise.adbapi import ConnectionPool
 
 from collections import namedtuple
 from mock import patch, Mock
+import hashlib
 import urllib
 import urlparse
 
@@ -44,6 +45,8 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.signing_key = [MockKey()]
         config.event_cache_size = 1
         config.disable_registration = False
+        config.macaroon_secret_key = "not even a little secret"
+        config.server_name = "server.under.test"
 
     if "clock" not in kargs:
         kargs["clock"] = MockClock()
@@ -64,6 +67,18 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
             database_engine=create_engine("sqlite3"),
             **kargs
         )
+
+    # bcrypt is far too slow to be doing in unit tests
+    def swap_out_hash_for_testing(old_build_handlers):
+        def build_handlers():
+            handlers = old_build_handlers()
+            auth_handler = handlers.auth_handler
+            auth_handler.hash = lambda p: hashlib.md5(p).hexdigest()
+            auth_handler.validate_hash = lambda p, h: hashlib.md5(p).hexdigest() == h
+            return handlers
+        return build_handlers
+
+    hs.build_handlers = swap_out_hash_for_testing(hs.build_handlers)
 
     defer.returnValue(hs)
 
@@ -228,6 +243,9 @@ class MockClock(object):
             else:
                 self.timers.append(t)
 
+    def advance_time_msec(self, ms):
+        self.advance_time(ms / 1000.)
+
 
 class SQLiteMemoryDbPool(ConnectionPool, object):
     def __init__(self):
@@ -275,12 +293,10 @@ class MemoryDataStore(object):
             raise StoreError(400, "User in use.")
         self.tokens_to_users[token] = user_id
 
-    def get_user_by_token(self, token):
+    def get_user_by_access_token(self, token):
         try:
             return {
                 "name": self.tokens_to_users[token],
-                "admin": 0,
-                "device_id": None,
             }
         except:
             raise StoreError(400, "User does not exist.")
@@ -322,7 +338,7 @@ class MemoryDataStore(object):
         ]
 
     def get_room_events_stream(self, user_id=None, from_key=None, to_key=None,
-                            room_id=None, limit=0, with_feedback=False):
+                            limit=0, with_feedback=False):
         return ([], from_key)  # TODO
 
     def get_joined_hosts_for_room(self, room_id):
@@ -378,7 +394,7 @@ class MemoryDataStore(object):
     def get_ops_levels(self, room_id):
         return defer.succeed((5, 5, 5))
 
-    def insert_client_ip(self, user, device_id, access_token, ip, user_agent):
+    def insert_client_ip(self, user, access_token, ip, user_agent):
         return defer.succeed(None)
 
 

@@ -43,14 +43,13 @@ class V2AlphaRestTestCase(unittest.TestCase):
             resource_for_federation=self.mock_resource,
         )
 
-        def _get_user_by_token(token=None):
+        def _get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.USER_ID),
-                "admin": False,
-                "device_id": None,
                 "token_id": 1,
+                "is_guest": False,
             }
-        hs.get_auth().get_user_by_token = _get_user_by_token
+        hs.get_auth()._get_user_by_access_token = _get_user_by_access_token
 
         for r in self.TO_REGISTER:
             r.register_servlets(hs, self.mock_resource)

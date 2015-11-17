@@ -27,7 +27,7 @@ class PusherRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        user, client = yield self.auth.get_user_by_req(request)
+        user, token_id, _ = yield self.auth.get_user_by_req(request)
 
         content = _parse_json(request)
 
@@ -65,7 +65,7 @@ class PusherRestServlet(ClientV1RestServlet):
         try:
             yield pusher_pool.add_pusher(
                 user_name=user.to_string(),
-                access_token=client.token_id,
+                access_token=token_id,
                 profile_tag=content['profile_tag'],
                 kind=content['kind'],
                 app_id=content['app_id'],

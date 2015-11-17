@@ -24,7 +24,7 @@ class CaptchaConfig(Config):
         self.captcha_bypass_secret = config.get("captcha_bypass_secret")
         self.recaptcha_siteverify_api = config["recaptcha_siteverify_api"]
 
-    def default_config(self, config_dir_path, server_name):
+    def default_config(self, **kwargs):
         return """\
         ## Captcha ##
 

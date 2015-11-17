@@ -73,6 +73,8 @@ class RoomStoreTestCase(unittest.TestCase):
             "room_id": self.room.to_string(),
             "topic": None,
             "aliases": [self.alias.to_string()],
+            "world_readable": False,
+            "guest_can_join": False,
         }, rooms[0])
 
 
@@ -85,7 +87,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
         # Room events need the full datastore, for persist_event() and
         # get_room_state()
         self.store = hs.get_datastore()
-        self.event_factory = hs.get_event_factory();
+        self.event_factory = hs.get_event_factory()
 
         self.room = RoomID.from_string("!abcde:test")
 

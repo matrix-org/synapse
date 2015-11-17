@@ -33,7 +33,7 @@ class SAML2Config(Config):
     def read_config(self, config):
         saml2_config = config.get("saml2_config", None)
         if saml2_config:
-            self.saml2_enabled = True
+            self.saml2_enabled = saml2_config.get("enabled", True)
             self.saml2_config_path = saml2_config["config_path"]
             self.saml2_idp_redirect_url = saml2_config["idp_redirect_url"]
         else:
@@ -41,7 +41,7 @@ class SAML2Config(Config):
             self.saml2_config_path = None
             self.saml2_idp_redirect_url = None
 
-    def default_config(self, config_dir_path, server_name):
+    def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Enable SAML2 for registration and login. Uses pysaml2
         # config_path:      Path to the sp_conf.py configuration file
@@ -49,6 +49,7 @@ class SAML2Config(Config):
         #                   the user back to /login/saml2 with proper info.
         # See pysaml2 docs for format of config.
         #saml2_config:
+        #   enabled: true
         #   config_path: "%s/sp_conf.py"
         #   idp_redirect_url: "http://%s/idp"
         """ % (config_dir_path, server_name)

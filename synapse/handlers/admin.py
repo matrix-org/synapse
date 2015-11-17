@@ -34,6 +34,7 @@ class AdminHandler(BaseHandler):
 
         d = {}
         for r in res:
+            # Note that device_id is always None
             device = d.setdefault(r["device_id"], {})
             session = device.setdefault(r["access_token"], [])
             session.append({

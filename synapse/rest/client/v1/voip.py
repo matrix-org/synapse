@@ -28,7 +28,7 @@ class VoipRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        auth_user, client = yield self.auth.get_user_by_req(request)
+        auth_user, _, _ = yield self.auth.get_user_by_req(request)
 
         turnUris = self.hs.config.turn_uris
         turnSecret = self.hs.config.turn_shared_secret
@@ -40,7 +40,7 @@ class VoipRestServlet(ClientV1RestServlet):
         username = "%d:%s" % (expiry, auth_user.to_string())
 
         mac = hmac.new(turnSecret, msg=username, digestmod=hashlib.sha1)
-        # We need to use standard base64 encoding here, *not* syutil's
+        # We need to use standard padded base64 encoding here
         # encode_base64 because we need to add the standard padding to get the
         # same result as the TURN server.
         password = base64.b64encode(mac.digest())

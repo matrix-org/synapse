@@ -4,10 +4,10 @@ import sys
 import json
 import time
 import hashlib
-from syutil.base64util import encode_base64
-from syutil.crypto.signing_key import read_signing_keys
-from syutil.crypto.jsonsign import sign_json
-from syutil.jsonutil import encode_canonical_json
+from unpaddedbase64 import encode_base64
+from signedjson.key import read_signing_keys
+from signedjson.sign import sign_json
+from canonicaljson import encode_canonical_json
 
 
 def select_v1_keys(connection):

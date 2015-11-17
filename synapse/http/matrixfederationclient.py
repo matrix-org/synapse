@@ -25,16 +25,17 @@ from synapse.util.async import sleep
 from synapse.util.logcontext import preserve_context_over_fn
 import synapse.metrics
 
-from syutil.jsonutil import encode_canonical_json
+from canonicaljson import encode_canonical_json
 
 from synapse.api.errors import (
     SynapseError, Codes, HttpResponseException,
 )
 
-from syutil.crypto.jsonsign import sign_json
+from signedjson.sign import sign_json
 
 import simplejson as json
 import logging
+import random
 import sys
 import urllib
 import urlparse
@@ -55,16 +56,19 @@ incoming_responses_counter = metrics.register_counter(
 )
 
 
+MAX_RETRIES = 10
+
+
 class MatrixFederationEndpointFactory(object):
     def __init__(self, hs):
-        self.tls_context_factory = hs.tls_context_factory
+        self.tls_server_context_factory = hs.tls_server_context_factory
 
     def endpointForURI(self, uri):
         destination = uri.netloc
 
         return matrix_federation_endpoint(
             reactor, destination, timeout=10,
-            ssl_context_factory=self.tls_context_factory
+            ssl_context_factory=self.tls_server_context_factory
         )
 
 
@@ -119,7 +123,7 @@ class MatrixFederationHttpClient(object):
 
         # XXX: Would be much nicer to retry only at the transaction-layer
         # (once we have reliable transactions in place)
-        retries_left = 5
+        retries_left = MAX_RETRIES
 
         http_url_bytes = urlparse.urlunparse(
             ("", "", path_bytes, param_bytes, query_bytes, "")
@@ -180,7 +184,10 @@ class MatrixFederationHttpClient(object):
                     )
 
                     if retries_left and not timeout:
-                        yield sleep(2 ** (5 - retries_left))
+                        delay = 4 ** (MAX_RETRIES + 1 - retries_left)
+                        delay = max(delay, 60)
+                        delay *= random.uniform(0.8, 1.4)
+                        yield sleep(delay)
                         retries_left -= 1
                     else:
                         raise

@@ -47,7 +47,7 @@ class DomainSpecificString(
     @classmethod
     def from_string(cls, s):
         """Parse the string given by 's' into a structure object."""
-        if s[0] != cls.SIGIL:
+        if len(s) < 1 or s[0] != cls.SIGIL:
             raise SynapseError(400, "Expected %s string to start with '%s'" % (
                 cls.__name__, cls.SIGIL,
             ))
@@ -98,10 +98,13 @@ class EventID(DomainSpecificString):
 
 
 class StreamToken(
-    namedtuple(
-        "Token",
-        ("room_key", "presence_key", "typing_key", "receipt_key")
-    )
+    namedtuple("Token", (
+        "room_key",
+        "presence_key",
+        "typing_key",
+        "receipt_key",
+        "private_user_data_key",
+    ))
 ):
     _SEPARATOR = "_"
 
@@ -109,7 +112,7 @@ class StreamToken(
     def from_string(cls, string):
         try:
             keys = string.split(cls._SEPARATOR)
-            if len(keys) == len(cls._fields) - 1:
+            while len(keys) < len(cls._fields):
                 # i.e. old token from before receipt_key
                 keys.append("0")
             return cls(*keys)
@@ -128,13 +131,14 @@ class StreamToken(
         else:
             return int(self.room_key[1:].split("-")[-1])
 
-    def is_after(self, other_token):
+    def is_after(self, other):
         """Does this token contain events that the other doesn't?"""
         return (
-            (other_token.room_stream_id < self.room_stream_id)
-            or (int(other_token.presence_key) < int(self.presence_key))
-            or (int(other_token.typing_key) < int(self.typing_key))
-            or (int(other_token.receipt_key) < int(self.receipt_key))
+            (other.room_stream_id < self.room_stream_id)
+            or (int(other.presence_key) < int(self.presence_key))
+            or (int(other.typing_key) < int(self.typing_key))
+            or (int(other.receipt_key) < int(self.receipt_key))
+            or (int(other.private_user_data_key) < int(self.private_user_data_key))
         )
 
     def copy_and_advance(self, key, new_value):
@@ -209,7 +213,3 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
             return "t%d-%d" % (self.topological, self.stream)
         else:
             return "s%d" % (self.stream,)
-
-
-# token_id is the primary key ID of the access token, not the access token itself.
-ClientInfo = namedtuple("ClientInfo", ("device_id", "token_id"))

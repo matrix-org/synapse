@@ -17,7 +17,7 @@
 from __future__ import absolute_import
 
 import logging
-from resource import getrusage, getpagesize, RUSAGE_SELF
+from resource import getrusage, RUSAGE_SELF
 import functools
 import os
 import stat
@@ -100,7 +100,6 @@ def render_all():
 # process resource usage
 
 rusage = None
-PAGE_SIZE = getpagesize()
 
 
 def update_resource_metrics():
@@ -113,8 +112,8 @@ resource_metrics = get_metrics_for("process.resource")
 resource_metrics.register_callback("utime", lambda: rusage.ru_utime * 1000)
 resource_metrics.register_callback("stime", lambda: rusage.ru_stime * 1000)
 
-# pages
-resource_metrics.register_callback("maxrss", lambda: rusage.ru_maxrss * PAGE_SIZE)
+# kilobytes
+resource_metrics.register_callback("maxrss", lambda: rusage.ru_maxrss * 1024)
 
 TYPES = {
     stat.S_IFSOCK: "SOCK",
@@ -130,6 +129,10 @@ TYPES = {
 def _process_fds():
     counts = {(k,): 0 for k in TYPES.values()}
     counts[("other",)] = 0
+
+    # Not every OS will have a /proc/self/fd directory
+    if not os.path.exists("/proc/self/fd"):
+        return counts
 
     for fd in os.listdir("/proc/self/fd"):
         try:

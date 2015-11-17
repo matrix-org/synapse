@@ -18,7 +18,7 @@ from synapse.util.caches.descriptors import cached
 
 from collections import namedtuple
 
-from syutil.jsonutil import encode_canonical_json
+from canonicaljson import encode_canonical_json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ class TransactionStore(SQLBaseStore):
             allow_none=True,
         )
 
-        if result and result.response_code:
+        if result and result["response_code"]:
             return result["response_code"], result["response_json"]
         else:
             return None
@@ -253,16 +253,6 @@ class TransactionStore(SQLBaseStore):
             retry_interval (int) - how long until next retry in ms
         """
 
-        # As this is the new value, we might as well prefill the cache
-        self.get_destination_retry_timings.prefill(
-            destination,
-            {
-                "destination": destination,
-                "retry_last_ts": retry_last_ts,
-                "retry_interval": retry_interval
-            },
-        )
-
         # XXX: we could chose to not bother persisting this if our cache thinks
         # this is a NOOP
         return self.runInteraction(
@@ -275,30 +265,24 @@ class TransactionStore(SQLBaseStore):
 
     def _set_destination_retry_timings(self, txn, destination,
                                        retry_last_ts, retry_interval):
-        query = (
-            "UPDATE destinations"
-            " SET retry_last_ts = ?, retry_interval = ?"
-            " WHERE destination = ?"
-        )
+        txn.call_after(self.get_destination_retry_timings.invalidate, (destination,))
 
-        txn.execute(
-            query,
-            (
-                retry_last_ts, retry_interval, destination,
-            )
+        self._simple_upsert_txn(
+            txn,
+            "destinations",
+            keyvalues={
+                "destination": destination,
+            },
+            values={
+                "retry_last_ts": retry_last_ts,
+                "retry_interval": retry_interval,
+            },
+            insertion_values={
+                "destination": destination,
+                "retry_last_ts": retry_last_ts,
+                "retry_interval": retry_interval,
+            }
         )
-
-        if txn.rowcount == 0:
-            # destination wasn't already in table. Insert it.
-            self._simple_insert_txn(
-                txn,
-                table="destinations",
-                values={
-                    "destination": destination,
-                    "retry_last_ts": retry_last_ts,
-                    "retry_interval": retry_interval,
-                }
-            )
 
     def get_destinations_needing_retry(self):
         """Get all destinations which are due a retry for sending a transaction.

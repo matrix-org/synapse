@@ -19,6 +19,7 @@ from synapse.api.errors import StoreError
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks
+from .engines import PostgresEngine, Sqlite3Engine
 
 import collections
 import logging
@@ -98,34 +99,39 @@ class RoomStore(SQLBaseStore):
         """
 
         def f(txn):
-            topic_subquery = (
-                "SELECT topics.event_id as event_id, "
-                "topics.room_id as room_id, topic "
-                "FROM topics "
-                "INNER JOIN current_state_events as c "
-                "ON c.event_id = topics.event_id "
-            )
+            def subquery(table_name, column_name=None):
+                column_name = column_name or table_name
+                return (
+                    "SELECT %(table_name)s.event_id as event_id, "
+                    "%(table_name)s.room_id as room_id, %(column_name)s "
+                    "FROM %(table_name)s "
+                    "INNER JOIN current_state_events as c "
+                    "ON c.event_id = %(table_name)s.event_id " % {
+                        "column_name": column_name,
+                        "table_name": table_name,
+                    }
+                )
 
-            name_subquery = (
-                "SELECT room_names.event_id as event_id, "
-                "room_names.room_id as room_id, name "
-                "FROM room_names "
-                "INNER JOIN current_state_events as c "
-                "ON c.event_id = room_names.event_id "
-            )
-
-            # We use non printing ascii character US (\x1F) as a separator
             sql = (
-                "SELECT r.room_id, max(n.name), max(t.topic)"
+                "SELECT"
+                "    r.room_id,"
+                "    max(n.name),"
+                "    max(t.topic),"
+                "    max(v.history_visibility),"
+                "    max(g.guest_access)"
                 " FROM rooms AS r"
                 " LEFT JOIN (%(topic)s) AS t ON t.room_id = r.room_id"
                 " LEFT JOIN (%(name)s) AS n ON n.room_id = r.room_id"
+                " LEFT JOIN (%(history_visibility)s) AS v ON v.room_id = r.room_id"
+                " LEFT JOIN (%(guest_access)s) AS g ON g.room_id = r.room_id"
                 " WHERE r.is_public = ?"
-                " GROUP BY r.room_id"
-            ) % {
-                "topic": topic_subquery,
-                "name": name_subquery,
-            }
+                " GROUP BY r.room_id" % {
+                    "topic": subquery("topics", "topic"),
+                    "name": subquery("room_names", "name"),
+                    "history_visibility": subquery("history_visibility"),
+                    "guest_access": subquery("guest_access"),
+                }
+            )
 
             txn.execute(sql, (is_public,))
 
@@ -155,10 +161,12 @@ class RoomStore(SQLBaseStore):
                 "room_id": r[0],
                 "name": r[1],
                 "topic": r[2],
-                "aliases": r[3],
+                "world_readable": r[3] == "world_readable",
+                "guest_can_join": r[4] == "can_join",
+                "aliases": r[5],
             }
             for r in rows
-            if r[3]  # We only return rooms that have at least one alias.
+            if r[5]  # We only return rooms that have at least one alias.
         ]
 
         defer.returnValue(ret)
@@ -175,6 +183,10 @@ class RoomStore(SQLBaseStore):
                 },
             )
 
+            self._store_event_search_txn(
+                txn, event, "content.topic", event.content["topic"]
+            )
+
     def _store_room_name_txn(self, txn, event):
         if hasattr(event, "content") and "name" in event.content:
             self._simple_insert_txn(
@@ -186,6 +198,52 @@ class RoomStore(SQLBaseStore):
                     "name": event.content["name"],
                 }
             )
+
+            self._store_event_search_txn(
+                txn, event, "content.name", event.content["name"]
+            )
+
+    def _store_room_message_txn(self, txn, event):
+        if hasattr(event, "content") and "body" in event.content:
+            self._store_event_search_txn(
+                txn, event, "content.body", event.content["body"]
+            )
+
+    def _store_history_visibility_txn(self, txn, event):
+        self._store_content_index_txn(txn, event, "history_visibility")
+
+    def _store_guest_access_txn(self, txn, event):
+        self._store_content_index_txn(txn, event, "guest_access")
+
+    def _store_content_index_txn(self, txn, event, key):
+        if hasattr(event, "content") and key in event.content:
+            sql = (
+                "INSERT INTO %(key)s"
+                " (event_id, room_id, %(key)s)"
+                " VALUES (?, ?, ?)" % {"key": key}
+            )
+            txn.execute(sql, (
+                event.event_id,
+                event.room_id,
+                event.content[key]
+            ))
+
+    def _store_event_search_txn(self, txn, event, key, value):
+        if isinstance(self.database_engine, PostgresEngine):
+            sql = (
+                "INSERT INTO event_search (event_id, room_id, key, vector)"
+                " VALUES (?,?,?,to_tsvector('english', ?))"
+            )
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            sql = (
+                "INSERT INTO event_search (event_id, room_id, key, value)"
+                " VALUES (?,?,?,?)"
+            )
+        else:
+            # This should be unreachable.
+            raise Exception("Unrecognized database engine")
+
+        txn.execute(sql, (event.event_id, event.room_id, key, value,))
 
     @cachedInlineCallbacks()
     def get_room_name_and_aliases(self, room_id):

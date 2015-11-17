@@ -12,16 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from OpenSSL import SSL
+from OpenSSL.SSL import VERIFY_NONE
 
 from synapse.api.errors import CodeMessageException
 from synapse.util.logcontext import preserve_context_over_fn
-from syutil.jsonutil import encode_canonical_json
 import synapse.metrics
 
-from twisted.internet import defer, reactor
+from canonicaljson import encode_canonical_json
+
+from twisted.internet import defer, reactor, ssl
 from twisted.web.client import (
     Agent, readBody, FileBodyProducer, PartialDownloadError,
-    HTTPConnectionPool,
 )
 from twisted.web.http_headers import Headers
 
@@ -56,10 +58,14 @@ class SimpleHttpClient(object):
         # The default context factory in Twisted 14.0.0 (which we require) is
         # BrowserLikePolicyForHTTPS which will do regular cert validation
         # 'like a browser'
-        pool = HTTPConnectionPool(reactor)
-        pool.maxPersistentPerHost = 10
-        self.agent = Agent(reactor, pool=pool)
-        self.version_string = hs.version_string
+        self.agent = Agent(
+            reactor,
+            connectTimeout=15,
+            contextFactory=hs.get_http_client_context_factory()
+        )
+        self.user_agent = hs.version_string
+        if hs.config.user_agent_suffix:
+            self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix,)
 
     def request(self, method, uri, *args, **kwargs):
         # A small wrapper around self.agent.request() so we can easily attach
@@ -104,7 +110,7 @@ class SimpleHttpClient(object):
             uri.encode("ascii"),
             headers=Headers({
                 b"Content-Type": [b"application/x-www-form-urlencoded"],
-                b"User-Agent": [self.version_string],
+                b"User-Agent": [self.user_agent],
             }),
             bodyProducer=FileBodyProducer(StringIO(query_bytes))
         )
@@ -123,7 +129,8 @@ class SimpleHttpClient(object):
             "POST",
             uri.encode("ascii"),
             headers=Headers({
-                "Content-Type": ["application/json"]
+                b"Content-Type": [b"application/json"],
+                b"User-Agent": [self.user_agent],
             }),
             bodyProducer=FileBodyProducer(StringIO(json_str))
         )
@@ -149,27 +156,8 @@ class SimpleHttpClient(object):
             On a non-2xx HTTP response. The response body will be used as the
             error message.
         """
-        if len(args):
-            query_bytes = urllib.urlencode(args, True)
-            uri = "%s?%s" % (uri, query_bytes)
-
-        response = yield self.request(
-            "GET",
-            uri.encode("ascii"),
-            headers=Headers({
-                b"User-Agent": [self.version_string],
-            })
-        )
-
-        body = yield preserve_context_over_fn(readBody, response)
-
-        if 200 <= response.code < 300:
-            defer.returnValue(json.loads(body))
-        else:
-            # NB: This is explicitly not json.loads(body)'d because the contract
-            # of CodeMessageException is a *string* message. Callers can always
-            # load it into JSON if they want.
-            raise CodeMessageException(response.code, body)
+        body = yield self.get_raw(uri, args)
+        defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
     def put_json(self, uri, json_body, args={}):
@@ -198,7 +186,7 @@ class SimpleHttpClient(object):
             "PUT",
             uri.encode("ascii"),
             headers=Headers({
-                b"User-Agent": [self.version_string],
+                b"User-Agent": [self.user_agent],
                 "Content-Type": ["application/json"]
             }),
             bodyProducer=FileBodyProducer(StringIO(json_str))
@@ -212,6 +200,42 @@ class SimpleHttpClient(object):
             # NB: This is explicitly not json.loads(body)'d because the contract
             # of CodeMessageException is a *string* message. Callers can always
             # load it into JSON if they want.
+            raise CodeMessageException(response.code, body)
+
+    @defer.inlineCallbacks
+    def get_raw(self, uri, args={}):
+        """ Gets raw text from the given URI.
+
+        Args:
+            uri (str): The URI to request, not including query parameters
+            args (dict): A dictionary used to create query strings, defaults to
+                None.
+                **Note**: The value of each key is assumed to be an iterable
+                and *not* a string.
+        Returns:
+            Deferred: Succeeds when we get *any* 2xx HTTP response, with the
+            HTTP body at text.
+        Raises:
+            On a non-2xx HTTP response. The response body will be used as the
+            error message.
+        """
+        if len(args):
+            query_bytes = urllib.urlencode(args, True)
+            uri = "%s?%s" % (uri, query_bytes)
+
+        response = yield self.request(
+            "GET",
+            uri.encode("ascii"),
+            headers=Headers({
+                b"User-Agent": [self.user_agent],
+            })
+        )
+
+        body = yield preserve_context_over_fn(readBody, response)
+
+        if 200 <= response.code < 300:
+            defer.returnValue(body)
+        else:
             raise CodeMessageException(response.code, body)
 
 
@@ -233,7 +257,7 @@ class CaptchaServerHttpClient(SimpleHttpClient):
             bodyProducer=FileBodyProducer(StringIO(query_bytes)),
             headers=Headers({
                 b"Content-Type": [b"application/x-www-form-urlencoded"],
-                b"User-Agent": [self.version_string],
+                b"User-Agent": [self.user_agent],
             })
         )
 
@@ -251,3 +275,18 @@ def _print_ex(e):
             _print_ex(ex)
     else:
         logger.exception(e)
+
+
+class InsecureInterceptableContextFactory(ssl.ContextFactory):
+    """
+    Factory for PyOpenSSL SSL contexts which accepts any certificate for any domain.
+
+    Do not use this since it allows an attacker to intercept your communications.
+    """
+
+    def __init__(self):
+        self._context = SSL.Context(SSL.SSLv23_METHOD)
+        self._context.set_verify(VERIFY_NONE, lambda *_: None)
+
+    def getContext(self, hostname, port):
+        return self._context

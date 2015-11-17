@@ -15,11 +15,12 @@
 # limitations under the License.
 
 
-from synapse.events.utils import prune_event
-from syutil.jsonutil import encode_canonical_json
-from syutil.base64util import encode_base64, decode_base64
-from syutil.crypto.jsonsign import sign_json
 from synapse.api.errors import SynapseError, Codes
+from synapse.events.utils import prune_event
+
+from canonicaljson import encode_canonical_json
+from unpaddedbase64 import encode_base64, decode_base64
+from signedjson.sign import sign_json
 
 import hashlib
 import logging
