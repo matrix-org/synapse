@@ -269,3 +269,39 @@ class RoomMemberStore(SQLBaseStore):
         ret = len(room_id_lists.pop(0).intersection(*room_id_lists)) > 0
 
         defer.returnValue(ret)
+
+    def forget(self, user_id, room_id):
+        def f(txn):
+            sql = (
+                "UPDATE"
+                "  room_memberships"
+                " SET"
+                "  forgotten = 1"
+                " WHERE"
+                "  user_id = ?"
+                " AND"
+                "  room_id = ?"
+            )
+            txn.execute(sql, (user_id, room_id))
+        self.runInteraction("forget_membership", f)
+
+    @defer.inlineCallbacks
+    def did_forget(self, user_id, room_id):
+        def f(txn):
+            sql = (
+                "SELECT"
+                "  COUNT(*)"
+                "FROM"
+                "  room_memberships"
+                " WHERE"
+                "  user_id = ?"
+                " AND"
+                "  room_id = ?"
+                " AND"
+                "  forgotten = 1"
+            )
+            txn.execute(sql, (user_id, room_id))
+            rows = txn.fetchall()
+            return rows[0][0]
+        count = yield self.runInteraction("did_forget_membership", f)
+        defer.returnValue(count > 0)
