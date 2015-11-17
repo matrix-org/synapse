@@ -589,7 +589,7 @@ class Auth(object):
             macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
             self.validate_macaroon(
                 macaroon, "access",
-                [lambda c: c == "guest = true", lambda c: c.startswith("time < ")]
+                [lambda c: c.startswith("time < ")]
             )
 
             user_prefix = "user_id = "
@@ -643,6 +643,7 @@ class Auth(object):
         v.satisfy_exact("gen = 1")
         v.satisfy_exact("type = " + type_string)
         v.satisfy_general(lambda c: c.startswith("user_id = "))
+        v.satisfy_exact("guest = true")
 
         for validation_function in additional_validation_functions:
             v.satisfy_general(validation_function)
