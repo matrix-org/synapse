@@ -409,6 +409,7 @@ class PresenceInvitesTestCase(PresenceTestCase):
                     }
                 ),
                 json_data_callback=ANY,
+                long_retries=True,
             ),
             defer.succeed((200, "OK"))
         )
@@ -443,6 +444,7 @@ class PresenceInvitesTestCase(PresenceTestCase):
                     }
                 ),
                 json_data_callback=ANY,
+                long_retries=True,
             ),
             defer.succeed((200, "OK"))
         )
@@ -483,6 +485,7 @@ class PresenceInvitesTestCase(PresenceTestCase):
                     }
                 ),
                 json_data_callback=ANY,
+                long_retries=True,
             ),
             defer.succeed((200, "OK"))
         )
@@ -827,6 +830,7 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
                     }
                 ),
                 json_data_callback=ANY,
+                long_retries=True,
             ),
             defer.succeed((200, "OK"))
         )
@@ -843,6 +847,7 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
                     }
                 ),
                 json_data_callback=ANY,
+                long_retries=True,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1033,6 +1038,7 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
                     }
                 ),
                 json_data_callback=ANY,
+                long_retries=True,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1048,6 +1054,7 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
                     }
                 ),
                 json_data_callback=ANY,
+                long_retries=True,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1078,6 +1085,7 @@ class PresencePushTestCase(MockedDatastorePresenceTestCase):
                     }
                 ),
                 json_data_callback=ANY,
+                long_retries=True,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1184,6 +1192,7 @@ class PresencePollingTestCase(MockedDatastorePresenceTestCase):
                     },
                 ),
                 json_data_callback=ANY,
+                long_retries=True,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1200,6 +1209,7 @@ class PresencePollingTestCase(MockedDatastorePresenceTestCase):
                     },
                 ),
                 json_data_callback=ANY,
+                long_retries=True,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1232,6 +1242,7 @@ class PresencePollingTestCase(MockedDatastorePresenceTestCase):
                     },
                 ),
                 json_data_callback=ANY,
+                long_retries=True,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1265,6 +1276,7 @@ class PresencePollingTestCase(MockedDatastorePresenceTestCase):
                     },
                 ),
                 json_data_callback=ANY,
+                long_retries=True,
             ),
             defer.succeed((200, "OK"))
         )
@@ -1297,6 +1309,7 @@ class PresencePollingTestCase(MockedDatastorePresenceTestCase):
                     },
                 ),
                 json_data_callback=ANY,
+                long_retries=True,
             ),
             defer.succeed((200, "OK"))
         )

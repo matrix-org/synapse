@@ -197,6 +197,7 @@ class FederationTestCase(unittest.TestCase):
                 'pdu_failures': [],
             },
             json_data_callback=ANY,
+            long_retries=True,
         )
 
     @defer.inlineCallbacks
@@ -228,6 +229,7 @@ class FederationTestCase(unittest.TestCase):
                 'pdu_failures': [],
             },
             json_data_callback=ANY,
+            long_retries=True,
         )
 
     @defer.inlineCallbacks
