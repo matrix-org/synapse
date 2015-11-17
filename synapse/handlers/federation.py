@@ -564,7 +564,7 @@ class FederationHandler(BaseHandler):
 
     @log_function
     @defer.inlineCallbacks
-    def do_invite_join(self, target_hosts, room_id, joinee):
+    def do_invite_join(self, target_hosts, room_id, joinee, content):
         """ Attempts to join the `joinee` to the room `room_id` via the
         server `target_host`.
 
@@ -584,7 +584,8 @@ class FederationHandler(BaseHandler):
             target_hosts,
             room_id,
             joinee,
-            "join"
+            "join",
+            content,
         )
 
         self.room_queues[room_id] = []
@@ -840,12 +841,14 @@ class FederationHandler(BaseHandler):
         defer.returnValue(None)
 
     @defer.inlineCallbacks
-    def _make_and_verify_event(self, target_hosts, room_id, user_id, membership):
+    def _make_and_verify_event(self, target_hosts, room_id, user_id, membership,
+                               content={},):
         origin, pdu = yield self.replication_layer.make_membership_event(
             target_hosts,
             room_id,
             user_id,
-            membership
+            membership,
+            content,
         )
 
         logger.debug("Got response to make_%s: %s", membership, pdu)
@@ -1097,8 +1100,6 @@ class FederationHandler(BaseHandler):
         context = yield self._prep_event(
             origin, event,
             state=state,
-            backfilled=backfilled,
-            current_state=current_state,
             auth_events=auth_events,
         )
 
@@ -1121,7 +1122,6 @@ class FederationHandler(BaseHandler):
                     origin,
                     ev_info["event"],
                     state=ev_info.get("state"),
-                    backfilled=backfilled,
                     auth_events=ev_info.get("auth_events"),
                 )
                 for ev_info in event_infos
@@ -1208,8 +1208,7 @@ class FederationHandler(BaseHandler):
         defer.returnValue((event_stream_id, max_stream_id))
 
     @defer.inlineCallbacks
-    def _prep_event(self, origin, event, state=None, backfilled=False,
-                    current_state=None, auth_events=None):
+    def _prep_event(self, origin, event, state=None, auth_events=None):
         outlier = event.internal_metadata.is_outlier()
 
         context = yield self.state_handler.compute_event_context(
@@ -1241,6 +1240,10 @@ class FederationHandler(BaseHandler):
             )
 
             context.rejected = RejectedReason.AUTH_ERROR
+
+        if event.type == EventTypes.GuestAccess:
+            full_context = yield self.store.get_current_state(room_id=event.room_id)
+            yield self.maybe_kick_guest_users(event, full_context)
 
         defer.returnValue(context)
 

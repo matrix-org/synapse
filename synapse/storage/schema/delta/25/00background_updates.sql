@@ -13,13 +13,9 @@
  * limitations under the License.
  */
 
-/*
- * This is a manual index of history_visibility content of state events,
- * so that we can join on them in SELECT statements.
- */
-CREATE TABLE IF NOT EXISTS history_visibility(
-    event_id TEXT NOT NULL,
-    room_id TEXT NOT NULL,
-    history_visibility TEXT NOT NULL,
-    UNIQUE (event_id)
+
+CREATE TABLE IF NOT EXISTS background_updates(
+    update_name TEXT NOT NULL, -- The name of the background update.
+    progress_json TEXT NOT NULL, -- The current progress of the update as JSON.
+    CONSTRAINT background_updates_uniqueness UNIQUE (update_name)
 );

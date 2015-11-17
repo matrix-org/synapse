@@ -994,3 +994,59 @@ class RoomInitialSyncTestCase(RestTestCase):
         }
         self.assertTrue(self.user_id in presence_by_user)
         self.assertEquals("m.presence", presence_by_user[self.user_id]["type"])
+
+
+class RoomMessageListTestCase(RestTestCase):
+    """ Tests /rooms/$room_id/messages REST events. """
+    user_id = "@sid1:red"
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
+        self.auth_user_id = self.user_id
+
+        hs = yield setup_test_homeserver(
+            "red",
+            http_client=None,
+            replication_layer=Mock(),
+            ratelimiter=NonCallableMock(spec_set=["send_message"]),
+        )
+        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter.send_message.return_value = (True, 0)
+
+        hs.get_handlers().federation_handler = Mock()
+
+        def _get_user_by_access_token(token=None, allow_guest=False):
+            return {
+                "user": UserID.from_string(self.auth_user_id),
+                "token_id": 1,
+                "is_guest": False,
+            }
+        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+
+        def _insert_client_ip(*args, **kwargs):
+            return defer.succeed(None)
+        hs.get_datastore().insert_client_ip = _insert_client_ip
+
+        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
+
+        self.room_id = yield self.create_room_as(self.user_id)
+
+    @defer.inlineCallbacks
+    def test_topo_token_is_accepted(self):
+        token = "t1-0_0_0_0_0"
+        (code, response) = yield self.mock_resource.trigger_get(
+            "/rooms/%s/messages?access_token=x&from=%s" %
+            (self.room_id, token))
+        self.assertEquals(200, code)
+        self.assertTrue("start" in response)
+        self.assertEquals(token, response['start'])
+        self.assertTrue("chunk" in response)
+        self.assertTrue("end" in response)
+
+    @defer.inlineCallbacks
+    def test_stream_token_is_rejected(self):
+        (code, response) = yield self.mock_resource.trigger_get(
+            "/rooms/%s/messages?access_token=x&from=s0_0_0_0" %
+            self.room_id)
+        self.assertEquals(400, code)

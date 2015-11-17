@@ -53,6 +53,14 @@ class Clock(object):
         loop.stop()
 
     def call_later(self, delay, callback, *args, **kwargs):
+        """Call something later
+
+        Args:
+            delay(float): How long to wait in seconds.
+            callback(function): Function to call
+            *args: Postional arguments to pass to function.
+            **kwargs: Key arguments to pass to function.
+        """
         current_context = LoggingContext.current_context()
 
         def wrapped_callback(*args, **kwargs):

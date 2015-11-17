@@ -14,6 +14,8 @@
 # limitations under the License.
 
 from twisted.internet import defer
+from synapse.api.constants import EventTypes
+from synapse.api.errors import AuthError
 
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor, ObservableDeferred
@@ -346,9 +348,9 @@ class Notifier(object):
 
         room_ids = []
         if is_guest:
-            # TODO(daniel): Deal with non-room events too
-            only_room_events = True
             if guest_room_id:
+                if not self._is_world_readable(guest_room_id):
+                    raise AuthError(403, "Guest access not allowed")
                 room_ids = [guest_room_id]
         else:
             rooms = yield self.store.get_rooms_for_user(user.to_string())
@@ -361,6 +363,7 @@ class Notifier(object):
 
             events = []
             end_token = from_token
+
             for name, source in self.event_sources.sources.items():
                 keyname = "%s_key" % name
                 before_id = getattr(before_token, keyname)
@@ -377,7 +380,7 @@ class Notifier(object):
                     room_ids=room_ids,
                 )
 
-                if is_guest:
+                if name == "room":
                     room_member_handler = self.hs.get_handlers().room_member_handler
                     new_events = yield room_member_handler._filter_events_for_client(
                         user.to_string(),
@@ -402,6 +405,17 @@ class Notifier(object):
             result = ([], (from_token, from_token))
 
         defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _is_world_readable(self, room_id):
+        state = yield self.hs.get_state_handler().get_current_state(
+            room_id,
+            EventTypes.RoomHistoryVisibility
+        )
+        if state and "history_visibility" in state.content:
+            defer.returnValue(state.content["history_visibility"] == "world_readable")
+        else:
+            defer.returnValue(False)
 
     @log_function
     def remove_expired_streams(self):

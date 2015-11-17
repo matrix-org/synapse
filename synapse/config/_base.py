@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import argparse
+import errno
 import os
 import yaml
 import sys
@@ -91,8 +92,11 @@ class Config(object):
     @classmethod
     def ensure_directory(cls, dir_path):
         dir_path = cls.abspath(dir_path)
-        if not os.path.exists(dir_path):
+        try:
             os.makedirs(dir_path)
+        except OSError, e:
+            if e.errno != errno.EEXIST:
+                raise
         if not os.path.isdir(dir_path):
             raise ConfigError(
                 "%s is not a directory" % (dir_path,)
