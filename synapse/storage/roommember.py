@@ -271,6 +271,7 @@ class RoomMemberStore(SQLBaseStore):
         defer.returnValue(ret)
 
     def forget(self, user_id, room_id):
+        """Indicate that user_id wishes to discard history for room_id."""
         def f(txn):
             sql = (
                 "UPDATE"
@@ -287,6 +288,9 @@ class RoomMemberStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def did_forget(self, user_id, room_id):
+        """Returns whether user_id has elected to discard history for room_id.
+
+        Returns False if they have since re-joined."""
         def f(txn):
             sql = (
                 "SELECT"
@@ -298,10 +302,36 @@ class RoomMemberStore(SQLBaseStore):
                 " AND"
                 "  room_id = ?"
                 " AND"
-                "  forgotten = 1"
+                "  forgotten = 0"
             )
             txn.execute(sql, (user_id, room_id))
             rows = txn.fetchall()
             return rows[0][0]
         count = yield self.runInteraction("did_forget_membership", f)
-        defer.returnValue(count > 0)
+        defer.returnValue(count == 0)
+
+    @defer.inlineCallbacks
+    def was_forgotten_at(self, user_id, room_id, event_id):
+        """Returns whether user_id has elected to discard history for room_id at event_id.
+
+        event_id must be a membership event."""
+        def f(txn):
+            sql = (
+                "SELECT"
+                "  COUNT(*)"
+                "FROM"
+                "  room_memberships"
+                " WHERE"
+                "  user_id = ?"
+                " AND"
+                "  room_id = ?"
+                " AND"
+                "  event_id = ?"
+                " AND"
+                "  forgotten = 1"
+            )
+            txn.execute(sql, (user_id, room_id, event_id))
+            rows = txn.fetchall()
+            return rows[0][0]
+        count = yield self.runInteraction("did_forget_membership_at", f)
+        defer.returnValue(count == 1)
