@@ -17,14 +17,20 @@ export PEP8SUFFIX="--output-file=violations.flake8.log || echo flake8 finished w
 
 tox
 
-: ${GIT_BRANCH:="$(git rev-parse --abbrev-ref HEAD)"}
+: ${GIT_BRANCH:="origin/$(git rev-parse --abbrev-ref HEAD)"}
 
 set +u
 . .tox/py27/bin/activate
 set -u
 
+if [[ ! -e .sytest-base ]]; then
+  git clone https://github.com/matrix-org/sytest.git .sytest-base --mirror
+else
+  (cd .sytest-base; git fetch)
+fi
+
 rm -rf sytest
-git clone https://github.com/matrix-org/sytest.git sytest
+git clone .sytest-base sytest --shared
 cd sytest
 
 git checkout "${GIT_BRANCH}" || (echo >&2 "No ref ${GIT_BRANCH} found, falling back to develop" ; git checkout develop)
