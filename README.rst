@@ -133,6 +133,8 @@ In case of problems, please see the _Troubleshooting section below.
 Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
 above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
 
+Another alternative is to install via apt from http://matrix.org/packages/debian/.
+
 To set up your homeserver, run (in your virtualenv, as before)::
 
     cd ~/.synapse
