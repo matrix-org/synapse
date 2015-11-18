@@ -1,3 +1,9 @@
+Changes in synapse v0.11.0-r1 (2015-11-18)
+==========================================
+
+* Retry and fail federation requests more aggressively for requests that block
+  client side requests (PR #384)
+
 Changes in synapse v0.11.0 (2015-11-17)
 =======================================
 
