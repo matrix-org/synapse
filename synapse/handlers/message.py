@@ -436,14 +436,14 @@ class MessageHandler(BaseHandler):
                     for c in current_state.values()
                 ]
 
-                private_user_data = []
+                account_data = []
                 tags = tags_by_room.get(event.room_id)
                 if tags:
-                    private_user_data.append({
+                    account_data.append({
                         "type": "m.tag",
                         "content": {"tags": tags},
                     })
-                d["private_user_data"] = private_user_data
+                d["account_data"] = account_data
             except:
                 logger.exception("Failed to get snapshot")
 
@@ -498,14 +498,14 @@ class MessageHandler(BaseHandler):
                 user_id, room_id, pagin_config, membership, member_event_id, is_guest
             )
 
-        private_user_data = []
+        account_data = []
         tags = yield self.store.get_tags_for_room(user_id, room_id)
         if tags:
-            private_user_data.append({
+            account_data.append({
                 "type": "m.tag",
                 "content": {"tags": tags},
             })
-        result["private_user_data"] = private_user_data
+        result["account_data"] = account_data
 
         defer.returnValue(result)
 
