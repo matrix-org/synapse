@@ -148,9 +148,9 @@ class SyncRestServlet(RestServlet):
                 sync_result.presence, filter, time_now
             ),
             "rooms": {
-                "joined": joined,
-                "invited": invited,
-                "archived": archived,
+                "join": joined,
+                "invite": invited,
+                "leave": archived,
             },
             "next_batch": sync_result.next_batch.to_string(),
         }
