@@ -134,6 +134,9 @@ Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
 above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
 
 Another alternative is to install via apt from http://matrix.org/packages/debian/.
+Note that these packages do not include  a client - choose one from
+https://matrix.org/blog/try-matrix-now/ (or build your own with 
+https://github.com/matrix-org/matrix-js-sdk/). 
 
 To set up your homeserver, run (in your virtualenv, as before)::
 
