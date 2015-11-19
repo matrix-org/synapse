@@ -231,7 +231,7 @@ class Porter(object):
                 next_chunk = rows[-1][0] + 1
 
                 if table == "event_search":
-                    # We have to treat event_search differnetly since it has a
+                    # We have to treat event_search differently since it has a
                     # different structure in the two different databases.
                     def insert(txn):
                         sql = (
