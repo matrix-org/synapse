@@ -25,6 +25,8 @@ class ConfigError(Exception):
     pass
 
 
+# We split these messages out to allow packages to override with package
+# specific instructions.
 MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS = """\
 Please opt in or out of reporting anonymized homeserver usage statistics, by
 setting the `report_stats` key in your config file to either True or False.
