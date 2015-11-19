@@ -58,9 +58,10 @@ class LoginRestServlet(ClientV1RestServlet):
             flows.append({"type": LoginRestServlet.SAML2_TYPE})
         if self.cas_enabled:
             flows.append({"type": LoginRestServlet.CAS_TYPE})
+            flows.append({"type": LoginRestServlet.TOKEN_TYPE})
         if self.password_enabled:
             flows.append({"type": LoginRestServlet.PASS_TYPE})
-        flows.append({"type": LoginRestServlet.TOKEN_TYPE})
+
         return (200, {"flows": flows})
 
     def on_OPTIONS(self, request):
