@@ -407,7 +407,7 @@ class AuthHandler(BaseHandler):
         try:
             macaroon = pymacaroons.Macaroon.deserialize(login_token)
             auth_api = self.hs.get_auth()
-            auth_api.validate_macaroon(macaroon, "login", [auth_api.verify_expiry])
+            auth_api.validate_macaroon(macaroon, "login", True)
             return self._get_user_from_macaroon(macaroon)
         except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
             raise AuthError(401, "Invalid token", errcode=Codes.UNKNOWN_TOKEN)
