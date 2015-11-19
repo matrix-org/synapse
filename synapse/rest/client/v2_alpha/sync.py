@@ -284,7 +284,7 @@ class SyncRestServlet(RestServlet):
                 "prev_batch": room.timeline.prev_batch.to_string(),
                 "limited": room.timeline.limited,
             },
-            "state": serialized_state,
+            "state": {"events": serialized_state},
             "private_user_data": {"events": private_user_data},
         }
 
