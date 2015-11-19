@@ -295,7 +295,7 @@ class RoomMemberStore(SQLBaseStore):
             sql = (
                 "SELECT"
                 "  COUNT(*)"
-                "FROM"
+                " FROM"
                 "  room_memberships"
                 " WHERE"
                 "  user_id = ?"
@@ -318,8 +318,8 @@ class RoomMemberStore(SQLBaseStore):
         def f(txn):
             sql = (
                 "SELECT"
-                "  COUNT(*)"
-                "FROM"
+                "  forgotten"
+                " FROM"
                 "  room_memberships"
                 " WHERE"
                 "  user_id = ?"
@@ -327,11 +327,9 @@ class RoomMemberStore(SQLBaseStore):
                 "  room_id = ?"
                 " AND"
                 "  event_id = ?"
-                " AND"
-                "  forgotten = 1"
             )
             txn.execute(sql, (user_id, room_id, event_id))
             rows = txn.fetchall()
             return rows[0][0]
-        count = yield self.runInteraction("did_forget_membership_at", f)
-        defer.returnValue(count == 1)
+        forgot = yield self.runInteraction("did_forget_membership_at", f)
+        defer.returnValue(forgot == 1)
