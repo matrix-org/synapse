@@ -54,7 +54,7 @@ class Filtering(object):
         ]
 
         room_level_definitions = [
-            "state", "timeline", "ephemeral", "private_user_data"
+            "state", "timeline", "ephemeral", "account_data"
         ]
 
         for key in top_level_definitions:
@@ -131,8 +131,8 @@ class FilterCollection(object):
             self.filter_json.get("room", {}).get("ephemeral", {})
         )
 
-        self.room_private_user_data = Filter(
-            self.filter_json.get("room", {}).get("private_user_data", {})
+        self.room_account_data = Filter(
+            self.filter_json.get("room", {}).get("account_data", {})
         )
 
         self.presence_filter = Filter(
@@ -160,8 +160,8 @@ class FilterCollection(object):
     def filter_room_ephemeral(self, events):
         return self.room_ephemeral_filter.filter(events)
 
-    def filter_room_private_user_data(self, events):
-        return self.room_private_user_data.filter(events)
+    def filter_room_account_data(self, events):
+        return self.room_account_data.filter(events)
 
 
 class Filter(object):
