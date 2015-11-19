@@ -25,18 +25,29 @@ class ConfigError(Exception):
     pass
 
 
+# We split these messages out to allow packages to override with package
+# specific instructions.
+MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS = """\
+Please opt in or out of reporting anonymized homeserver usage statistics, by
+setting the `report_stats` key in your config file to either True or False.
+"""
+
+MISSING_REPORT_STATS_SPIEL = """\
+We would really appreciate it if you could help our project out by reporting
+anonymized usage statistics from your homeserver. Only very basic aggregate
+data (e.g. number of users) will be reported, but it helps us to track the
+growth of the Matrix community, and helps us to make Matrix a success, as well
+as to convince other networks that they should peer with us.
+
+Thank you.
+"""
+
+MISSING_SERVER_NAME = """\
+Missing mandatory `server_name` config option.
+"""
+
+
 class Config(object):
-
-    stats_reporting_begging_spiel = (
-        "We would really appreciate it if you could help our project out by"
-        " reporting anonymized usage statistics from your homeserver. Only very"
-        " basic aggregate data (e.g. number of users) will be reported, but it"
-        " helps us to track the growth of the Matrix community, and helps us to"
-        " make Matrix a success, as well as to convince other networks that they"
-        " should peer with us."
-        "\nThank you."
-    )
-
     @staticmethod
     def parse_size(value):
         if isinstance(value, int) or isinstance(value, long):
@@ -215,7 +226,7 @@ class Config(object):
             if config_args.report_stats is None:
                 config_parser.error(
                     "Please specify either --report-stats=yes or --report-stats=no\n\n" +
-                    cls.stats_reporting_begging_spiel
+                    MISSING_REPORT_STATS_SPIEL
                 )
             if not config_files:
                 config_parser.error(
@@ -290,6 +301,10 @@ class Config(object):
             yaml_config = cls.read_config_file(config_file)
             specified_config.update(yaml_config)
 
+        if "server_name" not in specified_config:
+            sys.stderr.write("\n" + MISSING_SERVER_NAME + "\n")
+            sys.exit(1)
+
         server_name = specified_config["server_name"]
         _, config = obj.generate_config(
             config_dir_path=config_dir_path,
@@ -299,11 +314,8 @@ class Config(object):
         config.update(specified_config)
         if "report_stats" not in config:
             sys.stderr.write(
-                "Please opt in or out of reporting anonymized homeserver usage "
-                "statistics, by setting the report_stats key in your config file "
-                " ( " + config_path + " ) " +
-                "to either True or False.\n\n" +
-                Config.stats_reporting_begging_spiel + "\n")
+                "\n" + MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS + "\n" +
+                MISSING_REPORT_STATS_SPIEL + "\n")
             sys.exit(1)
 
         if generate_keys:

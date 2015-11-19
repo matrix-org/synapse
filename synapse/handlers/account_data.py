@@ -16,19 +16,19 @@
 from twisted.internet import defer
 
 
-class PrivateUserDataEventSource(object):
+class AccountDataEventSource(object):
     def __init__(self, hs):
         self.store = hs.get_datastore()
 
     def get_current_key(self, direction='f'):
-        return self.store.get_max_private_user_data_stream_id()
+        return self.store.get_max_account_data_stream_id()
 
     @defer.inlineCallbacks
     def get_new_events(self, user, from_key, **kwargs):
         user_id = user.to_string()
         last_stream_id = from_key
 
-        current_stream_id = yield self.store.get_max_private_user_data_stream_id()
+        current_stream_id = yield self.store.get_max_account_data_stream_id()
         tags = yield self.store.get_updated_tags(user_id, last_stream_id)
 
         results = []

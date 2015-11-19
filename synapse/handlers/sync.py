@@ -51,7 +51,7 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
     "timeline",          # TimelineBatch
     "state",             # dict[(str, str), FrozenEvent]
     "ephemeral",
-    "private_user_data",
+    "account_data",
 ])):
     __slots__ = []
 
@@ -63,7 +63,7 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
             self.timeline
             or self.state
             or self.ephemeral
-            or self.private_user_data
+            or self.account_data
         )
 
 
@@ -71,7 +71,7 @@ class ArchivedSyncResult(collections.namedtuple("JoinedSyncResult", [
     "room_id",            # str
     "timeline",           # TimelineBatch
     "state",              # dict[(str, str), FrozenEvent]
-    "private_user_data",
+    "account_data",
 ])):
     __slots__ = []
 
@@ -82,7 +82,7 @@ class ArchivedSyncResult(collections.namedtuple("JoinedSyncResult", [
         return bool(
             self.timeline
             or self.state
-            or self.private_user_data
+            or self.account_data
         )
 
 
@@ -261,20 +261,20 @@ class SyncHandler(BaseHandler):
             timeline=batch,
             state=current_state,
             ephemeral=ephemeral_by_room.get(room_id, []),
-            private_user_data=self.private_user_data_for_room(
+            account_data=self.account_data_for_room(
                 room_id, tags_by_room
             ),
         ))
 
-    def private_user_data_for_room(self, room_id, tags_by_room):
-        private_user_data = []
+    def account_data_for_room(self, room_id, tags_by_room):
+        account_data = []
         tags = tags_by_room.get(room_id)
         if tags is not None:
-            private_user_data.append({
+            account_data.append({
                 "type": "m.tag",
                 "content": {"tags": tags},
             })
-        return private_user_data
+        return account_data
 
     @defer.inlineCallbacks
     def ephemeral_by_room(self, sync_config, now_token, since_token=None):
@@ -357,7 +357,7 @@ class SyncHandler(BaseHandler):
             room_id=room_id,
             timeline=batch,
             state=leave_state,
-            private_user_data=self.private_user_data_for_room(
+            account_data=self.account_data_for_room(
                 room_id, tags_by_room
             ),
         ))
@@ -412,7 +412,7 @@ class SyncHandler(BaseHandler):
 
         tags_by_room = yield self.store.get_updated_tags(
             sync_config.user.to_string(),
-            since_token.private_user_data_key,
+            since_token.account_data_key,
         )
 
         joined = []
@@ -468,7 +468,7 @@ class SyncHandler(BaseHandler):
                     ),
                     state=state,
                     ephemeral=ephemeral_by_room.get(room_id, []),
-                    private_user_data=self.private_user_data_for_room(
+                    account_data=self.account_data_for_room(
                         room_id, tags_by_room
                     ),
                 )
@@ -605,7 +605,7 @@ class SyncHandler(BaseHandler):
             timeline=batch,
             state=state,
             ephemeral=ephemeral_by_room.get(room_id, []),
-            private_user_data=self.private_user_data_for_room(
+            account_data=self.account_data_for_room(
                 room_id, tags_by_room
             ),
         )
@@ -653,7 +653,7 @@ class SyncHandler(BaseHandler):
             room_id=leave_event.room_id,
             timeline=batch,
             state=state_events_delta,
-            private_user_data=self.private_user_data_for_room(
+            account_data=self.account_data_for_room(
                 leave_event.room_id, tags_by_room
             ),
         )

@@ -274,8 +274,8 @@ class SyncRestServlet(RestServlet):
         serialized_state = [serialize(e) for e in state_events]
         serialized_timeline = [serialize(e) for e in timeline_events]
 
-        private_user_data = filter.filter_room_private_user_data(
-            room.private_user_data
+        account_data = filter.filter_room_account_data(
+            room.account_data
         )
 
         result = {
@@ -285,7 +285,7 @@ class SyncRestServlet(RestServlet):
                 "limited": room.timeline.limited,
             },
             "state": {"events": serialized_state},
-            "private_user_data": {"events": private_user_data},
+            "account_data": {"events": account_data},
         }
 
         if joined:
