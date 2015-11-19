@@ -594,10 +594,7 @@ class Auth(object):
     def _get_user_from_macaroon(self, macaroon_str):
         try:
             macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
-            self.validate_macaroon(
-                macaroon, "access",
-                [lambda c: c.startswith("time < ")]
-            )
+            self.validate_macaroon(macaroon, "access", False)
 
             user_prefix = "user_id = "
             user = None
@@ -645,22 +642,34 @@ class Auth(object):
                 errcode=Codes.UNKNOWN_TOKEN
             )
 
-    def validate_macaroon(self, macaroon, type_string, additional_validation_functions):
+    def validate_macaroon(self, macaroon, type_string, verify_expiry):
+        """
+        validate that a Macaroon is understood by and was signed by this server.
+
+        Args:
+            macaroon(pymacaroons.Macaroon): The macaroon to validate
+            type_string(str): The kind of token this is (e.g. "access", "refresh")
+            verify_expiry(bool): Whether to verify whether the macaroon has expired.
+                This should really always be True, but no clients currently implement
+                token refresh, so we can't enforce expiry yet.
+        """
         v = pymacaroons.Verifier()
         v.satisfy_exact("gen = 1")
         v.satisfy_exact("type = " + type_string)
         v.satisfy_general(lambda c: c.startswith("user_id = "))
         v.satisfy_exact("guest = true")
+        if verify_expiry:
+            v.satisfy_general(self._verify_expiry)
+        else:
+            v.satisfy_general(lambda c: c.startswith("time < "))
 
-        for validation_function in additional_validation_functions:
-            v.satisfy_general(validation_function)
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 
         v = pymacaroons.Verifier()
         v.satisfy_general(self._verify_recognizes_caveats)
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 
-    def verify_expiry(self, caveat):
+    def _verify_expiry(self, caveat):
         prefix = "time < "
         if not caveat.startswith(prefix):
             return False
