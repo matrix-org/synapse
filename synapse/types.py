@@ -103,7 +103,7 @@ class StreamToken(
         "presence_key",
         "typing_key",
         "receipt_key",
-        "private_user_data_key",
+        "account_data_key",
     ))
 ):
     _SEPARATOR = "_"
@@ -138,7 +138,7 @@ class StreamToken(
             or (int(other.presence_key) < int(self.presence_key))
             or (int(other.typing_key) < int(self.typing_key))
             or (int(other.receipt_key) < int(self.receipt_key))
-            or (int(other.private_user_data_key) < int(self.private_user_data_key))
+            or (int(other.account_data_key) < int(self.account_data_key))
         )
 
     def copy_and_advance(self, key, new_value):
