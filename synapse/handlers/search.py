@@ -80,6 +80,9 @@ class SearchHandler(BaseHandler):
             # What to order results by (impacts whether pagination can be doen)
             order_by = room_cat.get("order_by", "rank")
 
+            # Return the current state of the rooms?
+            include_state = room_cat.get("include_state", False)
+
             # Include context around each event?
             event_context = room_cat.get(
                 "event_context", None
@@ -97,6 +100,9 @@ class SearchHandler(BaseHandler):
                 after_limit = int(event_context.get(
                     "after_limit", 5
                 ))
+
+                # Return the historic display name and avatar for the senders
+                # of the events?
                 include_profile = bool(event_context.get("include_profile", False))
         except KeyError:
             raise SynapseError(400, "Invalid search query")
@@ -316,6 +322,18 @@ class SearchHandler(BaseHandler):
                 for e in context["events_after"]
             ]
 
+        state_results = {}
+        if include_state:
+            rooms = set(e.room_id for e in allowed_events)
+            for room_id in rooms:
+                state = yield self.state_handler.get_current_state(room_id)
+                state_results[room_id] = state.values()
+
+            state_results.values()
+
+        # We're now about to serialize the events. We should not make any
+        # blocking calls after this. Otherwise the 'age' will be wrong
+
         results = {
             e.event_id: {
                 "rank": rank_map[e.event_id],
@@ -331,6 +349,12 @@ class SearchHandler(BaseHandler):
             "results": results,
             "count": len(results)
         }
+
+        if state_results:
+            rooms_cat_res["state"] = {
+                room_id: [serialize_event(e, time_now) for e in state]
+                for room_id, state in state_results.items()
+            }
 
         if room_groups and "room_id" in group_keys:
             rooms_cat_res.setdefault("groups", {})["room_id"] = room_groups
