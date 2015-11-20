@@ -17,13 +17,14 @@ from twisted.internet import defer
 
 from ._base import BaseHandler
 
-from synapse.api.constants import Membership
+from synapse.api.constants import Membership, EventTypes
 from synapse.api.filtering import Filter
 from synapse.api.errors import SynapseError
 from synapse.events.utils import serialize_event
 
 from unpaddedbase64 import decode_base64, encode_base64
 
+import itertools
 import logging
 
 
@@ -96,6 +97,7 @@ class SearchHandler(BaseHandler):
                 after_limit = int(event_context.get(
                     "after_limit", 5
                 ))
+                include_profile = bool(event_context.get("include_profile", False))
         except KeyError:
             raise SynapseError(400, "Invalid search query")
 
@@ -268,6 +270,33 @@ class SearchHandler(BaseHandler):
                 res["end"] = now_token.copy_and_replace(
                     "room_key", res["end"]
                 ).to_string()
+
+                if include_profile:
+                    senders = set(
+                        ev.sender
+                        for ev in itertools.chain(
+                            res["events_before"], [event], res["events_after"]
+                        )
+                    )
+
+                    if res["events_after"]:
+                        last_event_id = res["events_after"][-1].event_id
+                    else:
+                        last_event_id = event.event_id
+
+                    state = yield self.store.get_state_for_event(
+                        last_event_id,
+                        types=[(EventTypes.Member, sender) for sender in senders]
+                    )
+
+                    res["profile_info"] = {
+                        s.state_key: {
+                            "displayname": s.content.get("displayname", None),
+                            "avatar_url": s.content.get("avatar_url", None),
+                        }
+                        for s in state.values()
+                        if s.type == EventTypes.Member and s.state_key in senders
+                    }
 
                 contexts[event.event_id] = res
         else:
