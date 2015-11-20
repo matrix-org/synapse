@@ -48,3 +48,6 @@ Muthu Subramanian <muthu.subramanian.karunanidhi at ericsson.com>
 
 Steven Hammerton <steven.hammerton at openmarket.com>
  * Add CAS support for registration and login.
+
+Mads Robin Christensen <mads at v42 dot dk>
+ * CentOS 7 installation instructions.
