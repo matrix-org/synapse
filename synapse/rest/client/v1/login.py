@@ -58,6 +58,14 @@ class LoginRestServlet(ClientV1RestServlet):
             flows.append({"type": LoginRestServlet.SAML2_TYPE})
         if self.cas_enabled:
             flows.append({"type": LoginRestServlet.CAS_TYPE})
+
+            # While its valid for us to advertise this login type generally,
+            # synapse currently only gives out these tokens as part of the
+            # CAS login flow.
+            # Generally we don't want to advertise login flows that clients
+            # don't know how to implement, since they (currently) will always
+            # fall back to the fallback API if they don't understand one of the
+            # login flow types returned.
             flows.append({"type": LoginRestServlet.TOKEN_TYPE})
         if self.password_enabled:
             flows.append({"type": LoginRestServlet.PASS_TYPE})
