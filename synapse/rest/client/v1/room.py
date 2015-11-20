@@ -448,7 +448,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
     def register(self, http_server):
         # /rooms/$roomid/[invite|join|leave]
         PATTERN = ("/rooms/(?P<room_id>[^/]*)/"
-                   "(?P<membership_action>join|invite|leave|ban|kick)")
+                   "(?P<membership_action>join|invite|leave|ban|kick|forget)")
         register_txn_path(self, PATTERN, http_server)
 
     @defer.inlineCallbacks
@@ -457,6 +457,8 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             request,
             allow_guest=True
         )
+
+        effective_membership_action = membership_action
 
         if is_guest and membership_action not in {Membership.JOIN, Membership.LEAVE}:
             raise AuthError(403, "Guest access not allowed")
@@ -488,11 +490,13 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             UserID.from_string(state_key)
 
             if membership_action == "kick":
-                membership_action = "leave"
+                effective_membership_action = "leave"
+        elif membership_action == "forget":
+            effective_membership_action = "leave"
 
         msg_handler = self.handlers.message_handler
 
-        content = {"membership": unicode(membership_action)}
+        content = {"membership": unicode(effective_membership_action)}
         if is_guest:
             content["kind"] = "guest"
 
@@ -508,6 +512,9 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             txn_id=txn_id,
             is_guest=is_guest,
         )
+
+        if membership_action == "forget":
+            self.handlers.room_member_handler.forget(user, room_id)
 
         defer.returnValue((200, {}))
 

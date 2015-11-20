@@ -207,6 +207,13 @@ class Auth(object):
                 user_id, room_id
             ))
 
+        if membership == Membership.LEAVE:
+            forgot = yield self.store.did_forget(user_id, room_id)
+            if forgot:
+                raise AuthError(403, "User %s not in room %s" % (
+                    user_id, room_id
+                ))
+
         defer.returnValue(member)
 
     @defer.inlineCallbacks
