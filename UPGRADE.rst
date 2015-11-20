@@ -30,6 +30,19 @@ running:
     python synapse/python_dependencies.py | xargs -n1 pip install
 
 
+Upgrading to v0.11.0
+====================
+
+This release includes the option to send anonymous usage stats to matrix.org,
+and requires that administrators explictly opt in or out by setting the
+``report_stats`` option to either ``true`` or ``false``.
+
+We would really appreciate it if you could help our project out by reporting
+anonymized usage statistics from your homeserver. Only very basic aggregate
+data (e.g. number of users) will be reported, but it helps us to track the
+growth of the Matrix community, and helps us to make Matrix a success, as well
+as to convince other networks that they should peer with us.
+
 
 Upgrading to v0.9.0
 ===================
