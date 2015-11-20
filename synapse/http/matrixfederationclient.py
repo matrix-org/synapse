@@ -302,7 +302,7 @@ class MatrixFederationHttpClient(object):
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
-    def post_json(self, destination, path, data={}, long_requests=True):
+    def post_json(self, destination, path, data={}, long_retries=True):
         """ Sends the specifed json data using POST
 
         Args:
@@ -332,7 +332,7 @@ class MatrixFederationHttpClient(object):
             path.encode("ascii"),
             body_callback=body_callback,
             headers_dict={"Content-Type": ["application/json"]},
-            long_requests=True,
+            long_retries=True,
         )
 
         if 200 <= response.code < 300:

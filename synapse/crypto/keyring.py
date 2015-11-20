@@ -397,7 +397,7 @@ class Keyring(object):
                     for server_name, key_ids in server_names_and_key_ids
                 }
             },
-            long_requests=True,
+            long_retries=True,
         )
 
         keys = {}
