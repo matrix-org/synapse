@@ -129,10 +129,9 @@ def format_event_for_client_v2(d):
     return d
 
 
-def format_event_for_client_v2_without_event_id(d):
+def format_event_for_client_v2_without_room_id(d):
     d = format_event_for_client_v2(d)
     d.pop("room_id", None)
-    d.pop("event_id", None)
     return d
 
 
