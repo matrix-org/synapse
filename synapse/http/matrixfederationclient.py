@@ -190,11 +190,11 @@ class MatrixFederationHttpClient(object):
                     if retries_left and not timeout:
                         if long_retries:
                             delay = 4 ** (MAX_LONG_RETRIES + 1 - retries_left)
-                            delay = max(delay, 60)
+                            delay = min(delay, 60)
                             delay *= random.uniform(0.8, 1.4)
                         else:
                             delay = 0.5 * 2 ** (MAX_SHORT_RETRIES - retries_left)
-                            delay = max(delay, 2)
+                            delay = min(delay, 2)
                             delay *= random.uniform(0.8, 1.4)
 
                         yield sleep(delay)
