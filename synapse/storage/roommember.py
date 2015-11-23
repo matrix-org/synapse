@@ -160,7 +160,7 @@ class RoomMemberStore(SQLBaseStore):
 
     def _get_rooms_for_user_where_membership_is_txn(self, txn, user_id,
                                                     membership_list):
-        where_clause = "user_id = ? AND (%s) AND forgotten == 0" % (
+        where_clause = "user_id = ? AND (%s) AND forgotten = 0" % (
             " OR ".join(["membership = ?" for _ in membership_list]),
         )
 
