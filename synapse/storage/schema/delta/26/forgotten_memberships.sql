@@ -19,6 +19,8 @@
  *
  * If all users on this server have left a room, we can delete the room
  * entirely.
+ *
+ * This column should always contain either 0 or 1.
  */
 
- ALTER TABLE room_memberships ADD COLUMN forgotten INTEGER(1) DEFAULT 0;
+ ALTER TABLE room_memberships ADD COLUMN forgotten INTEGER DEFAULT 0;
