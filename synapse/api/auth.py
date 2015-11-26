@@ -860,7 +860,7 @@ class Auth(object):
 
         redact_level = self._get_named_level(auth_events, "redact", 50)
 
-        if user_level > redact_level:
+        if user_level >= redact_level:
             return False
 
         redacter_domain = EventID.from_string(event.event_id).domain
