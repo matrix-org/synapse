@@ -139,10 +139,17 @@ class SearchHandler(BaseHandler):
         # Holds the next_batch for the entire result set if one of those exists
         global_next_batch = None
 
+        highlights = set()
+
         if order_by == "rank":
-            results = yield self.store.search_msgs(
+            search_result = yield self.store.search_msgs(
                 room_ids, search_term, keys
             )
+
+            if search_result["highlights"]:
+                highlights.update(search_result["highlights"])
+
+            results = search_result["results"]
 
             results_map = {r["event"].event_id: r for r in results}
 
@@ -187,10 +194,15 @@ class SearchHandler(BaseHandler):
                 # But only go around 5 times since otherwise synapse will be sad.
                 while len(room_events) < search_filter.limit() and i < 5:
                     i += 1
-                    results = yield self.store.search_room(
+                    search_result = yield self.store.search_room(
                         room_id, search_term, keys, search_filter.limit() * 2,
                         pagination_token=pagination_token,
                     )
+
+                    if search_result["highlights"]:
+                        highlights.update(search_result["highlights"])
+
+                    results = search_result["results"]
 
                     results_map = {r["event"].event_id: r for r in results}
 
@@ -347,7 +359,8 @@ class SearchHandler(BaseHandler):
 
         rooms_cat_res = {
             "results": results,
-            "count": len(results)
+            "count": len(results),
+            "highlights": list(highlights),
         }
 
         if state_results:
