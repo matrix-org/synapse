@@ -102,7 +102,9 @@ def format_event_raw(d):
 def format_event_for_client_v1(d):
     d = format_event_for_client_v2(d)
 
-    d["user_id"] = d.get("sender", None)
+    sender = d.get("sender")
+    if sender is not None:
+        d["user_id"] = sender
 
     copy_keys = (
         "age", "redacted_because", "replaces_state", "prev_content",
