@@ -233,10 +233,15 @@ class FederationHandler(BaseHandler):
 
         if event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
-                user = UserID.from_string(event.state_key)
-                yield self.distributor.fire(
-                    "user_joined_room", user=user, room_id=event.room_id
+                context = yield self.state_handler.compute_event_context(
+                    event, old_state=state, outlier=event.internal_metadata.is_outlier()
                 )
+                prev_state = context.current_state.get((event.type, event.state_key))
+                if not prev_state or prev_state.membership != Membership.JOIN:
+                    user = UserID.from_string(event.state_key)
+                    yield self.distributor.fire(
+                        "user_joined_room", user=user, room_id=event.room_id
+                    )
 
     @defer.inlineCallbacks
     def _filter_events_for_server(self, server_name, room_id, events):
