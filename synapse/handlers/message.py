@@ -31,6 +31,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def collect_presencelike_data(distributor, user, content):
+    return distributor.fire("changed_presencelike_data", user, content)
+
+
 class MessageHandler(BaseHandler):
 
     def __init__(self, hs):
@@ -195,10 +199,8 @@ class MessageHandler(BaseHandler):
             if membership == Membership.JOIN:
                 joinee = UserID.from_string(builder.state_key)
                 # If event doesn't include a display name, add one.
-                yield self.distributor.fire(
-                    "collect_presencelike_data",
-                    joinee,
-                    builder.content
+                yield collect_presencelike_data(
+                    self.distributor, joinee, builder.content
                 )
 
         if token_id is not None:
