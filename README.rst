@@ -115,8 +115,8 @@ Installing prerequisites on CentOS 7::
 
     sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
                      lcms2-devel libwebp-devel tcl-devel tk-devel \
-                     python-virtualenv
-                     sudo yum groupinstall "Development Tools"
+                     python-virtualenv libffi-devel openssl-devel
+    sudo yum groupinstall "Development Tools"
 
 
 Installing prerequisites on Mac OS X::
@@ -152,7 +152,8 @@ To set up your homeserver, run (in your virtualenv, as before)::
     python -m synapse.app.homeserver \
         --server-name machine.my.domain.name \
         --config-path homeserver.yaml \
-        --generate-config
+        --generate-config \
+        --report-stats=[yes|no]
 
 Substituting your host and domain name as appropriate.
 
