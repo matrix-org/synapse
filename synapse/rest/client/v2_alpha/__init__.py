@@ -23,6 +23,7 @@ from . import (
     keys,
     tokenrefresh,
     tags,
+    account_data,
 )
 
 from synapse.http.server import JsonResource
@@ -46,3 +47,4 @@ class ClientV2AlphaRestResource(JsonResource):
         keys.register_servlets(hs, client_resource)
         tokenrefresh.register_servlets(hs, client_resource)
         tags.register_servlets(hs, client_resource)
+        account_data.register_servlets(hs, client_resource)

@@ -144,6 +144,9 @@ class SyncRestServlet(RestServlet):
         )
 
         response_content = {
+            "account_data": self.encode_account_data(
+                sync_result.account_data, filter, time_now
+            ),
             "presence": self.encode_presence(
                 sync_result.presence, filter, time_now
             ),
@@ -164,6 +167,9 @@ class SyncRestServlet(RestServlet):
             event['sender'] = event['content'].pop('user_id')
             formatted.append(event)
         return {"events": filter.filter_presence(formatted)}
+
+    def encode_account_data(self, events, filter, time_now):
+        return {"events": filter.filter_account_data(events)}
 
     def encode_joined(self, rooms, filter, time_now, token_id):
         """

@@ -359,6 +359,10 @@ class MessageHandler(BaseHandler):
 
         tags_by_room = yield self.store.get_tags_for_user(user_id)
 
+        account_data, account_data_by_room = (
+            yield self.store.get_account_data_for_user(user_id)
+        )
+
         public_room_ids = yield self.store.get_public_room_ids()
 
         limit = pagin_config.limit
@@ -436,14 +440,22 @@ class MessageHandler(BaseHandler):
                     for c in current_state.values()
                 ]
 
-                account_data = []
+                account_data_events = []
                 tags = tags_by_room.get(event.room_id)
                 if tags:
-                    account_data.append({
+                    account_data_events.append({
                         "type": "m.tag",
                         "content": {"tags": tags},
                     })
-                d["account_data"] = account_data
+
+                account_data = account_data_by_room.get(event.room_id, {})
+                for account_data_type, content in account_data.items():
+                    account_data_events.append({
+                        "type": account_data_type,
+                        "content": content,
+                    })
+
+                d["account_data"] = account_data_events
             except:
                 logger.exception("Failed to get snapshot")
 
@@ -456,9 +468,17 @@ class MessageHandler(BaseHandler):
                 consumeErrors=True
             ).addErrback(unwrapFirstError)
 
+        account_data_events = []
+        for account_data_type, content in account_data.items():
+            account_data_events.append({
+                "type": account_data_type,
+                "content": content,
+            })
+
         ret = {
             "rooms": rooms_ret,
             "presence": presence,
+            "account_data": account_data_events,
             "receipts": receipt,
             "end": now_token.to_string(),
         }
@@ -498,14 +518,22 @@ class MessageHandler(BaseHandler):
                 user_id, room_id, pagin_config, membership, member_event_id, is_guest
             )
 
-        account_data = []
+        account_data_events = []
         tags = yield self.store.get_tags_for_room(user_id, room_id)
         if tags:
-            account_data.append({
+            account_data_events.append({
                 "type": "m.tag",
                 "content": {"tags": tags},
             })
-        result["account_data"] = account_data
+
+        account_data = yield self.store.get_account_data_for_room(user_id, room_id)
+        for account_data_type, content in account_data.items():
+            account_data_events.append({
+                "type": account_data_type,
+                "content": content,
+            })
+
+        result["account_data"] = account_data_events
 
         defer.returnValue(result)
 

@@ -50,7 +50,7 @@ class Filtering(object):
         # many definitions.
 
         top_level_definitions = [
-            "presence"
+            "presence", "account_data"
         ]
 
         room_level_definitions = [
@@ -139,6 +139,10 @@ class FilterCollection(object):
             self.filter_json.get("presence", {})
         )
 
+        self.account_data = Filter(
+            self.filter_json.get("account_data", {})
+        )
+
     def timeline_limit(self):
         return self.room_timeline_filter.limit()
 
@@ -150,6 +154,9 @@ class FilterCollection(object):
 
     def filter_presence(self, events):
         return self.presence_filter.filter(events)
+
+    def filter_account_data(self, events):
+        return self.account_data.filter(events)
 
     def filter_room_state(self, events):
         return self.room_state_filter.filter(events)
