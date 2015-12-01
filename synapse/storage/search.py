@@ -20,6 +20,7 @@ from synapse.api.errors import SynapseError
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 import logging
+import re
 
 
 logger = logging.getLogger(__name__)
@@ -194,14 +195,21 @@ class SearchStore(BackgroundUpdateStore):
             for ev in events
         }
 
-        defer.returnValue([
-            {
-                "event": event_map[r["event_id"]],
-                "rank": r["rank"],
-            }
-            for r in results
-            if r["event_id"] in event_map
-        ])
+        highlights = None
+        if isinstance(self.database_engine, PostgresEngine):
+            highlights = yield self._find_highlights_in_postgres(search_term, events)
+
+        defer.returnValue({
+            "results": [
+                {
+                    "event": event_map[r["event_id"]],
+                    "rank": r["rank"],
+                }
+                for r in results
+                if r["event_id"] in event_map
+            ],
+            "highlights": highlights,
+        })
 
     @defer.inlineCallbacks
     def search_room(self, room_id, search_term, keys, limit, pagination_token=None):
@@ -294,14 +302,91 @@ class SearchStore(BackgroundUpdateStore):
             for ev in events
         }
 
-        defer.returnValue([
-            {
-                "event": event_map[r["event_id"]],
-                "rank": r["rank"],
-                "pagination_token": "%s,%s" % (
-                    r["topological_ordering"], r["stream_ordering"]
-                ),
-            }
-            for r in results
-            if r["event_id"] in event_map
-        ])
+        highlights = None
+        if isinstance(self.database_engine, PostgresEngine):
+            highlights = yield self._find_highlights_in_postgres(search_term, events)
+
+        defer.returnValue({
+            "results": [
+                {
+                    "event": event_map[r["event_id"]],
+                    "rank": r["rank"],
+                    "pagination_token": "%s,%s" % (
+                        r["topological_ordering"], r["stream_ordering"]
+                    ),
+                }
+                for r in results
+                if r["event_id"] in event_map
+            ],
+            "highlights": highlights,
+        })
+
+    def _find_highlights_in_postgres(self, search_term, events):
+        """Given a list of events and a search term, return a list of words
+        that match from the content of the event.
+
+        This is used to give a list of words that clients can match against to
+        highlight the matching parts.
+
+        Args:
+            search_term (str)
+            events (list): A list of events
+
+        Returns:
+            deferred : A set of strings.
+        """
+        def f(txn):
+            highlight_words = set()
+            for event in events:
+                # As a hack we simply join values of all possible keys. This is
+                # fine since we're only using them to find possible highlights.
+                values = []
+                for key in ("body", "name", "topic"):
+                    v = event.content.get(key, None)
+                    if v:
+                        values.append(v)
+
+                if not values:
+                    continue
+
+                value = " ".join(values)
+
+                # We need to find some values for StartSel and StopSel that
+                # aren't in the value so that we can pick results out.
+                start_sel = "<"
+                stop_sel = ">"
+
+                while start_sel in value:
+                    start_sel += "<"
+                while stop_sel in value:
+                    stop_sel += ">"
+
+                query = "SELECT ts_headline(?, plainto_tsquery('english', ?), %s)" % (
+                    _to_postgres_options({
+                        "StartSel": start_sel,
+                        "StopSel": stop_sel,
+                        "MaxFragments": "50",
+                    })
+                )
+                txn.execute(query, (value, search_term,))
+                headline, = txn.fetchall()[0]
+
+                # Now we need to pick the possible highlights out of the haedline
+                # result.
+                matcher_regex = "%s(.*?)%s" % (
+                    re.escape(start_sel),
+                    re.escape(stop_sel),
+                )
+
+                res = re.findall(matcher_regex, headline)
+                highlight_words.update([r.lower() for r in res])
+
+            return highlight_words
+
+        return self.runInteraction("_find_highlights", f)
+
+
+def _to_postgres_options(options_dict):
+    return "'%s'" % (
+        ",".join("%s=%s" % (k, v) for k, v in options_dict.items()),
+    )
