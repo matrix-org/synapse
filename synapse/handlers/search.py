@@ -135,7 +135,7 @@ class SearchHandler(BaseHandler):
             defer.returnValue({
                 "search_categories": {
                     "room_events": {
-                        "results": {},
+                        "results": [],
                         "count": 0,
                         "highlights": [],
                     }
@@ -339,16 +339,14 @@ class SearchHandler(BaseHandler):
         # We're now about to serialize the events. We should not make any
         # blocking calls after this. Otherwise the 'age' will be wrong
 
-        results = {
-            e.event_id: {
+        results = [
+            {
                 "rank": rank_map[e.event_id],
                 "result": serialize_event(e, time_now),
                 "context": contexts.get(e.event_id, {}),
             }
             for e in allowed_events
-        }
-
-        logger.info("Found %d results", len(results))
+        ]
 
         rooms_cat_res = {
             "results": results,
