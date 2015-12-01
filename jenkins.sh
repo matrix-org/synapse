@@ -42,4 +42,29 @@ export PERL5LIB PERL_MB_OPT PERL_MM_OPT
 
 ./install-deps.pl
 
-./run-tests.pl -O tap --synapse-directory .. --all > results.tap
+: ${PORT_BASE:=8000}
+
+echo >&2 "Running sytest with SQLite3";
+./run-tests.pl -O tap --synapse-directory .. --all --port-base $PORT_BASE > results-sqlite3.tap
+
+RUN_POSTGRES=""
+
+for port in $(($PORT_BASE + 1)) $(($PORT_BASE + 2)); do
+    if psql synapse_jenkins_$port <<< ""; then
+        RUN_POSTGRES=$RUN_POSTGRES:$port
+        cat > localhost-$port/database.yaml << EOF
+name: psycopg2
+args:
+    database: synapse_jenkins_$port
+EOF
+    fi
+done
+
+# Run if both postgresql databases exist
+if test $RUN_POSTGRES = ":$(($PORT_BASE + 1)):$(($PORT_BASE + 2))"; then
+    echo >&2 "Running sytest with PostgreSQL";
+    pip install psycopg2
+    ./run-tests.pl -O tap --synapse-directory .. --all --port-base $PORT_BASE > results-postgresql.tap
+else
+    echo >&2 "Skipping running sytest with PostgreSQL, $RUN_POSTGRES"
+fi
