@@ -517,10 +517,12 @@ class RoomMemberHandler(BaseHandler):
                 do_auth=do_auth,
             )
 
-        user = UserID.from_string(event.user_id)
-        yield self.distributor.fire(
-            "user_joined_room", user=user, room_id=room_id
-        )
+        prev_state = context.current_state.get((event.type, event.state_key))
+        if not prev_state or prev_state.membership != Membership.JOIN:
+            user = UserID.from_string(event.user_id)
+            yield self.distributor.fire(
+                "user_joined_room", user=user, room_id=room_id
+            )
 
     @defer.inlineCallbacks
     def get_inviter(self, event):
