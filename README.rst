@@ -439,6 +439,10 @@ SRV record, as that is the name other machines will expect it to have::
     python -m synapse.app.homeserver --config-path homeserver.yaml
 
 
+If you've already generated the config file, you need to edit the "server_name"
+in you  ```homeserver.yaml``` file. If you've already started Synapse and a
+database has been created, you will have to recreate the database.
+
 You may additionally want to pass one or more "-v" options, in order to
 increase the verbosity of logging output; at least for initial testing.
 
