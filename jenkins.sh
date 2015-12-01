@@ -64,7 +64,7 @@ done
 if test $RUN_POSTGRES = ":$(($PORT_BASE + 1)):$(($PORT_BASE + 2))"; then
     echo >&2 "Running sytest with PostgreSQL";
     pip install psycopg2
-    ./run-tests.pl -O tap --synapse-directory .. --all > results.tap
+    ./run-tests.pl -O tap --synapse-directory .. --all --port-base $PORT_BASE > results.tap
 else
     echo >&2 "Skipping running sytest with PostgreSQL, $RUN_POSTGRES"
 fi
