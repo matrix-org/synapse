@@ -42,6 +42,7 @@ from .end_to_end_keys import EndToEndKeyStore
 from .receipts import ReceiptsStore
 from .search import SearchStore
 from .tags import TagsStore
+from .account_data import AccountDataStore
 
 
 import logging
@@ -73,6 +74,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 EndToEndKeyStore,
                 SearchStore,
                 TagsStore,
+                AccountDataStore,
                 ):
 
     def __init__(self, hs):
