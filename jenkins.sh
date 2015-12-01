@@ -45,7 +45,7 @@ export PERL5LIB PERL_MB_OPT PERL_MM_OPT
 : ${PORT_BASE:=8000}
 
 echo >&2 "Running sytest with SQLite3";
-./run-tests.pl -O tap --synapse-directory .. --all --port-base $PORT_BASE > results.tap
+./run-tests.pl -O tap --synapse-directory .. --all --port-base $PORT_BASE > results-sqlite3.tap
 
 RUN_POSTGRES=""
 
@@ -64,7 +64,7 @@ done
 if test $RUN_POSTGRES = ":$(($PORT_BASE + 1)):$(($PORT_BASE + 2))"; then
     echo >&2 "Running sytest with PostgreSQL";
     pip install psycopg2
-    ./run-tests.pl -O tap --synapse-directory .. --all --port-base $PORT_BASE > results.tap
+    ./run-tests.pl -O tap --synapse-directory .. --all --port-base $PORT_BASE > results-postgresql.tap
 else
     echo >&2 "Skipping running sytest with PostgreSQL, $RUN_POSTGRES"
 fi
