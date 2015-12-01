@@ -365,7 +365,7 @@ class PresenceInvitesTestCase(PresenceTestCase):
         # TODO(paul): This test will likely break if/when real auth permissions
         # are added; for now the HS will always accept any invite
 
-        yield self.handler.send_invite(
+        yield self.handler.send_presence_invite(
                 observer_user=self.u_apple, observed_user=self.u_banana)
 
         self.assertEquals(
@@ -384,7 +384,7 @@ class PresenceInvitesTestCase(PresenceTestCase):
 
     @defer.inlineCallbacks
     def test_invite_local_nonexistant(self):
-        yield self.handler.send_invite(
+        yield self.handler.send_presence_invite(
                 observer_user=self.u_apple, observed_user=self.u_durian)
 
         self.assertEquals(
@@ -414,7 +414,7 @@ class PresenceInvitesTestCase(PresenceTestCase):
             defer.succeed((200, "OK"))
         )
 
-        yield self.handler.send_invite(
+        yield self.handler.send_presence_invite(
                 observer_user=self.u_apple, observed_user=u_rocket)
 
         self.assertEquals(
