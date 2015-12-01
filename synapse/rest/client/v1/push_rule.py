@@ -18,7 +18,7 @@ from twisted.internet import defer
 from synapse.api.errors import (
     SynapseError, Codes, UnrecognizedRequestError, NotFoundError, StoreError
 )
-from .base import ClientV1RestServlet, client_path_pattern
+from .base import ClientV1RestServlet, client_path_patterns
 from synapse.storage.push_rule import (
     InconsistentRuleException, RuleNotFoundException
 )
@@ -31,7 +31,7 @@ import simplejson as json
 
 
 class PushRuleRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/pushrules/.*$")
+    PATTERNS = client_path_patterns("/pushrules/.*$")
     SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR = (
         "Unrecognised request: You probably wanted a trailing slash")
 

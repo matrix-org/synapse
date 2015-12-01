@@ -18,7 +18,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, Codes
 from synapse.api.constants import LoginType
-from base import ClientV1RestServlet, client_path_pattern
+from base import ClientV1RestServlet, client_path_patterns
 import synapse.util.stringutils as stringutils
 
 from synapse.util.async import run_on_reactor
@@ -48,7 +48,7 @@ class RegisterRestServlet(ClientV1RestServlet):
     handler doesn't have a concept of multi-stages or sessions.
     """
 
-    PATTERN = client_path_pattern("/register$")
+    PATTERNS = client_path_patterns("/register$", releases=())
 
     def __init__(self, hs):
         super(RegisterRestServlet, self).__init__(hs)

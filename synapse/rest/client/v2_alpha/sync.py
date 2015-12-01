@@ -25,7 +25,7 @@ from synapse.events.utils import (
     serialize_event, format_event_for_client_v2_without_room_id,
 )
 from synapse.api.filtering import FilterCollection
-from ._base import client_v2_pattern
+from ._base import client_v2_patterns
 
 import copy
 import logging
@@ -69,7 +69,7 @@ class SyncRestServlet(RestServlet):
         }
     """
 
-    PATTERN = client_v2_pattern("/sync$")
+    PATTERNS = client_v2_patterns("/sync$")
     ALLOWED_PRESENCE = set(["online", "offline"])
 
     def __init__(self, hs):

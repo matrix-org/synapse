@@ -27,7 +27,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def client_path_pattern(path_regex):
+def client_path_patterns(path_regex, releases=(0,)):
     """Creates a regex compiled client path with the correct client path
     prefix.
 
@@ -37,7 +37,13 @@ def client_path_pattern(path_regex):
     Returns:
         SRE_Pattern
     """
-    return re.compile("^" + CLIENT_PREFIX + path_regex)
+    patterns = [re.compile("^" + CLIENT_PREFIX + path_regex)]
+    unstable_prefix = CLIENT_PREFIX.replace("/api/v1", "/unstable")
+    patterns.append(re.compile("^" + unstable_prefix + path_regex))
+    for release in releases:
+        new_prefix = CLIENT_PREFIX.replace("/api/v1", "/r%d" % release)
+        patterns.append(re.compile("^" + new_prefix + path_regex))
+    return patterns
 
 
 class ClientV1RestServlet(RestServlet):

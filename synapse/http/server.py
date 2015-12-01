@@ -120,7 +120,7 @@ class HttpServer(object):
     """ Interface for registering callbacks on a HTTP server
     """
 
-    def register_path(self, method, path_pattern, callback):
+    def register_paths(self, method, path_patterns, callback):
         """ Register a callback that gets fired if we receive a http request
         with the given method for a path that matches the given regex.
 
@@ -129,7 +129,7 @@ class HttpServer(object):
 
         Args:
             method (str): The method to listen to.
-            path_pattern (str): The regex used to match requests.
+            path_patterns (list<SRE_Pattern>): The regex used to match requests.
             callback (function): The function to fire if we receive a matched
                 request. The first argument will be the request object and
                 subsequent arguments will be any matched groups from the regex.
@@ -165,10 +165,11 @@ class JsonResource(HttpServer, resource.Resource):
         self.version_string = hs.version_string
         self.hs = hs
 
-    def register_path(self, method, path_pattern, callback):
-        self.path_regexs.setdefault(method, []).append(
-            self._PathEntry(path_pattern, callback)
-        )
+    def register_paths(self, method, path_patterns, callback):
+        for path_pattern in path_patterns:
+            self.path_regexs.setdefault(method, []).append(
+                self._PathEntry(path_pattern, callback)
+            )
 
     def render(self, request):
         """ This gets called by twisted every time someone sends us a request.

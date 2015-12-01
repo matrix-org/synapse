@@ -21,7 +21,7 @@ from synapse.types import UserID
 
 from canonicaljson import encode_canonical_json
 
-from ._base import client_v2_pattern
+from ._base import client_v2_patterns
 
 import simplejson as json
 import logging
@@ -54,7 +54,7 @@ class KeyUploadServlet(RestServlet):
       },
     }
     """
-    PATTERN = client_v2_pattern("/keys/upload/(?P<device_id>[^/]*)")
+    PATTERNS = client_v2_patterns("/keys/upload/(?P<device_id>[^/]*)")
 
     def __init__(self, hs):
         super(KeyUploadServlet, self).__init__()
@@ -154,12 +154,13 @@ class KeyQueryServlet(RestServlet):
     } } } } } }
     """
 
-    PATTERN = client_v2_pattern(
+    PATTERNS = client_v2_patterns(
         "/keys/query(?:"
         "/(?P<user_id>[^/]*)(?:"
         "/(?P<device_id>[^/]*)"
         ")?"
-        ")?"
+        ")?",
+        releases=()
     )
 
     def __init__(self, hs):
@@ -245,10 +246,11 @@ class OneTimeKeyServlet(RestServlet):
     } } } }
 
     """
-    PATTERN = client_v2_pattern(
+    PATTERNS = client_v2_patterns(
         "/keys/claim(?:/?|(?:/"
         "(?P<user_id>[^/]*)/(?P<device_id>[^/]*)/(?P<algorithm>[^/]*)"
-        ")?)"
+        ")?)",
+        releases=()
     )
 
     def __init__(self, hs):

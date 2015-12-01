@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import client_v2_pattern
+from ._base import client_v2_patterns
 
 from synapse.http.servlet import RestServlet
 from synapse.api.errors import AuthError, SynapseError
@@ -31,7 +31,7 @@ class TagListServlet(RestServlet):
     """
     GET /user/{user_id}/rooms/{room_id}/tags HTTP/1.1
     """
-    PATTERN = client_v2_pattern(
+    PATTERNS = client_v2_patterns(
         "/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/tags"
     )
 
@@ -56,7 +56,7 @@ class TagServlet(RestServlet):
     PUT /user/{user_id}/rooms/{room_id}/tags/{tag} HTTP/1.1
     DELETE /user/{user_id}/rooms/{room_id}/tags/{tag} HTTP/1.1
     """
-    PATTERN = client_v2_pattern(
+    PATTERNS = client_v2_patterns(
         "/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/tags/(?P<tag>[^/]*)"
     )
 
