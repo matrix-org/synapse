@@ -226,19 +226,20 @@ class SearchHandler(BaseHandler):
 
                 if len(results) < search_filter.limit() * 2:
                     pagination_token = None
+                    break
                 else:
                     pagination_token = results[-1]["pagination_token"]
 
-            if room_events:
-                for event in room_events:
-                    group = room_groups.setdefault(event.room_id, {
-                        "results": [],
-                    })
-                    group["results"].append(event.event_id)
+            for event in room_events:
+                group = room_groups.setdefault(event.room_id, {
+                    "results": [],
+                })
+                group["results"].append(event.event_id)
 
-            pagination_token = results_map[room_events[-1].event_id]["pagination_token"]
+            if room_events and len(room_events) >= search_filter.limit():
+                last_event_id = room_events[-1].event_id
+                pagination_token = results_map[last_event_id]["pagination_token"]
 
-            if pagination_token:
                 global_next_batch = encode_base64("%s\n%s\n%s" % (
                     "all", "", pagination_token
                 ))
