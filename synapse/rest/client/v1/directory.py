@@ -18,7 +18,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import AuthError, SynapseError, Codes
 from synapse.types import RoomAlias
-from .base import ClientV1RestServlet, client_path_pattern
+from .base import ClientV1RestServlet, client_path_patterns
 
 import simplejson as json
 import logging
@@ -32,7 +32,7 @@ def register_servlets(hs, http_server):
 
 
 class ClientDirectoryServer(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/directory/room/(?P<room_alias>[^/]*)$")
+    PATTERNS = client_path_patterns("/directory/room/(?P<room_alias>[^/]*)$")
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_alias):

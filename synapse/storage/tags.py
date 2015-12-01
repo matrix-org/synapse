@@ -48,8 +48,8 @@ class TagsStore(SQLBaseStore):
         Args:
             user_id(str): The user to get the tags for.
         Returns:
-            A deferred dict mapping from room_id strings to lists of tag
-            strings.
+            A deferred dict mapping from room_id strings to dicts mapping from
+            tag strings to tag content.
         """
 
         deferred = self._simple_select_list(

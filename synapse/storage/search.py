@@ -212,11 +212,11 @@ class SearchStore(BackgroundUpdateStore):
         })
 
     @defer.inlineCallbacks
-    def search_room(self, room_id, search_term, keys, limit, pagination_token=None):
+    def search_rooms(self, room_ids, search_term, keys, limit, pagination_token=None):
         """Performs a full text search over events with given keys.
 
         Args:
-            room_id (str): The room_id to search in
+            room_id (list): The room_ids to search in
             search_term (str): Search term to search for
             keys (list): List of keys to search in, currently supports
                 "content.body", "content.name", "content.topic"
@@ -226,7 +226,15 @@ class SearchStore(BackgroundUpdateStore):
             list of dicts
         """
         clauses = []
-        args = [search_term, room_id]
+        args = [search_term]
+
+        # Make sure we don't explode because the person is in too many rooms.
+        # We filter the results below regardless.
+        if len(room_ids) < 500:
+            clauses.append(
+                "room_id IN (%s)" % (",".join(["?"] * len(room_ids)),)
+            )
+            args.extend(room_ids)
 
         local_clauses = []
         for key in keys:
@@ -239,25 +247,25 @@ class SearchStore(BackgroundUpdateStore):
 
         if pagination_token:
             try:
-                topo, stream = pagination_token.split(",")
-                topo = int(topo)
+                origin_server_ts, stream = pagination_token.split(",")
+                origin_server_ts = int(origin_server_ts)
                 stream = int(stream)
             except:
                 raise SynapseError(400, "Invalid pagination token")
 
             clauses.append(
-                "(topological_ordering < ?"
-                " OR (topological_ordering = ? AND stream_ordering < ?))"
+                "(origin_server_ts < ?"
+                " OR (origin_server_ts = ? AND stream_ordering < ?))"
             )
-            args.extend([topo, topo, stream])
+            args.extend([origin_server_ts, origin_server_ts, stream])
 
         if isinstance(self.database_engine, PostgresEngine):
             sql = (
                 "SELECT ts_rank_cd(vector, query) as rank,"
-                " topological_ordering, stream_ordering, room_id, event_id"
+                " origin_server_ts, stream_ordering, room_id, event_id"
                 " FROM plainto_tsquery('english', ?) as query, event_search"
                 " NATURAL JOIN events"
-                " WHERE vector @@ query AND room_id = ?"
+                " WHERE vector @@ query AND "
             )
         elif isinstance(self.database_engine, Sqlite3Engine):
             # We use CROSS JOIN here to ensure we use the right indexes.
@@ -270,30 +278,31 @@ class SearchStore(BackgroundUpdateStore):
             # MATCH unless it uses the full text search index
             sql = (
                 "SELECT rank(matchinfo) as rank, room_id, event_id,"
-                " topological_ordering, stream_ordering"
+                " origin_server_ts, stream_ordering"
                 " FROM (SELECT key, event_id, matchinfo(event_search) as matchinfo"
                 " FROM event_search"
                 " WHERE value MATCH ?"
                 " )"
                 " CROSS JOIN events USING (event_id)"
-                " WHERE room_id = ?"
+                " WHERE "
             )
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
 
-        for clause in clauses:
-            sql += " AND " + clause
+        sql += " AND ".join(clauses)
 
         # We add an arbitrary limit here to ensure we don't try to pull the
         # entire table from the database.
-        sql += " ORDER BY topological_ordering DESC, stream_ordering DESC LIMIT ?"
+        sql += " ORDER BY origin_server_ts DESC, stream_ordering DESC LIMIT ?"
 
         args.append(limit)
 
         results = yield self._execute(
             "search_rooms", self.cursor_to_dict, sql, *args
         )
+
+        results = filter(lambda row: row["room_id"] in room_ids, results)
 
         events = yield self._get_events([r["event_id"] for r in results])
 
@@ -312,7 +321,7 @@ class SearchStore(BackgroundUpdateStore):
                     "event": event_map[r["event_id"]],
                     "rank": r["rank"],
                     "pagination_token": "%s,%s" % (
-                        r["topological_ordering"], r["stream_ordering"]
+                        r["origin_server_ts"], r["stream_ordering"]
                     ),
                 }
                 for r in results

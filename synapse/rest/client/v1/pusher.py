@@ -17,13 +17,13 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, Codes
 from synapse.push import PusherConfigException
-from .base import ClientV1RestServlet, client_path_pattern
+from .base import ClientV1RestServlet, client_path_patterns
 
 import simplejson as json
 
 
 class PusherRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/pushers/set$")
+    PATTERNS = client_path_patterns("/pushers/set$")
 
     @defer.inlineCallbacks
     def on_POST(self, request):

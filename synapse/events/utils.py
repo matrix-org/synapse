@@ -100,22 +100,20 @@ def format_event_raw(d):
 
 
 def format_event_for_client_v1(d):
-    d["user_id"] = d.pop("sender", None)
+    d = format_event_for_client_v2(d)
 
-    move_keys = (
+    sender = d.get("sender")
+    if sender is not None:
+        d["user_id"] = sender
+
+    copy_keys = (
         "age", "redacted_because", "replaces_state", "prev_content",
         "invite_room_state",
     )
-    for key in move_keys:
+    for key in copy_keys:
         if key in d["unsigned"]:
             d[key] = d["unsigned"][key]
 
-    drop_keys = (
-        "auth_events", "prev_events", "hashes", "signatures", "depth",
-        "unsigned", "origin", "prev_state"
-    )
-    for key in drop_keys:
-        d.pop(key, None)
     return d
 
 

@@ -16,12 +16,12 @@
 from twisted.internet import defer
 
 from synapse.streams.config import PaginationConfig
-from base import ClientV1RestServlet, client_path_pattern
+from base import ClientV1RestServlet, client_path_patterns
 
 
 # TODO: Needs unit testing
 class InitialSyncRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/initialSync$")
+    PATTERNS = client_path_patterns("/initialSync$")
 
     @defer.inlineCallbacks
     def on_GET(self, request):
