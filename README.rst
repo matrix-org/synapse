@@ -115,8 +115,8 @@ Installing prerequisites on CentOS 7::
 
     sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
                      lcms2-devel libwebp-devel tcl-devel tk-devel \
-                     python-virtualenv
-                     sudo yum groupinstall "Development Tools"
+                     python-virtualenv libffi-devel
+    sudo yum groupinstall "Development Tools"
 
 
 Installing prerequisites on Mac OS X::
