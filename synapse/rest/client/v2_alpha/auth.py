@@ -20,7 +20,7 @@ from synapse.api.errors import SynapseError
 from synapse.api.urls import CLIENT_V2_ALPHA_PREFIX
 from synapse.http.servlet import RestServlet
 
-from ._base import client_v2_pattern
+from ._base import client_v2_patterns
 
 import logging
 
@@ -97,7 +97,7 @@ class AuthRestServlet(RestServlet):
     cannot be handled in the normal flow (with requests to the same endpoint).
     Current use is for web fallback auth.
     """
-    PATTERN = client_v2_pattern("/auth/(?P<stagetype>[\w\.]*)/fallback/web")
+    PATTERNS = client_v2_patterns("/auth/(?P<stagetype>[\w\.]*)/fallback/web")
 
     def __init__(self, hs):
         super(AuthRestServlet, self).__init__()

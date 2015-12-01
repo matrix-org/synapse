@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from base import ClientV1RestServlet, client_path_pattern
+from base import ClientV1RestServlet, client_path_patterns
 
 
 import hmac
@@ -24,7 +24,7 @@ import base64
 
 
 class VoipRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/voip/turnServer$")
+    PATTERNS = client_path_patterns("/voip/turnServer$")
 
     @defer.inlineCallbacks
     def on_GET(self, request):

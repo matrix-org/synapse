@@ -19,7 +19,7 @@ from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
 from synapse.http.servlet import RestServlet
 
-from ._base import client_v2_pattern, parse_json_dict_from_request
+from ._base import client_v2_patterns, parse_json_dict_from_request
 
 import logging
 import hmac
@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 class RegisterRestServlet(RestServlet):
-    PATTERN = client_v2_pattern("/register")
+    PATTERNS = client_v2_patterns("/register")
 
     def __init__(self, hs):
         super(RegisterRestServlet, self).__init__()

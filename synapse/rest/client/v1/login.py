@@ -18,7 +18,7 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError, LoginError, Codes
 from synapse.http.client import SimpleHttpClient
 from synapse.types import UserID
-from base import ClientV1RestServlet, client_path_pattern
+from base import ClientV1RestServlet, client_path_patterns
 
 import simplejson as json
 import urllib
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 class LoginRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/login$")
+    PATTERNS = client_path_patterns("/login$", releases=())
     PASS_TYPE = "m.login.password"
     SAML2_TYPE = "m.login.saml2"
     CAS_TYPE = "m.login.cas"
@@ -238,7 +238,7 @@ class LoginRestServlet(ClientV1RestServlet):
 
 
 class SAML2RestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/login/saml2")
+    PATTERNS = client_path_patterns("/login/saml2", releases=())
 
     def __init__(self, hs):
         super(SAML2RestServlet, self).__init__(hs)
@@ -282,7 +282,7 @@ class SAML2RestServlet(ClientV1RestServlet):
 
 # TODO Delete this after all CAS clients switch to token login instead
 class CasRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/login/cas")
+    PATTERNS = client_path_patterns("/login/cas", releases=())
 
     def __init__(self, hs):
         super(CasRestServlet, self).__init__(hs)
@@ -293,7 +293,7 @@ class CasRestServlet(ClientV1RestServlet):
 
 
 class CasRedirectServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/login/cas/redirect")
+    PATTERNS = client_path_patterns("/login/cas/redirect", releases=())
 
     def __init__(self, hs):
         super(CasRedirectServlet, self).__init__(hs)
@@ -316,7 +316,7 @@ class CasRedirectServlet(ClientV1RestServlet):
 
 
 class CasTicketServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/login/cas/ticket")
+    PATTERNS = client_path_patterns("/login/cas/ticket", releases=())
 
     def __init__(self, hs):
         super(CasTicketServlet, self).__init__(hs)
