@@ -467,7 +467,7 @@ class PresenceHandler(BaseHandler):
             )
 
     @defer.inlineCallbacks
-    def send_invite(self, observer_user, observed_user):
+    def send_presence_invite(self, observer_user, observed_user):
         """Request the presence of a local or remote user for a local user"""
         if not self.hs.is_mine(observer_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
