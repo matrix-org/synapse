@@ -120,7 +120,7 @@ class PresenceListRestServlet(ClientV1RestServlet):
                 if len(u) == 0:
                     continue
                 invited_user = UserID.from_string(u)
-                yield self.handlers.presence_handler.send_invite(
+                yield self.handlers.presence_handler.send_presence_invite(
                     observer_user=user, observed_user=invited_user
                 )
 
