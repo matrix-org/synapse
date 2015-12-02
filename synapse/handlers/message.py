@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 def collect_presencelike_data(distributor, user, content):
-    return distributor.fire("changed_presencelike_data", user, content)
+    return distributor.fire("collect_presencelike_data", user, content)
 
 
 class MessageHandler(BaseHandler):
