@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 class LoginRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/login$", releases=())
+    PATTERNS = client_path_patterns("/login$", releases=(), include_in_unstable=False)
     PASS_TYPE = "m.login.password"
     SAML2_TYPE = "m.login.saml2"
     CAS_TYPE = "m.login.cas"
