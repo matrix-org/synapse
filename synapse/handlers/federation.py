@@ -177,7 +177,7 @@ class FederationHandler(BaseHandler):
                 )
 
             try:
-                _, event_stream_id, max_stream_id = yield self._handle_new_event(
+                context, event_stream_id, max_stream_id = yield self._handle_new_event(
                     origin,
                     event,
                     state=state,
@@ -234,9 +234,6 @@ class FederationHandler(BaseHandler):
 
         if event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
-                context = yield self.state_handler.compute_event_context(
-                    event, old_state=state, outlier=event.internal_metadata.is_outlier()
-                )
                 prev_state = context.current_state.get((event.type, event.state_key))
                 if not prev_state or prev_state.membership != Membership.JOIN:
                     # Only fire user_joined_room if the user has acutally
