@@ -527,6 +527,9 @@ class RoomMemberHandler(BaseHandler):
 
         prev_state = context.current_state.get((event.type, event.state_key))
         if not prev_state or prev_state.membership != Membership.JOIN:
+            # Only fire user_joined_room if the user has acutally joined the
+            # room. Don't bother if the user is just changing their profile
+            # info.
             user = UserID.from_string(event.user_id)
             yield user_joined_room(self.distributor, user, room_id)
 
