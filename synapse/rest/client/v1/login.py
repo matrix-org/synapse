@@ -16,7 +16,6 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, LoginError, Codes
-from synapse.http.client import SimpleHttpClient
 from synapse.types import UserID
 from base import ClientV1RestServlet, client_path_patterns
 
@@ -51,6 +50,7 @@ class LoginRestServlet(ClientV1RestServlet):
         self.cas_server_url = hs.config.cas_server_url
         self.cas_required_attributes = hs.config.cas_required_attributes
         self.servername = hs.config.server_name
+        self.http_client = hs.get_simple_http_client()
 
     def on_GET(self, request):
         flows = []
@@ -98,15 +98,12 @@ class LoginRestServlet(ClientV1RestServlet):
             # TODO Delete this after all CAS clients switch to token login instead
             elif self.cas_enabled and (login_submission["type"] ==
                                        LoginRestServlet.CAS_TYPE):
-                # TODO: get this from the homeserver rather than creating a new one for
-                # each request
-                http_client = SimpleHttpClient(self.hs)
                 uri = "%s/proxyValidate" % (self.cas_server_url,)
                 args = {
                     "ticket": login_submission["ticket"],
                     "service": login_submission["service"]
                 }
-                body = yield http_client.get_raw(uri, args)
+                body = yield self.http_client.get_raw(uri, args)
                 result = yield self.do_cas_login(body)
                 defer.returnValue(result)
             elif login_submission["type"] == LoginRestServlet.TOKEN_TYPE:
