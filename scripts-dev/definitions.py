@@ -152,7 +152,7 @@ if __name__ == '__main__':
     while referrer_depth:
         referrer_depth -= 1
         for entry in result.values():
-            for used_by in entry["used"]:
+            for used_by in entry.get("used", ()):
                 referrers.add(used_by)
         for name, definition in names.items():
             if not name in referrers:

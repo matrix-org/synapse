@@ -28,6 +28,18 @@ import random
 logger = logging.getLogger(__name__)
 
 
+def started_user_eventstream(distributor, user):
+    return distributor.fire("started_user_eventstream", user)
+
+
+def stopped_user_eventstream(distributor, user):
+    return distributor.fire("stopped_user_eventstream", user)
+
+
+def user_joined_room(distributor, user, room_id):
+    return distributor.fire("user_joined_room", user, room_id)
+
+
 class EventStreamHandler(BaseHandler):
 
     def __init__(self, hs):
@@ -66,7 +78,7 @@ class EventStreamHandler(BaseHandler):
                 except:
                     logger.exception("Failed to cancel event timer")
             else:
-                yield self.distributor.fire("started_user_eventstream", user)
+                yield started_user_eventstream(self.distributor, user)
 
         self._streams_per_user[user] += 1
 
@@ -89,7 +101,7 @@ class EventStreamHandler(BaseHandler):
 
                 self._stop_timer_per_user.pop(user, None)
 
-                return self.distributor.fire("stopped_user_eventstream", user)
+                return stopped_user_eventstream(self.distributor, user)
 
             logger.debug("Scheduling _later: for %s", user)
             self._stop_timer_per_user[user] = (
@@ -120,9 +132,7 @@ class EventStreamHandler(BaseHandler):
                 timeout = random.randint(int(timeout*0.9), int(timeout*1.1))
 
             if is_guest:
-                yield self.distributor.fire(
-                    "user_joined_room", user=auth_user, room_id=room_id
-                )
+                yield user_joined_room(self.distributor, auth_user, room_id)
 
             events, tokens = yield self.notifier.get_events_for(
                 auth_user, pagin_config, timeout,

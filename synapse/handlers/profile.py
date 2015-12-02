@@ -28,6 +28,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def changed_presencelike_data(distributor, user, state):
+    return distributor.fire("changed_presencelike_data", user, state)
+
+
+def collect_presencelike_data(distributor, user, content):
+    return distributor.fire("collect_presencelike_data", user, content)
+
+
 class ProfileHandler(BaseHandler):
 
     def __init__(self, hs):
@@ -95,11 +103,9 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, new_displayname
         )
 
-        yield self.distributor.fire(
-            "changed_presencelike_data", target_user, {
-                "displayname": new_displayname,
-            }
-        )
+        yield changed_presencelike_data(self.distributor, target_user, {
+            "displayname": new_displayname,
+        })
 
         yield self._update_join_states(target_user)
 
@@ -144,11 +150,9 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, new_avatar_url
         )
 
-        yield self.distributor.fire(
-            "changed_presencelike_data", target_user, {
-                "avatar_url": new_avatar_url,
-            }
-        )
+        yield changed_presencelike_data(self.distributor, target_user, {
+            "avatar_url": new_avatar_url,
+        })
 
         yield self._update_join_states(target_user)
 
@@ -208,9 +212,7 @@ class ProfileHandler(BaseHandler):
                 "membership": Membership.JOIN,
             }
 
-            yield self.distributor.fire(
-                "collect_presencelike_data", user, content
-            )
+            yield collect_presencelike_data(self.distributor, user, content)
 
             msg_handler = self.hs.get_handlers().message_handler
             try:

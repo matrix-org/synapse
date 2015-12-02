@@ -240,9 +240,18 @@ class SearchHandler(BaseHandler):
                 last_event_id = room_events[-1].event_id
                 pagination_token = results_map[last_event_id]["pagination_token"]
 
-                global_next_batch = encode_base64("%s\n%s\n%s" % (
-                    "all", "", pagination_token
-                ))
+                # We want to respect the given batch group and group keys so
+                # that if people blindly use the top level `next_batch` token
+                # it returns more from the same group (if applicable) rather
+                # than reverting to searching all results again.
+                if batch_group and batch_group_key:
+                    global_next_batch = encode_base64("%s\n%s\n%s" % (
+                        batch_group, batch_group_key, pagination_token
+                    ))
+                else:
+                    global_next_batch = encode_base64("%s\n%s\n%s" % (
+                        "all", "", pagination_token
+                    ))
 
                 for room_id, group in room_groups.items():
                     group["next_batch"] = encode_base64("%s\n%s\n%s" % (
