@@ -14,7 +14,6 @@
 # limitations under the License.
 
 from synapse.push import Pusher, PusherConfigException
-from synapse.http.client import SimpleHttpClient
 
 from twisted.internet import defer
 
@@ -46,7 +45,7 @@ class HttpPusher(Pusher):
                 "'url' required in data for HTTP pusher"
             )
         self.url = data['url']
-        self.httpCli = SimpleHttpClient(self.hs)
+        self.http_client = _hs.get_simple_http_client()
         self.data_minus_url = {}
         self.data_minus_url.update(self.data)
         del self.data_minus_url['url']
@@ -107,7 +106,7 @@ class HttpPusher(Pusher):
         if not notification_dict:
             defer.returnValue([])
         try:
-            resp = yield self.httpCli.post_json_get_json(self.url, notification_dict)
+            resp = yield self.http_client.post_json_get_json(self.url, notification_dict)
         except:
             logger.warn("Failed to push %s ", self.url)
             defer.returnValue(False)
@@ -138,7 +137,7 @@ class HttpPusher(Pusher):
             }
         }
         try:
-            resp = yield self.httpCli.post_json_get_json(self.url, d)
+            resp = yield self.http_client.post_json_get_json(self.url, d)
         except:
             logger.exception("Failed to push %s ", self.url)
             defer.returnValue(False)
