@@ -140,7 +140,10 @@ class SearchStore(BackgroundUpdateStore):
             list of dicts
         """
         clauses = []
-        args = []
+        if isinstance(self.database_engine, PostgresEngine):
+            args = [_postgres_parse_query(search_term)]
+        else:
+            args = [_sqlite_parse_query(search_term)]
 
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
@@ -162,7 +165,7 @@ class SearchStore(BackgroundUpdateStore):
         if isinstance(self.database_engine, PostgresEngine):
             sql = (
                 "SELECT ts_rank_cd(vector, query) AS rank, room_id, event_id"
-                " FROM plainto_tsquery('english', ?) as query, event_search"
+                " FROM to_tsquery('english', ?) as query, event_search"
                 " WHERE vector @@ query"
             )
         elif isinstance(self.database_engine, Sqlite3Engine):
@@ -183,7 +186,7 @@ class SearchStore(BackgroundUpdateStore):
         sql += " ORDER BY rank DESC LIMIT 500"
 
         results = yield self._execute(
-            "search_msgs", self.cursor_to_dict, sql, *([search_term] + args)
+            "search_msgs", self.cursor_to_dict, sql, *args
         )
 
         results = filter(lambda row: row["room_id"] in room_ids, results)
@@ -226,7 +229,11 @@ class SearchStore(BackgroundUpdateStore):
             list of dicts
         """
         clauses = []
-        args = [search_term]
+
+        if isinstance(self.database_engine, PostgresEngine):
+            args = [_postgres_parse_query(search_term)]
+        else:
+            args = [_sqlite_parse_query(search_term)]
 
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
@@ -263,7 +270,7 @@ class SearchStore(BackgroundUpdateStore):
             sql = (
                 "SELECT ts_rank_cd(vector, query) as rank,"
                 " origin_server_ts, stream_ordering, room_id, event_id"
-                " FROM plainto_tsquery('english', ?) as query, event_search"
+                " FROM to_tsquery('english', ?) as query, event_search"
                 " NATURAL JOIN events"
                 " WHERE vector @@ query AND "
             )
@@ -399,3 +406,23 @@ def _to_postgres_options(options_dict):
     return "'%s'" % (
         ",".join("%s=%s" % (k, v) for k, v in options_dict.items()),
     )
+
+
+def _postgres_parse_query(search_term):
+    """Takes a plain unicode string from the user and converts it into a form
+    that can be passed to `to_tsquery(..)` postgres func. We use this so that
+    we can add prefix matching, which isn't something `plainto_tsquery` supports.
+    """
+    results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
+
+    return " & ".join(result + ":*" for result in results)
+
+
+def _sqlite_parse_query(search_term):
+    """Takes a plain unicode string from the user and converts it into a form
+    that can be passed to sqlite `MATCH`. We use this so that we can do prefix
+    matching.
+    """
+    results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
+
+    return " & ".join(result + "*" for result in results)
