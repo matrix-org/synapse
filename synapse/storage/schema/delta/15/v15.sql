@@ -1,7 +1,7 @@
 -- Drop, copy & recreate pushers table to change unique key
 -- Also add access_token column at the same time
 CREATE TABLE IF NOT EXISTS pushers2 (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id BIGINT PRIMARY KEY,
   user_name TEXT NOT NULL,
   access_token INTEGER DEFAULT NULL,
   profile_tag varchar(32) NOT NULL,
