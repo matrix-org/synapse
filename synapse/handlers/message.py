@@ -26,6 +26,8 @@ from synapse.types import UserID, RoomStreamToken, StreamToken
 
 from ._base import BaseHandler
 
+from canonicaljson import encode_canonical_json
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -212,6 +214,16 @@ class MessageHandler(BaseHandler):
         event, context = yield self._create_new_client_event(
             builder=builder,
         )
+
+        if event.is_state():
+            prev_state = context.current_state.get((event.type, event.state_key))
+            if prev_state and event.user_id == prev_state.user_id:
+                prev_content = encode_canonical_json(prev_state.content)
+                next_content = encode_canonical_json(event.content)
+                if prev_content == next_content:
+                    # Duplicate suppression for state updates with same sender
+                    # and content.
+                    defer.returnValue(prev_state)
 
         if event.type == EventTypes.Member:
             member_handler = self.hs.get_handlers().room_member_handler
