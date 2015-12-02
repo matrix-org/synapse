@@ -31,6 +31,10 @@ import urllib
 logger = logging.getLogger(__name__)
 
 
+def registered_user(distributor, user):
+    return distributor.fire("registered_user", user)
+
+
 class RegistrationHandler(BaseHandler):
 
     def __init__(self, hs):
@@ -98,7 +102,7 @@ class RegistrationHandler(BaseHandler):
                 password_hash=password_hash
             )
 
-            yield self.distributor.fire("registered_user", user)
+            yield registered_user(self.distributor, user)
         else:
             # autogen a random user ID
             attempts = 0
@@ -117,7 +121,7 @@ class RegistrationHandler(BaseHandler):
                         token=token,
                         password_hash=password_hash)
 
-                    self.distributor.fire("registered_user", user)
+                    yield registered_user(self.distributor, user)
                 except SynapseError:
                     # if user id is taken, just generate another
                     user_id = None
@@ -167,7 +171,7 @@ class RegistrationHandler(BaseHandler):
             token=token,
             password_hash=""
         )
-        self.distributor.fire("registered_user", user)
+        registered_user(self.distributor, user)
         defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
@@ -215,7 +219,7 @@ class RegistrationHandler(BaseHandler):
                 token=token,
                 password_hash=None
             )
-            yield self.distributor.fire("registered_user", user)
+            yield registered_user(self.distributor, user)
         except Exception, e:
             yield self.store.add_access_token_to_user(user_id, token)
             # Ignore Registration errors
