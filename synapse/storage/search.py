@@ -140,7 +140,10 @@ class SearchStore(BackgroundUpdateStore):
             list of dicts
         """
         clauses = []
-        args = [_parse_query(self.database_engine, search_term)]
+
+        search_query = search_query = _parse_query(self.database_engine, search_term)
+
+        args = [search_query]
 
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
@@ -197,7 +200,7 @@ class SearchStore(BackgroundUpdateStore):
 
         highlights = None
         if isinstance(self.database_engine, PostgresEngine):
-            highlights = yield self._find_highlights_in_postgres(search_term, events)
+            highlights = yield self._find_highlights_in_postgres(search_query, events)
 
         defer.returnValue({
             "results": [
@@ -227,7 +230,9 @@ class SearchStore(BackgroundUpdateStore):
         """
         clauses = []
 
-        args = [_parse_query(self.database_engine, search_term)]
+        search_query = search_query = _parse_query(self.database_engine, search_term)
+
+        args = [search_query]
 
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
@@ -314,7 +319,7 @@ class SearchStore(BackgroundUpdateStore):
 
         highlights = None
         if isinstance(self.database_engine, PostgresEngine):
-            highlights = yield self._find_highlights_in_postgres(search_term, events)
+            highlights = yield self._find_highlights_in_postgres(search_query, events)
 
         defer.returnValue({
             "results": [
@@ -331,7 +336,7 @@ class SearchStore(BackgroundUpdateStore):
             "highlights": highlights,
         })
 
-    def _find_highlights_in_postgres(self, search_term, events):
+    def _find_highlights_in_postgres(self, search_query, events):
         """Given a list of events and a search term, return a list of words
         that match from the content of the event.
 
@@ -339,7 +344,7 @@ class SearchStore(BackgroundUpdateStore):
         highlight the matching parts.
 
         Args:
-            search_term (str)
+            search_query (str)
             events (list): A list of events
 
         Returns:
@@ -371,14 +376,14 @@ class SearchStore(BackgroundUpdateStore):
                 while stop_sel in value:
                     stop_sel += ">"
 
-                query = "SELECT ts_headline(?, plainto_tsquery('english', ?), %s)" % (
+                query = "SELECT ts_headline(?, to_tsquery('english', ?), %s)" % (
                     _to_postgres_options({
                         "StartSel": start_sel,
                         "StopSel": stop_sel,
                         "MaxFragments": "50",
                     })
                 )
-                txn.execute(query, (value, search_term,))
+                txn.execute(query, (value, search_query,))
                 headline, = txn.fetchall()[0]
 
                 # Now we need to pick the possible highlights out of the haedline
