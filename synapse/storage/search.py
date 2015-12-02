@@ -419,5 +419,8 @@ def _parse_query(database_engine, search_term):
 
     if isinstance(database_engine, PostgresEngine):
         return " & ".join(result + ":*" for result in results)
-    else:
+    elif isinstance(database_engine, Sqlite3Engine):
         return " & ".join(result + "*" for result in results)
+    else:
+        # This should be unreachable.
+        raise Exception("Unrecognized database engine")
