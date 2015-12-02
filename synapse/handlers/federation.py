@@ -177,7 +177,7 @@ class FederationHandler(BaseHandler):
                 )
 
             try:
-                _, event_stream_id, max_stream_id = yield self._handle_new_event(
+                context, event_stream_id, max_stream_id = yield self._handle_new_event(
                     origin,
                     event,
                     state=state,
@@ -234,8 +234,13 @@ class FederationHandler(BaseHandler):
 
         if event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
-                user = UserID.from_string(event.state_key)
-                yield user_joined_room(self.distributor, user, event.room_id)
+                prev_state = context.current_state.get((event.type, event.state_key))
+                if not prev_state or prev_state.membership != Membership.JOIN:
+                    # Only fire user_joined_room if the user has acutally
+                    # joined the room. Don't bother if the user is just
+                    # changing their profile info.
+                    user = UserID.from_string(event.state_key)
+                    yield user_joined_room(self.distributor, user, event.room_id)
 
     @defer.inlineCallbacks
     def _filter_events_for_server(self, server_name, room_id, events):
