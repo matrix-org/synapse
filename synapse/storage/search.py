@@ -140,10 +140,7 @@ class SearchStore(BackgroundUpdateStore):
             list of dicts
         """
         clauses = []
-        if isinstance(self.database_engine, PostgresEngine):
-            args = [_postgres_parse_query(search_term)]
-        else:
-            args = [_sqlite_parse_query(search_term)]
+        args = [_parse_query(self.database_engine, search_term)]
 
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
@@ -230,10 +227,7 @@ class SearchStore(BackgroundUpdateStore):
         """
         clauses = []
 
-        if isinstance(self.database_engine, PostgresEngine):
-            args = [_postgres_parse_query(search_term)]
-        else:
-            args = [_sqlite_parse_query(search_term)]
+        args = [_parse_query(self.database_engine, search_term)]
 
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
@@ -408,21 +402,17 @@ def _to_postgres_options(options_dict):
     )
 
 
-def _postgres_parse_query(search_term):
+def _parse_query(database_engine, search_term):
     """Takes a plain unicode string from the user and converts it into a form
-    that can be passed to `to_tsquery(..)` postgres func. We use this so that
-    we can add prefix matching, which isn't something `plainto_tsquery` supports.
+    that can be passed to database.
+    We use this so that we can add prefix matching, which isn't something
+    that is supported by default.
     """
+
+    # Pull out the individual words, discarding any non-word characters.
     results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
 
-    return " & ".join(result + ":*" for result in results)
-
-
-def _sqlite_parse_query(search_term):
-    """Takes a plain unicode string from the user and converts it into a form
-    that can be passed to sqlite `MATCH`. We use this so that we can do prefix
-    matching.
-    """
-    results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
-
-    return " & ".join(result + "*" for result in results)
+    if isinstance(database_engine, PostgresEngine):
+        return " & ".join(result + ":*" for result in results)
+    else:
+        return " & ".join(result + "*" for result in results)
