@@ -42,16 +42,15 @@ class AdminHandler(BaseHandler):
 
         ret = {
             "user_id": user.to_string(),
-            "devices": [
-                {
-                    "device_id": None,
+            "devices": {
+                "": {
                     "sessions": [
                         {
                             "connections": connections,
                         }
                     ]
                 },
-            ],
+            },
         }
 
         defer.returnValue(ret)
