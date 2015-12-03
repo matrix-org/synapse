@@ -110,10 +110,10 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
                                    client_path_patterns(state_key),
                                    self.on_PUT)
         http_server.register_paths("GET",
-                                   client_path_patterns(no_state_key, releases=()),
+                                   client_path_patterns(no_state_key),
                                    self.on_GET_no_state_key)
         http_server.register_paths("PUT",
-                                   client_path_patterns(no_state_key, releases=()),
+                                   client_path_patterns(no_state_key),
                                    self.on_PUT_no_state_key)
 
     def on_GET_no_state_key(self, request, room_id, event_type):
@@ -381,30 +381,6 @@ class RoomInitialSyncRestServlet(ClientV1RestServlet):
             is_guest=is_guest,
         )
         defer.returnValue((200, content))
-
-
-class RoomTriggerBackfill(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/backfill$", releases=())
-
-    def __init__(self, hs):
-        super(RoomTriggerBackfill, self).__init__(hs)
-        self.clock = hs.get_clock()
-
-    @defer.inlineCallbacks
-    def on_GET(self, request, room_id):
-        remote_server = urllib.unquote(
-            request.args["remote"][0]
-        ).decode("UTF-8")
-
-        limit = int(request.args["limit"][0])
-
-        handler = self.handlers.federation_handler
-        events = yield handler.backfill(remote_server, room_id, limit)
-
-        time_now = self.clock.time_msec()
-
-        res = [serialize_event(event, time_now) for event in events]
-        defer.returnValue((200, res))
 
 
 class RoomEventContext(ClientV1RestServlet):
@@ -679,7 +655,6 @@ def register_servlets(hs, http_server):
     RoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
-    RoomTriggerBackfill(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
     RoomSendEventRestServlet(hs).register(http_server)
     PublicRoomListRestServlet(hs).register(http_server)

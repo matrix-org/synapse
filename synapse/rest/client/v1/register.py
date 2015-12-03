@@ -48,7 +48,7 @@ class RegisterRestServlet(ClientV1RestServlet):
     handler doesn't have a concept of multi-stages or sessions.
     """
 
-    PATTERNS = client_path_patterns("/register$", releases=())
+    PATTERNS = client_path_patterns("/register$", releases=(), include_in_unstable=False)
 
     def __init__(self, hs):
         super(RegisterRestServlet, self).__init__(hs)

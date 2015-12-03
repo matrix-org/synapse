@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class PasswordRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/password", releases=())
+    PATTERNS = client_v2_patterns("/account/password")
 
     def __init__(self, hs):
         super(PasswordRestServlet, self).__init__()
@@ -89,7 +89,7 @@ class PasswordRestServlet(RestServlet):
 
 
 class ThreepidRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/3pid", releases=())
+    PATTERNS = client_v2_patterns("/account/3pid")
 
     def __init__(self, hs):
         super(ThreepidRestServlet, self).__init__()

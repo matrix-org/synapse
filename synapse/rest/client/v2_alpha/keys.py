@@ -54,7 +54,7 @@ class KeyUploadServlet(RestServlet):
       },
     }
     """
-    PATTERNS = client_v2_patterns("/keys/upload/(?P<device_id>[^/]*)")
+    PATTERNS = client_v2_patterns("/keys/upload/(?P<device_id>[^/]*)", releases=())
 
     def __init__(self, hs):
         super(KeyUploadServlet, self).__init__()
