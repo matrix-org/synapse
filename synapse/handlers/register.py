@@ -42,6 +42,7 @@ class RegistrationHandler(BaseHandler):
 
         self.distributor = hs.get_distributor()
         self.distributor.declare("registered_user")
+        self.captch_client = CaptchaServerHttpClient(hs)
 
     @defer.inlineCallbacks
     def check_username(self, localpart):
@@ -306,10 +307,7 @@ class RegistrationHandler(BaseHandler):
         """
         Used only by c/s api v1
         """
-        # TODO: get this from the homeserver rather than creating a new one for
-        # each request
-        client = CaptchaServerHttpClient(self.hs)
-        data = yield client.post_urlencoded_get_raw(
+        data = yield self.captcha_client.post_urlencoded_get_raw(
             "http://www.google.com:80/recaptcha/api/verify",
             args={
                 'privatekey': private_key,
