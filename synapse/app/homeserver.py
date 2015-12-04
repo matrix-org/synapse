@@ -499,13 +499,23 @@ class SynapseRequest(Request):
         self.start_time = int(time.time() * 1000)
 
     def finished_processing(self):
+
+        try:
+            context = LoggingContext.current_context()
+            ru_utime, ru_stime = context.get_resource_usage()
+        except:
+            ru_utime, ru_stime = (0, 0)
+
         self.site.access_logger.info(
             "%s - %s - {%s}"
-            " Processed request: %dms %sB %s \"%s %s %s\" \"%s\"",
+            " Processed request: %dms (%dms, %dms)"
+            " %sB %s \"%s %s %s\" \"%s\"",
             self.getClientIP(),
             self.site.site_tag,
             self.authenticated_entity,
             int(time.time() * 1000) - self.start_time,
+            int(ru_utime * 1000),
+            int(ru_stime * 1000),
             self.sentLength,
             self.code,
             self.method,
