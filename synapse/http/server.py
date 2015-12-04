@@ -53,6 +53,14 @@ response_timer = metrics.register_distribution(
     labels=["method", "servlet"]
 )
 
+response_ru_utime = metrics.register_distribution(
+    "response_ru_utime", labels=["method", "servlet"]
+)
+
+response_ru_stime = metrics.register_distribution(
+    "response_ru_stime", labels=["method", "servlet"]
+)
+
 _next_request_id = 0
 
 
@@ -220,6 +228,15 @@ class JsonResource(HttpServer, resource.Resource):
             response_timer.inc_by(
                 self.clock.time_msec() - start, request.method, servlet_classname
             )
+
+            try:
+                context = LoggingContext.current_context()
+                ru_utime, ru_stime = context.get_resource_usage()
+
+                response_ru_utime.inc_by(ru_utime, request.method, servlet_classname)
+                response_ru_stime.inc_by(ru_stime, request.method, servlet_classname)
+            except:
+                pass
 
             return
 
