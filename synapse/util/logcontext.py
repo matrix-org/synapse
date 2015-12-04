@@ -23,6 +23,7 @@ try:
     import resource
     RUSAGE_THREAD = 1
     resource.getrusage(RUSAGE_THREAD)
+
     def get_thread_resource_usage():
         return resource.getrusage(RUSAGE_THREAD)
 except:
@@ -137,13 +138,12 @@ class LoggingContext(object):
             return
 
         if self.usage_start:
-           self.usage_end = get_thread_resource_usage()
+            self.usage_end = get_thread_resource_usage()
 
     def get_resource_usage(self):
         ru_utime = self.ru_utime
         ru_stime = self.ru_stime
 
-        start = self.usage_start
         if self.usage_start and threading.current_thread() is self.main_thread:
             current = get_thread_resource_usage()
             ru_utime += current.ru_utime - self.usage_start.ru_utime
