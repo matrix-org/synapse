@@ -143,6 +143,10 @@ class FilterCollection(object):
             self.filter_json.get("account_data", {})
         )
 
+        self.include_leave = self.filter_json.get("room", {}).get(
+            "include_leave", False
+        )
+
     def timeline_limit(self):
         return self.room_timeline_filter.limit()
 

@@ -186,14 +186,14 @@ class SyncHandler(BaseHandler):
             pagination_config=pagination_config.get_source_config("presence"),
             key=None
         )
+
+        membership_list = (Membership.INVITE, Membership.JOIN)
+        if sync_config.filter.include_leave:
+            membership_list += (Membership.LEAVE, Membership.BAN)
+
         room_list = yield self.store.get_rooms_for_user_where_membership_is(
             user_id=sync_config.user.to_string(),
-            membership_list=(
-                Membership.INVITE,
-                Membership.JOIN,
-                Membership.LEAVE,
-                Membership.BAN
-            )
+            membership_list=membership_list
         )
 
         account_data, account_data_by_room = (
