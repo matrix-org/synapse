@@ -21,12 +21,20 @@ logger = logging.getLogger(__name__)
 
 try:
     import resource
+
+    # Python doesn't ship with a definition of RUSAGE_THREAD but it's defined
+    # to be 1 on linux so we hard code it.
     RUSAGE_THREAD = 1
+
+    # If the system doesn't support RUSAGE_THREAD then this should throw an
+    # exception.
     resource.getrusage(RUSAGE_THREAD)
 
     def get_thread_resource_usage():
         return resource.getrusage(RUSAGE_THREAD)
 except:
+    # If the system doesn't support resource.getrusage(RUSAGE_THREAD) then we
+    # won't track resource usage by returning None.
     def get_thread_resource_usage():
         return None
 
