@@ -18,8 +18,8 @@ encoding use, e.g.::
 This would create an appropriate database named ``synapse`` owned by the
 ``synapse_user`` user (which must already exist).
 
-Set up client
-=============
+Set up client in Debian/Ubuntu
+===========================
 
 Postgres support depends on the postgres python connector ``psycopg2``. In the
 virtual env::
@@ -27,6 +27,19 @@ virtual env::
     sudo apt-get install libpq-dev
     pip install psycopg2
 
+Set up client in RHEL/CentOs 7
+==============================
+
+Make sure you have the appropriate version of postgres-devel installed. For a
+postgres 9.4, use the postgres 9.4 packages from
+[here](https://wiki.postgresql.org/wiki/YUM_Installation).
+
+As with Debian/Ubuntu, postgres support depends on the postgres python connector
+``psycopg2``. In the virtual env::
+
+    sudo yum install postgresql-devel libpqxx-devel.x86_64
+    export PATH=/usr/pgsql-9.4/bin/:$PATH
+    pip install psycopg2
 
 Synapse config
 ==============
