@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import uuid
-from mock.mock import Mock
+from mock import Mock
 from synapse.types import RoomID, UserID
 
 from tests import unittest
