@@ -207,7 +207,12 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
     def set_rule_attr(self, user_name, spec, val):
         if spec['attr'] == 'enabled':
+            if isinstance(val, dict) and "enabled" in val:
+                val = val["enabled"]
             if not isinstance(val, bool):
+                # Legacy fallback
+                # This should *actually* take a dict, but many clients pass
+                # bools directly, so let's not break them.
                 raise SynapseError(400, "Value for 'enabled' must be boolean")
             namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
             self.hs.get_datastore().set_push_rule_enabled(
