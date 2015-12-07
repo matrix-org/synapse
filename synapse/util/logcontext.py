@@ -69,6 +69,9 @@ class LoggingContext(object):
         def stop(self):
             pass
 
+        def add_database_transaction(self, duration_ms):
+            pass
+
     sentinel = Sentinel()
 
     def __init__(self, name=None):
@@ -76,6 +79,8 @@ class LoggingContext(object):
         self.name = name
         self.ru_stime = 0.
         self.ru_utime = 0.
+        self.db_txn_count = 0
+        self.db_txn_duration = 0.
         self.usage_start = None
         self.main_thread = threading.current_thread()
 
@@ -170,6 +175,10 @@ class LoggingContext(object):
             ru_stime += current.ru_stime - self.usage_start.ru_stime
 
         return ru_utime, ru_stime
+
+    def add_database_transaction(self, duration_ms):
+        self.db_txn_count += 1
+        self.db_txn_duration += duration_ms / 1000.
 
 
 class LoggingContextFilter(logging.Filter):
