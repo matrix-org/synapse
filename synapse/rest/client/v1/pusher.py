@@ -54,6 +54,7 @@ class PusherRestServlet(ClientV1RestServlet):
             raise SynapseError(400, "Missing parameters: "+','.join(missing),
                                errcode=Codes.MISSING_PARAM)
 
+        logger.debug("set pushkey %s to kind %s", content['pushkey'], content['kind'])
         logger.debug("Got pushers request with body: %r", content)
 
         append = False
