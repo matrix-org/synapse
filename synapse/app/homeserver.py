@@ -503,12 +503,15 @@ class SynapseRequest(Request):
         try:
             context = LoggingContext.current_context()
             ru_utime, ru_stime = context.get_resource_usage()
+            db_txn_count = context.db_txn_count
+            db_txn_duration = context.db_txn_duration
         except:
             ru_utime, ru_stime = (0, 0)
+            db_txn_count, db_txn_duration = (0, 0)
 
         self.site.access_logger.info(
             "%s - %s - {%s}"
-            " Processed request: %dms (%dms, %dms)"
+            " Processed request: %dms (%dms, %dms) (%dms/%d)"
             " %sB %s \"%s %s %s\" \"%s\"",
             self.getClientIP(),
             self.site.site_tag,
@@ -516,6 +519,8 @@ class SynapseRequest(Request):
             int(time.time() * 1000) - self.start_time,
             int(ru_utime * 1000),
             int(ru_stime * 1000),
+            int(db_txn_duration * 1000),
+            int(db_txn_count),
             self.sentLength,
             self.code,
             self.method,

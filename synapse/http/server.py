@@ -61,6 +61,15 @@ response_ru_stime = metrics.register_distribution(
     "response_ru_stime", labels=["method", "servlet"]
 )
 
+response_db_txn_count = metrics.register_distribution(
+    "response_db_txn_count", labels=["method", "servlet"]
+)
+
+response_db_txn_duration = metrics.register_distribution(
+    "response_db_txn_duration", labels=["method", "servlet"]
+)
+
+
 _next_request_id = 0
 
 
@@ -235,6 +244,12 @@ class JsonResource(HttpServer, resource.Resource):
 
                 response_ru_utime.inc_by(ru_utime, request.method, servlet_classname)
                 response_ru_stime.inc_by(ru_stime, request.method, servlet_classname)
+                response_db_txn_count.inc_by(
+                    context.db_txn_count, request.method, servlet_classname
+                )
+                response_db_txn_duration.inc_by(
+                    context.db_txn_duration, request.method, servlet_classname
+                )
             except:
                 pass
 
