@@ -16,14 +16,12 @@
 from twisted.internet import defer
 
 from synapse.streams.config import PaginationConfig
-from synapse.types import StreamToken, UserID
+from synapse.types import StreamToken
 
 import synapse.util.async
-import baserules
+import push_rule_evaluator as push_rule_evaluator
 
 import logging
-import simplejson as json
-import re
 import random
 
 logger = logging.getLogger(__name__)
@@ -33,9 +31,6 @@ class Pusher(object):
     INITIAL_BACKOFF = 1000
     MAX_BACKOFF = 60 * 60 * 1000
     GIVE_UP_AFTER = 24 * 60 * 60 * 1000
-    DEFAULT_ACTIONS = ['dont_notify']
-
-    INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
     def __init__(self, _hs, profile_tag, user_name, app_id,
                  app_display_name, device_display_name, pushkey, pushkey_ts,
@@ -61,161 +56,6 @@ class Pusher(object):
         # The last value of last_active_time that we saw
         self.last_last_active_time = 0
         self.has_unread = True
-
-    @defer.inlineCallbacks
-    def _actions_for_event(self, ev):
-        """
-        This should take into account notification settings that the user
-        has configured both globally and per-room when we have the ability
-        to do such things.
-        """
-        if ev['user_id'] == self.user_name:
-            # let's assume you probably know about messages you sent yourself
-            defer.returnValue(['dont_notify'])
-
-        rawrules = yield self.store.get_push_rules_for_user(self.user_name)
-
-        rules = []
-        for rawrule in rawrules:
-            rule = dict(rawrule)
-            rule['conditions'] = json.loads(rawrule['conditions'])
-            rule['actions'] = json.loads(rawrule['actions'])
-            rules.append(rule)
-
-        enabled_map = yield self.store.get_push_rules_enabled_for_user(self.user_name)
-
-        user = UserID.from_string(self.user_name)
-
-        rules = baserules.list_with_base_rules(rules, user)
-
-        room_id = ev['room_id']
-
-        # get *our* member event for display name matching
-        my_display_name = None
-        our_member_event = yield self.store.get_current_state(
-            room_id=room_id,
-            event_type='m.room.member',
-            state_key=self.user_name,
-        )
-        if our_member_event:
-            my_display_name = our_member_event[0].content.get("displayname")
-
-        room_members = yield self.store.get_users_in_room(room_id)
-        room_member_count = len(room_members)
-
-        for r in rules:
-            if r['rule_id'] in enabled_map:
-                r['enabled'] = enabled_map[r['rule_id']]
-            elif 'enabled' not in r:
-                r['enabled'] = True
-            if not r['enabled']:
-                continue
-            matches = True
-
-            conditions = r['conditions']
-            actions = r['actions']
-
-            for c in conditions:
-                matches &= self._event_fulfills_condition(
-                    ev, c, display_name=my_display_name,
-                    room_member_count=room_member_count
-                )
-            logger.debug(
-                "Rule %s %s",
-                r['rule_id'], "matches" if matches else "doesn't match"
-            )
-            # ignore rules with no actions (we have an explict 'dont_notify')
-            if len(actions) == 0:
-                logger.warn(
-                    "Ignoring rule id %s with no actions for user %s",
-                    r['rule_id'], self.user_name
-                )
-                continue
-            if matches:
-                logger.info(
-                    "%s matches for user %s, event %s",
-                    r['rule_id'], self.user_name, ev['event_id']
-                )
-                defer.returnValue(actions)
-
-        logger.info(
-            "No rules match for user %s, event %s",
-            self.user_name, ev['event_id']
-        )
-        defer.returnValue(Pusher.DEFAULT_ACTIONS)
-
-    @staticmethod
-    def _glob_to_regexp(glob):
-        r = re.escape(glob)
-        r = re.sub(r'\\\*', r'.*?', r)
-        r = re.sub(r'\\\?', r'.', r)
-
-        # handle [abc], [a-z] and [!a-z] style ranges.
-        r = re.sub(r'\\\[(\\\!|)(.*)\\\]',
-                   lambda x: ('[%s%s]' % (x.group(1) and '^' or '',
-                                          re.sub(r'\\\-', '-', x.group(2)))), r)
-        return r
-
-    def _event_fulfills_condition(self, ev, condition, display_name, room_member_count):
-        if condition['kind'] == 'event_match':
-            if 'pattern' not in condition:
-                logger.warn("event_match condition with no pattern")
-                return False
-            # XXX: optimisation: cache our pattern regexps
-            if condition['key'] == 'content.body':
-                r = r'\b%s\b' % self._glob_to_regexp(condition['pattern'])
-            else:
-                r = r'^%s$' % self._glob_to_regexp(condition['pattern'])
-            val = _value_for_dotted_key(condition['key'], ev)
-            if val is None:
-                return False
-            return re.search(r, val, flags=re.IGNORECASE) is not None
-
-        elif condition['kind'] == 'device':
-            if 'profile_tag' not in condition:
-                return True
-            return condition['profile_tag'] == self.profile_tag
-
-        elif condition['kind'] == 'contains_display_name':
-            # This is special because display names can be different
-            # between rooms and so you can't really hard code it in a rule.
-            # Optimisation: we should cache these names and update them from
-            # the event stream.
-            if 'content' not in ev or 'body' not in ev['content']:
-                return False
-            if not display_name:
-                return False
-            return re.search(
-                r"\b%s\b" % re.escape(display_name), ev['content']['body'],
-                flags=re.IGNORECASE
-            ) is not None
-
-        elif condition['kind'] == 'room_member_count':
-            if 'is' not in condition:
-                return False
-            m = Pusher.INEQUALITY_EXPR.match(condition['is'])
-            if not m:
-                return False
-            ineq = m.group(1)
-            rhs = m.group(2)
-            if not rhs.isdigit():
-                return False
-            rhs = int(rhs)
-
-            if ineq == '' or ineq == '==':
-                return room_member_count == rhs
-            elif ineq == '<':
-                return room_member_count < rhs
-            elif ineq == '>':
-                return room_member_count > rhs
-            elif ineq == '>=':
-                return room_member_count >= rhs
-            elif ineq == '<=':
-                return room_member_count <= rhs
-            else:
-                return False
-        else:
-            return True
 
     @defer.inlineCallbacks
     def get_context_for_event(self, ev):
@@ -308,8 +148,14 @@ class Pusher(object):
             return
 
         processed = False
-        actions = yield self._actions_for_event(single_event)
-        tweaks = _tweaks_for_actions(actions)
+
+        rule_evaluator = yield push_rule_evaluator.\
+            evaluator_for_user_name_and_profile_tag(
+            self.user_name, self.profile_tag, single_event['room_id'], self.store
+        )
+
+        actions = yield rule_evaluator.actions_for_event(single_event)
+        tweaks = rule_evaluator.tweaks_for_actions(actions)
 
         if len(actions) == 0:
             logger.warn("Empty actions! Using default action.")
@@ -446,27 +292,6 @@ class Pusher(object):
                     logger.info("Resetting badge count for %s", self.user_name)
                     self.reset_badge_count()
                     self.has_unread = False
-
-
-def _value_for_dotted_key(dotted_key, event):
-    parts = dotted_key.split(".")
-    val = event
-    while len(parts) > 0:
-        if parts[0] not in val:
-            return None
-        val = val[parts[0]]
-        parts = parts[1:]
-    return val
-
-
-def _tweaks_for_actions(actions):
-    tweaks = {}
-    for a in actions:
-        if not isinstance(a, dict):
-            continue
-        if 'set_tweak' in a and 'value' in a:
-            tweaks[a['set_tweak']] = a['value']
-    return tweaks
 
 
 class PusherConfigException(Exception):
