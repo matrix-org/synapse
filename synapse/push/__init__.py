@@ -149,10 +149,10 @@ class Pusher(object):
 
         processed = False
 
-        rule_evaluator = yield push_rule_evaluator.\
-            evaluator_for_user_name_and_profile_tag(
-            self.user_name, self.profile_tag, single_event['room_id'], self.store
-        )
+        rule_evaluator = yield \
+            push_rule_evaluator.evaluator_for_user_name_and_profile_tag(
+                self.user_name, self.profile_tag, single_event['room_id'], self.store
+            )
 
         actions = yield rule_evaluator.actions_for_event(single_event)
         tweaks = rule_evaluator.tweaks_for_actions(actions)
