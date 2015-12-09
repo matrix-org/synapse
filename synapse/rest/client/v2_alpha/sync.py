@@ -25,10 +25,13 @@ from synapse.events.utils import (
     serialize_event, format_event_for_client_v2_without_room_id,
 )
 from synapse.api.filtering import FilterCollection
+from synapse.api.errors import SynapseError
 from ._base import client_v2_patterns
 
 import copy
 import logging
+
+import ujson as json
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +51,7 @@ class SyncRestServlet(RestServlet):
           "next_batch": // batch token for the next /sync
           "presence": // presence data for the user.
           "rooms": {
-            "joined": { // Joined rooms being updated.
+            "join": { // Joined rooms being updated.
               "${room_id}": { // Id of the room being updated
                 "event_map": // Map of EventID -> event JSON.
                 "timeline": { // The recent events in the room if gap is "true"
@@ -63,8 +66,8 @@ class SyncRestServlet(RestServlet):
                 "ephemeral": {"events": []} // list of event objects
               }
             },
-            "invited": {}, // Invited rooms being updated.
-            "archived": {} // Archived rooms being updated.
+            "invite": {}, // Invited rooms being updated.
+            "leave": {} // Archived rooms being updated.
           }
         }
     """
@@ -100,12 +103,21 @@ class SyncRestServlet(RestServlet):
             )
         )
 
-        try:
-            filter = yield self.filtering.get_user_filter(
-                user.localpart, filter_id
-            )
-        except:
-            filter = FilterCollection({})
+        if filter_id and filter_id.startswith('{'):
+            logging.error("MJH %r", filter_id)
+            try:
+                filter_object = json.loads(filter_id)
+            except:
+                raise SynapseError(400, "Invalid filter JSON")
+            self.filtering._check_valid_filter(filter_object)
+            filter = FilterCollection(filter_object)
+        else:
+            try:
+                filter = yield self.filtering.get_user_filter(
+                    user.localpart, filter_id
+                )
+            except:
+                filter = FilterCollection({})
 
         sync_config = SyncConfig(
             user=user,
