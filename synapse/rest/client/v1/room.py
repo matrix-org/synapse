@@ -490,7 +490,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         )
 
         if membership_action == "forget":
-            self.handlers.room_member_handler.forget(user, room_id)
+            yield self.handlers.room_member_handler.forget(user, room_id)
 
         defer.returnValue((200, {}))
 

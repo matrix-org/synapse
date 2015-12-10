@@ -755,7 +755,7 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue((token, public_key, key_validity_url, display_name))
 
     def forget(self, user, room_id):
-        self.store.forget(user.to_string(), room_id)
+        return self.store.forget(user.to_string(), room_id)
 
 
 class RoomListHandler(BaseHandler):
