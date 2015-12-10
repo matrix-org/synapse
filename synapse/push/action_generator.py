@@ -19,7 +19,6 @@ import push_rule_evaluator
 
 import logging
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -42,6 +41,9 @@ class ActionGenerator:
             evaluator = yield push_rule_evaluator.\
                 evaluator_for_user_name_and_profile_tag(
                     uid, None, event['room_id'], self.store
-            )
+                )
             actions = yield evaluator.actions_for_event(event)
             logger.info("actions for user %s: %s", uid, actions)
+            self.store.set_actions_for_event(
+                event['event_id'], uid, None, actions
+            )
