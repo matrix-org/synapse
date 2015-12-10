@@ -244,6 +244,12 @@ class FederationHandler(BaseHandler):
                     user = UserID.from_string(event.state_key)
                     yield user_joined_room(self.distributor, user, event.room_id)
 
+        if not backfilled and not event.internal_metadata.is_outlier():
+            action_generator = ActionGenerator(self.store)
+            yield action_generator.handle_event(serialize_event(
+                event, self.clock.time_msec())
+            )
+
     @defer.inlineCallbacks
     def _filter_events_for_server(self, server_name, room_id, events):
         event_to_state = yield self.store.get_state_for_events(
@@ -1115,11 +1121,6 @@ class FederationHandler(BaseHandler):
             current_state=current_state,
         )
 
-        action_generator = ActionGenerator(self.store)
-        yield action_generator.handle_event(serialize_event(
-            event, self.clock.time_msec())
-        )
-
         defer.returnValue((context, event_stream_id, max_stream_id))
 
     @defer.inlineCallbacks
@@ -1145,12 +1146,6 @@ class FederationHandler(BaseHandler):
             backfilled=backfilled,
             is_new_state=(not outliers and not backfilled),
         )
-
-        for ev_info in event_infos:
-            action_generator = ActionGenerator(self.store)
-            yield action_generator.handle_event(serialize_event(
-                ev_info["event"], self.clock.time_msec())
-            )
 
     @defer.inlineCallbacks
     def _persist_auth_tree(self, auth_events, state, event):
