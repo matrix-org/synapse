@@ -19,8 +19,11 @@ from synapse.api.errors import LimitExceededError, SynapseError, AuthError
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.api.constants import Membership, EventTypes
 from synapse.types import UserID, RoomAlias
+from synapse.push.action_generator import ActionGenerator
 
 from synapse.util.logcontext import PreserveLoggingContext
+
+from synapse.events.utils import serialize_event
 
 import logging
 
@@ -263,6 +266,11 @@ class BaseHandler(object):
         (event_stream_id, max_stream_id) = yield self.store.persist_event(
             event, context=context
         )
+
+        action_generator = ActionGenerator(self.store)
+        yield action_generator.handle_event(serialize_event(
+            event, self.clock.time_msec()
+        ))
 
         destinations = set(extra_destinations)
         for k, s in context.current_state.items():

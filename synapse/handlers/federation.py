@@ -32,9 +32,11 @@ from synapse.crypto.event_signing import (
 )
 from synapse.types import UserID
 
-from synapse.events.utils import prune_event
+from synapse.events.utils import prune_event, serialize_event
 
 from synapse.util.retryutils import NotRetryingDestination
+
+from synapse.push.action_generator import ActionGenerator
 
 from twisted.internet import defer
 
@@ -1113,6 +1115,11 @@ class FederationHandler(BaseHandler):
             current_state=current_state,
         )
 
+        action_generator = ActionGenerator(self.store)
+        yield action_generator.handle_event(serialize_event(
+            event, self.clock.time_msec())
+        )
+
         defer.returnValue((context, event_stream_id, max_stream_id))
 
     @defer.inlineCallbacks
@@ -1138,6 +1145,12 @@ class FederationHandler(BaseHandler):
             backfilled=backfilled,
             is_new_state=(not outliers and not backfilled),
         )
+
+        for ev_info in event_infos:
+            action_generator = ActionGenerator(self.store)
+            yield action_generator.handle_event(serialize_event(
+                ev_info["event"], self.clock.time_msec())
+            )
 
     @defer.inlineCallbacks
     def _persist_auth_tree(self, auth_events, state, event):

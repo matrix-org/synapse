@@ -292,6 +292,18 @@ class RegistrationStore(SQLBaseStore):
         defer.returnValue(None)
 
     @defer.inlineCallbacks
+    def get_all_user_ids(self):
+        """Returns all user ids registered on this homeserver"""
+        return self.runInteraction(
+            "get_all_user_ids",
+            self._get_all_user_ids_txn
+        )
+
+    def _get_all_user_ids_txn(self, txn):
+        txn.execute("SELECT name from users")
+        return [r[0] for r in txn.fetchall()]
+
+    @defer.inlineCallbacks
     def count_all_users(self):
         """Counts all users registered on the homeserver."""
         def _count_users(txn):
