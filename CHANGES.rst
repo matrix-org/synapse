@@ -1,5 +1,5 @@
-Changes in synapse v0.12.0 (2015-12-10)
-=======================================
+Changes in synapse v0.12.0-rc1 (2015-12-10)
+===========================================
 
 * Host the client APIs released as r0 by
   https://matrix.org/docs/spec/r0.0.0/client_server.html
