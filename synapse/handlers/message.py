@@ -26,9 +26,15 @@ from synapse.types import UserID, RoomStreamToken, StreamToken
 
 from ._base import BaseHandler
 
+from canonicaljson import encode_canonical_json
+
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def collect_presencelike_data(distributor, user, content):
+    return distributor.fire("collect_presencelike_data", user, content)
 
 
 class MessageHandler(BaseHandler):
@@ -195,10 +201,8 @@ class MessageHandler(BaseHandler):
             if membership == Membership.JOIN:
                 joinee = UserID.from_string(builder.state_key)
                 # If event doesn't include a display name, add one.
-                yield self.distributor.fire(
-                    "collect_presencelike_data",
-                    joinee,
-                    builder.content
+                yield collect_presencelike_data(
+                    self.distributor, joinee, builder.content
                 )
 
         if token_id is not None:
@@ -210,6 +214,16 @@ class MessageHandler(BaseHandler):
         event, context = yield self._create_new_client_event(
             builder=builder,
         )
+
+        if event.is_state():
+            prev_state = context.current_state.get((event.type, event.state_key))
+            if prev_state and event.user_id == prev_state.user_id:
+                prev_content = encode_canonical_json(prev_state.content)
+                next_content = encode_canonical_json(event.content)
+                if prev_content == next_content:
+                    # Duplicate suppression for state updates with same sender
+                    # and content.
+                    defer.returnValue(prev_state)
 
         if event.type == EventTypes.Member:
             member_handler = self.hs.get_handlers().room_member_handler
@@ -359,6 +373,10 @@ class MessageHandler(BaseHandler):
 
         tags_by_room = yield self.store.get_tags_for_user(user_id)
 
+        account_data, account_data_by_room = (
+            yield self.store.get_account_data_for_user(user_id)
+        )
+
         public_room_ids = yield self.store.get_public_room_ids()
 
         limit = pagin_config.limit
@@ -436,14 +454,22 @@ class MessageHandler(BaseHandler):
                     for c in current_state.values()
                 ]
 
-                private_user_data = []
+                account_data_events = []
                 tags = tags_by_room.get(event.room_id)
                 if tags:
-                    private_user_data.append({
+                    account_data_events.append({
                         "type": "m.tag",
                         "content": {"tags": tags},
                     })
-                d["private_user_data"] = private_user_data
+
+                account_data = account_data_by_room.get(event.room_id, {})
+                for account_data_type, content in account_data.items():
+                    account_data_events.append({
+                        "type": account_data_type,
+                        "content": content,
+                    })
+
+                d["account_data"] = account_data_events
             except:
                 logger.exception("Failed to get snapshot")
 
@@ -456,9 +482,17 @@ class MessageHandler(BaseHandler):
                 consumeErrors=True
             ).addErrback(unwrapFirstError)
 
+        account_data_events = []
+        for account_data_type, content in account_data.items():
+            account_data_events.append({
+                "type": account_data_type,
+                "content": content,
+            })
+
         ret = {
             "rooms": rooms_ret,
             "presence": presence,
+            "account_data": account_data_events,
             "receipts": receipt,
             "end": now_token.to_string(),
         }
@@ -498,14 +532,22 @@ class MessageHandler(BaseHandler):
                 user_id, room_id, pagin_config, membership, member_event_id, is_guest
             )
 
-        private_user_data = []
+        account_data_events = []
         tags = yield self.store.get_tags_for_room(user_id, room_id)
         if tags:
-            private_user_data.append({
+            account_data_events.append({
                 "type": "m.tag",
                 "content": {"tags": tags},
             })
-        result["private_user_data"] = private_user_data
+
+        account_data = yield self.store.get_account_data_for_room(user_id, room_id)
+        for account_data_type, content in account_data.items():
+            account_data_events.append({
+                "type": account_data_type,
+                "content": content,
+            })
+
+        result["account_data"] = account_data_events
 
         defer.returnValue(result)
 
@@ -588,23 +630,28 @@ class MessageHandler(BaseHandler):
 
         @defer.inlineCallbacks
         def get_presence():
-            states = {}
-            if not is_guest:
-                states = yield presence_handler.get_states(
-                    target_users=[UserID.from_string(m.user_id) for m in room_members],
-                    auth_user=auth_user,
-                    as_event=True,
-                    check_auth=False,
-                )
+            states = yield presence_handler.get_states(
+                target_users=[UserID.from_string(m.user_id) for m in room_members],
+                auth_user=auth_user,
+                as_event=True,
+                check_auth=False,
+            )
 
             defer.returnValue(states.values())
 
-        receipts_handler = self.hs.get_handlers().receipts_handler
+        @defer.inlineCallbacks
+        def get_receipts():
+            receipts_handler = self.hs.get_handlers().receipts_handler
+            receipts = yield receipts_handler.get_receipts_for_room(
+                room_id,
+                now_token.receipt_key
+            )
+            defer.returnValue(receipts)
 
         presence, receipts, (messages, token) = yield defer.gatherResults(
             [
                 get_presence(),
-                receipts_handler.get_receipts_for_room(room_id, now_token.receipt_key),
+                get_receipts(),
                 self.store.get_recent_events_for_room(
                     room_id,
                     limit=limit,

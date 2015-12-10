@@ -381,28 +381,24 @@ class Keyring(object):
     def get_server_verify_key_v2_indirect(self, server_names_and_key_ids,
                                           perspective_name,
                                           perspective_keys):
-        limiter = yield get_retry_limiter(
-            perspective_name, self.clock, self.store
-        )
-
-        with limiter:
-            # TODO(mark): Set the minimum_valid_until_ts to that needed by
-            # the events being validated or the current time if validating
-            # an incoming request.
-            query_response = yield self.client.post_json(
-                destination=perspective_name,
-                path=b"/_matrix/key/v2/query",
-                data={
-                    u"server_keys": {
-                        server_name: {
-                            key_id: {
-                                u"minimum_valid_until_ts": 0
-                            } for key_id in key_ids
-                        }
-                        for server_name, key_ids in server_names_and_key_ids
+        # TODO(mark): Set the minimum_valid_until_ts to that needed by
+        # the events being validated or the current time if validating
+        # an incoming request.
+        query_response = yield self.client.post_json(
+            destination=perspective_name,
+            path=b"/_matrix/key/v2/query",
+            data={
+                u"server_keys": {
+                    server_name: {
+                        key_id: {
+                            u"minimum_valid_until_ts": 0
+                        } for key_id in key_ids
                     }
-                },
-            )
+                    for server_name, key_ids in server_names_and_key_ids
+                }
+            },
+            long_retries=True,
+        )
 
         keys = {}
 

@@ -51,7 +51,7 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
     "timeline",          # TimelineBatch
     "state",             # dict[(str, str), FrozenEvent]
     "ephemeral",
-    "private_user_data",
+    "account_data",
 ])):
     __slots__ = []
 
@@ -63,7 +63,7 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
             self.timeline
             or self.state
             or self.ephemeral
-            or self.private_user_data
+            or self.account_data
         )
 
 
@@ -71,7 +71,7 @@ class ArchivedSyncResult(collections.namedtuple("JoinedSyncResult", [
     "room_id",            # str
     "timeline",           # TimelineBatch
     "state",              # dict[(str, str), FrozenEvent]
-    "private_user_data",
+    "account_data",
 ])):
     __slots__ = []
 
@@ -82,7 +82,7 @@ class ArchivedSyncResult(collections.namedtuple("JoinedSyncResult", [
         return bool(
             self.timeline
             or self.state
-            or self.private_user_data
+            or self.account_data
         )
 
 
@@ -100,6 +100,7 @@ class InvitedSyncResult(collections.namedtuple("InvitedSyncResult", [
 class SyncResult(collections.namedtuple("SyncResult", [
     "next_batch",  # Token for the next sync
     "presence",  # List of presence events for the user.
+    "account_data",  # List of account_data events for the user.
     "joined",  # JoinedSyncResult for each joined room.
     "invited",  # InvitedSyncResult for each invited room.
     "archived",  # ArchivedSyncResult for each archived room.
@@ -185,13 +186,19 @@ class SyncHandler(BaseHandler):
             pagination_config=pagination_config.get_source_config("presence"),
             key=None
         )
+
+        membership_list = (Membership.INVITE, Membership.JOIN)
+        if sync_config.filter.include_leave:
+            membership_list += (Membership.LEAVE, Membership.BAN)
+
         room_list = yield self.store.get_rooms_for_user_where_membership_is(
             user_id=sync_config.user.to_string(),
-            membership_list=(
-                Membership.INVITE,
-                Membership.JOIN,
-                Membership.LEAVE,
-                Membership.BAN
+            membership_list=membership_list
+        )
+
+        account_data, account_data_by_room = (
+            yield self.store.get_account_data_for_user(
+                sync_config.user.to_string()
             )
         )
 
@@ -211,6 +218,7 @@ class SyncHandler(BaseHandler):
                     timeline_since_token=timeline_since_token,
                     ephemeral_by_room=ephemeral_by_room,
                     tags_by_room=tags_by_room,
+                    account_data_by_room=account_data_by_room,
                 )
                 joined.append(room_sync)
             elif event.membership == Membership.INVITE:
@@ -230,11 +238,13 @@ class SyncHandler(BaseHandler):
                     leave_token=leave_token,
                     timeline_since_token=timeline_since_token,
                     tags_by_room=tags_by_room,
+                    account_data_by_room=account_data_by_room,
                 )
                 archived.append(room_sync)
 
         defer.returnValue(SyncResult(
             presence=presence,
+            account_data=self.account_data_for_user(account_data),
             joined=joined,
             invited=invited,
             archived=archived,
@@ -244,7 +254,8 @@ class SyncHandler(BaseHandler):
     @defer.inlineCallbacks
     def full_state_sync_for_joined_room(self, room_id, sync_config,
                                         now_token, timeline_since_token,
-                                        ephemeral_by_room, tags_by_room):
+                                        ephemeral_by_room, tags_by_room,
+                                        account_data_by_room):
         """Sync a room for a client which is starting without any state
         Returns:
             A Deferred JoinedSyncResult.
@@ -261,20 +272,39 @@ class SyncHandler(BaseHandler):
             timeline=batch,
             state=current_state,
             ephemeral=ephemeral_by_room.get(room_id, []),
-            private_user_data=self.private_user_data_for_room(
-                room_id, tags_by_room
+            account_data=self.account_data_for_room(
+                room_id, tags_by_room, account_data_by_room
             ),
         ))
 
-    def private_user_data_for_room(self, room_id, tags_by_room):
-        private_user_data = []
+    def account_data_for_user(self, account_data):
+        account_data_events = []
+
+        for account_data_type, content in account_data.items():
+            account_data_events.append({
+                "type": account_data_type,
+                "content": content,
+            })
+
+        return account_data_events
+
+    def account_data_for_room(self, room_id, tags_by_room, account_data_by_room):
+        account_data_events = []
         tags = tags_by_room.get(room_id)
         if tags is not None:
-            private_user_data.append({
+            account_data_events.append({
                 "type": "m.tag",
                 "content": {"tags": tags},
             })
-        return private_user_data
+
+        account_data = account_data_by_room.get(room_id, {})
+        for account_data_type, content in account_data.items():
+            account_data_events.append({
+                "type": account_data_type,
+                "content": content,
+            })
+
+        return account_data_events
 
     @defer.inlineCallbacks
     def ephemeral_by_room(self, sync_config, now_token, since_token=None):
@@ -341,7 +371,8 @@ class SyncHandler(BaseHandler):
     @defer.inlineCallbacks
     def full_state_sync_for_archived_room(self, room_id, sync_config,
                                           leave_event_id, leave_token,
-                                          timeline_since_token, tags_by_room):
+                                          timeline_since_token, tags_by_room,
+                                          account_data_by_room):
         """Sync a room for a client which is starting without any state
         Returns:
             A Deferred JoinedSyncResult.
@@ -357,8 +388,8 @@ class SyncHandler(BaseHandler):
             room_id=room_id,
             timeline=batch,
             state=leave_state,
-            private_user_data=self.private_user_data_for_room(
-                room_id, tags_by_room
+            account_data=self.account_data_for_room(
+                room_id, tags_by_room, account_data_by_room
             ),
         ))
 
@@ -412,7 +443,14 @@ class SyncHandler(BaseHandler):
 
         tags_by_room = yield self.store.get_updated_tags(
             sync_config.user.to_string(),
-            since_token.private_user_data_key,
+            since_token.account_data_key,
+        )
+
+        account_data, account_data_by_room = (
+            yield self.store.get_updated_account_data_for_user(
+                sync_config.user.to_string(),
+                since_token.account_data_key,
+            )
         )
 
         joined = []
@@ -468,8 +506,8 @@ class SyncHandler(BaseHandler):
                     ),
                     state=state,
                     ephemeral=ephemeral_by_room.get(room_id, []),
-                    private_user_data=self.private_user_data_for_room(
-                        room_id, tags_by_room
+                    account_data=self.account_data_for_room(
+                        room_id, tags_by_room, account_data_by_room
                     ),
                 )
                 logger.debug("Result for room %s: %r", room_id, room_sync)
@@ -492,14 +530,15 @@ class SyncHandler(BaseHandler):
             for room_id in joined_room_ids:
                 room_sync = yield self.incremental_sync_with_gap_for_room(
                     room_id, sync_config, since_token, now_token,
-                    ephemeral_by_room, tags_by_room
+                    ephemeral_by_room, tags_by_room, account_data_by_room
                 )
                 if room_sync:
                     joined.append(room_sync)
 
         for leave_event in leave_events:
             room_sync = yield self.incremental_sync_for_archived_room(
-                sync_config, leave_event, since_token, tags_by_room
+                sync_config, leave_event, since_token, tags_by_room,
+                account_data_by_room
             )
             archived.append(room_sync)
 
@@ -510,6 +549,7 @@ class SyncHandler(BaseHandler):
 
         defer.returnValue(SyncResult(
             presence=presence,
+            account_data=self.account_data_for_user(account_data),
             joined=joined,
             invited=invited,
             archived=archived,
@@ -566,7 +606,8 @@ class SyncHandler(BaseHandler):
     @defer.inlineCallbacks
     def incremental_sync_with_gap_for_room(self, room_id, sync_config,
                                            since_token, now_token,
-                                           ephemeral_by_room, tags_by_room):
+                                           ephemeral_by_room, tags_by_room,
+                                           account_data_by_room):
         """ Get the incremental delta needed to bring the client up to date for
         the room. Gives the client the most recent events and the changes to
         state.
@@ -605,8 +646,8 @@ class SyncHandler(BaseHandler):
             timeline=batch,
             state=state,
             ephemeral=ephemeral_by_room.get(room_id, []),
-            private_user_data=self.private_user_data_for_room(
-                room_id, tags_by_room
+            account_data=self.account_data_for_room(
+                room_id, tags_by_room, account_data_by_room
             ),
         )
 
@@ -616,7 +657,8 @@ class SyncHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def incremental_sync_for_archived_room(self, sync_config, leave_event,
-                                           since_token, tags_by_room):
+                                           since_token, tags_by_room,
+                                           account_data_by_room):
         """ Get the incremental delta needed to bring the client up to date for
         the archived room.
         Returns:
@@ -653,8 +695,8 @@ class SyncHandler(BaseHandler):
             room_id=leave_event.room_id,
             timeline=batch,
             state=state_events_delta,
-            private_user_data=self.private_user_data_for_room(
-                leave_event.room_id, tags_by_room
+            account_data=self.account_data_for_room(
+                leave_event.room_id, tags_by_room, account_data_by_room
             ),
         )
 

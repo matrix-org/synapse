@@ -64,8 +64,7 @@ class Clock(object):
         current_context = LoggingContext.current_context()
 
         def wrapped_callback(*args, **kwargs):
-            with PreserveLoggingContext():
-                LoggingContext.thread_local.current_context = current_context
+            with PreserveLoggingContext(current_context):
                 callback(*args, **kwargs)
 
         with PreserveLoggingContext():

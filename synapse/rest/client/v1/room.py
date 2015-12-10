@@ -16,7 +16,7 @@
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
 from twisted.internet import defer
 
-from base import ClientV1RestServlet, client_path_pattern
+from base import ClientV1RestServlet, client_path_patterns
 from synapse.api.errors import SynapseError, Codes, AuthError
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
@@ -34,16 +34,16 @@ class RoomCreateRestServlet(ClientV1RestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def register(self, http_server):
-        PATTERN = "/createRoom"
-        register_txn_path(self, PATTERN, http_server)
+        PATTERNS = "/createRoom"
+        register_txn_path(self, PATTERNS, http_server)
         # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
-        http_server.register_path("OPTIONS",
-                                  client_path_pattern("/rooms(?:/.*)?$"),
-                                  self.on_OPTIONS)
+        http_server.register_paths("OPTIONS",
+                                   client_path_patterns("/rooms(?:/.*)?$"),
+                                   self.on_OPTIONS)
         # define CORS for /createRoom[/txnid]
-        http_server.register_path("OPTIONS",
-                                  client_path_pattern("/createRoom(?:/.*)?$"),
-                                  self.on_OPTIONS)
+        http_server.register_paths("OPTIONS",
+                                   client_path_patterns("/createRoom(?:/.*)?$"),
+                                   self.on_OPTIONS)
 
     @defer.inlineCallbacks
     def on_PUT(self, request, txn_id):
@@ -103,18 +103,18 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
         state_key = ("/rooms/(?P<room_id>[^/]*)/state/"
                      "(?P<event_type>[^/]*)/(?P<state_key>[^/]*)$")
 
-        http_server.register_path("GET",
-                                  client_path_pattern(state_key),
-                                  self.on_GET)
-        http_server.register_path("PUT",
-                                  client_path_pattern(state_key),
-                                  self.on_PUT)
-        http_server.register_path("GET",
-                                  client_path_pattern(no_state_key),
-                                  self.on_GET_no_state_key)
-        http_server.register_path("PUT",
-                                  client_path_pattern(no_state_key),
-                                  self.on_PUT_no_state_key)
+        http_server.register_paths("GET",
+                                   client_path_patterns(state_key),
+                                   self.on_GET)
+        http_server.register_paths("PUT",
+                                   client_path_patterns(state_key),
+                                   self.on_PUT)
+        http_server.register_paths("GET",
+                                   client_path_patterns(no_state_key),
+                                   self.on_GET_no_state_key)
+        http_server.register_paths("PUT",
+                                   client_path_patterns(no_state_key),
+                                   self.on_PUT_no_state_key)
 
     def on_GET_no_state_key(self, request, room_id, event_type):
         return self.on_GET(request, room_id, event_type, "")
@@ -170,8 +170,8 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
 
     def register(self, http_server):
         # /rooms/$roomid/send/$event_type[/$txn_id]
-        PATTERN = ("/rooms/(?P<room_id>[^/]*)/send/(?P<event_type>[^/]*)")
-        register_txn_path(self, PATTERN, http_server, with_get=True)
+        PATTERNS = ("/rooms/(?P<room_id>[^/]*)/send/(?P<event_type>[^/]*)")
+        register_txn_path(self, PATTERNS, http_server, with_get=True)
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_type, txn_id=None):
@@ -215,8 +215,8 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
 
     def register(self, http_server):
         # /join/$room_identifier[/$txn_id]
-        PATTERN = ("/join/(?P<room_identifier>[^/]*)")
-        register_txn_path(self, PATTERN, http_server)
+        PATTERNS = ("/join/(?P<room_identifier>[^/]*)")
+        register_txn_path(self, PATTERNS, http_server)
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_identifier, txn_id=None):
@@ -280,7 +280,7 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
 
 # TODO: Needs unit testing
 class PublicRoomListRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/publicRooms$")
+    PATTERNS = client_path_patterns("/publicRooms$")
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -291,7 +291,7 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
 
 # TODO: Needs unit testing
 class RoomMemberListRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/members$")
+    PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/members$")
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
@@ -328,7 +328,7 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
 
 # TODO: Needs better unit testing
 class RoomMessageListRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/messages$")
+    PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/messages$")
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
@@ -351,7 +351,7 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
 
 # TODO: Needs unit testing
 class RoomStateRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/state$")
+    PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/state$")
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
@@ -368,7 +368,7 @@ class RoomStateRestServlet(ClientV1RestServlet):
 
 # TODO: Needs unit testing
 class RoomInitialSyncRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/initialSync$")
+    PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/initialSync$")
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
@@ -383,32 +383,8 @@ class RoomInitialSyncRestServlet(ClientV1RestServlet):
         defer.returnValue((200, content))
 
 
-class RoomTriggerBackfill(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/rooms/(?P<room_id>[^/]*)/backfill$")
-
-    def __init__(self, hs):
-        super(RoomTriggerBackfill, self).__init__(hs)
-        self.clock = hs.get_clock()
-
-    @defer.inlineCallbacks
-    def on_GET(self, request, room_id):
-        remote_server = urllib.unquote(
-            request.args["remote"][0]
-        ).decode("UTF-8")
-
-        limit = int(request.args["limit"][0])
-
-        handler = self.handlers.federation_handler
-        events = yield handler.backfill(remote_server, room_id, limit)
-
-        time_now = self.clock.time_msec()
-
-        res = [serialize_event(event, time_now) for event in events]
-        defer.returnValue((200, res))
-
-
 class RoomEventContext(ClientV1RestServlet):
-    PATTERN = client_path_pattern(
+    PATTERNS = client_path_patterns(
         "/rooms/(?P<room_id>[^/]*)/context/(?P<event_id>[^/]*)$"
     )
 
@@ -447,9 +423,9 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
 
     def register(self, http_server):
         # /rooms/$roomid/[invite|join|leave]
-        PATTERN = ("/rooms/(?P<room_id>[^/]*)/"
-                   "(?P<membership_action>join|invite|leave|ban|kick)")
-        register_txn_path(self, PATTERN, http_server)
+        PATTERNS = ("/rooms/(?P<room_id>[^/]*)/"
+                    "(?P<membership_action>join|invite|leave|ban|kick|forget)")
+        register_txn_path(self, PATTERNS, http_server)
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, membership_action, txn_id=None):
@@ -457,6 +433,8 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             request,
             allow_guest=True
         )
+
+        effective_membership_action = membership_action
 
         if is_guest and membership_action not in {Membership.JOIN, Membership.LEAVE}:
             raise AuthError(403, "Guest access not allowed")
@@ -488,11 +466,13 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             UserID.from_string(state_key)
 
             if membership_action == "kick":
-                membership_action = "leave"
+                effective_membership_action = "leave"
+        elif membership_action == "forget":
+            effective_membership_action = "leave"
 
         msg_handler = self.handlers.message_handler
 
-        content = {"membership": unicode(membership_action)}
+        content = {"membership": unicode(effective_membership_action)}
         if is_guest:
             content["kind"] = "guest"
 
@@ -508,6 +488,9 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             txn_id=txn_id,
             is_guest=is_guest,
         )
+
+        if membership_action == "forget":
+            self.handlers.room_member_handler.forget(user, room_id)
 
         defer.returnValue((200, {}))
 
@@ -536,8 +519,8 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
 
 class RoomRedactEventRestServlet(ClientV1RestServlet):
     def register(self, http_server):
-        PATTERN = ("/rooms/(?P<room_id>[^/]*)/redact/(?P<event_id>[^/]*)")
-        register_txn_path(self, PATTERN, http_server)
+        PATTERNS = ("/rooms/(?P<room_id>[^/]*)/redact/(?P<event_id>[^/]*)")
+        register_txn_path(self, PATTERNS, http_server)
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_id, txn_id=None):
@@ -575,7 +558,7 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
 
 
 class RoomTypingRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern(
+    PATTERNS = client_path_patterns(
         "/rooms/(?P<room_id>[^/]*)/typing/(?P<user_id>[^/]*)$"
     )
 
@@ -608,7 +591,7 @@ class RoomTypingRestServlet(ClientV1RestServlet):
 
 
 class SearchRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern(
+    PATTERNS = client_path_patterns(
         "/search$"
     )
 
@@ -648,20 +631,20 @@ def register_txn_path(servlet, regex_string, http_server, with_get=False):
         http_server : The http_server to register paths with.
         with_get: True to also register respective GET paths for the PUTs.
     """
-    http_server.register_path(
+    http_server.register_paths(
         "POST",
-        client_path_pattern(regex_string + "$"),
+        client_path_patterns(regex_string + "$"),
         servlet.on_POST
     )
-    http_server.register_path(
+    http_server.register_paths(
         "PUT",
-        client_path_pattern(regex_string + "/(?P<txn_id>[^/]*)$"),
+        client_path_patterns(regex_string + "/(?P<txn_id>[^/]*)$"),
         servlet.on_PUT
     )
     if with_get:
-        http_server.register_path(
+        http_server.register_paths(
             "GET",
-            client_path_pattern(regex_string + "/(?P<txn_id>[^/]*)$"),
+            client_path_patterns(regex_string + "/(?P<txn_id>[^/]*)$"),
             servlet.on_GET
         )
 
@@ -672,7 +655,6 @@ def register_servlets(hs, http_server):
     RoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
-    RoomTriggerBackfill(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
     RoomSendEventRestServlet(hs).register(http_server)
     PublicRoomListRestServlet(hs).register(http_server)

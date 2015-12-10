@@ -207,6 +207,13 @@ class Auth(object):
                 user_id, room_id
             ))
 
+        if membership == Membership.LEAVE:
+            forgot = yield self.store.did_forget(user_id, room_id)
+            if forgot:
+                raise AuthError(403, "User %s not in room %s" % (
+                    user_id, room_id
+                ))
+
         defer.returnValue(member)
 
     @defer.inlineCallbacks
@@ -587,7 +594,7 @@ class Auth(object):
     def _get_user_from_macaroon(self, macaroon_str):
         try:
             macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
-            self._validate_macaroon(macaroon)
+            self.validate_macaroon(macaroon, "access", False)
 
             user_prefix = "user_id = "
             user = None
@@ -635,13 +642,27 @@ class Auth(object):
                 errcode=Codes.UNKNOWN_TOKEN
             )
 
-    def _validate_macaroon(self, macaroon):
+    def validate_macaroon(self, macaroon, type_string, verify_expiry):
+        """
+        validate that a Macaroon is understood by and was signed by this server.
+
+        Args:
+            macaroon(pymacaroons.Macaroon): The macaroon to validate
+            type_string(str): The kind of token this is (e.g. "access", "refresh")
+            verify_expiry(bool): Whether to verify whether the macaroon has expired.
+                This should really always be True, but no clients currently implement
+                token refresh, so we can't enforce expiry yet.
+        """
         v = pymacaroons.Verifier()
         v.satisfy_exact("gen = 1")
-        v.satisfy_exact("type = access")
+        v.satisfy_exact("type = " + type_string)
         v.satisfy_general(lambda c: c.startswith("user_id = "))
-        v.satisfy_general(self._verify_expiry)
         v.satisfy_exact("guest = true")
+        if verify_expiry:
+            v.satisfy_general(self._verify_expiry)
+        else:
+            v.satisfy_general(lambda c: c.startswith("time < "))
+
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 
         v = pymacaroons.Verifier()
@@ -652,9 +673,6 @@ class Auth(object):
         prefix = "time < "
         if not caveat.startswith(prefix):
             return False
-        # TODO(daniel): Enable expiry check when clients actually know how to
-        # refresh tokens. (And remember to enable the tests)
-        return True
         expiry = int(caveat[len(prefix):])
         now = self.hs.get_clock().time_msec()
         return now < expiry
@@ -842,7 +860,7 @@ class Auth(object):
 
         redact_level = self._get_named_level(auth_events, "redact", 50)
 
-        if user_level > redact_level:
+        if user_level >= redact_level:
             return False
 
         redacter_domain = EventID.from_string(event.event_id).domain

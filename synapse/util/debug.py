@@ -30,8 +30,7 @@ def debug_deferreds():
         context = LoggingContext.current_context()
 
         def restore_context_callback(x):
-            with PreserveLoggingContext():
-                LoggingContext.thread_local.current_context = context
+            with PreserveLoggingContext(context):
                 return fn(x)
 
         return restore_context_callback

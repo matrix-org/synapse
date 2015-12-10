@@ -20,7 +20,6 @@ from synapse.api.errors import (
     CodeMessageException
 )
 from ._base import BaseHandler
-from synapse.http.client import SimpleHttpClient
 from synapse.util.async import run_on_reactor
 from synapse.api.errors import SynapseError
 
@@ -35,13 +34,12 @@ class IdentityHandler(BaseHandler):
     def __init__(self, hs):
         super(IdentityHandler, self).__init__(hs)
 
+        self.http_client = hs.get_simple_http_client()
+
     @defer.inlineCallbacks
     def threepid_from_creds(self, creds):
         yield run_on_reactor()
 
-        # TODO: get this from the homeserver rather than creating a new one for
-        # each request
-        http_client = SimpleHttpClient(self.hs)
         # XXX: make this configurable!
         # trustedIdServers = ['matrix.org', 'localhost:8090']
         trustedIdServers = ['matrix.org', 'vector.im']
@@ -67,7 +65,7 @@ class IdentityHandler(BaseHandler):
 
         data = {}
         try:
-            data = yield http_client.get_json(
+            data = yield self.http_client.get_json(
                 "https://%s%s" % (
                     id_server,
                     "/_matrix/identity/api/v1/3pid/getValidated3pid"
@@ -85,7 +83,6 @@ class IdentityHandler(BaseHandler):
     def bind_threepid(self, creds, mxid):
         yield run_on_reactor()
         logger.debug("binding threepid %r to %s", creds, mxid)
-        http_client = SimpleHttpClient(self.hs)
         data = None
 
         if 'id_server' in creds:
@@ -103,7 +100,7 @@ class IdentityHandler(BaseHandler):
             raise SynapseError(400, "No client_secret in creds")
 
         try:
-            data = yield http_client.post_urlencoded_get_json(
+            data = yield self.http_client.post_urlencoded_get_json(
                 "https://%s%s" % (
                     id_server, "/_matrix/identity/api/v1/3pid/bind"
                 ),
@@ -121,7 +118,6 @@ class IdentityHandler(BaseHandler):
     @defer.inlineCallbacks
     def requestEmailToken(self, id_server, email, client_secret, send_attempt, **kwargs):
         yield run_on_reactor()
-        http_client = SimpleHttpClient(self.hs)
 
         params = {
             'email': email,
@@ -131,7 +127,7 @@ class IdentityHandler(BaseHandler):
         params.update(kwargs)
 
         try:
-            data = yield http_client.post_urlencoded_get_json(
+            data = yield self.http_client.post_urlencoded_get_json(
                 "https://%s%s" % (
                     id_server,
                     "/_matrix/identity/api/v1/validate/email/requestToken"

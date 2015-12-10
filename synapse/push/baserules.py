@@ -247,6 +247,7 @@ def make_base_append_underride_rules(user):
         },
         {
             'rule_id': 'global/underride/.m.rule.message',
+            'enabled': False,
             'conditions': [
                 {
                     'kind': 'event_match',

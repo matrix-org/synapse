@@ -41,6 +41,18 @@ logger = logging.getLogger(__name__)
 id_server_scheme = "https://"
 
 
+def collect_presencelike_data(distributor, user, content):
+    return distributor.fire("collect_presencelike_data", user, content)
+
+
+def user_left_room(distributor, user, room_id):
+    return distributor.fire("user_left_room", user=user, room_id=room_id)
+
+
+def user_joined_room(distributor, user, room_id):
+    return distributor.fire("user_joined_room", user=user, room_id=room_id)
+
+
 class RoomCreationHandler(BaseHandler):
 
     PRESETS_DICT = {
@@ -438,9 +450,7 @@ class RoomMemberHandler(BaseHandler):
 
             if prev_state and prev_state.membership == Membership.JOIN:
                 user = UserID.from_string(event.user_id)
-                self.distributor.fire(
-                    "user_left_room", user=user, room_id=event.room_id
-                )
+                user_left_room(self.distributor, user, event.room_id)
 
         defer.returnValue({"room_id": room_id})
 
@@ -458,9 +468,7 @@ class RoomMemberHandler(BaseHandler):
             raise SynapseError(404, "No known servers")
 
         # If event doesn't include a display name, add one.
-        yield self.distributor.fire(
-            "collect_presencelike_data", joinee, content
-        )
+        yield collect_presencelike_data(self.distributor, joinee, content)
 
         content.update({"membership": Membership.JOIN})
         builder = self.event_builder_factory.new({
@@ -517,10 +525,13 @@ class RoomMemberHandler(BaseHandler):
                 do_auth=do_auth,
             )
 
-        user = UserID.from_string(event.user_id)
-        yield self.distributor.fire(
-            "user_joined_room", user=user, room_id=room_id
-        )
+        prev_state = context.current_state.get((event.type, event.state_key))
+        if not prev_state or prev_state.membership != Membership.JOIN:
+            # Only fire user_joined_room if the user has acutally joined the
+            # room. Don't bother if the user is just changing their profile
+            # info.
+            user = UserID.from_string(event.user_id)
+            yield user_joined_room(self.distributor, user, room_id)
 
     @defer.inlineCallbacks
     def get_inviter(self, event):
@@ -742,6 +753,9 @@ class RoomMemberHandler(BaseHandler):
             id_server_scheme, id_server,
         )
         defer.returnValue((token, public_key, key_validity_url, display_name))
+
+    def forget(self, user, room_id):
+        self.store.forget(user.to_string(), room_id)
 
 
 class RoomListHandler(BaseHandler):

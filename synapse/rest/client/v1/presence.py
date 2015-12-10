@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.types import UserID
-from .base import ClientV1RestServlet, client_path_pattern
+from .base import ClientV1RestServlet, client_path_patterns
 
 import simplejson as json
 import logging
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class PresenceStatusRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/presence/(?P<user_id>[^/]*)/status")
+    PATTERNS = client_path_patterns("/presence/(?P<user_id>[^/]*)/status")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -73,7 +73,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
 
 
 class PresenceListRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/presence/list/(?P<user_id>[^/]*)")
+    PATTERNS = client_path_patterns("/presence/list/(?P<user_id>[^/]*)")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -120,7 +120,7 @@ class PresenceListRestServlet(ClientV1RestServlet):
                 if len(u) == 0:
                     continue
                 invited_user = UserID.from_string(u)
-                yield self.handlers.presence_handler.send_invite(
+                yield self.handlers.presence_handler.send_presence_invite(
                     observer_user=user, observed_user=invited_user
                 )
 

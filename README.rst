@@ -111,6 +111,14 @@ Installing prerequisites on ArchLinux::
     sudo pacman -S base-devel python2 python-pip \
                    python-setuptools python-virtualenv sqlite3
 
+Installing prerequisites on CentOS 7::
+
+    sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
+                     lcms2-devel libwebp-devel tcl-devel tk-devel \
+                     python-virtualenv libffi-devel openssl-devel
+    sudo yum groupinstall "Development Tools"
+
+
 Installing prerequisites on Mac OS X::
 
     xcode-select --install
@@ -133,15 +141,21 @@ In case of problems, please see the _Troubleshooting section below.
 Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
 above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
 
+Another alternative is to install via apt from http://matrix.org/packages/debian/.
+Note that these packages do not include  a client - choose one from
+https://matrix.org/blog/try-matrix-now/ (or build your own with 
+https://github.com/matrix-org/matrix-js-sdk/). 
+
 To set up your homeserver, run (in your virtualenv, as before)::
 
     cd ~/.synapse
     python -m synapse.app.homeserver \
         --server-name machine.my.domain.name \
         --config-path homeserver.yaml \
-        --generate-config
+        --generate-config \
+        --report-stats=[yes|no]
 
-Substituting your host and domain name as appropriate.
+...substituting your host and domain name as appropriate.
 
 This will generate you a config file that you can then customise, but it will
 also generate a set of keys for you. These keys will allow your Home Server to
@@ -154,10 +168,11 @@ key in the <server name>.signing.key file (the second word, which by default is
 
 By default, registration of new users is disabled. You can either enable
 registration in the config by specifying ``enable_registration: true``
-(it is then recommended to also set up CAPTCHA), or
+(it is then recommended to also set up CAPTCHA - see docs/CAPTCHA_SETUP), or
 you can use the command line to register new users::
 
     $ source ~/.synapse/bin/activate
+    $ synctl start # if not already running
     $ register_new_matrix_user -c homeserver.yaml https://localhost:8448
     New user localpart: erikj
     Password:
@@ -166,6 +181,16 @@ you can use the command line to register new users::
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server.  See docs/turn-howto.rst for details.
+
+Running Synapse
+===============
+
+To actually run your new homeserver, pick a working directory for Synapse to
+run (e.g. ``~/.synapse``), and::
+
+    cd ~/.synapse
+    source ./bin/activate
+    synctl start
 
 Using PostgreSQL
 ================
@@ -188,16 +213,6 @@ may have a few regressions relative to SQLite.
 
 For information on how to install and use PostgreSQL, please see
 `docs/postgres.rst <docs/postgres.rst>`_.
-
-Running Synapse
-===============
-
-To actually run your new homeserver, pick a working directory for Synapse to
-run (e.g. ``~/.synapse``), and::
-
-    cd ~/.synapse
-    source ./bin/activate
-    synctl start
 
 Platform Specific Instructions
 ==============================
@@ -424,6 +439,10 @@ SRV record, as that is the name other machines will expect it to have::
         --generate-config
     python -m synapse.app.homeserver --config-path homeserver.yaml
 
+
+If you've already generated the config file, you need to edit the "server_name"
+in you  ```homeserver.yaml``` file. If you've already started Synapse and a
+database has been created, you will have to recreate the database.
 
 You may additionally want to pass one or more "-v" options, in order to
 increase the verbosity of logging output; at least for initial testing.

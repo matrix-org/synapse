@@ -18,7 +18,7 @@ from twisted.internet import defer
 from synapse.api.errors import AuthError, SynapseError
 from synapse.types import UserID
 
-from base import ClientV1RestServlet, client_path_pattern
+from base import ClientV1RestServlet, client_path_patterns
 
 import logging
 
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class WhoisRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/admin/whois/(?P<user_id>[^/]*)")
+    PATTERNS = client_path_patterns("/admin/whois/(?P<user_id>[^/]*)")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):

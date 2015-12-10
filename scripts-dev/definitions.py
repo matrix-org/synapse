@@ -79,16 +79,16 @@ def defined_names(prefix, defs, names):
         defined_names(prefix + name + ".", funcs, names)
 
 
-def used_names(prefix, defs, names):
+def used_names(prefix, item, defs, names):
     for name, funcs in defs.get('def', {}).items():
-        used_names(prefix + name + ".", funcs, names)
+        used_names(prefix + name + ".", name, funcs, names)
 
     for name, funcs in defs.get('class', {}).items():
-        used_names(prefix + name + ".", funcs, names)
+        used_names(prefix + name + ".", name, funcs, names)
 
     for used in defs.get('uses', ()):
         if used in names:
-            names[used].setdefault('used', []).append(prefix.rstrip('.'))
+            names[used].setdefault('used', {}).setdefault(item, []).append(prefix.rstrip('.'))
 
 
 if __name__ == '__main__':
@@ -109,6 +109,14 @@ if __name__ == '__main__':
         "directories", nargs='+', metavar="DIR",
         help="Directories to search for definitions"
     )
+    parser.add_argument(
+        "--referrers", default=0, type=int,
+        help="Include referrers up to the given depth"
+    )
+    parser.add_argument(
+        "--format", default="yaml",
+        help="Output format, one of 'yaml' or 'dot'"
+    )
     args = parser.parse_args()
 
     definitions = {}
@@ -124,7 +132,7 @@ if __name__ == '__main__':
         defined_names(filepath + ":", defs, names)
 
     for filepath, defs in definitions.items():
-        used_names(filepath + ":", defs, names)
+        used_names(filepath + ":", None, defs, names)
 
     patterns = [re.compile(pattern) for pattern in args.pattern or ()]
     ignore = [re.compile(pattern) for pattern in args.ignore or ()]
@@ -139,4 +147,29 @@ if __name__ == '__main__':
             continue
         result[name] = definition
 
-    yaml.dump(result, sys.stdout, default_flow_style=False)
+    referrer_depth = args.referrers
+    referrers = set()
+    while referrer_depth:
+        referrer_depth -= 1
+        for entry in result.values():
+            for used_by in entry.get("used", ()):
+                referrers.add(used_by)
+        for name, definition in names.items():
+            if not name in referrers:
+                continue
+            if ignore and any(pattern.match(name) for pattern in ignore):
+                continue
+            result[name] = definition
+
+    if args.format == 'yaml':
+        yaml.dump(result, sys.stdout, default_flow_style=False)
+    elif args.format == 'dot':
+        print "digraph {"
+        for name, entry in result.items():
+            print name
+            for used_by in entry.get("used", ()):
+                if used_by in result:
+                    print used_by, "->", name
+        print "}"
+    else:
+        raise ValueError("Unknown format %r" % (args.format))

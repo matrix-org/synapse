@@ -15,42 +15,21 @@
 import logging
 
 from synapse.storage.prepare_database import get_statements
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 import ujson
 
 logger = logging.getLogger(__name__)
 
 
-POSTGRES_TABLE = """
-CREATE TABLE IF NOT EXISTS event_search (
-    event_id TEXT,
-    room_id TEXT,
-    sender TEXT,
-    key TEXT,
-    vector tsvector
-);
-
-CREATE INDEX event_search_fts_idx ON event_search USING gin(vector);
-CREATE INDEX event_search_ev_idx ON event_search(event_id);
-CREATE INDEX event_search_ev_ridx ON event_search(room_id);
-"""
-
-
-SQLITE_TABLE = (
-    "CREATE VIRTUAL TABLE event_search"
-    " USING fts4 ( event_id, room_id, sender, key, value )"
+ALTER_TABLE = (
+    "ALTER TABLE events ADD COLUMN origin_server_ts BIGINT;"
+    "CREATE INDEX events_ts ON events(origin_server_ts, stream_ordering);"
 )
 
 
 def run_upgrade(cur, database_engine, *args, **kwargs):
-    if isinstance(database_engine, PostgresEngine):
-        for statement in get_statements(POSTGRES_TABLE.splitlines()):
-            cur.execute(statement)
-    elif isinstance(database_engine, Sqlite3Engine):
-        cur.execute(SQLITE_TABLE)
-    else:
-        raise Exception("Unrecognized database engine")
+    for statement in get_statements(ALTER_TABLE.splitlines()):
+        cur.execute(statement)
 
     cur.execute("SELECT MIN(stream_ordering) FROM events")
     rows = cur.fetchall()
@@ -75,4 +54,4 @@ def run_upgrade(cur, database_engine, *args, **kwargs):
 
         sql = database_engine.convert_param_style(sql)
 
-        cur.execute(sql, ("event_search", progress_json))
+        cur.execute(sql, ("event_origin_server_ts", progress_json))

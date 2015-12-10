@@ -18,7 +18,7 @@ from twisted.internet import defer
 from synapse.api.errors import AuthError, StoreError, SynapseError
 from synapse.http.servlet import RestServlet
 
-from ._base import client_v2_pattern, parse_json_dict_from_request
+from ._base import client_v2_patterns, parse_json_dict_from_request
 
 
 class TokenRefreshRestServlet(RestServlet):
@@ -26,7 +26,7 @@ class TokenRefreshRestServlet(RestServlet):
     Exchanges refresh tokens for a pair of an access token and a new refresh
     token.
     """
-    PATTERN = client_v2_pattern("/tokenrefresh")
+    PATTERNS = client_v2_patterns("/tokenrefresh")
 
     def __init__(self, hs):
         super(TokenRefreshRestServlet, self).__init__()

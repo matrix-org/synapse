@@ -168,8 +168,9 @@ class MockHttpResource(HttpServer):
 
         raise KeyError("No event can handle %s" % path)
 
-    def register_path(self, method, path_pattern, callback):
-        self.callbacks.append((method, path_pattern, callback))
+    def register_paths(self, method, path_patterns, callback):
+        for path_pattern in path_patterns:
+            self.callbacks.append((method, path_pattern, callback))
 
 
 class MockKey(object):

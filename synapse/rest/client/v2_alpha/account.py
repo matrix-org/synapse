@@ -20,7 +20,7 @@ from synapse.api.errors import LoginError, SynapseError, Codes
 from synapse.http.servlet import RestServlet
 from synapse.util.async import run_on_reactor
 
-from ._base import client_v2_pattern, parse_json_dict_from_request
+from ._base import client_v2_patterns, parse_json_dict_from_request
 
 import logging
 
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class PasswordRestServlet(RestServlet):
-    PATTERN = client_v2_pattern("/account/password")
+    PATTERNS = client_v2_patterns("/account/password")
 
     def __init__(self, hs):
         super(PasswordRestServlet, self).__init__()
@@ -89,7 +89,7 @@ class PasswordRestServlet(RestServlet):
 
 
 class ThreepidRestServlet(RestServlet):
-    PATTERN = client_v2_pattern("/account/3pid")
+    PATTERNS = client_v2_patterns("/account/3pid")
 
     def __init__(self, hs):
         super(ThreepidRestServlet, self).__init__()

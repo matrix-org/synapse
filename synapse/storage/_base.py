@@ -214,7 +214,8 @@ class SQLBaseStore(object):
 
         self._clock.looping_call(loop, 10000)
 
-    def _new_transaction(self, conn, desc, after_callbacks, func, *args, **kwargs):
+    def _new_transaction(self, conn, desc, after_callbacks, logging_context,
+                         func, *args, **kwargs):
         start = time.time() * 1000
         txn_id = self._TXN_ID
 
@@ -277,6 +278,9 @@ class SQLBaseStore(object):
             end = time.time() * 1000
             duration = end - start
 
+            if logging_context is not None:
+                logging_context.add_database_transaction(duration)
+
             transaction_logger.debug("[TXN END] {%s} %f", name, duration)
 
             self._current_txn_total_time += duration
@@ -302,7 +306,8 @@ class SQLBaseStore(object):
 
                 current_context.copy_to(context)
                 return self._new_transaction(
-                    conn, desc, after_callbacks, func, *args, **kwargs
+                    conn, desc, after_callbacks, current_context,
+                    func, *args, **kwargs
                 )
 
         result = yield preserve_context_over_fn(

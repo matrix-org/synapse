@@ -92,7 +92,15 @@ class BaseHandler(object):
 
             membership_event = state.get((EventTypes.Member, user_id), None)
             if membership_event:
-                membership = membership_event.membership
+                was_forgotten_at_event = yield self.store.was_forgotten_at(
+                    membership_event.state_key,
+                    membership_event.room_id,
+                    membership_event.event_id
+                )
+                if was_forgotten_at_event:
+                    membership = None
+                else:
+                    membership = membership_event.membership
             else:
                 membership = None
 

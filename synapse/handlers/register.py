@@ -31,6 +31,10 @@ import urllib
 logger = logging.getLogger(__name__)
 
 
+def registered_user(distributor, user):
+    return distributor.fire("registered_user", user)
+
+
 class RegistrationHandler(BaseHandler):
 
     def __init__(self, hs):
@@ -38,6 +42,7 @@ class RegistrationHandler(BaseHandler):
 
         self.distributor = hs.get_distributor()
         self.distributor.declare("registered_user")
+        self.captch_client = CaptchaServerHttpClient(hs)
 
     @defer.inlineCallbacks
     def check_username(self, localpart):
@@ -98,7 +103,7 @@ class RegistrationHandler(BaseHandler):
                 password_hash=password_hash
             )
 
-            yield self.distributor.fire("registered_user", user)
+            yield registered_user(self.distributor, user)
         else:
             # autogen a random user ID
             attempts = 0
@@ -117,7 +122,7 @@ class RegistrationHandler(BaseHandler):
                         token=token,
                         password_hash=password_hash)
 
-                    self.distributor.fire("registered_user", user)
+                    yield registered_user(self.distributor, user)
                 except SynapseError:
                     # if user id is taken, just generate another
                     user_id = None
@@ -167,7 +172,7 @@ class RegistrationHandler(BaseHandler):
             token=token,
             password_hash=""
         )
-        self.distributor.fire("registered_user", user)
+        registered_user(self.distributor, user)
         defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
@@ -215,7 +220,7 @@ class RegistrationHandler(BaseHandler):
                 token=token,
                 password_hash=None
             )
-            yield self.distributor.fire("registered_user", user)
+            yield registered_user(self.distributor, user)
         except Exception, e:
             yield self.store.add_access_token_to_user(user_id, token)
             # Ignore Registration errors
@@ -302,10 +307,7 @@ class RegistrationHandler(BaseHandler):
         """
         Used only by c/s api v1
         """
-        # TODO: get this from the homeserver rather than creating a new one for
-        # each request
-        client = CaptchaServerHttpClient(self.hs)
-        data = yield client.post_urlencoded_get_raw(
+        data = yield self.captcha_client.post_urlencoded_get_raw(
             "http://www.google.com:80/recaptcha/api/verify",
             args={
                 'privatekey': private_key,

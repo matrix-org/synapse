@@ -22,13 +22,16 @@ from synapse.handlers.sync import SyncConfig
 from synapse.types import StreamToken
 from synapse.events import FrozenEvent
 from synapse.events.utils import (
-    serialize_event, format_event_for_client_v2_without_event_id,
+    serialize_event, format_event_for_client_v2_without_room_id,
 )
 from synapse.api.filtering import FilterCollection
-from ._base import client_v2_pattern
+from synapse.api.errors import SynapseError
+from ._base import client_v2_patterns
 
 import copy
 import logging
+
+import ujson as json
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +51,7 @@ class SyncRestServlet(RestServlet):
           "next_batch": // batch token for the next /sync
           "presence": // presence data for the user.
           "rooms": {
-            "joined": { // Joined rooms being updated.
+            "join": { // Joined rooms being updated.
               "${room_id}": { // Id of the room being updated
                 "event_map": // Map of EventID -> event JSON.
                 "timeline": { // The recent events in the room if gap is "true"
@@ -63,13 +66,13 @@ class SyncRestServlet(RestServlet):
                 "ephemeral": {"events": []} // list of event objects
               }
             },
-            "invited": {}, // Invited rooms being updated.
-            "archived": {} // Archived rooms being updated.
+            "invite": {}, // Invited rooms being updated.
+            "leave": {} // Archived rooms being updated.
           }
         }
     """
 
-    PATTERN = client_v2_pattern("/sync$")
+    PATTERNS = client_v2_patterns("/sync$")
     ALLOWED_PRESENCE = set(["online", "offline"])
 
     def __init__(self, hs):
@@ -100,12 +103,21 @@ class SyncRestServlet(RestServlet):
             )
         )
 
-        try:
-            filter = yield self.filtering.get_user_filter(
-                user.localpart, filter_id
-            )
-        except:
-            filter = FilterCollection({})
+        if filter_id and filter_id.startswith('{'):
+            logging.error("MJH %r", filter_id)
+            try:
+                filter_object = json.loads(filter_id)
+            except:
+                raise SynapseError(400, "Invalid filter JSON")
+            self.filtering._check_valid_filter(filter_object)
+            filter = FilterCollection(filter_object)
+        else:
+            try:
+                filter = yield self.filtering.get_user_filter(
+                    user.localpart, filter_id
+                )
+            except:
+                filter = FilterCollection({})
 
         sync_config = SyncConfig(
             user=user,
@@ -144,13 +156,16 @@ class SyncRestServlet(RestServlet):
         )
 
         response_content = {
+            "account_data": self.encode_account_data(
+                sync_result.account_data, filter, time_now
+            ),
             "presence": self.encode_presence(
                 sync_result.presence, filter, time_now
             ),
             "rooms": {
-                "joined": joined,
-                "invited": invited,
-                "archived": archived,
+                "join": joined,
+                "invite": invited,
+                "leave": archived,
             },
             "next_batch": sync_result.next_batch.to_string(),
         }
@@ -164,6 +179,9 @@ class SyncRestServlet(RestServlet):
             event['sender'] = event['content'].pop('user_id')
             formatted.append(event)
         return {"events": filter.filter_presence(formatted)}
+
+    def encode_account_data(self, events, filter, time_now):
+        return {"events": filter.filter_account_data(events)}
 
     def encode_joined(self, rooms, filter, time_now, token_id):
         """
@@ -207,7 +225,7 @@ class SyncRestServlet(RestServlet):
         for room in rooms:
             invite = serialize_event(
                 room.invite, time_now, token_id=token_id,
-                event_format=format_event_for_client_v2_without_event_id,
+                event_format=format_event_for_client_v2_without_room_id,
             )
             invited_state = invite.get("unsigned", {}).pop("invite_room_state", [])
             invited_state.append(invite)
@@ -256,7 +274,13 @@ class SyncRestServlet(RestServlet):
         :return: the room, encoded in our response format
         :rtype: dict[str, object]
         """
-        event_map = {}
+        def serialize(event):
+            # TODO(mjark): Respect formatting requirements in the filter.
+            return serialize_event(
+                event, time_now, token_id=token_id,
+                event_format=format_event_for_client_v2_without_room_id,
+            )
+
         state_dict = room.state
         timeline_events = filter.filter_room_timeline(room.timeline.events)
 
@@ -264,37 +288,22 @@ class SyncRestServlet(RestServlet):
             state_dict, timeline_events)
 
         state_events = filter.filter_room_state(state_dict.values())
-        state_event_ids = []
-        for event in state_events:
-            # TODO(mjark): Respect formatting requirements in the filter.
-            event_map[event.event_id] = serialize_event(
-                event, time_now, token_id=token_id,
-                event_format=format_event_for_client_v2_without_event_id,
-            )
-            state_event_ids.append(event.event_id)
 
-        timeline_event_ids = []
-        for event in timeline_events:
-            # TODO(mjark): Respect formatting requirements in the filter.
-            event_map[event.event_id] = serialize_event(
-                event, time_now, token_id=token_id,
-                event_format=format_event_for_client_v2_without_event_id,
-            )
-            timeline_event_ids.append(event.event_id)
+        serialized_state = [serialize(e) for e in state_events]
+        serialized_timeline = [serialize(e) for e in timeline_events]
 
-        private_user_data = filter.filter_room_private_user_data(
-            room.private_user_data
+        account_data = filter.filter_room_account_data(
+            room.account_data
         )
 
         result = {
-            "event_map": event_map,
             "timeline": {
-                "events": timeline_event_ids,
+                "events": serialized_timeline,
                 "prev_batch": room.timeline.prev_batch.to_string(),
                 "limited": room.timeline.limited,
             },
-            "state": {"events": state_event_ids},
-            "private_user_data": {"events": private_user_data},
+            "state": {"events": serialized_state},
+            "account_data": {"events": account_data},
         }
 
         if joined:

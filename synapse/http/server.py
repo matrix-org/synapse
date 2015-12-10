@@ -53,6 +53,23 @@ response_timer = metrics.register_distribution(
     labels=["method", "servlet"]
 )
 
+response_ru_utime = metrics.register_distribution(
+    "response_ru_utime", labels=["method", "servlet"]
+)
+
+response_ru_stime = metrics.register_distribution(
+    "response_ru_stime", labels=["method", "servlet"]
+)
+
+response_db_txn_count = metrics.register_distribution(
+    "response_db_txn_count", labels=["method", "servlet"]
+)
+
+response_db_txn_duration = metrics.register_distribution(
+    "response_db_txn_duration", labels=["method", "servlet"]
+)
+
+
 _next_request_id = 0
 
 
@@ -120,7 +137,7 @@ class HttpServer(object):
     """ Interface for registering callbacks on a HTTP server
     """
 
-    def register_path(self, method, path_pattern, callback):
+    def register_paths(self, method, path_patterns, callback):
         """ Register a callback that gets fired if we receive a http request
         with the given method for a path that matches the given regex.
 
@@ -129,7 +146,7 @@ class HttpServer(object):
 
         Args:
             method (str): The method to listen to.
-            path_pattern (str): The regex used to match requests.
+            path_patterns (list<SRE_Pattern>): The regex used to match requests.
             callback (function): The function to fire if we receive a matched
                 request. The first argument will be the request object and
                 subsequent arguments will be any matched groups from the regex.
@@ -165,10 +182,11 @@ class JsonResource(HttpServer, resource.Resource):
         self.version_string = hs.version_string
         self.hs = hs
 
-    def register_path(self, method, path_pattern, callback):
-        self.path_regexs.setdefault(method, []).append(
-            self._PathEntry(path_pattern, callback)
-        )
+    def register_paths(self, method, path_patterns, callback):
+        for path_pattern in path_patterns:
+            self.path_regexs.setdefault(method, []).append(
+                self._PathEntry(path_pattern, callback)
+            )
 
     def render(self, request):
         """ This gets called by twisted every time someone sends us a request.
@@ -219,6 +237,21 @@ class JsonResource(HttpServer, resource.Resource):
             response_timer.inc_by(
                 self.clock.time_msec() - start, request.method, servlet_classname
             )
+
+            try:
+                context = LoggingContext.current_context()
+                ru_utime, ru_stime = context.get_resource_usage()
+
+                response_ru_utime.inc_by(ru_utime, request.method, servlet_classname)
+                response_ru_stime.inc_by(ru_stime, request.method, servlet_classname)
+                response_db_txn_count.inc_by(
+                    context.db_txn_count, request.method, servlet_classname
+                )
+                response_db_txn_duration.inc_by(
+                    context.db_txn_duration, request.method, servlet_classname
+                )
+            except:
+                pass
 
             return
 

@@ -19,7 +19,7 @@ from synapse.api.errors import AuthError, SynapseError
 from synapse.http.servlet import RestServlet
 from synapse.types import UserID
 
-from ._base import client_v2_pattern
+from ._base import client_v2_patterns
 
 import simplejson as json
 import logging
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class GetFilterRestServlet(RestServlet):
-    PATTERN = client_v2_pattern("/user/(?P<user_id>[^/]*)/filter/(?P<filter_id>[^/]*)")
+    PATTERNS = client_v2_patterns("/user/(?P<user_id>[^/]*)/filter/(?P<filter_id>[^/]*)")
 
     def __init__(self, hs):
         super(GetFilterRestServlet, self).__init__()
@@ -65,7 +65,7 @@ class GetFilterRestServlet(RestServlet):
 
 
 class CreateFilterRestServlet(RestServlet):
-    PATTERN = client_v2_pattern("/user/(?P<user_id>[^/]*)/filter")
+    PATTERNS = client_v2_patterns("/user/(?P<user_id>[^/]*)/filter")
 
     def __init__(self, hs):
         super(CreateFilterRestServlet, self).__init__()

@@ -1,3 +1,42 @@
+Changes in synapse v0.11.1 (2015-11-20)
+=======================================
+
+* Add extra options to search API (PR #394)
+* Fix bug where we did not correctly cap federation retry timers. This meant it
+  could take several hours for servers to start talking to ressurected servers,
+  even when they were receiving traffic from them (PR #393)
+* Don't advertise login token flow unless CAS is enabled. This caused issues
+  where some clients would always use the fallback API if they did not
+  recognize all login flows (PR #391)
+* Change /v2 sync API to rename ``private_user_data`` to ``account_data``
+  (PR #386)
+* Change /v2 sync API to remove the ``event_map`` and rename keys in ``rooms``
+  object (PR #389)
+
+Changes in synapse v0.11.0-r2 (2015-11-19)
+==========================================
+
+* Fix bug in database port script (PR #387)
+
+Changes in synapse v0.11.0-r1 (2015-11-18)
+==========================================
+
+* Retry and fail federation requests more aggressively for requests that block
+  client side requests (PR #384)
+
+Changes in synapse v0.11.0 (2015-11-17)
+=======================================
+
+* Change CAS login API (PR #349)
+
+Changes in synapse v0.11.0-rc2 (2015-11-13)
+===========================================
+
+* Various changes to /sync API response format (PR #373)
+* Fix regression when setting display name in newly joined room over
+  federation (PR #368)
+* Fix problem where /search was slow when using SQLite (PR #366)
+
 Changes in synapse v0.11.0-rc1 (2015-11-11)
 ===========================================
 

@@ -62,6 +62,14 @@ def partitionbool(l, func):
     return ret.get(True, []), ret.get(False, [])
 
 
+def user_presence_changed(distributor, user, statuscache):
+    return distributor.fire("user_presence_changed", user, statuscache)
+
+
+def collect_presencelike_data(distributor, user, content):
+    return distributor.fire("collect_presencelike_data", user, content)
+
+
 class PresenceHandler(BaseHandler):
 
     STATE_LEVELS = {
@@ -361,9 +369,7 @@ class PresenceHandler(BaseHandler):
         yield self.store.set_presence_state(
             target_user.localpart, state_to_store
         )
-        yield self.distributor.fire(
-            "collect_presencelike_data", target_user, state
-        )
+        yield collect_presencelike_data(self.distributor, target_user, state)
 
         if now_level > was_level:
             state["last_active"] = self.clock.time_msec()
@@ -467,7 +473,7 @@ class PresenceHandler(BaseHandler):
             )
 
     @defer.inlineCallbacks
-    def send_invite(self, observer_user, observed_user):
+    def send_presence_invite(self, observer_user, observed_user):
         """Request the presence of a local or remote user for a local user"""
         if not self.hs.is_mine(observer_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
@@ -878,7 +884,7 @@ class PresenceHandler(BaseHandler):
             room_ids=room_ids,
             statuscache=statuscache,
         )
-        yield self.distributor.fire("user_presence_changed", user, statuscache)
+        yield user_presence_changed(self.distributor, user, statuscache)
 
     @defer.inlineCallbacks
     def incoming_presence(self, origin, content):
@@ -1116,9 +1122,7 @@ class PresenceHandler(BaseHandler):
                     self._user_cachemap[user].get_state()["last_active"]
                 )
 
-            yield self.distributor.fire(
-                "collect_presencelike_data", user, state
-            )
+            yield collect_presencelike_data(self.distributor, user, state)
 
         if "last_active" in state:
             state = dict(state)
