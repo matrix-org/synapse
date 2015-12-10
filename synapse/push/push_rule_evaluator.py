@@ -43,7 +43,7 @@ def evaluator_for_user_name_and_profile_tag(user_name, profile_tag, room_id, sto
 
 
 class PushRuleEvaluator:
-    DEFAULT_ACTIONS = ['dont_notify']
+    DEFAULT_ACTIONS = []
     INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
     def __init__(self, user_name, profile_tag, raw_rules, enabled_map, room_id,
@@ -85,7 +85,7 @@ class PushRuleEvaluator:
         """
         if ev['user_id'] == self.user_name:
             # let's assume you probably know about messages you sent yourself
-            defer.returnValue(['dont_notify'])
+            defer.returnValue([])
 
         room_id = ev['room_id']
 
@@ -131,6 +131,11 @@ class PushRuleEvaluator:
                     "%s matches for user %s, event %s",
                     r['rule_id'], self.user_name, ev['event_id']
                 )
+
+                # filter out dont_notify as we treat an empty actions list
+                # as dont_notify, and this doesn't take up a row in our database
+                actions = [x for x in actions if x != 'dont_notify']
+
                 defer.returnValue(actions)
 
         logger.info(

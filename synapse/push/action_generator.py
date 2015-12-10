@@ -35,7 +35,6 @@ class ActionGenerator:
     @defer.inlineCallbacks
     def handle_event(self, event):
         users = yield self.store.get_users_in_room(event['room_id'])
-        logger.error("users in room: %r", users)
 
         for uid in users:
             evaluator = yield push_rule_evaluator.\
@@ -44,6 +43,7 @@ class ActionGenerator:
                 )
             actions = yield evaluator.actions_for_event(event)
             logger.info("actions for user %s: %s", uid, actions)
-            self.store.set_actions_for_event(
-                event['event_id'], uid, None, actions
-            )
+            if len(actions):
+                self.store.set_actions_for_event(
+                    event['event_id'], uid, None, actions
+                )
