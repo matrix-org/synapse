@@ -130,7 +130,7 @@ To install the synapse homeserver run::
     virtualenv -p python2.7 ~/.synapse
     source ~/.synapse/bin/activate
     pip install --upgrade setuptools
-    pip install --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
+    pip install https://github.com/matrix-org/synapse/tarball/master
 
 This installs synapse, along with the libraries it uses, into a virtual
 environment under ``~/.synapse``.  Feel free to pick a different directory
@@ -235,8 +235,7 @@ pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 )::
 You also may need to explicitly specify python 2.7 again during the install
 request::
 
-    pip2.7 install --process-dependency-links \
-        https://github.com/matrix-org/synapse/tarball/master
+    pip2.7 install https://github.com/matrix-org/synapse/tarball/master
 
 If you encounter an error with lib bcrypt causing an Wrong ELF Class:
 ELFCLASS32 (x64 Systems), you may need to reinstall py-bcrypt to correctly
@@ -295,8 +294,7 @@ Troubleshooting
 Troubleshooting Installation
 ----------------------------
 
-Synapse requires pip 1.7 or later, so if your OS provides too old a version and
-you get errors about ``error: no such option: --process-dependency-links`` you
+Synapse requires pip 1.7 or later, so if your OS provides too old a version you
 may need to manually upgrade it::
 
     sudo pip install --upgrade pip
