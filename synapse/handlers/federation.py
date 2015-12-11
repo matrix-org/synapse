@@ -596,7 +596,7 @@ class FederationHandler(BaseHandler):
         handled_events = set()
 
         try:
-            new_event = self._sign_event(event)
+            event = self._sign_event(event)
             # Try the host we successfully got a response to /make_join/
             # request first.
             try:
@@ -604,7 +604,7 @@ class FederationHandler(BaseHandler):
                 target_hosts.insert(0, origin)
             except ValueError:
                 pass
-            ret = yield self.replication_layer.send_join(target_hosts, new_event)
+            ret = yield self.replication_layer.send_join(target_hosts, event)
 
             origin = ret["origin"]
             state = ret["state"]
@@ -613,12 +613,12 @@ class FederationHandler(BaseHandler):
 
             handled_events.update([s.event_id for s in state])
             handled_events.update([a.event_id for a in auth_chain])
-            handled_events.add(new_event.event_id)
+            handled_events.add(event.event_id)
 
             logger.debug("do_invite_join auth_chain: %s", auth_chain)
             logger.debug("do_invite_join state: %s", state)
 
-            logger.debug("do_invite_join event: %s", new_event)
+            logger.debug("do_invite_join event: %s", event)
 
             try:
                 yield self.store.store_room(
@@ -636,14 +636,14 @@ class FederationHandler(BaseHandler):
 
             with PreserveLoggingContext():
                 d = self.notifier.on_new_room_event(
-                    new_event, event_stream_id, max_stream_id,
+                    event, event_stream_id, max_stream_id,
                     extra_users=[joinee]
                 )
 
             def log_failure(f):
                 logger.warn(
                     "Failed to notify about %s: %s",
-                    new_event.event_id, f.value
+                    event.event_id, f.value
                 )
 
             d.addErrback(log_failure)
