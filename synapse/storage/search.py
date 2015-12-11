@@ -143,7 +143,7 @@ class SearchStore(BackgroundUpdateStore):
 
         search_query = search_query = _parse_query(self.database_engine, search_term)
 
-        args = [search_query]
+        args = []
 
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
@@ -164,16 +164,19 @@ class SearchStore(BackgroundUpdateStore):
 
         if isinstance(self.database_engine, PostgresEngine):
             sql = (
-                "SELECT ts_rank_cd(vector, query) AS rank, room_id, event_id"
-                " FROM to_tsquery('english', ?) as query, event_search"
-                " WHERE vector @@ query"
+                "SELECT ts_rank_cd(vector, to_tsquery('english', ?)) AS rank,"
+                " room_id, event_id"
+                " FROM event_search"
+                " WHERE vector @@ to_tsquery('english', ?)"
             )
+            args = [search_query, search_query] + args
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
                 "SELECT rank(matchinfo(event_search)) as rank, room_id, event_id"
                 " FROM event_search"
                 " WHERE value MATCH ?"
             )
+            args = [search_query] + args
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
@@ -232,7 +235,7 @@ class SearchStore(BackgroundUpdateStore):
 
         search_query = search_query = _parse_query(self.database_engine, search_term)
 
-        args = [search_query]
+        args = []
 
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
@@ -267,12 +270,13 @@ class SearchStore(BackgroundUpdateStore):
 
         if isinstance(self.database_engine, PostgresEngine):
             sql = (
-                "SELECT ts_rank_cd(vector, query) as rank,"
+                "SELECT ts_rank_cd(vector, to_tsquery('english', ?)) as rank,"
                 " origin_server_ts, stream_ordering, room_id, event_id"
-                " FROM to_tsquery('english', ?) as query, event_search"
+                " FROM event_search"
                 " NATURAL JOIN events"
-                " WHERE vector @@ query AND "
+                " WHERE vector @@ to_tsquery('english', ?) AND "
             )
+            args = [search_term, search_term] + args
         elif isinstance(self.database_engine, Sqlite3Engine):
             # We use CROSS JOIN here to ensure we use the right indexes.
             # https://sqlite.org/optoverview.html#crossjoin
@@ -292,6 +296,7 @@ class SearchStore(BackgroundUpdateStore):
                 " CROSS JOIN events USING (event_id)"
                 " WHERE "
             )
+            args = [search_term] + args
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
