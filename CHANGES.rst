@@ -1,3 +1,37 @@
+Changes in synapse v0.12.0-rc1 (2015-12-10)
+===========================================
+
+* Host the client APIs released as r0 by
+  https://matrix.org/docs/spec/r0.0.0/client_server.html
+  on paths prefixed by ``/_matrix/client/r0``. (PR #430, PR #415, PR #400)
+* Updates the client APIs to match r0 of the matrix specification.
+
+  * All APIs return events in the new event format, old APIs also include
+    the fields needed to parse the event using the old format for
+    compatibility. (PR #402)
+  * Search results are now given as a JSON array rather than
+    a JSON object (PR #405)
+  * Miscellaneous changes to search (PR #403, PR #406, PR #412)
+  * Filter JSON objects may now be passed as query parameters to ``/sync``
+    (PR #431)
+  * Fix implementation of ``/admin/whois`` (PR #418)
+  * Only include the rooms that user has left in ``/sync`` if the client
+    requests them in the filter (PR #423)
+  * Don't push for ``m.room.message`` by default (PR #411)
+  * Add API for setting per account user data (PR #392)
+  * Allow users to forget rooms (PR #385)
+
+* Performance improvements and monitoring:
+
+  * Add per-request counters for CPU time spent on the main python thread.
+    (PR #421, PR #420)
+  * Add per-request counters for time spent in the database (PR #429)
+  * Make state updates in the C+S API idempotent (PR #416)
+  * Only fire ``user_joined_room`` if the user has actually joined. (PR #410)
+  * Reuse a single http client, rather than creating new ones (PR #413)
+
+* Fixed a bug upgrading from older versions of synapse on postgresql (PR #417)
+
 Changes in synapse v0.11.1 (2015-11-20)
 =======================================
 
