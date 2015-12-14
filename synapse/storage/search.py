@@ -85,6 +85,11 @@ class SearchStore(BackgroundUpdateStore):
                     # skip over it.
                     continue
 
+                if not isinstance(value, basestring):
+                    # If the event body, name or topic isn't a string
+                    # then skip over it
+                    continue
+
                 event_search_rows.append((event_id, room_id, key, value))
 
             if isinstance(self.database_engine, PostgresEngine):
