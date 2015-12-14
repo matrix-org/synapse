@@ -1,3 +1,14 @@
+Changes in synapse v0.12.0-rc2 (2015-12-14)
+===========================================
+
+* Add caches for whether rooms have been forgotten by a user (PR #434)
+* Remove instructions to use ``--process-dependency-link`` since all of the
+  dependencies of synapse are on PyPI (PR #436)
+* Parallelise the processing of ``/sync`` requests (PR #437)
+* Fix race updating presence in ``/events`` (PR #444)
+* Fix bug back-populating search results (PR #441)
+* Fix bug calculating state in ``/sync`` requests (PR #442)
+
 Changes in synapse v0.12.0-rc1 (2015-12-10)
 ===========================================
 
