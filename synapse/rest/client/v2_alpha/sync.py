@@ -362,7 +362,7 @@ class SyncRestServlet(RestServlet):
             # cause the displayname calculations on the client to be incorrect
             if prev_event_id is None or not prev_content or not prev_sender:
                 logger.debug(
-                    "Removing %r from the state dict, as it is missing "
+                    "Removing %r from the state dict, as it is missing"
                     " prev_content (prev_event_id=%r)",
                     timeline_event.event_id, prev_event_id
                 )
