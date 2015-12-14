@@ -121,7 +121,7 @@ class RoomMemberStore(SQLBaseStore):
         return self.get_rooms_for_user_where_membership_is(
             user_id, [Membership.INVITE]
         ).addCallback(lambda invites: self._get_events([
-            invites.event_id for invite in invites
+            invite.event_id for invite in invites
         ]))
 
     def get_leave_and_ban_events_for_user(self, user_id):
