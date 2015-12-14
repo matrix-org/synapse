@@ -189,7 +189,7 @@ class SearchStore(BackgroundUpdateStore):
 
             count_sql = (
                 "SELECT room_id, count(*) as count FROM event_search"
-                " WHERE value MATCH ? AND "
+                " WHERE value MATCH ?"
             )
             count_args = [search_term] + count_args
         else:
