@@ -357,14 +357,19 @@ class SyncRestServlet(RestServlet):
             if prev_event_id is None:
                 del result[event_key]
             else:
-                result[event_key] = FrozenEvent({
-                    "type": timeline_event.type,
-                    "state_key": timeline_event.state_key,
-                    "content": timeline_event.unsigned['prev_content'],
-                    "sender": timeline_event.unsigned['prev_sender'],
-                    "event_id": prev_event_id,
-                    "room_id": timeline_event.room_id,
-                })
+                prev_content = timeline_event.unsigned.get('prev_content')
+                prev_sender = timeline_event.unsigned.get('prev_sender')
+                if prev_content and prev_sender:
+                    result[event_key] = FrozenEvent({
+                        "type": timeline_event.type,
+                        "state_key": timeline_event.state_key,
+                        "content": prev_content,
+                        "sender": prev_sender,
+                        "event_id": prev_event_id,
+                        "room_id": timeline_event.room_id,
+                    })
+                else:
+                    del result[event_key]
             logger.debug("New value: %r", result.get(event_key))
 
         return result
