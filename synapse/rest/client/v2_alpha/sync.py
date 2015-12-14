@@ -354,17 +354,20 @@ class SyncRestServlet(RestServlet):
             logger.debug("Replacing %s with %s in state dict",
                          timeline_event.event_id, prev_event_id)
 
-            if prev_event_id is None:
+            prev_content = timeline_event.unsigned.get('prev_content')
+            prev_sender = timeline_event.unsigned.get('prev_sender')
+            if prev_event_id is None or not prev_content or not prev_sender:
                 del result[event_key]
             else:
                 result[event_key] = FrozenEvent({
                     "type": timeline_event.type,
                     "state_key": timeline_event.state_key,
-                    "content": timeline_event.unsigned['prev_content'],
-                    "sender": timeline_event.unsigned['prev_sender'],
+                    "content": prev_content,
+                    "sender": prev_sender,
                     "event_id": prev_event_id,
                     "room_id": timeline_event.room_id,
                 })
+
             logger.debug("New value: %r", result.get(event_key))
 
         return result
