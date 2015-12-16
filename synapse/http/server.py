@@ -129,7 +129,7 @@ def request_handler(request_handler):
                         500,
                         {
                             "error": "Internal server error",
-                            "errcode": Codes.M_UNKNOWN,
+                            "errcode": Codes.UNKNOWN,
                         },
                         send_cors=True
                     )
