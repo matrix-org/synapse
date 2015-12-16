@@ -304,6 +304,7 @@ class SyncRestServlet(RestServlet):
             },
             "state": {"events": serialized_state},
             "account_data": {"events": account_data},
+            "unread_notification_count": room.unread_notification_count
         }
 
         if joined:

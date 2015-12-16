@@ -52,6 +52,7 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
     "state",             # dict[(str, str), FrozenEvent]
     "ephemeral",
     "account_data",
+    "unread_notification_count",
 ])):
     __slots__ = []
 
@@ -64,6 +65,7 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
             or self.state
             or self.ephemeral
             or self.account_data
+            or self.unread_notification_count > 0
         )
 
 
@@ -160,6 +162,18 @@ class SyncHandler(BaseHandler):
             return self.full_state_sync(sync_config, since_token)
         else:
             return self.incremental_sync_with_gap(sync_config, since_token)
+
+    def last_read_event_id_for_room_and_user(self, room_id, user_id, ephemeral_by_room):
+        if room_id not in ephemeral_by_room:
+            return None
+        for e in ephemeral_by_room[room_id]:
+            if e['type'] != 'm.receipt':
+                continue
+            for receipt_event_id,val in e['content'].items():
+                if 'm.read' in val:
+                    if user_id in val['m.read']:
+                        return receipt_event_id
+        return None
 
     @defer.inlineCallbacks
     def full_state_sync(self, sync_config, timeline_since_token):
@@ -265,6 +279,16 @@ class SyncHandler(BaseHandler):
             room_id, sync_config, now_token, since_token=timeline_since_token
         )
 
+        last_unread_event_id = self.last_read_event_id_for_room_and_user(
+            room_id, sync_config.user.to_string(), ephemeral_by_room
+        )
+
+        notifs = []
+        if last_unread_event_id:
+            notifs = yield self.store.get_unread_event_actions_by_room(
+                room_id, last_unread_event_id
+            )
+
         current_state = yield self.get_state_at(room_id, now_token)
 
         defer.returnValue(JoinedSyncResult(
@@ -275,6 +299,7 @@ class SyncHandler(BaseHandler):
             account_data=self.account_data_for_room(
                 room_id, tags_by_room, account_data_by_room
             ),
+            unread_notification_count=len(notifs)
         ))
 
     def account_data_for_user(self, account_data):
@@ -509,6 +534,7 @@ class SyncHandler(BaseHandler):
                     account_data=self.account_data_for_room(
                         room_id, tags_by_room, account_data_by_room
                     ),
+                    unread_notification_count=0
                 )
                 logger.debug("Result for room %s: %r", room_id, room_sync)
 

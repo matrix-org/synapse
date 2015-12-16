@@ -45,5 +45,5 @@ class ActionGenerator:
             logger.info("actions for user %s: %s", uid, actions)
             if len(actions):
                 self.store.set_actions_for_event(
-                    event['event_id'], uid, None, actions
+                    event, uid, None, actions
                 )
