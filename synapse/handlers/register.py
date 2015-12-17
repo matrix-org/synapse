@@ -132,9 +132,9 @@ class RegistrationHandler(BaseHandler):
                         raise RegistrationError(
                             500, "Cannot generate user ID.")
 
-            # We used to generate default identicons here, but nowadays
-            # we want clients to generate their own as part of their branding
-            # rather than there being consistent matrix-wide ones, so we don't.
+        # We used to generate default identicons here, but nowadays
+        # we want clients to generate their own as part of their branding
+        # rather than there being consistent matrix-wide ones, so we don't.
 
         defer.returnValue((user_id, token))
 
