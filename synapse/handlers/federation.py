@@ -1650,11 +1650,22 @@ class FederationHandler(BaseHandler):
         sender = invite["sender"]
         room_id = invite["room_id"]
 
+        if "signed" not in invite:
+            logger.info(
+                "Discarding received notification of third party invite "
+                "without signed: %s" % (invite,)
+            )
+            return
+
+        third_party_invite = {
+            "signed": invite["signed"],
+        }
+
         event_dict = {
             "type": EventTypes.Member,
             "content": {
                 "membership": Membership.INVITE,
-                "third_party_invite": invite,
+                "third_party_invite": third_party_invite,
             },
             "room_id": room_id,
             "sender": sender,
