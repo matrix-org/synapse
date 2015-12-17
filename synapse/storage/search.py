@@ -286,8 +286,10 @@ class SearchStore(BackgroundUpdateStore):
             "(%s)" % (" OR ".join(local_clauses),)
         )
 
-        count_args = args
-        count_clauses = clauses
+        # take copies of the current args and clauses lists, before adding
+        # pagination clauses to main query.
+        count_args = list(args)
+        count_clauses = list(clauses)
 
         if pagination_token:
             try:
