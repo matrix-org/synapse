@@ -1650,7 +1650,7 @@ class FederationHandler(BaseHandler):
         sender = invite["sender"]
         room_id = invite["room_id"]
 
-        if "signed" not in invite:
+        if "signed" not in invite or "token" not in invite["signed"]:
             logger.info(
                 "Discarding received notification of third party invite "
                 "without signed: %s" % (invite,)
@@ -1676,6 +1676,11 @@ class FederationHandler(BaseHandler):
             builder = self.event_builder_factory.new(event_dict)
             EventValidator().validate_new(builder)
             event, context = yield self._create_new_client_event(builder=builder)
+
+            event, context = yield self.add_display_name_to_third_party_invite(
+                event_dict, event, context
+            )
+
             self.auth.check(event, context.current_state)
             yield self._validate_keyserver(event, auth_events=context.current_state)
             member_handler = self.hs.get_handlers().room_member_handler
@@ -1697,6 +1702,10 @@ class FederationHandler(BaseHandler):
             builder=builder,
         )
 
+        event, context = yield self.add_display_name_to_third_party_invite(
+            event_dict, event, context
+        )
+
         self.auth.check(event, auth_events=context.current_state)
         yield self._validate_keyserver(event, auth_events=context.current_state)
 
@@ -1705,6 +1714,27 @@ class FederationHandler(BaseHandler):
         event.signatures.update(returned_invite.signatures)
         member_handler = self.hs.get_handlers().room_member_handler
         yield member_handler.change_membership(event, context)
+
+    @defer.inlineCallbacks
+    def add_display_name_to_third_party_invite(self, event_dict, event, context):
+        key = (
+            EventTypes.ThirdPartyInvite,
+            event.content["third_party_invite"]["signed"]["token"]
+        )
+        original_invite = context.current_state.get(key)
+        if not original_invite:
+            logger.info(
+                "Could not find invite event for third_party_invite - "
+                "discarding: %s" % (event_dict,)
+            )
+            return
+
+        display_name = original_invite.content["display_name"]
+        event_dict["content"]["third_party_invite"]["display_name"] = display_name
+        builder = self.event_builder_factory.new(event_dict)
+        EventValidator().validate_new(builder)
+        event, context = yield self._create_new_client_event(builder=builder)
+        defer.returnValue((event, context))
 
     @defer.inlineCallbacks
     def _validate_keyserver(self, event, auth_events):
