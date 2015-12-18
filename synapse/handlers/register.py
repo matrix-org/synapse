@@ -42,7 +42,7 @@ class RegistrationHandler(BaseHandler):
 
         self.distributor = hs.get_distributor()
         self.distributor.declare("registered_user")
-        self.captch_client = CaptchaServerHttpClient(hs)
+        self.captcha_client = CaptchaServerHttpClient(hs)
 
     @defer.inlineCallbacks
     def check_username(self, localpart):
