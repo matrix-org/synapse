@@ -42,12 +42,9 @@ class EventActionsStore(SQLBaseStore):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def get_unread_event_actions_by_room(self, room_id, last_read_event_id):
-        #events = yield self._get_events(
-        #    [last_read_event_id],
-        #    check_redacted=False
-        #)
-
+    def get_unread_event_actions_by_room_for_user(
+            self, room_id, user_id, last_read_event_id
+    ):
         def _get_unread_event_actions_by_room(txn):
             sql = (
                 "SELECT stream_ordering, topological_ordering"
@@ -65,10 +62,11 @@ class EventActionsStore(SQLBaseStore):
             topological_ordering = results[0][1]
 
             sql = (
-                "SELECT ea.actions"
+                "SELECT ea.event_id, ea.actions"
                 " FROM event_actions ea, events e"
                 " WHERE ea.room_id = e.room_id"
                 " AND ea.event_id = e.event_id"
+                " AND ea.user_id = ?"
                 " AND ea.room_id = ?"
                 " AND ("
                 "       e.topological_ordering > ?"
@@ -76,9 +74,14 @@ class EventActionsStore(SQLBaseStore):
                 ")"
             )
             txn.execute(sql,
-                (room_id, topological_ordering, topological_ordering, stream_ordering)
+                (
+                    user_id, room_id,
+                    topological_ordering, topological_ordering, stream_ordering
+                )
             )
-            return txn.fetchall()
+            return [
+                { "event_id": row[0], "actions": row[1] } for row in txn.fetchall()
+            ]
 
         ret = yield self.runInteraction(
             "get_unread_event_actions_by_room",
