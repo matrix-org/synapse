@@ -1,0 +1,5 @@
+ * processing push by bluntly running the rules for each user
+ * processing push twice because the pushers still run the rules themselves rather than pulling out of the event_actions table
+ * consequently converting events back & forth between objects & dicts when processing
+ * fetching all the current ephemeral events for each room on an incremental sync to get the user's read receipt
+ * doing 2 more db queries per room to get the unread notif count
