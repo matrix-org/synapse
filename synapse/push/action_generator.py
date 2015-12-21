@@ -15,6 +15,8 @@
 
 from twisted.internet import defer
 
+from synapse.types import UserID
+
 import push_rule_evaluator
 
 import logging
@@ -23,7 +25,8 @@ logger = logging.getLogger(__name__)
 
 
 class ActionGenerator:
-    def __init__(self, store):
+    def __init__(self, hs, store):
+        self.hs = hs
         self.store = store
         # really we want to get all user ids and all profile tags too,
         # since we want the actions for each profile tag for every user and
@@ -37,6 +40,9 @@ class ActionGenerator:
         users = yield self.store.get_users_in_room(event['room_id'])
 
         for uid in users:
+            if not self.hs.is_mine(UserID.from_string(uid)):
+                continue
+
             evaluator = yield push_rule_evaluator.\
                 evaluator_for_user_name_and_profile_tag(
                     uid, None, event['room_id'], self.store
