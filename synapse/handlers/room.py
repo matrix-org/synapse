@@ -816,7 +816,8 @@ class RoomListHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_public_room_list(self):
         chunk = yield self.store.get_rooms(is_public=True)
-        results = yield defer.gatherResults(
+
+        room_members = yield defer.gatherResults(
             [
                 self.store.get_users_in_room(room["room_id"])
                 for room in chunk
@@ -824,11 +825,29 @@ class RoomListHandler(BaseHandler):
             consumeErrors=True,
         ).addErrback(unwrapFirstError)
 
+        avatar_urls = yield defer.gatherResults(
+            [
+                self.get_room_avatar_url(room["room_id"])
+                for room in chunk
+            ],
+            consumeErrors=True,
+        ).addErrback(unwrapFirstError)
+
         for i, room in enumerate(chunk):
-            room["num_joined_members"] = len(results[i])
+            room["num_joined_members"] = len(room_members[i])
+            if avatar_urls[i]:
+                room["avatar_url"] = avatar_urls[i]
 
         # FIXME (erikj): START is no longer a valid value
         defer.returnValue({"start": "START", "end": "END", "chunk": chunk})
+
+    @defer.inlineCallbacks
+    def get_room_avatar_url(self, room_id):
+        event = yield self.hs.get_state_handler().get_current_state(
+            room_id, "m.room.avatar"
+        )
+        if event and "url" in event.content:
+            defer.returnValue(event.content["url"])
 
 
 class RoomContextHandler(BaseHandler):
