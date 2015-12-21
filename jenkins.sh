@@ -22,9 +22,7 @@ tox
 
 : ${GIT_BRANCH:="origin/$(git rev-parse --abbrev-ref HEAD)"}
 
-set +u
-. .tox/py27/bin/activate
-set -u
+TOX_BIN=$WORKSPACE/.tox/py27/bin
 
 if [[ ! -e .sytest-base ]]; then
   git clone https://github.com/matrix-org/sytest.git .sytest-base --mirror
@@ -48,7 +46,8 @@ export PERL5LIB PERL_MB_OPT PERL_MM_OPT
 : ${PORT_BASE:=8000}
 
 echo >&2 "Running sytest with SQLite3";
-./run-tests.pl --coverage -O tap --synapse-directory .. --all --port-base $PORT_BASE > results-sqlite3.tap
+./run-tests.pl --coverage -O tap --synapse-directory $WORKSPACE \
+    --python $TOX_BIN/python --all --port-base $PORT_BASE > results-sqlite3.tap
 
 RUN_POSTGRES=""
 
@@ -66,8 +65,9 @@ done
 # Run if both postgresql databases exist
 if test $RUN_POSTGRES = ":$(($PORT_BASE + 1)):$(($PORT_BASE + 2))"; then
     echo >&2 "Running sytest with PostgreSQL";
-    pip install psycopg2
-    ./run-tests.pl --coverage -O tap --synapse-directory .. --all --port-base $PORT_BASE > results-postgresql.tap
+    $TOX_BIN/pip install psycopg2
+    ./run-tests.pl --coverage -O tap --synapse-directory $WORKSPACE \
+        --python $TOX_BIN/python --all --port-base $PORT_BASE > results-postgresql.tap
 else
     echo >&2 "Skipping running sytest with PostgreSQL, $RUN_POSTGRES"
 fi
@@ -76,6 +76,6 @@ cd ..
 cp sytest/.coverage.* .
 
 # Combine the coverage reports
-python -m coverage combine
+$TOX_BIN/python -m coverage combine
 # Output coverage to coverage.xml
-coverage xml -o coverage.xml
+$TOX_BIN/coverage xml -o coverage.xml
