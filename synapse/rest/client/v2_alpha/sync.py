@@ -104,7 +104,6 @@ class SyncRestServlet(RestServlet):
         )
 
         if filter_id and filter_id.startswith('{'):
-            logging.error("MJH %r", filter_id)
             try:
                 filter_object = json.loads(filter_id)
             except:
