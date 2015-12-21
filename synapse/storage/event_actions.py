@@ -73,14 +73,13 @@ class EventActionsStore(SQLBaseStore):
                 "       OR (e.topological_ordering == ? AND e.stream_ordering > ?)"
                 ")"
             )
-            txn.execute(sql,
-                (
-                    user_id, room_id,
-                    topological_ordering, topological_ordering, stream_ordering
-                )
+            txn.execute(sql, (
+                user_id, room_id,
+                topological_ordering, topological_ordering, stream_ordering
+            )
             )
             return [
-                { "event_id": row[0], "actions": row[1] } for row in txn.fetchall()
+                {"event_id": row[0], "actions": row[1]} for row in txn.fetchall()
             ]
 
         ret = yield self.runInteraction(
@@ -88,6 +87,7 @@ class EventActionsStore(SQLBaseStore):
             _get_unread_event_actions_by_room
         )
         defer.returnValue(ret)
+
 
 class EventActionsTable(object):
     table_name = "event_actions"

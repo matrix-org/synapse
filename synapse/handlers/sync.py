@@ -170,7 +170,7 @@ class SyncHandler(BaseHandler):
         for e in ephemeral_by_room[room_id]:
             if e['type'] != 'm.receipt':
                 continue
-            for receipt_event_id,val in e['content'].items():
+            for receipt_event_id, val in e['content'].items():
                 if 'm.read' in val:
                     if user_id in val['m.read']:
                         return receipt_event_id
@@ -281,7 +281,7 @@ class SyncHandler(BaseHandler):
         )
 
         notifs = yield self.unread_notifs_for_room_id(
-                room_id, sync_config, ephemeral_by_room
+            room_id, sync_config, ephemeral_by_room
         )
         notif_count = None
         if notifs is not None:
