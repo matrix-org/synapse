@@ -16,7 +16,7 @@ export DUMP_COVERAGE_COMMAND="coverage help"
 # UNSTABLE or FAILURE this build.
 export PEP8SUFFIX="--output-file=violations.flake8.log || echo flake8 finished with status code \$?"
 
-rm .coverage.* || echo "No files to remove"
+rm .coverage* || echo "No coverage files to remove"
 
 tox
 
@@ -76,6 +76,7 @@ cd ..
 cp sytest/.coverage.* .
 
 # Combine the coverage reports
+echo "Combining:" .coverage.*
 $TOX_BIN/python -m coverage combine
 # Output coverage to coverage.xml
 $TOX_BIN/coverage xml -o coverage.xml
