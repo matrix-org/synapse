@@ -704,13 +704,48 @@ class RoomMemberHandler(BaseHandler):
             token_id,
             txn_id
     ):
+        room_state = yield self.hs.get_state_handler().get_current_state(room_id)
+
+        inviter_display_name = ""
+        inviter_avatar_url = ""
+        member_event = room_state.get((EventTypes.Member, user.to_string()))
+        if member_event:
+            inviter_display_name = member_event.content.get("displayname", "")
+            inviter_avatar_url = member_event.content.get("avatar_url", "")
+
+        canonical_room_alias = ""
+        canonical_alias_event = room_state.get((EventTypes.CanonicalAlias, ""))
+        if canonical_alias_event:
+            canonical_room_alias = canonical_alias_event.content.get("alias", "")
+
+        room_name = ""
+        room_name_event = room_state.get((EventTypes.Name, ""))
+        if room_name_event:
+            room_name = room_name_event.content.get("name", "")
+
+        room_join_rules = ""
+        join_rules_event = room_state.get((EventTypes.JoinRules, ""))
+        if join_rules_event:
+            room_join_rules = join_rules_event.content.get("join_rule", "")
+
+        room_avatar_url = ""
+        room_avatar_event = room_state.get((EventTypes.RoomAvatar, ""))
+        if room_avatar_event:
+            room_avatar_url = room_avatar_event.content.get("url", "")
+
         token, public_key, key_validity_url, display_name = (
             yield self._ask_id_server_for_third_party_invite(
-                id_server,
-                medium,
-                address,
-                room_id,
-                user.to_string()
+                id_server=id_server,
+                medium=medium,
+                address=address,
+                room_id=room_id,
+                inviter_user_id=user.to_string(),
+                room_alias=canonical_room_alias,
+                room_avatar_url=room_avatar_url,
+                room_join_rules=room_join_rules,
+                room_name=room_name,
+                inviter_display_name=inviter_display_name,
+                inviter_avatar_url=inviter_avatar_url
             )
         )
         msg_handler = self.hs.get_handlers().message_handler
@@ -732,7 +767,19 @@ class RoomMemberHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _ask_id_server_for_third_party_invite(
-            self, id_server, medium, address, room_id, sender):
+            self,
+            id_server,
+            medium,
+            address,
+            room_id,
+            inviter_user_id,
+            room_alias,
+            room_avatar_url,
+            room_join_rules,
+            room_name,
+            inviter_display_name,
+            inviter_avatar_url
+    ):
         is_url = "%s%s/_matrix/identity/api/v1/store-invite" % (
             id_server_scheme, id_server,
         )
@@ -742,7 +789,13 @@ class RoomMemberHandler(BaseHandler):
                 "medium": medium,
                 "address": address,
                 "room_id": room_id,
-                "sender": sender,
+                "room_alias": room_alias,
+                "room_avatar_url": room_avatar_url,
+                "room_join_rules": room_join_rules,
+                "room_name": room_name,
+                "sender": inviter_user_id,
+                "sender_display_name": inviter_display_name,
+                "sender_avatar_url": inviter_avatar_url,
             }
         )
         # TODO: Check for success
@@ -755,7 +808,7 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue((token, public_key, key_validity_url, display_name))
 
     def forget(self, user, room_id):
-        self.store.forget(user.to_string(), room_id)
+        return self.store.forget(user.to_string(), room_id)
 
 
 class RoomListHandler(BaseHandler):

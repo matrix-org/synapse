@@ -778,7 +778,7 @@ class Auth(object):
                 if "third_party_invite" in event.content:
                     key = (
                         EventTypes.ThirdPartyInvite,
-                        event.content["third_party_invite"]["token"]
+                        event.content["third_party_invite"]["signed"]["token"]
                     )
                     third_party_invite = current_state.get(key)
                     if third_party_invite:

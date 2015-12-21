@@ -15,7 +15,7 @@
 
 
 from synapse.api.errors import (
-    cs_exception, SynapseError, CodeMessageException, UnrecognizedRequestError
+    cs_exception, SynapseError, CodeMessageException, UnrecognizedRequestError, Codes
 )
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 import synapse.metrics
@@ -127,7 +127,10 @@ def request_handler(request_handler):
                     respond_with_json(
                         request,
                         500,
-                        {"error": "Internal server error"},
+                        {
+                            "error": "Internal server error",
+                            "errcode": Codes.UNKNOWN,
+                        },
                         send_cors=True
                     )
     return wrapped_request_handler

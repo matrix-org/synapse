@@ -152,10 +152,14 @@ class SearchHandler(BaseHandler):
 
         highlights = set()
 
+        count = None
+
         if order_by == "rank":
             search_result = yield self.store.search_msgs(
                 room_ids, search_term, keys
             )
+
+            count = search_result["count"]
 
             if search_result["highlights"]:
                 highlights.update(search_result["highlights"])
@@ -206,6 +210,8 @@ class SearchHandler(BaseHandler):
 
                 if search_result["highlights"]:
                     highlights.update(search_result["highlights"])
+
+                count = search_result["count"]
 
                 results = search_result["results"]
 
@@ -359,7 +365,7 @@ class SearchHandler(BaseHandler):
 
         rooms_cat_res = {
             "results": results,
-            "count": len(results),
+            "count": count,
             "highlights": list(highlights),
         }
 

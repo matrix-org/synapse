@@ -42,7 +42,7 @@ class RegistrationHandler(BaseHandler):
 
         self.distributor = hs.get_distributor()
         self.distributor.declare("registered_user")
-        self.captch_client = CaptchaServerHttpClient(hs)
+        self.captcha_client = CaptchaServerHttpClient(hs)
 
     @defer.inlineCallbacks
     def check_username(self, localpart):
@@ -132,25 +132,9 @@ class RegistrationHandler(BaseHandler):
                         raise RegistrationError(
                             500, "Cannot generate user ID.")
 
-        # create a default avatar for the user
-        # XXX: ideally clients would explicitly specify one, but given they don't
-        # and we want consistent and pretty identicons for random users, we'll
-        # do it here.
-        try:
-            auth_user = UserID.from_string(user_id)
-            media_repository = self.hs.get_resource_for_media_repository()
-            identicon_resource = media_repository.getChildWithDefault("identicon", None)
-            upload_resource = media_repository.getChildWithDefault("upload", None)
-            identicon_bytes = identicon_resource.generate_identicon(user_id, 320, 320)
-            content_uri = yield upload_resource.create_content(
-                "image/png", None, identicon_bytes, len(identicon_bytes), auth_user
-            )
-            profile_handler = self.hs.get_handlers().profile_handler
-            profile_handler.set_avatar_url(
-                auth_user, auth_user, ("%s#auto" % (content_uri,))
-            )
-        except NotImplementedError:
-            pass  # make tests pass without messing around creating default avatars
+        # We used to generate default identicons here, but nowadays
+        # we want clients to generate their own as part of their branding
+        # rather than there being consistent matrix-wide ones, so we don't.
 
         defer.returnValue((user_id, token))
 

@@ -18,7 +18,7 @@ from twisted.internet import defer
 from collections import namedtuple
 
 from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 from synapse.api.constants import Membership
 from synapse.types import UserID
@@ -121,7 +121,7 @@ class RoomMemberStore(SQLBaseStore):
         return self.get_rooms_for_user_where_membership_is(
             user_id, [Membership.INVITE]
         ).addCallback(lambda invites: self._get_events([
-            invites.event_id for invite in invites
+            invite.event_id for invite in invites
         ]))
 
     def get_leave_and_ban_events_for_user(self, user_id):
@@ -270,6 +270,7 @@ class RoomMemberStore(SQLBaseStore):
 
         defer.returnValue(ret)
 
+    @defer.inlineCallbacks
     def forget(self, user_id, room_id):
         """Indicate that user_id wishes to discard history for room_id."""
         def f(txn):
@@ -284,9 +285,11 @@ class RoomMemberStore(SQLBaseStore):
                 "  room_id = ?"
             )
             txn.execute(sql, (user_id, room_id))
-        self.runInteraction("forget_membership", f)
+        yield self.runInteraction("forget_membership", f)
+        self.was_forgotten_at.invalidate_all()
+        self.did_forget.invalidate((user_id, room_id))
 
-    @defer.inlineCallbacks
+    @cachedInlineCallbacks(num_args=2)
     def did_forget(self, user_id, room_id):
         """Returns whether user_id has elected to discard history for room_id.
 
@@ -310,7 +313,7 @@ class RoomMemberStore(SQLBaseStore):
         count = yield self.runInteraction("did_forget_membership", f)
         defer.returnValue(count == 0)
 
-    @defer.inlineCallbacks
+    @cachedInlineCallbacks(num_args=3)
     def was_forgotten_at(self, user_id, room_id, event_id):
         """Returns whether user_id has elected to discard history for room_id at event_id.
 
