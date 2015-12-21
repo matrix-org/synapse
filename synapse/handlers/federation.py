@@ -346,6 +346,11 @@ class FederationHandler(BaseHandler):
             a_id for event in all_events for a_id, _ in event.auth_events
         )
 
+        for e_id in required_auth:
+            if e_id not in auth_events and e_id in event_ids:
+                auth_events[e_id] = event_map[e_id]
+            # TODO(paul): we should also inspect our local database here
+
         missing_auth = required_auth - set(auth_events)
         results = yield defer.gatherResults(
             [
