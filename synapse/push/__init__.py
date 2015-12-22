@@ -26,7 +26,9 @@ import random
 
 logger = logging.getLogger(__name__)
 
-
+# Pushers could now be moved to pull out of the event_actions table instead
+# of listening on the event stream: this would avoid them having to run the
+# rules again.
 class Pusher(object):
     INITIAL_BACKOFF = 1000
     MAX_BACKOFF = 60 * 60 * 1000

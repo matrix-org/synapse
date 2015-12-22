@@ -447,6 +447,9 @@ class SyncHandler(BaseHandler):
         )
         now_token = now_token.copy_and_replace("presence_key", presence_key)
 
+        # We now fetch all ephemeral events for this room in order to get
+        # this users current read receipt. This could almost certainly be
+        # optimised.
         _, all_ephemeral_by_room = yield self.ephemeral_by_room(
             sync_config, now_token
         )

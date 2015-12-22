@@ -59,6 +59,14 @@ def evaluator_for_room_id(room_id, hs, store):
 
 
 class BulkPushRuleEvaluator:
+    """
+    Runs push rules for all users in a room.
+    This is faster than running PushRuleEvaluator for each user because it
+    fetches all the rules for all the users in one (batched) db query
+    rarher than doing multiple queries per-user. It currently uses
+    the same logic to run the actual rules, but could be optimised further
+    (see https://matrix.org/jira/browse/SYN-562)
+    """
     def __init__(self, room_id, rules_by_user, display_names, users_in_room):
         self.room_id = room_id
         self.rules_by_user = rules_by_user
