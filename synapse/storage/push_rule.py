@@ -56,6 +56,47 @@ class PushRuleStore(SQLBaseStore):
         })
 
     @defer.inlineCallbacks
+    def bulk_get_push_rules(self, user_ids):
+        batch_size = 100
+
+        def f(txn, user_ids_to_fetch):
+            sql = (
+                "SELECT " +
+                ",".join(map(lambda x: "pr."+x, PushRuleTable.fields)) +
+                " FROM " + PushRuleTable.table_name + " pr " +
+                " LEFT JOIN " + PushRuleEnableTable.table_name + " pre " +
+                " ON pr.user_name = pre.user_name and pr.rule_id = pre.rule_id " +
+                " WHERE pr.user_name " +
+                " IN (" + ",".join(["?" for _ in user_ids_to_fetch]) + ")"
+                " AND (pre.enabled is null or pre.enabled = 1)"
+                " ORDER BY pr.user_name, pr.priority_class DESC, pr.priority DESC"
+            )
+            txn.execute(sql, user_ids_to_fetch)
+            return txn.fetchall()
+
+        results = {}
+
+        batch_start = 0
+        while batch_start < len(user_ids):
+            batch_end = max(len(user_ids), batch_size)
+            batch_user_ids = user_ids[batch_start:batch_end]
+            batch_start = batch_end
+
+            rows = yield self.runInteraction(
+                "bulk_get_push_rules", f, batch_user_ids
+            )
+
+            for r in rows:
+                rawdict = {
+                    PushRuleTable.fields[i]: r[i] for i in range(len(r))
+                }
+
+                if rawdict['user_name'] not in results:
+                    results[rawdict['user_name']] = []
+                results[rawdict['user_name']].append(rawdict)
+        defer.returnValue(results)
+
+    @defer.inlineCallbacks
     def add_push_rule(self, before, after, **kwargs):
         vals = kwargs
         if 'conditions' in vals:

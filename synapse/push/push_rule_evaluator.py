@@ -113,7 +113,8 @@ class PushRuleEvaluator:
             for c in conditions:
                 matches &= self._event_fulfills_condition(
                     ev, c, display_name=my_display_name,
-                    room_member_count=room_member_count
+                    room_member_count=room_member_count,
+                    profile_tag=self.profile_tag
                 )
             logger.debug(
                 "Rule %s %s",
@@ -156,16 +157,18 @@ class PushRuleEvaluator:
                                           re.sub(r'\\\-', '-', x.group(2)))), r)
         return r
 
-    def _event_fulfills_condition(self, ev, condition, display_name, room_member_count):
+    @staticmethod
+    def _event_fulfills_condition(ev, condition,
+                                  display_name, room_member_count, profile_tag):
         if condition['kind'] == 'event_match':
             if 'pattern' not in condition:
                 logger.warn("event_match condition with no pattern")
                 return False
             # XXX: optimisation: cache our pattern regexps
             if condition['key'] == 'content.body':
-                r = r'\b%s\b' % self._glob_to_regexp(condition['pattern'])
+                r = r'\b%s\b' % PushRuleEvaluator._glob_to_regexp(condition['pattern'])
             else:
-                r = r'^%s$' % self._glob_to_regexp(condition['pattern'])
+                r = r'^%s$' % PushRuleEvaluator._glob_to_regexp(condition['pattern'])
             val = _value_for_dotted_key(condition['key'], ev)
             if val is None:
                 return False
@@ -174,7 +177,7 @@ class PushRuleEvaluator:
         elif condition['kind'] == 'device':
             if 'profile_tag' not in condition:
                 return True
-            return condition['profile_tag'] == self.profile_tag
+            return condition['profile_tag'] == profile_tag
 
         elif condition['kind'] == 'contains_display_name':
             # This is special because display names can be different

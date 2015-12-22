@@ -15,9 +15,7 @@
 
 from twisted.internet import defer
 
-from synapse.types import UserID
-
-import push_rule_evaluator
+import bulk_push_rule_evaluator
 
 import logging
 
@@ -39,17 +37,13 @@ class ActionGenerator:
     def handle_event(self, event):
         users = yield self.store.get_users_in_room(event['room_id'])
 
-        for uid in users:
-            if not self.hs.is_mine(UserID.from_string(uid)):
-                continue
+        bulk_evaluator = yield bulk_push_rule_evaluator.evaluator_for_room_id(
+            event['room_id'], self.hs, self.store
+        )
 
-            evaluator = yield push_rule_evaluator.\
-                evaluator_for_user_name_and_profile_tag(
-                    uid, None, event['room_id'], self.store
-                )
-            actions = yield evaluator.actions_for_event(event)
-            logger.info("actions for user %s: %s", uid, actions)
-            if len(actions):
-                self.store.set_actions_for_event(
-                    event, uid, None, actions
-                )
+        actions_by_user = bulk_evaluator.action_for_event_by_user(event)
+
+        for uid,actions in actions_by_user.items():
+            self.store.set_actions_for_event(
+                event, uid, None, actions
+            )
