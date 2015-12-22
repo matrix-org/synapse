@@ -24,22 +24,27 @@ logger = logging.getLogger(__name__)
 
 class EventActionsStore(SQLBaseStore):
     @defer.inlineCallbacks
-    def set_actions_for_event(self, event, user_id, profile_tag, actions):
-        actionsJson = json.dumps(actions)
-
-        ret = yield self.runInteraction(
-            "_set_actions_for_event",
-            self._simple_upsert_txn,
-            EventActionsTable.table_name,
-            {
+    def set_actions_for_event_and_users(self, event, tuples):
+        """
+        :param event: the event set actions for
+        :param tuples: list of tuples of (user_id, profile_tag, actions)
+        """
+        values = []
+        for uid, profile_tag, actions in tuples:
+            values.append({
                 'room_id': event['room_id'],
                 'event_id': event['event_id'],
-                'user_id': user_id,
-                'profile_tag': profile_tag
-            },
-            {'actions': actionsJson}
+                'user_id': uid,
+                'profile_tag': profile_tag,
+                'actions': json.dumps(actions)
+            })
+
+        yield self.runInteraction(
+            "set_actions_for_event_and_users",
+            self._simple_insert_many_txn,
+            EventActionsTable.table_name,
+            values
         )
-        defer.returnValue(ret)
 
     @defer.inlineCallbacks
     def get_unread_event_actions_by_room_for_user(
