@@ -520,11 +520,11 @@ class SyncHandler(BaseHandler):
         # this users current read receipt. This could almost certainly be
         # optimised.
         _, all_ephemeral_by_room = yield self.ephemeral_by_room(
-            sync_config, now_token
+            sync_config, now_token, room_ids
         )
 
         now_token, ephemeral_by_room = yield self.ephemeral_by_room(
-            sync_config, now_token, since_token
+            sync_config, now_token, room_ids, since_token
         )
 
         rm_handler = self.hs.get_handlers().room_member_handler
