@@ -6,7 +6,6 @@ export PYTHONDONTWRITEBYTECODE=yep
 export TRIAL_FLAGS="--reporter=subunit"
 export TOXSUFFIX="| subunit-1to2 | subunit2junitxml --no-passthrough --output-to=results.xml"
 # Write coverage reports to a separate file for each process
-# Include branch coverage
 export COVERAGE_OPTS="-p"
 export DUMP_COVERAGE_COMMAND="coverage help"
 
