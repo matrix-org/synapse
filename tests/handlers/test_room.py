@@ -43,6 +43,10 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                 "store_room",
                 "get_latest_events_in_room",
                 "add_event_hashes",
+                "get_users_in_room",
+                "bulk_get_push_rules",
+                "get_current_state",
+                "set_actions_for_event_and_users",
             ]),
             resource_for_federation=NonCallableMock(),
             http_client=NonCallableMock(spec_set=[]),
@@ -90,6 +94,8 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
 
         self.datastore.persist_event.return_value = (1,1)
         self.datastore.add_event_hashes.return_value = []
+        self.datastore.get_users_in_room.return_value = ["@bob:red"]
+        self.datastore.bulk_get_push_rules.return_value = {}
 
     @defer.inlineCallbacks
     def test_invite(self):
@@ -109,6 +115,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         self.datastore.get_latest_events_in_room.return_value = (
             defer.succeed([])
         )
+        self.datastore.get_current_state.return_value = {}
 
         def annotate(_):
             ctx = Mock()
@@ -190,6 +197,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         self.datastore.get_latest_events_in_room.return_value = (
             defer.succeed([])
         )
+        self.datastore.get_current_state.return_value = {}
 
         def annotate(_):
             ctx = Mock()
@@ -265,6 +273,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         self.datastore.get_latest_events_in_room.return_value = (
             defer.succeed([])
         )
+        self.datastore.get_current_state.return_value = {}
 
         def annotate(_):
             ctx = Mock()
