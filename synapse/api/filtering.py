@@ -70,6 +70,11 @@ class Filtering(object):
     def _check_definition_room_lists(self, definition):
         """Check that "rooms" and "not_rooms" are lists of room ids if they
         are present
+
+        Args:
+            definition(dict): The filter definition
+        Raises:
+            SynapseError: If there was a problem with this definition.
         """
         # check rooms are valid room IDs
         room_id_keys = ["rooms", "not_rooms"]
