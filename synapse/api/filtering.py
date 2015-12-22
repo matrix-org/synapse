@@ -62,9 +62,28 @@ class Filtering(object):
                 self._check_definition(user_filter_json[key])
 
         if "room" in user_filter_json:
+            self._check_definition_room_lists(user_filter_json["room"])
             for key in room_level_definitions:
                 if key in user_filter_json["room"]:
                     self._check_definition(user_filter_json["room"][key])
+
+    def _check_definition_room_lists(self, definition):
+        """Check that "rooms" and "not_rooms" are lists of room ids if they
+        are present
+
+        Args:
+            definition(dict): The filter definition
+        Raises:
+            SynapseError: If there was a problem with this definition.
+        """
+        # check rooms are valid room IDs
+        room_id_keys = ["rooms", "not_rooms"]
+        for key in room_id_keys:
+            if key in definition:
+                if type(definition[key]) != list:
+                    raise SynapseError(400, "Expected %s to be a list." % key)
+                for room_id in definition[key]:
+                    RoomID.from_string(room_id)
 
     def _check_definition(self, definition):
         """Check if the provided definition is valid.
@@ -85,14 +104,7 @@ class Filtering(object):
                 400, "Expected JSON object, not %s" % (definition,)
             )
 
-        # check rooms are valid room IDs
-        room_id_keys = ["rooms", "not_rooms"]
-        for key in room_id_keys:
-            if key in definition:
-                if type(definition[key]) != list:
-                    raise SynapseError(400, "Expected %s to be a list." % key)
-                for room_id in definition[key]:
-                    RoomID.from_string(room_id)
+        self._check_definition_room_lists(definition)
 
         # check senders are valid user IDs
         user_id_keys = ["senders", "not_senders"]
@@ -119,33 +131,26 @@ class FilterCollection(object):
     def __init__(self, filter_json):
         self.filter_json = filter_json
 
-        self.room_timeline_filter = Filter(
-            self.filter_json.get("room", {}).get("timeline", {})
-        )
+        room_filter_json = self.filter_json.get("room", {})
 
-        self.room_state_filter = Filter(
-            self.filter_json.get("room", {}).get("state", {})
-        )
+        self.room_filter = Filter({
+            k: v for k, v in room_filter_json.items()
+            if k in ("rooms", "not_rooms")
+        })
 
-        self.room_ephemeral_filter = Filter(
-            self.filter_json.get("room", {}).get("ephemeral", {})
-        )
-
-        self.room_account_data = Filter(
-            self.filter_json.get("room", {}).get("account_data", {})
-        )
-
-        self.presence_filter = Filter(
-            self.filter_json.get("presence", {})
-        )
-
-        self.account_data = Filter(
-            self.filter_json.get("account_data", {})
-        )
+        self.room_timeline_filter = Filter(room_filter_json.get("timeline", {}))
+        self.room_state_filter = Filter(room_filter_json.get("state", {}))
+        self.room_ephemeral_filter = Filter(room_filter_json.get("ephemeral", {}))
+        self.room_account_data = Filter(room_filter_json.get("account_data", {}))
+        self.presence_filter = Filter(self.filter_json.get("presence", {}))
+        self.account_data = Filter(self.filter_json.get("account_data", {}))
 
         self.include_leave = self.filter_json.get("room", {}).get(
             "include_leave", False
         )
+
+    def list_rooms(self):
+        return self.room_filter.list_rooms()
 
     def timeline_limit(self):
         return self.room_timeline_filter.limit()
@@ -163,21 +168,30 @@ class FilterCollection(object):
         return self.account_data.filter(events)
 
     def filter_room_state(self, events):
-        return self.room_state_filter.filter(events)
+        return self.room_state_filter.filter(self.room_filter.filter(events))
 
     def filter_room_timeline(self, events):
-        return self.room_timeline_filter.filter(events)
+        return self.room_timeline_filter.filter(self.room_filter.filter(events))
 
     def filter_room_ephemeral(self, events):
-        return self.room_ephemeral_filter.filter(events)
+        return self.room_ephemeral_filter.filter(self.room_filter.filter(events))
 
     def filter_room_account_data(self, events):
-        return self.room_account_data.filter(events)
+        return self.room_account_data.filter(self.room_filter.filter(events))
 
 
 class Filter(object):
     def __init__(self, filter_json):
         self.filter_json = filter_json
+
+    def list_rooms(self):
+        """The list of room_id strings this filter restricts the output to
+        or None if the this filter doesn't list the room ids.
+        """
+        if "rooms" in self.filter_json:
+            return list(set(self.filter_json["rooms"]))
+        else:
+            return None
 
     def check(self, event):
         """Checks whether the filter matches the given event.

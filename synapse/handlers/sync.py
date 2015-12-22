@@ -15,8 +15,8 @@
 
 from ._base import BaseHandler
 
-from synapse.streams.config import PaginationConfig
 from synapse.api.constants import Membership, EventTypes
+from synapse.api.errors import GuestAccessError
 from synapse.util import unwrapFirstError
 
 from twisted.internet import defer
@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 SyncConfig = collections.namedtuple("SyncConfig", [
     "user",
+    "is_guest",
     "filter",
 ])
 
@@ -120,6 +121,8 @@ class SyncResult(collections.namedtuple("SyncResult", [
             self.presence or self.joined or self.invited
         )
 
+GuestRoom = collections.namedtuple("GuestRoom", ("room_id", "membership"))
+
 
 class SyncHandler(BaseHandler):
 
@@ -138,6 +141,18 @@ class SyncHandler(BaseHandler):
             A Deferred SyncResult.
         """
 
+        if sync_config.is_guest:
+            bad_rooms = []
+            for room_id in sync_config.filter.list_rooms():
+                world_readable = yield self._is_world_readable(room_id)
+                if not world_readable:
+                    bad_rooms.append(room_id)
+
+            if bad_rooms:
+                raise GuestAccessError(
+                    bad_rooms, 403, "Guest access not allowed"
+                )
+
         if timeout == 0 or since_token is None or full_state:
             # we are going to return immediately, so don't bother calling
             # notifier.wait_for_events.
@@ -153,6 +168,17 @@ class SyncHandler(BaseHandler):
                 from_token=since_token
             )
             defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _is_world_readable(self, room_id):
+        state = yield self.hs.get_state_handler().get_current_state(
+            room_id,
+            EventTypes.RoomHistoryVisibility
+        )
+        if state and "history_visibility" in state.content:
+            defer.returnValue(state.content["history_visibility"] == "world_readable")
+        else:
+            defer.returnValue(False)
 
     def current_sync_for_user(self, sync_config, since_token=None,
                               full_state=False):
@@ -189,37 +215,52 @@ class SyncHandler(BaseHandler):
         """
         now_token = yield self.event_sources.get_current_token()
 
-        now_token, ephemeral_by_room = yield self.ephemeral_by_room(
-            sync_config, now_token
-        )
+        if sync_config.is_guest:
+            room_list = [
+                GuestRoom(room_id, Membership.JOIN)
+                for room_id in sync_config.filter.list_rooms()
+            ]
 
-        presence_stream = self.event_sources.sources["presence"]
-        # TODO (mjark): This looks wrong, shouldn't we be getting the presence
-        # UP to the present rather than after the present?
-        pagination_config = PaginationConfig(from_token=now_token)
-        presence, _ = yield presence_stream.get_pagination_rows(
-            user=sync_config.user,
-            pagination_config=pagination_config.get_source_config("presence"),
-            key=None
-        )
+            account_data = {}
+            account_data_by_room = {}
+            tags_by_room = {}
 
-        membership_list = (Membership.INVITE, Membership.JOIN)
-        if sync_config.filter.include_leave:
-            membership_list += (Membership.LEAVE, Membership.BAN)
+        else:
+            membership_list = (Membership.INVITE, Membership.JOIN)
+            if sync_config.filter.include_leave:
+                membership_list += (Membership.LEAVE, Membership.BAN)
 
-        room_list = yield self.store.get_rooms_for_user_where_membership_is(
-            user_id=sync_config.user.to_string(),
-            membership_list=membership_list
-        )
+            room_list = yield self.store.get_rooms_for_user_where_membership_is(
+                user_id=sync_config.user.to_string(),
+                membership_list=membership_list
+            )
 
-        account_data, account_data_by_room = (
-            yield self.store.get_account_data_for_user(
+            account_data, account_data_by_room = (
+                yield self.store.get_account_data_for_user(
+                    sync_config.user.to_string()
+                )
+            )
+
+            tags_by_room = yield self.store.get_tags_for_user(
                 sync_config.user.to_string()
             )
+
+        presence_stream = self.event_sources.sources["presence"]
+
+        joined_room_ids = [
+            room.room_id for room in room_list
+            if room.membership == Membership.JOIN
+        ]
+
+        presence, _ = yield presence_stream.get_new_events(
+            from_key=0,
+            user=sync_config.user,
+            room_ids=joined_room_ids,
+            is_guest=sync_config.is_guest,
         )
 
-        tags_by_room = yield self.store.get_tags_for_user(
-            sync_config.user.to_string()
+        now_token, ephemeral_by_room = yield self.ephemeral_by_room(
+            sync_config, now_token, joined_room_ids
         )
 
         joined = []
@@ -338,11 +379,13 @@ class SyncHandler(BaseHandler):
         return account_data_events
 
     @defer.inlineCallbacks
-    def ephemeral_by_room(self, sync_config, now_token, since_token=None):
+    def ephemeral_by_room(self, sync_config, now_token, room_ids,
+                          since_token=None):
         """Get the ephemeral events for each room the user is in
         Args:
             sync_config (SyncConfig): The flags, filters and user for the sync.
             now_token (StreamToken): Where the server is currently up to.
+            room_ids (list): List of room id strings to get data for.
             since_token (StreamToken): Where the server was when the client
                 last synced.
         Returns:
@@ -352,9 +395,6 @@ class SyncHandler(BaseHandler):
         """
 
         typing_key = since_token.typing_key if since_token else "0"
-
-        rooms = yield self.store.get_rooms_for_user(sync_config.user.to_string())
-        room_ids = [room.room_id for room in rooms]
 
         typing_source = self.event_sources.sources["typing"]
         typing, typing_key = yield typing_source.get_new_events(
@@ -433,8 +473,38 @@ class SyncHandler(BaseHandler):
         """
         now_token = yield self.event_sources.get_current_token()
 
-        rooms = yield self.store.get_rooms_for_user(sync_config.user.to_string())
-        room_ids = [room.room_id for room in rooms]
+        if sync_config.is_guest:
+            room_ids = sync_config.filter.list_rooms()
+
+            tags_by_room = {}
+            account_data = {}
+            account_data_by_room = {}
+
+        else:
+            rooms = yield self.store.get_rooms_for_user(
+                sync_config.user.to_string()
+            )
+            room_ids = [room.room_id for room in rooms]
+
+            now_token, ephemeral_by_room = yield self.ephemeral_by_room(
+                sync_config, now_token, since_token
+            )
+
+            tags_by_room = yield self.store.get_updated_tags(
+                sync_config.user.to_string(),
+                since_token.account_data_key,
+            )
+
+            account_data, account_data_by_room = (
+                yield self.store.get_updated_account_data_for_user(
+                    sync_config.user.to_string(),
+                    since_token.account_data_key,
+                )
+            )
+
+        now_token, ephemeral_by_room = yield self.ephemeral_by_room(
+            sync_config, now_token, room_ids, since_token
+        )
 
         presence_source = self.event_sources.sources["presence"]
         presence, presence_key = yield presence_source.get_new_events(
@@ -442,8 +512,7 @@ class SyncHandler(BaseHandler):
             from_key=since_token.presence_key,
             limit=sync_config.filter.presence_limit(),
             room_ids=room_ids,
-            # /sync doesn't support guest access, they can't get to this point in code
-            is_guest=False,
+            is_guest=sync_config.is_guest,
         )
         now_token = now_token.copy_and_replace("presence_key", presence_key)
 
@@ -477,18 +546,8 @@ class SyncHandler(BaseHandler):
             from_key=since_token.room_key,
             to_key=now_token.room_key,
             limit=timeline_limit + 1,
-        )
-
-        tags_by_room = yield self.store.get_updated_tags(
-            sync_config.user.to_string(),
-            since_token.account_data_key,
-        )
-
-        account_data, account_data_by_room = (
-            yield self.store.get_updated_account_data_for_user(
-                sync_config.user.to_string(),
-                since_token.account_data_key,
-            )
+            room_ids=room_ids if sync_config.is_guest else (),
+            is_guest=sync_config.is_guest,
         )
 
         joined = []
@@ -628,7 +687,10 @@ class SyncHandler(BaseHandler):
             end_key = "s" + room_key.split('-')[-1]
             loaded_recents = sync_config.filter.filter_room_timeline(events)
             loaded_recents = yield self._filter_events_for_client(
-                sync_config.user.to_string(), loaded_recents,
+                sync_config.user.to_string(),
+                loaded_recents,
+                is_guest=sync_config.is_guest,
+                require_all_visible_for_guests=False
             )
             loaded_recents.extend(recents)
             recents = loaded_recents

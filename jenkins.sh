@@ -6,7 +6,6 @@ export PYTHONDONTWRITEBYTECODE=yep
 export TRIAL_FLAGS="--reporter=subunit"
 export TOXSUFFIX="| subunit-1to2 | subunit2junitxml --no-passthrough --output-to=results.xml"
 # Write coverage reports to a separate file for each process
-# Include branch coverage
 export COVERAGE_OPTS="-p"
 export DUMP_COVERAGE_COMMAND="coverage help"
 
@@ -16,15 +15,13 @@ export DUMP_COVERAGE_COMMAND="coverage help"
 # UNSTABLE or FAILURE this build.
 export PEP8SUFFIX="--output-file=violations.flake8.log || echo flake8 finished with status code \$?"
 
-rm .coverage.* || echo "No files to remove"
+rm .coverage* || echo "No coverage files to remove"
 
 tox
 
 : ${GIT_BRANCH:="origin/$(git rev-parse --abbrev-ref HEAD)"}
 
-set +u
-. .tox/py27/bin/activate
-set -u
+TOX_BIN=$WORKSPACE/.tox/py27/bin
 
 if [[ ! -e .sytest-base ]]; then
   git clone https://github.com/matrix-org/sytest.git .sytest-base --mirror
@@ -48,7 +45,8 @@ export PERL5LIB PERL_MB_OPT PERL_MM_OPT
 : ${PORT_BASE:=8000}
 
 echo >&2 "Running sytest with SQLite3";
-./run-tests.pl --coverage -O tap --synapse-directory .. --all --port-base $PORT_BASE > results-sqlite3.tap
+./run-tests.pl --coverage -O tap --synapse-directory $WORKSPACE \
+    --python $TOX_BIN/python --all --port-base $PORT_BASE > results-sqlite3.tap
 
 RUN_POSTGRES=""
 
@@ -66,8 +64,9 @@ done
 # Run if both postgresql databases exist
 if test $RUN_POSTGRES = ":$(($PORT_BASE + 1)):$(($PORT_BASE + 2))"; then
     echo >&2 "Running sytest with PostgreSQL";
-    pip install psycopg2
-    ./run-tests.pl --coverage -O tap --synapse-directory .. --all --port-base $PORT_BASE > results-postgresql.tap
+    $TOX_BIN/pip install psycopg2
+    ./run-tests.pl --coverage -O tap --synapse-directory $WORKSPACE \
+        --python $TOX_BIN/python --all --port-base $PORT_BASE > results-postgresql.tap
 else
     echo >&2 "Skipping running sytest with PostgreSQL, $RUN_POSTGRES"
 fi
@@ -76,6 +75,7 @@ cd ..
 cp sytest/.coverage.* .
 
 # Combine the coverage reports
-python -m coverage combine
+echo "Combining:" .coverage.*
+$TOX_BIN/python -m coverage combine
 # Output coverage to coverage.xml
-coverage xml -o coverage.xml
+$TOX_BIN/coverage xml -o coverage.xml
