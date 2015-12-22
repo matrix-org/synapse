@@ -35,8 +35,6 @@ class ActionGenerator:
 
     @defer.inlineCallbacks
     def handle_event(self, event):
-        users = yield self.store.get_users_in_room(event['room_id'])
-
         bulk_evaluator = yield bulk_push_rule_evaluator.evaluator_for_room_id(
             event['room_id'], self.hs, self.store
         )

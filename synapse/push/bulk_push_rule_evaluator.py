@@ -54,7 +54,7 @@ def evaluator_for_room_id(room_id, hs, store):
             display_names[ev.state_key] = ev.content.get("displayname")
 
     defer.returnValue(BulkPushRuleEvaluator(
-            room_id, rules_by_user, display_names, users
+        room_id, rules_by_user, display_names, users
     ))
 
 
