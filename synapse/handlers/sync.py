@@ -203,14 +203,7 @@ class SyncHandler(BaseHandler):
             account_data_by_room = {}
             tags_by_room = {}
 
-            # TODO: Hook up read receipts
-            ephemeral_by_room = {}
-
         else:
-            now_token, ephemeral_by_room = yield self.ephemeral_by_room(
-                sync_config, now_token
-            )
-
             membership_list = (Membership.INVITE, Membership.JOIN)
             if sync_config.filter.include_leave:
                 membership_list += (Membership.LEAVE, Membership.BAN)
@@ -242,6 +235,10 @@ class SyncHandler(BaseHandler):
             user=sync_config.user,
             room_ids=joined_room_ids,
             is_guest=sync_config.is_guest,
+        )
+
+        now_token, ephemeral_by_room = yield self.ephemeral_by_room(
+            sync_config, now_token, joined_room_ids
         )
 
         joined = []
@@ -352,11 +349,13 @@ class SyncHandler(BaseHandler):
         return account_data_events
 
     @defer.inlineCallbacks
-    def ephemeral_by_room(self, sync_config, now_token, since_token=None):
+    def ephemeral_by_room(self, sync_config, now_token, room_ids,
+                          since_token=None):
         """Get the ephemeral events for each room the user is in
         Args:
             sync_config (SyncConfig): The flags, filters and user for the sync.
             now_token (StreamToken): Where the server is currently up to.
+            room_ids (list): List of room id strings to get data for.
             since_token (StreamToken): Where the server was when the client
                 last synced.
         Returns:
@@ -366,9 +365,6 @@ class SyncHandler(BaseHandler):
         """
 
         typing_key = since_token.typing_key if since_token else "0"
-
-        rooms = yield self.store.get_rooms_for_user(sync_config.user.to_string())
-        room_ids = [room.room_id for room in rooms]
 
         typing_source = self.event_sources.sources["typing"]
         typing, typing_key = yield typing_source.get_new_events(
@@ -450,8 +446,6 @@ class SyncHandler(BaseHandler):
         if sync_config.is_guest:
             room_ids = sync_config.filter.list_rooms()
 
-            ephemeral_by_room = {}
-
             tags_by_room = {}
             account_data = {}
             account_data_by_room = {}
@@ -477,6 +471,10 @@ class SyncHandler(BaseHandler):
                     since_token.account_data_key,
                 )
             )
+
+        now_token, ephemeral_by_room = yield self.ephemeral_by_room(
+            sync_config, now_token, room_ids, since_token
+        )
 
         presence_source = self.event_sources.sources["presence"]
         presence, presence_key = yield presence_source.get_new_events(
