@@ -195,9 +195,10 @@ class SyncHandler(BaseHandler):
         now_token = yield self.event_sources.get_current_token()
 
         if sync_config.is_guest:
-            room_list = []
-            for room_id in sync_config.filter.list_rooms():
-                room_list.append(GuestRoom(room_id, Membership.JOIN))
+            room_list = [
+                GuestRoom(room_id, Membership.JOIN)
+                for room_id in sync_config.filter.list_rooms()
+            ]
 
             account_data = {}
             account_data_by_room = {}
