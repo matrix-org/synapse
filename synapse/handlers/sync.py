@@ -16,7 +16,7 @@
 from ._base import BaseHandler
 
 from synapse.api.constants import Membership, EventTypes
-from synapse.api.errors import AuthError
+from synapse.api.errors import GuestAccessError
 from synapse.util import unwrapFirstError
 
 from twisted.internet import defer
@@ -139,10 +139,16 @@ class SyncHandler(BaseHandler):
         """
 
         if sync_config.is_guest:
+            bad_rooms = []
             for room_id in sync_config.filter.list_rooms():
                 world_readable = yield self._is_world_readable(room_id)
                 if not world_readable:
-                    raise AuthError(403, "Guest access not allowed")
+                    bad_rooms.append(room_id)
+
+            if bad_rooms:
+                raise GuestAccessError(
+                    bad_rooms, 403, "Guest access not allowed"
+                )
 
         if timeout == 0 or since_token is None or full_state:
             # we are going to return immediately, so don't bother calling
