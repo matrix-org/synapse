@@ -85,7 +85,9 @@ class SyncRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        user, token_id, _ = yield self.auth.get_user_by_req(request)
+        user, token_id, is_guest = yield self.auth.get_user_by_req(
+            request, allow_guest=True
+        )
 
         timeout = parse_integer(request, "timeout", default=0)
         since = parse_string(request, "since")
@@ -118,8 +120,14 @@ class SyncRestServlet(RestServlet):
             except:
                 filter = FilterCollection({})
 
+        if is_guest and filter.list_rooms() is None:
+            raise SynapseError(
+                400, "Guest users must provide a list of rooms in the filter"
+            )
+
         sync_config = SyncConfig(
             user=user,
+            is_guest=is_guest,
             filter=filter,
         )
 

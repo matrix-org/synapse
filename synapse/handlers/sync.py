@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 SyncConfig = collections.namedtuple("SyncConfig", [
     "user",
+    "is_guest",
     "filter",
 ])
 
