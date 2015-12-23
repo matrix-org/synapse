@@ -349,7 +349,7 @@ class Notifier(object):
         room_ids = []
         if is_guest:
             if guest_room_id:
-                if not self._is_world_readable(guest_room_id):
+                if not (yield self._is_world_readable(guest_room_id)):
                     raise AuthError(403, "Guest access not allowed")
                 room_ids = [guest_room_id]
         else:
