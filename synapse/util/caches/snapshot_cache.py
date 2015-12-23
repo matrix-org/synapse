@@ -28,14 +28,14 @@ class SnapshotCache(object):
 
     def rotate(self, time_now_ms):
         # Rotate once if the cache duration has passed since the last rotation.
-        if time_now_ms - self.time_last_rotated_ms > self.DURATION_MS:
+        if time_now_ms - self.time_last_rotated_ms >= self.DURATION_MS:
             self.prev_result_cache = self.next_result_cache
             self.next_result_cache = {}
             self.time_last_rotated_ms += self.DURATION_MS
 
         # Rotate again if the cache duration has passed twice since the last
         # rotation.
-        if time_now_ms - self.time_last_rotated_ms > self.DURATION_MS:
+        if time_now_ms - self.time_last_rotated_ms >= self.DURATION_MS:
             self.prev_result_cache = self.next_result_cache
             self.next_result_cache = {}
             self.time_last_rotated_ms = time_now_ms
