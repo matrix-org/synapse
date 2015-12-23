@@ -1,3 +1,27 @@
+Changes in synapse v0.12.0-rc3 (2015-12-23)
+===========================================
+
+* Allow guest accounts access to ``/sync`` (PR #455)
+* Allow filters to include/exclude rooms at the room level
+  rather than just from the components of the sync for each
+  room. (PR #454)
+* Include urls for room avatars in the response to ``/publicRooms`` (PR #453)
+* Don't set a identicon as the avatar for a user when they register (PR #450)
+* Add a ``display_name`` to third-party invites (PR #449)
+* Send more information to the identity server for third-party invites so that
+  it can send richer messages to the invitee (PR #446)
+
+* Cache the responses to ``/intialSync`` for 5 minutes. If a client
+  retries a request to ``/initialSync`` before the a response was computed
+  to the first request then the same response is used for both requests
+  (PR #457)
+
+* Fix a bug where synapse would always request the signing keys of
+  remote servers even when the key was cached locally (PR #452)
+* Fix 500 when pagination search results (PR #447)
+* Fix a bug where synapse was leaking raw email address in third-party invites
+   (PR #448)
+
 Changes in synapse v0.12.0-rc2 (2015-12-14)
 ===========================================
 
