@@ -17,8 +17,28 @@ from synapse.util.async import ObservableDeferred
 
 
 class SnapshotCache(object):
+    """Cache for snapshots like the response of /initialSync.
+    The response of initialSync only has to be a recent snapshot of the
+    server state. It shouldn't matter to clients if it is a few minutes out
+    of date.
 
-    DURATION_MS = 5 * 60 * 1000  # Cache results for 2 minutes.
+    This caches a deferred response. Until the deferred completes it will be
+    returned from the cache. This means that if the client retries the request
+    while the response is still being computed, that original response will be
+    used rather than trying to compute a new response.
+
+    Once the deferred completes it will removed from the cache after 5 minutes.
+    We delay removing it from the cache because a client retrying its request
+    could race with us finishing computing the response.
+
+    Rather than tracking precisely how long something has been in the cache we
+    keep two generations of completed responses. Every 5 minutes discard the
+    old generation, move the new generation to the old generation, and set the
+    new generation to be empty. This means that a result will be in the cache
+    somewhere between 5 and 10 minutes.
+    """
+
+    DURATION_MS = 5 * 60 * 1000  # Cache results for 5 minutes.
 
     def __init__(self):
         self.pending_result_cache = {}  # Request that haven't finished yet.
@@ -51,6 +71,8 @@ class SnapshotCache(object):
         result = self.pending_result_cache.get(key, result)
         if result is not None:
             return result.observe()
+        else:
+            return None
 
     def set(self, time_now_ms, key, deferred):
         self.rotate(time_now_ms)
