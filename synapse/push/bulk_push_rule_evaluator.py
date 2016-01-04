@@ -33,7 +33,7 @@ def decode_rule_json(rule):
 
 
 @defer.inlineCallbacks
-def evaluator_for_room_id(room_id, hs, store):
+def evaluator_for_room_id(room_id, store):
     users = yield store.get_users_in_room(room_id)
     rules_by_user = yield store.bulk_get_push_rules(users)
     rules_by_user = {

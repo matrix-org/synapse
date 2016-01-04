@@ -23,8 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class ActionGenerator:
-    def __init__(self, hs, store):
-        self.hs = hs
+    def __init__(self, store):
         self.store = store
         # really we want to get all user ids and all profile tags too,
         # since we want the actions for each profile tag for every user and
@@ -34,9 +33,9 @@ class ActionGenerator:
         # tag (ie. we just need all the users).
 
     @defer.inlineCallbacks
-    def handle_event(self, event):
+    def handle_push_actions_for_event(self, event):
         bulk_evaluator = yield bulk_push_rule_evaluator.evaluator_for_room_id(
-            event['room_id'], self.hs, self.store
+            event['room_id'], self.store
         )
 
         actions_by_user = bulk_evaluator.action_for_event_by_user(event)

@@ -267,8 +267,8 @@ class BaseHandler(object):
             event, context=context
         )
 
-        action_generator = ActionGenerator(self.hs, self.store)
-        yield action_generator.handle_event(serialize_event(
+        action_generator = ActionGenerator(self.store)
+        yield action_generator.handle_push_actions_for_event(serialize_event(
             event, self.clock.time_msec()
         ))
 

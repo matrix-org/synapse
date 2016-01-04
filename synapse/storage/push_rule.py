@@ -62,12 +62,12 @@ class PushRuleStore(SQLBaseStore):
         def f(txn, user_ids_to_fetch):
             sql = (
                 "SELECT " +
-                ",".join(map(lambda x: "pr."+x, PushRuleTable.fields)) +
+                ",".join("pr."+x for x in PushRuleTable.fields) +
                 " FROM " + PushRuleTable.table_name + " pr " +
                 " LEFT JOIN " + PushRuleEnableTable.table_name + " pre " +
                 " ON pr.user_name = pre.user_name and pr.rule_id = pre.rule_id " +
                 " WHERE pr.user_name " +
-                " IN (" + ",".join(["?" for _ in user_ids_to_fetch]) + ")"
+                " IN (" + ",".join("?" for _ in user_ids_to_fetch) + ")"
                 " AND (pre.enabled is null or pre.enabled = 1)"
                 " ORDER BY pr.user_name, pr.priority_class DESC, pr.priority DESC"
             )
@@ -78,7 +78,7 @@ class PushRuleStore(SQLBaseStore):
 
         batch_start = 0
         while batch_start < len(user_ids):
-            batch_end = max(len(user_ids), batch_size)
+            batch_end = min(len(user_ids), batch_size)
             batch_user_ids = user_ids[batch_start:batch_end]
             batch_start = batch_end
 
