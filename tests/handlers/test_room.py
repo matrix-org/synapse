@@ -46,7 +46,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                 "get_users_in_room",
                 "bulk_get_push_rules",
                 "get_current_state",
-                "set_actions_for_event_and_users",
+                "set_push_actions_for_event_and_users",
             ]),
             resource_for_federation=NonCallableMock(),
             http_client=NonCallableMock(spec_set=[]),
