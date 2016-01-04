@@ -120,6 +120,22 @@ class AuthError(SynapseError):
         super(AuthError, self).__init__(*args, **kwargs)
 
 
+class GuestAccessError(AuthError):
+    """An error raised when a there is a problem with a guest user accessing
+    a room"""
+
+    def __init__(self, rooms, *args, **kwargs):
+        self.rooms = rooms
+        super(GuestAccessError, self).__init__(*args, **kwargs)
+
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+            rooms=self.rooms,
+        )
+
+
 class EventSizeError(SynapseError):
     """An error raised when an event is too big."""
 

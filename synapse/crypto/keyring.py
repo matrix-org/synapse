@@ -230,7 +230,9 @@ class Keyring(object):
 
             missing_keys = {}
             for group in group_id_to_group.values():
-                missing_keys.setdefault(group.server_name, set()).union(group.key_ids)
+                missing_keys.setdefault(group.server_name, set()).update(
+                    group.key_ids
+                )
 
             for fn in key_fetch_fns:
                 results = yield fn(missing_keys.items())

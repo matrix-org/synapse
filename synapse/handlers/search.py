@@ -131,6 +131,17 @@ class SearchHandler(BaseHandler):
         if batch_group == "room_id":
             room_ids.intersection_update({batch_group_key})
 
+        if not room_ids:
+            defer.returnValue({
+                "search_categories": {
+                    "room_events": {
+                        "results": [],
+                        "count": 0,
+                        "highlights": [],
+                    }
+                }
+            })
+
         rank_map = {}  # event_id -> rank of event
         allowed_events = []
         room_groups = {}  # Holds result of grouping by room, if applicable
@@ -139,10 +150,21 @@ class SearchHandler(BaseHandler):
         # Holds the next_batch for the entire result set if one of those exists
         global_next_batch = None
 
+        highlights = set()
+
+        count = None
+
         if order_by == "rank":
-            results = yield self.store.search_msgs(
+            search_result = yield self.store.search_msgs(
                 room_ids, search_term, keys
             )
+
+            count = search_result["count"]
+
+            if search_result["highlights"]:
+                highlights.update(search_result["highlights"])
+
+            results = search_result["results"]
 
             results_map = {r["event"].event_id: r for r in results}
 
@@ -171,80 +193,78 @@ class SearchHandler(BaseHandler):
                 s["results"].append(e.event_id)
 
         elif order_by == "recent":
-            # In this case we specifically loop through each room as the given
-            # limit applies to each room, rather than a global list.
-            # This is not necessarilly a good idea.
-            for room_id in room_ids:
-                room_events = []
-                if batch_group == "room_id" and batch_group_key == room_id:
-                    pagination_token = batch_token
-                else:
+            room_events = []
+            i = 0
+
+            pagination_token = batch_token
+
+            # We keep looping and we keep filtering until we reach the limit
+            # or we run out of things.
+            # But only go around 5 times since otherwise synapse will be sad.
+            while len(room_events) < search_filter.limit() and i < 5:
+                i += 1
+                search_result = yield self.store.search_rooms(
+                    room_ids, search_term, keys, search_filter.limit() * 2,
+                    pagination_token=pagination_token,
+                )
+
+                if search_result["highlights"]:
+                    highlights.update(search_result["highlights"])
+
+                count = search_result["count"]
+
+                results = search_result["results"]
+
+                results_map = {r["event"].event_id: r for r in results}
+
+                rank_map.update({r["event"].event_id: r["rank"] for r in results})
+
+                filtered_events = search_filter.filter([
+                    r["event"] for r in results
+                ])
+
+                events = yield self._filter_events_for_client(
+                    user.to_string(), filtered_events
+                )
+
+                room_events.extend(events)
+                room_events = room_events[:search_filter.limit()]
+
+                if len(results) < search_filter.limit() * 2:
                     pagination_token = None
-                i = 0
-
-                # We keep looping and we keep filtering until we reach the limit
-                # or we run out of things.
-                # But only go around 5 times since otherwise synapse will be sad.
-                while len(room_events) < search_filter.limit() and i < 5:
-                    i += 1
-                    results = yield self.store.search_room(
-                        room_id, search_term, keys, search_filter.limit() * 2,
-                        pagination_token=pagination_token,
-                    )
-
-                    results_map = {r["event"].event_id: r for r in results}
-
-                    rank_map.update({r["event"].event_id: r["rank"] for r in results})
-
-                    filtered_events = search_filter.filter([
-                        r["event"] for r in results
-                    ])
-
-                    events = yield self._filter_events_for_client(
-                        user.to_string(), filtered_events
-                    )
-
-                    room_events.extend(events)
-                    room_events = room_events[:search_filter.limit()]
-
-                    if len(results) < search_filter.limit() * 2:
-                        pagination_token = None
-                        break
-                    else:
-                        pagination_token = results[-1]["pagination_token"]
-
-                if room_events:
-                    res = results_map[room_events[-1].event_id]
-                    pagination_token = res["pagination_token"]
-
-                    group = room_groups.setdefault(room_id, {})
-                    if pagination_token:
-                        next_batch = encode_base64("%s\n%s\n%s" % (
-                            "room_id", room_id, pagination_token
-                        ))
-                        group["next_batch"] = next_batch
-
-                        if batch_token:
-                            global_next_batch = next_batch
-
-                    group["results"] = [e.event_id for e in room_events]
-                    group["order"] = max(
-                        e.origin_server_ts/1000 for e in room_events
-                        if hasattr(e, "origin_server_ts")
-                    )
-
-                allowed_events.extend(room_events)
-
-            # Normalize the group orders
-            if room_groups:
-                if len(room_groups) > 1:
-                    mx = max(g["order"] for g in room_groups.values())
-                    mn = min(g["order"] for g in room_groups.values())
-
-                    for g in room_groups.values():
-                        g["order"] = (g["order"] - mn) * 1.0 / (mx - mn)
+                    break
                 else:
-                    room_groups.values()[0]["order"] = 1
+                    pagination_token = results[-1]["pagination_token"]
+
+            for event in room_events:
+                group = room_groups.setdefault(event.room_id, {
+                    "results": [],
+                })
+                group["results"].append(event.event_id)
+
+            if room_events and len(room_events) >= search_filter.limit():
+                last_event_id = room_events[-1].event_id
+                pagination_token = results_map[last_event_id]["pagination_token"]
+
+                # We want to respect the given batch group and group keys so
+                # that if people blindly use the top level `next_batch` token
+                # it returns more from the same group (if applicable) rather
+                # than reverting to searching all results again.
+                if batch_group and batch_group_key:
+                    global_next_batch = encode_base64("%s\n%s\n%s" % (
+                        batch_group, batch_group_key, pagination_token
+                    ))
+                else:
+                    global_next_batch = encode_base64("%s\n%s\n%s" % (
+                        "all", "", pagination_token
+                    ))
+
+                for room_id, group in room_groups.items():
+                    group["next_batch"] = encode_base64("%s\n%s\n%s" % (
+                        "room_id", room_id, pagination_token
+                    ))
+
+            allowed_events.extend(room_events)
 
         else:
             # We should never get here due to the guard earlier.
@@ -334,20 +354,19 @@ class SearchHandler(BaseHandler):
         # We're now about to serialize the events. We should not make any
         # blocking calls after this. Otherwise the 'age' will be wrong
 
-        results = {
-            e.event_id: {
+        results = [
+            {
                 "rank": rank_map[e.event_id],
                 "result": serialize_event(e, time_now),
                 "context": contexts.get(e.event_id, {}),
             }
             for e in allowed_events
-        }
-
-        logger.info("Found %d results", len(results))
+        ]
 
         rooms_cat_res = {
             "results": results,
-            "count": len(results)
+            "count": count,
+            "highlights": list(highlights),
         }
 
         if state_results:

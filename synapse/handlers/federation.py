@@ -44,6 +44,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def user_joined_room(distributor, user, room_id):
+    return distributor.fire("user_joined_room", user, room_id)
+
+
 class FederationHandler(BaseHandler):
     """Handles events that originated from federation.
         Responsible for:
@@ -60,10 +64,7 @@ class FederationHandler(BaseHandler):
 
         self.hs = hs
 
-        self.distributor.observe(
-            "user_joined_room",
-            self._on_user_joined
-        )
+        self.distributor.observe("user_joined_room", self.user_joined_room)
 
         self.waiting_for_join_list = {}
 
@@ -176,7 +177,7 @@ class FederationHandler(BaseHandler):
                 )
 
             try:
-                _, event_stream_id, max_stream_id = yield self._handle_new_event(
+                context, event_stream_id, max_stream_id = yield self._handle_new_event(
                     origin,
                     event,
                     state=state,
@@ -233,10 +234,13 @@ class FederationHandler(BaseHandler):
 
         if event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
-                user = UserID.from_string(event.state_key)
-                yield self.distributor.fire(
-                    "user_joined_room", user=user, room_id=event.room_id
-                )
+                prev_state = context.current_state.get((event.type, event.state_key))
+                if not prev_state or prev_state.membership != Membership.JOIN:
+                    # Only fire user_joined_room if the user has acutally
+                    # joined the room. Don't bother if the user is just
+                    # changing their profile info.
+                    user = UserID.from_string(event.state_key)
+                    yield user_joined_room(self.distributor, user, event.room_id)
 
     @defer.inlineCallbacks
     def _filter_events_for_server(self, server_name, room_id, events):
@@ -592,7 +596,7 @@ class FederationHandler(BaseHandler):
         handled_events = set()
 
         try:
-            new_event = self._sign_event(event)
+            event = self._sign_event(event)
             # Try the host we successfully got a response to /make_join/
             # request first.
             try:
@@ -600,7 +604,7 @@ class FederationHandler(BaseHandler):
                 target_hosts.insert(0, origin)
             except ValueError:
                 pass
-            ret = yield self.replication_layer.send_join(target_hosts, new_event)
+            ret = yield self.replication_layer.send_join(target_hosts, event)
 
             origin = ret["origin"]
             state = ret["state"]
@@ -609,12 +613,12 @@ class FederationHandler(BaseHandler):
 
             handled_events.update([s.event_id for s in state])
             handled_events.update([a.event_id for a in auth_chain])
-            handled_events.add(new_event.event_id)
+            handled_events.add(event.event_id)
 
             logger.debug("do_invite_join auth_chain: %s", auth_chain)
             logger.debug("do_invite_join state: %s", state)
 
-            logger.debug("do_invite_join event: %s", new_event)
+            logger.debug("do_invite_join event: %s", event)
 
             try:
                 yield self.store.store_room(
@@ -632,14 +636,14 @@ class FederationHandler(BaseHandler):
 
             with PreserveLoggingContext():
                 d = self.notifier.on_new_room_event(
-                    new_event, event_stream_id, max_stream_id,
+                    event, event_stream_id, max_stream_id,
                     extra_users=[joinee]
                 )
 
             def log_failure(f):
                 logger.warn(
                     "Failed to notify about %s: %s",
-                    new_event.event_id, f.value
+                    event.event_id, f.value
                 )
 
             d.addErrback(log_failure)
@@ -733,9 +737,7 @@ class FederationHandler(BaseHandler):
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.JOIN:
                 user = UserID.from_string(event.state_key)
-                yield self.distributor.fire(
-                    "user_joined_room", user=user, room_id=event.room_id
-                )
+                yield user_joined_room(self.distributor, user, event.room_id)
 
         new_pdu = event
 
@@ -1082,7 +1084,7 @@ class FederationHandler(BaseHandler):
         return self.store.get_min_depth(context)
 
     @log_function
-    def _on_user_joined(self, user, room_id):
+    def user_joined_room(self, user, room_id):
         waiters = self.waiting_for_join_list.get(
             (user.to_string(), room_id),
             []
@@ -1648,11 +1650,22 @@ class FederationHandler(BaseHandler):
         sender = invite["sender"]
         room_id = invite["room_id"]
 
+        if "signed" not in invite or "token" not in invite["signed"]:
+            logger.info(
+                "Discarding received notification of third party invite "
+                "without signed: %s" % (invite,)
+            )
+            return
+
+        third_party_invite = {
+            "signed": invite["signed"],
+        }
+
         event_dict = {
             "type": EventTypes.Member,
             "content": {
                 "membership": Membership.INVITE,
-                "third_party_invite": invite,
+                "third_party_invite": third_party_invite,
             },
             "room_id": room_id,
             "sender": sender,
@@ -1663,6 +1676,11 @@ class FederationHandler(BaseHandler):
             builder = self.event_builder_factory.new(event_dict)
             EventValidator().validate_new(builder)
             event, context = yield self._create_new_client_event(builder=builder)
+
+            event, context = yield self.add_display_name_to_third_party_invite(
+                event_dict, event, context
+            )
+
             self.auth.check(event, context.current_state)
             yield self._validate_keyserver(event, auth_events=context.current_state)
             member_handler = self.hs.get_handlers().room_member_handler
@@ -1684,6 +1702,10 @@ class FederationHandler(BaseHandler):
             builder=builder,
         )
 
+        event, context = yield self.add_display_name_to_third_party_invite(
+            event_dict, event, context
+        )
+
         self.auth.check(event, auth_events=context.current_state)
         yield self._validate_keyserver(event, auth_events=context.current_state)
 
@@ -1692,6 +1714,27 @@ class FederationHandler(BaseHandler):
         event.signatures.update(returned_invite.signatures)
         member_handler = self.hs.get_handlers().room_member_handler
         yield member_handler.change_membership(event, context)
+
+    @defer.inlineCallbacks
+    def add_display_name_to_third_party_invite(self, event_dict, event, context):
+        key = (
+            EventTypes.ThirdPartyInvite,
+            event.content["third_party_invite"]["signed"]["token"]
+        )
+        original_invite = context.current_state.get(key)
+        if not original_invite:
+            logger.info(
+                "Could not find invite event for third_party_invite - "
+                "discarding: %s" % (event_dict,)
+            )
+            return
+
+        display_name = original_invite.content["display_name"]
+        event_dict["content"]["third_party_invite"]["display_name"] = display_name
+        builder = self.event_builder_factory.new(event_dict)
+        EventValidator().validate_new(builder)
+        event, context = yield self._create_new_client_event(builder=builder)
+        defer.returnValue((event, context))
 
     @defer.inlineCallbacks
     def _validate_keyserver(self, event, auth_events):

@@ -111,6 +111,14 @@ Installing prerequisites on ArchLinux::
     sudo pacman -S base-devel python2 python-pip \
                    python-setuptools python-virtualenv sqlite3
 
+Installing prerequisites on CentOS 7::
+
+    sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
+                     lcms2-devel libwebp-devel tcl-devel tk-devel \
+                     python-virtualenv libffi-devel openssl-devel
+    sudo yum groupinstall "Development Tools"
+
+
 Installing prerequisites on Mac OS X::
 
     xcode-select --install
@@ -122,7 +130,7 @@ To install the synapse homeserver run::
     virtualenv -p python2.7 ~/.synapse
     source ~/.synapse/bin/activate
     pip install --upgrade setuptools
-    pip install --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
+    pip install https://github.com/matrix-org/synapse/tarball/master
 
 This installs synapse, along with the libraries it uses, into a virtual
 environment under ``~/.synapse``.  Feel free to pick a different directory
@@ -148,9 +156,10 @@ To set up your homeserver, run (in your virtualenv, as before)::
     python -m synapse.app.homeserver \
         --server-name machine.my.domain.name \
         --config-path homeserver.yaml \
-        --generate-config
+        --generate-config \
+        --report-stats=[yes|no]
 
-Substituting your host and domain name as appropriate.
+...substituting your host and domain name as appropriate.
 
 This will generate you a config file that you can then customise, but it will
 also generate a set of keys for you. These keys will allow your Home Server to
@@ -163,10 +172,11 @@ key in the <server name>.signing.key file (the second word, which by default is
 
 By default, registration of new users is disabled. You can either enable
 registration in the config by specifying ``enable_registration: true``
-(it is then recommended to also set up CAPTCHA), or
+(it is then recommended to also set up CAPTCHA - see docs/CAPTCHA_SETUP), or
 you can use the command line to register new users::
 
     $ source ~/.synapse/bin/activate
+    $ synctl start # if not already running
     $ register_new_matrix_user -c homeserver.yaml https://localhost:8448
     New user localpart: erikj
     Password:
@@ -175,6 +185,16 @@ you can use the command line to register new users::
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server.  See docs/turn-howto.rst for details.
+
+Running Synapse
+===============
+
+To actually run your new homeserver, pick a working directory for Synapse to
+run (e.g. ``~/.synapse``), and::
+
+    cd ~/.synapse
+    source ./bin/activate
+    synctl start
 
 Using PostgreSQL
 ================
@@ -198,16 +218,6 @@ may have a few regressions relative to SQLite.
 For information on how to install and use PostgreSQL, please see
 `docs/postgres.rst <docs/postgres.rst>`_.
 
-Running Synapse
-===============
-
-To actually run your new homeserver, pick a working directory for Synapse to
-run (e.g. ``~/.synapse``), and::
-
-    cd ~/.synapse
-    source ./bin/activate
-    synctl start
-
 Platform Specific Instructions
 ==============================
 
@@ -229,8 +239,7 @@ pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 )::
 You also may need to explicitly specify python 2.7 again during the install
 request::
 
-    pip2.7 install --process-dependency-links \
-        https://github.com/matrix-org/synapse/tarball/master
+    pip2.7 install https://github.com/matrix-org/synapse/tarball/master
 
 If you encounter an error with lib bcrypt causing an Wrong ELF Class:
 ELFCLASS32 (x64 Systems), you may need to reinstall py-bcrypt to correctly
@@ -289,8 +298,7 @@ Troubleshooting
 Troubleshooting Installation
 ----------------------------
 
-Synapse requires pip 1.7 or later, so if your OS provides too old a version and
-you get errors about ``error: no such option: --process-dependency-links`` you
+Synapse requires pip 1.7 or later, so if your OS provides too old a version you
 may need to manually upgrade it::
 
     sudo pip install --upgrade pip
@@ -433,6 +441,10 @@ SRV record, as that is the name other machines will expect it to have::
         --generate-config
     python -m synapse.app.homeserver --config-path homeserver.yaml
 
+
+If you've already generated the config file, you need to edit the "server_name"
+in you  ```homeserver.yaml``` file. If you've already started Synapse and a
+database has been created, you will have to recreate the database.
 
 You may additionally want to pass one or more "-v" options, in order to
 increase the verbosity of logging output; at least for initial testing.

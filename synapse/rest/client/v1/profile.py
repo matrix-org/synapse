@@ -16,14 +16,14 @@
 """ This module contains REST servlets to do with profile: /profile/<paths> """
 from twisted.internet import defer
 
-from .base import ClientV1RestServlet, client_path_pattern
+from .base import ClientV1RestServlet, client_path_patterns
 from synapse.types import UserID
 
 import simplejson as json
 
 
 class ProfileDisplaynameRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/profile/(?P<user_id>[^/]*)/displayname")
+    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)/displayname")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -56,7 +56,7 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
 
 
 class ProfileAvatarURLRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/profile/(?P<user_id>[^/]*)/avatar_url")
+    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)/avatar_url")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -89,7 +89,7 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
 
 
 class ProfileRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/profile/(?P<user_id>[^/]*)")
+    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):

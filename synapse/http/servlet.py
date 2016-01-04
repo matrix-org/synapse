@@ -19,7 +19,6 @@ from synapse.api.errors import SynapseError
 
 import logging
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -102,12 +101,13 @@ class RestServlet(object):
 
     def register(self, http_server):
         """ Register this servlet with the given HTTP server. """
-        if hasattr(self, "PATTERN"):
-            pattern = self.PATTERN
+        if hasattr(self, "PATTERNS"):
+            patterns = self.PATTERNS
 
             for method in ("GET", "PUT", "POST", "OPTIONS", "DELETE"):
                 if hasattr(self, "on_%s" % (method,)):
                     method_handler = getattr(self, "on_%s" % (method,))
-                    http_server.register_path(method, pattern, method_handler)
+                    http_server.register_paths(method, patterns, method_handler)
+
         else:
             raise NotImplementedError("RestServlet must register something.")

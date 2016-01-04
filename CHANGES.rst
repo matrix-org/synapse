@@ -1,3 +1,77 @@
+Changes in synapse v0.12.0 (2016-01-04)
+=======================================
+
+* Expose ``/login`` under ``r0`` (PR #459)
+
+Changes in synapse v0.12.0-rc3 (2015-12-23)
+===========================================
+
+* Allow guest accounts access to ``/sync`` (PR #455)
+* Allow filters to include/exclude rooms at the room level
+  rather than just from the components of the sync for each
+  room. (PR #454)
+* Include urls for room avatars in the response to ``/publicRooms`` (PR #453)
+* Don't set a identicon as the avatar for a user when they register (PR #450)
+* Add a ``display_name`` to third-party invites (PR #449)
+* Send more information to the identity server for third-party invites so that
+  it can send richer messages to the invitee (PR #446)
+
+* Cache the responses to ``/intialSync`` for 5 minutes. If a client
+  retries a request to ``/initialSync`` before the a response was computed
+  to the first request then the same response is used for both requests
+  (PR #457)
+
+* Fix a bug where synapse would always request the signing keys of
+  remote servers even when the key was cached locally (PR #452)
+* Fix 500 when pagination search results (PR #447)
+* Fix a bug where synapse was leaking raw email address in third-party invites
+   (PR #448)
+
+Changes in synapse v0.12.0-rc2 (2015-12-14)
+===========================================
+
+* Add caches for whether rooms have been forgotten by a user (PR #434)
+* Remove instructions to use ``--process-dependency-link`` since all of the
+  dependencies of synapse are on PyPI (PR #436)
+* Parallelise the processing of ``/sync`` requests (PR #437)
+* Fix race updating presence in ``/events`` (PR #444)
+* Fix bug back-populating search results (PR #441)
+* Fix bug calculating state in ``/sync`` requests (PR #442)
+
+Changes in synapse v0.12.0-rc1 (2015-12-10)
+===========================================
+
+* Host the client APIs released as r0 by
+  https://matrix.org/docs/spec/r0.0.0/client_server.html
+  on paths prefixed by ``/_matrix/client/r0``. (PR #430, PR #415, PR #400)
+* Updates the client APIs to match r0 of the matrix specification.
+
+  * All APIs return events in the new event format, old APIs also include
+    the fields needed to parse the event using the old format for
+    compatibility. (PR #402)
+  * Search results are now given as a JSON array rather than
+    a JSON object (PR #405)
+  * Miscellaneous changes to search (PR #403, PR #406, PR #412)
+  * Filter JSON objects may now be passed as query parameters to ``/sync``
+    (PR #431)
+  * Fix implementation of ``/admin/whois`` (PR #418)
+  * Only include the rooms that user has left in ``/sync`` if the client
+    requests them in the filter (PR #423)
+  * Don't push for ``m.room.message`` by default (PR #411)
+  * Add API for setting per account user data (PR #392)
+  * Allow users to forget rooms (PR #385)
+
+* Performance improvements and monitoring:
+
+  * Add per-request counters for CPU time spent on the main python thread.
+    (PR #421, PR #420)
+  * Add per-request counters for time spent in the database (PR #429)
+  * Make state updates in the C+S API idempotent (PR #416)
+  * Only fire ``user_joined_room`` if the user has actually joined. (PR #410)
+  * Reuse a single http client, rather than creating new ones (PR #413)
+
+* Fixed a bug upgrading from older versions of synapse on postgresql (PR #417)
+
 Changes in synapse v0.11.1 (2015-11-20)
 =======================================
 

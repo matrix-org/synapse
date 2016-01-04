@@ -207,6 +207,13 @@ class Auth(object):
                 user_id, room_id
             ))
 
+        if membership == Membership.LEAVE:
+            forgot = yield self.store.did_forget(user_id, room_id)
+            if forgot:
+                raise AuthError(403, "User %s not in room %s" % (
+                    user_id, room_id
+                ))
+
         defer.returnValue(member)
 
     @defer.inlineCallbacks
@@ -771,7 +778,7 @@ class Auth(object):
                 if "third_party_invite" in event.content:
                     key = (
                         EventTypes.ThirdPartyInvite,
-                        event.content["third_party_invite"]["token"]
+                        event.content["third_party_invite"]["signed"]["token"]
                     )
                     third_party_invite = current_state.get(key)
                     if third_party_invite:
@@ -853,7 +860,7 @@ class Auth(object):
 
         redact_level = self._get_named_level(auth_events, "redact", 50)
 
-        if user_level > redact_level:
+        if user_level >= redact_level:
             return False
 
         redacter_domain = EventID.from_string(event.event_id).domain

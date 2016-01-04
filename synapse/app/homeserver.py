@@ -15,6 +15,8 @@
 # limitations under the License.
 
 import sys
+from synapse.rest import ClientRestResource
+
 sys.dont_write_bytecode = True
 from synapse.python_dependencies import (
     check_requirements, DEPENDENCY_LINKS, MissingRequirementError
@@ -53,15 +55,13 @@ from synapse.rest.key.v1.server_key_resource import LocalKey
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.api.urls import (
-    CLIENT_PREFIX, FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
-    SERVER_KEY_PREFIX, MEDIA_PREFIX, CLIENT_V2_ALPHA_PREFIX, STATIC_PREFIX,
+    FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
+    SERVER_KEY_PREFIX, MEDIA_PREFIX, STATIC_PREFIX,
     SERVER_KEY_V2_PREFIX,
 )
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.util.logcontext import LoggingContext
-from synapse.rest.client.v1 import ClientV1RestResource
-from synapse.rest.client.v2_alpha import ClientV2AlphaRestResource
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 
 from synapse import events
@@ -92,11 +92,8 @@ class SynapseHomeServer(HomeServer):
     def build_http_client(self):
         return MatrixFederationHttpClient(self)
 
-    def build_resource_for_client(self):
-        return ClientV1RestResource(self)
-
-    def build_resource_for_client_v2_alpha(self):
-        return ClientV2AlphaRestResource(self)
+    def build_client_resource(self):
+        return ClientRestResource(self)
 
     def build_resource_for_federation(self):
         return JsonResource(self)
@@ -179,16 +176,15 @@ class SynapseHomeServer(HomeServer):
         for res in listener_config["resources"]:
             for name in res["names"]:
                 if name == "client":
+                    client_resource = self.get_client_resource()
                     if res["compress"]:
-                        client_v1 = gz_wrap(self.get_resource_for_client())
-                        client_v2 = gz_wrap(self.get_resource_for_client_v2_alpha())
-                    else:
-                        client_v1 = self.get_resource_for_client()
-                        client_v2 = self.get_resource_for_client_v2_alpha()
+                        client_resource = gz_wrap(client_resource)
 
                     resources.update({
-                        CLIENT_PREFIX: client_v1,
-                        CLIENT_V2_ALPHA_PREFIX: client_v2,
+                        "/_matrix/client/api/v1": client_resource,
+                        "/_matrix/client/r0": client_resource,
+                        "/_matrix/client/unstable": client_resource,
+                        "/_matrix/client/v2_alpha": client_resource,
                     })
 
                 if name == "federation":
@@ -499,13 +495,28 @@ class SynapseRequest(Request):
         self.start_time = int(time.time() * 1000)
 
     def finished_processing(self):
+
+        try:
+            context = LoggingContext.current_context()
+            ru_utime, ru_stime = context.get_resource_usage()
+            db_txn_count = context.db_txn_count
+            db_txn_duration = context.db_txn_duration
+        except:
+            ru_utime, ru_stime = (0, 0)
+            db_txn_count, db_txn_duration = (0, 0)
+
         self.site.access_logger.info(
             "%s - %s - {%s}"
-            " Processed request: %dms %sB %s \"%s %s %s\" \"%s\"",
+            " Processed request: %dms (%dms, %dms) (%dms/%d)"
+            " %sB %s \"%s %s %s\" \"%s\"",
             self.getClientIP(),
             self.site.site_tag,
             self.authenticated_entity,
             int(time.time() * 1000) - self.start_time,
+            int(ru_utime * 1000),
+            int(ru_stime * 1000),
+            int(db_txn_duration * 1000),
+            int(db_txn_count),
             self.sentLength,
             self.code,
             self.method,

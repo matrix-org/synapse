@@ -31,6 +31,10 @@ import urllib
 logger = logging.getLogger(__name__)
 
 
+def registered_user(distributor, user):
+    return distributor.fire("registered_user", user)
+
+
 class RegistrationHandler(BaseHandler):
 
     def __init__(self, hs):
@@ -38,6 +42,7 @@ class RegistrationHandler(BaseHandler):
 
         self.distributor = hs.get_distributor()
         self.distributor.declare("registered_user")
+        self.captcha_client = CaptchaServerHttpClient(hs)
 
     @defer.inlineCallbacks
     def check_username(self, localpart):
@@ -98,7 +103,7 @@ class RegistrationHandler(BaseHandler):
                 password_hash=password_hash
             )
 
-            yield self.distributor.fire("registered_user", user)
+            yield registered_user(self.distributor, user)
         else:
             # autogen a random user ID
             attempts = 0
@@ -117,7 +122,7 @@ class RegistrationHandler(BaseHandler):
                         token=token,
                         password_hash=password_hash)
 
-                    self.distributor.fire("registered_user", user)
+                    yield registered_user(self.distributor, user)
                 except SynapseError:
                     # if user id is taken, just generate another
                     user_id = None
@@ -127,25 +132,9 @@ class RegistrationHandler(BaseHandler):
                         raise RegistrationError(
                             500, "Cannot generate user ID.")
 
-        # create a default avatar for the user
-        # XXX: ideally clients would explicitly specify one, but given they don't
-        # and we want consistent and pretty identicons for random users, we'll
-        # do it here.
-        try:
-            auth_user = UserID.from_string(user_id)
-            media_repository = self.hs.get_resource_for_media_repository()
-            identicon_resource = media_repository.getChildWithDefault("identicon", None)
-            upload_resource = media_repository.getChildWithDefault("upload", None)
-            identicon_bytes = identicon_resource.generate_identicon(user_id, 320, 320)
-            content_uri = yield upload_resource.create_content(
-                "image/png", None, identicon_bytes, len(identicon_bytes), auth_user
-            )
-            profile_handler = self.hs.get_handlers().profile_handler
-            profile_handler.set_avatar_url(
-                auth_user, auth_user, ("%s#auto" % (content_uri,))
-            )
-        except NotImplementedError:
-            pass  # make tests pass without messing around creating default avatars
+        # We used to generate default identicons here, but nowadays
+        # we want clients to generate their own as part of their branding
+        # rather than there being consistent matrix-wide ones, so we don't.
 
         defer.returnValue((user_id, token))
 
@@ -167,7 +156,7 @@ class RegistrationHandler(BaseHandler):
             token=token,
             password_hash=""
         )
-        self.distributor.fire("registered_user", user)
+        registered_user(self.distributor, user)
         defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
@@ -215,7 +204,7 @@ class RegistrationHandler(BaseHandler):
                 token=token,
                 password_hash=None
             )
-            yield self.distributor.fire("registered_user", user)
+            yield registered_user(self.distributor, user)
         except Exception, e:
             yield self.store.add_access_token_to_user(user_id, token)
             # Ignore Registration errors
@@ -302,10 +291,7 @@ class RegistrationHandler(BaseHandler):
         """
         Used only by c/s api v1
         """
-        # TODO: get this from the homeserver rather than creating a new one for
-        # each request
-        client = CaptchaServerHttpClient(self.hs)
-        data = yield client.post_urlencoded_get_raw(
+        data = yield self.captcha_client.post_urlencoded_get_raw(
             "http://www.google.com:80/recaptcha/api/verify",
             args={
                 'privatekey': private_key,

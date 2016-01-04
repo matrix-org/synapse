@@ -30,34 +30,27 @@ class AdminHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_whois(self, user):
-        res = yield self.store.get_user_ip_and_agents(user)
+        connections = []
 
-        d = {}
-        for r in res:
-            # Note that device_id is always None
-            device = d.setdefault(r["device_id"], {})
-            session = device.setdefault(r["access_token"], [])
-            session.append({
-                "ip": r["ip"],
-                "user_agent": r["user_agent"],
-                "last_seen": r["last_seen"],
+        sessions = yield self.store.get_user_ip_and_agents(user)
+        for session in sessions:
+            connections.append({
+                "ip": session["ip"],
+                "last_seen": session["last_seen"],
+                "user_agent": session["user_agent"],
             })
 
         ret = {
             "user_id": user.to_string(),
-            "devices": [
-                {
-                    "device_id": k,
+            "devices": {
+                "": {
                     "sessions": [
                         {
-                            # "access_token": x, TODO (erikj)
-                            "connections": y,
+                            "connections": connections,
                         }
-                        for x, y in v.items()
                     ]
-                }
-                for k, v in d.items()
-            ],
+                },
+            },
         }
 
         defer.returnValue(ret)

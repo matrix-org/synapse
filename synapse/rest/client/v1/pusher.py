@@ -17,13 +17,16 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, Codes
 from synapse.push import PusherConfigException
-from .base import ClientV1RestServlet, client_path_pattern
+from .base import ClientV1RestServlet, client_path_patterns
 
 import simplejson as json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class PusherRestServlet(ClientV1RestServlet):
-    PATTERN = client_path_pattern("/pushers/set$")
+    PATTERNS = client_path_patterns("/pushers/set$")
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -50,6 +53,9 @@ class PusherRestServlet(ClientV1RestServlet):
         if len(missing):
             raise SynapseError(400, "Missing parameters: "+','.join(missing),
                                errcode=Codes.MISSING_PARAM)
+
+        logger.debug("set pushkey %s to kind %s", content['pushkey'], content['kind'])
+        logger.debug("Got pushers request with body: %r", content)
 
         append = False
         if 'append' in content:

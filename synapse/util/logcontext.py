@@ -19,6 +19,25 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+try:
+    import resource
+
+    # Python doesn't ship with a definition of RUSAGE_THREAD but it's defined
+    # to be 1 on linux so we hard code it.
+    RUSAGE_THREAD = 1
+
+    # If the system doesn't support RUSAGE_THREAD then this should throw an
+    # exception.
+    resource.getrusage(RUSAGE_THREAD)
+
+    def get_thread_resource_usage():
+        return resource.getrusage(RUSAGE_THREAD)
+except:
+    # If the system doesn't support resource.getrusage(RUSAGE_THREAD) then we
+    # won't track resource usage by returning None.
+    def get_thread_resource_usage():
+        return None
+
 
 class LoggingContext(object):
     """Additional context for log formatting. Contexts are scoped within a
@@ -27,7 +46,9 @@ class LoggingContext(object):
         name (str): Name for the context for debugging.
     """
 
-    __slots__ = ["parent_context", "name", "__dict__"]
+    __slots__ = [
+        "parent_context", "name", "usage_start", "usage_end", "main_thread", "__dict__"
+    ]
 
     thread_local = threading.local()
 
@@ -42,11 +63,26 @@ class LoggingContext(object):
         def copy_to(self, record):
             pass
 
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+        def add_database_transaction(self, duration_ms):
+            pass
+
     sentinel = Sentinel()
 
     def __init__(self, name=None):
         self.parent_context = None
         self.name = name
+        self.ru_stime = 0.
+        self.ru_utime = 0.
+        self.db_txn_count = 0
+        self.db_txn_duration = 0.
+        self.usage_start = None
+        self.main_thread = threading.current_thread()
 
     def __str__(self):
         return "%s@%x" % (self.name, id(self))
@@ -56,12 +92,26 @@ class LoggingContext(object):
         """Get the current logging context from thread local storage"""
         return getattr(cls.thread_local, "current_context", cls.sentinel)
 
+    @classmethod
+    def set_current_context(cls, context):
+        """Set the current logging context in thread local storage
+        Args:
+            context(LoggingContext): The context to activate.
+        Returns:
+            The context that was previously active
+        """
+        current = cls.current_context()
+        if current is not context:
+            current.stop()
+            cls.thread_local.current_context = context
+            context.start()
+        return current
+
     def __enter__(self):
         """Enters this logging context into thread local storage"""
         if self.parent_context is not None:
             raise Exception("Attempt to enter logging context multiple times")
-        self.parent_context = self.current_context()
-        self.thread_local.current_context = self
+        self.parent_context = self.set_current_context(self)
         return self
 
     def __exit__(self, type, value, traceback):
@@ -70,16 +120,16 @@ class LoggingContext(object):
         Returns:
             None to avoid suppressing any exeptions that were thrown.
         """
-        if self.thread_local.current_context is not self:
-            if self.thread_local.current_context is self.sentinel:
+        current = self.set_current_context(self.parent_context)
+        if current is not self:
+            if current is self.sentinel:
                 logger.debug("Expected logging context %s has been lost", self)
             else:
                 logger.warn(
                     "Current logging context %s is not expected context %s",
-                    self.thread_local.current_context,
+                    current,
                     self
                 )
-        self.thread_local.current_context = self.parent_context
         self.parent_context = None
 
     def __getattr__(self, name):
@@ -92,6 +142,43 @@ class LoggingContext(object):
             self.parent_context.copy_to(record)
         for key, value in self.__dict__.items():
             setattr(record, key, value)
+
+        record.ru_utime, record.ru_stime = self.get_resource_usage()
+
+    def start(self):
+        if threading.current_thread() is not self.main_thread:
+            return
+
+        if self.usage_start and self.usage_end:
+            self.ru_utime += self.usage_end.ru_utime - self.usage_start.ru_utime
+            self.ru_stime += self.usage_end.ru_stime - self.usage_start.ru_stime
+            self.usage_start = None
+            self.usage_end = None
+
+        if not self.usage_start:
+            self.usage_start = get_thread_resource_usage()
+
+    def stop(self):
+        if threading.current_thread() is not self.main_thread:
+            return
+
+        if self.usage_start:
+            self.usage_end = get_thread_resource_usage()
+
+    def get_resource_usage(self):
+        ru_utime = self.ru_utime
+        ru_stime = self.ru_stime
+
+        if self.usage_start and threading.current_thread() is self.main_thread:
+            current = get_thread_resource_usage()
+            ru_utime += current.ru_utime - self.usage_start.ru_utime
+            ru_stime += current.ru_stime - self.usage_start.ru_stime
+
+        return ru_utime, ru_stime
+
+    def add_database_transaction(self, duration_ms):
+        self.db_txn_count += 1
+        self.db_txn_duration += duration_ms / 1000.
 
 
 class LoggingContextFilter(logging.Filter):
@@ -121,17 +208,20 @@ class PreserveLoggingContext(object):
     exited. Used to restore the context after a function using
     @defer.inlineCallbacks is resumed by a callback from the reactor."""
 
-    __slots__ = ["current_context"]
+    __slots__ = ["current_context", "new_context"]
+
+    def __init__(self, new_context=LoggingContext.sentinel):
+        self.new_context = new_context
 
     def __enter__(self):
         """Captures the current logging context"""
-        self.current_context = LoggingContext.current_context()
-        LoggingContext.thread_local.current_context = LoggingContext.sentinel
+        self.current_context = LoggingContext.set_current_context(
+            self.new_context
+        )
 
     def __exit__(self, type, value, traceback):
         """Restores the current logging context"""
-        LoggingContext.thread_local.current_context = self.current_context
-
+        LoggingContext.set_current_context(self.current_context)
         if self.current_context is not LoggingContext.sentinel:
             if self.current_context.parent_context is None:
                 logger.warn(
@@ -164,8 +254,7 @@ class _PreservingContextDeferred(defer.Deferred):
 
     def _wrap_callback(self, f):
         def g(res, *args, **kwargs):
-            with PreserveLoggingContext():
-                LoggingContext.thread_local.current_context = self._log_context
+            with PreserveLoggingContext(self._log_context):
                 res = f(res, *args, **kwargs)
             return res
         return g

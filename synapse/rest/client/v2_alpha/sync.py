@@ -25,10 +25,13 @@ from synapse.events.utils import (
     serialize_event, format_event_for_client_v2_without_room_id,
 )
 from synapse.api.filtering import FilterCollection
-from ._base import client_v2_pattern
+from synapse.api.errors import SynapseError
+from ._base import client_v2_patterns
 
 import copy
 import logging
+
+import ujson as json
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +51,7 @@ class SyncRestServlet(RestServlet):
           "next_batch": // batch token for the next /sync
           "presence": // presence data for the user.
           "rooms": {
-            "joined": { // Joined rooms being updated.
+            "join": { // Joined rooms being updated.
               "${room_id}": { // Id of the room being updated
                 "event_map": // Map of EventID -> event JSON.
                 "timeline": { // The recent events in the room if gap is "true"
@@ -63,13 +66,13 @@ class SyncRestServlet(RestServlet):
                 "ephemeral": {"events": []} // list of event objects
               }
             },
-            "invited": {}, // Invited rooms being updated.
-            "archived": {} // Archived rooms being updated.
+            "invite": {}, // Invited rooms being updated.
+            "leave": {} // Archived rooms being updated.
           }
         }
     """
 
-    PATTERN = client_v2_pattern("/sync$")
+    PATTERNS = client_v2_patterns("/sync$")
     ALLOWED_PRESENCE = set(["online", "offline"])
 
     def __init__(self, hs):
@@ -82,7 +85,9 @@ class SyncRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        user, token_id, _ = yield self.auth.get_user_by_req(request)
+        user, token_id, is_guest = yield self.auth.get_user_by_req(
+            request, allow_guest=True
+        )
 
         timeout = parse_integer(request, "timeout", default=0)
         since = parse_string(request, "since")
@@ -100,15 +105,29 @@ class SyncRestServlet(RestServlet):
             )
         )
 
-        try:
-            filter = yield self.filtering.get_user_filter(
-                user.localpart, filter_id
+        if filter_id and filter_id.startswith('{'):
+            try:
+                filter_object = json.loads(filter_id)
+            except:
+                raise SynapseError(400, "Invalid filter JSON")
+            self.filtering._check_valid_filter(filter_object)
+            filter = FilterCollection(filter_object)
+        else:
+            try:
+                filter = yield self.filtering.get_user_filter(
+                    user.localpart, filter_id
+                )
+            except:
+                filter = FilterCollection({})
+
+        if is_guest and filter.list_rooms() is None:
+            raise SynapseError(
+                400, "Guest users must provide a list of rooms in the filter"
             )
-        except:
-            filter = FilterCollection({})
 
         sync_config = SyncConfig(
             user=user,
+            is_guest=is_guest,
             filter=filter,
         )
 
@@ -144,6 +163,9 @@ class SyncRestServlet(RestServlet):
         )
 
         response_content = {
+            "account_data": self.encode_account_data(
+                sync_result.account_data, filter, time_now
+            ),
             "presence": self.encode_presence(
                 sync_result.presence, filter, time_now
             ),
@@ -164,6 +186,9 @@ class SyncRestServlet(RestServlet):
             event['sender'] = event['content'].pop('user_id')
             formatted.append(event)
         return {"events": filter.filter_presence(formatted)}
+
+    def encode_account_data(self, events, filter, time_now):
+        return {"events": filter.filter_account_data(events)}
 
     def encode_joined(self, rooms, filter, time_now, token_id):
         """
@@ -333,20 +358,36 @@ class SyncRestServlet(RestServlet):
                 continue
 
             prev_event_id = timeline_event.unsigned.get("replaces_state", None)
-            logger.debug("Replacing %s with %s in state dict",
-                         timeline_event.event_id, prev_event_id)
 
-            if prev_event_id is None:
+            prev_content = timeline_event.unsigned.get('prev_content')
+            prev_sender = timeline_event.unsigned.get('prev_sender')
+            # Empircally it seems possible for the event to have a
+            # "replaces_state" key but not a prev_content or prev_sender
+            # markjh conjectures that it could be due to the server not
+            # having a copy of that event.
+            # If this is the case the we ignore the previous event. This will
+            # cause the displayname calculations on the client to be incorrect
+            if prev_event_id is None or not prev_content or not prev_sender:
+                logger.debug(
+                    "Removing %r from the state dict, as it is missing"
+                    " prev_content (prev_event_id=%r)",
+                    timeline_event.event_id, prev_event_id
+                )
                 del result[event_key]
             else:
+                logger.debug(
+                    "Replacing %r with %r in state dict",
+                    timeline_event.event_id, prev_event_id
+                )
                 result[event_key] = FrozenEvent({
                     "type": timeline_event.type,
                     "state_key": timeline_event.state_key,
-                    "content": timeline_event.unsigned['prev_content'],
-                    "sender": timeline_event.unsigned['prev_sender'],
+                    "content": prev_content,
+                    "sender": prev_sender,
                     "event_id": prev_event_id,
                     "room_id": timeline_event.room_id,
                 })
+
             logger.debug("New value: %r", result.get(event_key))
 
         return result

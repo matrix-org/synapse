@@ -18,7 +18,7 @@ from twisted.internet import defer
 from collections import namedtuple
 
 from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 from synapse.api.constants import Membership
 from synapse.types import UserID
@@ -121,7 +121,7 @@ class RoomMemberStore(SQLBaseStore):
         return self.get_rooms_for_user_where_membership_is(
             user_id, [Membership.INVITE]
         ).addCallback(lambda invites: self._get_events([
-            invites.event_id for invite in invites
+            invite.event_id for invite in invites
         ]))
 
     def get_leave_and_ban_events_for_user(self, user_id):
@@ -160,7 +160,7 @@ class RoomMemberStore(SQLBaseStore):
 
     def _get_rooms_for_user_where_membership_is_txn(self, txn, user_id,
                                                     membership_list):
-        where_clause = "user_id = ? AND (%s)" % (
+        where_clause = "user_id = ? AND (%s) AND forgotten = 0" % (
             " OR ".join(["membership = ?" for _ in membership_list]),
         )
 
@@ -269,3 +269,70 @@ class RoomMemberStore(SQLBaseStore):
         ret = len(room_id_lists.pop(0).intersection(*room_id_lists)) > 0
 
         defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def forget(self, user_id, room_id):
+        """Indicate that user_id wishes to discard history for room_id."""
+        def f(txn):
+            sql = (
+                "UPDATE"
+                "  room_memberships"
+                " SET"
+                "  forgotten = 1"
+                " WHERE"
+                "  user_id = ?"
+                " AND"
+                "  room_id = ?"
+            )
+            txn.execute(sql, (user_id, room_id))
+        yield self.runInteraction("forget_membership", f)
+        self.was_forgotten_at.invalidate_all()
+        self.did_forget.invalidate((user_id, room_id))
+
+    @cachedInlineCallbacks(num_args=2)
+    def did_forget(self, user_id, room_id):
+        """Returns whether user_id has elected to discard history for room_id.
+
+        Returns False if they have since re-joined."""
+        def f(txn):
+            sql = (
+                "SELECT"
+                "  COUNT(*)"
+                " FROM"
+                "  room_memberships"
+                " WHERE"
+                "  user_id = ?"
+                " AND"
+                "  room_id = ?"
+                " AND"
+                "  forgotten = 0"
+            )
+            txn.execute(sql, (user_id, room_id))
+            rows = txn.fetchall()
+            return rows[0][0]
+        count = yield self.runInteraction("did_forget_membership", f)
+        defer.returnValue(count == 0)
+
+    @cachedInlineCallbacks(num_args=3)
+    def was_forgotten_at(self, user_id, room_id, event_id):
+        """Returns whether user_id has elected to discard history for room_id at event_id.
+
+        event_id must be a membership event."""
+        def f(txn):
+            sql = (
+                "SELECT"
+                "  forgotten"
+                " FROM"
+                "  room_memberships"
+                " WHERE"
+                "  user_id = ?"
+                " AND"
+                "  room_id = ?"
+                " AND"
+                "  event_id = ?"
+            )
+            txn.execute(sql, (user_id, room_id, event_id))
+            rows = txn.fetchall()
+            return rows[0][0]
+        forgot = yield self.runInteraction("did_forget_membership_at", f)
+        defer.returnValue(forgot == 1)
