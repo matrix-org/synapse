@@ -1,6 +1,7 @@
-Changes in synapse v0.12.0-rc4 (unreleased)
-===========================================
-* Fix C-S API to expose ``/login`` under ``r0`` (PR #459)
+Changes in synapse v0.12.0 (2016-01-04)
+=======================================
+
+* Expose ``/login`` under ``r0`` (PR #459)
 
 Changes in synapse v0.12.0-rc3 (2015-12-23)
 ===========================================
