@@ -23,7 +23,7 @@ Changes in synapse v0.12.0-rc3 (2015-12-23)
   remote servers even when the key was cached locally (PR #452)
 * Fix 500 when pagination search results (PR #447)
 * Fix a bug where synapse was leaking raw email address in third-party invites
-   (PR #448)
+  (PR #448)
 
 Changes in synapse v0.12.0-rc2 (2015-12-14)
 ===========================================
