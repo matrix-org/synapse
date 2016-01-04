@@ -75,7 +75,7 @@ class EventPushActionsStore(SQLBaseStore):
                 " AND ea.room_id = ?"
                 " AND ("
                 "       e.topological_ordering > ?"
-                "       OR (e.topological_ordering == ? AND e.stream_ordering > ?)"
+                "       OR (e.topological_ordering = ? AND e.stream_ordering > ?)"
                 ")"
             )
             txn.execute(sql, (
