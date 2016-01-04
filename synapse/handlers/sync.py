@@ -346,7 +346,7 @@ class SyncHandler(BaseHandler):
             account_data=self.account_data_for_room(
                 room_id, tags_by_room, account_data_by_room
             ),
-            unread_notification_count=notif_count
+            unread_notification_count=notif_count,
         ))
 
     def account_data_for_user(self, account_data):
