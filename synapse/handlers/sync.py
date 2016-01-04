@@ -749,6 +749,13 @@ class SyncHandler(BaseHandler):
         if just_joined:
             state = yield self.get_state_at(room_id, now_token)
 
+        notifs = yield self.unread_notifs_for_room_id(
+            room_id, sync_config, ephemeral_by_room
+        )
+        notif_count = None
+        if notifs is not None:
+            notif_count = len(notifs)
+
         room_sync = JoinedSyncResult(
             room_id=room_id,
             timeline=batch,
@@ -757,6 +764,7 @@ class SyncHandler(BaseHandler):
             account_data=self.account_data_for_room(
                 room_id, tags_by_room, account_data_by_room
             ),
+            unread_notification_count=notif_count,
         )
 
         logging.debug("Room sync: %r", room_sync)
