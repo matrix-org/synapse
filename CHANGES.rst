@@ -15,7 +15,7 @@ Changes in synapse v0.12.0-rc3 (2015-12-23)
 * Add a ``display_name`` to third-party invites (PR #449)
 * Send more information to the identity server for third-party invites so that
   it can send richer messages to the invitee (PR #446)
-* Cache the responses to ``/intialSync`` for 5 minutes. If a client
+* Cache the responses to ``/initialSync`` for 5 minutes. If a client
   retries a request to ``/initialSync`` before the a response was computed
   to the first request then the same response is used for both requests
   (PR #457)
