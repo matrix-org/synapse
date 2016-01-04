@@ -27,7 +27,7 @@ import random
 logger = logging.getLogger(__name__)
 
 
-# Pushers could now be moved to pull out of the event_actions table instead
+# Pushers could now be moved to pull out of the event_push_actions table instead
 # of listening on the event stream: this would avoid them having to run the
 # rules again.
 class Pusher(object):

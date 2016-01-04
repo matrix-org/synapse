@@ -22,9 +22,9 @@ import simplejson as json
 logger = logging.getLogger(__name__)
 
 
-class EventActionsStore(SQLBaseStore):
+class EventPushActionsStore(SQLBaseStore):
     @defer.inlineCallbacks
-    def set_actions_for_event_and_users(self, event, tuples):
+    def set_push_actions_for_event_and_users(self, event, tuples):
         """
         :param event: the event set actions for
         :param tuples: list of tuples of (user_id, profile_tag, actions)
@@ -42,15 +42,15 @@ class EventActionsStore(SQLBaseStore):
         yield self.runInteraction(
             "set_actions_for_event_and_users",
             self._simple_insert_many_txn,
-            EventActionsTable.table_name,
+            EventPushActionsTable.table_name,
             values
         )
 
     @defer.inlineCallbacks
-    def get_unread_event_actions_by_room_for_user(
+    def get_unread_event_push_actions_by_room_for_user(
             self, room_id, user_id, last_read_event_id
     ):
-        def _get_unread_event_actions_by_room(txn):
+        def _get_unread_event_push_actions_by_room(txn):
             sql = (
                 "SELECT stream_ordering, topological_ordering"
                 " FROM events"
@@ -68,7 +68,7 @@ class EventActionsStore(SQLBaseStore):
 
             sql = (
                 "SELECT ea.event_id, ea.actions"
-                " FROM event_actions ea, events e"
+                " FROM event_push_actions ea, events e"
                 " WHERE ea.room_id = e.room_id"
                 " AND ea.event_id = e.event_id"
                 " AND ea.user_id = ?"
@@ -88,11 +88,11 @@ class EventActionsStore(SQLBaseStore):
             ]
 
         ret = yield self.runInteraction(
-            "get_unread_event_actions_by_room",
-            _get_unread_event_actions_by_room
+            "get_unread_event_push_actions_by_room",
+            _get_unread_event_push_actions_by_room
         )
         defer.returnValue(ret)
 
 
-class EventActionsTable(object):
-    table_name = "event_actions"
+class EventPushActionsTable(object):
+    table_name = "event_push_actions"

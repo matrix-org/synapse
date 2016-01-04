@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-CREATE TABLE IF NOT EXISTS event_actions(
+CREATE TABLE IF NOT EXISTS event_push_actions(
     room_id TEXT NOT NULL,
     event_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
@@ -23,4 +23,4 @@ CREATE TABLE IF NOT EXISTS event_actions(
 );
 
 
-CREATE INDEX event_actions_room_id_event_id_user_id_profile_tag on event_actions(room_id, event_id, user_id, profile_tag);
+CREATE INDEX event_push_actions_room_id_event_id_user_id_profile_tag on event_push_actions(room_id, event_id, user_id, profile_tag);

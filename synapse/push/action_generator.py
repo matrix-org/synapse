@@ -40,7 +40,7 @@ class ActionGenerator:
 
         actions_by_user = bulk_evaluator.action_for_event_by_user(event)
 
-        yield self.store.set_actions_for_event_and_users(
+        yield self.store.set_push_actions_for_event_and_users(
             event,
             [
                 (uid, None, actions) for uid, actions in actions_by_user.items()

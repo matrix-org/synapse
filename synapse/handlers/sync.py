@@ -896,7 +896,7 @@ class SyncHandler(BaseHandler):
 
         notifs = []
         if last_unread_event_id:
-            notifs = yield self.store.get_unread_event_actions_by_room_for_user(
+            notifs = yield self.store.get_unread_event_push_actions_by_room_for_user(
                 room_id, sync_config.user.to_string(), last_unread_event_id
             )
         else:
