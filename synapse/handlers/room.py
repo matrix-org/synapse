@@ -115,6 +115,8 @@ class RoomCreationHandler(BaseHandler):
             except:
                 raise SynapseError(400, "Invalid user_id: %s" % (i,))
 
+        invite_3pid_list = config.get("invite_3pid", [])
+
         is_public = config.get("visibility", None) == "public"
 
         if room_id:
@@ -219,6 +221,20 @@ class RoomCreationHandler(BaseHandler):
                 "sender": user_id,
                 "content": {"membership": Membership.INVITE},
             }, ratelimit=False)
+
+        for invite_3pid in invite_3pid_list:
+            id_server = invite_3pid["id_server"]
+            address = invite_3pid["address"]
+            medium = invite_3pid["medium"]
+            yield self.hs.get_handlers().room_member_handler.do_3pid_invite(
+                room_id,
+                user,
+                medium,
+                address,
+                id_server,
+                None,
+                None,
+            )
 
         result = {"room_id": room_id}
 
