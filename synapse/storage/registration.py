@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -73,30 +73,39 @@ class RegistrationStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def register(self, user_id, token, password_hash):
+    def register(self, user_id, token, password_hash, was_guest=False):
         """Attempts to register an account.
 
         Args:
             user_id (str): The desired user ID to register.
             token (str): The desired access token to use for this user.
             password_hash (str): Optional. The password hash for this user.
+            was_guest (bool): Optional. Whether this is a guest account being
+                upgraded to a non-guest account.
         Raises:
             StoreError if the user_id could not be registered.
         """
         yield self.runInteraction(
             "register",
-            self._register, user_id, token, password_hash
+            self._register, user_id, token, password_hash, was_guest
         )
 
-    def _register(self, txn, user_id, token, password_hash):
+    def _register(self, txn, user_id, token, password_hash, was_guest):
         now = int(self.clock.time())
 
         next_id = self._access_tokens_id_gen.get_next_txn(txn)
 
         try:
-            txn.execute("INSERT INTO users(name, password_hash, creation_ts) "
-                        "VALUES (?,?,?)",
-                        [user_id, password_hash, now])
+            if was_guest:
+                txn.execute("UPDATE users SET"
+                            " password_hash = ?,"
+                            " upgrade_ts = ?"
+                            " WHERE name = ?",
+                            [password_hash, now, user_id])
+            else:
+                txn.execute("INSERT INTO users(name, password_hash, creation_ts) "
+                            "VALUES (?,?,?)",
+                            [user_id, password_hash, now])
         except self.database_engine.module.IntegrityError:
             raise StoreError(
                 400, "User ID already taken.", errcode=Codes.USER_IN_USE

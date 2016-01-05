@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -583,7 +583,7 @@ class Auth(object):
             AuthError if no user by that token exists or the token is invalid.
         """
         try:
-            ret = yield self._get_user_from_macaroon(token)
+            ret = yield self.get_user_from_macaroon(token)
         except AuthError:
             # TODO(daniel): Remove this fallback when all existing access tokens
             # have been re-issued as macaroons.
@@ -591,7 +591,7 @@ class Auth(object):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def _get_user_from_macaroon(self, macaroon_str):
+    def get_user_from_macaroon(self, macaroon_str):
         try:
             macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
             self.validate_macaroon(macaroon, "access", False)
