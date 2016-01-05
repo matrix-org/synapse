@@ -115,7 +115,7 @@ class SyncResult(collections.namedtuple("SyncResult", [
         events.
         """
         return bool(
-            self.presence or self.joined or self.invited
+            self.presence or self.joined or self.invited or self.archived
         )
 
 GuestRoom = collections.namedtuple("GuestRoom", ("room_id", "membership"))
