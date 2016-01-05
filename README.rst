@@ -146,6 +146,10 @@ Note that these packages do not include  a client - choose one from
 https://matrix.org/blog/try-matrix-now/ (or build your own with 
 https://github.com/matrix-org/matrix-js-sdk/). 
 
+Finally, Martin Giess has created an auto-deployment process with vagrant/ansible, 
+tested with VirtualBox/AWS/DigitalOcean - see https://github.com/EMnify/matrix-synapse-auto-deploy 
+for details.
+
 To set up your homeserver, run (in your virtualenv, as before)::
 
     cd ~/.synapse

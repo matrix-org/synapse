@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -115,6 +115,8 @@ class RoomCreationHandler(BaseHandler):
             except:
                 raise SynapseError(400, "Invalid user_id: %s" % (i,))
 
+        invite_3pid_list = config.get("invite_3pid", [])
+
         is_public = config.get("visibility", None) == "public"
 
         if room_id:
@@ -219,6 +221,20 @@ class RoomCreationHandler(BaseHandler):
                 "sender": user_id,
                 "content": {"membership": Membership.INVITE},
             }, ratelimit=False)
+
+        for invite_3pid in invite_3pid_list:
+            id_server = invite_3pid["id_server"]
+            address = invite_3pid["address"]
+            medium = invite_3pid["medium"]
+            yield self.hs.get_handlers().room_member_handler.do_3pid_invite(
+                room_id,
+                user,
+                medium,
+                address,
+                id_server,
+                token_id=None,
+                txn_id=None,
+            )
 
         result = {"room_id": room_id}
 
@@ -879,14 +895,12 @@ class RoomContextHandler(BaseHandler):
             user.to_string(),
             results["events_before"],
             is_guest=is_guest,
-            require_all_visible_for_guests=False
         )
 
         results["events_after"] = yield self._filter_events_for_client(
             user.to_string(),
             results["events_after"],
             is_guest=is_guest,
-            require_all_visible_for_guests=False
         )
 
         if results["events_after"]:

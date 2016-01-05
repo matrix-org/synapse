@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -118,7 +118,7 @@ class SyncResult(collections.namedtuple("SyncResult", [
         events.
         """
         return bool(
-            self.presence or self.joined or self.invited
+            self.presence or self.joined or self.invited or self.archived
         )
 
 GuestRoom = collections.namedtuple("GuestRoom", ("room_id", "membership"))
@@ -690,7 +690,6 @@ class SyncHandler(BaseHandler):
                 sync_config.user.to_string(),
                 loaded_recents,
                 is_guest=sync_config.is_guest,
-                require_all_visible_for_guests=False
             )
             loaded_recents.extend(recents)
             recents = loaded_recents

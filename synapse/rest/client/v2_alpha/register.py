@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -119,8 +119,13 @@ class RegisterRestServlet(RestServlet):
         if self.hs.config.disable_registration:
             raise SynapseError(403, "Registration has been disabled")
 
+        guest_access_token = body.get("guest_access_token", None)
+
         if desired_username is not None:
-            yield self.registration_handler.check_username(desired_username)
+            yield self.registration_handler.check_username(
+                desired_username,
+                guest_access_token=guest_access_token
+            )
 
         if self.hs.config.enable_registration_captcha:
             flows = [
@@ -150,7 +155,8 @@ class RegisterRestServlet(RestServlet):
 
         (user_id, token) = yield self.registration_handler.register(
             localpart=desired_username,
-            password=new_password
+            password=new_password,
+            guest_access_token=guest_access_token,
         )
 
         if result and LoginType.EMAIL_IDENTITY in result:
