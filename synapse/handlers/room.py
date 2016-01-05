@@ -232,8 +232,8 @@ class RoomCreationHandler(BaseHandler):
                 medium,
                 address,
                 id_server,
-                None,
-                None,
+                token_id=None,
+                txn_id=None,
             )
 
         result = {"room_id": room_id}
