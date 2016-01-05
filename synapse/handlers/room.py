@@ -879,14 +879,12 @@ class RoomContextHandler(BaseHandler):
             user.to_string(),
             results["events_before"],
             is_guest=is_guest,
-            require_all_visible_for_guests=False
         )
 
         results["events_after"] = yield self._filter_events_for_client(
             user.to_string(),
             results["events_after"],
             is_guest=is_guest,
-            require_all_visible_for_guests=False
         )
 
         if results["events_after"]:

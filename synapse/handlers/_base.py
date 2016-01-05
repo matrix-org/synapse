@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,8 +52,7 @@ class BaseHandler(object):
         self.event_builder_factory = hs.get_event_builder_factory()
 
     @defer.inlineCallbacks
-    def _filter_events_for_client(self, user_id, events, is_guest=False,
-                                  require_all_visible_for_guests=True):
+    def _filter_events_for_client(self, user_id, events, is_guest=False):
         # Assumes that user has at some point joined the room if not is_guest.
 
         def allowed(event, membership, visibility):
@@ -113,17 +112,6 @@ class BaseHandler(object):
             should_include = allowed(event, membership, visibility)
             if should_include:
                 events_to_return.append(event)
-
-        if (require_all_visible_for_guests
-                and is_guest
-                and len(events_to_return) < len(events)):
-            # This indicates that some events in the requested range were not
-            # visible to guest users. To be safe, we reject the entire request,
-            # so that we don't have to worry about interpreting visibility
-            # boundaries.
-            raise AuthError(403, "User %s does not have permission" % (
-                user_id
-            ))
 
         defer.returnValue(events_to_return)
 
