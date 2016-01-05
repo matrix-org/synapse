@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,12 +40,13 @@ class RegistrationHandler(BaseHandler):
     def __init__(self, hs):
         super(RegistrationHandler, self).__init__(hs)
 
+        self.auth = hs.get_auth()
         self.distributor = hs.get_distributor()
         self.distributor.declare("registered_user")
         self.captcha_client = CaptchaServerHttpClient(hs)
 
     @defer.inlineCallbacks
-    def check_username(self, localpart):
+    def check_username(self, localpart, guest_access_token=None):
         yield run_on_reactor()
 
         if urllib.quote(localpart) != localpart:
@@ -62,14 +63,29 @@ class RegistrationHandler(BaseHandler):
 
         users = yield self.store.get_users_by_id_case_insensitive(user_id)
         if users:
-            raise SynapseError(
-                400,
-                "User ID already taken.",
-                errcode=Codes.USER_IN_USE,
-            )
+            if not guest_access_token:
+                raise SynapseError(
+                    400,
+                    "User ID already taken.",
+                    errcode=Codes.USER_IN_USE,
+                )
+            user_data = yield self.auth.get_user_from_macaroon(guest_access_token)
+            if not user_data["is_guest"] or user_data["user"].localpart != localpart:
+                raise AuthError(
+                    403,
+                    "Cannot register taken user ID without valid guest "
+                    "credentials for that user.",
+                    errcode=Codes.FORBIDDEN,
+                )
 
     @defer.inlineCallbacks
-    def register(self, localpart=None, password=None, generate_token=True):
+    def register(
+        self,
+        localpart=None,
+        password=None,
+        generate_token=True,
+        guest_access_token=None
+    ):
         """Registers a new client on the server.
 
         Args:
@@ -89,7 +105,7 @@ class RegistrationHandler(BaseHandler):
             password_hash = self.auth_handler().hash(password)
 
         if localpart:
-            yield self.check_username(localpart)
+            yield self.check_username(localpart, guest_access_token=guest_access_token)
 
             user = UserID(localpart, self.hs.hostname)
             user_id = user.to_string()
@@ -100,7 +116,8 @@ class RegistrationHandler(BaseHandler):
             yield self.store.register(
                 user_id=user_id,
                 token=token,
-                password_hash=password_hash
+                password_hash=password_hash,
+                was_guest=guest_access_token is not None,
             )
 
             yield registered_user(self.distributor, user)
