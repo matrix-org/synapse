@@ -648,7 +648,6 @@ class SyncHandler(BaseHandler):
                 sync_config.user.to_string(),
                 loaded_recents,
                 is_guest=sync_config.is_guest,
-                require_all_visible_for_guests=False
             )
             loaded_recents.extend(recents)
             recents = loaded_recents
