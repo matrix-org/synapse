@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -685,7 +685,7 @@ class MessageHandler(BaseHandler):
         ).addErrback(unwrapFirstError)
 
         messages = yield self._filter_events_for_client(
-            user_id, messages, is_guest=is_guest, require_all_visible_for_guests=False
+            user_id, messages, is_guest=is_guest,
         )
 
         start_token = now_token.copy_and_replace("room_key", token[0])
