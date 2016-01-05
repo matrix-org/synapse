@@ -248,6 +248,7 @@ class ThumbnailResource(BaseMediaResource):
 
         if desired_method.lower() == "crop":
             info_list = []
+            info_list2 = []
             for info in thumbnail_infos:
                 t_w = info["thumbnail_width"]
                 t_h = info["thumbnail_height"]
@@ -258,12 +259,20 @@ class ThumbnailResource(BaseMediaResource):
                     size_quality = abs((d_w - t_w) * (d_h - t_h))
                     type_quality = desired_type != info["thumbnail_type"]
                     length_quality = info["thumbnail_length"]
-                    info_list.append((
-                        aspect_quality, min_quality, size_quality, type_quality,
-                        length_quality, info
-                    ))
+                    if t_w >= d_w or t_h >= d_h:
+                        info_list.append((
+                            aspect_quality, min_quality, size_quality, type_quality,
+                            length_quality, info
+                        ))
+                    else:
+                        info_list2.append((
+                            aspect_quality, min_quality, size_quality, type_quality,
+                            length_quality, info
+                        ))
             if info_list:
                 return min(info_list)[-1]
+            else:
+                return min(info_list2)[-1]
         else:
             info_list = []
             info_list2 = []
