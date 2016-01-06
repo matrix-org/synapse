@@ -53,6 +53,8 @@ class FederationTestCase(unittest.TestCase):
                 "bulk_get_push_rules",
                 "get_current_state",
                 "set_push_actions_for_event_and_users",
+                "is_guest",
+                "get_state_for_events",
             ]),
             resource_for_federation=NonCallableMock(),
             http_client=NonCallableMock(spec_set=[]),
@@ -72,6 +74,8 @@ class FederationTestCase(unittest.TestCase):
         self.hs = hs
 
         self.handlers.federation_handler = FederationHandler(self.hs)
+
+        self.datastore.get_state_for_events.return_value = {"$a:b": {}}
 
     @defer.inlineCallbacks
     def test_msg(self):

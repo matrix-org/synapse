@@ -45,7 +45,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
         self.assertEquals(
             # TODO(paul): Surely this field should be 'user_id', not 'name'
             #  Additionally surely it shouldn't come in a 1-element list
-            {"name": self.user_id, "password_hash": self.pwhash},
+            {"name": self.user_id, "password_hash": self.pwhash, "is_guest": 0},
             (yield self.store.get_user_by_id(self.user_id))
         )
 

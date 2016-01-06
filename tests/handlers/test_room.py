@@ -47,6 +47,8 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
                 "bulk_get_push_rules",
                 "get_current_state",
                 "set_push_actions_for_event_and_users",
+                "get_state_for_events",
+                "is_guest",
             ]),
             resource_for_federation=NonCallableMock(),
             http_client=NonCallableMock(spec_set=[]),
@@ -116,6 +118,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             defer.succeed([])
         )
         self.datastore.get_current_state.return_value = {}
+        self.datastore.get_state_for_events = lambda event_ids,types: {x: {} for x in event_ids}
 
         def annotate(_):
             ctx = Mock()
@@ -198,6 +201,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             defer.succeed([])
         )
         self.datastore.get_current_state.return_value = {}
+        self.datastore.get_state_for_events = lambda event_ids,types: {x: {} for x in event_ids}
 
         def annotate(_):
             ctx = Mock()
@@ -274,6 +278,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             defer.succeed([])
         )
         self.datastore.get_current_state.return_value = {}
+        self.datastore.get_state_for_events = lambda event_ids,types: {x: {} for x in event_ids}
 
         def annotate(_):
             ctx = Mock()
