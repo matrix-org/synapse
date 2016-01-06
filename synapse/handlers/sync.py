@@ -31,6 +31,8 @@ SyncConfig = collections.namedtuple("SyncConfig", [
     "user",
     "is_guest",
     "filter",
+    "since_token",
+    "full_state",
 ])
 
 
@@ -129,8 +131,7 @@ class SyncHandler(BaseHandler):
         self.clock = hs.get_clock()
 
     @defer.inlineCallbacks
-    def wait_for_sync_for_user(self, sync_config, since_token=None, timeout=0,
-                               full_state=False):
+    def wait_for_sync_for_user(self, sync_config, timeout=0):
         """Get the sync for a client if we have new data for it now. Otherwise
         wait for new data to arrive on the server. If the timeout expires, then
         return an empty sync result.
@@ -150,19 +151,24 @@ class SyncHandler(BaseHandler):
                     bad_rooms, 403, "Guest access not allowed"
                 )
 
-        if timeout == 0 or since_token is None or full_state:
+        return_immediatedly = (
+            timeout == 0
+            or sync_config.since_token is None
+            or sync_config.full_state
+        )
+
+        if return_immediatedly:
             # we are going to return immediately, so don't bother calling
             # notifier.wait_for_events.
-            result = yield self.current_sync_for_user(sync_config, since_token,
-                                                      full_state=full_state)
+            result = yield self.current_sync_for_user(sync_config)
             defer.returnValue(result)
         else:
             def current_sync_callback(before_token, after_token):
-                return self.current_sync_for_user(sync_config, since_token)
+                return self.current_sync_for_user(sync_config)
 
             result = yield self.notifier.wait_for_events(
                 sync_config.user, timeout, current_sync_callback,
-                from_token=since_token
+                from_token=sync_config.since_token
             )
             defer.returnValue(result)
 
@@ -177,19 +183,18 @@ class SyncHandler(BaseHandler):
         else:
             defer.returnValue(False)
 
-    def current_sync_for_user(self, sync_config, since_token=None,
-                              full_state=False):
+    def current_sync_for_user(self, sync_config):
         """Get the sync for client needed to match what the server has now.
         Returns:
             A Deferred SyncResult.
         """
-        if since_token is None or full_state:
-            return self.full_state_sync(sync_config, since_token)
+        if sync_config.since_token is None or sync_config.full_state:
+            return self.full_state_sync(sync_config)
         else:
-            return self.incremental_sync_with_gap(sync_config, since_token)
+            return self.incremental_sync_with_gap(sync_config)
 
     @defer.inlineCallbacks
-    def full_state_sync(self, sync_config, timeline_since_token):
+    def full_state_sync(self, sync_config):
         """Get a sync for a client which is starting without any state.
 
         If a 'message_since_token' is given, only timeline events which have
@@ -198,6 +203,9 @@ class SyncHandler(BaseHandler):
         Returns:
             A Deferred SyncResult.
         """
+
+        timeline_since_token = sync_config.since_token
+
         now_token = yield self.event_sources.get_current_token()
 
         if sync_config.is_guest:
@@ -442,12 +450,13 @@ class SyncHandler(BaseHandler):
         ))
 
     @defer.inlineCallbacks
-    def incremental_sync_with_gap(self, sync_config, since_token):
+    def incremental_sync_with_gap(self, sync_config):
         """ Get the incremental delta needed to bring the client up to
         date with the server.
         Returns:
             A Deferred SyncResult.
         """
+        since_token = sync_config.since_token
         now_token = yield self.event_sources.get_current_token()
 
         if sync_config.is_guest:

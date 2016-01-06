@@ -125,24 +125,25 @@ class SyncRestServlet(RestServlet):
                 400, "Guest users must provide a list of rooms in the filter"
             )
 
-        sync_config = SyncConfig(
-            user=user,
-            is_guest=is_guest,
-            filter=filter,
-        )
-
         if since is not None:
             since_token = StreamToken.from_string(since)
         else:
             since_token = None
+
+        sync_config = SyncConfig(
+            user=user,
+            is_guest=is_guest,
+            filter=filter,
+            since_token=since_token,
+            full_state=full_state,
+        )
 
         if set_presence == "online":
             yield self.event_stream_handler.started_stream(user)
 
         try:
             sync_result = yield self.sync_handler.wait_for_sync_for_user(
-                sync_config, since_token=since_token, timeout=timeout,
-                full_state=full_state
+                sync_config, timeout=timeout,
             )
         finally:
             if set_presence == "online":
