@@ -185,6 +185,7 @@ class SynapseHomeServer(HomeServer):
                         "/_matrix/client/r0": client_resource,
                         "/_matrix/client/unstable": client_resource,
                         "/_matrix/client/v2_alpha": client_resource,
+                        "/_matrix/client/versions": client_resource,
                     })
 
                 if name == "federation":
