@@ -688,6 +688,7 @@ def run(hs):
 
     @defer.inlineCallbacks
     def phone_stats_home():
+        logger.info("Gathering stats for reporting")
         now = int(hs.get_clock().time())
         uptime = int(now - start_time)
         if uptime < 0:
