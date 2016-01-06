@@ -259,7 +259,10 @@ class RegisterRestServlet(RestServlet):
     def _do_guest_registration(self):
         if not self.hs.config.allow_guest_access:
             defer.returnValue((403, "Guest access is disabled"))
-        user_id, _ = yield self.registration_handler.register(generate_token=False)
+        user_id, _ = yield self.registration_handler.register(
+            generate_token=False,
+            make_guest=True
+        )
         access_token = self.auth_handler.generate_access_token(user_id, ["guest = true"])
         defer.returnValue((200, {
             "user_id": user_id,

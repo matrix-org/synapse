@@ -32,7 +32,7 @@ from synapse.crypto.event_signing import (
 )
 from synapse.types import UserID
 
-from synapse.events.utils import prune_event, serialize_event
+from synapse.events.utils import prune_event
 
 from synapse.util.retryutils import NotRetryingDestination
 
@@ -246,8 +246,8 @@ class FederationHandler(BaseHandler):
 
         if not backfilled and not event.internal_metadata.is_outlier():
             action_generator = ActionGenerator(self.store)
-            yield action_generator.handle_push_actions_for_event(serialize_event(
-                event, self.clock.time_msec())
+            yield action_generator.handle_push_actions_for_event(
+                event, self
             )
 
     @defer.inlineCallbacks

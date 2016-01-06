@@ -32,8 +32,8 @@ class EventPushActionsStore(SQLBaseStore):
         values = []
         for uid, profile_tag, actions in tuples:
             values.append({
-                'room_id': event['room_id'],
-                'event_id': event['event_id'],
+                'room_id': event.room_id,
+                'event_id': event.event_id,
                 'user_id': uid,
                 'profile_tag': profile_tag,
                 'actions': json.dumps(actions)

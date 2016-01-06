@@ -23,6 +23,8 @@ from synapse.types import UserID
 import baserules
 from push_rule_evaluator import PushRuleEvaluator
 
+from synapse.events.utils import serialize_event
+
 logger = logging.getLogger(__name__)
 
 
@@ -54,7 +56,7 @@ def evaluator_for_room_id(room_id, store):
             display_names[ev.state_key] = ev.content.get("displayname")
 
     defer.returnValue(BulkPushRuleEvaluator(
-        room_id, rules_by_user, display_names, users
+        room_id, rules_by_user, display_names, users, store
     ))
 
 
@@ -67,19 +69,28 @@ class BulkPushRuleEvaluator:
     the same logic to run the actual rules, but could be optimised further
     (see https://matrix.org/jira/browse/SYN-562)
     """
-    def __init__(self, room_id, rules_by_user, display_names, users_in_room):
+    def __init__(self, room_id, rules_by_user, display_names, users_in_room, store):
         self.room_id = room_id
         self.rules_by_user = rules_by_user
         self.display_names = display_names
         self.users_in_room = users_in_room
+        self.store = store
 
-    def action_for_event_by_user(self, event):
+    @defer.inlineCallbacks
+    def action_for_event_by_user(self, event, handler):
         actions_by_user = {}
 
         for uid, rules in self.rules_by_user.items():
             display_name = None
             if uid in self.display_names:
                 display_name = self.display_names[uid]
+
+            is_guest = yield self.store.is_guest(UserID.from_string(uid))
+            filtered = yield handler._filter_events_for_client(
+                uid, [event], is_guest=is_guest
+            )
+            if len(filtered) == 0:
+                continue
 
             for rule in rules:
                 if 'enabled' in rule and not rule['enabled']:
@@ -94,14 +105,20 @@ class BulkPushRuleEvaluator:
                     if len(actions) > 0:
                         actions_by_user[uid] = actions
                     break
-        return actions_by_user
+        defer.returnValue(actions_by_user)
 
     @staticmethod
     def event_matches_rule(event, rule,
                            display_name, room_member_count, profile_tag):
         matches = True
+
+        # passing the clock all the way into here is extremely awkward and push
+        # rules do not care about any of the relative timestamps, so we just
+        # pass 0 for the current time.
+        client_event = serialize_event(event, 0)
+
         for cond in rule['conditions']:
             matches &= PushRuleEvaluator._event_fulfills_condition(
-                event, cond, display_name, room_member_count, profile_tag
+                client_event, cond, display_name, room_member_count, profile_tag
             )
         return matches

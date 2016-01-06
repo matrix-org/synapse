@@ -23,8 +23,6 @@ from synapse.push.action_generator import ActionGenerator
 
 from synapse.util.logcontext import PreserveLoggingContext
 
-from synapse.events.utils import serialize_event
-
 import logging
 
 
@@ -256,9 +254,9 @@ class BaseHandler(object):
         )
 
         action_generator = ActionGenerator(self.store)
-        yield action_generator.handle_push_actions_for_event(serialize_event(
-            event, self.clock.time_msec()
-        ))
+        yield action_generator.handle_push_actions_for_event(
+            event, self
+        )
 
         destinations = set(extra_destinations)
         for k, s in context.current_state.items():

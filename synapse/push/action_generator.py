@@ -33,12 +33,12 @@ class ActionGenerator:
         # tag (ie. we just need all the users).
 
     @defer.inlineCallbacks
-    def handle_push_actions_for_event(self, event):
+    def handle_push_actions_for_event(self, event, handler):
         bulk_evaluator = yield bulk_push_rule_evaluator.evaluator_for_room_id(
-            event['room_id'], self.store
+            event.room_id, self.store
         )
 
-        actions_by_user = bulk_evaluator.action_for_event_by_user(event)
+        actions_by_user = yield bulk_evaluator.action_for_event_by_user(event, handler)
 
         yield self.store.set_push_actions_for_event_and_users(
             event,
