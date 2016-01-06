@@ -936,6 +936,7 @@ class EventsStore(SQLBaseStore):
             )
             now_reporting = self.cursor_to_dict(txn)
             if not now_reporting:
+                logger.info("Calculating daily messages skipped; no now_reporting")
                 return None
             now_reporting = now_reporting[0]["stream_ordering"]
 
@@ -948,11 +949,18 @@ class EventsStore(SQLBaseStore):
             )
 
             if not last_reported:
+                logger.info("Calculating daily messages skipped; no last_reported")
                 return None
 
             # Close enough to correct for our purposes.
             yesterday = (now - 24 * 60 * 60)
-            if math.fabs(yesterday - last_reported[0]["reported_time"]) > 60 * 60:
+            since_yesterday_seconds = yesterday - last_reported[0]["reported_time"]
+            any_since_yesterday = math.fabs(since_yesterday_seconds) > 60 * 60
+            if any_since_yesterday:
+                logger.info(
+                    "Calculating daily messages skipped; since_yesterday_seconds: %d" %
+                    (since_yesterday_seconds,)
+                )
                 return None
 
             txn.execute(
@@ -968,6 +976,7 @@ class EventsStore(SQLBaseStore):
             )
             rows = self.cursor_to_dict(txn)
             if not rows:
+                logger.info("Calculating daily messages skipped; messages count missing")
                 return None
             return rows[0]["messages"]
 
