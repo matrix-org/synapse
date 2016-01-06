@@ -19,6 +19,8 @@ import bulk_push_rule_evaluator
 
 import logging
 
+from synapse.api.constants import EventTypes
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,6 +36,11 @@ class ActionGenerator:
 
     @defer.inlineCallbacks
     def handle_push_actions_for_event(self, event, handler):
+        if event.type == EventTypes.Redaction and event.redacts is not None:
+            yield self.store.remove_push_actions_for_event_id(
+                event.room_id, event.redacts
+            )
+
         bulk_evaluator = yield bulk_push_rule_evaluator.evaluator_for_room_id(
             event.room_id, self.store
         )

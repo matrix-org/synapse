@@ -93,6 +93,18 @@ class EventPushActionsStore(SQLBaseStore):
         )
         defer.returnValue(ret)
 
+    @defer.inlineCallbacks
+    def remove_push_actions_for_event_id(self, room_id, event_id):
+        def f(txn):
+            txn.execute(
+                "DELETE FROM event_push_actions WHERE room_id = ? AND event_id = ?",
+                (room_id, event_id)
+            )
+        yield self.runInteraction(
+            "remove_push_actions_for_event_id",
+            f
+        )
+
 
 class EventPushActionsTable(object):
     table_name = "event_push_actions"
