@@ -167,8 +167,7 @@ identify itself to other Home Servers, so don't lose or delete them. It would be
 wise to back them up somewhere safe. If, for whatever reason, you do need to
 change your Home Server's keys, you may find that other Home Servers have the
 old key cached. If you update the signing key, you should change the name of the
-key in the <server name>.signing.key file (the second word, which by default is
-, 'auto') to something different.
+key in the <server name>.signing.key file (the second word) to something different.
 
 By default, registration of new users is disabled. You can either enable
 registration in the config by specifying ``enable_registration: true``
