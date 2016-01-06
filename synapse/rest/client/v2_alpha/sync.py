@@ -91,6 +91,7 @@ class SyncRestServlet(RestServlet):
 
         timeout = parse_integer(request, "timeout", default=0)
         since = parse_string(request, "since")
+        until = parse_string(request, "until")
         set_presence = parse_string(
             request, "set_presence", default="online",
             allowed_values=self.ALLOWED_PRESENCE
@@ -125,16 +126,15 @@ class SyncRestServlet(RestServlet):
                 400, "Guest users must provide a list of rooms in the filter"
             )
 
-        if since is not None:
-            since_token = StreamToken.from_string(since)
-        else:
-            since_token = None
+        since_token = StreamToken.from_string(since) if since else None
+        until_token = StreamToken.from_string(until) if until else None
 
         sync_config = SyncConfig(
             user=user,
             is_guest=is_guest,
             filter=filter,
             since_token=since_token,
+            until_token=until_token,
             full_state=full_state,
         )
 
