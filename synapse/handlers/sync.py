@@ -340,7 +340,7 @@ class SyncHandler(BaseHandler):
             from_key=typing_key,
             limit=sync_config.filter.ephemeral_limit(),
             room_ids=room_ids,
-            is_guest=False,
+            is_guest=sync_config.is_guest,
         )
         now_token = now_token.copy_and_replace("typing_key", typing_key)
 
@@ -363,8 +363,7 @@ class SyncHandler(BaseHandler):
             from_key=receipt_key,
             limit=sync_config.filter.ephemeral_limit(),
             room_ids=room_ids,
-            # /sync doesn't support guest access, they can't get to this point in code
-            is_guest=False,
+            is_guest=sync_config.is_guest,
         )
         now_token = now_token.copy_and_replace("receipt_key", receipt_key)
 
@@ -420,8 +419,7 @@ class SyncHandler(BaseHandler):
             from_key=since_token.presence_key,
             limit=sync_config.filter.presence_limit(),
             room_ids=room_ids,
-            # /sync doesn't support guest access, they can't get to this point in code
-            is_guest=False,
+            is_guest=sync_config.is_guest,
         )
         now_token = now_token.copy_and_replace("presence_key", presence_key)
 
