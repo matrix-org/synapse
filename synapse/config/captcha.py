@@ -29,10 +29,10 @@ class CaptchaConfig(Config):
         ## Captcha ##
 
         # This Home Server's ReCAPTCHA public key.
-        recaptcha_private_key: "YOUR_PRIVATE_KEY"
+        recaptcha_public_key: "YOUR_PUBLIC_KEY"
 
         # This Home Server's ReCAPTCHA private key.
-        recaptcha_public_key: "YOUR_PUBLIC_KEY"
+        recaptcha_private_key: "YOUR_PRIVATE_KEY"
 
         # Enables ReCaptcha checks when registering, preventing signup
         # unless a captcha is answered. Requires a valid ReCaptcha
