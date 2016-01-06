@@ -149,9 +149,6 @@ class FilterCollection(object):
             "include_leave", False
         )
 
-    def list_rooms(self):
-        return self.room_filter.list_rooms()
-
     def timeline_limit(self):
         return self.room_timeline_filter.limit()
 
@@ -183,15 +180,6 @@ class FilterCollection(object):
 class Filter(object):
     def __init__(self, filter_json):
         self.filter_json = filter_json
-
-    def list_rooms(self):
-        """The list of room_id strings this filter restricts the output to
-        or None if the this filter doesn't list the room ids.
-        """
-        if "rooms" in self.filter_json:
-            return list(set(self.filter_json["rooms"]))
-        else:
-            return None
 
     def check(self, event):
         """Checks whether the filter matches the given event.

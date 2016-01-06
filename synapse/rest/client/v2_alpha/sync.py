@@ -120,15 +120,10 @@ class SyncRestServlet(RestServlet):
             except:
                 filter = FilterCollection({})
 
-        if is_guest and filter.list_rooms() is None:
-            raise SynapseError(
-                400, "Guest users must provide a list of rooms in the filter"
-            )
-
         sync_config = SyncConfig(
             user=user,
-            is_guest=is_guest,
             filter=filter,
+            is_guest=is_guest,
         )
 
         if since is not None:
