@@ -688,6 +688,7 @@ def run(hs):
 
     @defer.inlineCallbacks
     def phone_stats_home():
+        logger.info("Gathering stats for reporting")
         now = int(hs.get_clock().time())
         uptime = int(now - start_time)
         if uptime < 0:
@@ -718,6 +719,7 @@ def run(hs):
 
     if hs.config.report_stats:
         phone_home_task = task.LoopingCall(phone_stats_home)
+        logger.info("Scheduling stats reporting for 24 hour intervals")
         phone_home_task.start(60 * 60 * 24, now=False)
 
     def in_thread():
