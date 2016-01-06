@@ -91,6 +91,7 @@ class SyncRestServlet(RestServlet):
 
         timeout = parse_integer(request, "timeout", default=0)
         since = parse_string(request, "since")
+        until = parse_string(request, "until")
         set_presence = parse_string(
             request, "set_presence", default="online",
             allowed_values=self.ALLOWED_PRESENCE
@@ -125,24 +126,24 @@ class SyncRestServlet(RestServlet):
                 400, "Guest users must provide a list of rooms in the filter"
             )
 
+        since_token = StreamToken.from_string(since) if since else None
+        until_token = StreamToken.from_string(until) if until else None
+
         sync_config = SyncConfig(
             user=user,
             is_guest=is_guest,
             filter=filter,
+            since_token=since_token,
+            until_token=until_token,
+            full_state=full_state,
         )
-
-        if since is not None:
-            since_token = StreamToken.from_string(since)
-        else:
-            since_token = None
 
         if set_presence == "online":
             yield self.event_stream_handler.started_stream(user)
 
         try:
             sync_result = yield self.sync_handler.wait_for_sync_for_user(
-                sync_config, since_token=since_token, timeout=timeout,
-                full_state=full_state
+                sync_config, timeout=timeout,
             )
         finally:
             if set_presence == "online":
