@@ -142,7 +142,7 @@ class RegistrationStore(SQLBaseStore):
         """
         def f(txn):
             sql = (
-                "SELECT name, password_hash, is_guest FROM users"
+                "SELECT name, password_hash FROM users"
                 " WHERE lower(name) = lower(?)"
             )
             txn.execute(sql, (user_id,))
