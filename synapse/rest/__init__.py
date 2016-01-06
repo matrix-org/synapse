@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.rest.client import (
+    versions,
+)
+
 from synapse.rest.client.v1 import (
     room,
     events,
@@ -53,6 +57,8 @@ class ClientRestResource(JsonResource):
 
     @staticmethod
     def register_servlets(client_resource, hs):
+        versions.register_servlets(client_resource)
+
         # "v1"
         room.register_servlets(hs, client_resource)
         events.register_servlets(hs, client_resource)
