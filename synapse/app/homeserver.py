@@ -375,10 +375,13 @@ def change_resource_limit(soft_file_no):
             soft_file_no = hard
 
         resource.setrlimit(resource.RLIMIT_NOFILE, (soft_file_no, hard))
-
         logger.info("Set file limit to: %d", soft_file_no)
+
+        resource.setrlimit(
+            resource.RLIMIT_CORE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
+        )
     except (ValueError, resource.error) as e:
-        logger.warn("Failed to set file limit: %s", e)
+        logger.warn("Failed to set file or core limit: %s", e)
 
 
 def setup(config_options):
