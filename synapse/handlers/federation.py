@@ -310,6 +310,7 @@ class FederationHandler(BaseHandler):
 
         event_ids = set(e.event_id for e in events)
 
+        # A list of dangling edges in the set of events received from the peer
         edges = [
             ev.event_id
             for ev in events
