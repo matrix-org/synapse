@@ -42,6 +42,12 @@ from synapse.storage.prepare_database import UpgradeDatabaseException
 from synapse.server import HomeServer
 
 
+from twisted.conch.manhole import ColoredManhole
+from twisted.conch.insults import insults
+from twisted.conch import manhole_ssh
+from twisted.cred import checkers, portal
+
+
 from twisted.internet import reactor, task, defer
 from twisted.application import service
 from twisted.enterprise import adbapi
@@ -67,7 +73,6 @@ from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse import events
 
 from daemonize import Daemonize
-import twisted.manhole.telnet
 
 import synapse
 
@@ -249,10 +254,21 @@ class SynapseHomeServer(HomeServer):
             if listener["type"] == "http":
                 self._listener_http(config, listener)
             elif listener["type"] == "manhole":
-                f = twisted.manhole.telnet.ShellFactory()
-                f.username = "matrix"
-                f.password = "rabbithole"
-                f.namespace['hs'] = self
+                checker = checkers.InMemoryUsernamePasswordDatabaseDontUse(
+                    matrix="rabbithole"
+                )
+
+                rlm = manhole_ssh.TerminalRealm()
+                rlm.chainedProtocolFactory = lambda: insults.ServerProtocol(
+                    ColoredManhole,
+                    {
+                        "__name__": "__console__",
+                        "hs": self,
+                    }
+                )
+
+                f = manhole_ssh.ConchFactory(portal.Portal(rlm, [checker]))
+
                 reactor.listenTCP(
                     listener["port"],
                     f,
