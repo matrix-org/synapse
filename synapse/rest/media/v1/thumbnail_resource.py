@@ -253,7 +253,7 @@ class ThumbnailResource(BaseMediaResource):
                 t_w = info["thumbnail_width"]
                 t_h = info["thumbnail_height"]
                 t_method = info["thumbnail_method"]
-                if t_method == "scale" or t_method == "crop":
+                if t_method == "crop":
                     aspect_quality = abs(d_w * t_h - d_h * t_w)
                     min_quality = 0 if d_w <= t_w and d_h <= t_h else 1
                     size_quality = abs((d_w - t_w) * (d_h - t_h))
