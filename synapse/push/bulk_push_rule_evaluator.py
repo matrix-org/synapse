@@ -42,7 +42,7 @@ def evaluator_for_room_id(room_id, store):
         uid: baserules.list_with_base_rules(
             [decode_rule_json(rule_list) for rule_list in rules_by_user[uid]]
             if uid in rules_by_user else [],
-            UserID.from_string(uid)
+            UserID.from_string(uid),
         )
         for uid in users
     }
