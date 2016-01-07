@@ -103,7 +103,7 @@ class RegistrationStore(SQLBaseStore):
             if was_guest:
                 txn.execute("UPDATE users SET"
                             " password_hash = ?,"
-                            " upgrade_ts = ?"
+                            " upgrade_ts = ?,"
                             " is_guest = ?"
                             " WHERE name = ?",
                             [password_hash, now, make_guest, user_id])
