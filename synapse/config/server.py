@@ -200,7 +200,7 @@ class ServerConfig(Config):
               - names: [federation]
                 compress: false
 
-          # Turn on the twisted telnet manhole service on localhost on the given
+          # Turn on the twisted ssh manhole service on localhost on the given
           # port.
           # - port: 9000
           #   bind_address: 127.0.0.1
