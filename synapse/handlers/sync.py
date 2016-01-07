@@ -660,7 +660,7 @@ class SyncHandler(BaseHandler):
             ),
         )
 
-        logging.debug("Room sync: %r", room_sync)
+        logger.debug("Room sync: %r", room_sync)
 
         defer.returnValue(room_sync)
 
@@ -709,7 +709,7 @@ class SyncHandler(BaseHandler):
             ),
         )
 
-        logging.debug("Room sync: %r", room_sync)
+        logger.debug("Room sync: %r", room_sync)
 
         defer.returnValue(room_sync)
 
