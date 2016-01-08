@@ -259,6 +259,14 @@ During setup of Synapse you need to call python2.7 directly again::
 
 ...substituting your host and domain name as appropriate.
 
+FreeBSD
+-------
+
+Synapse can be installed via FreeBSD Ports or Packages:
+
+ - Ports: ``cd /usr/ports/net/py-matrix-synapse && make install clean``
+ - Packages: ``pkg install py27-matrix-synapse``
+
 Windows Install
 ---------------
 Synapse can be installed on Cygwin. It requires the following Cygwin packages:
