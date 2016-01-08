@@ -33,6 +33,7 @@ from .pusher import PusherStore
 from .push_rule import PushRuleStore
 from .media_repository import MediaRepositoryStore
 from .rejections import RejectionsStore
+from .event_push_actions import EventPushActionsStore
 
 from .state import StateStore
 from .signatures import SignatureStore
@@ -75,6 +76,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 SearchStore,
                 TagsStore,
                 AccountDataStore,
+                EventPushActionsStore
                 ):
 
     def __init__(self, hs):

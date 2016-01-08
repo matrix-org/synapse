@@ -311,6 +311,7 @@ class SyncRestServlet(RestServlet):
         if joined:
             ephemeral_events = filter.filter_room_ephemeral(room.ephemeral)
             result["ephemeral"] = {"events": ephemeral_events}
+            result["unread_notification_count"] = room.unread_notification_count
 
         return result
 

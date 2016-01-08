@@ -43,7 +43,7 @@ def evaluator_for_user_name_and_profile_tag(user_name, profile_tag, room_id, sto
 
 
 class PushRuleEvaluator:
-    DEFAULT_ACTIONS = ['dont_notify']
+    DEFAULT_ACTIONS = []
     INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
     def __init__(self, user_name, profile_tag, raw_rules, enabled_map, room_id,
@@ -85,7 +85,7 @@ class PushRuleEvaluator:
         """
         if ev['user_id'] == self.user_name:
             # let's assume you probably know about messages you sent yourself
-            defer.returnValue(['dont_notify'])
+            defer.returnValue([])
 
         room_id = ev['room_id']
 
@@ -113,7 +113,8 @@ class PushRuleEvaluator:
             for c in conditions:
                 matches &= self._event_fulfills_condition(
                     ev, c, display_name=my_display_name,
-                    room_member_count=room_member_count
+                    room_member_count=room_member_count,
+                    profile_tag=self.profile_tag
                 )
             logger.debug(
                 "Rule %s %s",
@@ -131,6 +132,11 @@ class PushRuleEvaluator:
                     "%s matches for user %s, event %s",
                     r['rule_id'], self.user_name, ev['event_id']
                 )
+
+                # filter out dont_notify as we treat an empty actions list
+                # as dont_notify, and this doesn't take up a row in our database
+                actions = [x for x in actions if x != 'dont_notify']
+
                 defer.returnValue(actions)
 
         logger.info(
@@ -151,16 +157,18 @@ class PushRuleEvaluator:
                                           re.sub(r'\\\-', '-', x.group(2)))), r)
         return r
 
-    def _event_fulfills_condition(self, ev, condition, display_name, room_member_count):
+    @staticmethod
+    def _event_fulfills_condition(ev, condition,
+                                  display_name, room_member_count, profile_tag):
         if condition['kind'] == 'event_match':
             if 'pattern' not in condition:
                 logger.warn("event_match condition with no pattern")
                 return False
             # XXX: optimisation: cache our pattern regexps
             if condition['key'] == 'content.body':
-                r = r'\b%s\b' % self._glob_to_regexp(condition['pattern'])
+                r = r'\b%s\b' % PushRuleEvaluator._glob_to_regexp(condition['pattern'])
             else:
-                r = r'^%s$' % self._glob_to_regexp(condition['pattern'])
+                r = r'^%s$' % PushRuleEvaluator._glob_to_regexp(condition['pattern'])
             val = _value_for_dotted_key(condition['key'], ev)
             if val is None:
                 return False
@@ -169,7 +177,7 @@ class PushRuleEvaluator:
         elif condition['kind'] == 'device':
             if 'profile_tag' not in condition:
                 return True
-            return condition['profile_tag'] == self.profile_tag
+            return condition['profile_tag'] == profile_tag
 
         elif condition['kind'] == 'contains_display_name':
             # This is special because display names can be different

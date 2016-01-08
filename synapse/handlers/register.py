@@ -84,7 +84,8 @@ class RegistrationHandler(BaseHandler):
         localpart=None,
         password=None,
         generate_token=True,
-        guest_access_token=None
+        guest_access_token=None,
+        make_guest=False
     ):
         """Registers a new client on the server.
 
@@ -118,6 +119,7 @@ class RegistrationHandler(BaseHandler):
                 token=token,
                 password_hash=password_hash,
                 was_guest=guest_access_token is not None,
+                make_guest=make_guest,
             )
 
             yield registered_user(self.distributor, user)

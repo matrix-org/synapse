@@ -49,6 +49,12 @@ class FederationTestCase(unittest.TestCase):
                 "get_destination_retry_timings",
                 "set_destination_retry_timings",
                 "have_events",
+                "get_users_in_room",
+                "bulk_get_push_rules",
+                "get_current_state",
+                "set_push_actions_for_event_and_users",
+                "is_guest",
+                "get_state_for_events",
             ]),
             resource_for_federation=NonCallableMock(),
             http_client=NonCallableMock(spec_set=[]),
@@ -69,6 +75,8 @@ class FederationTestCase(unittest.TestCase):
 
         self.handlers.federation_handler = FederationHandler(self.hs)
 
+        self.datastore.get_state_for_events.return_value = {"$a:b": {}}
+
     @defer.inlineCallbacks
     def test_msg(self):
         pdu = FrozenEvent({
@@ -85,6 +93,9 @@ class FederationTestCase(unittest.TestCase):
 
         self.datastore.persist_event.return_value = defer.succeed((1,1))
         self.datastore.get_room.return_value = defer.succeed(True)
+        self.datastore.get_users_in_room.return_value = ["@a:b"]
+        self.datastore.bulk_get_push_rules.return_value = {}
+        self.datastore.get_current_state.return_value = {}
         self.auth.check_host_in_room.return_value = defer.succeed(True)
 
         retry_timings_res = {

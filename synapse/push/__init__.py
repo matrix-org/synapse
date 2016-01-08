@@ -27,6 +27,9 @@ import random
 logger = logging.getLogger(__name__)
 
 
+# Pushers could now be moved to pull out of the event_push_actions table instead
+# of listening on the event stream: this would avoid them having to run the
+# rules again.
 class Pusher(object):
     INITIAL_BACKOFF = 1000
     MAX_BACKOFF = 60 * 60 * 1000
@@ -157,21 +160,7 @@ class Pusher(object):
         actions = yield rule_evaluator.actions_for_event(single_event)
         tweaks = rule_evaluator.tweaks_for_actions(actions)
 
-        if len(actions) == 0:
-            logger.warn("Empty actions! Using default action.")
-            actions = Pusher.DEFAULT_ACTIONS
-
-        if 'notify' not in actions and 'dont_notify' not in actions:
-            logger.warn("Neither notify nor dont_notify in actions: adding default")
-            actions.extend(Pusher.DEFAULT_ACTIONS)
-
-        if 'dont_notify' in actions:
-            logger.debug(
-                "%s for %s: dont_notify",
-                single_event['event_id'], self.user_name
-            )
-            processed = True
-        else:
+        if 'notify' in actions:
             rejected = yield self.dispatch_push(single_event, tweaks)
             self.has_unread = True
             if isinstance(rejected, list) or isinstance(rejected, tuple):
@@ -192,6 +181,8 @@ class Pusher(object):
                         yield self.hs.get_pusherpool().remove_pusher(
                             self.app_id, pk, self.user_name
                         )
+        else:
+            processed = True
 
         if not self.alive:
             return
