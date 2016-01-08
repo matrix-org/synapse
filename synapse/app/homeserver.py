@@ -496,8 +496,8 @@ class SynapseRequest(Request):
 
     def get_redacted_uri(self):
         return re.sub(
-            r'(\?.*access_token=)[^&]*(.*)$',
-            r'\1<redacted>\2',
+            r'(\?.*accesss(_|%5[Ff])token=)[^&]*(.*)$',
+            r'\1<redacted>\3',
             self.uri
         )
 
