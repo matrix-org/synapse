@@ -32,17 +32,17 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
         state = yield self.handlers.presence_handler.get_state(
-            target_user=user, auth_user=auth_user)
+            target_user=user, auth_user=requester.user)
 
         defer.returnValue((200, state))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
         state = {}
@@ -64,7 +64,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
             raise SynapseError(400, "Unable to parse state")
 
         yield self.handlers.presence_handler.set_state(
-            target_user=user, auth_user=auth_user, state=state)
+            target_user=user, auth_user=requester.user, state=state)
 
         defer.returnValue((200, {}))
 
@@ -77,13 +77,13 @@ class PresenceListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
         if not self.hs.is_mine(user):
             raise SynapseError(400, "User not hosted on this Home Server")
 
-        if auth_user != user:
+        if requester.user != user:
             raise SynapseError(400, "Cannot get another user's presence list")
 
         presence = yield self.handlers.presence_handler.get_presence_list(
@@ -97,13 +97,13 @@ class PresenceListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, user_id):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
         if not self.hs.is_mine(user):
             raise SynapseError(400, "User not hosted on this Home Server")
 
-        if auth_user != user:
+        if requester.user != user:
             raise SynapseError(
                 400, "Cannot modify another user's presence list")
 

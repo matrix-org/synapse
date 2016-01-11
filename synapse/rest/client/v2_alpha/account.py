@@ -55,10 +55,11 @@ class PasswordRestServlet(RestServlet):
 
         if LoginType.PASSWORD in result:
             # if using password, they should also be logged in
-            auth_user, _, _ = yield self.auth.get_user_by_req(request)
-            if auth_user.to_string() != result[LoginType.PASSWORD]:
+            requester = yield self.auth.get_user_by_req(request)
+            requester_user_id = requester.user.to_string()
+            if requester_user_id.to_string() != result[LoginType.PASSWORD]:
                 raise LoginError(400, "", Codes.UNKNOWN)
-            user_id = auth_user.to_string()
+            user_id = requester_user_id
         elif LoginType.EMAIL_IDENTITY in result:
             threepid = result[LoginType.EMAIL_IDENTITY]
             if 'medium' not in threepid or 'address' not in threepid:
@@ -102,10 +103,10 @@ class ThreepidRestServlet(RestServlet):
     def on_GET(self, request):
         yield run_on_reactor()
 
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request)
 
         threepids = yield self.hs.get_datastore().user_get_threepids(
-            auth_user.to_string()
+            requester.user.to_string()
         )
 
         defer.returnValue((200, {'threepids': threepids}))
@@ -120,7 +121,8 @@ class ThreepidRestServlet(RestServlet):
             raise SynapseError(400, "Missing param", Codes.MISSING_PARAM)
         threePidCreds = body['threePidCreds']
 
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
 
         threepid = yield self.identity_handler.threepid_from_creds(threePidCreds)
 
@@ -135,7 +137,7 @@ class ThreepidRestServlet(RestServlet):
                 raise SynapseError(500, "Invalid response from ID Server")
 
         yield self.auth_handler.add_threepid(
-            auth_user.to_string(),
+            user_id,
             threepid['medium'],
             threepid['address'],
             threepid['validated_at'],
@@ -144,10 +146,10 @@ class ThreepidRestServlet(RestServlet):
         if 'bind' in body and body['bind']:
             logger.debug(
                 "Binding emails %s to %s",
-                threepid, auth_user.to_string()
+                threepid, user_id
             )
             yield self.identity_handler.bind_threepid(
-                threePidCreds, auth_user.to_string()
+                threePidCreds, user_id
             )
 
         defer.returnValue((200, {}))

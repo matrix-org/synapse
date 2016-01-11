@@ -85,9 +85,10 @@ class SyncRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        user, token_id, is_guest = yield self.auth.get_user_by_req(
+        requester = yield self.auth.get_user_by_req(
             request, allow_guest=True
         )
+        user = requester.user
 
         timeout = parse_integer(request, "timeout", default=0)
         since = parse_string(request, "since")
@@ -123,7 +124,7 @@ class SyncRestServlet(RestServlet):
         sync_config = SyncConfig(
             user=user,
             filter=filter,
-            is_guest=is_guest,
+            is_guest=requester.is_guest,
         )
 
         if since is not None:
@@ -146,15 +147,15 @@ class SyncRestServlet(RestServlet):
         time_now = self.clock.time_msec()
 
         joined = self.encode_joined(
-            sync_result.joined, filter, time_now, token_id
+            sync_result.joined, filter, time_now, requester.access_token_id
         )
 
         invited = self.encode_invited(
-            sync_result.invited, filter, time_now, token_id
+            sync_result.invited, filter, time_now, requester.access_token_id
         )
 
         archived = self.encode_archived(
-            sync_result.archived, filter, time_now, token_id
+            sync_result.archived, filter, time_now, requester.access_token_id
         )
 
         response_content = {

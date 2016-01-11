@@ -43,8 +43,8 @@ class AccountDataServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id, account_data_type):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
-        if user_id != auth_user.to_string():
+        requester = yield self.auth.get_user_by_req(request)
+        if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
         try:
@@ -82,8 +82,8 @@ class RoomAccountDataServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id, room_id, account_data_type):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
-        if user_id != auth_user.to_string():
+        requester = yield self.auth.get_user_by_req(request)
+        if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
         try:

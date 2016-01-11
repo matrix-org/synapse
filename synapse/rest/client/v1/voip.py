@@ -28,7 +28,7 @@ class VoipRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request)
 
         turnUris = self.hs.config.turn_uris
         turnSecret = self.hs.config.turn_shared_secret
@@ -37,7 +37,7 @@ class VoipRestServlet(ClientV1RestServlet):
             defer.returnValue((200, {}))
 
         expiry = (self.hs.get_clock().time_msec() + userLifetime) / 1000
-        username = "%d:%s" % (expiry, auth_user.to_string())
+        username = "%d:%s" % (expiry, requester.user.to_string())
 
         mac = hmac.new(turnSecret, msg=username, digestmod=hashlib.sha1)
         # We need to use standard padded base64 encoding here
