@@ -106,12 +106,12 @@ class RegistrationStore(SQLBaseStore):
                             " upgrade_ts = ?,"
                             " is_guest = ?"
                             " WHERE name = ?",
-                            [password_hash, now, make_guest, user_id])
+                            [password_hash, now, 1 if make_guest else 0, user_id])
             else:
                 txn.execute("INSERT INTO users "
                             "(name, password_hash, creation_ts, is_guest) "
                             "VALUES (?,?,?,?)",
-                            [user_id, password_hash, now, make_guest])
+                            [user_id, password_hash, now, 1 if make_guest else 0])
         except self.database_engine.module.IntegrityError:
             raise StoreError(
                 400, "User ID already taken.", errcode=Codes.USER_IN_USE
