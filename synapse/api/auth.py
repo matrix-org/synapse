@@ -22,7 +22,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes, SynapseError, EventSizeError
-from synapse.types import RoomID, UserID, EventID
+from synapse.types import Requester, RoomID, UserID, EventID
 from synapse.util.logutils import log_function
 from unpaddedbase64 import decode_base64
 
@@ -534,7 +534,9 @@ class Auth(object):
 
                 request.authenticated_entity = user_id
 
-                defer.returnValue((UserID.from_string(user_id), "", False))
+                defer.returnValue(
+                    Requester(UserID.from_string(user_id), "", False)
+                )
                 return
             except KeyError:
                 pass  # normal users won't have the user_id query parameter set.
@@ -564,7 +566,7 @@ class Auth(object):
 
             request.authenticated_entity = user.to_string()
 
-            defer.returnValue((user, token_id, is_guest,))
+            defer.returnValue(Requester(user, token_id, is_guest))
         except KeyError:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",

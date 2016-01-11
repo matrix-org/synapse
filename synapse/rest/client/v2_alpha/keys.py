@@ -64,8 +64,8 @@ class KeyUploadServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, device_id):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
-        user_id = auth_user.to_string()
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
         # TODO: Check that the device_id matches that in the authentication
         # or derive the device_id from the authentication instead.
         try:
@@ -78,8 +78,8 @@ class KeyUploadServlet(RestServlet):
         device_keys = body.get("device_keys", None)
         if device_keys:
             logger.info(
-                "Updating device_keys for device %r for user %r at %d",
-                device_id, auth_user, time_now
+                "Updating device_keys for device %r for user %s at %d",
+                device_id, user_id, time_now
             )
             # TODO: Sign the JSON with the server key
             yield self.store.set_e2e_device_keys(
@@ -109,8 +109,8 @@ class KeyUploadServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, device_id):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
-        user_id = auth_user.to_string()
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
 
         result = yield self.store.count_e2e_one_time_keys(user_id, device_id)
         defer.returnValue((200, {"one_time_key_counts": result}))
@@ -182,8 +182,8 @@ class KeyQueryServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id, device_id):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
-        auth_user_id = auth_user.to_string()
+        requester = yield self.auth.get_user_by_req(request)
+        auth_user_id = requester.user.to_string()
         user_id = user_id if user_id else auth_user_id
         device_ids = [device_id] if device_id else []
         result = yield self.handle_request(

@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """Tests REST events for /presence paths."""
-
 from tests import unittest
 from twisted.internet import defer
 
@@ -26,7 +25,7 @@ from synapse.api.constants import PresenceState
 from synapse.handlers.presence import PresenceHandler
 from synapse.rest.client.v1 import presence
 from synapse.rest.client.v1 import events
-from synapse.types import UserID
+from synapse.types import Requester, UserID
 from synapse.util.async import run_on_reactor
 
 from collections import namedtuple
@@ -301,7 +300,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         hs.get_clock().time_msec.return_value = 1000000
 
         def _get_user_by_req(req=None, allow_guest=False):
-            return (UserID.from_string(myid), "", False)
+            return Requester(UserID.from_string(myid), "", False)
 
         hs.get_v1auth().get_user_by_req = _get_user_by_req
 

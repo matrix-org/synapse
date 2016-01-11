@@ -69,9 +69,9 @@ class ClientDirectoryServer(ClientV1RestServlet):
 
         try:
             # try to auth as a user
-            user, _, _ = yield self.auth.get_user_by_req(request)
+            requester = yield self.auth.get_user_by_req(request)
             try:
-                user_id = user.to_string()
+                user_id = requester.user.to_string()
                 yield dir_handler.create_association(
                     user_id, room_alias, room_id, servers
                 )
@@ -116,8 +116,8 @@ class ClientDirectoryServer(ClientV1RestServlet):
             # fallback to default user behaviour if they aren't an AS
             pass
 
-        user, _, _ = yield self.auth.get_user_by_req(request)
-
+        requester = yield self.auth.get_user_by_req(request)
+        user = requester.user
         is_admin = yield self.auth.is_server_admin(user)
         if not is_admin:
             raise AuthError(403, "You need to be a server admin")

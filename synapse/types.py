@@ -18,6 +18,9 @@ from synapse.api.errors import SynapseError
 from collections import namedtuple
 
 
+Requester = namedtuple("Requester", ["user", "access_token_id", "is_guest"])
+
+
 class DomainSpecificString(
         namedtuple("DomainSpecificString", ("localpart", "domain"))
 ):

@@ -70,7 +70,7 @@ class UploadResource(BaseMediaResource):
     @request_handler
     @defer.inlineCallbacks
     def _async_render_POST(self, request):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request)
         # TODO: The checks here are a bit late. The content will have
         # already been uploaded to a tmp file at this point
         content_length = request.getHeader("Content-Length")
@@ -110,7 +110,7 @@ class UploadResource(BaseMediaResource):
 
         content_uri = yield self.create_content(
             media_type, upload_name, request.content.read(),
-            content_length, auth_user
+            content_length, requester.user
         )
 
         respond_with_json(
