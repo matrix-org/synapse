@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-ALTER TABLE users ADD is_guest admin SMALLINT DEFAULT 0 NOT NULL;
+ALTER TABLE users ADD is_guest SMALLINT DEFAULT 0 NOT NULL;
 /*
  * NB: any guest users created between 27 and 28 will be incorrectly
  * marked as not guests: we don't bother to fill these in correctly
