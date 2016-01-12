@@ -86,7 +86,7 @@ class PusherStore(SQLBaseStore):
         try:
             next_id = yield self._pushers_id_gen.get_next()
             yield self._simple_upsert(
-                PushersTable.table_name,
+                "pushers",
                 dict(
                     app_id=app_id,
                     pushkey=pushkey,
@@ -114,7 +114,7 @@ class PusherStore(SQLBaseStore):
     @defer.inlineCallbacks
     def delete_pusher_by_app_id_pushkey_user_name(self, app_id, pushkey, user_name):
         yield self._simple_delete_one(
-            PushersTable.table_name,
+            "pushers",
             {"app_id": app_id, "pushkey": pushkey, 'user_name': user_name},
             desc="delete_pusher_by_app_id_pushkey_user_name",
         )
@@ -122,7 +122,7 @@ class PusherStore(SQLBaseStore):
     @defer.inlineCallbacks
     def update_pusher_last_token(self, app_id, pushkey, user_name, last_token):
         yield self._simple_update_one(
-            PushersTable.table_name,
+            "pushers",
             {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_name},
             {'last_token': last_token},
             desc="update_pusher_last_token",
@@ -132,7 +132,7 @@ class PusherStore(SQLBaseStore):
     def update_pusher_last_token_and_success(self, app_id, pushkey, user_name,
                                              last_token, last_success):
         yield self._simple_update_one(
-            PushersTable.table_name,
+            "pushers",
             {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_name},
             {'last_token': last_token, 'last_success': last_success},
             desc="update_pusher_last_token_and_success",
@@ -142,12 +142,8 @@ class PusherStore(SQLBaseStore):
     def update_pusher_failing_since(self, app_id, pushkey, user_name,
                                     failing_since):
         yield self._simple_update_one(
-            PushersTable.table_name,
+            "pushers",
             {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_name},
             {'failing_since': failing_since},
             desc="update_pusher_failing_since",
         )
-
-
-class PushersTable(object):
-    table_name = "pushers"

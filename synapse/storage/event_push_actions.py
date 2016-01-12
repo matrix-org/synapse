@@ -42,7 +42,7 @@ class EventPushActionsStore(SQLBaseStore):
         yield self.runInteraction(
             "set_actions_for_event_and_users",
             self._simple_insert_many_txn,
-            EventPushActionsTable.table_name,
+            "event_push_actions",
             values
         )
 
@@ -104,7 +104,3 @@ class EventPushActionsStore(SQLBaseStore):
             "remove_push_actions_for_event_id",
             f
         )
-
-
-class EventPushActionsTable(object):
-    table_name = "event_push_actions"
