@@ -27,11 +27,14 @@ class PushRuleStore(SQLBaseStore):
     @cachedInlineCallbacks()
     def get_push_rules_for_user(self, user_name):
         rows = yield self._simple_select_list(
-            table=PushRuleTable.table_name,
+            table="push_rules",
             keyvalues={
                 "user_name": user_name,
             },
-            retcols=PushRuleTable.fields,
+            retcols=(
+                "user_name", "rule_id", "priority_class", "priority",
+                "conditions", "actions",
+            ),
             desc="get_push_rules_enabled_for_user",
         )
 
@@ -44,11 +47,13 @@ class PushRuleStore(SQLBaseStore):
     @cachedInlineCallbacks()
     def get_push_rules_enabled_for_user(self, user_name):
         results = yield self._simple_select_list(
-            table=PushRuleEnableTable.table_name,
+            table="push_rules_enable",
             keyvalues={
                 'user_name': user_name
             },
-            retcols=PushRuleEnableTable.fields,
+            retcols=(
+                "user_name", "rule_id", "enabled",
+            ),
             desc="get_push_rules_enabled_for_user",
         )
         defer.returnValue({
@@ -61,14 +66,15 @@ class PushRuleStore(SQLBaseStore):
 
         def f(txn, user_ids_to_fetch):
             sql = (
-                "SELECT " +
-                ",".join("pr."+x for x in PushRuleTable.fields) +
-                " FROM " + PushRuleTable.table_name + " pr " +
-                " LEFT JOIN " + PushRuleEnableTable.table_name + " pre " +
-                " ON pr.user_name = pre.user_name and pr.rule_id = pre.rule_id " +
-                " WHERE pr.user_name " +
+                "SELECT"
+                "  pr.user_name, pr.rule_id, priority_class, priority,"
+                "  conditions, actions"
+                " FROM push_rules AS pr"
+                " LEFT JOIN push_rules_enable AS pre"
+                " ON pr.user_name = pre.user_name AND pr.rule_id = pre.rule_id"
+                " WHERE pr.user_name"
                 " IN (" + ",".join("?" for _ in user_ids_to_fetch) + ")"
-                " AND (pre.enabled is null or pre.enabled = 1)"
+                " AND (pre.enabled IS NULL OR pre.enabled = 1)"
                 " ORDER BY pr.user_name, pr.priority_class DESC, pr.priority DESC"
             )
             txn.execute(sql, user_ids_to_fetch)
@@ -86,14 +92,15 @@ class PushRuleStore(SQLBaseStore):
                 "bulk_get_push_rules", f, batch_user_ids
             )
 
-            for r in rows:
-                rawdict = {
-                    PushRuleTable.fields[i]: r[i] for i in range(len(r))
-                }
+            cols = (
+                "user_name", "rule_id", "priority_class", "priority",
+                "conditions", "actions",
+            )
 
-                if rawdict['user_name'] not in results:
-                    results[rawdict['user_name']] = []
-                results[rawdict['user_name']].append(rawdict)
+            for row in rows:
+                rawdict = dict(zip(cols, rows))
+                results.setdefault(rawdict["user_name"], []).append(rawdict)
+
         defer.returnValue(results)
 
     @defer.inlineCallbacks
@@ -131,7 +138,7 @@ class PushRuleStore(SQLBaseStore):
 
         res = self._simple_select_one_txn(
             txn,
-            table=PushRuleTable.table_name,
+            table="push_rules",
             keyvalues={
                 "user_name": user_name,
                 "rule_id": relative_to_rule,
@@ -170,7 +177,7 @@ class PushRuleStore(SQLBaseStore):
         new_rule['priority'] = new_rule_priority
 
         sql = (
-            "SELECT COUNT(*) FROM " + PushRuleTable.table_name +
+            "SELECT COUNT(*) FROM push_rules"
             " WHERE user_name = ? AND priority_class = ? AND priority = ?"
         )
         txn.execute(sql, (user_name, priority_class, new_rule_priority))
@@ -179,7 +186,7 @@ class PushRuleStore(SQLBaseStore):
 
         # if there are conflicting rules, bump everything
         if num_conflicting:
-            sql = "UPDATE "+PushRuleTable.table_name+" SET priority = priority "
+            sql = "UPDATE push_rules SET priority = priority "
             if after:
                 sql += "-1"
             else:
@@ -202,7 +209,7 @@ class PushRuleStore(SQLBaseStore):
 
         self._simple_insert_txn(
             txn,
-            table=PushRuleTable.table_name,
+            table="push_rules",
             values=new_rule,
         )
 
@@ -210,7 +217,7 @@ class PushRuleStore(SQLBaseStore):
                                             priority_class, **kwargs):
         # find the highest priority rule in that class
         sql = (
-            "SELECT COUNT(*), MAX(priority) FROM " + PushRuleTable.table_name +
+            "SELECT COUNT(*), MAX(priority) FROM push_rules"
             " WHERE user_name = ? and priority_class = ?"
         )
         txn.execute(sql, (user_name, priority_class))
@@ -237,7 +244,7 @@ class PushRuleStore(SQLBaseStore):
 
         self._simple_insert_txn(
             txn,
-            table=PushRuleTable.table_name,
+            table="push_rules",
             values=new_rule,
         )
 
@@ -253,7 +260,7 @@ class PushRuleStore(SQLBaseStore):
             rule_id (str): The rule_id of the rule to be deleted
         """
         yield self._simple_delete_one(
-            PushRuleTable.table_name,
+            "push_rules",
             {'user_name': user_name, 'rule_id': rule_id},
             desc="delete_push_rule",
         )
@@ -274,7 +281,7 @@ class PushRuleStore(SQLBaseStore):
         new_id = self._push_rules_enable_id_gen.get_next_txn(txn)
         self._simple_upsert_txn(
             txn,
-            PushRuleEnableTable.table_name,
+            "push_rules_enable",
             {'user_name': user_name, 'rule_id': rule_id},
             {'enabled': 1 if enabled else 0},
             {'id': new_id},
@@ -293,27 +300,3 @@ class RuleNotFoundException(Exception):
 
 class InconsistentRuleException(Exception):
     pass
-
-
-class PushRuleTable(object):
-    table_name = "push_rules"
-
-    fields = [
-        "id",
-        "user_name",
-        "rule_id",
-        "priority_class",
-        "priority",
-        "conditions",
-        "actions",
-    ]
-
-
-class PushRuleEnableTable(object):
-    table_name = "push_rules_enable"
-
-    fields = [
-        "user_name",
-        "rule_id",
-        "enabled"
-    ]
