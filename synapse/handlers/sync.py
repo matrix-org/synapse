@@ -585,7 +585,8 @@ class SyncHandler(BaseHandler):
                 sync_config, leave_event, since_token, tags_by_room,
                 account_data_by_room
             )
-            archived.append(room_sync)
+            if room_sync:
+                archived.append(room_sync)
 
         invited = [
             InvitedSyncResult(room_id=event.room_id, invite=event)
@@ -725,6 +726,9 @@ class SyncHandler(BaseHandler):
         )
 
         leave_token = since_token.copy_and_replace("room_key", stream_token)
+
+        if since_token.is_after(leave_token):
+            defer.returnValue(None)
 
         batch = yield self.load_filtered_recents(
             leave_event.room_id, sync_config, leave_token, since_token,
