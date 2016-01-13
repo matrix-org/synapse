@@ -265,6 +265,7 @@ class ApplicationServiceStore(SQLBaseStore):
             except Exception as e:
                 logger.error("Failed to load appservice from '%s'", config_file)
                 logger.exception(e)
+                raise
 
 
 class ApplicationServiceTransactionStore(SQLBaseStore):
