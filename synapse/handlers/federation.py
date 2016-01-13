@@ -36,7 +36,7 @@ from synapse.events.utils import prune_event
 
 from synapse.util.retryutils import NotRetryingDestination
 
-from synapse.push.action_generator import ActionGenerator
+# from synapse.push.action_generator import ActionGenerator
 
 from twisted.internet import defer
 
@@ -244,11 +244,12 @@ class FederationHandler(BaseHandler):
                     user = UserID.from_string(event.state_key)
                     yield user_joined_room(self.distributor, user, event.room_id)
 
-        if not backfilled and not event.internal_metadata.is_outlier():
-            action_generator = ActionGenerator(self.store)
-            yield action_generator.handle_push_actions_for_event(
-                event, self
-            )
+        # Temporarily disable notifications due to performance concerns.
+        # if not backfilled and not event.internal_metadata.is_outlier():
+        #     action_generator = ActionGenerator(self.store)
+        #     yield action_generator.handle_push_actions_for_event(
+        #         event, self
+        #     )
 
     @defer.inlineCallbacks
     def _filter_events_for_server(self, server_name, room_id, events):
