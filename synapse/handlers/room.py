@@ -864,30 +864,41 @@ class RoomContextHandler(BaseHandler):
                 (excluding state).
 
         Returns:
-            dict
+            dict, or None if the event isn't found
         """
         before_limit = math.floor(limit/2.)
         after_limit = limit - before_limit
 
         now_token = yield self.hs.get_event_sources().get_current_token()
 
+        def filter_evts(events):
+            return self._filter_events_for_client(
+                user.to_string(),
+                events,
+                is_guest=is_guest,
+                require_all_visible_for_guests=False,
+            )
+
+        event = yield self.store.get_event(event_id, get_prev_content=True,
+                                           allow_none=True)
+        if not event:
+            defer.returnValue(None)
+            return
+
+        filtered = yield(filter_evts([event]))
+        if not filtered:
+            raise AuthError(
+                403,
+                "You don't have permission to access that event."
+            )
+
         results = yield self.store.get_events_around(
             room_id, event_id, before_limit, after_limit
         )
 
-        results["events_before"] = yield self._filter_events_for_client(
-            user.to_string(),
-            results["events_before"],
-            is_guest=is_guest,
-            require_all_visible_for_guests=False
-        )
-
-        results["events_after"] = yield self._filter_events_for_client(
-            user.to_string(),
-            results["events_after"],
-            is_guest=is_guest,
-            require_all_visible_for_guests=False
-        )
+        results["events_before"] = yield filter_evts(results["events_before"])
+        results["events_after"] = yield filter_evts(results["events_after"])
+        results["event"] = event
 
         if results["events_after"]:
             last_event_id = results["events_after"][-1].event_id
