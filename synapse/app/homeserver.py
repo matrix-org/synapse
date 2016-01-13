@@ -88,6 +88,9 @@ import time
 logger = logging.getLogger("synapse.app.homeserver")
 
 
+ACCESS_TOKEN_RE = re.compile(r'(\?.*access(_|%5[Ff])token=)[^&]*(.*)$')
+
+
 def gz_wrap(r):
     return EncodingResourceWrapper(r, [GzipEncoderFactory()])
 
@@ -495,8 +498,7 @@ class SynapseRequest(Request):
         )
 
     def get_redacted_uri(self):
-        return re.sub(
-            r'(\?.*accesss(_|%5[Ff])token=)[^&]*(.*)$',
+        return ACCESS_TOKEN_RE.sub(
             r'\1<redacted>\3',
             self.uri
         )
