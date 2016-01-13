@@ -840,9 +840,9 @@ class SyncHandler(BaseHandler):
         return False
 
     @defer.inlineCallbacks
-    def unreadnotifs_for_room_id(self, room_id, sync_config, ephemeral_by_room):
+    def unread_notifs_for_room_id(self, room_id, sync_config, ephemeral_by_room):
         # Temporarily disable notifications due to performance concerns.
-        return
+        defer.returnValue([])
 
         last_unread_event_id = self.last_read_event_id_for_room_and_user(
             room_id, sync_config.user.to_string(), ephemeral_by_room
