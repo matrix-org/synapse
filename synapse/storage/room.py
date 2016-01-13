@@ -49,7 +49,7 @@ class RoomStore(SQLBaseStore):
         """
         try:
             yield self._simple_insert(
-                RoomsTable.table_name,
+                "rooms",
                 {
                     "room_id": room_id,
                     "creator": room_creator_user_id,
@@ -70,9 +70,9 @@ class RoomStore(SQLBaseStore):
             A namedtuple containing the room information, or an empty list.
         """
         return self._simple_select_one(
-            table=RoomsTable.table_name,
+            table="rooms",
             keyvalues={"room_id": room_id},
-            retcols=RoomsTable.fields,
+            retcols=("room_id", "is_public", "creator"),
             desc="get_room",
             allow_none=True,
         )
@@ -275,13 +275,3 @@ class RoomStore(SQLBaseStore):
                     aliases.extend(e.content['aliases'])
 
         defer.returnValue((name, aliases))
-
-
-class RoomsTable(object):
-    table_name = "rooms"
-
-    fields = [
-        "room_id",
-        "is_public",
-        "creator"
-    ]

@@ -28,7 +28,6 @@ from synapse.api.constants import PresenceState
 from synapse.api.errors import SynapseError
 from synapse.handlers.presence import PresenceHandler, UserPresenceCache
 from synapse.streams.config import SourcePaginationConfig
-from synapse.storage.transactions import DestinationsTable
 from synapse.types import UserID
 
 OFFLINE = PresenceState.OFFLINE
