@@ -27,7 +27,6 @@ from ..utils import (
 from synapse.api.errors import AuthError
 from synapse.handlers.typing import TypingNotificationHandler
 
-from synapse.storage.transactions import DestinationsTable
 from synapse.types import UserID
 
 
