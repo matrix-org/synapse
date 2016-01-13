@@ -93,18 +93,21 @@ class BulkPushRuleEvaluator:
                 continue
 
             for rule in rules:
-                if 'enabled' in rule and not rule['enabled']:
-                    continue
+                try:
+                    if 'enabled' in rule and not rule['enabled']:
+                        continue
 
-                # XXX: profile tags
-                if BulkPushRuleEvaluator.event_matches_rule(
-                    event, rule,
-                    display_name, len(self.users_in_room), None
-                ):
-                    actions = [x for x in rule['actions'] if x != 'dont_notify']
-                    if len(actions) > 0:
-                        actions_by_user[uid] = actions
-                    break
+                    # XXX: profile tags
+                    if BulkPushRuleEvaluator.event_matches_rule(
+                        event, rule,
+                        display_name, len(self.users_in_room), None
+                    ):
+                        actions = [x for x in rule['actions'] if x != 'dont_notify']
+                        if len(actions) > 0:
+                            actions_by_user[uid] = actions
+                        break
+                except:
+                    logger.exception("Failed to handle rule %r", rule)
         defer.returnValue(actions_by_user)
 
     @staticmethod
