@@ -36,10 +36,6 @@ def stopped_user_eventstream(distributor, user):
     return distributor.fire("stopped_user_eventstream", user)
 
 
-def user_joined_room(distributor, user, room_id):
-    return distributor.fire("user_joined_room", user, room_id)
-
-
 class EventStreamHandler(BaseHandler):
 
     def __init__(self, hs):
@@ -135,9 +131,6 @@ class EventStreamHandler(BaseHandler):
                 # Add some randomness to this value to try and mitigate against
                 # thundering herds on restart.
                 timeout = random.randint(int(timeout*0.9), int(timeout*1.1))
-
-            if is_guest:
-                yield user_joined_room(self.distributor, auth_user, room_id)
 
             events, tokens = yield self.notifier.get_events_for(
                 auth_user, pagin_config, timeout,
