@@ -15,27 +15,27 @@
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
 
 
-def list_with_base_rules(rawrules, user_name):
+def list_with_base_rules(rawrules, user_id):
     ruleslist = []
 
     # shove the server default rules for each kind onto the end of each
     current_prio_class = PRIORITY_CLASS_INVERSE_MAP.keys()[-1]
 
     ruleslist.extend(make_base_prepend_rules(
-        user_name, PRIORITY_CLASS_INVERSE_MAP[current_prio_class]
+        user_id, PRIORITY_CLASS_INVERSE_MAP[current_prio_class]
     ))
 
     for r in rawrules:
         if r['priority_class'] < current_prio_class:
             while r['priority_class'] < current_prio_class:
                 ruleslist.extend(make_base_append_rules(
-                    user_name,
+                    user_id,
                     PRIORITY_CLASS_INVERSE_MAP[current_prio_class]
                 ))
                 current_prio_class -= 1
                 if current_prio_class > 0:
                     ruleslist.extend(make_base_prepend_rules(
-                        user_name,
+                        user_id,
                         PRIORITY_CLASS_INVERSE_MAP[current_prio_class]
                     ))
 
@@ -43,13 +43,13 @@ def list_with_base_rules(rawrules, user_name):
 
     while current_prio_class > 0:
         ruleslist.extend(make_base_append_rules(
-            user_name,
+            user_id,
             PRIORITY_CLASS_INVERSE_MAP[current_prio_class]
         ))
         current_prio_class -= 1
         if current_prio_class > 0:
             ruleslist.extend(make_base_prepend_rules(
-                user_name,
+                user_id,
                 PRIORITY_CLASS_INVERSE_MAP[current_prio_class]
             ))
 

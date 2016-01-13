@@ -27,17 +27,17 @@ logger = logging.getLogger(__name__)
 
 
 @defer.inlineCallbacks
-def evaluator_for_user_name_and_profile_tag(user_name, profile_tag, room_id, store):
-    rawrules = yield store.get_push_rules_for_user(user_name)
-    enabled_map = yield store.get_push_rules_enabled_for_user(user_name)
+def evaluator_for_user_id_and_profile_tag(user_id, profile_tag, room_id, store):
+    rawrules = yield store.get_push_rules_for_user(user_id)
+    enabled_map = yield store.get_push_rules_enabled_for_user(user_id)
     our_member_event = yield store.get_current_state(
         room_id=room_id,
         event_type='m.room.member',
-        state_key=user_name,
+        state_key=user_id,
     )
 
     defer.returnValue(PushRuleEvaluator(
-        user_name, profile_tag, rawrules, enabled_map,
+        user_id, profile_tag, rawrules, enabled_map,
         room_id, our_member_event, store
     ))
 
@@ -46,9 +46,9 @@ class PushRuleEvaluator:
     DEFAULT_ACTIONS = []
     INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
-    def __init__(self, user_name, profile_tag, raw_rules, enabled_map, room_id,
+    def __init__(self, user_id, profile_tag, raw_rules, enabled_map, room_id,
                  our_member_event, store):
-        self.user_name = user_name
+        self.user_id = user_id
         self.profile_tag = profile_tag
         self.room_id = room_id
         self.our_member_event = our_member_event
@@ -61,7 +61,7 @@ class PushRuleEvaluator:
             rule['actions'] = json.loads(raw_rule['actions'])
             rules.append(rule)
 
-        user = UserID.from_string(self.user_name)
+        user = UserID.from_string(self.user_id)
         self.rules = baserules.list_with_base_rules(rules, user)
 
         self.enabled_map = enabled_map
@@ -83,7 +83,7 @@ class PushRuleEvaluator:
         has configured both globally and per-room when we have the ability
         to do such things.
         """
-        if ev['user_id'] == self.user_name:
+        if ev['user_id'] == self.user_id:
             # let's assume you probably know about messages you sent yourself
             defer.returnValue([])
 
@@ -124,13 +124,13 @@ class PushRuleEvaluator:
             if len(actions) == 0:
                 logger.warn(
                     "Ignoring rule id %s with no actions for user %s",
-                    r['rule_id'], self.user_name
+                    r['rule_id'], self.user_id
                 )
                 continue
             if matches:
                 logger.info(
                     "%s matches for user %s, event %s",
-                    r['rule_id'], self.user_name, ev['event_id']
+                    r['rule_id'], self.user_id, ev['event_id']
                 )
 
                 # filter out dont_notify as we treat an empty actions list
@@ -141,7 +141,7 @@ class PushRuleEvaluator:
 
         logger.info(
             "No rules match for user %s, event %s",
-            self.user_name, ev['event_id']
+            self.user_id, ev['event_id']
         )
         defer.returnValue(PushRuleEvaluator.DEFAULT_ACTIONS)
 

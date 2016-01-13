@@ -73,7 +73,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
         try:
             yield self.hs.get_datastore().add_push_rule(
-                user_name=requester.user.to_string(),
+                user_id=requester.user.to_string(),
                 rule_id=_namespaced_rule_id_from_spec(spec),
                 priority_class=priority_class,
                 conditions=conditions,
@@ -206,7 +206,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
     def on_OPTIONS(self, _):
         return 200, {}
 
-    def set_rule_attr(self, user_name, spec, val):
+    def set_rule_attr(self, user_id, spec, val):
         if spec['attr'] == 'enabled':
             if isinstance(val, dict) and "enabled" in val:
                 val = val["enabled"]
@@ -217,15 +217,15 @@ class PushRuleRestServlet(ClientV1RestServlet):
                 raise SynapseError(400, "Value for 'enabled' must be boolean")
             namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
             self.hs.get_datastore().set_push_rule_enabled(
-                user_name, namespaced_rule_id, val
+                user_id, namespaced_rule_id, val
             )
         else:
             raise UnrecognizedRequestError()
 
-    def get_rule_attr(self, user_name, namespaced_rule_id, attr):
+    def get_rule_attr(self, user_id, namespaced_rule_id, attr):
         if attr == 'enabled':
             return self.hs.get_datastore().get_push_rule_enabled_by_user_rule_id(
-                user_name, namespaced_rule_id
+                user_id, namespaced_rule_id
             )
         else:
             raise UnrecognizedRequestError()
