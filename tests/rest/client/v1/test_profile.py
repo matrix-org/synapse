@@ -18,6 +18,7 @@ from tests import unittest
 from twisted.internet import defer
 
 from mock import Mock
+from tests.utils import requester_for_user
 
 from ....utils import MockHttpResource, setup_test_homeserver
 
@@ -52,7 +53,7 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         def _get_user_by_req(request=None, allow_guest=False):
-            return Requester(UserID.from_string(myid), "", False)
+            return requester_for_user(UserID.from_string(myid))
 
         hs.get_v1auth().get_user_by_req = _get_user_by_req
 
@@ -83,7 +84,7 @@ class ProfileTestCase(unittest.TestCase):
 
         self.assertEquals(200, code)
         self.assertEquals(mocked_set.call_args[0][0].localpart, "1234ABCD")
-        self.assertEquals(mocked_set.call_args[0][1].localpart, "1234ABCD")
+        self.assertEquals(mocked_set.call_args[0][1].user.localpart, "1234ABCD")
         self.assertEquals(mocked_set.call_args[0][2], "Frank Jr.")
 
     @defer.inlineCallbacks
@@ -142,6 +143,6 @@ class ProfileTestCase(unittest.TestCase):
 
         self.assertEquals(200, code)
         self.assertEquals(mocked_set.call_args[0][0].localpart, "1234ABCD")
-        self.assertEquals(mocked_set.call_args[0][1].localpart, "1234ABCD")
+        self.assertEquals(mocked_set.call_args[0][1].user.localpart, "1234ABCD")
         self.assertEquals(mocked_set.call_args[0][2],
                 "http://my.server/pic.gif")

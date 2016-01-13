@@ -116,10 +116,13 @@ class BaseHandler(object):
 
         defer.returnValue(events_to_return)
 
-    def ratelimit(self, user_id):
+    def ratelimit(self, requester):
+        if requester.app_service and not requester.app_service.ratelimit:
+            return
+
         time_now = self.clock.time()
         allowed, time_allowed = self.ratelimiter.send_message(
-            user_id, time_now,
+            requester.user.to_string(), time_now,
             msg_rate_hz=self.hs.config.rc_messages_per_second,
             burst_count=self.hs.config.rc_message_burst_count,
         )

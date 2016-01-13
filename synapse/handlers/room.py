@@ -74,7 +74,7 @@ class RoomCreationHandler(BaseHandler):
     }
 
     @defer.inlineCallbacks
-    def create_room(self, user_id, room_id, config):
+    def create_room(self, requester, room_id, config):
         """ Creates a new room.
 
         Args:
@@ -88,7 +88,9 @@ class RoomCreationHandler(BaseHandler):
             SynapseError if the room ID was taken, couldn't be stored, or
             something went horribly wrong.
         """
-        self.ratelimit(user_id)
+        self.ratelimit(requester)
+
+        user_id = requester.user.to_string()
 
         if "room_alias_name" in config:
             for wchar in string.whitespace:
@@ -232,7 +234,7 @@ class RoomCreationHandler(BaseHandler):
                 medium,
                 address,
                 id_server,
-                token_id=None,
+                requester=None,
                 txn_id=None,
             )
 
@@ -624,7 +626,7 @@ class RoomMemberHandler(BaseHandler):
             medium,
             address,
             id_server,
-            token_id,
+            requester,
             txn_id
     ):
         invitee = yield self._lookup_3pid(
@@ -644,7 +646,7 @@ class RoomMemberHandler(BaseHandler):
                     "sender": inviter.to_string(),
                     "state_key": invitee,
                 },
-                token_id=token_id,
+                requester=requester,
                 txn_id=txn_id,
             )
         else:
@@ -654,7 +656,7 @@ class RoomMemberHandler(BaseHandler):
                 address,
                 room_id,
                 inviter,
-                token_id,
+                requester,
                 txn_id=txn_id
             )
 
@@ -717,7 +719,7 @@ class RoomMemberHandler(BaseHandler):
             address,
             room_id,
             user,
-            token_id,
+            requester,
             txn_id
     ):
         room_state = yield self.hs.get_state_handler().get_current_state(room_id)
@@ -777,7 +779,7 @@ class RoomMemberHandler(BaseHandler):
                 "sender": user.to_string(),
                 "state_key": token,
             },
-            token_id=token_id,
+            requester=requester,
             txn_id=txn_id,
         )
 
@@ -941,9 +943,7 @@ class RoomEventSource(object):
 
         to_key = yield self.get_current_key()
 
-        app_service = yield self.store.get_app_service_by_user_id(
-            user.to_string()
-        )
+        app_service = self.store.get_app_service_by_user_id(user.to_string())
         if app_service:
             events, end_key = yield self.store.get_appservice_room_stream(
                 service=app_service,

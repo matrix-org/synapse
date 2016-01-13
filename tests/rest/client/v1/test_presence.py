@@ -18,6 +18,7 @@ from tests import unittest
 from twisted.internet import defer
 
 from mock import Mock
+from tests.utils import requester_for_user
 
 from ....utils import MockHttpResource, setup_test_homeserver
 
@@ -300,7 +301,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         hs.get_clock().time_msec.return_value = 1000000
 
         def _get_user_by_req(req=None, allow_guest=False):
-            return Requester(UserID.from_string(myid), "", False)
+            return requester_for_user(UserID.from_string(myid))
 
         hs.get_v1auth().get_user_by_req = _get_user_by_req
 
@@ -327,7 +328,7 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         self.mock_datastore = hs.get_datastore()
         self.mock_datastore.get_app_service_by_token = Mock(return_value=None)
         self.mock_datastore.get_app_service_by_user_id = Mock(
-            return_value=defer.succeed(None)
+            return_value=None
         )
         self.mock_datastore.get_rooms_for_user = (
             lambda u: [

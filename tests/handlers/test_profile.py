@@ -23,7 +23,7 @@ from synapse.api.errors import AuthError
 from synapse.handlers.profile import ProfileHandler
 from synapse.types import UserID
 
-from tests.utils import setup_test_homeserver
+from tests.utils import setup_test_homeserver, requester_for_user
 
 
 class ProfileHandlers(object):
@@ -85,7 +85,11 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_set_my_name(self):
-        yield self.handler.set_displayname(self.frank, self.frank, "Frank Jr.")
+        yield self.handler.set_displayname(
+            self.frank,
+            requester_for_user(self.frank),
+            "Frank Jr."
+        )
 
         self.assertEquals(
             (yield self.store.get_profile_displayname(self.frank.localpart)),
@@ -94,7 +98,9 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_set_my_name_noauth(self):
-        d = self.handler.set_displayname(self.frank, self.bob, "Frank Jr.")
+        d = self.handler.set_displayname(
+            self.frank, requester_for_user(self.bob), "Frank Jr."
+        )
 
         yield self.assertFailure(d, AuthError)
 
@@ -136,8 +142,11 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_set_my_avatar(self):
-        yield self.handler.set_avatar_url(self.frank, self.frank,
-                "http://my.server/pic.gif")
+        yield self.handler.set_avatar_url(
+            self.frank,
+            requester_for_user(self.frank),
+            "http://my.server/pic.gif"
+        )
 
         self.assertEquals(
             (yield self.store.get_profile_avatar_url(self.frank.localpart)),

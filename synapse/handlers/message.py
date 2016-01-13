@@ -23,7 +23,7 @@ from synapse.events.validator import EventValidator
 from synapse.util import unwrapFirstError
 from synapse.util.logcontext import PreserveLoggingContext
 from synapse.util.caches.snapshot_cache import SnapshotCache
-from synapse.types import UserID, RoomStreamToken, StreamToken
+from synapse.types import UserID, RoomStreamToken, StreamToken, Requester
 
 from ._base import BaseHandler
 
@@ -175,7 +175,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def create_and_send_event(self, event_dict, ratelimit=True,
-                              token_id=None, txn_id=None, is_guest=False):
+                              txn_id=None, requester=None):
         """ Given a dict from a client, create and handle a new event.
 
         Creates an FrozenEvent object, filling out auth_events, prev_events,
@@ -192,11 +192,14 @@ class MessageHandler(BaseHandler):
 
         self.validator.validate_new(builder)
 
-        if ratelimit:
-            self.ratelimit(builder.user_id)
         # TODO(paul): Why does 'event' not have a 'user' object?
         user = UserID.from_string(builder.user_id)
         assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
+        if requester is None:
+            requester = Requester(user, None, False, None)
+
+        if ratelimit:
+            self.ratelimit(requester)
 
         if builder.type == EventTypes.Member:
             membership = builder.content.get("membership", None)
@@ -207,8 +210,8 @@ class MessageHandler(BaseHandler):
                     self.distributor, joinee, builder.content
                 )
 
-        if token_id is not None:
-            builder.internal_metadata.token_id = token_id
+        if requester.access_token_id is not None:
+            builder.internal_metadata.token_id = requester.access_token_id
 
         if txn_id is not None:
             builder.internal_metadata.txn_id = txn_id
@@ -229,7 +232,11 @@ class MessageHandler(BaseHandler):
 
         if event.type == EventTypes.Member:
             member_handler = self.hs.get_handlers().room_member_handler
-            yield member_handler.change_membership(event, context, is_guest=is_guest)
+            yield member_handler.change_membership(
+                event,
+                context,
+                is_guest=(requester.is_guest)
+            )
         else:
             yield self.handle_new_client_event(
                 event=event,

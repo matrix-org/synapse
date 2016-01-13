@@ -66,19 +66,19 @@ class RoomCreateRestServlet(ClientV1RestServlet):
         room_config = self.get_room_config(request)
         info = yield self.make_room(
             room_config,
-            requester.user,
+            requester,
             None,
         )
         room_config.update(info)
         defer.returnValue((200, info))
 
     @defer.inlineCallbacks
-    def make_room(self, room_config, auth_user, room_id):
+    def make_room(self, room_config, requester, room_id):
         handler = self.handlers.room_creation_handler
         info = yield handler.create_room(
-            user_id=auth_user.to_string(),
+            requester=requester,
             room_id=room_id,
-            config=room_config
+            config=room_config,
         )
         defer.returnValue(info)
 
@@ -163,7 +163,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
 
         msg_handler = self.handlers.message_handler
         yield msg_handler.create_and_send_event(
-            event_dict, token_id=requester.access_token_id, txn_id=txn_id,
+            event_dict, requester=requester, txn_id=txn_id,
         )
 
         defer.returnValue((200, {}))
@@ -190,7 +190,7 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
                 "room_id": room_id,
                 "sender": requester.user.to_string(),
             },
-            token_id=requester.access_token_id,
+            requester=requester,
             txn_id=txn_id,
         )
 
@@ -263,9 +263,8 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
                     "sender": requester.user.to_string(),
                     "state_key": requester.user.to_string(),
                 },
-                token_id=requester.access_token_id,
+                requester=requester,
                 txn_id=txn_id,
-                is_guest=requester.is_guest,
             )
 
             defer.returnValue((200, {"room_id": identifier.to_string()}))
@@ -467,7 +466,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 content["medium"],
                 content["address"],
                 content["id_server"],
-                requester.access_token_id,
+                requester,
                 txn_id
             )
             defer.returnValue((200, {}))
@@ -500,9 +499,8 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 "sender": user.to_string(),
                 "state_key": state_key,
             },
-            token_id=requester.access_token_id,
+            requester=requester,
             txn_id=txn_id,
-            is_guest=requester.is_guest,
         )
 
         if membership_action == "forget":
@@ -552,7 +550,7 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
                 "sender": requester.user.to_string(),
                 "redacts": event_id,
             },
-            token_id=requester.access_token_id,
+            requester=requester,
             txn_id=txn_id,
         )
 

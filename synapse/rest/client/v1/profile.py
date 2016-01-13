@@ -47,7 +47,7 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
             defer.returnValue((400, "Unable to parse name"))
 
         yield self.handlers.profile_handler.set_displayname(
-            user, requester.user, new_name)
+            user, requester, new_name)
 
         defer.returnValue((200, {}))
 
@@ -80,7 +80,7 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
             defer.returnValue((400, "Unable to parse name"))
 
         yield self.handlers.profile_handler.set_avatar_url(
-            user, requester.user, new_name)
+            user, requester, new_name)
 
         defer.returnValue((200, {}))
 

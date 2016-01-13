@@ -458,7 +458,7 @@ class SyncHandler(BaseHandler):
         )
 
         rm_handler = self.hs.get_handlers().room_member_handler
-        app_service = yield self.store.get_app_service_by_user_id(
+        app_service = self.store.get_app_service_by_user_id(
             sync_config.user.to_string()
         )
         if app_service:

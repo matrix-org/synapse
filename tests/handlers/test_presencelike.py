@@ -20,6 +20,7 @@ from tests import unittest
 from twisted.internet import defer
 
 from mock import Mock, call, ANY, NonCallableMock
+from tests.utils import requester_for_user
 
 from ..utils import MockClock, setup_test_homeserver
 
@@ -27,7 +28,6 @@ from synapse.api.constants import PresenceState
 from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.profile import ProfileHandler
 from synapse.types import UserID
-
 
 OFFLINE = PresenceState.OFFLINE
 UNAVAILABLE = PresenceState.UNAVAILABLE
@@ -65,6 +65,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 "is_presence_visible",
                 "set_profile_displayname",
                 "get_rooms_for_user",
+                "get_app_service_by_user_id",
             ]),
             handlers=None,
             resource_for_federation=Mock(),
@@ -223,7 +224,7 @@ class PresenceProfilelikeDataTestCase(unittest.TestCase):
                 None)
 
         yield self.handlers.profile_handler.set_displayname(self.u_apple,
-                self.u_apple, "I am an Apple")
+                requester_for_user(self.u_apple), "I am an Apple")
 
         self.mock_update_client.assert_has_calls([
             call(

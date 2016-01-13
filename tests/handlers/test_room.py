@@ -21,6 +21,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.handlers.room import RoomMemberHandler, RoomCreationHandler
 from synapse.handlers.profile import ProfileHandler
 from synapse.types import UserID
+from tests.utils import requester_for_user
 from ..utils import setup_test_homeserver
 
 from mock import Mock, NonCallableMock
@@ -343,6 +344,7 @@ class RoomCreationTest(unittest.TestCase):
                 "snapshot_room",
                 "persist_event",
                 "get_joined_hosts_for_room",
+                "get_app_service_by_user_id",
             ]),
             http_client=NonCallableMock(spec_set=[]),
             notifier=NonCallableMock(spec_set=["on_new_room_event"]),
@@ -377,7 +379,7 @@ class RoomCreationTest(unittest.TestCase):
         config = {"visibility": "private"}
 
         yield self.room_creation_handler.create_room(
-            user_id=user_id,
+            requester=requester_for_user(UserID.from_string(user_id)),
             room_id=room_id,
             config=config,
         )

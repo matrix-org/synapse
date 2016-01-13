@@ -19,6 +19,7 @@ from synapse.api.constants import EventTypes
 from synapse.storage.prepare_database import prepare_database
 from synapse.storage.engines import create_engine
 from synapse.server import HomeServer
+from synapse.types import Requester
 
 from synapse.util.logcontext import LoggingContext
 
@@ -478,3 +479,7 @@ class DeferredMockCallable(object):
                     "call(%s)" % _format_call(c[0], c[1]) for c in calls
                 ])
             )
+
+
+def requester_for_user(user):
+    return Requester(user, None, False, None)

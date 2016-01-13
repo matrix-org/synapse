@@ -63,16 +63,12 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
             outfile.write(yaml.dump(as_yaml))
             self.as_yaml_files.append(as_token)
 
-    @defer.inlineCallbacks
     def test_retrieve_unknown_service_token(self):
-        service = yield self.store.get_app_service_by_token("invalid_token")
+        service = self.store.get_app_service_by_token("invalid_token")
         self.assertEquals(service, None)
 
-    @defer.inlineCallbacks
     def test_retrieval_of_service(self):
-        stored_service = yield self.store.get_app_service_by_token(
-            self.as_token
-        )
+        stored_service = self.store.get_app_service_by_token(self.as_token)
         self.assertEquals(stored_service.token, self.as_token)
         self.assertEquals(stored_service.url, self.as_url)
         self.assertEquals(

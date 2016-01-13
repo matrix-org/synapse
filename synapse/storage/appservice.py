@@ -56,9 +56,9 @@ class ApplicationServiceStore(SQLBaseStore):
             synapse.appservice.ApplicationService or None.
         """
         for service in self.services_cache:
-            if service.sender == user_id:
-                return defer.succeed(service)
-        return defer.succeed(None)
+            if service.sender == user_id or service.is_exclusive_user(user_id):
+                return service
+        return None
 
     def get_app_service_by_token(self, token):
         """Get the application service with the given appservice token.
@@ -70,8 +70,8 @@ class ApplicationServiceStore(SQLBaseStore):
         """
         for service in self.services_cache:
             if service.token == token:
-                return defer.succeed(service)
-        return defer.succeed(None)
+                return service
+        return None
 
     def get_app_service_rooms(self, service):
         """Get a list of RoomsForUser for this application service.
@@ -245,7 +245,8 @@ class ApplicationServiceStore(SQLBaseStore):
             namespaces=as_info["namespaces"],
             hs_token=as_info["hs_token"],
             sender=user_id,
-            id=as_info["as_token"]  # the token is the only unique thing here
+            id=as_info["as_token"],  # the token is the only unique thing here
+            ratelimit=as_info.get("ratelimit", True),
         )
 
     def _populate_appservice_cache(self, config_files):

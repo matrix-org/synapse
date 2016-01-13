@@ -161,7 +161,7 @@ class RegistrationHandler(BaseHandler):
     def appservice_register(self, user_localpart, as_token):
         user = UserID(user_localpart, self.hs.hostname)
         user_id = user.to_string()
-        service = yield self.store.get_app_service_by_token(as_token)
+        service = self.store.get_app_service_by_token(as_token)
         if not service:
             raise AuthError(403, "Invalid application service token.")
         if not service.is_interested_in_user(user_id):
