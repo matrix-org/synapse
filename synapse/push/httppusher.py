@@ -51,7 +51,7 @@ class HttpPusher(Pusher):
         del self.data_minus_url['url']
 
     @defer.inlineCallbacks
-    def _build_notification_dict(self, event, tweaks):
+    def _build_notification_dict(self, event, tweaks, badge):
         # we probably do not want to push for every presence update
         # (we may want to be able to set up notifications when specific
         # people sign in, but we'd want to only deliver the pertinent ones)
@@ -71,7 +71,7 @@ class HttpPusher(Pusher):
                 'counts': {  # -- we don't mark messages as read yet so
                              # we have no way of knowing
                     # Just set the badge to 1 until we have read receipts
-                    'unread': 1,
+                    'unread': badge,
                     # 'missed_calls': 2
                 },
                 'devices': [
@@ -101,8 +101,8 @@ class HttpPusher(Pusher):
         defer.returnValue(d)
 
     @defer.inlineCallbacks
-    def dispatch_push(self, event, tweaks):
-        notification_dict = yield self._build_notification_dict(event, tweaks)
+    def dispatch_push(self, event, tweaks, badge):
+        notification_dict = yield self._build_notification_dict(event, tweaks, badge)
         if not notification_dict:
             defer.returnValue([])
         try:
@@ -116,15 +116,15 @@ class HttpPusher(Pusher):
         defer.returnValue(rejected)
 
     @defer.inlineCallbacks
-    def reset_badge_count(self):
+    def send_badge(self, badge):
+        logger.info("Sending updated badge count %d to %r", badge, self.user_name)
         d = {
             'notification': {
                 'id': '',
                 'type': None,
                 'sender': '',
                 'counts': {
-                    'unread': 0,
-                    'missed_calls': 0
+                    'unread': badge
                 },
                 'devices': [
                     {
