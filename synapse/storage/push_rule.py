@@ -62,13 +62,14 @@ class PushRuleStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def bulk_get_push_rules(self, user_ids):
+        if not user_ids:
+            defer.returnValue({})
+
         batch_size = 100
 
         def f(txn, user_ids_to_fetch):
             sql = (
-                "SELECT"
-                "  pr.user_name, pr.rule_id, priority_class, priority,"
-                "  conditions, actions"
+                "SELECT pr.*"
                 " FROM push_rules AS pr"
                 " LEFT JOIN push_rules_enable AS pre"
                 " ON pr.user_name = pre.user_name AND pr.rule_id = pre.rule_id"
@@ -78,29 +79,18 @@ class PushRuleStore(SQLBaseStore):
                 " ORDER BY pr.user_name, pr.priority_class DESC, pr.priority DESC"
             )
             txn.execute(sql, user_ids_to_fetch)
-            return txn.fetchall()
+            return self.cursor_to_dict(txn)
 
         results = {}
 
-        batch_start = 0
-        while batch_start < len(user_ids):
-            batch_end = min(len(user_ids), batch_size)
-            batch_user_ids = user_ids[batch_start:batch_end]
-            batch_start = batch_end
-
+        chunks = [user_ids[i:i+batch_size] for i in xrange(0, len(user_ids), batch_size)]
+        for batch_user_ids in chunks:
             rows = yield self.runInteraction(
                 "bulk_get_push_rules", f, batch_user_ids
             )
 
-            cols = (
-                "user_name", "rule_id", "priority_class", "priority",
-                "conditions", "actions",
-            )
-
             for row in rows:
-                rawdict = dict(zip(cols, rows))
-                results.setdefault(rawdict["user_name"], []).append(rawdict)
-
+                results.setdefault(row['user_name'], []).append(row)
         defer.returnValue(results)
 
     @defer.inlineCallbacks
