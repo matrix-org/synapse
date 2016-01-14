@@ -528,6 +528,11 @@ class Auth(object):
                             403,
                             "Application service cannot masquerade as this user."
                         )
+                    if not (yield self.store.get_user_by_id(user_id)):
+                        raise AuthError(
+                            403,
+                            "Application service has not registered this user"
+                        )
 
                 if not user_id:
                     raise KeyError
