@@ -671,7 +671,7 @@ class SyncHandler(BaseHandler):
             room_id, sync_config, now_token, since_token,
         )
 
-        logging.debug("Recents %r", batch)
+        logger.debug("Recents %r", batch)
 
         current_state = yield self.get_state_at(room_id, now_token)
 
@@ -734,7 +734,7 @@ class SyncHandler(BaseHandler):
             leave_event.room_id, sync_config, leave_token, since_token,
         )
 
-        logging.debug("Recents %r", batch)
+        logger.debug("Recents %r", batch)
 
         state_events_at_leave = yield self.store.get_state_for_event(
             leave_event.event_id
