@@ -15,7 +15,6 @@
 import logging
 import urllib
 import yaml
-from simplejson import JSONDecodeError
 import simplejson as json
 from twisted.internet import defer
 
@@ -143,64 +142,6 @@ class ApplicationServiceStore(SQLBaseStore):
         rooms_for_user_matching_user_id |= set(missing_rooms_for_user)
 
         return rooms_for_user_matching_user_id
-
-    def _parse_services_dict(self, results):
-        # SQL results in the form:
-        # [
-        #   {
-        #     'regex': "something",
-        #     'url': "something",
-        #     'namespace': enum,
-        #     'as_id': 0,
-        #     'token': "something",
-        #     'hs_token': "otherthing",
-        #     'id': 0
-        #   }
-        # ]
-        services = {}
-        for res in results:
-            as_token = res["token"]
-            if as_token is None:
-                continue
-            if as_token not in services:
-                # add the service
-                services[as_token] = {
-                    "id": res["id"],
-                    "url": res["url"],
-                    "token": as_token,
-                    "hs_token": res["hs_token"],
-                    "sender": res["sender"],
-                    "namespaces": {
-                        ApplicationService.NS_USERS: [],
-                        ApplicationService.NS_ALIASES: [],
-                        ApplicationService.NS_ROOMS: []
-                    }
-                }
-            # add the namespace regex if one exists
-            ns_int = res["namespace"]
-            if ns_int is None:
-                continue
-            try:
-                services[as_token]["namespaces"][
-                    ApplicationService.NS_LIST[ns_int]].append(
-                    json.loads(res["regex"])
-                )
-            except IndexError:
-                logger.error("Bad namespace enum '%s'. %s", ns_int, res)
-            except JSONDecodeError:
-                logger.error("Bad regex object '%s'", res["regex"])
-
-        service_list = []
-        for service in services.values():
-            service_list.append(ApplicationService(
-                token=service["token"],
-                url=service["url"],
-                namespaces=service["namespaces"],
-                hs_token=service["hs_token"],
-                sender=service["sender"],
-                id=service["id"]
-            ))
-        return service_list
 
     def _load_appservice(self, as_info):
         required_string_fields = [
