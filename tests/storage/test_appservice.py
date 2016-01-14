@@ -12,12 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import tempfile
+from synapse.config._base import ConfigError
 from tests import unittest
 from twisted.internet import defer
 
 from tests.utils import setup_test_homeserver
 from synapse.appservice import ApplicationService, ApplicationServiceState
-from synapse.server import HomeServer
 from synapse.storage.appservice import (
     ApplicationServiceStore, ApplicationServiceTransactionStore
 )
@@ -26,7 +27,6 @@ import json
 import os
 import yaml
 from mock import Mock
-from tests.utils import SQLiteMemoryDbPool, MockClock
 
 
 class ApplicationServiceStoreTestCase(unittest.TestCase):
@@ -41,9 +41,16 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
 
         self.as_token = "token1"
         self.as_url = "some_url"
-        self._add_appservice(self.as_token, self.as_url, "some_hs_token", "bob")
-        self._add_appservice("token2", "some_url", "some_hs_token", "bob")
-        self._add_appservice("token3", "some_url", "some_hs_token", "bob")
+        self.as_id = "as1"
+        self._add_appservice(
+            self.as_token,
+            self.as_id,
+            self.as_url,
+            "some_hs_token",
+            "bob"
+        )
+        self._add_appservice("token2", "as2", "some_url", "some_hs_token", "bob")
+        self._add_appservice("token3", "as3", "some_url", "some_hs_token", "bob")
         # must be done after inserts
         self.store = ApplicationServiceStore(hs)
 
@@ -55,9 +62,9 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
             except:
                 pass
 
-    def _add_appservice(self, as_token, url, hs_token, sender):
+    def _add_appservice(self, as_token, id, url, hs_token, sender):
         as_yaml = dict(url=url, as_token=as_token, hs_token=hs_token,
-                       sender_localpart=sender, namespaces={})
+                       id=id, sender_localpart=sender, namespaces={})
         # use the token as the filename
         with open(as_token, 'w') as outfile:
             outfile.write(yaml.dump(as_yaml))
@@ -74,6 +81,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
             self.as_token
         )
         self.assertEquals(stored_service.token, self.as_token)
+        self.assertEquals(stored_service.id, self.as_id)
         self.assertEquals(stored_service.url, self.as_url)
         self.assertEquals(
             stored_service.namespaces[ApplicationService.NS_ALIASES],
@@ -110,34 +118,34 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             {
                 "token": "token1",
                 "url": "https://matrix-as.org",
-                "id": "token1"
+                "id": "id_1"
             },
             {
                 "token": "alpha_tok",
                 "url": "https://alpha.com",
-                "id": "alpha_tok"
+                "id": "id_alpha"
             },
             {
                 "token": "beta_tok",
                 "url": "https://beta.com",
-                "id": "beta_tok"
+                "id": "id_beta"
             },
             {
-                "token": "delta_tok",
-                "url": "https://delta.com",
-                "id": "delta_tok"
+                "token": "gamma_tok",
+                "url": "https://gamma.com",
+                "id": "id_gamma"
             },
         ]
         for s in self.as_list:
-            yield self._add_service(s["url"], s["token"])
+            yield self._add_service(s["url"], s["token"], s["id"])
 
         self.as_yaml_files = []
 
         self.store = TestTransactionStore(hs)
 
-    def _add_service(self, url, as_token):
+    def _add_service(self, url, as_token, id):
         as_yaml = dict(url=url, as_token=as_token, hs_token="something",
-                       sender_localpart="a_sender", namespaces={})
+                       id=id, sender_localpart="a_sender", namespaces={})
         # use the token as the filename
         with open(as_token, 'w') as outfile:
             outfile.write(yaml.dump(as_yaml))
@@ -405,3 +413,64 @@ class TestTransactionStore(ApplicationServiceTransactionStore,
 
     def __init__(self, hs):
         super(TestTransactionStore, self).__init__(hs)
+
+
+class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
+
+    def _write_config(self, suffix, **kwargs):
+        vals = {
+            "id": "id" + suffix,
+            "url": "url" + suffix,
+            "as_token": "as_token" + suffix,
+            "hs_token": "hs_token" + suffix,
+            "sender_localpart": "sender_localpart" + suffix,
+            "namespaces": {},
+        }
+        vals.update(kwargs)
+
+        _, path = tempfile.mkstemp(prefix="as_config")
+        with open(path, "w") as f:
+            f.write(yaml.dump(vals))
+        return path
+
+    @defer.inlineCallbacks
+    def test_unique_works(self):
+        f1 = self._write_config(suffix="1")
+        f2 = self._write_config(suffix="2")
+
+        config = Mock(app_service_config_files=[f1, f2])
+        hs = yield setup_test_homeserver(config=config)
+
+        ApplicationServiceStore(hs)
+
+    @defer.inlineCallbacks
+    def test_duplicate_ids(self):
+        f1 = self._write_config(id="id", suffix="1")
+        f2 = self._write_config(id="id", suffix="2")
+
+        config = Mock(app_service_config_files=[f1, f2])
+        hs = yield setup_test_homeserver(config=config)
+
+        with self.assertRaises(ConfigError) as cm:
+            ApplicationServiceStore(hs)
+
+        e = cm.exception
+        self.assertIn(f1, e.message)
+        self.assertIn(f2, e.message)
+        self.assertIn("id", e.message)
+
+    @defer.inlineCallbacks
+    def test_duplicate_as_tokens(self):
+        f1 = self._write_config(as_token="as_token", suffix="1")
+        f2 = self._write_config(as_token="as_token", suffix="2")
+
+        config = Mock(app_service_config_files=[f1, f2])
+        hs = yield setup_test_homeserver(config=config)
+
+        with self.assertRaises(ConfigError) as cm:
+            ApplicationServiceStore(hs)
+
+        e = cm.exception
+        self.assertIn(f1, e.message)
+        self.assertIn(f2, e.message)
+        self.assertIn("as_token", e.message)
