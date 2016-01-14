@@ -42,6 +42,7 @@ class Codes(object):
     EXCLUSIVE = "M_EXCLUSIVE"
     THREEPID_AUTH_FAILED = "M_THREEPID_AUTH_FAILED"
     THREEPID_IN_USE = "THREEPID_IN_USE"
+    INVALID_USER_NAME = "M_INVALID_USER_NAME"
 
 
 class CodeMessageException(RuntimeError):
