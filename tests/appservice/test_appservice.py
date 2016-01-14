@@ -29,6 +29,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
 
     def setUp(self):
         self.service = ApplicationService(
+            id="unique_identifier",
             url="some_url",
             token="some_token",
             namespaces={
