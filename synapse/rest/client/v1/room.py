@@ -414,10 +414,16 @@ class RoomEventContext(ClientV1RestServlet):
             requester.is_guest,
         )
 
+        if not results:
+            raise SynapseError(
+                404, "Event not found.", errcode=Codes.NOT_FOUND
+            )
+
         time_now = self.clock.time_msec()
         results["events_before"] = [
             serialize_event(event, time_now) for event in results["events_before"]
         ]
+        results["event"] = serialize_event(results["event"], time_now)
         results["events_after"] = [
             serialize_event(event, time_now) for event in results["events_after"]
         ]
