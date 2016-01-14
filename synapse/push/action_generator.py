@@ -36,6 +36,9 @@ class ActionGenerator:
 
     @defer.inlineCallbacks
     def handle_push_actions_for_event(self, event, handler):
+        # Temporarily disable notifications due to performance concerns.
+        return
+
         if event.type == EventTypes.Redaction and event.redacts is not None:
             yield self.store.remove_push_actions_for_event_id(
                 event.room_id, event.redacts
