@@ -51,7 +51,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         content = _parse_json(request)
 
         if 'attr' in spec:
-            self.set_rule_attr(requester.user, spec, content)
+            self.set_rule_attr(requester.user.to_string(), spec, content)
             defer.returnValue((200, {}))
 
         try:
