@@ -397,7 +397,7 @@ class RoomMemberHandler(BaseHandler):
                     remotedomains.add(member.domain)
 
     @defer.inlineCallbacks
-    def change_membership(self, event, context, do_auth=True, is_guest=False):
+    def change_membership(self, event, context, is_guest=False):
         """ Change the membership status of a user in a room.
 
         Args:
@@ -432,7 +432,7 @@ class RoomMemberHandler(BaseHandler):
                 if not is_guest_access_allowed:
                     raise AuthError(403, "Guest access not allowed")
 
-            yield self._do_join(event, context, do_auth=do_auth)
+            yield self._do_join(event, context)
         else:
             if event.membership == Membership.LEAVE:
                 is_host_in_room = yield self.is_host_in_room(room_id, context)
@@ -459,9 +459,7 @@ class RoomMemberHandler(BaseHandler):
 
             yield self._do_local_membership_update(
                 event,
-                membership=event.content["membership"],
                 context=context,
-                do_auth=do_auth,
             )
 
             if prev_state and prev_state.membership == Membership.JOIN:
@@ -497,12 +495,12 @@ class RoomMemberHandler(BaseHandler):
         })
         event, context = yield self._create_new_client_event(builder)
 
-        yield self._do_join(event, context, room_hosts=hosts, do_auth=True)
+        yield self._do_join(event, context, room_hosts=hosts)
 
         defer.returnValue({"room_id": room_id})
 
     @defer.inlineCallbacks
-    def _do_join(self, event, context, room_hosts=None, do_auth=True):
+    def _do_join(self, event, context, room_hosts=None):
         room_id = event.room_id
 
         # XXX: We don't do an auth check if we are doing an invite
@@ -536,9 +534,7 @@ class RoomMemberHandler(BaseHandler):
 
             yield self._do_local_membership_update(
                 event,
-                membership=event.content["membership"],
                 context=context,
-                do_auth=do_auth,
             )
 
         prev_state = context.current_state.get((event.type, event.state_key))
@@ -603,8 +599,7 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue(room_ids)
 
     @defer.inlineCallbacks
-    def _do_local_membership_update(self, event, membership, context,
-                                    do_auth):
+    def _do_local_membership_update(self, event, context):
         yield run_on_reactor()
 
         target_user = UserID.from_string(event.state_key)
@@ -613,7 +608,6 @@ class RoomMemberHandler(BaseHandler):
             event,
             context,
             extra_users=[target_user],
-            suppress_auth=(not do_auth),
         )
 
     @defer.inlineCallbacks
