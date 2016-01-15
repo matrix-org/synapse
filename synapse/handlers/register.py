@@ -54,7 +54,7 @@ class RegistrationHandler(BaseHandler):
                 400,
                 "User ID must only contain characters which do not"
                 " require URL encoding.",
-                Codes.INVALID_USER_NAME
+                Codes.INVALID_USERNAME
             )
 
         user = UserID(localpart, self.hs.hostname)
