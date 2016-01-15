@@ -442,7 +442,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
     def register(self, http_server):
         # /rooms/$roomid/[invite|join|leave]
         PATTERNS = ("/rooms/(?P<room_id>[^/]*)/"
-                    "(?P<membership_action>join|invite|leave|ban|kick|forget)")
+                    "(?P<membership_action>join|invite|leave|ban|unban|kick|forget)")
         register_txn_path(self, PATTERNS, http_server)
 
     @defer.inlineCallbacks
@@ -451,9 +451,6 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             request,
             allow_guest=True,
         )
-        user = requester.user
-
-        effective_membership_action = membership_action
 
         if requester.is_guest and membership_action not in {
             Membership.JOIN,
@@ -463,13 +460,10 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
 
         content = _parse_json(request)
 
-        # target user is you unless it is an invite
-        state_key = user.to_string()
-
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
             yield self.handlers.room_member_handler.do_3pid_invite(
                 room_id,
-                user,
+                requester.user,
                 content["medium"],
                 content["address"],
                 content["id_server"],
@@ -478,41 +472,20 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             )
             defer.returnValue((200, {}))
             return
-        elif membership_action in ["invite", "ban", "kick"]:
-            if "user_id" in content:
-                state_key = content["user_id"]
-            else:
+
+        target = requester.user
+        if membership_action in ["invite", "ban", "unban", "kick"]:
+            if "user_id" not in content:
                 raise SynapseError(400, "Missing user_id key.")
+            target = UserID.from_string(content["user_id"])
 
-            # make sure it looks like a user ID; it'll throw if it's invalid.
-            UserID.from_string(state_key)
-
-            if membership_action == "kick":
-                effective_membership_action = "leave"
-        elif membership_action == "forget":
-            effective_membership_action = "leave"
-
-        msg_handler = self.handlers.message_handler
-
-        content = {"membership": unicode(effective_membership_action)}
-        if requester.is_guest:
-            content["kind"] = "guest"
-
-        yield msg_handler.create_and_send_event(
-            {
-                "type": EventTypes.Member,
-                "content": content,
-                "room_id": room_id,
-                "sender": user.to_string(),
-                "state_key": state_key,
-            },
-            token_id=requester.access_token_id,
+        yield self.handlers.room_member_handler.update_membership(
+            requester=requester,
+            target=target,
+            room_id=room_id,
+            action=membership_action,
             txn_id=txn_id,
-            is_guest=requester.is_guest,
         )
-
-        if membership_action == "forget":
-            yield self.handlers.room_member_handler.forget(user, room_id)
 
         defer.returnValue((200, {}))
 

@@ -156,7 +156,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
             builder
         )
 
-        yield room_handler.change_membership(event, context)
+        yield room_handler.send_membership_event(event, context)
 
         self.state_handler.compute_event_context.assert_called_once_with(
             builder
@@ -232,7 +232,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         )
 
         # Actual invocation
-        yield room_handler.change_membership(event, context)
+        yield room_handler.send_membership_event(event, context)
 
         self.federation.handle_new_event.assert_called_once_with(
             event, destinations=set()
@@ -312,7 +312,7 @@ class RoomMemberHandlerTestCase(unittest.TestCase):
         self.distributor.observe("user_left_room", leave_signal_observer)
 
         # Actual invocation
-        yield room_handler.change_membership(event, context)
+        yield room_handler.send_membership_event(event, context)
 
         self.federation.handle_new_event.assert_called_once_with(
             event, destinations=set(['red'])
