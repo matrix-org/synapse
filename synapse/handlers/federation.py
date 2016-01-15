@@ -1693,7 +1693,7 @@ class FederationHandler(BaseHandler):
             self.auth.check(event, context.current_state)
             yield self._validate_keyserver(event, auth_events=context.current_state)
             member_handler = self.hs.get_handlers().room_member_handler
-            yield member_handler.change_membership(event, context)
+            yield member_handler.send_membership_event(event, context)
         else:
             destinations = set([x.split(":", 1)[-1] for x in (sender, room_id)])
             yield self.replication_layer.forward_third_party_invite(
@@ -1722,7 +1722,7 @@ class FederationHandler(BaseHandler):
         # TODO: Make sure the signatures actually are correct.
         event.signatures.update(returned_invite.signatures)
         member_handler = self.hs.get_handlers().room_member_handler
-        yield member_handler.change_membership(event, context)
+        yield member_handler.send_membership_event(event, context)
 
     @defer.inlineCallbacks
     def add_display_name_to_third_party_invite(self, event_dict, event, context):

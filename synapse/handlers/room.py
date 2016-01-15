@@ -22,7 +22,7 @@ from synapse.types import UserID, RoomAlias, RoomID
 from synapse.api.constants import (
     EventTypes, Membership, JoinRules, RoomCreationPreset,
 )
-from synapse.api.errors import AuthError, StoreError, SynapseError
+from synapse.api.errors import AuthError, StoreError, SynapseError, Codes
 from synapse.util import stringutils, unwrapFirstError
 from synapse.util.async import run_on_reactor
 
@@ -397,7 +397,58 @@ class RoomMemberHandler(BaseHandler):
                     remotedomains.add(member.domain)
 
     @defer.inlineCallbacks
-    def change_membership(self, event, context, is_guest=False):
+    def update_membership(self, requester, target, room_id, action, txn_id=None):
+        effective_membership_state = action
+        if action in ["kick", "unban"]:
+            effective_membership_state = "leave"
+        elif action == "forget":
+            effective_membership_state = "leave"
+
+        msg_handler = self.hs.get_handlers().message_handler
+
+        content = {"membership": unicode(effective_membership_state)}
+        if requester.is_guest:
+            content["kind"] = "guest"
+
+        event, context = yield msg_handler.create_event(
+            {
+                "type": EventTypes.Member,
+                "content": content,
+                "room_id": room_id,
+                "sender": requester.user.to_string(),
+                "state_key": target.to_string(),
+            },
+            token_id=requester.access_token_id,
+            txn_id=txn_id,
+        )
+
+        old_state = context.current_state.get((EventTypes.Member, event.state_key))
+        old_membership = old_state.content.get("membership") if old_state else None
+        if action == "unban" and old_membership != "ban":
+            raise SynapseError(
+                403,
+                "Cannot unban user who was not banned (membership=%s)" % old_membership,
+                errcode=Codes.BAD_STATE
+            )
+        if old_membership == "ban" and action != "unban":
+            raise SynapseError(
+                403,
+                "Cannot %s user who was is banned" % (action,),
+                errcode=Codes.BAD_STATE
+            )
+
+        yield msg_handler.send_event(
+            event,
+            context,
+            ratelimit=True,
+            is_guest=requester.is_guest
+        )
+
+        if action == "forget":
+            yield self.forget(requester.user, room_id)
+
+    @defer.inlineCallbacks
+    def send_membership_event(self, event, context, is_guest=False):
         """ Change the membership status of a user in a room.
 
         Args:
