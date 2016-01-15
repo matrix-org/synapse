@@ -171,12 +171,10 @@ class BaseHandler(object):
         )
 
     @defer.inlineCallbacks
-    def handle_new_client_event(self, event, context, extra_destinations=[],
-                                extra_users=[], suppress_auth=False):
+    def handle_new_client_event(self, event, context, extra_users=[]):
         # We now need to go and hit out to wherever we need to hit out to.
 
-        if not suppress_auth:
-            self.auth.check(event, auth_events=context.current_state)
+        self.auth.check(event, auth_events=context.current_state)
 
         yield self.maybe_kick_guest_users(event, context.current_state.values())
 
@@ -258,7 +256,7 @@ class BaseHandler(object):
             event, self
         )
 
-        destinations = set(extra_destinations)
+        destinations = set()
         for k, s in context.current_state.items():
             try:
                 if k[0] == EventTypes.Member:
