@@ -161,7 +161,7 @@ class PushRuleEvaluator:
             )
 
             if matches:
-                logger.info(
+                logger.debug(
                     "%s matches for user %s, event %s",
                     r['rule_id'], self.user_id, ev['event_id']
                 )
@@ -172,7 +172,7 @@ class PushRuleEvaluator:
 
                 defer.returnValue(actions)
 
-        logger.info(
+        logger.debug(
             "No rules match for user %s, event %s",
             self.user_id, ev['event_id']
         )
