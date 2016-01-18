@@ -184,9 +184,14 @@ class PushRuleEvaluatorForEvent(object):
 
     def __init__(self, event, body_parts, room_member_count):
         self._event = event
+
+        # This is a list of words of the content.body (if event has one). Each
+        # word has been converted to lower case.
         self._body_parts = body_parts
+
         self._room_member_count = room_member_count
 
+        # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
 
     @staticmethod
@@ -264,19 +269,13 @@ class PushRuleEvaluatorForEvent(object):
         return self._value_cache.get(dotted_key, None)
 
 
-def _value_for_dotted_key(dotted_key, event):
-    parts = dotted_key.split(".")
-    val = event
-    while len(parts) > 0:
-        if parts[0] not in val:
-            return None
-        val = val[parts[0]]
-        parts = parts[1:]
-
-    return val
-
-
 def _glob_to_matcher(glob):
+    """Takes a glob and returns a `func(string) -> bool`, which returns if the
+    string matches the glob. Assumes given string is lower case.
+
+    The matcher returned is either a simple string comparison for globs without
+    wildcards, or a regex matcher for globs with wildcards.
+    """
     glob = glob.lower()
 
     if not IS_GLOB.search(glob):
