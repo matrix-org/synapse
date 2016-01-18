@@ -62,10 +62,6 @@ def make_base_append_rules(kind):
     elif kind == 'content':
         rules = BASE_APPEND_CONTENT_RULES
 
-    for r in rules:
-        r['priority_class'] = PRIORITY_CLASS_MAP[kind]
-        r['default'] = True  # Deprecated, left for backwards compat
-
     return rules
 
 
@@ -74,10 +70,6 @@ def make_base_prepend_rules(kind):
 
     if kind == 'override':
         rules = BASE_PREPEND_OVERRIDE_RULES
-
-    for r in rules:
-        r['priority_class'] = PRIORITY_CLASS_MAP[kind]
-        r['default'] = True  # Deprecated, left for backwards compat
 
     return rules
 
@@ -261,3 +253,20 @@ BASE_APPEND_UNDERRIDE_RULES = [
         ]
     }
 ]
+
+
+for r in BASE_APPEND_CONTENT_RULES:
+    r['priority_class'] = PRIORITY_CLASS_MAP['content']
+    r['default'] = True
+
+for r in BASE_PREPEND_OVERRIDE_RULES:
+    r['priority_class'] = PRIORITY_CLASS_MAP['override']
+    r['default'] = True
+
+for r in BASE_APPEND_OVRRIDE_RULES:
+    r['priority_class'] = PRIORITY_CLASS_MAP['override']
+    r['default'] = True
+
+for r in BASE_APPEND_UNDERRIDE_RULES:
+    r['priority_class'] = PRIORITY_CLASS_MAP['underride']
+    r['default'] = True
