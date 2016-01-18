@@ -117,6 +117,15 @@ class EventBase(object):
     def __set__(self, instance, value):
         raise AttributeError("Unrecognized attribute %s" % (instance,))
 
+    def __getitem__(self, field):
+        return self._event_dict[field]
+
+    def __contains__(self, field):
+        return field in self._event_dict
+
+    def items(self):
+        return self._event_dict.items()
+
 
 class FrozenEvent(EventBase):
     def __init__(self, event_dict, internal_metadata_dict={}, rejected_reason=None):
