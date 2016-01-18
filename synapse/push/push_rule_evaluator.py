@@ -131,11 +131,10 @@ class PushRuleEvaluator:
         evaluator = PushRuleEvaluatorForEvent.create(ev, room_member_count)
 
         for r in self.rules:
-            if r['rule_id'] in self.enabled_map:
-                r['enabled'] = self.enabled_map[r['rule_id']]
-            elif 'enabled' not in r:
-                r['enabled'] = True
-            if not r['enabled']:
+            if self.enabled_map.get(r['rule_id'], None) is False:
+                continue
+
+            if not r.get("enabled", True):
                 continue
 
             conditions = r['conditions']
