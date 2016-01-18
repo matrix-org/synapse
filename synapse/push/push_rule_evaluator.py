@@ -130,7 +130,8 @@ class PushRuleEvaluator:
         evaluator = PushRuleEvaluatorForEvent(ev, room_member_count)
 
         for r in self.rules:
-            if self.enabled_map.get(r['rule_id'], None) is False:
+            enabled = self.enabled_map.get(r['rule_id'], None)
+            if enabled is not None and not enabled:
                 continue
 
             if not r.get("enabled", True):
