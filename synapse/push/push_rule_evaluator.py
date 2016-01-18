@@ -274,7 +274,7 @@ def _glob_matches(glob, value, word_boundary=False):
             r,
         )
         if word_boundary:
-            r = "\b%s\b" % (r,)
+            r = r"\b%s\b" % (r,)
             r = re.compile(r, flags=re.IGNORECASE)
 
             return r.search(value)
@@ -285,7 +285,7 @@ def _glob_matches(glob, value, word_boundary=False):
             return r.match(value)
     elif word_boundary:
         r = re.escape(glob)
-        r = "\b%s\b" % (r,)
+        r = r"\b%s\b" % (r,)
         r = re.compile(r, flags=re.IGNORECASE)
 
         return r.search(value)
