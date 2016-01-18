@@ -562,6 +562,8 @@ class Auth(object):
             defer.returnValue(app_service.sender)
 
         user_id = request_args["user_id"][0]
+        if app_service.sender == user_id:
+            defer.returnValue(app_service.sender)
 
         if not app_service.is_interested_in_user(user_id):
             raise AuthError(
