@@ -273,10 +273,16 @@ def _glob_matches(glob, value, word_boundary=False):
             ),
             r,
         )
-        r = r + "$"
-        r = re.compile(r, flags=re.IGNORECASE)
+        if word_boundary:
+            r = "\b%s\b" % (r,)
+            r = re.compile(r, flags=re.IGNORECASE)
 
-        return r.match(value)
+            return r.search(value)
+        else:
+            r = r + "$"
+            r = re.compile(r, flags=re.IGNORECASE)
+
+            return r.match(value)
     elif word_boundary:
         r = re.escape(glob)
         r = "\b%s\b" % (r,)
