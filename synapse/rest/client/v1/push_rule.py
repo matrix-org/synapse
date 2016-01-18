@@ -140,6 +140,10 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
             template_name = _priority_class_to_template_name(r['priority_class'])
 
+            # Remove internal stuff.
+            for c in r["conditions"]:
+                c.pop("_id", None)
+
             if r['priority_class'] > PRIORITY_CLASS_MAP['override']:
                 # per-device rule
                 profile_tag = _profile_tag_from_conditions(r["conditions"])
