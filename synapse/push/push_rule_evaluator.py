@@ -15,15 +15,20 @@
 
 from twisted.internet import defer
 
-from synapse.types import UserID
-
 import baserules
 
 import logging
 import simplejson as json
 import re
 
+from synapse.types import UserID
+
 logger = logging.getLogger(__name__)
+
+
+GLOB_REGEX = re.compile(r'\\\[(\\\!|)(.*)\\\]')
+IS_GLOB = re.compile(r'[\?\*\[\]]')
+INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
 
 @defer.inlineCallbacks
@@ -42,9 +47,34 @@ def evaluator_for_user_id_and_profile_tag(user_id, profile_tag, room_id, store):
     ))
 
 
+def _room_member_count(ev, condition, room_member_count):
+    if 'is' not in condition:
+        return False
+    m = INEQUALITY_EXPR.match(condition['is'])
+    if not m:
+        return False
+    ineq = m.group(1)
+    rhs = m.group(2)
+    if not rhs.isdigit():
+        return False
+    rhs = int(rhs)
+
+    if ineq == '' or ineq == '==':
+        return room_member_count == rhs
+    elif ineq == '<':
+        return room_member_count < rhs
+    elif ineq == '>':
+        return room_member_count > rhs
+    elif ineq == '>=':
+        return room_member_count >= rhs
+    elif ineq == '<=':
+        return room_member_count <= rhs
+    else:
+        return False
+
+
 class PushRuleEvaluator:
     DEFAULT_ACTIONS = []
-    INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
     def __init__(self, user_id, profile_tag, raw_rules, enabled_map, room_id,
                  our_member_event, store):
@@ -98,6 +128,8 @@ class PushRuleEvaluator:
         room_members = yield self.store.get_users_in_room(room_id)
         room_member_count = len(room_members)
 
+        evaluator = PushRuleEvaluatorForEvent.create(ev, room_member_count)
+
         for r in self.rules:
             if r['rule_id'] in self.enabled_map:
                 r['enabled'] = self.enabled_map[r['rule_id']]
@@ -105,21 +137,10 @@ class PushRuleEvaluator:
                 r['enabled'] = True
             if not r['enabled']:
                 continue
-            matches = True
 
             conditions = r['conditions']
             actions = r['actions']
 
-            for c in conditions:
-                matches &= self._event_fulfills_condition(
-                    ev, c, display_name=my_display_name,
-                    room_member_count=room_member_count,
-                    profile_tag=self.profile_tag
-                )
-            logger.debug(
-                "Rule %s %s",
-                r['rule_id'], "matches" if matches else "doesn't match"
-            )
             # ignore rules with no actions (we have an explict 'dont_notify')
             if len(actions) == 0:
                 logger.warn(
@@ -127,6 +148,18 @@ class PushRuleEvaluator:
                     r['rule_id'], self.user_id
                 )
                 continue
+
+            matches = True
+            for c in conditions:
+                matches = evaluator.matches(c, my_display_name, self.profile_tag)
+                if not matches:
+                    break
+
+            logger.debug(
+                "Rule %s %s",
+                r['rule_id'], "matches" if matches else "doesn't match"
+            )
+
             if matches:
                 logger.info(
                     "%s matches for user %s, event %s",
@@ -145,80 +178,83 @@ class PushRuleEvaluator:
         )
         defer.returnValue(PushRuleEvaluator.DEFAULT_ACTIONS)
 
-    @staticmethod
-    def _glob_to_regexp(glob):
-        r = re.escape(glob)
-        r = re.sub(r'\\\*', r'.*?', r)
-        r = re.sub(r'\\\?', r'.', r)
 
-        # handle [abc], [a-z] and [!a-z] style ranges.
-        r = re.sub(r'\\\[(\\\!|)(.*)\\\]',
-                   lambda x: ('[%s%s]' % (x.group(1) and '^' or '',
-                                          re.sub(r'\\\-', '-', x.group(2)))), r)
-        return r
+class PushRuleEvaluatorForEvent(object):
+    WORD_BOUNDARY = re.compile(r'\b')
+
+    def __init__(self, event, body_parts, room_member_count):
+        self._event = event
+        self._body_parts = body_parts
+        self._room_member_count = room_member_count
+
+        self._value_cache = _flatten_dict(event)
 
     @staticmethod
-    def _event_fulfills_condition(ev, condition,
-                                  display_name, room_member_count, profile_tag):
+    def create(event, room_member_count):
+        body = event.get("content", {}).get("body", None)
+        if body:
+            body_parts = PushRuleEvaluatorForEvent.WORD_BOUNDARY.split(body)
+            body_parts[:] = [
+                part.lower() for part in body_parts
+            ]
+        else:
+            body_parts = []
+
+        return PushRuleEvaluatorForEvent(event, body_parts, room_member_count)
+
+    def matches(self, condition, display_name, profile_tag):
         if condition['kind'] == 'event_match':
-            if 'pattern' not in condition:
-                logger.warn("event_match condition with no pattern")
-                return False
-            # XXX: optimisation: cache our pattern regexps
-            if condition['key'] == 'content.body':
-                r = r'\b%s\b' % PushRuleEvaluator._glob_to_regexp(condition['pattern'])
-            else:
-                r = r'^%s$' % PushRuleEvaluator._glob_to_regexp(condition['pattern'])
-            val = _value_for_dotted_key(condition['key'], ev)
-            if val is None:
-                return False
-            return re.search(r, val, flags=re.IGNORECASE) is not None
-
+            return self._event_match(condition)
         elif condition['kind'] == 'device':
             if 'profile_tag' not in condition:
                 return True
             return condition['profile_tag'] == profile_tag
-
         elif condition['kind'] == 'contains_display_name':
-            # This is special because display names can be different
-            # between rooms and so you can't really hard code it in a rule.
-            # Optimisation: we should cache these names and update them from
-            # the event stream.
-            if 'content' not in ev or 'body' not in ev['content']:
-                return False
-            if not display_name:
-                return False
-            return re.search(
-                r"\b%s\b" % re.escape(display_name), ev['content']['body'],
-                flags=re.IGNORECASE
-            ) is not None
-
+            return self._contains_display_name(display_name)
         elif condition['kind'] == 'room_member_count':
-            if 'is' not in condition:
-                return False
-            m = PushRuleEvaluator.INEQUALITY_EXPR.match(condition['is'])
-            if not m:
-                return False
-            ineq = m.group(1)
-            rhs = m.group(2)
-            if not rhs.isdigit():
-                return False
-            rhs = int(rhs)
-
-            if ineq == '' or ineq == '==':
-                return room_member_count == rhs
-            elif ineq == '<':
-                return room_member_count < rhs
-            elif ineq == '>':
-                return room_member_count > rhs
-            elif ineq == '>=':
-                return room_member_count >= rhs
-            elif ineq == '<=':
-                return room_member_count <= rhs
-            else:
-                return False
+            return _room_member_count(
+                self._event, condition, self._room_member_count
+            )
         else:
             return True
+
+    def _event_match(self, condition):
+        pattern = condition.get('pattern', None)
+
+        if not pattern:
+            logger.warn("event_match condition with no pattern")
+            return False
+
+        # XXX: optimisation: cache our pattern regexps
+        if condition['key'] == 'content.body':
+            matcher = _glob_to_matcher(pattern)
+
+            for part in self._body_parts:
+                if matcher(part):
+                    return True
+            return False
+        else:
+            haystack = self._get_value(condition['key'])
+            if haystack is None:
+                return False
+
+            matcher = _glob_to_matcher(pattern)
+
+            return matcher(haystack.lower())
+
+    def _contains_display_name(self, display_name):
+        if not display_name:
+            return False
+
+        lower_display_name = display_name.lower()
+        for part in self._body_parts:
+            if part == lower_display_name:
+                return True
+
+        return False
+
+    def _get_value(self, dotted_key):
+        return self._value_cache.get(dotted_key, None)
 
 
 def _value_for_dotted_key(dotted_key, event):
@@ -229,4 +265,42 @@ def _value_for_dotted_key(dotted_key, event):
             return None
         val = val[parts[0]]
         parts = parts[1:]
+
     return val
+
+
+def _glob_to_matcher(glob):
+    glob = glob.lower()
+
+    if not IS_GLOB.search(glob):
+        return lambda value: value == glob
+
+    r = re.escape(glob)
+
+    r = r.replace(r'\*', '.*?')
+    r = r.replace(r'\?', '.')
+
+    # handle [abc], [a-z] and [!a-z] style ranges.
+    r = GLOB_REGEX.sub(
+        lambda x: (
+            '[%s%s]' % (
+                x.group(1) and '^' or '',
+                x.group(2).replace(r'\\\-', '-')
+            )
+        ),
+        r,
+    )
+
+    r = r + "$"
+    r = re.compile(r)
+    return lambda value: r.match(value)
+
+
+def _flatten_dict(d, prefix=[], result={}):
+    for key, value in d.items():
+        if isinstance(value, basestring):
+            result[".".join(prefix + [key])] = value.lower()
+        elif hasattr(value, "items"):
+            _flatten_dict(value, prefix=(prefix+[key]), result=result)
+
+    return result

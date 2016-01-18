@@ -14,16 +14,16 @@
 # limitations under the License.
 
 import logging
-import simplejson as json
+import ujson as json
 
 from twisted.internet import defer
 
+import baserules
+from push_rule_evaluator import PushRuleEvaluatorForEvent
+
+from synapse.api.constants import EventTypes
 from synapse.types import UserID
 
-import baserules
-from push_rule_evaluator import PushRuleEvaluator
-
-from synapse.events.utils import serialize_event
 
 logger = logging.getLogger(__name__)
 
@@ -35,28 +35,25 @@ def decode_rule_json(rule):
 
 
 @defer.inlineCallbacks
-def evaluator_for_room_id(room_id, store):
-    users = yield store.get_users_in_room(room_id)
-    rules_by_user = yield store.bulk_get_push_rules(users)
+def _get_rules(room_id, user_ids, store):
+    rules_by_user = yield store.bulk_get_push_rules(user_ids)
     rules_by_user = {
         uid: baserules.list_with_base_rules(
-            [decode_rule_json(rule_list) for rule_list in rules_by_user[uid]]
-            if uid in rules_by_user else [],
+            [decode_rule_json(rule_list) for rule_list in rules_by_user.get(uid, [])],
             UserID.from_string(uid),
         )
-        for uid in users
+        for uid in user_ids
     }
-    member_events = yield store.get_current_state(
-        room_id=room_id,
-        event_type='m.room.member',
-    )
-    display_names = {}
-    for ev in member_events:
-        if ev.content.get("displayname"):
-            display_names[ev.state_key] = ev.content.get("displayname")
+    defer.returnValue(rules_by_user)
+
+
+@defer.inlineCallbacks
+def evaluator_for_room_id(room_id, store):
+    users = yield store.get_users_in_room(room_id)
+    rules_by_user = yield _get_rules(room_id, users, store)
 
     defer.returnValue(BulkPushRuleEvaluator(
-        room_id, rules_by_user, display_names, users, store
+        room_id, rules_by_user, users, store
     ))
 
 
@@ -69,10 +66,9 @@ class BulkPushRuleEvaluator:
     the same logic to run the actual rules, but could be optimised further
     (see https://matrix.org/jira/browse/SYN-562)
     """
-    def __init__(self, room_id, rules_by_user, display_names, users_in_room, store):
+    def __init__(self, room_id, rules_by_user, users_in_room, store):
         self.room_id = room_id
         self.rules_by_user = rules_by_user
-        self.display_names = display_names
         self.users_in_room = users_in_room
         self.store = store
 
@@ -80,15 +76,30 @@ class BulkPushRuleEvaluator:
     def action_for_event_by_user(self, event, handler):
         actions_by_user = {}
 
-        for uid, rules in self.rules_by_user.items():
-            display_name = None
-            if uid in self.display_names:
-                display_name = self.display_names[uid]
+        users_dict = yield self.store.are_guests(self.rules_by_user.keys())
 
-            is_guest = yield self.store.is_guest(UserID.from_string(uid))
-            filtered = yield handler._filter_events_for_client(
-                uid, [event], is_guest=is_guest
-            )
+        filtered_by_user = yield handler._filter_events_for_clients(
+            users_dict.items(), [event]
+        )
+
+        evaluator = PushRuleEvaluatorForEvent.create(event, len(self.users_in_room))
+
+        condition_cache = {}
+
+        member_state = yield self.store.get_state_for_event(
+            event.event_id,
+        )
+
+        display_names = {}
+        for ev in member_state.values():
+            nm = ev.content.get("displayname", None)
+            if nm and ev.type == EventTypes.Member:
+                display_names[ev.state_key] = nm
+
+        for uid, rules in self.rules_by_user.items():
+            display_name = display_names.get(uid, None)
+
+            filtered = filtered_by_user[uid]
             if len(filtered) == 0:
                 continue
 
@@ -96,29 +107,32 @@ class BulkPushRuleEvaluator:
                 if 'enabled' in rule and not rule['enabled']:
                     continue
 
-                # XXX: profile tags
-                if BulkPushRuleEvaluator.event_matches_rule(
-                    event, rule,
-                    display_name, len(self.users_in_room), None
-                ):
+                matches = _condition_checker(
+                    evaluator, rule['conditions'], display_name, condition_cache
+                )
+                if matches:
                     actions = [x for x in rule['actions'] if x != 'dont_notify']
-                    if len(actions) > 0:
+                    if actions:
                         actions_by_user[uid] = actions
                     break
         defer.returnValue(actions_by_user)
 
-    @staticmethod
-    def event_matches_rule(event, rule,
-                           display_name, room_member_count, profile_tag):
-        matches = True
 
-        # passing the clock all the way into here is extremely awkward and push
-        # rules do not care about any of the relative timestamps, so we just
-        # pass 0 for the current time.
-        client_event = serialize_event(event, 0)
+def _condition_checker(evaluator, conditions, display_name, cache):
+    for cond in conditions:
+        _id = cond.get("_id", None)
+        if _id:
+            res = cache.get(_id, None)
+            if res is False:
+                break
+            elif res is True:
+                continue
 
-        for cond in rule['conditions']:
-            matches &= PushRuleEvaluator._event_fulfills_condition(
-                client_event, cond, display_name, room_member_count, profile_tag
-            )
-        return matches
+        res = evaluator.matches(cond, display_name, None)
+        if _id:
+            cache[_id] = res
+
+        if res is False:
+            return False
+
+    return True

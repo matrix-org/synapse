@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
 from twisted.internet import defer
 
 import logging
@@ -60,6 +60,27 @@ class PushRuleStore(SQLBaseStore):
             r['rule_id']: False if r['enabled'] == 0 else True for r in results
         })
 
+    @cached()
+    def _get_push_rules_enabled_for_user(self, user_id):
+        def f(txn):
+            sql = (
+                "SELECT pr.*"
+                " FROM push_rules AS pr"
+                " LEFT JOIN push_rules_enable AS pre"
+                " ON pr.user_name = pre.user_name AND pr.rule_id = pre.rule_id"
+                " WHERE pr.user_name = ?"
+                " AND (pre.enabled IS NULL OR pre.enabled = 1)"
+                " ORDER BY pr.priority_class DESC, pr.priority DESC"
+            )
+            txn.execute(sql, (user_id,))
+            return self.cursor_to_dict(txn)
+
+        return self.runInteraction(
+            "_get_push_rules_enabled_for_user", f
+        )
+
+    # @cachedList(cache=_get_push_rules_enabled_for_user.cache, list_name="user_ids",
+    #             num_args=1, inlineCallbacks=True)
     @defer.inlineCallbacks
     def bulk_get_push_rules(self, user_ids):
         if not user_ids:
