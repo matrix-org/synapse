@@ -81,7 +81,7 @@ class BulkPushRuleEvaluator:
             users_dict.items(), [event]
         )
 
-        evaluator = PushRuleEvaluatorForEvent.create(event, len(self.users_in_room))
+        evaluator = PushRuleEvaluatorForEvent(event, len(self.users_in_room))
 
         condition_cache = {}
 
