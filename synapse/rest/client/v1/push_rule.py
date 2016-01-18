@@ -126,7 +126,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
             rule["actions"] = json.loads(rawrule["actions"])
             ruleslist.append(rule)
 
-        ruleslist = baserules.list_with_base_rules(ruleslist, user)
+        ruleslist = baserules.list_with_base_rules(ruleslist)
 
         rules = {'global': {}, 'device': {}}
 
@@ -143,6 +143,12 @@ class PushRuleRestServlet(ClientV1RestServlet):
             # Remove internal stuff.
             for c in r["conditions"]:
                 c.pop("_id", None)
+
+                pattern_type = c.pop("pattern_type", None)
+                if pattern_type == "user_id":
+                    c["pattern"] = user.to_string()
+                elif pattern_type == "user_localpart":
+                    c["pattern"] = user.localpart
 
             if r['priority_class'] > PRIORITY_CLASS_MAP['override']:
                 # per-device rule

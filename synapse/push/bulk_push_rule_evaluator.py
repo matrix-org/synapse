@@ -22,7 +22,6 @@ import baserules
 from push_rule_evaluator import PushRuleEvaluatorForEvent
 
 from synapse.api.constants import EventTypes
-from synapse.types import UserID
 
 
 logger = logging.getLogger(__name__)
@@ -38,10 +37,10 @@ def decode_rule_json(rule):
 def _get_rules(room_id, user_ids, store):
     rules_by_user = yield store.bulk_get_push_rules(user_ids)
     rules_by_user = {
-        uid: baserules.list_with_base_rules(
-            [decode_rule_json(rule_list) for rule_list in rules_by_user.get(uid, [])],
-            UserID.from_string(uid),
-        )
+        uid: baserules.list_with_base_rules([
+            decode_rule_json(rule_list)
+            for rule_list in rules_by_user.get(uid, [])
+        ])
         for uid in user_ids
     }
     defer.returnValue(rules_by_user)
@@ -108,7 +107,7 @@ class BulkPushRuleEvaluator:
                     continue
 
                 matches = _condition_checker(
-                    evaluator, rule['conditions'], display_name, condition_cache
+                    evaluator, rule['conditions'], uid, display_name, condition_cache
                 )
                 if matches:
                     actions = [x for x in rule['actions'] if x != 'dont_notify']
@@ -118,7 +117,7 @@ class BulkPushRuleEvaluator:
         defer.returnValue(actions_by_user)
 
 
-def _condition_checker(evaluator, conditions, display_name, cache):
+def _condition_checker(evaluator, conditions, uid, display_name, cache):
     for cond in conditions:
         _id = cond.get("_id", None)
         if _id:
@@ -128,7 +127,7 @@ def _condition_checker(evaluator, conditions, display_name, cache):
             elif res is True:
                 continue
 
-        res = evaluator.matches(cond, display_name, None)
+        res = evaluator.matches(cond, uid, display_name, None)
         if _id:
             cache[_id] = res
 

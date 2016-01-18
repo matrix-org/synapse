@@ -91,8 +91,7 @@ class PushRuleEvaluator:
             rule['actions'] = json.loads(raw_rule['actions'])
             rules.append(rule)
 
-        user = UserID.from_string(self.user_id)
-        self.rules = baserules.list_with_base_rules(rules, user)
+        self.rules = baserules.list_with_base_rules(rules)
 
         self.enabled_map = enabled_map
 
@@ -150,7 +149,9 @@ class PushRuleEvaluator:
 
             matches = True
             for c in conditions:
-                matches = evaluator.matches(c, my_display_name, self.profile_tag)
+                matches = evaluator.matches(
+                    c, self.user_id, my_display_name, self.profile_tag
+                )
                 if not matches:
                     break
 
@@ -201,9 +202,9 @@ class PushRuleEvaluatorForEvent(object):
 
         return PushRuleEvaluatorForEvent(event, body_parts, room_member_count)
 
-    def matches(self, condition, display_name, profile_tag):
+    def matches(self, condition, user_id, display_name, profile_tag):
         if condition['kind'] == 'event_match':
-            return self._event_match(condition)
+            return self._event_match(condition, user_id)
         elif condition['kind'] == 'device':
             if 'profile_tag' not in condition:
                 return True
@@ -217,8 +218,15 @@ class PushRuleEvaluatorForEvent(object):
         else:
             return True
 
-    def _event_match(self, condition):
+    def _event_match(self, condition, user_id):
         pattern = condition.get('pattern', None)
+
+        if not pattern:
+            pattern_type = condition.get('pattern_type', None)
+            if pattern_type == "user_id":
+                pattern = user_id
+            elif pattern_type == "user_localpart":
+                pattern = UserID.from_string(user_id).localpart
 
         if not pattern:
             logger.warn("event_match condition with no pattern")
