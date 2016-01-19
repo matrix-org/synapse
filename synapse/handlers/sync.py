@@ -54,8 +54,7 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
     "state",             # dict[(str, str), FrozenEvent]
     "ephemeral",
     "account_data",
-    "unread_notification_count",
-    "unread_highlight_count",
+    "unread_notifications",
 ])):
     __slots__ = []
 
@@ -294,11 +293,10 @@ class SyncHandler(BaseHandler):
             room_id, sync_config, ephemeral_by_room
         )
 
-        notif_count = None
-        highlight_count = None
+        unread_notifications = {}
         if notifs is not None:
-            notif_count = len(notifs)
-            highlight_count = len([
+            unread_notifications["notification_count"] = len(notifs)
+            unread_notifications["highlight_count"] = len([
                 1 for notif in notifs if _action_has_highlight(notif["actions"])
             ])
 
@@ -312,8 +310,7 @@ class SyncHandler(BaseHandler):
             account_data=self.account_data_for_room(
                 room_id, tags_by_room, account_data_by_room
             ),
-            unread_notification_count=notif_count,
-            unread_highlight_count=highlight_count,
+            unread_notifications=unread_notifications,
         ))
 
     def account_data_for_user(self, account_data):
@@ -533,18 +530,6 @@ class SyncHandler(BaseHandler):
                 else:
                     prev_batch = now_token
 
-                notifs = yield self.unread_notifs_for_room_id(
-                    room_id, sync_config, all_ephemeral_by_room
-                )
-
-                notif_count = None
-                highlight_count = None
-                if notifs is not None:
-                    notif_count = len(notifs)
-                    highlight_count = len([
-                        1 for notif in notifs if _action_has_highlight(notif["actions"])
-                    ])
-
                 just_joined = yield self.check_joined_room(sync_config, state)
                 if just_joined:
                     logger.debug("User has just joined %s: needs full state",
@@ -565,12 +550,23 @@ class SyncHandler(BaseHandler):
                     account_data=self.account_data_for_room(
                         room_id, tags_by_room, account_data_by_room
                     ),
-                    unread_notification_count=notif_count,
-                    unread_highlight_count=highlight_count,
+                    unread_notifications={},
                 )
                 logger.debug("Result for room %s: %r", room_id, room_sync)
 
                 if room_sync:
+                    notifs = yield self.unread_notifs_for_room_id(
+                        room_id, sync_config, all_ephemeral_by_room
+                    )
+
+                    if notifs is not None:
+                        notif_dict = room_sync.unread_notifications
+                        notif_dict["notification_count"] = len(notifs)
+                        notif_dict["highlight_count"] = len([
+                            1 for notif in notifs
+                            if _action_has_highlight(notif["actions"])
+                        ])
+
                     joined.append(room_sync)
 
         else:
@@ -708,11 +704,10 @@ class SyncHandler(BaseHandler):
             room_id, sync_config, all_ephemeral_by_room
         )
 
-        notif_count = None
-        highlight_count = None
+        unread_notifications = {}
         if notifs is not None:
-            notif_count = len(notifs)
-            highlight_count = len([
+            unread_notifications["notification_count"] = len(notifs)
+            unread_notifications["highlight_count"] = len([
                 1 for notif in notifs if _action_has_highlight(notif["actions"])
             ])
 
@@ -724,8 +719,7 @@ class SyncHandler(BaseHandler):
             account_data=self.account_data_for_room(
                 room_id, tags_by_room, account_data_by_room
             ),
-            unread_notification_count=notif_count,
-            unread_highlight_count=highlight_count,
+            unread_notifications=unread_notifications,
         )
 
         logger.debug("Room sync: %r", room_sync)
