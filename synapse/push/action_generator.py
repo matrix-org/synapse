@@ -25,8 +25,9 @@ logger = logging.getLogger(__name__)
 
 
 class ActionGenerator:
-    def __init__(self, store):
-        self.store = store
+    def __init__(self, hs):
+        self.hs = hs
+        self.store = hs.get_datastore()
         # really we want to get all user ids and all profile tags too,
         # since we want the actions for each profile tag for every user and
         # also actions for a client with no profile tag for each user.
@@ -42,7 +43,7 @@ class ActionGenerator:
             )
 
         bulk_evaluator = yield bulk_push_rule_evaluator.evaluator_for_room_id(
-            event.room_id, self.store
+            event.room_id, self.hs, self.store
         )
 
         actions_by_user = yield bulk_evaluator.action_for_event_by_user(event, handler)

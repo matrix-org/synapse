@@ -266,7 +266,7 @@ class BaseHandler(object):
             event, context=context
         )
 
-        action_generator = ActionGenerator(self.store)
+        action_generator = ActionGenerator(self.hs)
         yield action_generator.handle_push_actions_for_event(
             event, self
         )

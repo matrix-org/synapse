@@ -36,6 +36,7 @@ def decode_rule_json(rule):
 @defer.inlineCallbacks
 def _get_rules(room_id, user_ids, store):
     rules_by_user = yield store.bulk_get_push_rules(user_ids)
+
     rules_by_user = {
         uid: baserules.list_with_base_rules([
             decode_rule_json(rule_list)
@@ -47,12 +48,16 @@ def _get_rules(room_id, user_ids, store):
 
 
 @defer.inlineCallbacks
-def evaluator_for_room_id(room_id, store):
-    users = yield store.get_users_in_room(room_id)
-    rules_by_user = yield _get_rules(room_id, users, store)
+def evaluator_for_room_id(room_id, hs, store):
+    results = yield store.get_receipts_for_room(room_id, "m.read")
+    user_ids = [
+        row["user_id"] for row in results
+        if hs.is_mine_id(row["user_id"])
+    ]
+    rules_by_user = yield _get_rules(room_id, user_ids, store)
 
     defer.returnValue(BulkPushRuleEvaluator(
-        room_id, rules_by_user, users, store
+        room_id, rules_by_user, user_ids, store
     ))
 
 
@@ -129,7 +134,7 @@ def _condition_checker(evaluator, conditions, uid, display_name, cache):
 
         res = evaluator.matches(cond, uid, display_name, None)
         if _id:
-            cache[_id] = res
+            cache[_id] = bool(res)
 
         if not res:
             return False

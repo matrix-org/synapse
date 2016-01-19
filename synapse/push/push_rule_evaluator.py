@@ -22,6 +22,7 @@ import simplejson as json
 import re
 
 from synapse.types import UserID
+from synapse.util.caches.lrucache import LruCache
 
 logger = logging.getLogger(__name__)
 
@@ -277,18 +278,18 @@ def _glob_matches(glob, value, word_boundary=False):
             )
             if word_boundary:
                 r = r"\b%s\b" % (r,)
-                r = re.compile(r, flags=re.IGNORECASE)
+                r = _compile_regex(r)
 
                 return r.search(value)
             else:
                 r = r + "$"
-                r = re.compile(r, flags=re.IGNORECASE)
+                r = _compile_regex(r)
 
                 return r.match(value)
         elif word_boundary:
             r = re.escape(glob)
             r = r"\b%s\b" % (r,)
-            r = re.compile(r, flags=re.IGNORECASE)
+            r = _compile_regex(r)
 
             return r.search(value)
         else:
@@ -306,3 +307,16 @@ def _flatten_dict(d, prefix=[], result={}):
             _flatten_dict(value, prefix=(prefix+[key]), result=result)
 
     return result
+
+
+regex_cache = LruCache(5000)
+
+
+def _compile_regex(regex_str):
+    r = regex_cache.get(regex_str, None)
+    if r:
+        return r
+
+    r = re.compile(regex_str, flags=re.IGNORECASE)
+    regex_cache[regex_str] = r
+    return r

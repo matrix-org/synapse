@@ -245,7 +245,7 @@ class FederationHandler(BaseHandler):
                     yield user_joined_room(self.distributor, user, event.room_id)
 
         if not backfilled and not event.internal_metadata.is_outlier():
-            action_generator = ActionGenerator(self.store)
+            action_generator = ActionGenerator(self.hs)
             yield action_generator.handle_push_actions_for_event(
                 event, self
             )
