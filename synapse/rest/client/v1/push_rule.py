@@ -27,6 +27,7 @@ from synapse.push.rulekinds import (
     PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
 )
 
+import copy
 import simplejson as json
 
 
@@ -126,7 +127,8 @@ class PushRuleRestServlet(ClientV1RestServlet):
             rule["actions"] = json.loads(rawrule["actions"])
             ruleslist.append(rule)
 
-        ruleslist = baserules.list_with_base_rules(ruleslist)
+        # We're going to be mutating this a lot, so do a deep copy
+        ruleslist = copy.deepcopy(baserules.list_with_base_rules(ruleslist))
 
         rules = {'global': {}, 'device': {}}
 
