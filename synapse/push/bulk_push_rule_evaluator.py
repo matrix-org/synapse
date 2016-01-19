@@ -131,7 +131,7 @@ def _condition_checker(evaluator, conditions, uid, display_name, cache):
         if _id:
             cache[_id] = res
 
-        if res is False:
+        if not res:
             return False
 
     return True
