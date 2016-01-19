@@ -588,7 +588,8 @@ class SyncHandler(BaseHandler):
             for room_id in joined_room_ids:
                 room_sync = yield self.incremental_sync_with_gap_for_room(
                     room_id, sync_config, since_token, now_token,
-                    ephemeral_by_room, tags_by_room, account_data_by_room
+                    ephemeral_by_room, tags_by_room, account_data_by_room,
+                    all_ephemeral_by_room=all_ephemeral_by_room,
                 )
                 if room_sync:
                     joined.append(room_sync)
@@ -668,7 +669,8 @@ class SyncHandler(BaseHandler):
     def incremental_sync_with_gap_for_room(self, room_id, sync_config,
                                            since_token, now_token,
                                            ephemeral_by_room, tags_by_room,
-                                           account_data_by_room):
+                                           account_data_by_room,
+                                           all_ephemeral_by_room):
         """ Get the incremental delta needed to bring the client up to date for
         the room. Gives the client the most recent events and the changes to
         state.
@@ -703,7 +705,7 @@ class SyncHandler(BaseHandler):
             state = yield self.get_state_at(room_id, now_token)
 
         notifs = yield self.unread_notifs_for_room_id(
-            room_id, sync_config, ephemeral_by_room
+            room_id, sync_config, all_ephemeral_by_room
         )
 
         notif_count = None
