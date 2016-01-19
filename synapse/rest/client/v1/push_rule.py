@@ -27,6 +27,7 @@ from synapse.push.rulekinds import (
     PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
 )
 
+import copy
 import simplejson as json
 
 
@@ -126,7 +127,8 @@ class PushRuleRestServlet(ClientV1RestServlet):
             rule["actions"] = json.loads(rawrule["actions"])
             ruleslist.append(rule)
 
-        ruleslist = baserules.list_with_base_rules(ruleslist, user)
+        # We're going to be mutating this a lot, so do a deep copy
+        ruleslist = copy.deepcopy(baserules.list_with_base_rules(ruleslist))
 
         rules = {'global': {}, 'device': {}}
 
@@ -139,6 +141,16 @@ class PushRuleRestServlet(ClientV1RestServlet):
             rulearray = None
 
             template_name = _priority_class_to_template_name(r['priority_class'])
+
+            # Remove internal stuff.
+            for c in r["conditions"]:
+                c.pop("_id", None)
+
+                pattern_type = c.pop("pattern_type", None)
+                if pattern_type == "user_id":
+                    c["pattern"] = user.to_string()
+                elif pattern_type == "user_localpart":
+                    c["pattern"] = user.localpart
 
             if r['priority_class'] > PRIORITY_CLASS_MAP['override']:
                 # per-device rule
