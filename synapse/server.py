@@ -139,6 +139,9 @@ class BaseHomeServer(object):
     def is_mine(self, domain_specific_string):
         return domain_specific_string.domain == self.hostname
 
+    def is_mine_id(self, string):
+        return string.split(":", 1)[1] == self.hostname
+
 # Build magic accessors for every dependency
 for depname in BaseHomeServer.DEPENDENCIES:
     BaseHomeServer._make_dependency_method(depname)

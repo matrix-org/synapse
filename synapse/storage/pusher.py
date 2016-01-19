@@ -80,7 +80,7 @@ class PusherStore(SQLBaseStore):
         defer.returnValue(rows)
 
     @defer.inlineCallbacks
-    def add_pusher(self, user_name, access_token, profile_tag, kind, app_id,
+    def add_pusher(self, user_id, access_token, profile_tag, kind, app_id,
                    app_display_name, device_display_name,
                    pushkey, pushkey_ts, lang, data):
         try:
@@ -90,7 +90,7 @@ class PusherStore(SQLBaseStore):
                 dict(
                     app_id=app_id,
                     pushkey=pushkey,
-                    user_name=user_name,
+                    user_name=user_id,
                 ),
                 dict(
                     access_token=access_token,
@@ -112,38 +112,38 @@ class PusherStore(SQLBaseStore):
             raise StoreError(500, "Problem creating pusher.")
 
     @defer.inlineCallbacks
-    def delete_pusher_by_app_id_pushkey_user_name(self, app_id, pushkey, user_name):
+    def delete_pusher_by_app_id_pushkey_user_id(self, app_id, pushkey, user_id):
         yield self._simple_delete_one(
             "pushers",
-            {"app_id": app_id, "pushkey": pushkey, 'user_name': user_name},
-            desc="delete_pusher_by_app_id_pushkey_user_name",
+            {"app_id": app_id, "pushkey": pushkey, 'user_name': user_id},
+            desc="delete_pusher_by_app_id_pushkey_user_id",
         )
 
     @defer.inlineCallbacks
-    def update_pusher_last_token(self, app_id, pushkey, user_name, last_token):
+    def update_pusher_last_token(self, app_id, pushkey, user_id, last_token):
         yield self._simple_update_one(
             "pushers",
-            {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_name},
+            {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_id},
             {'last_token': last_token},
             desc="update_pusher_last_token",
         )
 
     @defer.inlineCallbacks
-    def update_pusher_last_token_and_success(self, app_id, pushkey, user_name,
+    def update_pusher_last_token_and_success(self, app_id, pushkey, user_id,
                                              last_token, last_success):
         yield self._simple_update_one(
             "pushers",
-            {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_name},
+            {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_id},
             {'last_token': last_token, 'last_success': last_success},
             desc="update_pusher_last_token_and_success",
         )
 
     @defer.inlineCallbacks
-    def update_pusher_failing_since(self, app_id, pushkey, user_name,
+    def update_pusher_failing_since(self, app_id, pushkey, user_id,
                                     failing_since):
         yield self._simple_update_one(
             "pushers",
-            {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_name},
+            {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_id},
             {'failing_since': failing_since},
             desc="update_pusher_failing_since",
         )

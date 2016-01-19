@@ -22,7 +22,7 @@ from synapse.types import UserID, RoomAlias, RoomID
 from synapse.api.constants import (
     EventTypes, Membership, JoinRules, RoomCreationPreset,
 )
-from synapse.api.errors import AuthError, StoreError, SynapseError
+from synapse.api.errors import AuthError, StoreError, SynapseError, Codes
 from synapse.util import stringutils, unwrapFirstError
 from synapse.util.async import run_on_reactor
 
@@ -397,7 +397,58 @@ class RoomMemberHandler(BaseHandler):
                     remotedomains.add(member.domain)
 
     @defer.inlineCallbacks
-    def change_membership(self, event, context, do_auth=True, is_guest=False):
+    def update_membership(self, requester, target, room_id, action, txn_id=None):
+        effective_membership_state = action
+        if action in ["kick", "unban"]:
+            effective_membership_state = "leave"
+        elif action == "forget":
+            effective_membership_state = "leave"
+
+        msg_handler = self.hs.get_handlers().message_handler
+
+        content = {"membership": unicode(effective_membership_state)}
+        if requester.is_guest:
+            content["kind"] = "guest"
+
+        event, context = yield msg_handler.create_event(
+            {
+                "type": EventTypes.Member,
+                "content": content,
+                "room_id": room_id,
+                "sender": requester.user.to_string(),
+                "state_key": target.to_string(),
+            },
+            token_id=requester.access_token_id,
+            txn_id=txn_id,
+        )
+
+        old_state = context.current_state.get((EventTypes.Member, event.state_key))
+        old_membership = old_state.content.get("membership") if old_state else None
+        if action == "unban" and old_membership != "ban":
+            raise SynapseError(
+                403,
+                "Cannot unban user who was not banned (membership=%s)" % old_membership,
+                errcode=Codes.BAD_STATE
+            )
+        if old_membership == "ban" and action != "unban":
+            raise SynapseError(
+                403,
+                "Cannot %s user who was is banned" % (action,),
+                errcode=Codes.BAD_STATE
+            )
+
+        yield msg_handler.send_event(
+            event,
+            context,
+            ratelimit=True,
+            is_guest=requester.is_guest
+        )
+
+        if action == "forget":
+            yield self.forget(requester.user, room_id)
+
+    @defer.inlineCallbacks
+    def send_membership_event(self, event, context, is_guest=False):
         """ Change the membership status of a user in a room.
 
         Args:
@@ -432,7 +483,7 @@ class RoomMemberHandler(BaseHandler):
                 if not is_guest_access_allowed:
                     raise AuthError(403, "Guest access not allowed")
 
-            yield self._do_join(event, context, do_auth=do_auth)
+            yield self._do_join(event, context)
         else:
             if event.membership == Membership.LEAVE:
                 is_host_in_room = yield self.is_host_in_room(room_id, context)
@@ -459,9 +510,7 @@ class RoomMemberHandler(BaseHandler):
 
             yield self._do_local_membership_update(
                 event,
-                membership=event.content["membership"],
                 context=context,
-                do_auth=do_auth,
             )
 
             if prev_state and prev_state.membership == Membership.JOIN:
@@ -497,12 +546,12 @@ class RoomMemberHandler(BaseHandler):
         })
         event, context = yield self._create_new_client_event(builder)
 
-        yield self._do_join(event, context, room_hosts=hosts, do_auth=True)
+        yield self._do_join(event, context, room_hosts=hosts)
 
         defer.returnValue({"room_id": room_id})
 
     @defer.inlineCallbacks
-    def _do_join(self, event, context, room_hosts=None, do_auth=True):
+    def _do_join(self, event, context, room_hosts=None):
         room_id = event.room_id
 
         # XXX: We don't do an auth check if we are doing an invite
@@ -536,9 +585,7 @@ class RoomMemberHandler(BaseHandler):
 
             yield self._do_local_membership_update(
                 event,
-                membership=event.content["membership"],
                 context=context,
-                do_auth=do_auth,
             )
 
         prev_state = context.current_state.get((event.type, event.state_key))
@@ -603,8 +650,7 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue(room_ids)
 
     @defer.inlineCallbacks
-    def _do_local_membership_update(self, event, membership, context,
-                                    do_auth):
+    def _do_local_membership_update(self, event, context):
         yield run_on_reactor()
 
         target_user = UserID.from_string(event.state_key)
@@ -613,7 +659,6 @@ class RoomMemberHandler(BaseHandler):
             event,
             context,
             extra_users=[target_user],
-            suppress_auth=(not do_auth),
         )
 
     @defer.inlineCallbacks
@@ -880,28 +925,39 @@ class RoomContextHandler(BaseHandler):
                 (excluding state).
 
         Returns:
-            dict
+            dict, or None if the event isn't found
         """
         before_limit = math.floor(limit/2.)
         after_limit = limit - before_limit
 
         now_token = yield self.hs.get_event_sources().get_current_token()
 
+        def filter_evts(events):
+            return self._filter_events_for_client(
+                user.to_string(),
+                events,
+                is_guest=is_guest)
+
+        event = yield self.store.get_event(event_id, get_prev_content=True,
+                                           allow_none=True)
+        if not event:
+            defer.returnValue(None)
+            return
+
+        filtered = yield(filter_evts([event]))
+        if not filtered:
+            raise AuthError(
+                403,
+                "You don't have permission to access that event."
+            )
+
         results = yield self.store.get_events_around(
             room_id, event_id, before_limit, after_limit
         )
 
-        results["events_before"] = yield self._filter_events_for_client(
-            user.to_string(),
-            results["events_before"],
-            is_guest=is_guest,
-        )
-
-        results["events_after"] = yield self._filter_events_for_client(
-            user.to_string(),
-            results["events_after"],
-            is_guest=is_guest,
-        )
+        results["events_before"] = yield filter_evts(results["events_before"])
+        results["events_after"] = yield filter_evts(results["events_after"])
+        results["event"] = event
 
         if results["events_after"]:
             last_event_id = results["events_after"][-1].event_id

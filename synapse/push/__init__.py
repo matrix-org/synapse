@@ -37,7 +37,7 @@ class Pusher(object):
     MAX_BACKOFF = 60 * 60 * 1000
     GIVE_UP_AFTER = 24 * 60 * 60 * 1000
 
-    def __init__(self, _hs, profile_tag, user_name, app_id,
+    def __init__(self, _hs, profile_tag, user_id, app_id,
                  app_display_name, device_display_name, pushkey, pushkey_ts,
                  data, last_token, last_success, failing_since):
         self.hs = _hs
@@ -45,7 +45,7 @@ class Pusher(object):
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
         self.profile_tag = profile_tag
-        self.user_name = user_name
+        self.user_id = user_id
         self.app_id = app_id
         self.app_display_name = app_display_name
         self.device_display_name = device_display_name
@@ -95,14 +95,14 @@ class Pusher(object):
             # we fail to dispatch the push)
             config = PaginationConfig(from_token=None, limit='1')
             chunk = yield self.evStreamHandler.get_stream(
-                self.user_name, config, timeout=0, affect_presence=False
+                self.user_id, config, timeout=0, affect_presence=False
             )
             self.last_token = chunk['end']
             self.store.update_pusher_last_token(
-                self.app_id, self.pushkey, self.user_name, self.last_token
+                self.app_id, self.pushkey, self.user_id, self.last_token
             )
             logger.info("Pusher %s for user %s starting from token %s",
-                        self.pushkey, self.user_name, self.last_token)
+                        self.pushkey, self.user_id, self.last_token)
 
         wait = 0
         while self.alive:
@@ -127,7 +127,7 @@ class Pusher(object):
         config = PaginationConfig(from_token=from_tok, limit='1')
         timeout = (300 + random.randint(-60, 60)) * 1000
         chunk = yield self.evStreamHandler.get_stream(
-            self.user_name, config, timeout=timeout, affect_presence=False
+            self.user_id, config, timeout=timeout, affect_presence=False
         )
 
         # limiting to 1 may get 1 event plus 1 presence event, so
@@ -144,7 +144,7 @@ class Pusher(object):
         if read_receipt:
             for receipt_part in read_receipt['content'].values():
                 if 'm.read' in receipt_part:
-                    if self.user_name in receipt_part['m.read'].keys():
+                    if self.user_id in receipt_part['m.read'].keys():
                         have_updated_badge = True
 
         if not single_event:
@@ -154,7 +154,7 @@ class Pusher(object):
             yield self.store.update_pusher_last_token(
                 self.app_id,
                 self.pushkey,
-                self.user_name,
+                self.user_id,
                 self.last_token
             )
             return
@@ -165,8 +165,8 @@ class Pusher(object):
         processed = False
 
         rule_evaluator = yield \
-            push_rule_evaluator.evaluator_for_user_name_and_profile_tag(
-                self.user_name, self.profile_tag, single_event['room_id'], self.store
+            push_rule_evaluator.evaluator_for_user_id_and_profile_tag(
+                self.user_id, self.profile_tag, single_event['room_id'], self.store
             )
 
         actions = yield rule_evaluator.actions_for_event(single_event)
@@ -192,7 +192,7 @@ class Pusher(object):
                             pk
                         )
                         yield self.hs.get_pusherpool().remove_pusher(
-                            self.app_id, pk, self.user_name
+                            self.app_id, pk, self.user_id
                         )
         else:
             if have_updated_badge:
@@ -208,7 +208,7 @@ class Pusher(object):
             yield self.store.update_pusher_last_token_and_success(
                 self.app_id,
                 self.pushkey,
-                self.user_name,
+                self.user_id,
                 self.last_token,
                 self.clock.time_msec()
             )
@@ -217,7 +217,7 @@ class Pusher(object):
                 yield self.store.update_pusher_failing_since(
                     self.app_id,
                     self.pushkey,
-                    self.user_name,
+                    self.user_id,
                     self.failing_since)
         else:
             if not self.failing_since:
@@ -225,7 +225,7 @@ class Pusher(object):
                 yield self.store.update_pusher_failing_since(
                     self.app_id,
                     self.pushkey,
-                    self.user_name,
+                    self.user_id,
                     self.failing_since
                 )
 
@@ -237,13 +237,13 @@ class Pusher(object):
                 # of old notifications.
                 logger.warn("Giving up on a notification to user %s, "
                             "pushkey %s",
-                            self.user_name, self.pushkey)
+                            self.user_id, self.pushkey)
                 self.backoff_delay = Pusher.INITIAL_BACKOFF
                 self.last_token = chunk['end']
                 yield self.store.update_pusher_last_token(
                     self.app_id,
                     self.pushkey,
-                    self.user_name,
+                    self.user_id,
                     self.last_token
                 )
 
@@ -251,14 +251,14 @@ class Pusher(object):
                 yield self.store.update_pusher_failing_since(
                     self.app_id,
                     self.pushkey,
-                    self.user_name,
+                    self.user_id,
                     self.failing_since
                 )
             else:
                 logger.warn("Failed to dispatch push for user %s "
                             "(failing for %dms)."
                             "Trying again in %dms",
-                            self.user_name,
+                            self.user_id,
                             self.clock.time_msec() - self.failing_since,
                             self.backoff_delay)
                 yield synapse.util.async.sleep(self.backoff_delay / 1000.0)
@@ -299,11 +299,11 @@ class Pusher(object):
         membership_list = (Membership.INVITE, Membership.JOIN)
 
         room_list = yield self.store.get_rooms_for_user_where_membership_is(
-            user_id=self.user_name,
+            user_id=self.user_id,
             membership_list=membership_list
         )
 
-        user_is_guest = yield self.store.is_guest(UserID.from_string(self.user_name))
+        user_is_guest = yield self.store.is_guest(self.user_id)
 
         # XXX: importing inside method to break circular dependency.
         # should sort out the mess by moving all this logic out of
@@ -311,7 +311,7 @@ class Pusher(object):
         # handler to somewhere more amenable to re-use.
         from synapse.handlers.sync import SyncConfig
         sync_config = SyncConfig(
-            user=UserID.from_string(self.user_name),
+            user=UserID.from_string(self.user_id),
             filter=FilterCollection({}),
             is_guest=user_is_guest,
         )
@@ -328,13 +328,13 @@ class Pusher(object):
                 badge += 1
             else:
                 last_unread_event_id = sync_handler.last_read_event_id_for_room_and_user(
-                    r.room_id, self.user_name, ephemeral_by_room
+                    r.room_id, self.user_id, ephemeral_by_room
                 )
 
                 if last_unread_event_id:
                     notifs = yield (
                         self.store.get_unread_event_push_actions_by_room_for_user(
-                            r.room_id, self.user_name, last_unread_event_id
+                            r.room_id, self.user_id, last_unread_event_id
                         )
                     )
                     badge += len(notifs)

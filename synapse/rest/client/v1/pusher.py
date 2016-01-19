@@ -41,7 +41,7 @@ class PusherRestServlet(ClientV1RestServlet):
                 and 'kind' in content and
                 content['kind'] is None):
             yield pusher_pool.remove_pusher(
-                content['app_id'], content['pushkey'], user_name=user.to_string()
+                content['app_id'], content['pushkey'], user_id=user.to_string()
             )
             defer.returnValue((200, {}))
 
@@ -71,7 +71,7 @@ class PusherRestServlet(ClientV1RestServlet):
 
         try:
             yield pusher_pool.add_pusher(
-                user_name=user.to_string(),
+                user_id=user.to_string(),
                 access_token=requester.access_token_id,
                 profile_tag=content['profile_tag'],
                 kind=content['kind'],

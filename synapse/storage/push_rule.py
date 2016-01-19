@@ -25,11 +25,11 @@ logger = logging.getLogger(__name__)
 
 class PushRuleStore(SQLBaseStore):
     @cachedInlineCallbacks()
-    def get_push_rules_for_user(self, user_name):
+    def get_push_rules_for_user(self, user_id):
         rows = yield self._simple_select_list(
             table="push_rules",
             keyvalues={
-                "user_name": user_name,
+                "user_name": user_id,
             },
             retcols=(
                 "user_name", "rule_id", "priority_class", "priority",
@@ -45,11 +45,11 @@ class PushRuleStore(SQLBaseStore):
         defer.returnValue(rows)
 
     @cachedInlineCallbacks()
-    def get_push_rules_enabled_for_user(self, user_name):
+    def get_push_rules_enabled_for_user(self, user_id):
         results = yield self._simple_select_list(
             table="push_rules_enable",
             keyvalues={
-                'user_name': user_name
+                'user_name': user_id
             },
             retcols=(
                 "user_name", "rule_id", "enabled",
@@ -122,7 +122,7 @@ class PushRuleStore(SQLBaseStore):
             )
             defer.returnValue(ret)
 
-    def _add_push_rule_relative_txn(self, txn, user_name, **kwargs):
+    def _add_push_rule_relative_txn(self, txn, user_id, **kwargs):
         after = kwargs.pop("after", None)
         relative_to_rule = kwargs.pop("before", after)
 
@@ -130,7 +130,7 @@ class PushRuleStore(SQLBaseStore):
             txn,
             table="push_rules",
             keyvalues={
-                "user_name": user_name,
+                "user_name": user_id,
                 "rule_id": relative_to_rule,
             },
             retcols=["priority_class", "priority"],
@@ -154,7 +154,7 @@ class PushRuleStore(SQLBaseStore):
         new_rule.pop("before", None)
         new_rule.pop("after", None)
         new_rule['priority_class'] = priority_class
-        new_rule['user_name'] = user_name
+        new_rule['user_name'] = user_id
         new_rule['id'] = self._push_rule_id_gen.get_next_txn(txn)
 
         # check if the priority before/after is free
@@ -170,7 +170,7 @@ class PushRuleStore(SQLBaseStore):
             "SELECT COUNT(*) FROM push_rules"
             " WHERE user_name = ? AND priority_class = ? AND priority = ?"
         )
-        txn.execute(sql, (user_name, priority_class, new_rule_priority))
+        txn.execute(sql, (user_id, priority_class, new_rule_priority))
         res = txn.fetchall()
         num_conflicting = res[0][0]
 
@@ -187,14 +187,14 @@ class PushRuleStore(SQLBaseStore):
             else:
                 sql += ">= ?"
 
-            txn.execute(sql, (user_name, priority_class, new_rule_priority))
+            txn.execute(sql, (user_id, priority_class, new_rule_priority))
 
         txn.call_after(
-            self.get_push_rules_for_user.invalidate, (user_name,)
+            self.get_push_rules_for_user.invalidate, (user_id,)
         )
 
         txn.call_after(
-            self.get_push_rules_enabled_for_user.invalidate, (user_name,)
+            self.get_push_rules_enabled_for_user.invalidate, (user_id,)
         )
 
         self._simple_insert_txn(
@@ -203,14 +203,14 @@ class PushRuleStore(SQLBaseStore):
             values=new_rule,
         )
 
-    def _add_push_rule_highest_priority_txn(self, txn, user_name,
+    def _add_push_rule_highest_priority_txn(self, txn, user_id,
                                             priority_class, **kwargs):
         # find the highest priority rule in that class
         sql = (
             "SELECT COUNT(*), MAX(priority) FROM push_rules"
             " WHERE user_name = ? and priority_class = ?"
         )
-        txn.execute(sql, (user_name, priority_class))
+        txn.execute(sql, (user_id, priority_class))
         res = txn.fetchall()
         (how_many, highest_prio) = res[0]
 
@@ -221,15 +221,15 @@ class PushRuleStore(SQLBaseStore):
         # and insert the new rule
         new_rule = kwargs
         new_rule['id'] = self._push_rule_id_gen.get_next_txn(txn)
-        new_rule['user_name'] = user_name
+        new_rule['user_name'] = user_id
         new_rule['priority_class'] = priority_class
         new_rule['priority'] = new_prio
 
         txn.call_after(
-            self.get_push_rules_for_user.invalidate, (user_name,)
+            self.get_push_rules_for_user.invalidate, (user_id,)
         )
         txn.call_after(
-            self.get_push_rules_enabled_for_user.invalidate, (user_name,)
+            self.get_push_rules_enabled_for_user.invalidate, (user_id,)
         )
 
         self._simple_insert_txn(
@@ -239,48 +239,48 @@ class PushRuleStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def delete_push_rule(self, user_name, rule_id):
+    def delete_push_rule(self, user_id, rule_id):
         """
         Delete a push rule. Args specify the row to be deleted and can be
         any of the columns in the push_rule table, but below are the
         standard ones
 
         Args:
-            user_name (str): The matrix ID of the push rule owner
+            user_id (str): The matrix ID of the push rule owner
             rule_id (str): The rule_id of the rule to be deleted
         """
         yield self._simple_delete_one(
             "push_rules",
-            {'user_name': user_name, 'rule_id': rule_id},
+            {'user_name': user_id, 'rule_id': rule_id},
             desc="delete_push_rule",
         )
 
-        self.get_push_rules_for_user.invalidate((user_name,))
-        self.get_push_rules_enabled_for_user.invalidate((user_name,))
+        self.get_push_rules_for_user.invalidate((user_id,))
+        self.get_push_rules_enabled_for_user.invalidate((user_id,))
 
     @defer.inlineCallbacks
-    def set_push_rule_enabled(self, user_name, rule_id, enabled):
+    def set_push_rule_enabled(self, user_id, rule_id, enabled):
         ret = yield self.runInteraction(
             "_set_push_rule_enabled_txn",
             self._set_push_rule_enabled_txn,
-            user_name, rule_id, enabled
+            user_id, rule_id, enabled
         )
         defer.returnValue(ret)
 
-    def _set_push_rule_enabled_txn(self, txn, user_name, rule_id, enabled):
+    def _set_push_rule_enabled_txn(self, txn, user_id, rule_id, enabled):
         new_id = self._push_rules_enable_id_gen.get_next_txn(txn)
         self._simple_upsert_txn(
             txn,
             "push_rules_enable",
-            {'user_name': user_name, 'rule_id': rule_id},
+            {'user_name': user_id, 'rule_id': rule_id},
             {'enabled': 1 if enabled else 0},
             {'id': new_id},
         )
         txn.call_after(
-            self.get_push_rules_for_user.invalidate, (user_name,)
+            self.get_push_rules_for_user.invalidate, (user_id,)
         )
         txn.call_after(
-            self.get_push_rules_enabled_for_user.invalidate, (user_name,)
+            self.get_push_rules_enabled_for_user.invalidate, (user_id,)
         )
 
 

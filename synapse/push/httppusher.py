@@ -23,13 +23,13 @@ logger = logging.getLogger(__name__)
 
 
 class HttpPusher(Pusher):
-    def __init__(self, _hs, profile_tag, user_name, app_id,
+    def __init__(self, _hs, profile_tag, user_id, app_id,
                  app_display_name, device_display_name, pushkey, pushkey_ts,
                  data, last_token, last_success, failing_since):
         super(HttpPusher, self).__init__(
             _hs,
             profile_tag,
-            user_name,
+            user_id,
             app_id,
             app_display_name,
             device_display_name,
@@ -87,7 +87,7 @@ class HttpPusher(Pusher):
         }
         if event['type'] == 'm.room.member':
             d['notification']['membership'] = event['content']['membership']
-            d['notification']['user_is_target'] = event['state_key'] == self.user_name
+            d['notification']['user_is_target'] = event['state_key'] == self.user_id
         if 'content' in event:
             d['notification']['content'] = event['content']
 
@@ -117,7 +117,7 @@ class HttpPusher(Pusher):
 
     @defer.inlineCallbacks
     def send_badge(self, badge):
-        logger.info("Sending updated badge count %d to %r", badge, self.user_name)
+        logger.info("Sending updated badge count %d to %r", badge, self.user_id)
         d = {
             'notification': {
                 'id': '',

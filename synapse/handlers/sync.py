@@ -55,6 +55,7 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
     "ephemeral",
     "account_data",
     "unread_notification_count",
+    "unread_highlight_count",
 ])):
     __slots__ = []
 
@@ -292,9 +293,14 @@ class SyncHandler(BaseHandler):
         notifs = yield self.unread_notifs_for_room_id(
             room_id, sync_config, ephemeral_by_room
         )
+
         notif_count = None
+        highlight_count = None
         if notifs is not None:
             notif_count = len(notifs)
+            highlight_count = len([
+                1 for notif in notifs if _action_has_highlight(notif["actions"])
+            ])
 
         current_state = yield self.get_state_at(room_id, now_token)
 
@@ -307,6 +313,7 @@ class SyncHandler(BaseHandler):
                 room_id, tags_by_room, account_data_by_room
             ),
             unread_notification_count=notif_count,
+            unread_highlight_count=highlight_count,
         ))
 
     def account_data_for_user(self, account_data):
@@ -529,9 +536,14 @@ class SyncHandler(BaseHandler):
                 notifs = yield self.unread_notifs_for_room_id(
                     room_id, sync_config, all_ephemeral_by_room
                 )
+
                 notif_count = None
+                highlight_count = None
                 if notifs is not None:
                     notif_count = len(notifs)
+                    highlight_count = len([
+                        1 for notif in notifs if _action_has_highlight(notif["actions"])
+                    ])
 
                 just_joined = yield self.check_joined_room(sync_config, state)
                 if just_joined:
@@ -553,7 +565,8 @@ class SyncHandler(BaseHandler):
                     account_data=self.account_data_for_room(
                         room_id, tags_by_room, account_data_by_room
                     ),
-                    unread_notification_count=notif_count
+                    unread_notification_count=notif_count,
+                    unread_highlight_count=highlight_count,
                 )
                 logger.debug("Result for room %s: %r", room_id, room_sync)
 
@@ -575,7 +588,8 @@ class SyncHandler(BaseHandler):
             for room_id in joined_room_ids:
                 room_sync = yield self.incremental_sync_with_gap_for_room(
                     room_id, sync_config, since_token, now_token,
-                    ephemeral_by_room, tags_by_room, account_data_by_room
+                    ephemeral_by_room, tags_by_room, account_data_by_room,
+                    all_ephemeral_by_room=all_ephemeral_by_room,
                 )
                 if room_sync:
                     joined.append(room_sync)
@@ -655,7 +669,8 @@ class SyncHandler(BaseHandler):
     def incremental_sync_with_gap_for_room(self, room_id, sync_config,
                                            since_token, now_token,
                                            ephemeral_by_room, tags_by_room,
-                                           account_data_by_room):
+                                           account_data_by_room,
+                                           all_ephemeral_by_room):
         """ Get the incremental delta needed to bring the client up to date for
         the room. Gives the client the most recent events and the changes to
         state.
@@ -671,7 +686,7 @@ class SyncHandler(BaseHandler):
             room_id, sync_config, now_token, since_token,
         )
 
-        logging.debug("Recents %r", batch)
+        logger.debug("Recents %r", batch)
 
         current_state = yield self.get_state_at(room_id, now_token)
 
@@ -690,11 +705,16 @@ class SyncHandler(BaseHandler):
             state = yield self.get_state_at(room_id, now_token)
 
         notifs = yield self.unread_notifs_for_room_id(
-            room_id, sync_config, ephemeral_by_room
+            room_id, sync_config, all_ephemeral_by_room
         )
+
         notif_count = None
+        highlight_count = None
         if notifs is not None:
             notif_count = len(notifs)
+            highlight_count = len([
+                1 for notif in notifs if _action_has_highlight(notif["actions"])
+            ])
 
         room_sync = JoinedSyncResult(
             room_id=room_id,
@@ -705,6 +725,7 @@ class SyncHandler(BaseHandler):
                 room_id, tags_by_room, account_data_by_room
             ),
             unread_notification_count=notif_count,
+            unread_highlight_count=highlight_count,
         )
 
         logger.debug("Room sync: %r", room_sync)
@@ -734,7 +755,7 @@ class SyncHandler(BaseHandler):
             leave_event.room_id, sync_config, leave_token, since_token,
         )
 
-        logging.debug("Recents %r", batch)
+        logger.debug("Recents %r", batch)
 
         state_events_at_leave = yield self.store.get_state_for_event(
             leave_event.event_id
@@ -850,8 +871,19 @@ class SyncHandler(BaseHandler):
             notifs = yield self.store.get_unread_event_push_actions_by_room_for_user(
                 room_id, sync_config.user.to_string(), last_unread_event_id
             )
-        else:
-            # There is no new information in this period, so your notification
-            # count is whatever it was last time.
-            defer.returnValue(None)
-        defer.returnValue(notifs)
+            defer.returnValue(notifs)
+
+        # There is no new information in this period, so your notification
+        # count is whatever it was last time.
+        defer.returnValue(None)
+
+
+def _action_has_highlight(actions):
+    for action in actions:
+        try:
+            if action.get("set_tweak", None) == "highlight":
+                return action.get("value", True)
+        except AttributeError:
+            pass
+
+    return False

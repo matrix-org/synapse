@@ -174,29 +174,24 @@ class MessageHandler(BaseHandler):
         defer.returnValue(chunk)
 
     @defer.inlineCallbacks
-    def create_and_send_event(self, event_dict, ratelimit=True,
-                              token_id=None, txn_id=None, is_guest=False):
-        """ Given a dict from a client, create and handle a new event.
+    def create_event(self, event_dict, token_id=None, txn_id=None):
+        """
+        Given a dict from a client, create a new event.
 
         Creates an FrozenEvent object, filling out auth_events, prev_events,
         etc.
 
         Adds display names to Join membership events.
 
-        Persists and notifies local clients and federation.
-
         Args:
             event_dict (dict): An entire event
+
+        Returns:
+            Tuple of created event (FrozenEvent), Context
         """
         builder = self.event_builder_factory.new(event_dict)
 
         self.validator.validate_new(builder)
-
-        if ratelimit:
-            self.ratelimit(builder.user_id)
-        # TODO(paul): Why does 'event' not have a 'user' object?
-        user = UserID.from_string(builder.user_id)
-        assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
 
         if builder.type == EventTypes.Member:
             membership = builder.content.get("membership", None)
@@ -216,6 +211,25 @@ class MessageHandler(BaseHandler):
         event, context = yield self._create_new_client_event(
             builder=builder,
         )
+        defer.returnValue((event, context))
+
+    @defer.inlineCallbacks
+    def send_event(self, event, context, ratelimit=True, is_guest=False):
+        """
+        Persists and notifies local clients and federation of an event.
+
+        Args:
+            event (FrozenEvent) the event to send.
+            context (Context) the context of the event.
+            ratelimit (bool): Whether to rate limit this send.
+            is_guest (bool): Whether the sender is a guest.
+        """
+        user = UserID.from_string(event.sender)
+
+        assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
+
+        if ratelimit:
+            self.ratelimit(event.sender)
 
         if event.is_state():
             prev_state = context.current_state.get((event.type, event.state_key))
@@ -229,7 +243,7 @@ class MessageHandler(BaseHandler):
 
         if event.type == EventTypes.Member:
             member_handler = self.hs.get_handlers().room_member_handler
-            yield member_handler.change_membership(event, context, is_guest=is_guest)
+            yield member_handler.send_membership_event(event, context, is_guest=is_guest)
         else:
             yield self.handle_new_client_event(
                 event=event,
@@ -241,6 +255,25 @@ class MessageHandler(BaseHandler):
             with PreserveLoggingContext():
                 presence.bump_presence_active_time(user)
 
+    @defer.inlineCallbacks
+    def create_and_send_event(self, event_dict, ratelimit=True,
+                              token_id=None, txn_id=None, is_guest=False):
+        """
+        Creates an event, then sends it.
+
+        See self.create_event and self.send_event.
+        """
+        event, context = yield self.create_event(
+            event_dict,
+            token_id=token_id,
+            txn_id=txn_id
+        )
+        yield self.send_event(
+            event,
+            context,
+            ratelimit=ratelimit,
+            is_guest=is_guest
+        )
         defer.returnValue(event)
 
     @defer.inlineCallbacks
