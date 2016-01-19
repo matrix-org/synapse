@@ -17,7 +17,7 @@ from ._base import SQLBaseStore
 from twisted.internet import defer
 
 import logging
-import simplejson as json
+import ujson as json
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,8 @@ class EventPushActionsStore(SQLBaseStore):
             )
             )
             return [
-                {"event_id": row[0], "actions": row[1]} for row in txn.fetchall()
+                {"event_id": row[0], "actions": json.loads(row[1])}
+                for row in txn.fetchall()
             ]
 
         ret = yield self.runInteraction(
