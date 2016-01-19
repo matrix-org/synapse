@@ -96,7 +96,6 @@ class BaseHomeServer(object):
             hostname : The hostname for the server.
         """
         self.hostname = hostname
-        self.hostname_with_colon = ":" + hostname
         self._building = {}
 
         # Other kwargs are explicit dependencies
@@ -141,7 +140,7 @@ class BaseHomeServer(object):
         return domain_specific_string.domain == self.hostname
 
     def is_mine_id(self, string):
-        return string.endswith(self.hostname_with_colon)
+        return string.split(":", 1)[1] == self.hostname
 
 # Build magic accessors for every dependency
 for depname in BaseHomeServer.DEPENDENCIES:
