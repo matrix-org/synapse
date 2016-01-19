@@ -123,7 +123,7 @@ def _condition_checker(evaluator, conditions, uid, display_name, cache):
         if _id:
             res = cache.get(_id, None)
             if res is False:
-                break
+                return False
             elif res is True:
                 continue
 
