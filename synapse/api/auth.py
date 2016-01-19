@@ -510,37 +510,14 @@ class Auth(object):
         """
         # Can optionally look elsewhere in the request (e.g. headers)
         try:
-            access_token = request.args["access_token"][0]
-
-            # Check for application service tokens with a user_id override
-            try:
-                app_service = yield self.store.get_app_service_by_token(
-                    access_token
-                )
-                if not app_service:
-                    raise KeyError
-
-                user_id = app_service.sender
-                if "user_id" in request.args:
-                    user_id = request.args["user_id"][0]
-                    if not app_service.is_interested_in_user(user_id):
-                        raise AuthError(
-                            403,
-                            "Application service cannot masquerade as this user."
-                        )
-
-                if not user_id:
-                    raise KeyError
-
+            user_id = yield self._get_appservice_user_id(request.args)
+            if user_id:
                 request.authenticated_entity = user_id
-
                 defer.returnValue(
                     Requester(UserID.from_string(user_id), "", False)
                 )
-                return
-            except KeyError:
-                pass  # normal users won't have the user_id query parameter set.
 
+            access_token = request.args["access_token"][0]
             user_info = yield self._get_user_by_access_token(access_token)
             user = user_info["user"]
             token_id = user_info["token_id"]
@@ -572,6 +549,33 @@ class Auth(object):
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",
                 errcode=Codes.MISSING_TOKEN
             )
+
+    @defer.inlineCallbacks
+    def _get_appservice_user_id(self, request_args):
+        app_service = yield self.store.get_app_service_by_token(
+            request_args["access_token"][0]
+        )
+        if app_service is None:
+            defer.returnValue(None)
+
+        if "user_id" not in request_args:
+            defer.returnValue(app_service.sender)
+
+        user_id = request_args["user_id"][0]
+        if app_service.sender == user_id:
+            defer.returnValue(app_service.sender)
+
+        if not app_service.is_interested_in_user(user_id):
+            raise AuthError(
+                403,
+                "Application service cannot masquerade as this user."
+            )
+        if not (yield self.store.get_user_by_id(user_id)):
+            raise AuthError(
+                403,
+                "Application service has not registered this user"
+                )
+        defer.returnValue(user_id)
 
     @defer.inlineCallbacks
     def _get_user_by_access_token(self, token):

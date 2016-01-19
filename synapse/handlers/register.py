@@ -53,7 +53,8 @@ class RegistrationHandler(BaseHandler):
             raise SynapseError(
                 400,
                 "User ID must only contain characters which do not"
-                " require URL encoding."
+                " require URL encoding.",
+                Codes.INVALID_USERNAME
             )
 
         user = UserID(localpart, self.hs.hostname)

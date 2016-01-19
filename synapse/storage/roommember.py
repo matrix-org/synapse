@@ -287,6 +287,7 @@ class RoomMemberStore(SQLBaseStore):
             txn.execute(sql, (user_id, room_id))
         yield self.runInteraction("forget_membership", f)
         self.was_forgotten_at.invalidate_all()
+        self.who_forgot_in_room.invalidate_all()
         self.did_forget.invalidate((user_id, room_id))
 
     @cachedInlineCallbacks(num_args=2)
@@ -336,3 +337,15 @@ class RoomMemberStore(SQLBaseStore):
             return rows[0][0]
         forgot = yield self.runInteraction("did_forget_membership_at", f)
         defer.returnValue(forgot == 1)
+
+    @cached()
+    def who_forgot_in_room(self, room_id):
+        return self._simple_select_list(
+            table="room_memberships",
+            retcols=("user_id", "event_id"),
+            keyvalues={
+                "room_id": room_id,
+                "forgotten": 1,
+            },
+            desc="who_forgot"
+        )

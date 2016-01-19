@@ -27,6 +27,7 @@ from synapse.push.rulekinds import (
     PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
 )
 
+import copy
 import simplejson as json
 
 
@@ -51,7 +52,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         content = _parse_json(request)
 
         if 'attr' in spec:
-            self.set_rule_attr(requester.user, spec, content)
+            self.set_rule_attr(requester.user.to_string(), spec, content)
             defer.returnValue((200, {}))
 
         try:
@@ -73,7 +74,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
         try:
             yield self.hs.get_datastore().add_push_rule(
-                user_name=requester.user.to_string(),
+                user_id=requester.user.to_string(),
                 rule_id=_namespaced_rule_id_from_spec(spec),
                 priority_class=priority_class,
                 conditions=conditions,
@@ -126,7 +127,8 @@ class PushRuleRestServlet(ClientV1RestServlet):
             rule["actions"] = json.loads(rawrule["actions"])
             ruleslist.append(rule)
 
-        ruleslist = baserules.list_with_base_rules(ruleslist, user)
+        # We're going to be mutating this a lot, so do a deep copy
+        ruleslist = copy.deepcopy(baserules.list_with_base_rules(ruleslist))
 
         rules = {'global': {}, 'device': {}}
 
@@ -139,6 +141,16 @@ class PushRuleRestServlet(ClientV1RestServlet):
             rulearray = None
 
             template_name = _priority_class_to_template_name(r['priority_class'])
+
+            # Remove internal stuff.
+            for c in r["conditions"]:
+                c.pop("_id", None)
+
+                pattern_type = c.pop("pattern_type", None)
+                if pattern_type == "user_id":
+                    c["pattern"] = user.to_string()
+                elif pattern_type == "user_localpart":
+                    c["pattern"] = user.localpart
 
             if r['priority_class'] > PRIORITY_CLASS_MAP['override']:
                 # per-device rule
@@ -206,7 +218,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
     def on_OPTIONS(self, _):
         return 200, {}
 
-    def set_rule_attr(self, user_name, spec, val):
+    def set_rule_attr(self, user_id, spec, val):
         if spec['attr'] == 'enabled':
             if isinstance(val, dict) and "enabled" in val:
                 val = val["enabled"]
@@ -217,15 +229,15 @@ class PushRuleRestServlet(ClientV1RestServlet):
                 raise SynapseError(400, "Value for 'enabled' must be boolean")
             namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
             self.hs.get_datastore().set_push_rule_enabled(
-                user_name, namespaced_rule_id, val
+                user_id, namespaced_rule_id, val
             )
         else:
             raise UnrecognizedRequestError()
 
-    def get_rule_attr(self, user_name, namespaced_rule_id, attr):
+    def get_rule_attr(self, user_id, namespaced_rule_id, attr):
         if attr == 'enabled':
             return self.hs.get_datastore().get_push_rule_enabled_by_user_rule_id(
-                user_name, namespaced_rule_id
+                user_id, namespaced_rule_id
             )
         else:
             raise UnrecognizedRequestError()
