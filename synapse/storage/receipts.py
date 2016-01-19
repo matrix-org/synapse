@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
+from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList, cached
 from synapse.util.caches import cache_counter, caches_by_name
 
 from twisted.internet import defer
@@ -32,6 +32,18 @@ class ReceiptsStore(SQLBaseStore):
         super(ReceiptsStore, self).__init__(hs)
 
         self._receipts_stream_cache = _RoomStreamChangeCache()
+
+    @cached(num_args=2)
+    def get_receipts_for_room(self, room_id, receipt_type):
+        return self._simple_select_list(
+            table="receipts_linearized",
+            keyvalues={
+                "room_id": room_id,
+                "receipt_type": receipt_type,
+            },
+            retcols=("user_id", "event_id"),
+            desc="get_receipts_for_room",
+        )
 
     @defer.inlineCallbacks
     def get_linearized_receipts_for_rooms(self, room_ids, to_key, from_key=None):
