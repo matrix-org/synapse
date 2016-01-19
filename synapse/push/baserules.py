@@ -237,7 +237,6 @@ BASE_APPEND_UNDERRIDE_RULES = [
     },
     {
         'rule_id': 'global/underride/.m.rule.message',
-        'enabled': False,
         'conditions': [
             {
                 'kind': 'event_match',
