@@ -258,40 +258,44 @@ def _glob_matches(glob, value, word_boundary=False):
     Returns:
         bool
     """
-    if IS_GLOB.search(glob):
-        r = re.escape(glob)
+    try:
+        if IS_GLOB.search(glob):
+            r = re.escape(glob)
 
-        r = r.replace(r'\*', '.*?')
-        r = r.replace(r'\?', '.')
+            r = r.replace(r'\*', '.*?')
+            r = r.replace(r'\?', '.')
 
-        # handle [abc], [a-z] and [!a-z] style ranges.
-        r = GLOB_REGEX.sub(
-            lambda x: (
-                '[%s%s]' % (
-                    x.group(1) and '^' or '',
-                    x.group(2).replace(r'\\\-', '-')
-                )
-            ),
-            r,
-        )
-        if word_boundary:
+            # handle [abc], [a-z] and [!a-z] style ranges.
+            r = GLOB_REGEX.sub(
+                lambda x: (
+                    '[%s%s]' % (
+                        x.group(1) and '^' or '',
+                        x.group(2).replace(r'\\\-', '-')
+                    )
+                ),
+                r,
+            )
+            if word_boundary:
+                r = r"\b%s\b" % (r,)
+                r = re.compile(r, flags=re.IGNORECASE)
+
+                return r.search(value)
+            else:
+                r = r + "$"
+                r = re.compile(r, flags=re.IGNORECASE)
+
+                return r.match(value)
+        elif word_boundary:
+            r = re.escape(glob)
             r = r"\b%s\b" % (r,)
             r = re.compile(r, flags=re.IGNORECASE)
 
             return r.search(value)
         else:
-            r = r + "$"
-            r = re.compile(r, flags=re.IGNORECASE)
-
-            return r.match(value)
-    elif word_boundary:
-        r = re.escape(glob)
-        r = r"\b%s\b" % (r,)
-        r = re.compile(r, flags=re.IGNORECASE)
-
-        return r.search(value)
-    else:
-        return value.lower() == glob.lower()
+            return value.lower() == glob.lower()
+    except re.error:
+        logger.warn("Failed to parse glob to regex: %r", glob)
+        return False
 
 
 def _flatten_dict(d, prefix=[], result={}):
