@@ -171,7 +171,8 @@ BASE_APPEND_UNDERRIDE_RULES = [
         'conditions': [
             {
                 'kind': 'room_member_count',
-                'is': '2'
+                'is': '2',
+                '_id': 'member_count',
             }
         ],
         'actions': [
@@ -192,7 +193,7 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 'kind': 'event_match',
                 'key': 'type',
                 'pattern': 'm.room.member',
-                '_id': '_invite_type',
+                '_id': '_member',
             },
             {
                 'kind': 'event_match',
