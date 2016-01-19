@@ -458,6 +458,9 @@ def setup(config_options):
     hs.get_datastore().start_doing_background_updates()
     hs.get_replication_layer().start_get_pdu_cache()
 
+    if hs.config.signal_parent:
+        os.kill(os.getppid(),  hs.config.signal_parent)
+
     return hs
 
 
