@@ -309,7 +309,7 @@ def _flatten_dict(d, prefix=[], result={}):
     return result
 
 
-regex_cache = LruCache(100000)
+regex_cache = LruCache(5000)
 
 
 def _compile_regex(regex_str):
