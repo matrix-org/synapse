@@ -57,7 +57,7 @@ class ReceiptsStore(SQLBaseStore):
             return txn.fetchall()
 
         defer.returnValue(dict(
-                (yield self.runInteraction("get_receipts_for_user", f))
+            (yield self.runInteraction("get_receipts_for_user", f))
         ))
 
     @defer.inlineCallbacks
@@ -212,7 +212,7 @@ class ReceiptsStore(SQLBaseStore):
     def insert_linearized_receipt_txn(self, txn, room_id, receipt_type,
                                       user_id, event_id, data, stream_id):
         txn.call_after(
-                self.get_receipts_for_room.invalidate, (room_id, receipt_type)
+            self.get_receipts_for_room.invalidate, (room_id, receipt_type)
         )
         txn.call_after(
             self.get_receipts_for_user.invalidate, (user_id, receipt_type)
@@ -347,7 +347,6 @@ class ReceiptsStore(SQLBaseStore):
         )
         # FIXME: This shouldn't invalidate the whole cache
         txn.call_after(self.get_linearized_receipts_for_room.invalidate_all)
-
 
         self._simple_delete_txn(
             txn,
