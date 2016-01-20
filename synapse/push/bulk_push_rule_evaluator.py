@@ -107,6 +107,9 @@ class BulkPushRuleEvaluator:
             if len(filtered) == 0:
                 continue
 
+            if filtered.sender == uid:
+                continue
+
             for rule in rules:
                 if 'enabled' in rule and not rule['enabled']:
                     continue
