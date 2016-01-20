@@ -85,6 +85,13 @@ class SyncRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
+        if "from" in request.args:
+            # /events used to use 'from', but /sync uses 'since'.
+            # Lets be helpful and whine if we see a 'from'.
+            raise SynapseError(
+                400, "'from' is not a valid query parameter. Did you mean 'since'?"
+            )
+
         requester = yield self.auth.get_user_by_req(
             request, allow_guest=True
         )
