@@ -43,6 +43,7 @@ class EventStreamRestServlet(ClientV1RestServlet):
         if is_guest:
             if "room_id" not in request.args:
                 raise SynapseError(400, "Guest users must specify room_id param")
+        if "room_id" in request.args:
             room_id = request.args["room_id"][0]
         try:
             handler = self.handlers.event_stream_handler

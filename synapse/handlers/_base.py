@@ -84,7 +84,7 @@ class BaseHandler(object):
             row["event_id"] for rows in forgotten for row in rows
         )
 
-        def allowed(event, user_id, is_guest):
+        def allowed(event, user_id, is_peeking):
             state = event_id_to_state[event.event_id]
 
             visibility_event = state.get((EventTypes.RoomHistoryVisibility, ""), None)
@@ -96,7 +96,7 @@ class BaseHandler(object):
             if visibility == "world_readable":
                 return True
 
-            if is_guest:
+            if is_peeking:
                 return False
 
             membership_event = state.get((EventTypes.Member, user_id), None)
@@ -112,7 +112,7 @@ class BaseHandler(object):
                 return True
 
             if event.type == EventTypes.RoomHistoryVisibility:
-                return not is_guest
+                return not is_peeking
 
             if visibility == "shared":
                 return True
@@ -127,15 +127,15 @@ class BaseHandler(object):
             user_id: [
                 event
                 for event in events
-                if allowed(event, user_id, is_guest)
+                if allowed(event, user_id, is_peeking)
             ]
-            for user_id, is_guest in user_tuples
+            for user_id, is_peeking in user_tuples
         })
 
     @defer.inlineCallbacks
-    def _filter_events_for_client(self, user_id, events, is_guest=False):
+    def _filter_events_for_client(self, user_id, events, is_peeking=False):
         # Assumes that user has at some point joined the room if not is_guest.
-        res = yield self._filter_events_for_clients([(user_id, is_guest)], events)
+        res = yield self._filter_events_for_clients([(user_id, is_peeking)], events)
         defer.returnValue(res.get(user_id, []))
 
     def ratelimit(self, user_id):

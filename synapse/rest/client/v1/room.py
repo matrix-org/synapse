@@ -348,8 +348,7 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
         handler = self.handlers.message_handler
         msgs = yield handler.get_messages(
             room_id=room_id,
-            user_id=requester.user.to_string(),
-            is_guest=requester.is_guest,
+            requester=requester,
             pagin_config=pagination_config,
             as_client_event=as_client_event
         )
@@ -384,9 +383,8 @@ class RoomInitialSyncRestServlet(ClientV1RestServlet):
         pagination_config = PaginationConfig.from_request(request)
         content = yield self.handlers.message_handler.room_initial_sync(
             room_id=room_id,
-            user_id=requester.user.to_string(),
+            requester=requester,
             pagin_config=pagination_config,
-            is_guest=requester.is_guest,
         )
         defer.returnValue((200, content))
 
