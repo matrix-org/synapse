@@ -56,10 +56,9 @@ class PasswordRestServlet(RestServlet):
         if LoginType.PASSWORD in result:
             # if using password, they should also be logged in
             requester = yield self.auth.get_user_by_req(request)
-            requester_user_id = requester.user.to_string()
-            if requester_user_id.to_string() != result[LoginType.PASSWORD]:
+            user_id = requester.user.to_string()
+            if user_id != result[LoginType.PASSWORD]:
                 raise LoginError(400, "", Codes.UNKNOWN)
-            user_id = requester_user_id
         elif LoginType.EMAIL_IDENTITY in result:
             threepid = result[LoginType.EMAIL_IDENTITY]
             if 'medium' not in threepid or 'address' not in threepid:
