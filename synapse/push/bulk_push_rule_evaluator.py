@@ -107,7 +107,7 @@ class BulkPushRuleEvaluator:
             if len(filtered) == 0:
                 continue
 
-            if filtered.sender == uid:
+            if filtered[0].sender == uid:
                 continue
 
             for rule in rules:
