@@ -285,11 +285,9 @@ class Pusher(object):
 
     @defer.inlineCallbacks
     def _get_badge_count(self):
-        membership_list = (Membership.INVITE, Membership.JOIN)
-
         room_list = yield self.store.get_rooms_for_user_where_membership_is(
             user_id=self.user_id,
-            membership_list=membership_list
+            membership_list=(Membership.INVITE, Membership.JOIN)
         )
 
         user_is_guest = yield self.store.is_guest(self.user_id)
