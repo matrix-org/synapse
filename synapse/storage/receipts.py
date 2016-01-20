@@ -45,6 +45,21 @@ class ReceiptsStore(SQLBaseStore):
             desc="get_receipts_for_room",
         )
 
+    @cachedInlineCallbacks(num_args=2)
+    def get_receipts_for_user(self, user_id, receipt_type):
+        def f(txn):
+            sql = (
+                "SELECT room_id,event_id "
+                "FROM receipts_linearized "
+                "WHERE user_id = ? AND receipt_type = ? "
+            )
+            txn.execute(sql, (user_id, receipt_type))
+            return txn.fetchall()
+
+        defer.returnValue(dict(
+                (yield self.runInteraction("get_receipts_for_user", f))
+        ))
+
     @defer.inlineCallbacks
     def get_linearized_receipts_for_rooms(self, room_ids, to_key, from_key=None):
         """Get receipts for multiple rooms for sending to clients.
@@ -194,29 +209,16 @@ class ReceiptsStore(SQLBaseStore):
     def get_max_receipt_stream_id(self):
         return self._receipts_id_gen.get_max_token(self)
 
-    @cachedInlineCallbacks()
-    def get_graph_receipts_for_room(self, room_id):
-        """Get receipts for sending to remote servers.
-        """
-        rows = yield self._simple_select_list(
-            table="receipts_graph",
-            keyvalues={"room_id": room_id},
-            retcols=["receipt_type", "user_id", "event_id"],
-            desc="get_linearized_receipts_for_room",
-        )
-
-        result = {}
-        for row in rows:
-            result.setdefault(
-                row["user_id"], {}
-            ).setdefault(
-                row["receipt_type"], []
-            ).append(row["event_id"])
-
-        defer.returnValue(result)
-
     def insert_linearized_receipt_txn(self, txn, room_id, receipt_type,
                                       user_id, event_id, data, stream_id):
+        txn.call_after(
+                self.get_receipts_for_room.invalidate, (room_id, receipt_type)
+        )
+        txn.call_after(
+            self.get_receipts_for_user.invalidate, (user_id, receipt_type)
+        )
+        # FIXME: This shouldn't invalidate the whole cache
+        txn.call_after(self.get_linearized_receipts_for_room.invalidate_all)
 
         # We don't want to clobber receipts for more recent events, so we
         # have to compare orderings of existing receipts
@@ -324,6 +326,7 @@ class ReceiptsStore(SQLBaseStore):
         )
 
         max_persisted_id = yield self._stream_id_gen.get_max_token(self)
+
         defer.returnValue((stream_id, max_persisted_id))
 
     def insert_graph_receipt(self, room_id, receipt_type, user_id, event_ids,
@@ -336,6 +339,16 @@ class ReceiptsStore(SQLBaseStore):
 
     def insert_graph_receipt_txn(self, txn, room_id, receipt_type,
                                  user_id, event_ids, data):
+        txn.call_after(
+            self.get_receipts_for_room.invalidate, (room_id, receipt_type)
+        )
+        txn.call_after(
+            self.get_receipts_for_user.invalidate, (user_id, receipt_type)
+        )
+        # FIXME: This shouldn't invalidate the whole cache
+        txn.call_after(self.get_linearized_receipts_for_room.invalidate_all)
+
+
         self._simple_delete_txn(
             txn,
             table="receipts_graph",

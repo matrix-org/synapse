@@ -16,9 +16,8 @@
 from twisted.internet import defer
 
 from synapse.streams.config import PaginationConfig
-from synapse.types import StreamToken, UserID
+from synapse.types import StreamToken
 from synapse.api.constants import Membership
-from synapse.api.filtering import FilterCollection
 
 import synapse.util.async
 import push_rule_evaluator as push_rule_evaluator
@@ -290,22 +289,9 @@ class Pusher(object):
             membership_list=(Membership.INVITE, Membership.JOIN)
         )
 
-        user_is_guest = yield self.store.is_guest(self.user_id)
-
-        # XXX: importing inside method to break circular dependency.
-        # should sort out the mess by moving all this logic out of
-        # push/__init__.py and probably moving the logic we use from the sync
-        # handler to somewhere more amenable to re-use.
-        from synapse.handlers.sync import SyncConfig
-        sync_config = SyncConfig(
-            user=UserID.from_string(self.user_id),
-            filter=FilterCollection({}),
-            is_guest=user_is_guest,
-        )
-        now_token = yield self.hs.get_event_sources().get_current_token()
-        sync_handler = self.hs.get_handlers().sync_handler
-        _, ephemeral_by_room = yield sync_handler.ephemeral_by_room(
-            sync_config, now_token
+        my_receipts_by_room = yield self.store.get_receipts_for_user(
+            self.user_id,
+            "m.read",
         )
 
         badge = 0
@@ -314,11 +300,9 @@ class Pusher(object):
             if r.membership == Membership.INVITE:
                 badge += 1
             else:
-                last_unread_event_id = sync_handler.last_read_event_id_for_room_and_user(
-                    r.room_id, self.user_id, ephemeral_by_room
-                )
+                if r.room_id in my_receipts_by_room:
+                    last_unread_event_id = my_receipts_by_room[r.room_id]
 
-                if last_unread_event_id:
                     notifs = yield (
                         self.store.get_unread_event_push_actions_by_room_for_user(
                             r.room_id, self.user_id, last_unread_event_id
