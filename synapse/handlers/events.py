@@ -135,7 +135,7 @@ class EventStreamHandler(BaseHandler):
             events, tokens = yield self.notifier.get_events_for(
                 auth_user, pagin_config, timeout,
                 only_room_events=only_room_events,
-                is_guest=is_guest, guest_room_id=room_id
+                is_guest=is_guest, explicit_room_id=room_id
             )
 
             time_now = self.clock.time_msec()

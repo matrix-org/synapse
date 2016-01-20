@@ -936,7 +936,7 @@ class RoomContextHandler(BaseHandler):
             return self._filter_events_for_client(
                 user.to_string(),
                 events,
-                is_guest=is_guest)
+                is_peeking=is_guest)
 
         event = yield self.store.get_event(event_id, get_prev_content=True,
                                            allow_none=True)

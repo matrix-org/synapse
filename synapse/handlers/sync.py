@@ -150,7 +150,7 @@ class SyncHandler(BaseHandler):
                 return self.current_sync_for_user(sync_config, since_token)
 
             result = yield self.notifier.wait_for_events(
-                sync_config.user, timeout, current_sync_callback,
+                sync_config.user.to_string(), timeout, current_sync_callback,
                 from_token=since_token
             )
             defer.returnValue(result)
@@ -640,7 +640,7 @@ class SyncHandler(BaseHandler):
             loaded_recents = yield self._filter_events_for_client(
                 sync_config.user.to_string(),
                 loaded_recents,
-                is_guest=sync_config.is_guest,
+                is_peeking=sync_config.is_guest,
             )
             loaded_recents.extend(recents)
             recents = loaded_recents
