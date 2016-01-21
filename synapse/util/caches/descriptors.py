@@ -38,7 +38,7 @@ class Cache(object):
 
     def __init__(self, name, max_entries=1000, keylen=1, lru=True):
         if lru:
-            self.cache = LruCache(max_size=max_entries)
+            self.cache = LruCache(max_size=max_entries, keylen=keylen)
             self.max_entries = None
         else:
             self.cache = OrderedDict()
@@ -98,6 +98,15 @@ class Cache(object):
         # raced with the INSERT don't update the cache (SYN-369)
         self.sequence += 1
         self.cache.pop(key, None)
+
+    def invalidate_many(self, key):
+        self.check_thread()
+        if not isinstance(key, tuple):
+            raise TypeError(
+                "The cache key must be a tuple not %r" % (type(key),)
+            )
+        self.sequence += 1
+        self.cache.del_multi(key)
 
     def invalidate_all(self):
         self.check_thread()

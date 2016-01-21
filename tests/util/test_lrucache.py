@@ -21,34 +21,34 @@ from synapse.util.caches.lrucache import LruCache
 class LruCacheTestCase(unittest.TestCase):
 
     def test_get_set(self):
-        cache = LruCache(1)
-        cache["key"] = "value"
-        self.assertEquals(cache.get("key"), "value")
-        self.assertEquals(cache["key"], "value")
+        cache = LruCache(1, 1)
+        cache[("key",)] = "value"
+        self.assertEquals(cache.get(("key",)), "value")
+        self.assertEquals(cache[("key",)], "value")
 
     def test_eviction(self):
-        cache = LruCache(2)
-        cache[1] = 1
-        cache[2] = 2
+        cache = LruCache(2, 1)
+        cache[(1,)] = 1
+        cache[(2,)] = 2
 
-        self.assertEquals(cache.get(1), 1)
-        self.assertEquals(cache.get(2), 2)
+        self.assertEquals(cache.get((1,)), 1)
+        self.assertEquals(cache.get((2,)), 2)
 
-        cache[3] = 3
+        cache[(3,)] = 3
 
-        self.assertEquals(cache.get(1), None)
-        self.assertEquals(cache.get(2), 2)
-        self.assertEquals(cache.get(3), 3)
+        self.assertEquals(cache.get((1,)), None)
+        self.assertEquals(cache.get((2,)), 2)
+        self.assertEquals(cache.get((3,)), 3)
 
     def test_setdefault(self):
-        cache = LruCache(1)
-        self.assertEquals(cache.setdefault("key", 1), 1)
-        self.assertEquals(cache.get("key"), 1)
-        self.assertEquals(cache.setdefault("key", 2), 1)
-        self.assertEquals(cache.get("key"), 1)
+        cache = LruCache(1, 1)
+        self.assertEquals(cache.setdefault(("key",), 1), 1)
+        self.assertEquals(cache.get(("key",)), 1)
+        self.assertEquals(cache.setdefault(("key",), 2), 1)
+        self.assertEquals(cache.get(("key",)), 1)
 
     def test_pop(self):
-        cache = LruCache(1)
-        cache["key"] = 1
-        self.assertEquals(cache.pop("key"), 1)
-        self.assertEquals(cache.pop("key"), None)
+        cache = LruCache(1, 1)
+        cache[("key",)] = 1
+        self.assertEquals(cache.pop(("key",)), 1)
+        self.assertEquals(cache.pop(("key",)), None)

@@ -32,7 +32,7 @@ class DictionaryCache(object):
     """
 
     def __init__(self, name, max_entries=1000):
-        self.cache = LruCache(max_size=max_entries)
+        self.cache = LruCache(max_size=max_entries, keylen=1)
 
         self.name = name
         self.sequence = 0
@@ -56,7 +56,7 @@ class DictionaryCache(object):
                 )
 
     def get(self, key, dict_keys=None):
-        entry = self.cache.get(key, self.sentinel)
+        entry = self.cache.get((key,), self.sentinel)
         if entry is not self.sentinel:
             cache_counter.inc_hits(self.name)
 
@@ -78,7 +78,7 @@ class DictionaryCache(object):
         # Increment the sequence number so that any SELECT statements that
         # raced with the INSERT don't update the cache (SYN-369)
         self.sequence += 1
-        self.cache.pop(key, None)
+        self.cache.pop((key,), None)
 
     def invalidate_all(self):
         self.check_thread()
@@ -96,8 +96,8 @@ class DictionaryCache(object):
                 self._update_or_insert(key, value)
 
     def _update_or_insert(self, key, value):
-        entry = self.cache.setdefault(key, DictionaryEntry(False, {}))
+        entry = self.cache.setdefault((key,), DictionaryEntry(False, {}))
         entry.value.update(value)
 
     def _insert(self, key, value):
-        self.cache[key] = DictionaryEntry(True, value)
+        self.cache[(key,)] = DictionaryEntry(True, value)

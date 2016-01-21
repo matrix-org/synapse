@@ -56,42 +56,42 @@ class CacheTestCase(unittest.TestCase):
     def test_eviction(self):
         cache = Cache("test", max_entries=2)
 
-        cache.prefill(1, "one")
-        cache.prefill(2, "two")
-        cache.prefill(3, "three")  # 1 will be evicted
+        cache.prefill((1,), "one")
+        cache.prefill((2,), "two")
+        cache.prefill((3,), "three")  # 1 will be evicted
 
         failed = False
         try:
-            cache.get(1)
+            cache.get((1,))
         except KeyError:
             failed = True
 
         self.assertTrue(failed)
 
-        cache.get(2)
-        cache.get(3)
+        cache.get((2,))
+        cache.get((3,))
 
     def test_eviction_lru(self):
         cache = Cache("test", max_entries=2, lru=True)
 
-        cache.prefill(1, "one")
-        cache.prefill(2, "two")
+        cache.prefill((1,), "one")
+        cache.prefill((2,), "two")
 
         # Now access 1 again, thus causing 2 to be least-recently used
-        cache.get(1)
+        cache.get((1,))
 
-        cache.prefill(3, "three")
+        cache.prefill((3,), "three")
 
         failed = False
         try:
-            cache.get(2)
+            cache.get((2,))
         except KeyError:
             failed = True
 
         self.assertTrue(failed)
 
-        cache.get(1)
-        cache.get(3)
+        cache.get((1,))
+        cache.get((3,))
 
 
 class CacheDecoratorTestCase(unittest.TestCase):
