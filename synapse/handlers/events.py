@@ -113,10 +113,10 @@ class EventStreamHandler(BaseHandler):
     @log_function
     def get_stream(self, auth_user_id, pagin_config, timeout=0,
                    as_client_event=True, affect_presence=True,
-                   only_room_events=False, room_id=None, is_guest=False):
+                   only_keys=None, room_id=None, is_guest=False):
         """Fetches the events stream for a given user.
 
-        If `only_room_events` is `True` only room events will be returned.
+        If `only_keys` is not None, events from keys will be sent down.
         """
         auth_user = UserID.from_string(auth_user_id)
 
@@ -134,7 +134,7 @@ class EventStreamHandler(BaseHandler):
 
             events, tokens = yield self.notifier.get_events_for(
                 auth_user, pagin_config, timeout,
-                only_room_events=only_room_events,
+                only_keys=only_keys,
                 is_guest=is_guest, explicit_room_id=room_id
             )
 
