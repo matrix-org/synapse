@@ -31,21 +31,6 @@ class PusherPool:
         self.pushers = {}
         self.last_pusher_started = -1
 
-        distributor = self.hs.get_distributor()
-        distributor.observe(
-            "user_presence_changed", self.user_presence_changed
-        )
-
-    @defer.inlineCallbacks
-    def user_presence_changed(self, user, state):
-        user_id = user.to_string()
-
-        # until we have read receipts, pushers use this to reset a user's
-        # badge counters to zero
-        for p in self.pushers.values():
-            if p.user_id == user_id:
-                yield p.presence_changed(state)
-
     @defer.inlineCallbacks
     def start(self):
         pushers = yield self.store.get_all_pushers()
