@@ -125,9 +125,6 @@ class Pusher(object):
         from_tok = StreamToken.from_string(self.last_token)
         config = PaginationConfig(from_token=from_tok, limit='1')
         timeout = (300 + random.randint(-60, 60)) * 1000
-        # note that we need to get read receipts down the stream as we need to
-        # wake up when one arrives. we don't need to explicitly look for
-        # them though.
         chunk = yield self.evStreamHandler.get_stream(
             self.user_id, config, timeout=timeout, affect_presence=False
         )
@@ -135,12 +132,23 @@ class Pusher(object):
         # limiting to 1 may get 1 event plus 1 presence event, so
         # pick out the actual event
         single_event = None
+        read_receipt = None
         for c in chunk['chunk']:
             if 'event_id' in c:  # Hmmm...
                 single_event = c
+            elif c['type'] == 'm.receipt':
+                read_receipt = c
+
+        have_updated_badge = False
+        if read_receipt:
+            for receipt_part in read_receipt['content'].values():
+                if 'm.read' in receipt_part:
+                    if self.user_id in receipt_part['m.read'].keys():
+                        have_updated_badge = True
 
         if not single_event:
-            yield self.update_badge()
+            if have_updated_badge:
+                yield self.update_badge()
             self.last_token = chunk['end']
             yield self.store.update_pusher_last_token(
                 self.app_id,
@@ -185,6 +193,9 @@ class Pusher(object):
                         yield self.hs.get_pusherpool().remove_pusher(
                             self.app_id, pk, self.user_id
                         )
+        else:
+            if have_updated_badge:
+                yield self.update_badge()
             processed = True
 
         if not self.alive:

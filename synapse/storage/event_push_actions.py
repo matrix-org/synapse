@@ -15,6 +15,7 @@
 
 from ._base import SQLBaseStore
 from twisted.internet import defer
+from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 import logging
 import ujson as json
@@ -46,7 +47,7 @@ class EventPushActionsStore(SQLBaseStore):
             values
         )
 
-    @defer.inlineCallbacks
+    @cachedInlineCallbacks(num_args=3)
     def get_unread_event_push_actions_by_room_for_user(
             self, room_id, user_id, last_read_event_id
     ):
