@@ -49,11 +49,10 @@ class RegistrationHandler(BaseHandler):
     def check_username(self, localpart, guest_access_token=None):
         yield run_on_reactor()
 
-        if urllib.quote(localpart) != localpart:
+        if urllib.quote(localpart.encode('utf-8')) != localpart:
             raise SynapseError(
                 400,
-                "User ID must only contain characters which do not"
-                " require URL encoding.",
+                "User ID can only contain characters a-z, 0-9, or '-./'",
                 Codes.INVALID_USERNAME
             )
 
