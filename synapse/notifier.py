@@ -403,7 +403,9 @@ class Notifier(object):
             # over /events.
             #
             # I am sorry for what I have done.
-            user_id_for_stream = "_PEEKING_" + user_id_for_stream
+            user_id_for_stream = "_PEEKING_%s_%s" % (
+                explicit_room_id, user_id_for_stream
+            )
 
         result = yield self.wait_for_events(
             user_id_for_stream,
