@@ -218,23 +218,25 @@ BASE_APPEND_UNDERRIDE_RULES = [
             }
         ]
     },
-    {
-        'rule_id': 'global/underride/.m.rule.member_event',
-        'conditions': [
-            {
-                'kind': 'event_match',
-                'key': 'type',
-                'pattern': 'm.room.member',
-                '_id': '_member',
-            }
-        ],
-        'actions': [
-            'notify', {
-                'set_tweak': 'highlight',
-                'value': False
-            }
-        ]
-    },
+    # This is too simple: https://matrix.org/jira/browse/SYN-607
+    # Removing for now
+    # {
+    #     'rule_id': 'global/underride/.m.rule.member_event',
+    #     'conditions': [
+    #         {
+    #             'kind': 'event_match',
+    #             'key': 'type',
+    #             'pattern': 'm.room.member',
+    #             '_id': '_member',
+    #         }
+    #     ],
+    #     'actions': [
+    #         'notify', {
+    #             'set_tweak': 'highlight',
+    #             'value': False
+    #         }
+    #     ]
+    # },
     {
         'rule_id': 'global/underride/.m.rule.message',
         'conditions': [
