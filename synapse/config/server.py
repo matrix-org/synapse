@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from ._base import Config
+import signal
 
 
 class ServerConfig(Config):
@@ -28,6 +29,11 @@ class ServerConfig(Config):
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", True)
+        self.signal_parent = config.get("signal_parent", None)
+        if isinstance(self.signal_parent, basestring):
+            # If the signal is given by a name then look it up in the signal
+            # module, e.g. "SIGUSR1" -> signal.SIGUSR1
+            self.signal_parent = getattr(signal, self.signal_parent)
 
         self.listeners = config.get("listeners", [])
 
@@ -138,6 +144,10 @@ class ServerConfig(Config):
 
         # When running as a daemon, the file to store the pid in
         pid_file: %(pid_file)s
+
+        # Send a signal to the parent process to notify it that synapse has
+        # sucessfully started.
+        # signal_parent: SIGUSR1
 
         # Whether to serve a web client from the HTTP/HTTPS root resource.
         web_client: True
