@@ -331,13 +331,13 @@ class Notifier(object):
 
     @defer.inlineCallbacks
     def get_events_for(self, user, pagination_config, timeout,
-                       only_room_events=False,
+                       only_keys=None,
                        is_guest=False, explicit_room_id=None):
         """ For the given user and rooms, return any new events for them. If
         there are no new events wait for up to `timeout` milliseconds for any
         new events to happen before returning.
 
-        If `only_room_events` is `True` only room events will be returned.
+        If `only_keys` is not None, events from keys will be sent down.
 
         If explicit_room_id is not set, the user's joined rooms will be polled
         for events.
@@ -367,7 +367,7 @@ class Notifier(object):
                 after_id = getattr(after_token, keyname)
                 if before_id == after_id:
                     continue
-                if only_room_events and name != "room":
+                if only_keys and name not in only_keys:
                     continue
                 new_events, new_key = yield source.get_new_events(
                     user=user,

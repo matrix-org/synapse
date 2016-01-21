@@ -126,7 +126,8 @@ class Pusher(object):
         config = PaginationConfig(from_token=from_tok, limit='1')
         timeout = (300 + random.randint(-60, 60)) * 1000
         chunk = yield self.evStreamHandler.get_stream(
-            self.user_id, config, timeout=timeout, affect_presence=False
+            self.user_id, config, timeout=timeout, affect_presence=False,
+            only_keys=("room", "receipt",),
         )
 
         # limiting to 1 may get 1 event plus 1 presence event, so
