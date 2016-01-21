@@ -43,7 +43,7 @@ class TreeCache(object):
         node_and_keys.append((self.root, None))
 
         for i in range(len(node_and_keys) - 1):
-            n,k = node_and_keys[i]
+            n, k = node_and_keys[i]
 
             if n:
                 break
