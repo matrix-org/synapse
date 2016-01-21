@@ -88,7 +88,7 @@ class SRVClientEndpoint(object):
         self.service_name = "_%s._%s.%s" % (service, protocol, domain)
 
         if default_port is not None:
-            self.default_server = self._Server(
+            self.default_server = _Server(
                 host=domain,
                 port=default_port,
                 priority=0,
