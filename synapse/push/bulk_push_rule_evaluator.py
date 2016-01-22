@@ -135,8 +135,16 @@ class BulkPushRuleEvaluator:
                     evaluator, rule['conditions'], uid, display_name, condition_cache
                 )
                 if matches:
+                    notify = False
+                    actions = []
+                    for a in rule['actions']:
+                        if a != 'dont_notify':
+                            actions.append(a)
+                        elif a == 'notify':
+                            notify = True
+
                     actions = [x for x in rule['actions'] if x != 'dont_notify']
-                    if actions:
+                    if actions and notify:
                         actions_by_user[uid] = actions
                     break
         defer.returnValue(actions_by_user)
