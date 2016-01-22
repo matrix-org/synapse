@@ -17,6 +17,7 @@
 from .. import unittest
 
 from synapse.util.caches.lrucache import LruCache
+from synapse.util.caches.treecache import TreeCache
 
 class LruCacheTestCase(unittest.TestCase):
 
@@ -54,7 +55,7 @@ class LruCacheTestCase(unittest.TestCase):
         self.assertEquals(cache.pop(("key",)), None)
 
     def test_del_multi(self):
-        cache = LruCache(4, 2)
+        cache = LruCache(4, 2, cache_type=TreeCache)
         cache[("animal", "cat")] = "mew"
         cache[("animal", "dog")] = "woof"
         cache[("vehicles", "car")] = "vroom"

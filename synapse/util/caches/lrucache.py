@@ -17,8 +17,6 @@
 from functools import wraps
 import threading
 
-from synapse.util.caches.treecache import TreeCache
-
 
 def enumerate_leaves(node, depth):
     if depth == 0:
@@ -31,8 +29,8 @@ def enumerate_leaves(node, depth):
 
 class LruCache(object):
     """Least-recently-used cache."""
-    def __init__(self, max_size, keylen):
-        cache = TreeCache()
+    def __init__(self, max_size, keylen, cache_type=dict):
+        cache = cache_type()
         self.size = 0
         list_root = []
         list_root[:] = [list_root, list_root, None, None]
@@ -124,6 +122,9 @@ class LruCache(object):
 
         @synchronized
         def cache_del_multi(key):
+            """
+            This will only work if constructed with cache_type=TreeCache
+            """
             popped = cache.pop(key)
             if popped is None:
                 return

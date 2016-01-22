@@ -53,7 +53,7 @@ class EventPushActionsStore(SQLBaseStore):
             f,
         )
 
-    @cachedInlineCallbacks(num_args=3, lru=True)
+    @cachedInlineCallbacks(num_args=3, lru=True, tree=True)
     def get_unread_event_push_actions_by_room_for_user(
             self, room_id, user_id, last_read_event_id
     ):
