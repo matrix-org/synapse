@@ -17,11 +17,27 @@
 from functools import wraps
 import threading
 
+from synapse.util.caches.treecache import TreeCache
+
+
+def enumerate_leaves(node, depth):
+    if depth == 0:
+        yield node
+    else:
+        for n in node.values():
+            for m in enumerate_leaves(n, depth - 1):
+                yield m
+
 
 class LruCache(object):
-    """Least-recently-used cache."""
-    def __init__(self, max_size):
-        cache = {}
+    """
+    Least-recently-used cache.
+    Supports del_multi only if cache_type=TreeCache
+    If cache_type=TreeCache, all keys must be tuples.
+    """
+    def __init__(self, max_size, keylen=1, cache_type=dict):
+        cache = cache_type()
+        self.size = 0
         list_root = []
         list_root[:] = [list_root, list_root, None, None]
 
@@ -44,6 +60,7 @@ class LruCache(object):
             prev_node[NEXT] = node
             next_node[PREV] = node
             cache[key] = node
+            self.size += 1
 
         def move_node_to_front(node):
             prev_node = node[PREV]
@@ -62,7 +79,7 @@ class LruCache(object):
             next_node = node[NEXT]
             prev_node[NEXT] = next_node
             next_node[PREV] = prev_node
-            cache.pop(node[KEY], None)
+            self.size -= 1
 
         @synchronized
         def cache_get(key, default=None):
@@ -81,8 +98,10 @@ class LruCache(object):
                 node[VALUE] = value
             else:
                 add_node(key, value)
-                if len(cache) > max_size:
-                    delete_node(list_root[PREV])
+                if self.size > max_size:
+                    todelete = list_root[PREV]
+                    delete_node(todelete)
+                    cache.pop(todelete[KEY], None)
 
         @synchronized
         def cache_set_default(key, value):
@@ -91,8 +110,10 @@ class LruCache(object):
                 return node[VALUE]
             else:
                 add_node(key, value)
-                if len(cache) > max_size:
-                    delete_node(list_root[PREV])
+                if self.size > max_size:
+                    todelete = list_root[PREV]
+                    delete_node(todelete)
+                    cache.pop(todelete[KEY], None)
                 return value
 
         @synchronized
@@ -100,9 +121,21 @@ class LruCache(object):
             node = cache.get(key, None)
             if node:
                 delete_node(node)
+                cache.pop(node[KEY], None)
                 return node[VALUE]
             else:
                 return default
+
+        @synchronized
+        def cache_del_multi(key):
+            """
+            This will only work if constructed with cache_type=TreeCache
+            """
+            popped = cache.pop(key)
+            if popped is None:
+                return
+            for leaf in enumerate_leaves(popped, keylen - len(key)):
+                delete_node(leaf)
 
         @synchronized
         def cache_clear():
@@ -112,7 +145,7 @@ class LruCache(object):
 
         @synchronized
         def cache_len():
-            return len(cache)
+            return self.size
 
         @synchronized
         def cache_contains(key):
@@ -123,6 +156,8 @@ class LruCache(object):
         self.set = cache_set
         self.setdefault = cache_set_default
         self.pop = cache_pop
+        if cache_type is TreeCache:
+            self.del_multi = cache_del_multi
         self.len = cache_len
         self.contains = cache_contains
         self.clear = cache_clear

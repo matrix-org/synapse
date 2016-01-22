@@ -94,6 +94,35 @@ class PushRuleStore(SQLBaseStore):
         defer.returnValue(results)
 
     @defer.inlineCallbacks
+    def bulk_get_push_rules_enabled(self, user_ids):
+        if not user_ids:
+            defer.returnValue({})
+
+        batch_size = 100
+
+        def f(txn, user_ids_to_fetch):
+            sql = (
+                "SELECT user_name, rule_id, enabled"
+                " FROM push_rules_enable"
+                " WHERE user_name"
+                " IN (" + ",".join("?" for _ in user_ids_to_fetch) + ")"
+            )
+            txn.execute(sql, user_ids_to_fetch)
+            return self.cursor_to_dict(txn)
+
+        results = {}
+
+        chunks = [user_ids[i:i+batch_size] for i in xrange(0, len(user_ids), batch_size)]
+        for batch_user_ids in chunks:
+            rows = yield self.runInteraction(
+                "bulk_get_push_rules_enabled", f, batch_user_ids
+            )
+
+            for row in rows:
+                results.setdefault(row['user_name'], {})[row['rule_id']] = row['enabled']
+        defer.returnValue(results)
+
+    @defer.inlineCallbacks
     def add_push_rule(self, before, after, **kwargs):
         vals = kwargs
         if 'conditions' in vals:
