@@ -40,14 +40,20 @@ class EventPushActionsStore(SQLBaseStore):
                 'actions': json.dumps(actions)
             })
 
+        def f(txn):
+            for uid, _, __ in tuples:
+                txn.call_after(
+                    self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
+                    (event.room_id, uid)
+                )
+            return self._simple_insert_many_txn(txn, "event_push_actions", values)
+
         yield self.runInteraction(
             "set_actions_for_event_and_users",
-            self._simple_insert_many_txn,
-            "event_push_actions",
-            values
+            f,
         )
 
-    @cachedInlineCallbacks(num_args=3)
+    @cachedInlineCallbacks(num_args=3, lru=True)
     def get_unread_event_push_actions_by_room_for_user(
             self, room_id, user_id, last_read_event_id
     ):
@@ -98,6 +104,11 @@ class EventPushActionsStore(SQLBaseStore):
     @defer.inlineCallbacks
     def remove_push_actions_for_event_id(self, room_id, event_id):
         def f(txn):
+            # Sad that we have to blow away the cache for the whole room here
+            txn.call_after(
+                self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
+                (room_id,)
+            )
             txn.execute(
                 "DELETE FROM event_push_actions WHERE room_id = ? AND event_id = ?",
                 (room_id, event_id)
