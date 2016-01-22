@@ -50,6 +50,9 @@ def _get_rules(room_id, user_ids, store):
     # fetch disabled rules, but this won't account for any server default
     # rules the user has disabled, so we need to do this too.
     for uid in user_ids:
+        if uid not in rules_enabled_by_user:
+            continue
+
         user_enabled_map = rules_enabled_by_user[uid]
 
         for rule in rules_by_user[uid]:
