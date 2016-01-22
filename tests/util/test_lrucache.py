@@ -52,3 +52,22 @@ class LruCacheTestCase(unittest.TestCase):
         cache[("key",)] = 1
         self.assertEquals(cache.pop(("key",)), 1)
         self.assertEquals(cache.pop(("key",)), None)
+
+    def test_del_multi(self):
+        cache = LruCache(4, 2)
+        cache[("animal", "cat")] = "mew"
+        cache[("animal", "dog")] = "woof"
+        cache[("vehicles", "car")] = "vroom"
+        cache[("vehicles", "train")] = "chuff"
+
+        self.assertEquals(len(cache), 4)
+
+        self.assertEquals(cache.get(("animal", "cat")), "mew")
+        self.assertEquals(cache.get(("vehicles", "car")), "vroom")
+        cache.del_multi(("animal",))
+        self.assertEquals(len(cache), 2)
+        self.assertEquals(cache.get(("animal", "cat")), None)
+        self.assertEquals(cache.get(("animal", "dog")), None)
+        self.assertEquals(cache.get(("vehicles", "car")), "vroom")
+        self.assertEquals(cache.get(("vehicles", "train")), "chuff")
+        # Man from del_multi say "Yes".
