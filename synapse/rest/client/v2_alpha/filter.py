@@ -59,7 +59,7 @@ class GetFilterRestServlet(RestServlet):
                 filter_id=filter_id,
             )
 
-            defer.returnValue((200, filter.filter_json))
+            defer.returnValue((200, filter.get_filter_json()))
         except KeyError:
             raise SynapseError(400, "No such filter")
 
