@@ -36,6 +36,7 @@ def decode_rule_json(rule):
 @defer.inlineCallbacks
 def _get_rules(room_id, user_ids, store):
     rules_by_user = yield store.bulk_get_push_rules(user_ids)
+    rules_enabled_by_user = yield store.bulk_get_push_rules_enabled(user_ids)
 
     rules_by_user = {
         uid: baserules.list_with_base_rules([
@@ -44,6 +45,22 @@ def _get_rules(room_id, user_ids, store):
         ])
         for uid in user_ids
     }
+
+    # We apply the rules-enabled map here: bulk_get_push_rules doesn't
+    # fetch disabled rules, but this won't account for any server default
+    # rules the user has disabled, so we need to do this too.
+    for uid in user_ids:
+        if uid not in rules_enabled_by_user:
+            continue
+
+        user_enabled_map = rules_enabled_by_user[uid]
+
+        for rule in rules_by_user[uid]:
+            rule_id = rule['rule_id']
+
+            if rule_id in user_enabled_map:
+                rule['enabled'] = user_enabled_map[rule_id]
+
     defer.returnValue(rules_by_user)
 
 
