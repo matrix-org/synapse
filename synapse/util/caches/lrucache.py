@@ -28,7 +28,11 @@ def enumerate_leaves(node, depth):
 
 
 class LruCache(object):
-    """Least-recently-used cache."""
+    """
+    Least-recently-used cache.
+    Supports del_multi only if cache_type=TreeCache
+    If cache_type=TreeCache, all keys must be tuples.
+    """
     def __init__(self, max_size, keylen=1, cache_type=dict):
         cache = cache_type()
         self.size = 0
