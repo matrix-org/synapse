@@ -52,7 +52,7 @@ class RegistrationHandler(BaseHandler):
         if urllib.quote(localpart.encode('utf-8')) != localpart:
             raise SynapseError(
                 400,
-                "User ID can only contain characters a-z, 0-9, or '-./'",
+                "User ID can only contain characters a-z, 0-9, or '_-./'",
                 Codes.INVALID_USERNAME
             )
 
