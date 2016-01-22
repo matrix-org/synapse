@@ -17,6 +17,8 @@
 from functools import wraps
 import threading
 
+from synapse.util.caches.treecache import TreeCache
+
 
 def enumerate_leaves(node, depth):
     if depth == 0:
@@ -154,7 +156,8 @@ class LruCache(object):
         self.set = cache_set
         self.setdefault = cache_set_default
         self.pop = cache_pop
-        self.del_multi = cache_del_multi
+        if cache_type is TreeCache:
+            self.del_multi = cache_del_multi
         self.len = cache_len
         self.contains = cache_contains
         self.clear = cache_clear
