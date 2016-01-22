@@ -2,6 +2,11 @@ SENTINEL = object()
 
 
 class TreeCache(object):
+    """
+    Tree-based backing store for LruCache. Allows subtrees of data to be deleted
+    efficiently.
+    Keys must be tuples.
+    """
     def __init__(self):
         self.root = {}
 
