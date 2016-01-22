@@ -13,6 +13,9 @@ class TreeCache(object):
     def __setitem__(self, key, value):
         return self.set(key, value)
 
+    def __contains__(self, key):
+        return self.get(key, SENTINEL) is not SENTINEL
+
     def set(self, key, value):
         node = self.root
         for k in key[:-1]:
