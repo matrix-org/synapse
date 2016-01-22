@@ -29,7 +29,7 @@ def enumerate_leaves(node, depth):
 
 class LruCache(object):
     """Least-recently-used cache."""
-    def __init__(self, max_size, keylen, cache_type=dict):
+    def __init__(self, max_size, keylen=1, cache_type=dict):
         cache = cache_type()
         self.size = 0
         list_root = []

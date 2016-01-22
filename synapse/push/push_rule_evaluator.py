@@ -309,14 +309,14 @@ def _flatten_dict(d, prefix=[], result={}):
     return result
 
 
-regex_cache = LruCache(5000, 1)
+regex_cache = LruCache(5000)
 
 
 def _compile_regex(regex_str):
-    r = regex_cache.get((regex_str,), None)
+    r = regex_cache.get(regex_str, None)
     if r:
         return r
 
     r = re.compile(regex_str, flags=re.IGNORECASE)
-    regex_cache[(regex_str,)] = r
+    regex_cache[regex_str] = r
     return r
