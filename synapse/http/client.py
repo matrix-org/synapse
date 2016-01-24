@@ -238,6 +238,87 @@ class SimpleHttpClient(object):
         else:
             raise CodeMessageException(response.code, body)
 
+    # XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
+    # The two should be factored out.
+
+    @defer.inlineCallbacks
+    def get_file(self, url, output_stream, args={}, max_size=None):
+        """GETs a file from a given URL
+        Args:
+            url (str): The URL to GET
+            output_stream (file): File to write the response body to.
+        Returns:
+            A (int,dict) tuple of the file length and a dict of the response
+            headers.
+        """
+
+        def body_callback(method, url_bytes, headers_dict):
+            self.sign_request(destination, method, url_bytes, headers_dict)
+            return None
+
+        response = yield self.request(
+            "GET",
+            url.encode("ascii"),
+            headers=Headers({
+                b"User-Agent": [self.user_agent],
+            })
+        )
+
+        headers = dict(response.headers.getAllRawHeaders())
+
+        if headers['Content-Length'] > max_size:
+            logger.warn("Requested URL is too large > %r bytes" % (self.max_size,))
+            # XXX: do we want to explicitly drop the connection here somehow? if so, how?
+            raise # what should we be raising here?
+
+        # TODO: if our Content-Type is HTML or something, just read the first
+        # N bytes into RAM rather than saving it all to disk only to read it
+        # straight back in again
+
+        try:
+            length = yield preserve_context_over_fn(
+                _readBodyToFile,
+                response, output_stream, max_size
+            )
+        except:
+            logger.exception("Failed to download body")
+            raise
+
+        defer.returnValue((length, headers))
+
+
+# XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
+# The two should be factored out.
+
+class _ReadBodyToFileProtocol(protocol.Protocol):
+    def __init__(self, stream, deferred, max_size):
+        self.stream = stream
+        self.deferred = deferred
+        self.length = 0
+        self.max_size = max_size
+
+    def dataReceived(self, data):
+        self.stream.write(data)
+        self.length += len(data)
+        if self.max_size is not None and self.length >= self.max_size:
+            logger.warn("Requested URL is too large > %r bytes" % (self.max_size,))
+            self.deferred = defer.Deferred()
+            self.transport.loseConnection()
+
+    def connectionLost(self, reason):
+        if reason.check(ResponseDone):
+            self.deferred.callback(self.length)
+        else:
+            self.deferred.errback(reason)
+
+
+# XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
+# The two should be factored out.
+
+def _readBodyToFile(response, stream, max_size):
+    d = defer.Deferred()
+    response.deliverBody(_ReadBodyToFileProtocol(stream, d, max_size))
+    return d
 
 class CaptchaServerHttpClient(SimpleHttpClient):
     """

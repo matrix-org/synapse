@@ -53,6 +53,7 @@ class ContentRepositoryConfig(Config):
     def read_config(self, config):
         self.max_upload_size = self.parse_size(config["max_upload_size"])
         self.max_image_pixels = self.parse_size(config["max_image_pixels"])
+        self.max_spider_size = self.parse_size(config["max_spider_size"])
         self.media_store_path = self.ensure_directory(config["media_store_path"])
         self.uploads_path = self.ensure_directory(config["uploads_path"])
         self.dynamic_thumbnails = config["dynamic_thumbnails"]
@@ -73,6 +74,9 @@ class ContentRepositoryConfig(Config):
         # The largest allowed upload size in bytes
         max_upload_size: "10M"
 
+        # The largest allowed URL preview spidering size in bytes
+        max_spider_size: "10M"
+
         # Maximum number of pixels that will be thumbnailed
         max_image_pixels: "32M"
 
@@ -80,7 +84,7 @@ class ContentRepositoryConfig(Config):
         # the resolution requested by the client. If true then whenever
         # a new resolution is requested by the client the server will
         # generate a new thumbnail. If false the server will pick a thumbnail
-        # from a precalcualted list.
+        # from a precalculated list.
         dynamic_thumbnails: false
 
         # List of thumbnail to precalculate when an image is uploaded.
