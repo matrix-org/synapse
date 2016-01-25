@@ -639,7 +639,6 @@ class SQLBaseStore(object):
         Filters rows by if value of `column` is in `iterable`.
 
         Args:
-            txn : Transaction object
             table : string giving the table name
             column : column name to test for inclusion against `iterable`
             iterable : list
