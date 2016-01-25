@@ -24,3 +24,4 @@ CREATE TABLE IF NOT EXISTS event_push_actions(
 
 
 CREATE INDEX event_push_actions_room_id_event_id_user_id_profile_tag on event_push_actions(room_id, event_id, user_id, profile_tag);
+CREATE INDEX event_push_actions_room_id_user_id on event_push_actions(room_id, user_id);
