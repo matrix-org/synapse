@@ -17,7 +17,6 @@ from twisted.internet import defer
 
 from synapse.streams.config import PaginationConfig
 from synapse.types import StreamToken
-from synapse.api.constants import Membership
 
 import synapse.util.async
 import push_rule_evaluator as push_rule_evaluator
@@ -296,31 +295,28 @@ class Pusher(object):
 
     @defer.inlineCallbacks
     def _get_badge_count(self):
-        room_list = yield self.store.get_rooms_for_user_where_membership_is(
-            user_id=self.user_id,
-            membership_list=(Membership.INVITE, Membership.JOIN)
-        )
+        invites, joins = yield defer.gatherResults([
+            self.store.get_invites_for_user(self.user_id),
+            self.store.get_rooms_for_user(self.user_id),
+        ], consumeErrors=True)
 
         my_receipts_by_room = yield self.store.get_receipts_for_user(
             self.user_id,
             "m.read",
         )
 
-        badge = 0
+        badge = len(invites)
 
-        for r in room_list:
-            if r.membership == Membership.INVITE:
-                badge += 1
-            else:
-                if r.room_id in my_receipts_by_room:
-                    last_unread_event_id = my_receipts_by_room[r.room_id]
+        for r in joins:
+            if r.room_id in my_receipts_by_room:
+                last_unread_event_id = my_receipts_by_room[r.room_id]
 
-                    notifs = yield (
-                        self.store.get_unread_event_push_actions_by_room_for_user(
-                            r.room_id, self.user_id, last_unread_event_id
-                        )
+                notifs = yield (
+                    self.store.get_unread_event_push_actions_by_room_for_user(
+                        r.room_id, self.user_id, last_unread_event_id
                     )
-                    badge += len(notifs)
+                )
+                badge += len(notifs)
         defer.returnValue(badge)
 
 
