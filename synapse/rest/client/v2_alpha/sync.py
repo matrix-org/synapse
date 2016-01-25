@@ -24,7 +24,7 @@ from synapse.events import FrozenEvent
 from synapse.events.utils import (
     serialize_event, format_event_for_client_v2_without_room_id,
 )
-from synapse.api.filtering import FilterCollection
+from synapse.api.filtering import FilterCollection, DEFAULT_FILTER_COLLECTION
 from synapse.api.errors import SynapseError
 from ._base import client_v2_patterns
 
@@ -113,20 +113,20 @@ class SyncRestServlet(RestServlet):
             )
         )
 
-        if filter_id and filter_id.startswith('{'):
-            try:
-                filter_object = json.loads(filter_id)
-            except:
-                raise SynapseError(400, "Invalid filter JSON")
-            self.filtering._check_valid_filter(filter_object)
-            filter = FilterCollection(filter_object)
-        else:
-            try:
+        if filter_id:
+            if filter_id.startswith('{'):
+                try:
+                    filter_object = json.loads(filter_id)
+                except:
+                    raise SynapseError(400, "Invalid filter JSON")
+                self.filtering.check_valid_filter(filter_object)
+                filter = FilterCollection(filter_object)
+            else:
                 filter = yield self.filtering.get_user_filter(
                     user.localpart, filter_id
                 )
-            except:
-                filter = FilterCollection({})
+        else:
+            filter = DEFAULT_FILTER_COLLECTION
 
         sync_config = SyncConfig(
             user=user,

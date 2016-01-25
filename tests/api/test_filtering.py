@@ -504,4 +504,4 @@ class FilteringTestCase(unittest.TestCase):
             filter_id=filter_id,
         )
 
-        self.assertEquals(filter.filter_json, user_filter_json)
+        self.assertEquals(filter.get_filter_json(), user_filter_json)
