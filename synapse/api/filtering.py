@@ -193,7 +193,7 @@ class Filter(object):
         sender = event.get("sender", None)
         if not sender:
             # Presence events have their 'sender' in content.user_id
-            sender = event.get("conntent", {}).get("user_id", None)
+            sender = event.get("content", {}).get("user_id", None)
 
         return self.check_fields(
             event.get("room_id", None),
