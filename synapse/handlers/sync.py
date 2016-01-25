@@ -131,11 +131,6 @@ class SyncHandler(BaseHandler):
         self.clock = hs.get_clock()
 
     @defer.inlineCallbacks
-    def get_sync_for_user(self, sync_config, since_token=None, timeout=0,
-                          filter_collection=DEFAULT_FILTER_COLLECTION):
-        pass
-
-    @defer.inlineCallbacks
     def wait_for_sync_for_user(self, sync_config, since_token=None, timeout=0,
                                full_state=False):
         """Get the sync for a client if we have new data for it now. Otherwise
@@ -777,7 +772,6 @@ class SyncHandler(BaseHandler):
         just_joined = yield self.check_joined_room(sync_config, state)
         if just_joined:
             state = yield self.get_state_at(room_id, now_token)
-            # batch.limited = True
 
         notifs = yield self.unread_notifs_for_room_id(
             room_id, sync_config, all_ephemeral_by_room
