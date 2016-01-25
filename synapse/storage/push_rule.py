@@ -65,32 +65,20 @@ class PushRuleStore(SQLBaseStore):
         if not user_ids:
             defer.returnValue({})
 
-        batch_size = 100
-
-        def f(txn, user_ids_to_fetch):
-            sql = (
-                "SELECT pr.*"
-                " FROM push_rules AS pr"
-                " LEFT JOIN push_rules_enable AS pre"
-                " ON pr.user_name = pre.user_name AND pr.rule_id = pre.rule_id"
-                " WHERE pr.user_name"
-                " IN (" + ",".join("?" for _ in user_ids_to_fetch) + ")"
-                " AND (pre.enabled IS NULL OR pre.enabled = 1)"
-                " ORDER BY pr.user_name, pr.priority_class DESC, pr.priority DESC"
-            )
-            txn.execute(sql, user_ids_to_fetch)
-            return self.cursor_to_dict(txn)
-
         results = {}
 
-        chunks = [user_ids[i:i+batch_size] for i in xrange(0, len(user_ids), batch_size)]
-        for batch_user_ids in chunks:
-            rows = yield self.runInteraction(
-                "bulk_get_push_rules", f, batch_user_ids
-            )
+        rows = yield self._simple_select_many_batch(
+            table="push_rules",
+            column="user_name",
+            iterable=user_ids,
+            retcols=("*",),
+            desc="bulk_get_push_rules",
+        )
 
-            for row in rows:
-                results.setdefault(row['user_name'], []).append(row)
+        rows.sort(key=lambda e: (-e["priority_class"], -e["priority"]))
+
+        for row in rows:
+            results.setdefault(row['user_name'], []).append(row)
         defer.returnValue(results)
 
     @defer.inlineCallbacks
@@ -98,28 +86,17 @@ class PushRuleStore(SQLBaseStore):
         if not user_ids:
             defer.returnValue({})
 
-        batch_size = 100
-
-        def f(txn, user_ids_to_fetch):
-            sql = (
-                "SELECT user_name, rule_id, enabled"
-                " FROM push_rules_enable"
-                " WHERE user_name"
-                " IN (" + ",".join("?" for _ in user_ids_to_fetch) + ")"
-            )
-            txn.execute(sql, user_ids_to_fetch)
-            return self.cursor_to_dict(txn)
-
         results = {}
 
-        chunks = [user_ids[i:i+batch_size] for i in xrange(0, len(user_ids), batch_size)]
-        for batch_user_ids in chunks:
-            rows = yield self.runInteraction(
-                "bulk_get_push_rules_enabled", f, batch_user_ids
-            )
-
-            for row in rows:
-                results.setdefault(row['user_name'], {})[row['rule_id']] = row['enabled']
+        rows = yield self._simple_select_many_batch(
+            table="push_rules_enable",
+            column="user_name",
+            iterable=user_ids,
+            retcols=("user_name", "rule_id", "enabled",),
+            desc="bulk_get_push_rules_enabled",
+        )
+        for row in rows:
+            results.setdefault(row['user_name'], {})[row['rule_id']] = row['enabled']
         defer.returnValue(results)
 
     @defer.inlineCallbacks
