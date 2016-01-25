@@ -55,11 +55,15 @@ def _get_rules(room_id, user_ids, store):
 
         user_enabled_map = rules_enabled_by_user[uid]
 
-        for rule in rules_by_user[uid]:
+        for i, rule in enumerate(rules_by_user[uid]):
             rule_id = rule['rule_id']
 
             if rule_id in user_enabled_map:
-                rule['enabled'] = user_enabled_map[rule_id]
+                if rule.get('enabled', True) != bool(user_enabled_map[rule_id]):
+                    # Rules are cached across users.
+                    rule = dict(rule)
+                    rule['enabled'] = bool(user_enabled_map[rule_id])
+                    rules_by_user[uid][i] = rule
 
     defer.returnValue(rules_by_user)
 
@@ -136,7 +140,7 @@ class BulkPushRuleEvaluator:
                 )
                 if matches:
                     actions = [x for x in rule['actions'] if x != 'dont_notify']
-                    if actions:
+                    if actions and 'notify' in actions:
                         actions_by_user[uid] = actions
                     break
         defer.returnValue(actions_by_user)
