@@ -13,26 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
 from tests import unittest
 from twisted.internet import defer
 
-from mock import Mock, NonCallableMock
+from mock import Mock
 from tests.utils import (
     MockHttpResource, DeferredMockCallable, setup_test_homeserver
 )
 
 from synapse.types import UserID
-from synapse.api.filtering import FilterCollection, Filter
+from synapse.api.filtering import Filter
+from synapse.events import FrozenEvent
 
 user_localpart = "test_user"
 # MockEvent = namedtuple("MockEvent", "sender type room_id")
 
 
 def MockEvent(**kwargs):
-    ev = NonCallableMock(spec_set=kwargs.keys())
-    ev.configure_mock(**kwargs)
-    return ev
+    return FrozenEvent(kwargs)
 
 
 class FilteringTestCase(unittest.TestCase):

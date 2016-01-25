@@ -190,18 +190,16 @@ class Filter(object):
         Returns:
             bool: True if the event matches
         """
-        if isinstance(event, dict):
-            return self.check_fields(
-                event.get("room_id", None),
-                event.get("sender", None),
-                event.get("type", None),
-            )
-        else:
-            return self.check_fields(
-                getattr(event, "room_id", None),
-                getattr(event, "sender", None),
-                event.type,
-            )
+        sender = event.get("sender", None)
+        if not sender:
+            # Presence events have their 'sender' in content.user_id
+            sender = event.get("content", {}).get("user_id", None)
+
+        return self.check_fields(
+            event.get("room_id", None),
+            sender,
+            event.get("type", None),
+        )
 
     def check_fields(self, room_id, sender, event_type):
         """Checks whether the filter matches the given event fields.

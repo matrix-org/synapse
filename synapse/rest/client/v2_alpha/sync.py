@@ -130,7 +130,7 @@ class SyncRestServlet(RestServlet):
 
         sync_config = SyncConfig(
             user=user,
-            filter=filter,
+            filter_collection=filter,
             is_guest=requester.is_guest,
         )
 
@@ -154,23 +154,21 @@ class SyncRestServlet(RestServlet):
         time_now = self.clock.time_msec()
 
         joined = self.encode_joined(
-            sync_result.joined, filter, time_now, requester.access_token_id
+            sync_result.joined, time_now, requester.access_token_id
         )
 
         invited = self.encode_invited(
-            sync_result.invited, filter, time_now, requester.access_token_id
+            sync_result.invited, time_now, requester.access_token_id
         )
 
         archived = self.encode_archived(
-            sync_result.archived, filter, time_now, requester.access_token_id
+            sync_result.archived, time_now, requester.access_token_id
         )
 
         response_content = {
-            "account_data": self.encode_account_data(
-                sync_result.account_data, filter, time_now
-            ),
+            "account_data": {"events": sync_result.account_data},
             "presence": self.encode_presence(
-                sync_result.presence, filter, time_now
+                sync_result.presence, time_now
             ),
             "rooms": {
                 "join": joined,
@@ -182,24 +180,20 @@ class SyncRestServlet(RestServlet):
 
         defer.returnValue((200, response_content))
 
-    def encode_presence(self, events, filter, time_now):
+    def encode_presence(self, events, time_now):
         formatted = []
         for event in events:
             event = copy.deepcopy(event)
             event['sender'] = event['content'].pop('user_id')
             formatted.append(event)
-        return {"events": filter.filter_presence(formatted)}
+        return {"events": formatted}
 
-    def encode_account_data(self, events, filter, time_now):
-        return {"events": filter.filter_account_data(events)}
-
-    def encode_joined(self, rooms, filter, time_now, token_id):
+    def encode_joined(self, rooms, time_now, token_id):
         """
         Encode the joined rooms in a sync result
 
         :param list[synapse.handlers.sync.JoinedSyncResult] rooms: list of sync
             results for rooms this user is joined to
-        :param FilterCollection filter: filters to apply to the results
         :param int time_now: current time - used as a baseline for age
             calculations
         :param int token_id: ID of the user's auth token - used for namespacing
@@ -211,18 +205,17 @@ class SyncRestServlet(RestServlet):
         joined = {}
         for room in rooms:
             joined[room.room_id] = self.encode_room(
-                room, filter, time_now, token_id
+                room, time_now, token_id
             )
 
         return joined
 
-    def encode_invited(self, rooms, filter, time_now, token_id):
+    def encode_invited(self, rooms, time_now, token_id):
         """
         Encode the invited rooms in a sync result
 
         :param list[synapse.handlers.sync.InvitedSyncResult] rooms: list of
              sync results for rooms this user is joined to
-        :param FilterCollection filter: filters to apply to the results
         :param int time_now: current time - used as a baseline for age
             calculations
         :param int token_id: ID of the user's auth token - used for namespacing
@@ -237,7 +230,9 @@ class SyncRestServlet(RestServlet):
                 room.invite, time_now, token_id=token_id,
                 event_format=format_event_for_client_v2_without_room_id,
             )
-            invited_state = invite.get("unsigned", {}).pop("invite_room_state", [])
+            unsigned = dict(invite.get("unsigned", {}))
+            invite["unsigned"] = unsigned
+            invited_state = list(unsigned.pop("invite_room_state", []))
             invited_state.append(invite)
             invited[room.room_id] = {
                 "invite_state": {"events": invited_state}
@@ -245,13 +240,12 @@ class SyncRestServlet(RestServlet):
 
         return invited
 
-    def encode_archived(self, rooms, filter, time_now, token_id):
+    def encode_archived(self, rooms, time_now, token_id):
         """
         Encode the archived rooms in a sync result
 
         :param list[synapse.handlers.sync.ArchivedSyncResult] rooms: list of
              sync results for rooms this user is joined to
-        :param FilterCollection filter: filters to apply to the results
         :param int time_now: current time - used as a baseline for age
             calculations
         :param int token_id: ID of the user's auth token - used for namespacing
@@ -263,17 +257,16 @@ class SyncRestServlet(RestServlet):
         joined = {}
         for room in rooms:
             joined[room.room_id] = self.encode_room(
-                room, filter, time_now, token_id, joined=False
+                room, time_now, token_id, joined=False
             )
 
         return joined
 
     @staticmethod
-    def encode_room(room, filter, time_now, token_id, joined=True):
+    def encode_room(room, time_now, token_id, joined=True):
         """
         :param JoinedSyncResult|ArchivedSyncResult room: sync result for a
             single room
-        :param FilterCollection filter: filters to apply to the results
         :param int time_now: current time - used as a baseline for age
             calculations
         :param int token_id: ID of the user's auth token - used for namespacing
@@ -292,19 +285,17 @@ class SyncRestServlet(RestServlet):
             )
 
         state_dict = room.state
-        timeline_events = filter.filter_room_timeline(room.timeline.events)
+        timeline_events = room.timeline.events
 
         state_dict = SyncRestServlet._rollback_state_for_timeline(
             state_dict, timeline_events)
 
-        state_events = filter.filter_room_state(state_dict.values())
+        state_events = state_dict.values()
 
         serialized_state = [serialize(e) for e in state_events]
         serialized_timeline = [serialize(e) for e in timeline_events]
 
-        account_data = filter.filter_room_account_data(
-            room.account_data
-        )
+        account_data = room.account_data
 
         result = {
             "timeline": {
@@ -317,7 +308,7 @@ class SyncRestServlet(RestServlet):
         }
 
         if joined:
-            ephemeral_events = filter.filter_room_ephemeral(room.ephemeral)
+            ephemeral_events = room.ephemeral
             result["ephemeral"] = {"events": ephemeral_events}
             result["unread_notifications"] = room.unread_notifications
 
@@ -334,8 +325,6 @@ class SyncRestServlet(RestServlet):
         :param list[synapse.events.EventBase] timeline: the event timeline
         :return: updated state dictionary
         """
-        logger.debug("Processing state dict %r; timeline %r", state,
-                     [e.get_dict() for e in timeline])
 
         result = state.copy()
 
@@ -357,8 +346,8 @@ class SyncRestServlet(RestServlet):
                 # the event graph, and the state is no longer valid. Really,
                 # the event shouldn't be in the timeline. We're going to ignore
                 # it for now, however.
-                logger.warn("Found state event %r in timeline which doesn't "
-                            "match state dictionary", timeline_event)
+                logger.debug("Found state event %r in timeline which doesn't "
+                             "match state dictionary", timeline_event)
                 continue
 
             prev_event_id = timeline_event.unsigned.get("replaces_state", None)
