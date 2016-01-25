@@ -48,24 +48,25 @@ class PresenceStore(SQLBaseStore):
             desc="get_presence_state",
         )
 
-    @cachedList(get_presence_state.cache, list_name="user_localparts")
+    @cachedList(get_presence_state.cache, list_name="user_localparts",
+                inlineCallbacks=True)
     def get_presence_states(self, user_localparts):
-        def f(txn):
-            results = {}
-            for user_localpart in user_localparts:
-                res = self._simple_select_one_txn(
-                    txn,
-                    table="presence",
-                    keyvalues={"user_id": user_localpart},
-                    retcols=["state", "status_msg", "mtime"],
-                    allow_none=True,
-                )
-                if res:
-                    results[user_localpart] = res
+        rows = yield self._simple_select_many_batch(
+            table="presence",
+            column="user_id",
+            iterable=user_localparts,
+            retcols=("user_id", "state", "status_msg", "mtime",),
+            desc="get_presence_states",
+        )
 
-            return results
-
-        return self.runInteraction("get_presence_states", f)
+        defer.returnValue({
+            row["user_id"]: {
+                "state": row["state"],
+                "status_msg": row["status_msg"],
+                "mtime": row["mtime"],
+            }
+            for row in rows
+        })
 
     def set_presence_state(self, user_localpart, new_state):
         res = self._simple_update_one(
