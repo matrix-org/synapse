@@ -647,6 +647,9 @@ class SQLBaseStore(object):
         """
         results = []
 
+        if not iterable:
+            defer.returnValue(results)
+
         chunks = [iterable[i:i+batch_size] for i in xrange(0, len(iterable), batch_size)]
         for chunk in chunks:
             rows = yield self.runInteraction(
@@ -673,6 +676,9 @@ class SQLBaseStore(object):
             keyvalues : dict of column names and values to select the rows with
             retcols : list of strings giving the names of the columns to return
         """
+        if not iterable:
+            return []
+
         sql = "SELECT %s FROM %s" % (", ".join(retcols), table)
 
         clauses = []
