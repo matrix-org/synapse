@@ -17,7 +17,6 @@ from ._base import BaseHandler
 
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import Membership, EventTypes
-from synapse.api.filtering import DEFAULT_FILTER_COLLECTION
 from synapse.util import unwrapFirstError
 
 from twisted.internet import defer
