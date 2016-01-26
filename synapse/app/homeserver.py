@@ -642,7 +642,7 @@ def _resource_id(resource, path_seg):
 
 
 def run(hs):
-    PROFILE_SYNAPSE = True
+    PROFILE_SYNAPSE = False
     if PROFILE_SYNAPSE:
         def profile(func):
             from cProfile import Profile
