@@ -52,7 +52,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         content = _parse_json(request)
 
         if 'attr' in spec:
-            self.set_rule_attr(requester.user.to_string(), spec, content)
+            yield self.set_rule_attr(requester.user.to_string(), spec, content)
             defer.returnValue((200, {}))
 
         try:
@@ -228,7 +228,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
                 # bools directly, so let's not break them.
                 raise SynapseError(400, "Value for 'enabled' must be boolean")
             namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
-            self.hs.get_datastore().set_push_rule_enabled(
+            return self.hs.get_datastore().set_push_rule_enabled(
                 user_id, namespaced_rule_id, val
             )
         else:
