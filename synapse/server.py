@@ -21,6 +21,7 @@
 # Imports required for the default HomeServer() implementation
 from twisted.web.client import BrowserLikePolicyForHTTPS
 from twisted.enterprise import adbapi
+from twisted.internet import defer
 
 from synapse.federation import initialize_http_replication
 from synapse.http.client import SimpleHttpClient,  InsecureInterceptableContextFactory
@@ -28,7 +29,7 @@ from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
 from synapse.state import StateHandler
-from synapse.storage import DataStore
+from synapse.storage import get_datastore
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
 from synapse.streams.events import EventSources
@@ -39,6 +40,11 @@ from synapse.events.builder import EventBuilderFactory
 from synapse.api.filtering import Filtering
 
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class HomeServer(object):
@@ -102,9 +108,18 @@ class HomeServer(object):
         self.hostname = hostname
         self._building = {}
 
+        self.clock = Clock()
+        self.distributor = Distributor()
+        self.ratelimiter = Ratelimiter()
+
         # Other kwargs are explicit dependencies
         for depname in kwargs:
             setattr(self, depname, kwargs[depname])
+
+    def setup(self):
+        logger.info("Setting up.")
+        self.datastore = get_datastore(self)
+        logger.info("Finished setting up.")
 
     def get_ip_from_request(self, request):
         # X-Forwarded-For is handled by our custom request type.
@@ -116,14 +131,8 @@ class HomeServer(object):
     def is_mine_id(self, string):
         return string.split(":", 1)[1] == self.hostname
 
-    def build_clock(self):
-        return Clock()
-
     def build_replication_layer(self):
         return initialize_http_replication(self)
-
-    def build_datastore(self):
-        return DataStore(self)
 
     def build_handlers(self):
         return Handlers(self)
@@ -135,10 +144,9 @@ class HomeServer(object):
         return Auth(self)
 
     def build_http_client_context_factory(self):
-        config = self.get_config()
         return (
             InsecureInterceptableContextFactory()
-            if config.use_insecure_ssl_client_just_for_testing_do_not_use
+            if self.config.use_insecure_ssl_client_just_for_testing_do_not_use
             else BrowserLikePolicyForHTTPS()
         )
 
@@ -157,14 +165,8 @@ class HomeServer(object):
     def build_state_handler(self):
         return StateHandler(self)
 
-    def build_distributor(self):
-        return Distributor()
-
     def build_event_sources(self):
         return EventSources(self)
-
-    def build_ratelimiter(self):
-        return Ratelimiter()
 
     def build_keyring(self):
         return Keyring(self)

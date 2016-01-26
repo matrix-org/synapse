@@ -254,6 +254,17 @@ class SynapseHomeServer(HomeServer):
         except IncorrectDatabaseSetup as e:
             quit_with_error(e.message)
 
+    def get_db_conn(self):
+        db_conn = self.database_engine.module.connect(
+            **{
+                k: v for k, v in self.db_config.get("args", {}).items()
+                if not k.startswith("cp_")
+            }
+        )
+
+        self.database_engine.on_new_connection(db_conn)
+        return db_conn
+
 
 def quit_with_error(error_string):
     message_lines = error_string.split("\n")
@@ -390,13 +401,7 @@ def setup(config_options):
     logger.info("Preparing database: %s...", config.database_config['name'])
 
     try:
-        db_conn = database_engine.module.connect(
-            **{
-                k: v for k, v in config.database_config.get("args", {}).items()
-                if not k.startswith("cp_")
-            }
-        )
-
+        db_conn = hs.get_db_conn()
         database_engine.prepare_database(db_conn)
         hs.run_startup_checks(db_conn, database_engine)
 
@@ -411,13 +416,17 @@ def setup(config_options):
 
     logger.info("Database prepared in %s.", config.database_config['name'])
 
+    hs.setup()
     hs.start_listening()
 
-    hs.get_pusherpool().start()
-    hs.get_state_handler().start_caching()
-    hs.get_datastore().start_profiling()
-    hs.get_datastore().start_doing_background_updates()
-    hs.get_replication_layer().start_get_pdu_cache()
+    def start():
+        hs.get_pusherpool().start()
+        hs.get_state_handler().start_caching()
+        hs.get_datastore().start_profiling()
+        hs.get_datastore().start_doing_background_updates()
+        hs.get_replication_layer().start_get_pdu_cache()
+
+    reactor.callWhenRunning(start)
 
     return hs
 
