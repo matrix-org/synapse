@@ -280,6 +280,15 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         }
         EventSources.SOURCE_TYPES["presence"] = PresenceEventSource
 
+        clock = Mock(spec=[
+            "call_later",
+            "cancel_call_later",
+            "time_msec",
+            "looping_call",
+        ])
+
+        clock.time_msec.return_value = 1000000
+
         hs = yield setup_test_homeserver(
             http_client=None,
             resource_for_client=self.mock_resource,
@@ -289,15 +298,8 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                 "get_presence_list",
                 "get_rooms_for_user",
             ]),
-            clock=Mock(spec=[
-                "call_later",
-                "cancel_call_later",
-                "time_msec",
-                "looping_call",
-            ]),
+            clock=clock,
         )
-
-        hs.get_clock().time_msec.return_value = 1000000
 
         def _get_user_by_req(req=None, allow_guest=False):
             return Requester(UserID.from_string(myid), "", False)

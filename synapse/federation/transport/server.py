@@ -17,7 +17,8 @@ from twisted.internet import defer
 
 from synapse.api.urls import FEDERATION_PREFIX as PREFIX
 from synapse.api.errors import Codes, SynapseError
-from synapse.util.logutils import log_function
+from synapse.http.server import JsonResource
+from synapse.util.ratelimitutils import FederationRateLimiter
 
 import functools
 import logging
@@ -28,8 +29,40 @@ import re
 logger = logging.getLogger(__name__)
 
 
-class TransportLayerServer(object):
+class TransportLayerServer(JsonResource):
     """Handles incoming federation HTTP requests"""
+
+    def __init__(self, hs):
+        self.hs = hs
+        self.clock = hs.get_clock()
+
+        super(TransportLayerServer, self).__init__(hs)
+
+        self.authenticator = Authenticator(hs)
+        self.ratelimiter = FederationRateLimiter(
+            self.clock,
+            window_size=hs.config.federation_rc_window_size,
+            sleep_limit=hs.config.federation_rc_sleep_limit,
+            sleep_msec=hs.config.federation_rc_sleep_delay,
+            reject_limit=hs.config.federation_rc_reject_limit,
+            concurrent_requests=hs.config.federation_rc_concurrent,
+        )
+
+        self.register_servlets()
+
+    def register_servlets(self):
+        register_servlets(
+            self.hs,
+            resource=self,
+            ratelimiter=self.ratelimiter,
+            authenticator=self.authenticator,
+        )
+
+
+class Authenticator(object):
+    def __init__(self, hs):
+        self.keyring = hs.get_keyring()
+        self.server_name = hs.hostname
 
     # A method just so we can pass 'self' as the authenticator to the Servlets
     @defer.inlineCallbacks
@@ -98,37 +131,9 @@ class TransportLayerServer(object):
 
         defer.returnValue((origin, content))
 
-    @log_function
-    def register_received_handler(self, handler):
-        """ Register a handler that will be fired when we receive data.
-
-        Args:
-            handler (TransportReceivedHandler)
-        """
-        FederationSendServlet(
-            handler,
-            authenticator=self,
-            ratelimiter=self.ratelimiter,
-            server_name=self.server_name,
-        ).register(self.server)
-
-    @log_function
-    def register_request_handler(self, handler):
-        """ Register a handler that will be fired when we get asked for data.
-
-        Args:
-            handler (TransportRequestHandler)
-        """
-        for servletclass in SERVLET_CLASSES:
-            servletclass(
-                handler,
-                authenticator=self,
-                ratelimiter=self.ratelimiter,
-            ).register(self.server)
-
 
 class BaseFederationServlet(object):
-    def __init__(self, handler, authenticator, ratelimiter):
+    def __init__(self, handler, authenticator, ratelimiter, server_name):
         self.handler = handler
         self.authenticator = authenticator
         self.ratelimiter = ratelimiter
@@ -172,7 +177,9 @@ class FederationSendServlet(BaseFederationServlet):
     PATH = "/send/([^/]*)/"
 
     def __init__(self, handler, server_name, **kwargs):
-        super(FederationSendServlet, self).__init__(handler, **kwargs)
+        super(FederationSendServlet, self).__init__(
+            handler, server_name=server_name, **kwargs
+        )
         self.server_name = server_name
 
     # This is when someone is trying to send us a bunch of data.
@@ -432,6 +439,7 @@ class On3pidBindServlet(BaseFederationServlet):
 
 
 SERVLET_CLASSES = (
+    FederationSendServlet,
     FederationPullServlet,
     FederationEventServlet,
     FederationStateServlet,
@@ -451,3 +459,13 @@ SERVLET_CLASSES = (
     FederationThirdPartyInviteExchangeServlet,
     On3pidBindServlet,
 )
+
+
+def register_servlets(hs, resource, authenticator, ratelimiter):
+    for servletclass in SERVLET_CLASSES:
+        servletclass(
+            handler=hs.get_replication_layer(),
+            authenticator=authenticator,
+            ratelimiter=ratelimiter,
+            server_name=hs.hostname,
+        ).register(resource)
