@@ -128,7 +128,9 @@ class EventsStore(SQLBaseStore):
                     is_new_state=is_new_state,
                     current_state=current_state,
                 )
-                self._events_stream_cache.room_has_changed(None, event.room_id, stream_ordering)
+                self._events_stream_cache.room_has_changed(
+                    None, event.room_id, stream_ordering
+                )
         except _RollbackButIsFineException:
             pass
 

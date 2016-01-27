@@ -262,7 +262,8 @@ class StreamStore(SQLBaseStore):
         def f(txn):
             if from_id is not None:
                 sql = (
-                    "SELECT m.event_id, stream_ordering FROM events AS e, room_memberships AS m"
+                    "SELECT m.event_id, stream_ordering FROM events AS e,"
+                    " room_memberships AS m"
                     " WHERE e.event_id = m.event_id"
                     " AND m.user_id = ?"
                     " AND e.stream_ordering > ? AND e.stream_ordering <= ?"
@@ -271,7 +272,8 @@ class StreamStore(SQLBaseStore):
                 txn.execute(sql, (user_id, from_id, to_id,))
             else:
                 sql = (
-                    "SELECT m.event_id, stream_ordering FROM events AS e, room_memberships AS m"
+                    "SELECT m.event_id, stream_ordering FROM events AS e,"
+                    " room_memberships AS m"
                     " WHERE e.event_id = m.event_id"
                     " AND m.user_id = ?"
                     " AND stream_ordering <= ?"
@@ -307,7 +309,8 @@ class StreamStore(SQLBaseStore):
                 "SELECT c.room_id FROM history_visibility AS h"
                 " INNER JOIN current_state_events AS c"
                 " ON h.event_id = c.event_id"
-                " WHERE c.room_id IN (%s) AND h.history_visibility = 'world_readable'" % (
+                " WHERE c.room_id IN (%s)"
+                " AND h.history_visibility = 'world_readable'" % (
                     ",".join(map(lambda _: "?", room_ids))
                 )
             )
