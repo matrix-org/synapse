@@ -60,8 +60,10 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
             name, db_pool=db_pool, config=config,
             version_string="Synapse/tests",
             database_engine=create_engine("sqlite3"),
+            get_db_conn=db_pool.get_db_conn,
             **kargs
         )
+        hs.setup()
     else:
         hs = HomeServer(
             name, db_pool=None, datastore=datastore, config=config,
@@ -279,6 +281,12 @@ class SQLiteMemoryDbPool(ConnectionPool, object):
         return self.runWithConnection(
             lambda conn: prepare_database(conn, engine)
         )
+
+    def get_db_conn(self):
+        conn = self.connect()
+        engine = create_engine("sqlite3")
+        prepare_database(conn, engine)
+        return conn
 
 
 class MemoryDataStore(object):
