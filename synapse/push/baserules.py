@@ -173,6 +173,12 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 'kind': 'room_member_count',
                 'is': '2',
                 '_id': 'member_count',
+            },
+            {
+                'kind': 'event_match',
+                'key': 'type',
+                'pattern': 'm.room.message',
+                '_id': '_message',
             }
         ],
         'actions': [

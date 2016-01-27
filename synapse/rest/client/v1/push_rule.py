@@ -52,7 +52,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         content = _parse_json(request)
 
         if 'attr' in spec:
-            self.set_rule_attr(requester.user.to_string(), spec, content)
+            yield self.set_rule_attr(requester.user.to_string(), spec, content)
             defer.returnValue((200, {}))
 
         try:
@@ -66,11 +66,12 @@ class PushRuleRestServlet(ClientV1RestServlet):
             raise SynapseError(400, e.message)
 
         before = request.args.get("before", None)
-        if before and len(before):
-            before = before[0]
+        if before:
+            before = _namespaced_rule_id(spec, before[0])
+
         after = request.args.get("after", None)
-        if after and len(after):
-            after = after[0]
+        if after:
+            after = _namespaced_rule_id(spec, after[0])
 
         try:
             yield self.hs.get_datastore().add_push_rule(
@@ -228,7 +229,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
                 # bools directly, so let's not break them.
                 raise SynapseError(400, "Value for 'enabled' must be boolean")
             namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
-            self.hs.get_datastore().set_push_rule_enabled(
+            return self.hs.get_datastore().set_push_rule_enabled(
                 user_id, namespaced_rule_id, val
             )
         else:
@@ -452,11 +453,15 @@ def _strip_device_condition(rule):
 
 
 def _namespaced_rule_id_from_spec(spec):
+    return _namespaced_rule_id(spec, spec['rule_id'])
+
+
+def _namespaced_rule_id(spec, rule_id):
     if spec['scope'] == 'global':
         scope = 'global'
     else:
         scope = 'device/%s' % (spec['profile_tag'])
-    return "%s/%s/%s" % (scope, spec['template'], spec['rule_id'])
+    return "%s/%s/%s" % (scope, spec['template'], rule_id)
 
 
 def _rule_id_from_namespaced(in_rule_id):
