@@ -728,7 +728,6 @@ def run(hs):
             auto_close_fds=False,
             verbose=True,
             logger=logger,
-            chdir=os.path.dirname(os.path.abspath(__file__)),
         )
 
         daemon.start()
