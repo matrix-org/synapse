@@ -179,7 +179,7 @@ class StreamStore(SQLBaseStore):
         room_ids = list(room_ids)
         for rm_ids in (room_ids[i:i+20] for i in xrange(0, len(room_ids), 20)):
             res = yield defer.gatherResults([
-                self.get_recent_room_events_stream_for_room(
+                self.get_room_events_stream_for_room(
                     room_id, from_key, to_key, limit
                 ).addCallback(lambda r, rm: (rm, r), room_id)
                 for room_id in room_ids
@@ -189,7 +189,7 @@ class StreamStore(SQLBaseStore):
         defer.returnValue(results)
 
     @defer.inlineCallbacks
-    def get_recent_room_events_stream_for_room(self, room_id, from_key, to_key, limit=0):
+    def get_room_events_stream_for_room(self, room_id, from_key, to_key, limit=0):
         if from_key is not None:
             from_id = RoomStreamToken.parse_stream_token(from_key).stream
         else:
@@ -246,7 +246,7 @@ class StreamStore(SQLBaseStore):
                 key = from_key
 
             return ret, key
-        res = yield self.runInteraction("get_recent_room_events_stream_for_room", f)
+        res = yield self.runInteraction("get_room_events_stream_for_room", f)
         defer.returnValue(res)
 
     def get_room_changes_for_user(self, user_id, from_key, to_key):
