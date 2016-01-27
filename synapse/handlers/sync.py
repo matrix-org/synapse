@@ -514,13 +514,6 @@ class SyncHandler(BaseHandler):
 
         timeline_limit = sync_config.filter_collection.timeline_limit()
 
-        room_events, _ = yield self.store.get_room_events_stream(
-            sync_config.user.to_string(),
-            from_key=since_token.room_key,
-            to_key=now_token.room_key,
-            limit=timeline_limit + 1,
-        )
-
         tags_by_room = yield self.store.get_updated_tags(
             sync_config.user.to_string(),
             since_token.account_data_key,
@@ -532,6 +525,32 @@ class SyncHandler(BaseHandler):
                 since_token.account_data_key,
             )
         )
+
+        rooms_changed = yield self.store.get_room_changes_for_user(
+            sync_config.user.to_string(), since_token.room_key, now_token.room_key
+        )
+
+        room_to_events = yield self.store.get_room_events_stream_for_rooms(
+            room_ids=room_ids,
+            from_key=since_token.room_key,
+            to_key=now_token.room_key,
+            limit=timeline_limit + 1,
+        )
+
+        room_events = [
+            event
+            for events, _ in room_to_events.values()
+            for event in events
+        ]
+
+        room_events.extend(rooms_changed)
+
+        # room_events, _ = yield self.store.get_room_events_stream(
+        #     sync_config.user.to_string(),
+        #     from_key=since_token.room_key,
+        #     to_key=now_token.room_key,
+        #     limit=timeline_limit + 1,
+        # )
 
         joined = []
         archived = []
@@ -694,14 +713,12 @@ class SyncHandler(BaseHandler):
         end_key = room_key
 
         while limited and len(recents) < timeline_limit and max_repeat:
-            events, keys = yield self.store.get_recent_events_for_room(
+            events, end_key = yield self.store.get_recent_room_events_stream_for_room(
                 room_id,
                 limit=load_limit + 1,
-                from_token=since_token.room_key if since_token else None,
-                end_token=end_key,
+                from_key=since_token.room_key if since_token else None,
+                to_key=end_key,
             )
-            room_key, _ = keys
-            end_key = "s" + room_key.split('-')[-1]
             loaded_recents = sync_config.filter_collection.filter_room_timeline(events)
             loaded_recents = yield self._filter_events_for_client(
                 sync_config.user.to_string(),
@@ -712,6 +729,7 @@ class SyncHandler(BaseHandler):
             recents = loaded_recents
             if len(events) <= load_limit:
                 limited = False
+                break
             max_repeat -= 1
 
         if len(recents) > timeline_limit:
