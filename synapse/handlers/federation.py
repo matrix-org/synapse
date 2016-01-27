@@ -1186,7 +1186,13 @@ class FederationHandler(BaseHandler):
 
             try:
                 self.auth.check(e, auth_events=auth_for_e)
-            except AuthError as err:
+            except SynapseError as err:
+                # we may get SynapseErrors here as well as AuthErrors. For
+                # instance, there are a couple of (ancient) events in some
+                # rooms whose senders do not have the correct sigil; these
+                # cause SynapseErrors in auth.check. We don't want to give up
+                # the attempt to federate altogether in such cases.
+
                 logger.warn(
                     "Rejecting %s because %s",
                     e.event_id, err.msg
