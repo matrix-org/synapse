@@ -66,11 +66,12 @@ class PushRuleRestServlet(ClientV1RestServlet):
             raise SynapseError(400, e.message)
 
         before = request.args.get("before", None)
-        if before and len(before):
-            before = before[0]
+        if before:
+            before = _namespaced_rule_id(spec, before[0])
+
         after = request.args.get("after", None)
-        if after and len(after):
-            after = after[0]
+        if after:
+            after = _namespaced_rule_id(spec, after[0])
 
         try:
             yield self.hs.get_datastore().add_push_rule(
@@ -452,11 +453,15 @@ def _strip_device_condition(rule):
 
 
 def _namespaced_rule_id_from_spec(spec):
+    return _namespaced_rule_id(spec, spec['rule_id'])
+
+
+def _namespaced_rule_id(spec, rule_id):
     if spec['scope'] == 'global':
         scope = 'global'
     else:
         scope = 'device/%s' % (spec['profile_tag'])
-    return "%s/%s/%s" % (scope, spec['template'], spec['rule_id'])
+    return "%s/%s/%s" % (scope, spec['template'], rule_id)
 
 
 def _rule_id_from_namespaced(in_rule_id):
