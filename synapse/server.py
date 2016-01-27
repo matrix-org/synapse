@@ -21,7 +21,6 @@
 # Imports required for the default HomeServer() implementation
 from twisted.web.client import BrowserLikePolicyForHTTPS
 from twisted.enterprise import adbapi
-from twisted.internet import defer
 
 from synapse.federation import initialize_http_replication
 from synapse.http.client import SimpleHttpClient,  InsecureInterceptableContextFactory
