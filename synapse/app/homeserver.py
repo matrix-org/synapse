@@ -50,16 +50,14 @@ from twisted.cred import checkers, portal
 
 from twisted.internet import reactor, task, defer
 from twisted.application import service
-from twisted.enterprise import adbapi
 from twisted.web.resource import Resource, EncodingResourceWrapper
 from twisted.web.static import File
 from twisted.web.server import Site, GzipEncoderFactory, Request
-from synapse.http.server import JsonResource, RootRedirect
+from synapse.http.server import RootRedirect
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.media.v1.media_repository import MediaRepositoryResource
 from synapse.rest.key.v1.server_key_resource import LocalKey
 from synapse.rest.key.v2 import KeyApiV2Resource
-from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.api.urls import (
     FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
     SERVER_KEY_PREFIX, MEDIA_PREFIX, STATIC_PREFIX,
@@ -69,6 +67,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.util.logcontext import LoggingContext
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
+from synapse.federation.transport.server import TransportLayerServer
 
 from synapse import events
 
@@ -95,80 +94,37 @@ def gz_wrap(r):
     return EncodingResourceWrapper(r, [GzipEncoderFactory()])
 
 
+def build_resource_for_web_client(hs):
+    webclient_path = hs.get_config().web_client_location
+    if not webclient_path:
+        try:
+            import syweb
+        except ImportError:
+            quit_with_error(
+                "Could not find a webclient.\n\n"
+                "Please either install the matrix-angular-sdk or configure\n"
+                "the location of the source to serve via the configuration\n"
+                "option `web_client_location`\n\n"
+                "To install the `matrix-angular-sdk` via pip, run:\n\n"
+                "    pip install '%(dep)s'\n"
+                "\n"
+                "You can also disable hosting of the webclient via the\n"
+                "configuration option `web_client`\n"
+                % {"dep": DEPENDENCY_LINKS["matrix-angular-sdk"]}
+            )
+        syweb_path = os.path.dirname(syweb.__file__)
+        webclient_path = os.path.join(syweb_path, "webclient")
+    # GZip is disabled here due to
+    # https://twistedmatrix.com/trac/ticket/7678
+    # (It can stay enabled for the API resources: they call
+    # write() with the whole body and then finish() straight
+    # after and so do not trigger the bug.
+    # GzipFile was removed in commit 184ba09
+    # return GzipFile(webclient_path)  # TODO configurable?
+    return File(webclient_path)  # TODO configurable?
+
+
 class SynapseHomeServer(HomeServer):
-
-    def build_http_client(self):
-        return MatrixFederationHttpClient(self)
-
-    def build_client_resource(self):
-        return ClientRestResource(self)
-
-    def build_resource_for_federation(self):
-        return JsonResource(self)
-
-    def build_resource_for_web_client(self):
-        webclient_path = self.get_config().web_client_location
-        if not webclient_path:
-            try:
-                import syweb
-            except ImportError:
-                quit_with_error(
-                    "Could not find a webclient.\n\n"
-                    "Please either install the matrix-angular-sdk or configure\n"
-                    "the location of the source to serve via the configuration\n"
-                    "option `web_client_location`\n\n"
-                    "To install the `matrix-angular-sdk` via pip, run:\n\n"
-                    "    pip install '%(dep)s'\n"
-                    "\n"
-                    "You can also disable hosting of the webclient via the\n"
-                    "configuration option `web_client`\n"
-                    % {"dep": DEPENDENCY_LINKS["matrix-angular-sdk"]}
-                )
-            syweb_path = os.path.dirname(syweb.__file__)
-            webclient_path = os.path.join(syweb_path, "webclient")
-        # GZip is disabled here due to
-        # https://twistedmatrix.com/trac/ticket/7678
-        # (It can stay enabled for the API resources: they call
-        # write() with the whole body and then finish() straight
-        # after and so do not trigger the bug.
-        # GzipFile was removed in commit 184ba09
-        # return GzipFile(webclient_path)  # TODO configurable?
-        return File(webclient_path)  # TODO configurable?
-
-    def build_resource_for_static_content(self):
-        # This is old and should go away: not going to bother adding gzip
-        return File(
-            os.path.join(os.path.dirname(synapse.__file__), "static")
-        )
-
-    def build_resource_for_content_repo(self):
-        return ContentRepoResource(
-            self, self.config.uploads_path, self.auth, self.content_addr
-        )
-
-    def build_resource_for_media_repository(self):
-        return MediaRepositoryResource(self)
-
-    def build_resource_for_server_key(self):
-        return LocalKey(self)
-
-    def build_resource_for_server_key_v2(self):
-        return KeyApiV2Resource(self)
-
-    def build_resource_for_metrics(self):
-        if self.get_config().enable_metrics:
-            return MetricsResource(self)
-        else:
-            return None
-
-    def build_db_pool(self):
-        name = self.db_config["name"]
-
-        return adbapi.ConnectionPool(
-            name,
-            **self.db_config.get("args", {})
-        )
-
     def _listener_http(self, config, listener_config):
         port = listener_config["port"]
         bind_address = listener_config.get("bind_address", "")
@@ -178,13 +134,11 @@ class SynapseHomeServer(HomeServer):
         if tls and config.no_tls:
             return
 
-        metrics_resource = self.get_resource_for_metrics()
-
         resources = {}
         for res in listener_config["resources"]:
             for name in res["names"]:
                 if name == "client":
-                    client_resource = self.get_client_resource()
+                    client_resource = ClientRestResource(self)
                     if res["compress"]:
                         client_resource = gz_wrap(client_resource)
 
@@ -198,31 +152,35 @@ class SynapseHomeServer(HomeServer):
 
                 if name == "federation":
                     resources.update({
-                        FEDERATION_PREFIX: self.get_resource_for_federation(),
+                        FEDERATION_PREFIX: TransportLayerServer(self),
                     })
 
                 if name in ["static", "client"]:
                     resources.update({
-                        STATIC_PREFIX: self.get_resource_for_static_content(),
+                        STATIC_PREFIX: File(
+                            os.path.join(os.path.dirname(synapse.__file__), "static")
+                        ),
                     })
 
                 if name in ["media", "federation", "client"]:
                     resources.update({
-                        MEDIA_PREFIX: self.get_resource_for_media_repository(),
-                        CONTENT_REPO_PREFIX: self.get_resource_for_content_repo(),
+                        MEDIA_PREFIX: MediaRepositoryResource(self),
+                        CONTENT_REPO_PREFIX: ContentRepoResource(
+                            self, self.config.uploads_path, self.auth, self.content_addr
+                        ),
                     })
 
                 if name in ["keys", "federation"]:
                     resources.update({
-                        SERVER_KEY_PREFIX: self.get_resource_for_server_key(),
-                        SERVER_KEY_V2_PREFIX: self.get_resource_for_server_key_v2(),
+                        SERVER_KEY_PREFIX: LocalKey(self),
+                        SERVER_KEY_V2_PREFIX: KeyApiV2Resource(self),
                     })
 
                 if name == "webclient":
-                    resources[WEB_CLIENT_PREFIX] = self.get_resource_for_web_client()
+                    resources[WEB_CLIENT_PREFIX] = build_resource_for_web_client(self)
 
-                if name == "metrics" and metrics_resource:
-                    resources[METRICS_PREFIX] = metrics_resource
+                if name == "metrics" and self.get_config().enable_metrics:
+                    resources[METRICS_PREFIX] = MetricsResource(self)
 
         root_resource = create_resource_tree(resources)
         if tls:
@@ -675,7 +633,7 @@ def _resource_id(resource, path_seg):
     the mapping should looks like _resource_id(A,C) = B.
 
     Args:
-        resource (Resource): The *parent* Resource
+        resource (Resource): The *parent* Resourceb
         path_seg (str): The name of the child Resource to be attached.
     Returns:
         str: A unique string which can be a key to the child Resource.
@@ -761,6 +719,7 @@ def run(hs):
             auto_close_fds=False,
             verbose=True,
             logger=logger,
+            chdir=os.path.dirname(os.path.abspath(__file__)),
         )
 
         daemon.start()

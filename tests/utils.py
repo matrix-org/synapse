@@ -19,6 +19,8 @@ from synapse.api.constants import EventTypes
 from synapse.storage.prepare_database import prepare_database
 from synapse.storage.engines import create_engine
 from synapse.server import HomeServer
+from synapse.federation.transport import server
+from synapse.util.ratelimitutils import FederationRateLimiter
 
 from synapse.util.logcontext import LoggingContext
 
@@ -79,6 +81,22 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         return build_handlers
 
     hs.build_handlers = swap_out_hash_for_testing(hs.build_handlers)
+
+    fed = kargs.get("resource_for_federation", None)
+    if fed:
+        server.register_servlets(
+            hs,
+            resource=fed,
+            authenticator=server.Authenticator(hs),
+            ratelimiter=FederationRateLimiter(
+                hs.get_clock(),
+                window_size=hs.config.federation_rc_window_size,
+                sleep_limit=hs.config.federation_rc_sleep_limit,
+                sleep_msec=hs.config.federation_rc_sleep_delay,
+                reject_limit=hs.config.federation_rc_reject_limit,
+                concurrent_requests=hs.config.federation_rc_concurrent
+            ),
+        )
 
     defer.returnValue(hs)
 
