@@ -241,7 +241,7 @@ class RoomMemberStore(SQLBaseStore):
 
         return rows
 
-    @cached()
+    @cached(max_entries=5000)
     def get_rooms_for_user(self, user_id):
         return self.get_rooms_for_user_where_membership_is(
             user_id, membership_list=[Membership.JOIN],
