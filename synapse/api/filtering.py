@@ -15,6 +15,8 @@
 from synapse.api.errors import SynapseError
 from synapse.types import UserID, RoomID
 
+import ujson as json
+
 
 class Filtering(object):
 
@@ -148,6 +150,9 @@ class FilterCollection(object):
         self.include_leave = filter_json.get("room", {}).get(
             "include_leave", False
         )
+
+    def __repr__(self):
+        return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
 
     def get_filter_json(self):
         return self._filter_json
