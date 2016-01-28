@@ -16,12 +16,13 @@
 from twisted.internet import defer
 
 from ._base import SQLBaseStore
+from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 import simplejson as json
 
 
 class FilteringStore(SQLBaseStore):
-    @defer.inlineCallbacks
+    @cachedInlineCallbacks(num_args=2)
     def get_user_filter(self, user_localpart, filter_id):
         def_json = yield self._simple_select_one_onecol(
             table="user_filters",
