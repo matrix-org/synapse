@@ -49,6 +49,11 @@ class StreamChangeCache(object):
             cache_counter.inc_misses(self.name)
             return True
 
+        if stream_pos == self._earliest_known_stream_pos:
+            # If the same as the earliest key, assume nothing has changed.
+            cache_counter.inc_hits(self.name)
+            return False
+
         latest_entity_change_pos = self._entity_to_key.get(entity, None)
         if latest_entity_change_pos is None:
             cache_counter.inc_misses(self.name)
