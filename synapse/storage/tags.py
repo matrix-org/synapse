@@ -15,7 +15,6 @@
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached
-from synapse.util.caches.stream_change_cache import StreamChangeCache
 from twisted.internet import defer
 
 import ujson as json
@@ -25,14 +24,6 @@ logger = logging.getLogger(__name__)
 
 
 class TagsStore(SQLBaseStore):
-    def __init__(self, hs):
-        super(TagsStore, self).__init__(hs)
-
-        self._tags_stream_cache = StreamChangeCache(
-            "TagsChangeCache", self._account_data_id_gen.get_max_token(None),
-            max_size=1000,
-        )
-
     def get_max_account_data_stream_id(self):
         """Get the current max stream id for the private user data stream
 
@@ -88,7 +79,9 @@ class TagsStore(SQLBaseStore):
             room_ids = [row[0] for row in txn.fetchall()]
             return room_ids
 
-        changed = self._tags_stream_cache.has_entity_changed(user_id, int(stream_id))
+        changed = self._account_data_stream_cache.has_entity_changed(
+            user_id, int(stream_id)
+        )
         if not changed:
             defer.returnValue({})
 
@@ -189,7 +182,10 @@ class TagsStore(SQLBaseStore):
             next_id(int): The the revision to advance to.
         """
 
-        txn.call_after(self._tags_stream_cache.entity_has_changed, user_id, next_id)
+        txn.call_after(
+            self._account_data_stream_cache.entity_has_changed,
+            user_id, next_id
+        )
 
         update_max_id_sql = (
             "UPDATE account_data_max_stream_id"

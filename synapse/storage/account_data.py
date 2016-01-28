@@ -28,7 +28,8 @@ class AccountDataStore(SQLBaseStore):
         super(AccountDataStore, self).__init__(hs)
 
         self._account_data_stream_cache = StreamChangeCache(
-            "AccountDataChangeCache", self._account_data_id_gen.get_max_token(None),
+            "AccountDataAndTagsChangeCache",
+            self._account_data_id_gen.get_max_token(None),
             max_size=1000,
         )
 
