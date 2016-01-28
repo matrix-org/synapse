@@ -236,7 +236,7 @@ class StreamStore(SQLBaseStore):
 
             ret.reverse()
 
-            self._set_before_and_after(ret, rows)
+            self._set_before_and_after(ret, rows, topo_order=False)
 
             if rows:
                 key = "s%d" % min(r["stream_ordering"] for r in rows)
@@ -581,10 +581,13 @@ class StreamStore(SQLBaseStore):
         return rows[0][0] if rows else 0
 
     @staticmethod
-    def _set_before_and_after(events, rows):
+    def _set_before_and_after(events, rows, topo_order=True):
         for event, row in zip(events, rows):
             stream = row["stream_ordering"]
-            topo = event.depth
+            if topo_order:
+                topo = event.depth
+            else:
+                topo = None
             internal = event.internal_metadata
             internal.before = str(RoomStreamToken(topo, stream - 1))
             internal.after = str(RoomStreamToken(topo, stream))
