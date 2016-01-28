@@ -199,12 +199,13 @@ class StreamStore(SQLBaseStore):
         if from_key == to_key:
             defer.returnValue(([], from_key))
 
-        has_changed = yield self._events_stream_cache.get_room_has_changed(
-            room_id, from_id
-        )
+        if from_id:
+            has_changed = yield self._events_stream_cache.get_room_has_changed(
+                room_id, from_id
+            )
 
-        if not has_changed:
-            defer.returnValue(([], from_key))
+            if not has_changed:
+                defer.returnValue(([], from_key))
 
         def f(txn):
             if from_id is not None:

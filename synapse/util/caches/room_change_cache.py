@@ -39,6 +39,8 @@ class RoomStreamChangeCache(object):
         caches_by_name[self.name] = self._cache
 
     def get_room_has_changed(self, room_id, key):
+        assert type(key) is int
+
         if key <= self._earliest_known_key:
             return True
 
@@ -55,6 +57,8 @@ class RoomStreamChangeCache(object):
         """Returns subset of room ids that have had new things since the
         given key. If the key is too old it will just return the given list.
         """
+        assert type(key) is int
+
         if key > self._earliest_known_key:
             keys = self._cache.keys()
             i = keys.bisect_right(key)
@@ -73,6 +77,8 @@ class RoomStreamChangeCache(object):
     def room_has_changed(self, room_id, key):
         """Informs the cache that the room has been changed at the given key.
         """
+        assert type(key) is int
+
         if key > self._earliest_known_key:
             old_key = self._room_to_key.get(room_id, None)
             if old_key:
