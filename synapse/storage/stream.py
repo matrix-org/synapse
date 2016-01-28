@@ -234,9 +234,9 @@ class StreamStore(SQLBaseStore):
                 get_prev_content=True
             )
 
-            ret.reverse()
-
             self._set_before_and_after(ret, rows, topo_order=False)
+
+            ret.reverse()
 
             if rows:
                 key = "s%d" % min(r["stream_ordering"] for r in rows)
@@ -568,6 +568,18 @@ class StreamStore(SQLBaseStore):
             retcols=("stream_ordering", "topological_ordering"),
         ).addCallback(lambda row: "t%d-%d" % (
             row["topological_ordering"], row["stream_ordering"],)
+        )
+
+    def get_max_topological_token_for_stream_and_room(self, room_id, stream_key):
+        sql = (
+            "SELECT max(topological_ordering) FROM events"
+            " WHERE room_id = ? AND stream_ordering < ?"
+        )
+        return self._execute(
+            "get_max_topological_token_for_stream_and_room", None,
+            sql, room_id, stream_key,
+        ).addCallback(
+            lambda r: r[0][0] if r else 0
         )
 
     def _get_max_topological_txn(self, txn):
