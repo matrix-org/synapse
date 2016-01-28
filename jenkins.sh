@@ -26,7 +26,7 @@ TOX_BIN=$WORKSPACE/.tox/py27/bin
 if [[ ! -e .sytest-base ]]; then
   git clone https://github.com/matrix-org/sytest.git .sytest-base --mirror
 else
-  (cd .sytest-base; git fetch)
+  (cd .sytest-base; git fetch -p)
 fi
 
 rm -rf sytest
