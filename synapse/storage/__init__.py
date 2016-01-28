@@ -61,22 +61,6 @@ logger = logging.getLogger(__name__)
 LAST_SEEN_GRANULARITY = 120*1000
 
 
-def get_datastore(hs):
-    logger.info("getting called!")
-
-    conn = hs.get_db_conn()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT MIN(stream_ordering) FROM events",)
-        rows = cur.fetchall()
-        min_token = rows[0][0] if rows and rows[0] and rows[0][0] else -1
-        min_token = min(min_token, -1)
-
-        return DataStore(conn, hs, min_token)
-    finally:
-        conn.close()
-
-
 class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore,
                 PresenceStore, TransactionStore,
@@ -98,10 +82,17 @@ class DataStore(RoomMemberStore, RoomStore,
                 EventPushActionsStore
                 ):
 
-    def __init__(self, db_conn, hs, min_stream_token):
+    def __init__(self, db_conn, hs):
         self.hs = hs
 
-        self.min_stream_token = min_stream_token
+        cur = db_conn.cursor()
+        try:
+            cur.execute("SELECT MIN(stream_ordering) FROM events",)
+            rows = cur.fetchall()
+            self.min_stream_token = rows[0][0] if rows and rows[0] and rows[0][0] else -1
+            self.min_stream_token = min(self.min_stream_token, -1)
+        finally:
+            cur.close()
 
         self.client_ip_last_seen = Cache(
             name="client_ip_last_seen",

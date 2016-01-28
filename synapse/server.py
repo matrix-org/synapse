@@ -28,7 +28,7 @@ from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
 from synapse.state import StateHandler
-from synapse.storage import get_datastore
+from synapse.storage import DataStore
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
 from synapse.streams.events import EventSources
@@ -117,7 +117,7 @@ class HomeServer(object):
 
     def setup(self):
         logger.info("Setting up.")
-        self.datastore = get_datastore(self)
+        self.datastore = DataStore(self.get_db_conn(), self)
         logger.info("Finished setting up.")
 
     def get_ip_from_request(self, request):
