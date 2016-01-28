@@ -298,46 +298,19 @@ class SyncHandler(BaseHandler):
             room_id, sync_config, now_token, since_token=timeline_since_token
         )
 
-        notifs = yield self.unread_notifs_for_room_id(
-            room_id, sync_config, ephemeral_by_room
+        room_sync = yield self.incremental_sync_with_gap_for_room(
+            room_id, sync_config,
+            now_token=now_token,
+            since_token=timeline_since_token,
+            ephemeral_by_room=ephemeral_by_room,
+            tags_by_room=tags_by_room,
+            account_data_by_room=account_data_by_room,
+            all_ephemeral_by_room=ephemeral_by_room,
+            batch=batch,
+            full_state=True,
         )
 
-        unread_notifications = {}
-        if notifs is not None:
-            unread_notifications["notification_count"] = len(notifs)
-            unread_notifications["highlight_count"] = len([
-                1 for notif in notifs if _action_has_highlight(notif["actions"])
-            ])
-
-        current_state = yield self.get_state_at(room_id, now_token)
-
-        current_state = {
-            (e.type, e.state_key): e
-            for e in sync_config.filter_collection.filter_room_state(
-                current_state.values()
-            )
-        }
-
-        account_data = self.account_data_for_room(
-            room_id, tags_by_room, account_data_by_room
-        )
-
-        account_data = sync_config.filter_collection.filter_room_account_data(
-            account_data
-        )
-
-        ephemeral = sync_config.filter_collection.filter_room_ephemeral(
-            ephemeral_by_room.get(room_id, [])
-        )
-
-        defer.returnValue(JoinedSyncResult(
-            room_id=room_id,
-            timeline=batch,
-            state=current_state,
-            ephemeral=ephemeral,
-            account_data=account_data,
-            unread_notifications=unread_notifications,
-        ))
+        defer.returnValue(room_sync)
 
     def account_data_for_user(self, account_data):
         account_data_events = []
@@ -635,7 +608,7 @@ class SyncHandler(BaseHandler):
         """
         filtering_factor = 2
         timeline_limit = sync_config.filter_collection.timeline_limit()
-        load_limit = max(timeline_limit * filtering_factor, 100)
+        load_limit = timeline_limit * filtering_factor
         max_repeat = 3  # Only try a few times per room, otherwise
         room_key = now_token.room_key
         end_key = room_key
@@ -699,7 +672,10 @@ class SyncHandler(BaseHandler):
                                            account_data_by_room,
                                            all_ephemeral_by_room,
                                            batch, full_state=False):
-        if batch.limited:
+        if full_state:
+            state = yield self.get_state_at(room_id, now_token)
+
+        elif batch.limited:
             current_state = yield self.get_state_at(room_id, now_token)
 
             state_at_previous_sync = yield self.get_state_at(
