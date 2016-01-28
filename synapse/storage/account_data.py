@@ -132,7 +132,7 @@ class AccountDataStore(SQLBaseStore):
             user_id, int(stream_id)
         )
         if not changed:
-            defer.returnValue(({}, {}))
+            return ({}, {})
 
         return self.runInteraction(
             "get_updated_account_data_for_user", get_updated_account_data_for_user_txn
