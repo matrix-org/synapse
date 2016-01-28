@@ -78,7 +78,7 @@ class ReceiptsStore(SQLBaseStore):
 
         if from_key:
             room_ids = yield self._receipts_stream_cache.get_rooms_changed(
-                self, room_ids, from_key
+                room_ids, from_key
             )
 
         results = yield self._get_linearized_receipts_for_rooms(
@@ -221,6 +221,11 @@ class ReceiptsStore(SQLBaseStore):
         # FIXME: This shouldn't invalidate the whole cache
         txn.call_after(self.get_linearized_receipts_for_room.invalidate_all)
 
+        txn.call_after(
+            self._receipts_stream_cache.room_has_changed,
+            room_id, stream_id
+        )
+
         # We don't want to clobber receipts for more recent events, so we
         # have to compare orderings of existing receipts
         sql = (
@@ -308,9 +313,6 @@ class ReceiptsStore(SQLBaseStore):
 
         stream_id_manager = yield self._receipts_id_gen.get_next(self)
         with stream_id_manager as stream_id:
-            yield self._receipts_stream_cache.room_has_changed(
-                self, room_id, stream_id
-            )
             have_persisted = yield self.runInteraction(
                 "insert_linearized_receipt",
                 self.insert_linearized_receipt_txn,

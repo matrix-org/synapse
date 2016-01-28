@@ -51,7 +51,7 @@ class RoomStreamChangeCache(object):
 
         return False
 
-    def get_rooms_changed(self, store, room_ids, key):
+    def get_rooms_changed(self, room_ids, key):
         """Returns subset of room ids that have had new things since the
         given key. If the key is too old it will just return the given list.
         """
@@ -70,7 +70,7 @@ class RoomStreamChangeCache(object):
 
         return result
 
-    def room_has_changed(self, store, room_id, key):
+    def room_has_changed(self, room_id, key):
         """Informs the cache that the room has been changed at the given key.
         """
         if key > self._earliest_known_key:

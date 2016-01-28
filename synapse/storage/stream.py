@@ -169,7 +169,7 @@ class StreamStore(SQLBaseStore):
         from_id = RoomStreamToken.parse_stream_token(from_key).stream
 
         room_ids = yield self._events_stream_cache.get_rooms_changed(
-            self, room_ids, from_id
+            room_ids, from_id
         )
 
         if not room_ids:

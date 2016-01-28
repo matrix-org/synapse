@@ -128,9 +128,6 @@ class EventsStore(SQLBaseStore):
                     is_new_state=is_new_state,
                     current_state=current_state,
                 )
-                self._events_stream_cache.room_has_changed(
-                    None, event.room_id, stream_ordering
-                )
         except _RollbackButIsFineException:
             pass
 
@@ -212,6 +209,12 @@ class EventsStore(SQLBaseStore):
         # Remove the any existing cache entries for the event_ids
         for event, _ in events_and_contexts:
             txn.call_after(self._invalidate_get_event_cache, event.event_id)
+
+            if not backfilled:
+                txn.call_after(
+                    self._events_stream_cache.room_has_changed,
+                    event.room_id, event.internal_metadata.stream_ordering,
+                )
 
         depth_updates = {}
         for event, _ in events_and_contexts:
