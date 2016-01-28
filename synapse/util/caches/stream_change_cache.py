@@ -46,15 +46,19 @@ class StreamChangeCache(object):
         assert type(stream_pos) is int
 
         if stream_pos <= self._earliest_known_stream_pos:
+            cache_counter.inc_misses(self.name)
             return True
 
         latest_entity_change_pos = self._entity_to_key.get(entity, None)
         if latest_entity_change_pos is None:
+            cache_counter.inc_misses(self.name)
             return True
 
         if stream_pos < latest_entity_change_pos:
+            cache_counter.inc_misses(self.name)
             return True
 
+        cache_counter.inc_hits(self.name)
         return False
 
     def get_entities_changed(self, entities, stream_pos):
