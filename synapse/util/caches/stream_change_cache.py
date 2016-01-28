@@ -82,18 +82,19 @@ class StreamChangeCache(object):
 
         return result
 
-    def entity_has_changed(self, entitiy, stream_pos):
-        """Informs the cache that the entitiy has been changed at the given
+    def entity_has_changed(self, entity, stream_pos):
+        """Informs the cache that the entity has been changed at the given
         position.
         """
         assert type(stream_pos) is int
 
         if stream_pos > self._earliest_known_stream_pos:
-            old_pos = self._entity_to_key.get(entitiy, None)
+            old_pos = self._entity_to_key.get(entity, None)
             if old_pos:
                 stream_pos = max(stream_pos, old_pos)
                 self._cache.pop(old_pos, None)
-            self._cache[stream_pos] = entitiy
+            self._cache[stream_pos] = entity
+            self._entity_to_key[entity] = stream_pos
 
             while len(self._cache) > self._max_size:
                 k, r = self._cache.popitem()
