@@ -608,8 +608,8 @@ class SyncHandler(BaseHandler):
         """
         filtering_factor = 2
         timeline_limit = sync_config.filter_collection.timeline_limit()
-        load_limit = timeline_limit * filtering_factor
-        max_repeat = 3  # Only try a few times per room, otherwise
+        load_limit = max(timeline_limit * filtering_factor, 10)
+        max_repeat = 5  # Only try a few times per room, otherwise
         room_key = now_token.room_key
         end_key = room_key
 
