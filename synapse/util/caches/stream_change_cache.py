@@ -45,7 +45,7 @@ class StreamChangeCache(object):
         """
         assert type(stream_pos) is int
 
-        if stream_pos <= self._earliest_known_stream_pos:
+        if stream_pos < self._earliest_known_stream_pos:
             cache_counter.inc_misses(self.name)
             return True
 
@@ -67,7 +67,7 @@ class StreamChangeCache(object):
         """
         assert type(stream_pos) is int
 
-        if stream_pos > self._earliest_known_stream_pos:
+        if stream_pos >= self._earliest_known_stream_pos:
             keys = self._cache.keys()
             i = keys.bisect_right(stream_pos)
 
