@@ -105,8 +105,6 @@ class MessageHandler(BaseHandler):
             room_token = pagin_config.from_token.room_key
 
         room_token = RoomStreamToken.parse(room_token)
-        if room_token.topological is None:
-            raise SynapseError(400, "Invalid token")
 
         pagin_config.from_token = pagin_config.from_token.copy_and_replace(
             "room_key", str(room_token)
@@ -117,27 +115,28 @@ class MessageHandler(BaseHandler):
         membership, member_event_id = yield self._check_in_room_or_world_readable(
             room_id, user_id
         )
-        if membership == Membership.LEAVE:
-            # If they have left the room then clamp the token to be before
-            # they left the room.
-            leave_token = yield self.store.get_topological_token_for_event(
-                member_event_id
+
+        if source_config.direction == 'b':
+            # if we're going backwards, we might need to backfill. This
+            # requires that we have a topo token.
+            if room_token.topological is None:
+                raise SynapseError(400, "Invalid token: cannot paginate "
+                                        "backwards from a stream token")
+
+            if membership == Membership.LEAVE:
+                # If they have left the room then clamp the token to be before
+                # they left the room, to save the effort of loading from the
+                # database.
+                leave_token = yield self.store.get_topological_token_for_event(
+                    member_event_id
+                )
+                leave_token = RoomStreamToken.parse(leave_token)
+                if leave_token.topological < room_token.topological:
+                    source_config.from_key = str(leave_token)
+
+            yield self.hs.get_handlers().federation_handler.maybe_backfill(
+                room_id, room_token.topological
             )
-            leave_token = RoomStreamToken.parse(leave_token)
-            if leave_token.topological < room_token.topological:
-                source_config.from_key = str(leave_token)
-
-            if source_config.direction == "f":
-                if source_config.to_key is None:
-                    source_config.to_key = str(leave_token)
-                else:
-                    to_token = RoomStreamToken.parse(source_config.to_key)
-                    if leave_token.topological < to_token.topological:
-                        source_config.to_key = str(leave_token)
-
-        yield self.hs.get_handlers().federation_handler.maybe_backfill(
-            room_id, room_token.topological
-        )
 
         events, next_key = yield data_source.get_pagination_rows(
             requester.user, source_config, room_id
