@@ -31,7 +31,9 @@ class ReceiptsStore(SQLBaseStore):
     def __init__(self, hs):
         super(ReceiptsStore, self).__init__(hs)
 
-        self._receipts_stream_cache = _RoomStreamChangeCache()
+        self._receipts_stream_cache = _RoomStreamChangeCache(
+            self._receipts_id_gen.get_max_token(None)
+        )
 
     @cached(num_args=2)
     def get_receipts_for_room(self, room_id, receipt_type):
@@ -377,11 +379,11 @@ class _RoomStreamChangeCache(object):
     may have changed since that key. If the key is too old then the cache
     will simply return all rooms.
     """
-    def __init__(self, size_of_cache=10000):
+    def __init__(self, current_key, size_of_cache=10000):
         self._size_of_cache = size_of_cache
         self._room_to_key = {}
         self._cache = sorteddict()
-        self._earliest_key = None
+        self._earliest_key = current_key
         self.name = "ReceiptsRoomChangeCache"
         caches_by_name[self.name] = self._cache
 

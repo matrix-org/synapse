@@ -18,7 +18,6 @@ from tests import unittest
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
-from synapse.storage.registration import RegistrationStore
 from synapse.util import stringutils
 
 from tests.utils import setup_test_homeserver
@@ -31,7 +30,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
         hs = yield setup_test_homeserver()
         self.db_pool = hs.get_db_pool()
 
-        self.store = RegistrationStore(hs)
+        self.store = hs.get_datastore()
 
         self.user_id = "@my-user:test"
         self.tokens = ["AbCdEfGhIjKlMnOpQrStUvWxYz",
