@@ -15,7 +15,7 @@
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList, cached
-from synapse.util.caches.room_change_cache import RoomStreamChangeCache
+from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from twisted.internet import defer
 
@@ -30,7 +30,7 @@ class ReceiptsStore(SQLBaseStore):
     def __init__(self, hs):
         super(ReceiptsStore, self).__init__(hs)
 
-        self._receipts_stream_cache = RoomStreamChangeCache(
+        self._receipts_stream_cache = StreamChangeCache(
             "ReceiptsRoomChangeCache", self._receipts_id_gen.get_max_token(None)
         )
 
@@ -77,7 +77,7 @@ class ReceiptsStore(SQLBaseStore):
         room_ids = set(room_ids)
 
         if from_key:
-            room_ids = yield self._receipts_stream_cache.get_rooms_changed(
+            room_ids = yield self._receipts_stream_cache.get_entities_changed(
                 room_ids, from_key
             )
 
@@ -222,7 +222,7 @@ class ReceiptsStore(SQLBaseStore):
         txn.call_after(self.get_linearized_receipts_for_room.invalidate_all)
 
         txn.call_after(
-            self._receipts_stream_cache.room_has_changed,
+            self._receipts_stream_cache.entity_has_changed,
             room_id, stream_id
         )
 

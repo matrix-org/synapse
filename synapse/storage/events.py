@@ -212,7 +212,7 @@ class EventsStore(SQLBaseStore):
 
             if not backfilled:
                 txn.call_after(
-                    self._events_stream_cache.room_has_changed,
+                    self._events_stream_cache.entity_has_changed,
                     event.room_id, event.internal_metadata.stream_ordering,
                 )
 

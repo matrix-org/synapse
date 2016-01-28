@@ -37,7 +37,7 @@ from twisted.internet import defer
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks
-from synapse.util.caches.room_change_cache import RoomStreamChangeCache
+from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.api.constants import EventTypes
 from synapse.types import RoomStreamToken
 from synapse.util.logutils import log_function
@@ -81,7 +81,7 @@ class StreamStore(SQLBaseStore):
     def __init__(self, hs):
         super(StreamStore, self).__init__(hs)
 
-        self._events_stream_cache = RoomStreamChangeCache(
+        self._events_stream_cache = StreamChangeCache(
             "EventsRoomStreamChangeCache", self._stream_id_gen.get_max_token(None)
         )
 
@@ -168,7 +168,7 @@ class StreamStore(SQLBaseStore):
     def get_room_events_stream_for_rooms(self, room_ids, from_key, to_key, limit=0):
         from_id = RoomStreamToken.parse_stream_token(from_key).stream
 
-        room_ids = yield self._events_stream_cache.get_rooms_changed(
+        room_ids = yield self._events_stream_cache.get_entities_changed(
             room_ids, from_id
         )
 
@@ -200,7 +200,7 @@ class StreamStore(SQLBaseStore):
             defer.returnValue(([], from_key))
 
         if from_id:
-            has_changed = yield self._events_stream_cache.get_room_has_changed(
+            has_changed = yield self._events_stream_cache.get_entity_has_changed(
                 room_id, from_id
             )
 
