@@ -128,7 +128,7 @@ class AccountDataStore(SQLBaseStore):
 
             return (global_account_data, account_data_by_room)
 
-        changed = self._account_data_stream_cache.get_entity_has_changed(
+        changed = self._account_data_stream_cache.has_entity_changed(
             user_id, int(stream_id)
         )
         if not changed:

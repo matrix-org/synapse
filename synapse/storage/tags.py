@@ -88,7 +88,7 @@ class TagsStore(SQLBaseStore):
             room_ids = [row[0] for row in txn.fetchall()]
             return room_ids
 
-        changed = self._tags_stream_cache.get_entity_has_changed(user_id, int(stream_id))
+        changed = self._tags_stream_cache.has_entity_changed(user_id, int(stream_id))
         if not changed:
             defer.returnValue({})
 

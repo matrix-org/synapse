@@ -200,7 +200,7 @@ class StreamStore(SQLBaseStore):
             defer.returnValue(([], from_key))
 
         if from_id:
-            has_changed = yield self._events_stream_cache.get_entity_has_changed(
+            has_changed = yield self._events_stream_cache.has_entity_changed(
                 room_id, from_id
             )
 

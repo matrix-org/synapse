@@ -40,7 +40,9 @@ class StreamChangeCache(object):
         self.name = name
         caches_by_name[self.name] = self._cache
 
-    def get_entity_has_changed(self, entity, stream_pos):
+    def has_entity_changed(self, entity, stream_pos):
+        """Returns True if the entity may have been updated since stream_pos
+        """
         assert type(stream_pos) is int
 
         if stream_pos <= self._earliest_known_stream_pos:
