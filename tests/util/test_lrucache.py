@@ -19,6 +19,7 @@ from .. import unittest
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.treecache import TreeCache
 
+
 class LruCacheTestCase(unittest.TestCase):
 
     def test_get_set(self):
@@ -72,3 +73,9 @@ class LruCacheTestCase(unittest.TestCase):
         self.assertEquals(cache.get(("vehicles", "car")), "vroom")
         self.assertEquals(cache.get(("vehicles", "train")), "chuff")
         # Man from del_multi say "Yes".
+
+    def test_clear(self):
+        cache = LruCache(1)
+        cache["key"] = 1
+        cache.clear()
+        self.assertEquals(len(cache), 0)
