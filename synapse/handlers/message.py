@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import SynapseError, AuthError, Codes
+from synapse.api.errors import AuthError, Codes
 from synapse.streams.config import PaginationConfig
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
@@ -119,9 +119,12 @@ class MessageHandler(BaseHandler):
         if source_config.direction == 'b':
             # if we're going backwards, we might need to backfill. This
             # requires that we have a topo token.
-            if room_token.topological is None:
-                raise SynapseError(400, "Invalid token: cannot paginate "
-                                        "backwards from a stream token")
+            if room_token.topological:
+                max_topo = room_token.topological
+            else:
+                max_topo = yield self.store.get_max_topological_token_for_stream_and_room(
+                    room_id, room_token.stream
+                )
 
             if membership == Membership.LEAVE:
                 # If they have left the room then clamp the token to be before
@@ -131,11 +134,11 @@ class MessageHandler(BaseHandler):
                     member_event_id
                 )
                 leave_token = RoomStreamToken.parse(leave_token)
-                if leave_token.topological < room_token.topological:
+                if leave_token.topological < max_topo:
                     source_config.from_key = str(leave_token)
 
             yield self.hs.get_handlers().federation_handler.maybe_backfill(
-                room_id, room_token.topological
+                room_id, max_topo
             )
 
         events, next_key = yield data_source.get_pagination_rows(
