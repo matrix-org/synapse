@@ -45,8 +45,9 @@ from .search import SearchStore
 from .tags import TagsStore
 from .account_data import AccountDataStore
 
-
 from util.id_generators import IdGenerator, StreamIdGenerator
+
+from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 
 import logging
@@ -84,6 +85,7 @@ class DataStore(RoomMemberStore, RoomStore,
 
     def __init__(self, db_conn, hs):
         self.hs = hs
+        self.database_engine = hs.database_engine
 
         cur = db_conn.cursor()
         try:
@@ -117,7 +119,56 @@ class DataStore(RoomMemberStore, RoomStore,
         self._push_rule_id_gen = IdGenerator("push_rules", "id", self)
         self._push_rules_enable_id_gen = IdGenerator("push_rules_enable", "id", self)
 
+        events_max = self._stream_id_gen.get_max_token(None)
+        event_cache_prefill, min_event_val = self._get_cache_dict(
+            db_conn, "events",
+            entity_column="room_id",
+            stream_column="stream_ordering",
+            max_value=events_max,
+        )
+        self._events_stream_cache = StreamChangeCache(
+            "EventsRoomStreamChangeCache", min_event_val,
+            prefilled_cache=event_cache_prefill,
+        )
+
+        account_max = self._account_data_id_gen.get_max_token(None)
+        self._account_data_stream_cache = StreamChangeCache(
+            "AccountDataAndTagsChangeCache", account_max,
+        )
+
         super(DataStore, self).__init__(hs)
+
+    def _get_cache_dict(self, db_conn, table, entity_column, stream_column, max_value):
+        # Fetch a mapping of room_id -> max stream position for "recent" rooms.
+        # It doesn't really matter how many we get, the StreamChangeCache will
+        # do the right thing to ensure it respects the max size of cache.
+        sql = (
+            "SELECT %(entity)s, MAX(%(stream)s) FROM %(table)s"
+            " WHERE %(stream)s > ? - 100000"
+            " GROUP BY %(entity)s"
+        ) % {
+            "table": table,
+            "entity": entity_column,
+            "stream": stream_column,
+        }
+
+        sql = self.database_engine.convert_param_style(sql)
+
+        txn = db_conn.cursor()
+        txn.execute(sql, (int(max_value),))
+        rows = txn.fetchall()
+
+        cache = {
+            row[0]: int(row[1])
+            for row in rows
+        }
+
+        if cache:
+            min_val = min(cache.values())
+        else:
+            min_val = max_value
+
+        return cache, min_val
 
     @defer.inlineCallbacks
     def insert_client_ip(self, user, access_token, ip, user_agent):

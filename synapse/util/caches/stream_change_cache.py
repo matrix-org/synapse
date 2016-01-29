@@ -32,13 +32,16 @@ class StreamChangeCache(object):
     entities that may have changed since that position. If position key is too
     old then the cache will simply return all given entities.
     """
-    def __init__(self, name, current_stream_pos, max_size=10000):
+    def __init__(self, name, current_stream_pos, max_size=10000, prefilled_cache={}):
         self._max_size = max_size
         self._entity_to_key = {}
         self._cache = sorteddict()
         self._earliest_known_stream_pos = current_stream_pos
         self.name = name
         caches_by_name[self.name] = self._cache
+
+        for entity, stream_pos in prefilled_cache.items():
+            self.entity_has_changed(entity, stream_pos)
 
     def has_entity_changed(self, entity, stream_pos):
         """Returns True if the entity may have been updated since stream_pos
