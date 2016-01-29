@@ -140,7 +140,6 @@ class LruCache(object):
             list_root[NEXT] = list_root
             list_root[PREV] = list_root
             cache.clear()
-            self.size = 0
 
         @synchronized
         def cache_len():
