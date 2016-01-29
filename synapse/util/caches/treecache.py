@@ -8,6 +8,7 @@ class TreeCache(object):
     Keys must be tuples.
     """
     def __init__(self):
+        self.size = 0
         self.root = {}
 
     def __setitem__(self, key, value):
@@ -21,6 +22,7 @@ class TreeCache(object):
         for k in key[:-1]:
             node = node.setdefault(k, {})
         node[key[-1]] = value
+        self.size += 1
 
     def get(self, key, default=None):
         node = self.root
@@ -31,6 +33,7 @@ class TreeCache(object):
         return node.get(key[-1], default)
 
     def clear(self):
+        self.size = 0
         self.root = {}
 
     def pop(self, key, default=None):
@@ -57,4 +60,8 @@ class TreeCache(object):
                 break
             node_and_keys[i+1][0].pop(k)
 
+        self.size -= 1
         return popped
+
+    def __len__(self):
+        return self.size
