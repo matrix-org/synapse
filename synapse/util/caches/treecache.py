@@ -72,7 +72,7 @@ class _Entry(object):
     __slots__ = ["value"]
 
     def __init__(self, value):
-        object.__setattr__(self, "value", value)
+        self.value = value
 
 
 def _strip_and_count_entires(d):
