@@ -139,11 +139,13 @@ class DataStore(RoomMemberStore, RoomStore,
         super(DataStore, self).__init__(hs)
 
     def _get_cache_dict(self, db_conn, table, entity_column, stream_column, max_value):
+        # Fetch a mapping of room_id -> max stream position for "recent" rooms.
+        # It doesn't really matter how many we get, the StreamChangeCache will
+        # do the right thing to ensure it respects the max size of cache.
         sql = (
             "SELECT %(entity)s, MAX(%(stream)s) FROM %(table)s"
             " WHERE %(stream)s > ? - 100000"
             " GROUP BY %(entity)s"
-            " ORDER BY MAX(%(stream)s) DESC"
         ) % {
             "table": table,
             "entity": entity_column,
