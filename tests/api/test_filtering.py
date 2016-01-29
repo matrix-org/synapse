@@ -382,19 +382,20 @@ class FilteringTestCase(unittest.TestCase):
                 "types": ["m.*"]
             }
         }
-        user = UserID.from_string("@" + user_localpart + ":test")
+
         filter_id = yield self.datastore.add_user_filter(
-            user_localpart=user_localpart,
+            user_localpart=user_localpart + "2",
             user_filter=user_filter_json,
         )
         event = MockEvent(
+            event_id="$asdasd:localhost",
             sender="@foo:bar",
             type="custom.avatar.3d.crazy",
         )
         events = [event]
 
         user_filter = yield self.filtering.get_user_filter(
-            user_localpart=user_localpart,
+            user_localpart=user_localpart + "2",
             filter_id=filter_id,
         )
 

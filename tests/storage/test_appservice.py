@@ -439,7 +439,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f2 = self._write_config(suffix="2")
 
         config = Mock(app_service_config_files=[f1, f2])
-        hs = yield setup_test_homeserver(config=config)
+        hs = yield setup_test_homeserver(config=config, datastore=Mock())
 
         ApplicationServiceStore(hs)
 
@@ -449,7 +449,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f2 = self._write_config(id="id", suffix="2")
 
         config = Mock(app_service_config_files=[f1, f2])
-        hs = yield setup_test_homeserver(config=config)
+        hs = yield setup_test_homeserver(config=config, datastore=Mock())
 
         with self.assertRaises(ConfigError) as cm:
             ApplicationServiceStore(hs)
@@ -465,7 +465,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f2 = self._write_config(as_token="as_token", suffix="2")
 
         config = Mock(app_service_config_files=[f1, f2])
-        hs = yield setup_test_homeserver(config=config)
+        hs = yield setup_test_homeserver(config=config, datastore=Mock())
 
         with self.assertRaises(ConfigError) as cm:
             ApplicationServiceStore(hs)

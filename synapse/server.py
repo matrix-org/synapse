@@ -20,6 +20,8 @@
 
 # Imports required for the default HomeServer() implementation
 from twisted.web.client import BrowserLikePolicyForHTTPS
+from twisted.enterprise import adbapi
+
 from synapse.federation import initialize_http_replication
 from synapse.http.client import SimpleHttpClient,  InsecureInterceptableContextFactory
 from synapse.notifier import Notifier
@@ -36,8 +38,15 @@ from synapse.push.pusherpool import PusherPool
 from synapse.events.builder import EventBuilderFactory
 from synapse.api.filtering import Filtering
 
+from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 
-class BaseHomeServer(object):
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
+class HomeServer(object):
     """A basic homeserver object without lazy component builders.
 
     This will need all of the components it requires to either be passed as
@@ -98,39 +107,18 @@ class BaseHomeServer(object):
         self.hostname = hostname
         self._building = {}
 
+        self.clock = Clock()
+        self.distributor = Distributor()
+        self.ratelimiter = Ratelimiter()
+
         # Other kwargs are explicit dependencies
         for depname in kwargs:
             setattr(self, depname, kwargs[depname])
 
-    @classmethod
-    def _make_dependency_method(cls, depname):
-        def _get(self):
-            if hasattr(self, depname):
-                return getattr(self, depname)
-
-            if hasattr(self, "build_%s" % (depname)):
-                # Prevent cyclic dependencies from deadlocking
-                if depname in self._building:
-                    raise ValueError("Cyclic dependency while building %s" % (
-                        depname,
-                    ))
-                self._building[depname] = 1
-
-                builder = getattr(self, "build_%s" % (depname))
-                dep = builder()
-                setattr(self, depname, dep)
-
-                del self._building[depname]
-
-                return dep
-
-            raise NotImplementedError(
-                "%s has no %s nor a builder for it" % (
-                    type(self).__name__, depname,
-                )
-            )
-
-        setattr(BaseHomeServer, "get_%s" % (depname), _get)
+    def setup(self):
+        logger.info("Setting up.")
+        self.datastore = DataStore(self.get_db_conn(), self)
+        logger.info("Finished setting up.")
 
     def get_ip_from_request(self, request):
         # X-Forwarded-For is handled by our custom request type.
@@ -142,32 +130,8 @@ class BaseHomeServer(object):
     def is_mine_id(self, string):
         return string.split(":", 1)[1] == self.hostname
 
-# Build magic accessors for every dependency
-for depname in BaseHomeServer.DEPENDENCIES:
-    BaseHomeServer._make_dependency_method(depname)
-
-
-class HomeServer(BaseHomeServer):
-    """A homeserver object that will construct most of its dependencies as
-    required.
-
-    It still requires the following to be specified by the caller:
-        resource_for_client
-        resource_for_web_client
-        resource_for_federation
-        resource_for_content_repo
-        http_client
-        db_pool
-    """
-
-    def build_clock(self):
-        return Clock()
-
     def build_replication_layer(self):
         return initialize_http_replication(self)
-
-    def build_datastore(self):
-        return DataStore(self)
 
     def build_handlers(self):
         return Handlers(self)
@@ -179,10 +143,9 @@ class HomeServer(BaseHomeServer):
         return Auth(self)
 
     def build_http_client_context_factory(self):
-        config = self.get_config()
         return (
             InsecureInterceptableContextFactory()
-            if config.use_insecure_ssl_client_just_for_testing_do_not_use
+            if self.config.use_insecure_ssl_client_just_for_testing_do_not_use
             else BrowserLikePolicyForHTTPS()
         )
 
@@ -201,14 +164,8 @@ class HomeServer(BaseHomeServer):
     def build_state_handler(self):
         return StateHandler(self)
 
-    def build_distributor(self):
-        return Distributor()
-
     def build_event_sources(self):
         return EventSources(self)
-
-    def build_ratelimiter(self):
-        return Ratelimiter()
 
     def build_keyring(self):
         return Keyring(self)
@@ -224,3 +181,55 @@ class HomeServer(BaseHomeServer):
 
     def build_pusherpool(self):
         return PusherPool(self)
+
+    def build_http_client(self):
+        return MatrixFederationHttpClient(self)
+
+    def build_db_pool(self):
+        name = self.db_config["name"]
+
+        return adbapi.ConnectionPool(
+            name,
+            **self.db_config.get("args", {})
+        )
+
+
+def _make_dependency_method(depname):
+    def _get(hs):
+        try:
+            return getattr(hs, depname)
+        except AttributeError:
+            pass
+
+        try:
+            builder = getattr(hs, "build_%s" % (depname))
+        except AttributeError:
+            builder = None
+
+        if builder:
+            # Prevent cyclic dependencies from deadlocking
+            if depname in hs._building:
+                raise ValueError("Cyclic dependency while building %s" % (
+                    depname,
+                ))
+            hs._building[depname] = 1
+
+            dep = builder()
+            setattr(hs, depname, dep)
+
+            del hs._building[depname]
+
+            return dep
+
+        raise NotImplementedError(
+            "%s has no %s nor a builder for it" % (
+                type(hs).__name__, depname,
+            )
+        )
+
+    setattr(HomeServer, "get_%s" % (depname), _get)
+
+
+# Build magic accessors for every dependency
+for depname in HomeServer.DEPENDENCIES:
+    _make_dependency_method(depname)

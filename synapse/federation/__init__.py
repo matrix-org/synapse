@@ -17,15 +17,10 @@
 """
 
 from .replication import ReplicationLayer
-from .transport import TransportLayer
+from .transport.client import TransportLayerClient
 
 
 def initialize_http_replication(homeserver):
-    transport = TransportLayer(
-        homeserver,
-        homeserver.hostname,
-        server=homeserver.get_resource_for_federation(),
-        client=homeserver.get_http_client()
-    )
+    transport = TransportLayerClient(homeserver)
 
     return ReplicationLayer(homeserver, transport)

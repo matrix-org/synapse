@@ -130,7 +130,8 @@ class PushRuleStore(SQLBaseStore):
 
     def _add_push_rule_relative_txn(self, txn, user_id, **kwargs):
         after = kwargs.pop("after", None)
-        relative_to_rule = kwargs.pop("before", after)
+        before = kwargs.pop("before", None)
+        relative_to_rule = before or after
 
         res = self._simple_select_one_txn(
             txn,

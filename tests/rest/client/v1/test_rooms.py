@@ -1045,8 +1045,13 @@ class RoomMessageListTestCase(RestTestCase):
         self.assertTrue("end" in response)
 
     @defer.inlineCallbacks
-    def test_stream_token_is_rejected(self):
+    def test_stream_token_is_accepted_for_fwd_pagianation(self):
+        token = "s0_0_0_0_0"
         (code, response) = yield self.mock_resource.trigger_get(
-            "/rooms/%s/messages?access_token=x&from=s0_0_0_0" %
-            self.room_id)
-        self.assertEquals(400, code)
+            "/rooms/%s/messages?access_token=x&from=%s" %
+            (self.room_id, token))
+        self.assertEquals(200, code)
+        self.assertTrue("start" in response)
+        self.assertEquals(token, response['start'])
+        self.assertTrue("chunk" in response)
+        self.assertTrue("end" in response)
