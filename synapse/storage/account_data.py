@@ -30,7 +30,7 @@ class AccountDataStore(SQLBaseStore):
         self._account_data_stream_cache = StreamChangeCache(
             "AccountDataAndTagsChangeCache",
             self._account_data_id_gen.get_max_token(None),
-            max_size=1000,
+            max_size=10000,
         )
 
     def get_account_data_for_user(self, user_id):
