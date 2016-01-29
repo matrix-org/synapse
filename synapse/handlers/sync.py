@@ -697,17 +697,6 @@ class SyncHandler(BaseHandler):
         if just_joined:
             state = yield self.get_state_at(room_id, now_token)
 
-        notifs = yield self.unread_notifs_for_room_id(
-            room_id, sync_config, all_ephemeral_by_room
-        )
-
-        unread_notifications = {}
-        if notifs is not None:
-            unread_notifications["notification_count"] = len(notifs)
-            unread_notifications["highlight_count"] = len([
-                1 for notif in notifs if _action_has_highlight(notif["actions"])
-            ])
-
         state = {
             (e.type, e.state_key): e
             for e in sync_config.filter_collection.filter_room_state(state.values())
@@ -725,6 +714,7 @@ class SyncHandler(BaseHandler):
             ephemeral_by_room.get(room_id, [])
         )
 
+        unread_notifications = {}
         room_sync = JoinedSyncResult(
             room_id=room_id,
             timeline=batch,
@@ -733,6 +723,17 @@ class SyncHandler(BaseHandler):
             account_data=account_data,
             unread_notifications=unread_notifications,
         )
+
+        if room_sync:
+            notifs = yield self.unread_notifs_for_room_id(
+                room_id, sync_config, all_ephemeral_by_room
+            )
+
+            if notifs is not None:
+                unread_notifications["notification_count"] = len(notifs)
+                unread_notifications["highlight_count"] = len([
+                    1 for notif in notifs if _action_has_highlight(notif["actions"])
+                ])
 
         logger.debug("Room sync: %r", room_sync)
 
