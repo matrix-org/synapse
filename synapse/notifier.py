@@ -376,10 +376,14 @@ class Notifier(object):
                     continue
                 if only_keys and name not in only_keys:
                     continue
+                if limit:
+                    new_limit = max(limit * 2, 10)
+                else:
+                    new_limit = 10
                 new_events, new_key = yield source.get_new_events(
                     user=user,
                     from_key=getattr(from_token, keyname),
-                    limit=max(limit * 2, 10),
+                    limit=new_limit,
                     is_guest=is_peeking,
                     room_ids=room_ids,
                 )
