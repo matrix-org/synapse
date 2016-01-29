@@ -1,4 +1,4 @@
-Changes in synapse v0.12.1-rc1 (2016-01-xx)
+Changes in synapse v0.12.1-rc1 (2016-01-29)
 ===========================================
 
 Features:
@@ -18,8 +18,8 @@ Changes:
 * Change to require unbanning before other membership changes (PR #501)
 * Change default push rules to notify for all messages (PR #486)
 * Change default push rules to not notify on membership changes (PR #514)
-* Change default push rules to only notify messages in one to one rooms
-  (PR #529)
+* Change default push rules in one to one rooms to only notify for events that
+  are messages (PR #529)
 * Change ``/sync`` to reject requests with a ``from`` query param (PR #512)
 * Change server manhole to use SSH rather than telnet (PR #473)
 * Change server to require AS users to be registered before use (PR #487)
@@ -39,7 +39,7 @@ Bug fixes:
 * Fix bug where ``/events`` would always return immediately for guest users
   (PR #480)
 * Fix bug where ``/sync`` unexpectedly returned old left rooms (PR #481)
-* Fix enabling and disabling push rules (P #498)
+* Fix enabling and disabling push rules (PR #498)
 * Fix bug where ``/register`` returned 500 when given unicode username
   (PR #513)
 
