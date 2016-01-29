@@ -65,7 +65,8 @@ class IdentityHandler(BaseHandler):
                     "Trusting untrustworthy ID server %r even though it isn't"
                     " in the trusted id list for testing because"
                     " 'use_insecure_ssl_client_just_for_testing_do_not_use'"
-                    " is set in the config"
+                    " is set in the config",
+                    id_server,
                 )
             else:
                 logger.warn('%s is not a trusted ID server: rejecting 3pid ' +
