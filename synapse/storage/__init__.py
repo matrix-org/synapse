@@ -85,6 +85,7 @@ class DataStore(RoomMemberStore, RoomStore,
 
     def __init__(self, db_conn, hs):
         self.hs = hs
+        self.database_engine = hs.database_engine
 
         cur = db_conn.cursor()
         try:
@@ -156,6 +157,8 @@ class DataStore(RoomMemberStore, RoomStore,
             "entity": entity_column,
             "stream": stream_column,
         }
+
+        sql = self.database_engine.convert_param_style(sql)
 
         txn = db_conn.cursor()
         txn.execute(sql, (int(max_value),))
