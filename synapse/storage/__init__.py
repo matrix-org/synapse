@@ -132,15 +132,8 @@ class DataStore(RoomMemberStore, RoomStore,
         )
 
         account_max = self._account_data_id_gen.get_max_token(None)
-        account_cache_prefill, min_acc_val = self._get_cache_dict(
-            db_conn, "account_data",
-            entity_column="user_id",
-            stream_column="stream_id",
-            max_value=account_max,
-        )
         self._account_data_stream_cache = StreamChangeCache(
-            "AccountDataAndTagsChangeCache", min_acc_val,
-            prefilled_cache=account_cache_prefill,
+            "AccountDataAndTagsChangeCache", account_max,
         )
 
         super(DataStore, self).__init__(hs)
