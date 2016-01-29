@@ -34,6 +34,7 @@ class RegistrationConfig(Config):
         self.registration_shared_secret = config.get("registration_shared_secret")
         self.macaroon_secret_key = config.get("macaroon_secret_key")
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
+        self.trusted_third_party_id_servers = config["trusted_third_party_id_servers"]
         self.allow_guest_access = config.get("allow_guest_access", False)
 
     def default_config(self, **kwargs):
@@ -60,6 +61,12 @@ class RegistrationConfig(Config):
         # participate in rooms hosted on this server which have been made
         # accessible to anonymous users.
         allow_guest_access: False
+
+        # The list of identity servers trusted to verify third party
+        # identifiers by this server.
+        trusted_third_party_id_servers:
+            - matrix.org
+            - vector.im
         """ % locals()
 
     def add_arguments(self, parser):
