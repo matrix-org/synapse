@@ -157,6 +157,10 @@ class AccountDataStore(SQLBaseStore):
                     "content": content_json,
                 }
             )
+            txn.call_after(
+                self._account_data_stream_cache.entity_has_changed,
+                user_id, next_id,
+            )
             self._update_max_stream_id(txn, next_id)
 
         with (yield self._account_data_id_gen.get_next(self)) as next_id:

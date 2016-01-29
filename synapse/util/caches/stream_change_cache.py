@@ -52,15 +52,10 @@ class StreamChangeCache(object):
             cache_counter.inc_misses(self.name)
             return True
 
-        if stream_pos == self._earliest_known_stream_pos:
-            # If the same as the earliest key, assume nothing has changed.
-            cache_counter.inc_hits(self.name)
-            return False
-
         latest_entity_change_pos = self._entity_to_key.get(entity, None)
         if latest_entity_change_pos is None:
-            cache_counter.inc_misses(self.name)
-            return True
+            cache_counter.inc_hits(self.name)
+            return False
 
         if stream_pos < latest_entity_change_pos:
             cache_counter.inc_misses(self.name)
@@ -98,7 +93,7 @@ class StreamChangeCache(object):
 
         if stream_pos > self._earliest_known_stream_pos:
             old_pos = self._entity_to_key.get(entity, None)
-            if old_pos:
+            if old_pos is not None:
                 stream_pos = max(stream_pos, old_pos)
                 self._cache.pop(old_pos, None)
             self._cache[stream_pos] = entity
