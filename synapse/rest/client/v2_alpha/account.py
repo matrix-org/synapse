@@ -116,9 +116,10 @@ class ThreepidRestServlet(RestServlet):
 
         body = parse_json_dict_from_request(request)
 
-        if 'threePidCreds' not in body:
+        threePidCreds = body.get('threePidCreds')
+        threePidCreds = body.get('three_pid_creds', threePidCreds)
+        if threePidCreds is None:
             raise SynapseError(400, "Missing param", Codes.MISSING_PARAM)
-        threePidCreds = body['threePidCreds']
 
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
