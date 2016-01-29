@@ -120,26 +120,26 @@ class DataStore(RoomMemberStore, RoomStore,
         self._push_rules_enable_id_gen = IdGenerator("push_rules_enable", "id", self)
 
         events_max = self._stream_id_gen.get_max_token(None)
-        event_cache_prefill = self._get_cache_dict(
+        event_cache_prefill, min_event_val = self._get_cache_dict(
             db_conn, "events",
             entity_column="room_id",
             stream_column="stream_ordering",
             max_value=events_max,
         )
         self._events_stream_cache = StreamChangeCache(
-            "EventsRoomStreamChangeCache", events_max,
+            "EventsRoomStreamChangeCache", min_event_val,
             prefilled_cache=event_cache_prefill,
         )
 
         account_max = self._account_data_id_gen.get_max_token(None)
-        account_cache_prefill = self._get_cache_dict(
+        account_cache_prefill, min_acc_val = self._get_cache_dict(
             db_conn, "account_data",
             entity_column="user_id",
             stream_column="stream_id",
             max_value=account_max,
         )
         self._account_data_stream_cache = StreamChangeCache(
-            "AccountDataAndTagsChangeCache", account_max,
+            "AccountDataAndTagsChangeCache", min_acc_val,
             prefilled_cache=account_cache_prefill,
         )
 
@@ -151,7 +151,6 @@ class DataStore(RoomMemberStore, RoomStore,
             " WHERE %(stream)s > ? - 100000"
             " GROUP BY %(entity)s"
             " ORDER BY MAX(%(stream)s) DESC"
-            " LIMIT 10000"
         ) % {
             "table": table,
             "entity": entity_column,
@@ -164,10 +163,17 @@ class DataStore(RoomMemberStore, RoomStore,
         txn.execute(sql, (int(max_value),))
         rows = txn.fetchall()
 
-        return {
-            row[0]: row[1]
+        cache = {
+            row[0]: int(row[1])
             for row in rows
         }
+
+        if cache:
+            min_val = min(cache.values())
+        else:
+            min_val = max_value
+
+        return cache, min_val
 
     @defer.inlineCallbacks
     def insert_client_ip(self, user, access_token, ip, user_agent):
