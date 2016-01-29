@@ -37,7 +37,6 @@ from twisted.internet import defer
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks
-from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.api.constants import EventTypes
 from synapse.types import RoomStreamToken
 from synapse.util.logutils import log_function
@@ -78,13 +77,6 @@ def upper_bound(token):
 
 
 class StreamStore(SQLBaseStore):
-    def __init__(self, hs):
-        super(StreamStore, self).__init__(hs)
-
-        self._events_stream_cache = StreamChangeCache(
-            "EventsRoomStreamChangeCache", self._stream_id_gen.get_max_token(None)
-        )
-
     @defer.inlineCallbacks
     def get_appservice_room_stream(self, service, from_key, to_key, limit=0):
         # NB this lives here instead of appservice.py so we can reuse the
