@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 
 class TagsStore(SQLBaseStore):
-
     def get_max_account_data_stream_id(self):
         """Get the current max stream id for the private user data stream
 
@@ -79,6 +78,12 @@ class TagsStore(SQLBaseStore):
             txn.execute(sql, (user_id, stream_id))
             room_ids = [row[0] for row in txn.fetchall()]
             return room_ids
+
+        changed = self._account_data_stream_cache.has_entity_changed(
+            user_id, int(stream_id)
+        )
+        if not changed:
+            defer.returnValue({})
 
         room_ids = yield self.runInteraction(
             "get_updated_tags", get_updated_tags_txn
@@ -176,6 +181,11 @@ class TagsStore(SQLBaseStore):
             room_id(str): The ID of the room.
             next_id(int): The the revision to advance to.
         """
+
+        txn.call_after(
+            self._account_data_stream_cache.entity_has_changed,
+            user_id, next_id
+        )
 
         update_max_id_sql = (
             "UPDATE account_data_max_stream_id"

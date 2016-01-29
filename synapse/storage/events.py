@@ -210,6 +210,12 @@ class EventsStore(SQLBaseStore):
         for event, _ in events_and_contexts:
             txn.call_after(self._invalidate_get_event_cache, event.event_id)
 
+            if not backfilled:
+                txn.call_after(
+                    self._events_stream_cache.entity_has_changed,
+                    event.room_id, event.internal_metadata.stream_ordering,
+                )
+
         depth_updates = {}
         for event, _ in events_and_contexts:
             if event.internal_metadata.is_outlier():
