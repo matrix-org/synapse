@@ -37,6 +37,7 @@ class LruCache(object):
     """
     def __init__(self, max_size, keylen=1, cache_type=dict):
         cache = cache_type()
+        self.cache = cache  # Used for introspection.
         self.size = 0
         list_root = []
         list_root[:] = [list_root, list_root, None, None]
@@ -142,6 +143,7 @@ class LruCache(object):
             list_root[NEXT] = list_root
             list_root[PREV] = list_root
             cache.clear()
+            self.size = 0
 
         @synchronized
         def cache_len():
