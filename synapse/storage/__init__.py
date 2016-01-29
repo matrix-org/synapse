@@ -148,7 +148,7 @@ class DataStore(RoomMemberStore, RoomStore,
     def _get_cache_dict(self, db_conn, table, entity_column, stream_column, max_value):
         sql = (
             "SELECT %(entity)s, MAX(%(stream)s) FROM %(table)s"
-            " WHERE %(stream)s > max(? - 100000, 0)"
+            " WHERE %(stream)s > ? - 100000"
             " GROUP BY %(entity)s"
             " ORDER BY MAX(%(stream)s) DESC"
             " LIMIT 10000"
