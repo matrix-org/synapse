@@ -363,7 +363,7 @@ class Notifier(object):
         @defer.inlineCallbacks
         def check_for_updates(before_token, after_token):
             if not after_token.is_after(before_token):
-                defer.returnValue(EventStreamResult([], (before_token, before_token)))
+                defer.returnValue(EventStreamResult([], (from_token, from_token)))
 
             events = []
             end_token = from_token
@@ -376,14 +376,11 @@ class Notifier(object):
                     continue
                 if only_keys and name not in only_keys:
                     continue
-                if limit:
-                    new_limit = max(limit * 2, 10)
-                else:
-                    new_limit = 10
+
                 new_events, new_key = yield source.get_new_events(
                     user=user,
                     from_key=getattr(from_token, keyname),
-                    limit=new_limit,
+                    limit=limit,
                     is_guest=is_peeking,
                     room_ids=room_ids,
                 )
