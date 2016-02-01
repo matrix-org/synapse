@@ -152,6 +152,7 @@ class RegisterRestServlet(RestServlet):
 
         desired_username = params.get("username", None)
         new_password = params.get("password", None)
+        guest_access_token = params.get("guest_access_token", None)
 
         (user_id, token) = yield self.registration_handler.register(
             localpart=desired_username,
