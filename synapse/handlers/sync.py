@@ -807,11 +807,12 @@ class SyncHandler(BaseHandler):
         and the previous sync.
 
         :param str room_id
-        :param TimelineBatch batch
+        :param TimelineBatch batch: The timeline batch for the room that will
+            be sent to the user.
         :param sync_config
-        :param str since_token
-        :param str now_token
-        :param bool full_state
+        :param str since_token: Token of the end of the previous batch. May be None.
+        :param str now_token: Token of the end of the current batch.
+        :param bool full_state: Whether to force returning the full state.
 
         :returns A new event dictionary
         """
@@ -919,7 +920,7 @@ def _calculate_state(timeline_contains, timeline_start, previous):
         timeline_contains (dict): state in the timeline
         timeline_start (dict): state at the start of the timeline
         previous (dict): state at the end of the previous sync (or empty dict
-            if there is an initial sync)
+            if this is an initial sync)
 
     Returns:
         dict
