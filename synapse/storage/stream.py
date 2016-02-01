@@ -252,6 +252,13 @@ class StreamStore(SQLBaseStore):
         if from_key == to_key:
             return defer.succeed([])
 
+        if from_id:
+            has_changed = self._membership_stream_cache.has_entity_changed(
+                user_id, int(from_id)
+            )
+            if not has_changed:
+                return defer.succeed([])
+
         def f(txn):
             if from_id is not None:
                 sql = (

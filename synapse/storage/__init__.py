@@ -131,6 +131,10 @@ class DataStore(RoomMemberStore, RoomStore,
             prefilled_cache=event_cache_prefill,
         )
 
+        self._membership_stream_cache = StreamChangeCache(
+            "MembershipStreamChangeCache", events_max,
+        )
+
         account_max = self._account_data_id_gen.get_max_token(None)
         self._account_data_stream_cache = StreamChangeCache(
             "AccountDataAndTagsChangeCache", account_max,
