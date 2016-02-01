@@ -39,7 +39,6 @@ from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.api.constants import EventTypes
 from synapse.types import RoomStreamToken
-from synapse.util.logutils import log_function
 
 import logging
 
@@ -288,11 +287,12 @@ class StreamStore(SQLBaseStore):
                 get_prev_content=True
             )
 
+            self._set_before_and_after(ret, rows, topo_order=False)
+
             return ret
 
         return self.runInteraction("get_room_changes_for_user", f)
 
-    @log_function
     def get_room_events_stream(
         self,
         user_id,
