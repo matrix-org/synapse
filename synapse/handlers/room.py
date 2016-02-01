@@ -1022,7 +1022,7 @@ class RoomEventSource(object):
             events = list(room_events)
             events.extend(e for evs, _ in room_to_events.values() for e in evs)
 
-            events.sort(key=lambda e: e.internal_metadata.after)
+            events.sort(key=lambda e: e.internal_metadata.order)
 
             if limit:
                 events[:] = events[:limit]
