@@ -1013,7 +1013,7 @@ class RoomEventSource(object):
                 limit=limit,
             )
         else:
-            room_events = yield self.store.get_room_changes_for_user(
+            room_events = yield self.store.get_membership_changes_for_user(
                 user.to_string(), from_key, to_key
             )
 

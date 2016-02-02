@@ -479,7 +479,7 @@ class SyncHandler(BaseHandler):
         )
 
         # Get a list of membership change events that have happened.
-        rooms_changed = yield self.store.get_room_changes_for_user(
+        rooms_changed = yield self.store.get_membership_changes_for_user(
             user_id, since_token.room_key, now_token.room_key
         )
 
