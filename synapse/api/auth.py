@@ -574,7 +574,7 @@ class Auth(object):
             raise AuthError(
                 403,
                 "Application service has not registered this user"
-                )
+            )
         defer.returnValue(user_id)
 
     @defer.inlineCallbacks

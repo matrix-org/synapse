@@ -52,7 +52,7 @@ class PusherRestServlet(ClientV1RestServlet):
             if i not in content:
                 missing.append(i)
         if len(missing):
-            raise SynapseError(400, "Missing parameters: "+','.join(missing),
+            raise SynapseError(400, "Missing parameters: " + ','.join(missing),
                                errcode=Codes.MISSING_PARAM)
 
         logger.debug("set pushkey %s to kind %s", content['pushkey'], content['kind'])
@@ -83,7 +83,7 @@ class PusherRestServlet(ClientV1RestServlet):
                 data=content['data']
             )
         except PusherConfigException as pce:
-            raise SynapseError(400, "Config Error: "+pce.message,
+            raise SynapseError(400, "Config Error: " + pce.message,
                                errcode=Codes.MISSING_PARAM)
 
         defer.returnValue((200, {}))

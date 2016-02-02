@@ -185,7 +185,7 @@ class SQLBaseStore(object):
             time_then = self._previous_loop_ts
             self._previous_loop_ts = time_now
 
-            ratio = (curr - prev)/(time_now - time_then)
+            ratio = (curr - prev) / (time_now - time_then)
 
             top_three_counters = self._txn_perf_counters.interval(
                 time_now - time_then, limit=3
@@ -643,7 +643,10 @@ class SQLBaseStore(object):
         if not iterable:
             defer.returnValue(results)
 
-        chunks = [iterable[i:i+batch_size] for i in xrange(0, len(iterable), batch_size)]
+        chunks = [
+            iterable[i:i + batch_size]
+            for i in xrange(0, len(iterable), batch_size)
+        ]
         for chunk in chunks:
             rows = yield self.runInteraction(
                 desc,
