@@ -243,7 +243,7 @@ class StreamStore(SQLBaseStore):
         defer.returnValue((ret, key))
 
     @defer.inlineCallbacks
-    def get_room_changes_for_user(self, user_id, from_key, to_key):
+    def get_membership_changes_for_user(self, user_id, from_key, to_key):
         if from_key is not None:
             from_id = RoomStreamToken.parse_stream_token(from_key).stream
         else:
@@ -285,7 +285,7 @@ class StreamStore(SQLBaseStore):
 
             return rows
 
-        rows = yield self.runInteraction("get_room_changes_for_user", f)
+        rows = yield self.runInteraction("get_membership_changes_for_user", f)
 
         ret = yield self._get_events(
             [r["event_id"] for r in rows],
