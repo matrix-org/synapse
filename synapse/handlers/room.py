@@ -18,7 +18,7 @@ from twisted.internet import defer
 
 from ._base import BaseHandler
 
-from synapse.types import UserID, RoomAlias, RoomID
+from synapse.types import UserID, RoomAlias, RoomID, RoomStreamToken
 from synapse.api.constants import (
     EventTypes, Membership, JoinRules, RoomCreationPreset,
 )
@@ -996,6 +996,11 @@ class RoomEventSource(object):
         # We just ignore the key for now.
 
         to_key = yield self.get_current_key()
+
+        from_token = RoomStreamToken.parse(from_key)
+        if from_token.topological:
+            logger.warn("Stream has topological part!!!! %r", from_key)
+            from_key = "s%s" % (from_token.stream,)
 
         app_service = yield self.store.get_app_service_by_user_id(
             user.to_string()
