@@ -139,7 +139,9 @@ class RegistrationHandler(BaseHandler):
                     yield self.store.register(
                         user_id=user_id,
                         token=token,
-                        password_hash=password_hash)
+                        password_hash=password_hash,
+                        make_guest=make_guest
+                    )
 
                     yield registered_user(self.distributor, user)
                 except SynapseError:
