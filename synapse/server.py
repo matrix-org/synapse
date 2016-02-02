@@ -23,7 +23,7 @@ from twisted.web.client import BrowserLikePolicyForHTTPS
 from twisted.enterprise import adbapi
 
 from synapse.federation import initialize_http_replication
-from synapse.http.client import SimpleHttpClient,  InsecureInterceptableContextFactory
+from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers

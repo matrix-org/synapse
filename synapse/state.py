@@ -63,7 +63,7 @@ class StateHandler(object):
             cache_name="state_cache",
             clock=self.clock,
             max_len=SIZE_OF_CACHE,
-            expiry_ms=EVICTION_TIMEOUT_SECONDS*1000,
+            expiry_ms=EVICTION_TIMEOUT_SECONDS * 1000,
             reset_expiry_on_get=True,
         )
 

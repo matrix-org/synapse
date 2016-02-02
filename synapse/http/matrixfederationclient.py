@@ -152,7 +152,7 @@ class MatrixFederationHttpClient(object):
 
                         return self.clock.time_bound_deferred(
                             request_deferred,
-                            time_out=timeout/1000. if timeout else 60,
+                            time_out=timeout / 1000. if timeout else 60,
                         )
 
                     response = yield preserve_context_over_fn(

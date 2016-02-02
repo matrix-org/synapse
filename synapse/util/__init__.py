@@ -46,7 +46,7 @@ class Clock(object):
 
     def looping_call(self, f, msec):
         l = task.LoopingCall(f)
-        l.start(msec/1000.0, now=False)
+        l.start(msec / 1000.0, now=False)
         return l
 
     def stop_looping_call(self, loop):
