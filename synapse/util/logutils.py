@@ -111,7 +111,7 @@ def time_function(f):
             _log_debug_as_f(
                 f,
                 "[FUNC END] {%s-%d} %f",
-                (func_name, id, end-start,),
+                (func_name, id, end - start,),
             )
 
         return r

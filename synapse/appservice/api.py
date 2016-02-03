@@ -29,7 +29,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     pushing.
     """
 
-    def __init__(self,  hs):
+    def __init__(self, hs):
         super(ApplicationServiceApi, self).__init__(hs)
         self.clock = hs.get_clock()
 

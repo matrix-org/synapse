@@ -20,7 +20,6 @@ from synapse.http.servlet import (
 )
 from synapse.handlers.sync import SyncConfig
 from synapse.types import StreamToken
-from synapse.events import FrozenEvent
 from synapse.events.utils import (
     serialize_event, format_event_for_client_v2_without_room_id,
 )
@@ -287,9 +286,6 @@ class SyncRestServlet(RestServlet):
         state_dict = room.state
         timeline_events = room.timeline.events
 
-        state_dict = SyncRestServlet._rollback_state_for_timeline(
-            state_dict, timeline_events)
-
         state_events = state_dict.values()
 
         serialized_state = [serialize(e) for e in state_events]
@@ -311,77 +307,6 @@ class SyncRestServlet(RestServlet):
             ephemeral_events = room.ephemeral
             result["ephemeral"] = {"events": ephemeral_events}
             result["unread_notifications"] = room.unread_notifications
-
-        return result
-
-    @staticmethod
-    def _rollback_state_for_timeline(state, timeline):
-        """
-        Wind the state dictionary backwards, so that it represents the
-        state at the start of the timeline, rather than at the end.
-
-        :param dict[(str, str), synapse.events.EventBase] state: the
-            state dictionary. Will be updated to the state before the timeline.
-        :param list[synapse.events.EventBase] timeline: the event timeline
-        :return: updated state dictionary
-        """
-
-        result = state.copy()
-
-        for timeline_event in reversed(timeline):
-            if not timeline_event.is_state():
-                continue
-
-            event_key = (timeline_event.type, timeline_event.state_key)
-
-            logger.debug("Considering %s for removal", event_key)
-
-            state_event = result.get(event_key)
-            if (state_event is None or
-                    state_event.event_id != timeline_event.event_id):
-                # the event in the timeline isn't present in the state
-                # dictionary.
-                #
-                # the most likely cause for this is that there was a fork in
-                # the event graph, and the state is no longer valid. Really,
-                # the event shouldn't be in the timeline. We're going to ignore
-                # it for now, however.
-                logger.debug("Found state event %r in timeline which doesn't "
-                             "match state dictionary", timeline_event)
-                continue
-
-            prev_event_id = timeline_event.unsigned.get("replaces_state", None)
-
-            prev_content = timeline_event.unsigned.get('prev_content')
-            prev_sender = timeline_event.unsigned.get('prev_sender')
-            # Empircally it seems possible for the event to have a
-            # "replaces_state" key but not a prev_content or prev_sender
-            # markjh conjectures that it could be due to the server not
-            # having a copy of that event.
-            # If this is the case the we ignore the previous event. This will
-            # cause the displayname calculations on the client to be incorrect
-            if prev_event_id is None or not prev_content or not prev_sender:
-                logger.debug(
-                    "Removing %r from the state dict, as it is missing"
-                    " prev_content (prev_event_id=%r)",
-                    timeline_event.event_id, prev_event_id
-                )
-                del result[event_key]
-            else:
-                logger.debug(
-                    "Replacing %r with %r in state dict",
-                    timeline_event.event_id, prev_event_id
-                )
-                result[event_key] = FrozenEvent({
-                    "type": timeline_event.type,
-                    "state_key": timeline_event.state_key,
-                    "content": prev_content,
-                    "sender": prev_sender,
-                    "event_id": prev_event_id,
-                    "room_id": timeline_event.room_id,
-                })
-
-            logger.debug("New value: %r", result.get(event_key))
 
         return result
 

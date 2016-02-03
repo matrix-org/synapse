@@ -14,27 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-from synapse.rest import ClientRestResource
+import synapse
 
-sys.dont_write_bytecode = True
+import contextlib
+import logging
+import os
+import re
+import resource
+import subprocess
+import sys
+import time
+
 from synapse.python_dependencies import (
-    check_requirements, DEPENDENCY_LINKS, MissingRequirementError
+    check_requirements, DEPENDENCY_LINKS
 )
 
-if __name__ == '__main__':
-    try:
-        check_requirements()
-    except MissingRequirementError as e:
-        message = "\n".join([
-            "Missing Requirement: %s" % (e.message,),
-            "To install run:",
-            "    pip install --upgrade --force \"%s\"" % (e.dependency,),
-            "",
-        ])
-        sys.stderr.writelines(message)
-        sys.exit(1)
-
+from synapse.rest import ClientRestResource
 from synapse.storage.engines import create_engine, IncorrectDatabaseSetup
 from synapse.storage import are_all_users_on_domain
 from synapse.storage.prepare_database import UpgradeDatabaseException
@@ -72,17 +67,6 @@ from synapse.federation.transport.server import TransportLayerServer
 from synapse import events
 
 from daemonize import Daemonize
-
-import synapse
-
-import contextlib
-import logging
-import os
-import re
-import resource
-import subprocess
-import time
-
 
 logger = logging.getLogger("synapse.app.homeserver")
 

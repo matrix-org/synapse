@@ -26,9 +26,7 @@ class VersionsRestServlet(RestServlet):
 
     def on_GET(self, request):
         return (200, {
-            "versions": [
-                "r0.0.1",
-            ]
+            "versions": ["r0.0.1"]
         })
 
 
