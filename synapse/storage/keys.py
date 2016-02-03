@@ -39,6 +39,7 @@ class KeyStore(SQLBaseStore):
             table="server_tls_certificates",
             keyvalues={"server_name": server_name},
             retcols=("tls_certificate",),
+            desc="get_server_certificate",
         )
         tls_certificate = OpenSSL.crypto.load_certificate(
             OpenSSL.crypto.FILETYPE_ASN1, tls_certificate_bytes,

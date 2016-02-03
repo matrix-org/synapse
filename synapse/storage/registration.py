@@ -134,6 +134,7 @@ class RegistrationStore(SQLBaseStore):
             },
             retcols=["name", "password_hash", "is_guest"],
             allow_none=True,
+            desc="get_user_by_id",
         )
 
     def get_users_by_id_case_insensitive(self, user_id):
