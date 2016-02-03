@@ -942,14 +942,6 @@ class RoomListHandler(BaseHandler):
         # FIXME (erikj): START is no longer a valid value
         defer.returnValue({"start": "START", "end": "END", "chunk": result})
 
-    @defer.inlineCallbacks
-    def get_room_avatar_url(self, room_id):
-        event = yield self.hs.get_state_handler().get_current_state(
-            room_id, "m.room.avatar"
-        )
-        if event and "url" in event.content:
-            defer.returnValue(event.content["url"])
-
 
 class RoomContextHandler(BaseHandler):
     @defer.inlineCallbacks
