@@ -932,7 +932,7 @@ class RoomListHandler(BaseHandler):
             defer.returnValue(result)
 
         result = []
-        for chunk in (room_ids[i:i+10] for i in xrange(0, len(room_ids), 10)):
+        for chunk in (room_ids[i:i + 10] for i in xrange(0, len(room_ids), 10)):
             chunk_result = yield defer.gatherResults([
                 handle_room(room_id)
                 for room_id in chunk
