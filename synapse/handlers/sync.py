@@ -706,10 +706,8 @@ class SyncHandler(BaseHandler):
             )
 
             if notifs is not None:
-                unread_notifications["notification_count"] = len(notifs)
-                unread_notifications["highlight_count"] = len([
-                    1 for notif in notifs if _action_has_highlight(notif["actions"])
-                ])
+                unread_notifications["notification_count"] = notifs["notify_count"]
+                unread_notifications["highlight_count"] = notifs["highlight_count"]
 
         logger.debug("Room sync: %r", room_sync)
 
