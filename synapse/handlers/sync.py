@@ -18,6 +18,7 @@ from ._base import BaseHandler
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import Membership, EventTypes
 from synapse.util import unwrapFirstError
+from synapse.util.logcontext import LoggingContext
 
 from twisted.internet import defer
 
@@ -139,6 +140,15 @@ class SyncHandler(BaseHandler):
         Returns:
             A Deferred SyncResult.
         """
+
+        context = LoggingContext.current_context()
+        if context:
+            if since_token is None:
+                context.tag = "initial_sync"
+            elif full_state:
+                context.tag = "full_state_sync"
+            else:
+                context.tag = "incremental_sync"
 
         if timeout == 0 or since_token is None or full_state:
             # we are going to return immediately, so don't bother calling
