@@ -23,11 +23,11 @@ from distutils.util import strtobool
 class RegistrationConfig(Config):
 
     def read_config(self, config):
-        self.disable_registration = not bool(
+        self.enable_registration = bool(
             strtobool(str(config["enable_registration"]))
         )
         if "disable_registration" in config:
-            self.disable_registration = bool(
+            self.enable_registration = not bool(
                 strtobool(str(config["disable_registration"]))
             )
 
@@ -78,6 +78,6 @@ class RegistrationConfig(Config):
 
     def read_arguments(self, args):
         if args.enable_registration is not None:
-            self.disable_registration = not bool(
+            self.enable_registration = bool(
                 strtobool(str(args.enable_registration))
             )

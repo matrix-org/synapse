@@ -117,7 +117,7 @@ class RegisterRestServlet(RestServlet):
             return
 
         # == Normal User Registration == (everyone else)
-        if self.hs.config.disable_registration:
+        if not self.hs.config.enable_registration:
             raise SynapseError(403, "Registration has been disabled")
 
         guest_access_token = body.get("guest_access_token", None)
