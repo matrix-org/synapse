@@ -72,7 +72,7 @@ class EventPushActionsStore(SQLBaseStore):
             )
             results = txn.fetchall()
             if len(results) == 0:
-                return []
+                return {}
 
             stream_ordering = results[0][0]
             topological_ordering = results[0][1]
