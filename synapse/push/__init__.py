@@ -316,7 +316,7 @@ class Pusher(object):
                         r.room_id, self.user_id, last_unread_event_id
                     )
                 )
-                badge += len(notifs)
+                badge += notifs["notify_count"]
         defer.returnValue(badge)
 
 
