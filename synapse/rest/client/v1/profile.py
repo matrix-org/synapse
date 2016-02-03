@@ -37,7 +37,7 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
         if displayname is not None:
             ret["displayname"] = displayname
 
-        defer.returnValue((200, {ret}))
+        defer.returnValue((200, ret))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
