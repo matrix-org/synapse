@@ -47,7 +47,8 @@ class LoggingContext(object):
     """
 
     __slots__ = [
-        "parent_context", "name", "usage_start", "usage_end", "main_thread", "__dict__"
+        "parent_context", "name", "usage_start", "usage_end", "main_thread",
+        "__dict__", "tag",
     ]
 
     thread_local = threading.local()
@@ -72,6 +73,9 @@ class LoggingContext(object):
         def add_database_transaction(self, duration_ms):
             pass
 
+        def __nonzero__(self):
+            return False
+
     sentinel = Sentinel()
 
     def __init__(self, name=None):
@@ -83,6 +87,7 @@ class LoggingContext(object):
         self.db_txn_duration = 0.
         self.usage_start = None
         self.main_thread = threading.current_thread()
+        self.tag = ""
 
     def __str__(self):
         return "%s@%x" % (self.name, id(self))
