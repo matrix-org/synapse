@@ -33,7 +33,11 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
             user,
         )
 
-        defer.returnValue((200, {"displayname": displayname}))
+        ret = {}
+        if displayname is not None:
+            ret["displayname"] = displayname
+
+        defer.returnValue((200, {ret}))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
@@ -66,7 +70,11 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
             user,
         )
 
-        defer.returnValue((200, {"avatar_url": avatar_url}))
+        ret = {}
+        if avatar_url is not None:
+            ret["avatar_url"] = avatar_url
+
+        defer.returnValue((200, ret))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
@@ -102,10 +110,13 @@ class ProfileRestServlet(ClientV1RestServlet):
             user,
         )
 
-        defer.returnValue((200, {
-            "displayname": displayname,
-            "avatar_url": avatar_url
-        }))
+        ret = {}
+        if displayname is not None:
+            ret["displayname"] = displayname
+        if avatar_url is not None:
+            ret["avatar_url"] = avatar_url
+
+        defer.returnValue((200, ret))
 
 
 def register_servlets(hs, http_server):
