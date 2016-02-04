@@ -186,7 +186,7 @@ class RegistrationHandler(BaseHandler):
             token=token,
             password_hash=""
         )
-        registered_user(self.distributor, user)
+        yield registered_user(self.distributor, user)
         defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks

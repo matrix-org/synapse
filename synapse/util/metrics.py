@@ -68,14 +68,16 @@ class Measure(object):
         block_timer.inc_by(duration, self.name)
 
         context = LoggingContext.current_context()
-        if not context:
-            return
 
         if context != self.start_context:
             logger.warn(
-                "Context have unexpectedly changed %r, %r",
-                context, self.start_context
+                "Context have unexpectedly changed from '%s' to '%s'. (%r)",
+                context, self.start_context, self.name
             )
+            return
+
+        if not context:
+            logger.warn("Expected context. (%r)", self.name)
             return
 
         ru_utime, ru_stime = context.get_resource_usage()

@@ -39,6 +39,7 @@ from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.api.constants import EventTypes
 from synapse.types import RoomStreamToken
+from synapse.util.logcontext import preserve_fn
 
 import logging
 
@@ -170,12 +171,12 @@ class StreamStore(SQLBaseStore):
         room_ids = list(room_ids)
         for rm_ids in (room_ids[i:i + 20] for i in xrange(0, len(room_ids), 20)):
             res = yield defer.gatherResults([
-                self.get_room_events_stream_for_room(
-                    room_id, from_key, to_key, limit
-                ).addCallback(lambda r, rm: (rm, r), room_id)
+                preserve_fn(self.get_room_events_stream_for_room)(
+                    room_id, from_key, to_key, limit,
+                )
                 for room_id in room_ids
             ])
-            results.update(dict(res))
+            results.update(dict(zip(rm_ids, res)))
 
         defer.returnValue(results)
 
