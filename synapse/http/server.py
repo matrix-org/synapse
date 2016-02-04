@@ -208,6 +208,9 @@ class JsonResource(HttpServer, resource.Resource):
         if request.method == "OPTIONS":
             self._send_response(request, 200, {})
             return
+
+        start_context = LoggingContext.current_context()
+
         # Loop through all the registered callbacks to check if the method
         # and path regex match
         for path_entry in self.path_regexs.get(request.method, []):
@@ -242,6 +245,13 @@ class JsonResource(HttpServer, resource.Resource):
                 tag = ""
                 if context:
                     tag = context.tag
+
+                    if context != start_context:
+                        logger.warn(
+                            "Context have unexpectedly changed %r, %r",
+                            context, self.start_context
+                        )
+                        return
 
                 incoming_requests_counter.inc(request.method, servlet_classname, tag)
 
