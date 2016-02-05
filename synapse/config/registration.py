@@ -33,12 +33,24 @@ class RegistrationConfig(Config):
 
         self.registration_shared_secret = config.get("registration_shared_secret")
         self.macaroon_secret_key = config.get("macaroon_secret_key")
+        if self.macaroon_secret_key is None:
+            raise Exception(
+                "Config is missing missing macaroon_secret_key - please set it"
+                " in your config file."
+            )
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
         self.trusted_third_party_id_servers = config["trusted_third_party_id_servers"]
         self.allow_guest_access = config.get("allow_guest_access", False)
 
-    def default_config(self, **kwargs):
+    def default_config(self, is_generating_file=False, **kwargs):
         registration_shared_secret = random_string_with_symbols(50)
+
+        macaroon_line = ""
+        if is_generating_file:
+            macaroon_line += '\n        macaroon_secret_key: "%s"\n' % (
+                random_string_with_symbols(50),
+            )
+
         macaroon_secret_key = random_string_with_symbols(50)
         return """\
         ## Registration ##
@@ -49,9 +61,7 @@ class RegistrationConfig(Config):
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.
         registration_shared_secret: "%(registration_shared_secret)s"
-
-        macaroon_secret_key: "%(macaroon_secret_key)s"
-
+%(macaroon_line)s
         # Set the number of bcrypt rounds used to generate password hash.
         # Larger numbers increase the work factor needed to generate the hash.
         # The default number of rounds is 12.
