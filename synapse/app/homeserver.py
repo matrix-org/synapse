@@ -24,6 +24,7 @@ import resource
 import subprocess
 import sys
 import time
+from synapse.config._base import ConfigError
 
 from synapse.python_dependencies import (
     check_requirements, DEPENDENCY_LINKS
@@ -350,11 +351,20 @@ def setup(config_options):
     Returns:
         HomeServer
     """
-    config = HomeServerConfig.load_config(
-        "Synapse Homeserver",
-        config_options,
-        generate_section="Homeserver"
-    )
+    try:
+        config = HomeServerConfig.load_config(
+            "Synapse Homeserver",
+            config_options,
+            generate_section="Homeserver"
+        )
+    except ConfigError as e:
+        sys.stderr.write("\n" + e.message + "\n")
+        sys.exit(1)
+
+    if not config:
+        # If a config isn't returned, and an exception isn't raised, we're just
+        # generating config files and shouldn't try to continue.
+        sys.exit(0)
 
     config.setup_logging()
 
