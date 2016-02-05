@@ -50,12 +50,11 @@ from twisted.web.resource import Resource, EncodingResourceWrapper
 from twisted.web.static import File
 from twisted.web.server import Site, GzipEncoderFactory, Request
 from synapse.http.server import RootRedirect
-from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.media.v1.media_repository import MediaRepositoryResource
 from synapse.rest.key.v1.server_key_resource import LocalKey
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.api.urls import (
-    FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
+    FEDERATION_PREFIX, WEB_CLIENT_PREFIX,
     SERVER_KEY_PREFIX, MEDIA_PREFIX, STATIC_PREFIX,
     SERVER_KEY_V2_PREFIX,
 )
@@ -150,9 +149,6 @@ class SynapseHomeServer(HomeServer):
                 if name in ["media", "federation", "client"]:
                     resources.update({
                         MEDIA_PREFIX: MediaRepositoryResource(self),
-                        CONTENT_REPO_PREFIX: ContentRepoResource(
-                            self, self.config.uploads_path, self.auth, self.content_addr
-                        ),
                     })
 
                 if name in ["keys", "federation"]:
