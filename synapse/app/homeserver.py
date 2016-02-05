@@ -56,7 +56,7 @@ from synapse.rest.key.v1.server_key_resource import LocalKey
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.api.urls import (
     FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
-    SERVER_KEY_PREFIX, MEDIA_PREFIX, STATIC_PREFIX,
+    SERVER_KEY_PREFIX, LEGACY_MEDIA_PREFIX, MEDIA_PREFIX, STATIC_PREFIX,
     SERVER_KEY_V2_PREFIX,
 )
 from synapse.config.homeserver import HomeServerConfig
@@ -148,8 +148,10 @@ class SynapseHomeServer(HomeServer):
                     })
 
                 if name in ["media", "federation", "client"]:
+                    media_repo = MediaRepositoryResource(self)
                     resources.update({
-                        MEDIA_PREFIX: MediaRepositoryResource(self),
+                        MEDIA_PREFIX: media_repo,
+                        LEGACY_MEDIA_PREFIX: media_repo,
                         CONTENT_REPO_PREFIX: ContentRepoResource(
                             self, self.config.uploads_path, self.auth, self.content_addr
                         ),
