@@ -57,7 +57,7 @@ class AccountDataServlet(RestServlet):
             user_id, account_data_type, body
         )
 
-        yield self.notifier.on_new_event(
+        self.notifier.on_new_event(
             "account_data_key", max_id, users=[user_id]
         )
 
@@ -99,7 +99,7 @@ class RoomAccountDataServlet(RestServlet):
             user_id, room_id, account_data_type, body
         )
 
-        yield self.notifier.on_new_event(
+        self.notifier.on_new_event(
             "account_data_key", max_id, users=[user_id]
         )
 

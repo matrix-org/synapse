@@ -80,7 +80,7 @@ class TagServlet(RestServlet):
 
         max_id = yield self.store.add_tag_to_room(user_id, room_id, tag, body)
 
-        yield self.notifier.on_new_event(
+        self.notifier.on_new_event(
             "account_data_key", max_id, users=[user_id]
         )
 
@@ -94,7 +94,7 @@ class TagServlet(RestServlet):
 
         max_id = yield self.store.remove_tag_from_room(user_id, room_id, tag)
 
-        yield self.notifier.on_new_event(
+        self.notifier.on_new_event(
             "account_data_key", max_id, users=[user_id]
         )
 

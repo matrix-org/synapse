@@ -709,6 +709,8 @@ def run(hs):
         phone_home_task.start(60 * 60 * 24, now=False)
 
     def in_thread():
+        # Uncomment to enable tracing of log context changes.
+        # sys.settrace(logcontext_tracer)
         with LoggingContext("run"):
             change_resource_limit(hs.config.soft_file_limit)
             reactor.run()

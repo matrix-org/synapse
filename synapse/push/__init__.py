@@ -111,7 +111,7 @@ class Pusher(object):
                     self.user_id, config, timeout=0, affect_presence=False
                 )
                 self.last_token = chunk['end']
-                self.store.update_pusher_last_token(
+                yield self.store.update_pusher_last_token(
                     self.app_id, self.pushkey, self.user_id, self.last_token
                 )
                 logger.info("New pusher %s for user %s starting from token %s",

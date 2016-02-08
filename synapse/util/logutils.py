@@ -168,3 +168,38 @@ def trace_function(f):
 
     wrapped.__name__ = func_name
     return wrapped
+
+
+def get_previous_frames():
+    s = inspect.currentframe().f_back.f_back
+    to_return = []
+    while s:
+        if s.f_globals["__name__"].startswith("synapse"):
+            filename, lineno, function, _, _ = inspect.getframeinfo(s)
+            args_string = inspect.formatargvalues(*inspect.getargvalues(s))
+
+            to_return.append("{{  %s:%d %s - Args: %s }}" % (
+                filename, lineno, function, args_string
+            ))
+
+        s = s.f_back
+
+    return ", ". join(to_return)
+
+
+def get_previous_frame(ignore=[]):
+    s = inspect.currentframe().f_back.f_back
+
+    while s:
+        if s.f_globals["__name__"].startswith("synapse"):
+            if not any(s.f_globals["__name__"].startswith(ig) for ig in ignore):
+                filename, lineno, function, _, _ = inspect.getframeinfo(s)
+                args_string = inspect.formatargvalues(*inspect.getargvalues(s))
+
+                return "{{  %s:%d %s - Args: %s }}" % (
+                    filename, lineno, function, args_string
+                )
+
+        s = s.f_back
+
+    return None

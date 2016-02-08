@@ -99,9 +99,8 @@ def request_handler(request_handler):
             request_context.request = request_id
             with request.processing():
                 try:
-                    d = request_handler(self, request)
-                    with PreserveLoggingContext():
-                        yield d
+                    with PreserveLoggingContext(request_context):
+                        yield request_handler(self, request)
                 except CodeMessageException as e:
                     code = e.code
                     if isinstance(e, SynapseError):

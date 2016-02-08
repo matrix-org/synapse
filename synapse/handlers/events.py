@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.util.logutils import log_function
 from synapse.types import UserID
 from synapse.events.utils import serialize_event
+from synapse.util.logcontext import preserve_context_over_fn
 
 from ._base import BaseHandler
 
@@ -29,11 +30,17 @@ logger = logging.getLogger(__name__)
 
 
 def started_user_eventstream(distributor, user):
-    return distributor.fire("started_user_eventstream", user)
+    return preserve_context_over_fn(
+        distributor.fire,
+        "started_user_eventstream", user
+    )
 
 
 def stopped_user_eventstream(distributor, user):
-    return distributor.fire("stopped_user_eventstream", user)
+    return preserve_context_over_fn(
+        distributor.fire,
+        "stopped_user_eventstream", user
+    )
 
 
 class EventStreamHandler(BaseHandler):
