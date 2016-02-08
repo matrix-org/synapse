@@ -23,7 +23,7 @@ import simplejson as json
 
 
 class ProfileDisplaynameRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)/displayname")
+    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)/displayname$")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -60,7 +60,7 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
 
 
 class ProfileAvatarURLRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)/avatar_url")
+    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)/avatar_url$")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -97,7 +97,7 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
 
 
 class ProfileRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)")
+    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)$")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
