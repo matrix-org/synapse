@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class PresenceStatusRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/presence/(?P<user_id>[^/]*)/status")
+    PATTERNS = client_path_patterns("/presence/(?P<user_id>[^/]*)/status$")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -73,7 +73,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
 
 
 class PresenceListRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/presence/list/(?P<user_id>[^/]*)")
+    PATTERNS = client_path_patterns("/presence/list/(?P<user_id>[^/]*)$")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
