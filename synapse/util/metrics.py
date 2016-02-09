@@ -48,33 +48,34 @@ block_db_txn_duration = metrics.register_distribution(
 
 
 class Measure(object):
-    __slots__ = ["clock", "name", "start_context", "start", "new_context"]
+    __slots__ = [
+        "clock", "name", "start_context", "start", "new_context", "ru_utime",
+        "ru_stime", "db_txn_count", "db_txn_duration"
+    ]
 
     def __init__(self, clock, name):
         self.clock = clock
         self.name = name
         self.start_context = None
         self.start = None
-        self.new_context = LoggingContext(self.name)
 
     def __enter__(self):
         self.start = self.clock.time_msec()
         self.start_context = LoggingContext.current_context()
-        self.new_context.__enter__()
+        self.ru_utime, self.ru_stime = self.start_context.get_resource_usage()
+        self.db_txn_count = self.start_context.db_txn_count
+        self.db_txn_duration = self.start_context.db_txn_duration
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        current_context = LoggingContext.current_context()
-
-        self.new_context.__exit__(exc_type, exc_val, exc_tb)
         if exc_type is not None:
             return
 
         duration = self.clock.time_msec() - self.start
         block_timer.inc_by(duration, self.name)
 
-        context = self.new_context
+        context = LoggingContext.current_context()
 
-        if context != current_context:
+        if context != self.start_context:
             logger.warn(
                 "Context have unexpectedly changed from '%s' to '%s'. (%r)",
                 context, self.start_context, self.name
@@ -87,7 +88,9 @@ class Measure(object):
 
         ru_utime, ru_stime = context.get_resource_usage()
 
-        block_ru_utime.inc_by(ru_utime, self.name)
-        block_ru_stime.inc_by(ru_stime, self.name)
-        block_db_txn_count.inc_by(context.db_txn_count, self.name)
-        block_db_txn_duration.inc_by(context.db_txn_duration, self.name)
+        block_ru_utime.inc_by(ru_utime - self.ru_utime, self.name)
+        block_ru_stime.inc_by(ru_stime - self.ru_stime, self.name)
+        block_db_txn_count.inc_by(context.db_txn_count - self.db_txn_count, self.name)
+        block_db_txn_duration.inc_by(
+            context.db_txn_duration - self.db_txn_duration, self.name
+        )
