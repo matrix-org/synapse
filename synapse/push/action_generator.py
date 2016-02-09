@@ -36,7 +36,7 @@ class ActionGenerator:
         # tag (ie. we just need all the users).
 
     @defer.inlineCallbacks
-    def handle_push_actions_for_event(self, event, handler):
+    def handle_push_actions_for_event(self, event, handler, current_state):
         if event.type == EventTypes.Redaction and event.redacts is not None:
             yield self.store.remove_push_actions_for_event_id(
                 event.room_id, event.redacts
@@ -46,7 +46,9 @@ class ActionGenerator:
             event.room_id, self.hs, self.store
         )
 
-        actions_by_user = yield bulk_evaluator.action_for_event_by_user(event, handler)
+        actions_by_user = yield bulk_evaluator.action_for_event_by_user(
+            event, handler, current_state
+        )
 
         yield self.store.set_push_actions_for_event_and_users(
             event,
