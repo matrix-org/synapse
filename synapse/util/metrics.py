@@ -48,26 +48,29 @@ block_db_txn_duration = metrics.register_distribution(
 
 
 class Measure(object):
-    __slots__ = ["clock", "name", "start_context", "start"]
+    __slots__ = ["clock", "name", "start_context", "start", "new_context"]
 
     def __init__(self, clock, name):
         self.clock = clock
         self.name = name
         self.start_context = None
         self.start = None
+        self.new_context = LoggingContext(self.name)
 
     def __enter__(self):
         self.start = self.clock.time_msec()
         self.start_context = LoggingContext.current_context()
+        self.new_context.__enter__()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.new_context.__exit__(exc_type, exc_val, exc_tb)
         if exc_type is not None:
             return
 
         duration = self.clock.time_msec() - self.start
         block_timer.inc_by(duration, self.name)
 
-        context = LoggingContext.current_context()
+        context = self.new_context
 
         if context != self.start_context:
             logger.warn(
