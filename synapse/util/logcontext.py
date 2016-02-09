@@ -231,7 +231,7 @@ class PreserveLoggingContext(object):
         if self.current_context:
             self.has_parent = self.current_context.parent_context is not None
             if not self.current_context.alive:
-                logger.warn(
+                logger.debug(
                     "Entering dead context: %s",
                     self.current_context,
                 )
@@ -241,14 +241,14 @@ class PreserveLoggingContext(object):
         context = LoggingContext.set_current_context(self.current_context)
 
         if context != self.new_context:
-            logger.warn(
+            logger.debug(
                 "Unexpected logging context: %s is not %s",
                 context, self.new_context,
             )
 
         if self.current_context is not LoggingContext.sentinel:
             if not self.current_context.alive:
-                logger.warn(
+                logger.debug(
                     "Restoring dead context: %s",
                     self.current_context,
                 )
