@@ -24,8 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class EventPushActionsStore(SQLBaseStore):
-    @defer.inlineCallbacks
-    def set_push_actions_for_event_and_users(self, event, tuples):
+    def _set_push_actions_for_event_and_users(self, txn, event, tuples):
         """
         :param event: the event set actions for
         :param tuples: list of tuples of (user_id, profile_tag, actions)
@@ -44,18 +43,12 @@ class EventPushActionsStore(SQLBaseStore):
                 'highlight': 1 if _action_has_highlight(actions) else 0,
             })
 
-        def f(txn):
-            for uid, _, __ in tuples:
-                txn.call_after(
-                    self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
-                    (event.room_id, uid)
-                )
-            return self._simple_insert_many_txn(txn, "event_push_actions", values)
-
-        yield self.runInteraction(
-            "set_actions_for_event_and_users",
-            f,
-        )
+        for uid, _, __ in tuples:
+            txn.call_after(
+                self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
+                (event.room_id, uid)
+            )
+        self._simple_insert_many_txn(txn, "event_push_actions", values)
 
     @cachedInlineCallbacks(num_args=3, lru=True, tree=True)
     def get_unread_event_push_actions_by_room_for_user(
@@ -107,21 +100,15 @@ class EventPushActionsStore(SQLBaseStore):
         )
         defer.returnValue(ret)
 
-    @defer.inlineCallbacks
-    def remove_push_actions_for_event_id(self, room_id, event_id):
-        def f(txn):
-            # Sad that we have to blow away the cache for the whole room here
-            txn.call_after(
-                self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
-                (room_id,)
-            )
-            txn.execute(
-                "DELETE FROM event_push_actions WHERE room_id = ? AND event_id = ?",
-                (room_id, event_id)
-            )
-        yield self.runInteraction(
-            "remove_push_actions_for_event_id",
-            f
+    def _remove_push_actions_for_event_id(self, txn, room_id, event_id):
+        # Sad that we have to blow away the cache for the whole room here
+        txn.call_after(
+            self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
+            (room_id,)
+        )
+        txn.execute(
+            "DELETE FROM event_push_actions WHERE room_id = ? AND event_id = ?",
+            (room_id, event_id)
         )
 
 
