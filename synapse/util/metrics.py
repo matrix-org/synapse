@@ -63,6 +63,8 @@ class Measure(object):
         self.new_context.__enter__()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        current_context = LoggingContext.current_context()
+
         self.new_context.__exit__(exc_type, exc_val, exc_tb)
         if exc_type is not None:
             return
@@ -72,7 +74,7 @@ class Measure(object):
 
         context = self.new_context
 
-        if context != self.start_context:
+        if context != current_context:
             logger.warn(
                 "Context have unexpectedly changed from '%s' to '%s'. (%r)",
                 context, self.start_context, self.name
