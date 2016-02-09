@@ -240,6 +240,11 @@ class ReceiptsStore(SQLBaseStore):
             room_id, stream_id
         )
 
+        txn.call_after(
+            self.get_last_receipt_event_id_for_user.invalidate,
+            (user_id, room_id, receipt_type)
+        )
+
         # We don't want to clobber receipts for more recent events, so we
         # have to compare orderings of existing receipts
         sql = (
