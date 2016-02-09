@@ -54,7 +54,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
                 "was: %r" % (config.macaroon_secret_key,)
             )
 
-    def test_load_suceeds_if_macaroon_secret_key_missing(self):
+    def test_load_succeeds_if_macaroon_secret_key_missing(self):
         self.generate_config_and_remove_lines_containing("macaroon")
         config1 = HomeServerConfig.load_config("", ["-c", self.file])
         config2 = HomeServerConfig.load_config("", ["-c", self.file])
