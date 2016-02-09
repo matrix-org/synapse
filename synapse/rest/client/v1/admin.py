@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class WhoisRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/admin/whois/(?P<user_id>[^/]*)$")
+    PATTERNS = client_path_patterns("/admin/whois/(?P<user_id>[^/]*)")
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
