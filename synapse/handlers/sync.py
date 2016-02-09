@@ -319,7 +319,6 @@ class SyncHandler(BaseHandler):
             ephemeral_by_room=ephemeral_by_room,
             tags_by_room=tags_by_room,
             account_data_by_room=account_data_by_room,
-            all_ephemeral_by_room=ephemeral_by_room,
             batch=batch,
             full_state=True,
         )
@@ -453,13 +452,6 @@ class SyncHandler(BaseHandler):
         )
         now_token = now_token.copy_and_replace("presence_key", presence_key)
 
-        # We now fetch all ephemeral events for this room in order to get
-        # this users current read receipt. This could almost certainly be
-        # optimised.
-        _, all_ephemeral_by_room = yield self.ephemeral_by_room(
-            sync_config, now_token
-        )
-
         now_token, ephemeral_by_room = yield self.ephemeral_by_room(
             sync_config, now_token, since_token
         )
@@ -591,7 +583,6 @@ class SyncHandler(BaseHandler):
                 ephemeral_by_room=ephemeral_by_room,
                 tags_by_room=tags_by_room,
                 account_data_by_room=account_data_by_room,
-                all_ephemeral_by_room=all_ephemeral_by_room,
                 batch=batch,
                 full_state=full_state,
             )
@@ -691,7 +682,6 @@ class SyncHandler(BaseHandler):
                                            since_token, now_token,
                                            ephemeral_by_room, tags_by_room,
                                            account_data_by_room,
-                                           all_ephemeral_by_room,
                                            batch, full_state=False):
         state = yield self.compute_state_delta(
             room_id, batch, sync_config, since_token, now_token,
@@ -722,7 +712,7 @@ class SyncHandler(BaseHandler):
 
         if room_sync:
             notifs = yield self.unread_notifs_for_room_id(
-                room_id, sync_config, all_ephemeral_by_room
+                room_id, sync_config
             )
 
             if notifs is not None:
@@ -906,10 +896,12 @@ class SyncHandler(BaseHandler):
         return False
 
     @defer.inlineCallbacks
-    def unread_notifs_for_room_id(self, room_id, sync_config, ephemeral_by_room):
+    def unread_notifs_for_room_id(self, room_id, sync_config):
         with Measure(self.clock, "unread_notifs_for_room_id"):
-            last_unread_event_id = self.last_read_event_id_for_room_and_user(
-                room_id, sync_config.user.to_string(), ephemeral_by_room
+            last_unread_event_id = yield self.store.get_last_receipt_event_id_for_user(
+                user_id=sync_config.user.to_string(),
+                room_id=room_id,
+                receipt_type="m.read"
             )
 
             notifs = []
