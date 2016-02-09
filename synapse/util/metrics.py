@@ -62,12 +62,13 @@ class Measure(object):
     def __enter__(self):
         self.start = self.clock.time_msec()
         self.start_context = LoggingContext.current_context()
-        self.ru_utime, self.ru_stime = self.start_context.get_resource_usage()
-        self.db_txn_count = self.start_context.db_txn_count
-        self.db_txn_duration = self.start_context.db_txn_duration
+        if self.start_context:
+            self.ru_utime, self.ru_stime = self.start_context.get_resource_usage()
+            self.db_txn_count = self.start_context.db_txn_count
+            self.db_txn_duration = self.start_context.db_txn_duration
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is not None:
+        if exc_type is not None or not self.start_context:
             return
 
         duration = self.clock.time_msec() - self.start

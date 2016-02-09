@@ -629,7 +629,10 @@ class SyncHandler(BaseHandler):
             room_key = now_token.room_key
             end_key = room_key
 
-            limited = recents is None or newly_joined_room or timeline_limit < len(recents)
+            if recents is None or newly_joined_room or timeline_limit < len(recents):
+                limited = True
+            else:
+                limited = False
 
             if recents is not None:
                 recents = sync_config.filter_collection.filter_room_timeline(recents)
