@@ -116,8 +116,6 @@ class LoggingContext(object):
 
     def __enter__(self):
         """Enters this logging context into thread local storage"""
-        if self.parent_context is not None:
-            raise Exception("Attempt to enter logging context multiple times")
         self.parent_context = self.set_current_context(self)
         self.alive = True
         return self
@@ -141,14 +139,8 @@ class LoggingContext(object):
         self.parent_context = None
         self.alive = False
 
-    def __getattr__(self, name):
-        """Delegate member lookup to parent context"""
-        return getattr(self.parent_context, name)
-
     def copy_to(self, record):
         """Copy fields from this context and its parents to the record"""
-        if self.parent_context is not None:
-            self.parent_context.copy_to(record)
         for key, value in self.__dict__.items():
             setattr(record, key, value)
 
