@@ -211,7 +211,7 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
     logger.debug("applied_delta_files: %s", applied_delta_files)
 
     for v in range(start_ver, SCHEMA_VERSION + 1):
-        logger.debug("Upgrading schema to v%d", v)
+        logger.info("Upgrading schema to v%d", v)
 
         delta_dir = os.path.join(dir_path, "schema", "delta", str(v))
 
