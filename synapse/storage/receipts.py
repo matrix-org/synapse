@@ -46,6 +46,20 @@ class ReceiptsStore(SQLBaseStore):
             desc="get_receipts_for_room",
         )
 
+    @cached(num_args=3)
+    def get_last_receipt_event_id_for_user(self, user_id, room_id, receipt_type):
+        return self._simple_select_one_onecol(
+            table="receipts_linearized",
+            keyvalues={
+                "room_id": room_id,
+                "receipt_type": receipt_type,
+                "user_id": user_id
+            },
+            retcol="event_id",
+            desc="get_own_receipt_for_user",
+            allow_none=True,
+        )
+
     @cachedInlineCallbacks(num_args=2)
     def get_receipts_for_user(self, user_id, receipt_type):
         def f(txn):
