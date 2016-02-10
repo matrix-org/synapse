@@ -19,8 +19,6 @@ import bulk_push_rule_evaluator
 
 import logging
 
-from synapse.api.constants import EventTypes
-
 logger = logging.getLogger(__name__)
 
 
@@ -36,21 +34,15 @@ class ActionGenerator:
         # tag (ie. we just need all the users).
 
     @defer.inlineCallbacks
-    def handle_push_actions_for_event(self, event, handler):
-        if event.type == EventTypes.Redaction and event.redacts is not None:
-            yield self.store.remove_push_actions_for_event_id(
-                event.room_id, event.redacts
-            )
-
+    def handle_push_actions_for_event(self, event, context, handler):
         bulk_evaluator = yield bulk_push_rule_evaluator.evaluator_for_room_id(
             event.room_id, self.hs, self.store
         )
 
-        actions_by_user = yield bulk_evaluator.action_for_event_by_user(event, handler)
-
-        yield self.store.set_push_actions_for_event_and_users(
-            event,
-            [
-                (uid, None, actions) for uid, actions in actions_by_user.items()
-            ]
+        actions_by_user = yield bulk_evaluator.action_for_event_by_user(
+            event, handler, context.current_state
         )
+
+        context.push_actions = [
+            (uid, None, actions) for uid, actions in actions_by_user.items()
+        ]

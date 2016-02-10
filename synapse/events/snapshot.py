@@ -20,3 +20,4 @@ class EventContext(object):
         self.current_state = current_state
         self.state_group = None
         self.rejected = False
+        self.push_actions = []

@@ -98,25 +98,21 @@ class BulkPushRuleEvaluator:
         self.store = store
 
     @defer.inlineCallbacks
-    def action_for_event_by_user(self, event, handler):
+    def action_for_event_by_user(self, event, handler, current_state):
         actions_by_user = {}
 
         users_dict = yield self.store.are_guests(self.rules_by_user.keys())
 
         filtered_by_user = yield handler._filter_events_for_clients(
-            users_dict.items(), [event]
+            users_dict.items(), [event], {event.event_id: current_state}
         )
 
         evaluator = PushRuleEvaluatorForEvent(event, len(self.users_in_room))
 
         condition_cache = {}
 
-        member_state = yield self.store.get_state_for_event(
-            event.event_id,
-        )
-
         display_names = {}
-        for ev in member_state.values():
+        for ev in current_state.values():
             nm = ev.content.get("displayname", None)
             if nm and ev.type == EventTypes.Member:
                 display_names[ev.state_key] = nm
