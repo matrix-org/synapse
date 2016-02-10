@@ -79,7 +79,7 @@ class LoggingContext(object):
     sentinel = Sentinel()
 
     def __init__(self, name=None):
-        self.parent_context = None
+        self.parent_context = LoggingContext.current_context()
         self.name = name
         self.ru_stime = 0.
         self.ru_utime = 0.
@@ -116,7 +116,12 @@ class LoggingContext(object):
 
     def __enter__(self):
         """Enters this logging context into thread local storage"""
-        self.parent_context = self.set_current_context(self)
+        old_context = self.set_current_context(self)
+        if self.parent_context != old_context:
+            logger.warn(
+                "Expected parent context %r, found %r",
+                self.parent_context, old_context
+            )
         self.alive = True
         return self
 
