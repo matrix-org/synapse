@@ -2,7 +2,8 @@ Changes in synapse v0.13.0 (2016-02-10)
 =======================================
 
 This version includes an upgrade of the schema, specifically adding an index to
-the ``events`` table, which may take a minute to complete.
+the ``events`` table. This may cause synapse to pause for several minutes the
+first time it is started after the upgrade.
 
 Changes:
 
@@ -10,7 +11,8 @@ Changes:
 * Change guest user ids to be incrementing integers (PR #550)
 * Improve performance of public room list API (PR #552)
 * Change profile API to omit keys rather than return null (PR #557)
-* Change to forward ``/media/r0`` to ``/media/v1`` (PR #595)
+* Add ``/media/r0`` endpoint prefix, which is equivalent to ``/media/v1/``
+  (PR #595)
 
 Bug fixes:
 
