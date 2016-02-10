@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ from twisted.internet import defer, reactor
 from synapse.events import FrozenEvent, USE_FROZEN_DICTS
 from synapse.events.utils import prune_event
 
-from synapse.util.logcontext import preserve_context_over_deferred
+from synapse.util.logcontext import preserve_fn, PreserveLoggingContext
 from synapse.util.logutils import log_function
 from synapse.api.constants import EventTypes
 
@@ -66,11 +66,9 @@ class EventsStore(SQLBaseStore):
             return
 
         if backfilled:
-            if not self.min_token_deferred.called:
-                yield self.min_token_deferred
-            start = self.min_token - 1
-            self.min_token -= len(events_and_contexts) + 1
-            stream_orderings = range(start, self.min_token, -1)
+            start = self.min_stream_token - 1
+            self.min_stream_token -= len(events_and_contexts) + 1
+            stream_orderings = range(start, self.min_stream_token, -1)
 
             @contextmanager
             def stream_ordering_manager():
@@ -86,7 +84,7 @@ class EventsStore(SQLBaseStore):
                 event.internal_metadata.stream_ordering = stream
 
             chunks = [
-                events_and_contexts[x:x+100]
+                events_and_contexts[x:x + 100]
                 for x in xrange(0, len(events_and_contexts), 100)
             ]
 
@@ -107,10 +105,8 @@ class EventsStore(SQLBaseStore):
                       is_new_state=True, current_state=None):
         stream_ordering = None
         if backfilled:
-            if not self.min_token_deferred.called:
-                yield self.min_token_deferred
-            self.min_token -= 1
-            stream_ordering = self.min_token
+            self.min_stream_token -= 1
+            stream_ordering = self.min_stream_token
 
         if stream_ordering is None:
             stream_ordering_manager = yield self._stream_id_gen.get_next(self)
@@ -209,17 +205,29 @@ class EventsStore(SQLBaseStore):
     @log_function
     def _persist_events_txn(self, txn, events_and_contexts, backfilled,
                             is_new_state=True):
-
-        # Remove the any existing cache entries for the event_ids
-        for event, _ in events_and_contexts:
-            txn.call_after(self._invalidate_get_event_cache, event.event_id)
-
         depth_updates = {}
-        for event, _ in events_and_contexts:
-            if event.internal_metadata.is_outlier():
-                continue
-            depth_updates[event.room_id] = max(
-                event.depth, depth_updates.get(event.room_id, event.depth)
+        for event, context in events_and_contexts:
+            # Remove the any existing cache entries for the event_ids
+            txn.call_after(self._invalidate_get_event_cache, event.event_id)
+            if not backfilled:
+                txn.call_after(
+                    self._events_stream_cache.entity_has_changed,
+                    event.room_id, event.internal_metadata.stream_ordering,
+                )
+
+            if not event.internal_metadata.is_outlier():
+                depth_updates[event.room_id] = max(
+                    event.depth, depth_updates.get(event.room_id, event.depth)
+                )
+
+            if context.push_actions:
+                self._set_push_actions_for_event_and_users_txn(
+                    txn, event, context.push_actions
+                )
+
+        if event.type == EventTypes.Redaction and event.redacts is not None:
+            self._remove_push_actions_for_event_id_txn(
+                txn, event.room_id, event.redacts
             )
 
         for room_id, depth in depth_updates.items():
@@ -662,14 +670,16 @@ class EventsStore(SQLBaseStore):
                     for ids, d in lst:
                         if not d.called:
                             try:
-                                d.callback([
-                                    res[i]
-                                    for i in ids
-                                    if i in res
-                                ])
+                                with PreserveLoggingContext():
+                                    d.callback([
+                                        res[i]
+                                        for i in ids
+                                        if i in res
+                                    ])
                             except:
                                 logger.exception("Failed to callback")
-                reactor.callFromThread(fire, event_list, row_dict)
+                with PreserveLoggingContext():
+                    reactor.callFromThread(fire, event_list, row_dict)
             except Exception as e:
                 logger.exception("do_fetch")
 
@@ -677,10 +687,12 @@ class EventsStore(SQLBaseStore):
                 def fire(evs):
                     for _, d in evs:
                         if not d.called:
-                            d.errback(e)
+                            with PreserveLoggingContext():
+                                d.errback(e)
 
                 if event_list:
-                    reactor.callFromThread(fire, event_list)
+                    with PreserveLoggingContext():
+                        reactor.callFromThread(fire, event_list)
 
     @defer.inlineCallbacks
     def _enqueue_events(self, events, check_redacted=True,
@@ -707,18 +719,20 @@ class EventsStore(SQLBaseStore):
                 should_start = False
 
         if should_start:
-            self.runWithConnection(
-                self._do_fetch
-            )
+            with PreserveLoggingContext():
+                self.runWithConnection(
+                    self._do_fetch
+                )
 
-        rows = yield preserve_context_over_deferred(events_d)
+        with PreserveLoggingContext():
+            rows = yield events_d
 
         if not allow_rejected:
             rows[:] = [r for r in rows if not r["rejects"]]
 
         res = yield defer.gatherResults(
             [
-                self._get_event_from_row(
+                preserve_fn(self._get_event_from_row)(
                     row["internal_metadata"], row["json"], row["redacts"],
                     check_redacted=check_redacted,
                     get_prev_content=get_prev_content,
@@ -738,7 +752,7 @@ class EventsStore(SQLBaseStore):
         rows = []
         N = 200
         for i in range(1 + len(events) / N):
-            evs = events[i*N:(i + 1)*N]
+            evs = events[i * N:(i + 1) * N]
             if not evs:
                 break
 
@@ -753,7 +767,7 @@ class EventsStore(SQLBaseStore):
                 " LEFT JOIN rejections as rej USING (event_id)"
                 " LEFT JOIN redactions as r ON e.event_id = r.redacts"
                 " WHERE e.event_id IN (%s)"
-            ) % (",".join(["?"]*len(evs)),)
+            ) % (",".join(["?"] * len(evs)),)
 
             txn.execute(sql, evs)
             rows.extend(self.cursor_to_dict(txn))
@@ -936,6 +950,7 @@ class EventsStore(SQLBaseStore):
             )
             now_reporting = self.cursor_to_dict(txn)
             if not now_reporting:
+                logger.info("Calculating daily messages skipped; no now_reporting")
                 return None
             now_reporting = now_reporting[0]["stream_ordering"]
 
@@ -948,11 +963,18 @@ class EventsStore(SQLBaseStore):
             )
 
             if not last_reported:
+                logger.info("Calculating daily messages skipped; no last_reported")
                 return None
 
             # Close enough to correct for our purposes.
             yesterday = (now - 24 * 60 * 60)
-            if math.fabs(yesterday - last_reported[0]["reported_time"]) > 60 * 60:
+            since_yesterday_seconds = yesterday - last_reported[0]["reported_time"]
+            any_since_yesterday = math.fabs(since_yesterday_seconds) > 60 * 60
+            if any_since_yesterday:
+                logger.info(
+                    "Calculating daily messages skipped; since_yesterday_seconds: %d" %
+                    (since_yesterday_seconds,)
+                )
                 return None
 
             txn.execute(
@@ -968,6 +990,7 @@ class EventsStore(SQLBaseStore):
             )
             rows = self.cursor_to_dict(txn)
             if not rows:
+                logger.info("Calculating daily messages skipped; messages count missing")
                 return None
             return rows[0]["messages"]
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,8 @@ class PusherRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        user, token_id, _ = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request)
+        user = requester.user
 
         content = _parse_json(request)
 
@@ -40,7 +41,7 @@ class PusherRestServlet(ClientV1RestServlet):
                 and 'kind' in content and
                 content['kind'] is None):
             yield pusher_pool.remove_pusher(
-                content['app_id'], content['pushkey'], user_name=user.to_string()
+                content['app_id'], content['pushkey'], user_id=user.to_string()
             )
             defer.returnValue((200, {}))
 
@@ -51,7 +52,7 @@ class PusherRestServlet(ClientV1RestServlet):
             if i not in content:
                 missing.append(i)
         if len(missing):
-            raise SynapseError(400, "Missing parameters: "+','.join(missing),
+            raise SynapseError(400, "Missing parameters: " + ','.join(missing),
                                errcode=Codes.MISSING_PARAM)
 
         logger.debug("set pushkey %s to kind %s", content['pushkey'], content['kind'])
@@ -70,8 +71,8 @@ class PusherRestServlet(ClientV1RestServlet):
 
         try:
             yield pusher_pool.add_pusher(
-                user_name=user.to_string(),
-                access_token=token_id,
+                user_id=user.to_string(),
+                access_token=requester.access_token_id,
                 profile_tag=content['profile_tag'],
                 kind=content['kind'],
                 app_id=content['app_id'],
@@ -82,7 +83,7 @@ class PusherRestServlet(ClientV1RestServlet):
                 data=content['data']
             )
         except PusherConfigException as pce:
-            raise SynapseError(400, "Config Error: "+pce.message,
+            raise SynapseError(400, "Config Error: " + pce.message,
                                errcode=Codes.MISSING_PARAM)
 
         defer.returnValue((200, {}))

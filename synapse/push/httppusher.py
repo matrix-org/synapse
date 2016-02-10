@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,13 +23,13 @@ logger = logging.getLogger(__name__)
 
 
 class HttpPusher(Pusher):
-    def __init__(self, _hs, profile_tag, user_name, app_id,
+    def __init__(self, _hs, profile_tag, user_id, app_id,
                  app_display_name, device_display_name, pushkey, pushkey_ts,
                  data, last_token, last_success, failing_since):
         super(HttpPusher, self).__init__(
             _hs,
             profile_tag,
-            user_name,
+            user_id,
             app_id,
             app_display_name,
             device_display_name,
@@ -51,7 +51,7 @@ class HttpPusher(Pusher):
         del self.data_minus_url['url']
 
     @defer.inlineCallbacks
-    def _build_notification_dict(self, event, tweaks):
+    def _build_notification_dict(self, event, tweaks, badge):
         # we probably do not want to push for every presence update
         # (we may want to be able to set up notifications when specific
         # people sign in, but we'd want to only deliver the pertinent ones)
@@ -71,7 +71,7 @@ class HttpPusher(Pusher):
                 'counts': {  # -- we don't mark messages as read yet so
                              # we have no way of knowing
                     # Just set the badge to 1 until we have read receipts
-                    'unread': 1,
+                    'unread': badge,
                     # 'missed_calls': 2
                 },
                 'devices': [
@@ -87,7 +87,7 @@ class HttpPusher(Pusher):
         }
         if event['type'] == 'm.room.member':
             d['notification']['membership'] = event['content']['membership']
-            d['notification']['user_is_target'] = event['state_key'] == self.user_name
+            d['notification']['user_is_target'] = event['state_key'] == self.user_id
         if 'content' in event:
             d['notification']['content'] = event['content']
 
@@ -101,8 +101,8 @@ class HttpPusher(Pusher):
         defer.returnValue(d)
 
     @defer.inlineCallbacks
-    def dispatch_push(self, event, tweaks):
-        notification_dict = yield self._build_notification_dict(event, tweaks)
+    def dispatch_push(self, event, tweaks, badge):
+        notification_dict = yield self._build_notification_dict(event, tweaks, badge)
         if not notification_dict:
             defer.returnValue([])
         try:
@@ -116,15 +116,15 @@ class HttpPusher(Pusher):
         defer.returnValue(rejected)
 
     @defer.inlineCallbacks
-    def reset_badge_count(self):
+    def send_badge(self, badge):
+        logger.info("Sending updated badge count %d to %r", badge, self.user_id)
         d = {
             'notification': {
                 'id': '',
                 'type': None,
                 'sender': '',
                 'counts': {
-                    'unread': 0,
-                    'missed_calls': 0
+                    'unread': badge
                 },
                 'devices': [
                     {

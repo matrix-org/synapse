@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,13 +16,16 @@
 
 from twisted.internet import defer, reactor
 
-from .logcontext import preserve_context_over_deferred
+from .logcontext import PreserveLoggingContext
 
 
+@defer.inlineCallbacks
 def sleep(seconds):
     d = defer.Deferred()
-    reactor.callLater(seconds, d.callback, seconds)
-    return preserve_context_over_deferred(d)
+    with PreserveLoggingContext():
+        reactor.callLater(seconds, d.callback, seconds)
+        res = yield d
+    defer.returnValue(res)
 
 
 def run_on_reactor():
@@ -54,6 +57,7 @@ class ObservableDeferred(object):
             object.__setattr__(self, "_result", (True, r))
             while self._observers:
                 try:
+                    # TODO: Handle errors here.
                     self._observers.pop().callback(r)
                 except:
                     pass
@@ -63,6 +67,7 @@ class ObservableDeferred(object):
             object.__setattr__(self, "_result", (False, f))
             while self._observers:
                 try:
+                    # TODO: Handle errors here.
                     self._observers.pop().errback(f)
                 except:
                     pass

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ class Codes(object):
     USER_IN_USE = "M_USER_IN_USE"
     ROOM_IN_USE = "M_ROOM_IN_USE"
     BAD_PAGINATION = "M_BAD_PAGINATION"
+    BAD_STATE = "M_BAD_STATE"
     UNKNOWN = "M_UNKNOWN"
     NOT_FOUND = "M_NOT_FOUND"
     MISSING_TOKEN = "M_MISSING_TOKEN"
@@ -42,6 +43,7 @@ class Codes(object):
     EXCLUSIVE = "M_EXCLUSIVE"
     THREEPID_AUTH_FAILED = "M_THREEPID_AUTH_FAILED"
     THREEPID_IN_USE = "THREEPID_IN_USE"
+    INVALID_USERNAME = "M_INVALID_USERNAME"
 
 
 class CodeMessageException(RuntimeError):
@@ -118,22 +120,6 @@ class AuthError(SynapseError):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.FORBIDDEN
         super(AuthError, self).__init__(*args, **kwargs)
-
-
-class GuestAccessError(AuthError):
-    """An error raised when a there is a problem with a guest user accessing
-    a room"""
-
-    def __init__(self, rooms, *args, **kwargs):
-        self.rooms = rooms
-        super(GuestAccessError, self).__init__(*args, **kwargs)
-
-    def error_dict(self):
-        return cs_error(
-            self.msg,
-            self.errcode,
-            rooms=self.rooms,
-        )
 
 
 class EventSizeError(SynapseError):

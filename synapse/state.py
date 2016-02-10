@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ class StateHandler(object):
             cache_name="state_cache",
             clock=self.clock,
             max_len=SIZE_OF_CACHE,
-            expiry_ms=EVICTION_TIMEOUT_SECONDS*1000,
+            expiry_ms=EVICTION_TIMEOUT_SECONDS * 1000,
             reset_expiry_on_get=True,
         )
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,8 +31,9 @@ class WhoisRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         target_user = UserID.from_string(user_id)
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(auth_user)
+        requester = yield self.auth.get_user_by_req(request)
+        auth_user = requester.user
+        is_admin = yield self.auth.is_server_admin(requester.user)
 
         if not is_admin and target_user != auth_user:
             raise AuthError(403, "You are not a server admin")

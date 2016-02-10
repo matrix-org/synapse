@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -122,7 +122,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
         hs.config.enable_registration_captcha = False
-        hs.config.disable_registration = False
+        hs.config.enable_registration = True
 
         hs.get_handlers().federation_handler = Mock()
 

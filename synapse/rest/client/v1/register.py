@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,7 +38,8 @@ logger = logging.getLogger(__name__)
 if hasattr(hmac, "compare_digest"):
     compare_digest = hmac.compare_digest
 else:
-    compare_digest = lambda a, b: a == b
+    def compare_digest(a, b):
+        return a == b
 
 
 class RegisterRestServlet(ClientV1RestServlet):
@@ -58,7 +59,7 @@ class RegisterRestServlet(ClientV1RestServlet):
         # }
         # TODO: persistent storage
         self.sessions = {}
-        self.disable_registration = hs.config.disable_registration
+        self.enable_registration = hs.config.enable_registration
 
     def on_GET(self, request):
         if self.hs.config.enable_registration_captcha:
@@ -112,7 +113,7 @@ class RegisterRestServlet(ClientV1RestServlet):
             is_using_shared_secret = login_type == LoginType.SHARED_SECRET
 
             can_register = (
-                not self.disable_registration
+                self.enable_registration
                 or is_application_server
                 or is_using_shared_secret
             )

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,3 +12,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import sys
+sys.dont_write_bytecode = True
+
+from synapse.python_dependencies import (
+    check_requirements, MissingRequirementError
+)  # NOQA
+
+try:
+    check_requirements()
+except MissingRequirementError as e:
+    message = "\n".join([
+        "Missing Requirement: %s" % (e.message,),
+        "To install run:",
+        "    pip install --upgrade --force \"%s\"" % (e.dependency,),
+        "",
+    ])
+    sys.stderr.writelines(message)
+    sys.exit(1)

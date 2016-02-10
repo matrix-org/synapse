@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,8 +22,9 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes, SynapseError, EventSizeError
-from synapse.types import RoomID, UserID, EventID
+from synapse.types import Requester, RoomID, UserID, EventID
 from synapse.util.logutils import log_function
+from synapse.util.logcontext import preserve_context_over_fn
 from unpaddedbase64 import decode_base64
 
 import logging
@@ -510,35 +511,14 @@ class Auth(object):
         """
         # Can optionally look elsewhere in the request (e.g. headers)
         try:
-            access_token = request.args["access_token"][0]
-
-            # Check for application service tokens with a user_id override
-            try:
-                app_service = yield self.store.get_app_service_by_token(
-                    access_token
-                )
-                if not app_service:
-                    raise KeyError
-
-                user_id = app_service.sender
-                if "user_id" in request.args:
-                    user_id = request.args["user_id"][0]
-                    if not app_service.is_interested_in_user(user_id):
-                        raise AuthError(
-                            403,
-                            "Application service cannot masquerade as this user."
-                        )
-
-                if not user_id:
-                    raise KeyError
-
+            user_id = yield self._get_appservice_user_id(request.args)
+            if user_id:
                 request.authenticated_entity = user_id
+                defer.returnValue(
+                    Requester(UserID.from_string(user_id), "", False)
+                )
 
-                defer.returnValue((UserID.from_string(user_id), "", False))
-                return
-            except KeyError:
-                pass  # normal users won't have the user_id query parameter set.
-
+            access_token = request.args["access_token"][0]
             user_info = yield self._get_user_by_access_token(access_token)
             user = user_info["user"]
             token_id = user_info["token_id"]
@@ -550,7 +530,8 @@ class Auth(object):
                 default=[""]
             )[0]
             if user and access_token and ip_addr:
-                self.store.insert_client_ip(
+                preserve_context_over_fn(
+                    self.store.insert_client_ip,
                     user=user,
                     access_token=access_token,
                     ip=ip_addr,
@@ -564,12 +545,39 @@ class Auth(object):
 
             request.authenticated_entity = user.to_string()
 
-            defer.returnValue((user, token_id, is_guest,))
+            defer.returnValue(Requester(user, token_id, is_guest))
         except KeyError:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",
                 errcode=Codes.MISSING_TOKEN
             )
+
+    @defer.inlineCallbacks
+    def _get_appservice_user_id(self, request_args):
+        app_service = yield self.store.get_app_service_by_token(
+            request_args["access_token"][0]
+        )
+        if app_service is None:
+            defer.returnValue(None)
+
+        if "user_id" not in request_args:
+            defer.returnValue(app_service.sender)
+
+        user_id = request_args["user_id"][0]
+        if app_service.sender == user_id:
+            defer.returnValue(app_service.sender)
+
+        if not app_service.is_interested_in_user(user_id):
+            raise AuthError(
+                403,
+                "Application service cannot masquerade as this user."
+            )
+        if not (yield self.store.get_user_by_id(user_id)):
+            raise AuthError(
+                403,
+                "Application service has not registered this user"
+            )
+        defer.returnValue(user_id)
 
     @defer.inlineCallbacks
     def _get_user_by_access_token(self, token):
@@ -583,7 +591,7 @@ class Auth(object):
             AuthError if no user by that token exists or the token is invalid.
         """
         try:
-            ret = yield self._get_user_from_macaroon(token)
+            ret = yield self.get_user_from_macaroon(token)
         except AuthError:
             # TODO(daniel): Remove this fallback when all existing access tokens
             # have been re-issued as macaroons.
@@ -591,7 +599,7 @@ class Auth(object):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def _get_user_from_macaroon(self, macaroon_str):
+    def get_user_from_macaroon(self, macaroon_str):
         try:
             macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
             self.validate_macaroon(macaroon, "access", False)
@@ -690,6 +698,7 @@ class Auth(object):
     def _look_up_user_by_access_token(self, token):
         ret = yield self.store.get_user_by_access_token(token)
         if not ret:
+            logger.warn("Unrecognised access token - not in store: %s" % (token,))
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Unrecognised access token.",
                 errcode=Codes.UNKNOWN_TOKEN
@@ -707,6 +716,7 @@ class Auth(object):
             token = request.args["access_token"][0]
             service = yield self.store.get_app_service_by_token(token)
             if not service:
+                logger.warn("Unrecognised appservice access token: %s" % (token,))
                 raise AuthError(
                     self.TOKEN_NOT_FOUND_HTTP_STATUS,
                     "Unrecognised access token.",

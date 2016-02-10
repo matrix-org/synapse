@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ class FederationClient(FederationBase):
             cache_name="get_pdu_cache",
             clock=self._clock,
             max_len=1000,
-            expiry_ms=120*1000,
+            expiry_ms=120 * 1000,
             reset_expiry_on_get=False,
         )
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ class RoomStore(SQLBaseStore):
         """
         try:
             yield self._simple_insert(
-                RoomsTable.table_name,
+                "rooms",
                 {
                     "room_id": room_id,
                     "creator": room_creator_user_id,
@@ -70,9 +70,9 @@ class RoomStore(SQLBaseStore):
             A namedtuple containing the room information, or an empty list.
         """
         return self._simple_select_one(
-            table=RoomsTable.table_name,
+            table="rooms",
             keyvalues={"room_id": room_id},
-            retcols=RoomsTable.fields,
+            retcols=("room_id", "is_public", "creator"),
             desc="get_room",
             allow_none=True,
         )
@@ -87,89 +87,19 @@ class RoomStore(SQLBaseStore):
             desc="get_public_room_ids",
         )
 
-    @defer.inlineCallbacks
-    def get_rooms(self, is_public):
-        """Retrieve a list of all public rooms.
-
-        Args:
-            is_public (bool): True if the rooms returned should be public.
-        Returns:
-            A list of room dicts containing at least a "room_id" key, a
-            "topic" key if one is set, and a "name" key if one is set
+    def get_room_count(self):
+        """Retrieve a list of all rooms
         """
 
         def f(txn):
-            def subquery(table_name, column_name=None):
-                column_name = column_name or table_name
-                return (
-                    "SELECT %(table_name)s.event_id as event_id, "
-                    "%(table_name)s.room_id as room_id, %(column_name)s "
-                    "FROM %(table_name)s "
-                    "INNER JOIN current_state_events as c "
-                    "ON c.event_id = %(table_name)s.event_id " % {
-                        "column_name": column_name,
-                        "table_name": table_name,
-                    }
-                )
+            sql = "SELECT count(*)  FROM rooms"
+            txn.execute(sql)
+            row = txn.fetchone()
+            return row[0] or 0
 
-            sql = (
-                "SELECT"
-                "    r.room_id,"
-                "    max(n.name),"
-                "    max(t.topic),"
-                "    max(v.history_visibility),"
-                "    max(g.guest_access)"
-                " FROM rooms AS r"
-                " LEFT JOIN (%(topic)s) AS t ON t.room_id = r.room_id"
-                " LEFT JOIN (%(name)s) AS n ON n.room_id = r.room_id"
-                " LEFT JOIN (%(history_visibility)s) AS v ON v.room_id = r.room_id"
-                " LEFT JOIN (%(guest_access)s) AS g ON g.room_id = r.room_id"
-                " WHERE r.is_public = ?"
-                " GROUP BY r.room_id" % {
-                    "topic": subquery("topics", "topic"),
-                    "name": subquery("room_names", "name"),
-                    "history_visibility": subquery("history_visibility"),
-                    "guest_access": subquery("guest_access"),
-                }
-            )
-
-            txn.execute(sql, (is_public,))
-
-            rows = txn.fetchall()
-
-            for i, row in enumerate(rows):
-                room_id = row[0]
-                aliases = self._simple_select_onecol_txn(
-                    txn,
-                    table="room_aliases",
-                    keyvalues={
-                        "room_id": room_id
-                    },
-                    retcol="room_alias",
-                )
-
-                rows[i] = list(row) + [aliases]
-
-            return rows
-
-        rows = yield self.runInteraction(
+        return self.runInteraction(
             "get_rooms", f
         )
-
-        ret = [
-            {
-                "room_id": r[0],
-                "name": r[1],
-                "topic": r[2],
-                "world_readable": r[3] == "world_readable",
-                "guest_can_join": r[4] == "can_join",
-                "aliases": r[5],
-            }
-            for r in rows
-            if r[5]  # We only return rooms that have at least one alias.
-        ]
-
-        defer.returnValue(ret)
 
     def _store_room_topic_txn(self, txn, event):
         if hasattr(event, "content") and "topic" in event.content:
@@ -275,13 +205,3 @@ class RoomStore(SQLBaseStore):
                     aliases.extend(e.content['aliases'])
 
         defer.returnValue((name, aliases))
-
-
-class RoomsTable(object):
-    table_name = "rooms"
-
-    fields = [
-        "room_id",
-        "is_public",
-        "creator"
-    ]

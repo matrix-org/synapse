@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.util.logutils import log_function
 from synapse.types import UserID
 from synapse.events.utils import serialize_event
+from synapse.util.logcontext import preserve_context_over_fn
 
 from ._base import BaseHandler
 
@@ -29,15 +30,17 @@ logger = logging.getLogger(__name__)
 
 
 def started_user_eventstream(distributor, user):
-    return distributor.fire("started_user_eventstream", user)
+    return preserve_context_over_fn(
+        distributor.fire,
+        "started_user_eventstream", user
+    )
 
 
 def stopped_user_eventstream(distributor, user):
-    return distributor.fire("stopped_user_eventstream", user)
-
-
-def user_joined_room(distributor, user, room_id):
-    return distributor.fire("user_joined_room", user, room_id)
+    return preserve_context_over_fn(
+        distributor.fire,
+        "stopped_user_eventstream", user
+    )
 
 
 class EventStreamHandler(BaseHandler):
@@ -117,10 +120,10 @@ class EventStreamHandler(BaseHandler):
     @log_function
     def get_stream(self, auth_user_id, pagin_config, timeout=0,
                    as_client_event=True, affect_presence=True,
-                   only_room_events=False, room_id=None, is_guest=False):
+                   only_keys=None, room_id=None, is_guest=False):
         """Fetches the events stream for a given user.
 
-        If `only_room_events` is `True` only room events will be returned.
+        If `only_keys` is not None, events from keys will be sent down.
         """
         auth_user = UserID.from_string(auth_user_id)
 
@@ -134,15 +137,12 @@ class EventStreamHandler(BaseHandler):
 
                 # Add some randomness to this value to try and mitigate against
                 # thundering herds on restart.
-                timeout = random.randint(int(timeout*0.9), int(timeout*1.1))
-
-            if is_guest:
-                yield user_joined_room(self.distributor, auth_user, room_id)
+                timeout = random.randint(int(timeout * 0.9), int(timeout * 1.1))
 
             events, tokens = yield self.notifier.get_events_for(
                 auth_user, pagin_config, timeout,
-                only_room_events=only_room_events,
-                is_guest=is_guest, guest_room_id=room_id
+                only_keys=only_keys,
+                is_guest=is_guest, explicit_room_id=room_id
             )
 
             time_now = self.clock.time_msec()

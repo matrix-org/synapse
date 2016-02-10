@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,15 +17,10 @@
 """
 
 from .replication import ReplicationLayer
-from .transport import TransportLayer
+from .transport.client import TransportLayerClient
 
 
 def initialize_http_replication(homeserver):
-    transport = TransportLayer(
-        homeserver,
-        homeserver.hostname,
-        server=homeserver.get_resource_for_federation(),
-        client=homeserver.get_http_client()
-    )
+    transport = TransportLayerClient(homeserver)
 
     return ReplicationLayer(homeserver, transport)

@@ -125,6 +125,15 @@ Installing prerequisites on Mac OS X::
     sudo easy_install pip
     sudo pip install virtualenv
 
+Installing prerequisites on Raspbian::
+
+    sudo apt-get install build-essential python2.7-dev libffi-dev \
+                         python-pip python-setuptools sqlite3 \
+                         libssl-dev python-virtualenv libjpeg-dev
+    sudo pip install --upgrade pip
+    sudo pip install --upgrade ndg-httpsclient
+    sudo pip install --upgrade virtualenv
+
 To install the synapse homeserver run::
 
     virtualenv -p python2.7 ~/.synapse
@@ -167,8 +176,7 @@ identify itself to other Home Servers, so don't lose or delete them. It would be
 wise to back them up somewhere safe. If, for whatever reason, you do need to
 change your Home Server's keys, you may find that other Home Servers have the
 old key cached. If you update the signing key, you should change the name of the
-key in the <server name>.signing.key file (the second word, which by default is
-, 'auto') to something different.
+key in the <server name>.signing.key file (the second word) to something different.
 
 By default, registration of new users is disabled. You can either enable
 registration in the config by specifying ``enable_registration: true``
@@ -259,6 +267,14 @@ During setup of Synapse you need to call python2.7 directly again::
 
 ...substituting your host and domain name as appropriate.
 
+FreeBSD
+-------
+
+Synapse can be installed via FreeBSD Ports or Packages:
+
+ - Ports: ``cd /usr/ports/net/py-matrix-synapse && make install clean``
+ - Packages: ``pkg install py27-matrix-synapse``
+
 Windows Install
 ---------------
 Synapse can be installed on Cygwin. It requires the following Cygwin packages:
@@ -302,6 +318,18 @@ Synapse requires pip 1.7 or later, so if your OS provides too old a version you
 may need to manually upgrade it::
 
     sudo pip install --upgrade pip
+
+Installing may fail with ``Could not find any downloads that satisfy the requirement pymacaroons-pynacl (from matrix-synapse==0.12.0)``.
+You can fix this by manually upgrading pip and virtualenv::
+
+    sudo pip install --upgrade virtualenv
+
+You can next rerun ``virtualenv -p python2.7 synapse`` to update the virtual env.
+
+Installing may fail during installing virtualenv with ``InsecurePlatformWarning: A true SSLContext object is not available. This prevents urllib3 from configuring SSL appropriately and may cause certain SSL connections to fail. For more information, see https://urllib3.readthedocs.org/en/latest/security.html#insecureplatformwarning.``
+You can fix this  by manually installing ndg-httpsclient::
+
+    pip install --upgrade ndg-httpsclient
 
 Installing may fail with ``mock requires setuptools>=17.1. Aborting installation``.
 You can fix this by upgrading setuptools::
@@ -537,4 +565,4 @@ sphinxcontrib-napoleon::
 Building internal API documentation::
 
     python setup.py build_sphinx
-
+    

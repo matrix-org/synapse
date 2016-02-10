@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,14 +34,16 @@ class EventStreamRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        auth_user, _, is_guest = yield self.auth.get_user_by_req(
+        requester = yield self.auth.get_user_by_req(
             request,
-            allow_guest=True
+            allow_guest=True,
         )
+        is_guest = requester.is_guest
         room_id = None
         if is_guest:
             if "room_id" not in request.args:
                 raise SynapseError(400, "Guest users must specify room_id param")
+        if "room_id" in request.args:
             room_id = request.args["room_id"][0]
         try:
             handler = self.handlers.event_stream_handler
@@ -56,9 +58,13 @@ class EventStreamRestServlet(ClientV1RestServlet):
             as_client_event = "raw" not in request.args
 
             chunk = yield handler.get_stream(
-                auth_user.to_string(), pagin_config, timeout=timeout,
-                as_client_event=as_client_event, affect_presence=(not is_guest),
-                room_id=room_id, is_guest=is_guest
+                requester.user.to_string(),
+                pagin_config,
+                timeout=timeout,
+                as_client_event=as_client_event,
+                affect_presence=(not is_guest),
+                room_id=room_id,
+                is_guest=is_guest,
             )
         except:
             logger.exception("Event stream failed")
@@ -80,9 +86,9 @@ class EventRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, event_id):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request)
         handler = self.handlers.event_handler
-        event = yield handler.get_event(auth_user, event_id)
+        event = yield handler.get_event(requester.user, event_id)
 
         time_now = self.clock.time_msec()
         if event:

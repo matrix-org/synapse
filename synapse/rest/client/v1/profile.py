@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,11 +33,15 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
             user,
         )
 
-        defer.returnValue((200, {"displayname": displayname}))
+        ret = {}
+        if displayname is not None:
+            ret["displayname"] = displayname
+
+        defer.returnValue((200, ret))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request, allow_guest=True)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         user = UserID.from_string(user_id)
 
         try:
@@ -47,7 +51,7 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
             defer.returnValue((400, "Unable to parse name"))
 
         yield self.handlers.profile_handler.set_displayname(
-            user, auth_user, new_name)
+            user, requester.user, new_name)
 
         defer.returnValue((200, {}))
 
@@ -66,11 +70,15 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
             user,
         )
 
-        defer.returnValue((200, {"avatar_url": avatar_url}))
+        ret = {}
+        if avatar_url is not None:
+            ret["avatar_url"] = avatar_url
+
+        defer.returnValue((200, ret))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
         try:
@@ -80,7 +88,7 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
             defer.returnValue((400, "Unable to parse name"))
 
         yield self.handlers.profile_handler.set_avatar_url(
-            user, auth_user, new_name)
+            user, requester.user, new_name)
 
         defer.returnValue((200, {}))
 
@@ -102,10 +110,13 @@ class ProfileRestServlet(ClientV1RestServlet):
             user,
         )
 
-        defer.returnValue((200, {
-            "displayname": displayname,
-            "avatar_url": avatar_url
-        }))
+        ret = {}
+        if displayname is not None:
+            ret["displayname"] = displayname
+        if avatar_url is not None:
+            ret["avatar_url"] = avatar_url
+
+        defer.returnValue((200, ret))
 
 
 def register_servlets(hs, http_server):

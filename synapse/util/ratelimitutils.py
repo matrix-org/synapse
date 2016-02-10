@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.api.errors import LimitExceededError
 
 from synapse.util.async import sleep
+from synapse.util.logcontext import preserve_fn
 
 import collections
 import contextlib
@@ -163,7 +164,7 @@ class _PerHostRatelimiter(object):
                 "Ratelimit [%s]: sleeping req",
                 id(request_id),
             )
-            ret_defer = sleep(self.sleep_msec/1000.0)
+            ret_defer = preserve_fn(sleep)(self.sleep_msec / 1000.0)
 
             self.sleeping_requests.add(request_id)
 

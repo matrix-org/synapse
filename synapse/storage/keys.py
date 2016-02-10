@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ class KeyStore(SQLBaseStore):
             table="server_tls_certificates",
             keyvalues={"server_name": server_name},
             retcols=("tls_certificate",),
+            desc="get_server_certificate",
         )
         tls_certificate = OpenSSL.crypto.load_certificate(
             OpenSSL.crypto.FILETYPE_ASN1, tls_certificate_bytes,

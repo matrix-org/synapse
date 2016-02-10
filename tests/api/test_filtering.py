@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,26 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
 from tests import unittest
 from twisted.internet import defer
 
-from mock import Mock, NonCallableMock
+from mock import Mock
 from tests.utils import (
     MockHttpResource, DeferredMockCallable, setup_test_homeserver
 )
 
 from synapse.types import UserID
-from synapse.api.filtering import FilterCollection, Filter
+from synapse.api.filtering import Filter
+from synapse.events import FrozenEvent
 
 user_localpart = "test_user"
 # MockEvent = namedtuple("MockEvent", "sender type room_id")
 
 
 def MockEvent(**kwargs):
-    ev = NonCallableMock(spec_set=kwargs.keys())
-    ev.configure_mock(**kwargs)
-    return ev
+    return FrozenEvent(kwargs)
 
 
 class FilteringTestCase(unittest.TestCase):
@@ -384,19 +382,20 @@ class FilteringTestCase(unittest.TestCase):
                 "types": ["m.*"]
             }
         }
-        user = UserID.from_string("@" + user_localpart + ":test")
+
         filter_id = yield self.datastore.add_user_filter(
-            user_localpart=user_localpart,
+            user_localpart=user_localpart + "2",
             user_filter=user_filter_json,
         )
         event = MockEvent(
+            event_id="$asdasd:localhost",
             sender="@foo:bar",
             type="custom.avatar.3d.crazy",
         )
         events = [event]
 
         user_filter = yield self.filtering.get_user_filter(
-            user_localpart=user_localpart,
+            user_localpart=user_localpart + "2",
             filter_id=filter_id,
         )
 
@@ -504,4 +503,4 @@ class FilteringTestCase(unittest.TestCase):
             filter_id=filter_id,
         )
 
-        self.assertEquals(filter.filter_json, user_filter_json)
+        self.assertEquals(filter.get_filter_json(), user_filter_json)

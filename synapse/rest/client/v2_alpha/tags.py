@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,8 +42,8 @@ class TagListServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id, room_id):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
-        if user_id != auth_user.to_string():
+        requester = yield self.auth.get_user_by_req(request)
+        if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot get tags for other users.")
 
         tags = yield self.store.get_tags_for_room(user_id, room_id)
@@ -68,8 +68,8 @@ class TagServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id, room_id, tag):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
-        if user_id != auth_user.to_string():
+        requester = yield self.auth.get_user_by_req(request)
+        if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add tags for other users.")
 
         try:
@@ -80,7 +80,7 @@ class TagServlet(RestServlet):
 
         max_id = yield self.store.add_tag_to_room(user_id, room_id, tag, body)
 
-        yield self.notifier.on_new_event(
+        self.notifier.on_new_event(
             "account_data_key", max_id, users=[user_id]
         )
 
@@ -88,13 +88,13 @@ class TagServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, user_id, room_id, tag):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
-        if user_id != auth_user.to_string():
+        requester = yield self.auth.get_user_by_req(request)
+        if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add tags for other users.")
 
         max_id = yield self.store.remove_tag_from_room(user_id, room_id, tag)
 
-        yield self.notifier.on_new_event(
+        self.notifier.on_new_event(
             "account_data_key", max_id, users=[user_id]
         )
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -89,7 +89,7 @@ class LoginRestServlet(ClientV1RestServlet):
                                          LoginRestServlet.SAML2_TYPE):
                 relay_state = ""
                 if "relay_state" in login_submission:
-                    relay_state = "&RelayState="+urllib.quote(
+                    relay_state = "&RelayState=" + urllib.quote(
                                   login_submission["relay_state"])
                 result = {
                     "uri": "%s%s" % (self.idp_redirect_url, relay_state)

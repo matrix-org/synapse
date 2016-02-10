@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ from tests import unittest
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
-from synapse.storage.registration import RegistrationStore
 from synapse.util import stringutils
 
 from tests.utils import setup_test_homeserver
@@ -31,7 +30,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
         hs = yield setup_test_homeserver()
         self.db_pool = hs.get_db_pool()
 
-        self.store = RegistrationStore(hs)
+        self.store = hs.get_datastore()
 
         self.user_id = "@my-user:test"
         self.tokens = ["AbCdEfGhIjKlMnOpQrStUvWxYz",
@@ -45,7 +44,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
         self.assertEquals(
             # TODO(paul): Surely this field should be 'user_id', not 'name'
             #  Additionally surely it shouldn't come in a 1-element list
-            {"name": self.user_id, "password_hash": self.pwhash},
+            {"name": self.user_id, "password_hash": self.pwhash, "is_guest": 0},
             (yield self.store.get_user_by_id(self.user_id))
         )
 

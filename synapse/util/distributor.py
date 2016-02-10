@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,9 +15,7 @@
 
 from twisted.internet import defer
 
-from synapse.util.logcontext import (
-    PreserveLoggingContext, preserve_context_over_deferred,
-)
+from synapse.util.logcontext import PreserveLoggingContext
 
 from synapse.util import unwrapFirstError
 
@@ -97,6 +95,7 @@ class Signal(object):
         Each observer callable may return a Deferred."""
         self.observers.append(observer)
 
+    @defer.inlineCallbacks
     def fire(self, *args, **kwargs):
         """Invokes every callable in the observer list, passing in the args and
         kwargs. Exceptions thrown by observers are logged but ignored. It is
@@ -116,6 +115,7 @@ class Signal(object):
                         failure.getTracebackObject()))
                 if not self.suppress_failures:
                     return failure
+
             return defer.maybeDeferred(observer, *args, **kwargs).addErrback(eb)
 
         with PreserveLoggingContext():
@@ -124,8 +124,11 @@ class Signal(object):
                 for observer in self.observers
             ]
 
-            d = defer.gatherResults(deferreds, consumeErrors=True)
+            res = yield defer.gatherResults(
+                deferreds, consumeErrors=True
+            ).addErrback(unwrapFirstError)
 
-        d.addErrback(unwrapFirstError)
+        defer.returnValue(res)
 
-        return preserve_context_over_deferred(d)
+    def __repr__(self):
+        return "<Signal name=%r>" % (self.name,)
