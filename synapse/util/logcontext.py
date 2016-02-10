@@ -41,7 +41,7 @@ except:
 
 class LoggingContext(object):
     """Additional context for log formatting. Contexts are scoped within a
-    "with" block. Contexts inherit the state of their parent contexts.
+    "with" block.
     Args:
         name (str): Name for the context for debugging.
     """
