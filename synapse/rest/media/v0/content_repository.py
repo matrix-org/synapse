@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -66,11 +66,11 @@ class ContentRepoResource(resource.Resource):
     @defer.inlineCallbacks
     def map_request_to_name(self, request):
         # auth the user
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request)
 
         # namespace all file uploads on the user
         prefix = base64.urlsafe_b64encode(
-            auth_user.to_string()
+            requester.user.to_string()
         ).replace('=', '')
 
         # use a random string for the main portion
@@ -94,7 +94,7 @@ class ContentRepoResource(resource.Resource):
         file_name = prefix + main_part + suffix
         file_path = os.path.join(self.directory, file_name)
         logger.info("User %s is uploading a file to path %s",
-                    auth_user.to_string(),
+                    request.user.user_id.to_string(),
                     file_path)
 
         # keep trying to make a non-clashing file, with a sensible max attempts

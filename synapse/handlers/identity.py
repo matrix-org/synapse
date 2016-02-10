@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,13 +36,14 @@ class IdentityHandler(BaseHandler):
 
         self.http_client = hs.get_simple_http_client()
 
+        self.trusted_id_servers = set(hs.config.trusted_third_party_id_servers)
+        self.trust_any_id_server_just_for_testing_do_not_use = (
+            hs.config.use_insecure_ssl_client_just_for_testing_do_not_use
+        )
+
     @defer.inlineCallbacks
     def threepid_from_creds(self, creds):
         yield run_on_reactor()
-
-        # XXX: make this configurable!
-        # trustedIdServers = ['matrix.org', 'localhost:8090']
-        trustedIdServers = ['matrix.org', 'vector.im']
 
         if 'id_server' in creds:
             id_server = creds['id_server']
@@ -58,10 +59,19 @@ class IdentityHandler(BaseHandler):
         else:
             raise SynapseError(400, "No client_secret in creds")
 
-        if id_server not in trustedIdServers:
-            logger.warn('%s is not a trusted ID server: rejecting 3pid ' +
-                        'credentials', id_server)
-            defer.returnValue(None)
+        if id_server not in self.trusted_id_servers:
+            if self.trust_any_id_server_just_for_testing_do_not_use:
+                logger.warn(
+                    "Trusting untrustworthy ID server %r even though it isn't"
+                    " in the trusted id list for testing because"
+                    " 'use_insecure_ssl_client_just_for_testing_do_not_use'"
+                    " is set in the config",
+                    id_server,
+                )
+            else:
+                logger.warn('%s is not a trusted ID server: rejecting 3pid ' +
+                            'credentials', id_server)
+                defer.returnValue(None)
 
         data = {}
         try:

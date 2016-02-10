@@ -1,4 +1,4 @@
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,13 +41,14 @@ except:
 
 class LoggingContext(object):
     """Additional context for log formatting. Contexts are scoped within a
-    "with" block. Contexts inherit the state of their parent contexts.
+    "with" block.
     Args:
         name (str): Name for the context for debugging.
     """
 
     __slots__ = [
-        "parent_context", "name", "usage_start", "usage_end", "main_thread", "__dict__"
+        "previous_context", "name", "usage_start", "usage_end", "main_thread",
+        "__dict__", "tag", "alive",
     ]
 
     thread_local = threading.local()
@@ -72,10 +73,13 @@ class LoggingContext(object):
         def add_database_transaction(self, duration_ms):
             pass
 
+        def __nonzero__(self):
+            return False
+
     sentinel = Sentinel()
 
     def __init__(self, name=None):
-        self.parent_context = None
+        self.previous_context = LoggingContext.current_context()
         self.name = name
         self.ru_stime = 0.
         self.ru_utime = 0.
@@ -83,6 +87,8 @@ class LoggingContext(object):
         self.db_txn_duration = 0.
         self.usage_start = None
         self.main_thread = threading.current_thread()
+        self.tag = ""
+        self.alive = True
 
     def __str__(self):
         return "%s@%x" % (self.name, id(self))
@@ -101,6 +107,7 @@ class LoggingContext(object):
             The context that was previously active
         """
         current = cls.current_context()
+
         if current is not context:
             current.stop()
             cls.thread_local.current_context = context
@@ -109,9 +116,13 @@ class LoggingContext(object):
 
     def __enter__(self):
         """Enters this logging context into thread local storage"""
-        if self.parent_context is not None:
-            raise Exception("Attempt to enter logging context multiple times")
-        self.parent_context = self.set_current_context(self)
+        old_context = self.set_current_context(self)
+        if self.previous_context != old_context:
+            logger.warn(
+                "Expected previous context %r, found %r",
+                self.previous_context, old_context
+            )
+        self.alive = True
         return self
 
     def __exit__(self, type, value, traceback):
@@ -120,7 +131,7 @@ class LoggingContext(object):
         Returns:
             None to avoid suppressing any exeptions that were thrown.
         """
-        current = self.set_current_context(self.parent_context)
+        current = self.set_current_context(self.previous_context)
         if current is not self:
             if current is self.sentinel:
                 logger.debug("Expected logging context %s has been lost", self)
@@ -130,16 +141,11 @@ class LoggingContext(object):
                     current,
                     self
                 )
-        self.parent_context = None
-
-    def __getattr__(self, name):
-        """Delegate member lookup to parent context"""
-        return getattr(self.parent_context, name)
+        self.previous_context = None
+        self.alive = False
 
     def copy_to(self, record):
-        """Copy fields from this context and its parents to the record"""
-        if self.parent_context is not None:
-            self.parent_context.copy_to(record)
+        """Copy fields from this context to the record"""
         for key, value in self.__dict__.items():
             setattr(record, key, value)
 
@@ -208,7 +214,7 @@ class PreserveLoggingContext(object):
     exited. Used to restore the context after a function using
     @defer.inlineCallbacks is resumed by a callback from the reactor."""
 
-    __slots__ = ["current_context", "new_context"]
+    __slots__ = ["current_context", "new_context", "has_parent"]
 
     def __init__(self, new_context=LoggingContext.sentinel):
         self.new_context = new_context
@@ -219,12 +225,27 @@ class PreserveLoggingContext(object):
             self.new_context
         )
 
+        if self.current_context:
+            self.has_parent = self.current_context.previous_context is not None
+            if not self.current_context.alive:
+                logger.debug(
+                    "Entering dead context: %s",
+                    self.current_context,
+                )
+
     def __exit__(self, type, value, traceback):
         """Restores the current logging context"""
-        LoggingContext.set_current_context(self.current_context)
+        context = LoggingContext.set_current_context(self.current_context)
+
+        if context != self.new_context:
+            logger.debug(
+                "Unexpected logging context: %s is not %s",
+                context, self.new_context,
+            )
+
         if self.current_context is not LoggingContext.sentinel:
-            if self.current_context.parent_context is None:
-                logger.warn(
+            if not self.current_context.alive:
+                logger.debug(
                     "Restoring dead context: %s",
                     self.current_context,
                 )
@@ -284,3 +305,74 @@ def preserve_context_over_deferred(deferred):
     d = _PreservingContextDeferred(current_context)
     deferred.chainDeferred(d)
     return d
+
+
+def preserve_fn(f):
+    """Ensures that function is called with correct context and that context is
+    restored after return. Useful for wrapping functions that return a deferred
+    which you don't yield on.
+    """
+    current = LoggingContext.current_context()
+
+    def g(*args, **kwargs):
+        with PreserveLoggingContext(current):
+            return f(*args, **kwargs)
+
+    return g
+
+
+# modules to ignore in `logcontext_tracer`
+_to_ignore = [
+    "synapse.util.logcontext",
+    "synapse.http.server",
+    "synapse.storage._base",
+    "synapse.util.async",
+]
+
+
+def logcontext_tracer(frame, event, arg):
+    """A tracer that logs whenever a logcontext "unexpectedly" changes within
+    a function. Probably inaccurate.
+
+    Use by calling `sys.settrace(logcontext_tracer)` in the main thread.
+    """
+    if event == 'call':
+        name = frame.f_globals["__name__"]
+        if name.startswith("synapse"):
+            if name == "synapse.util.logcontext":
+                if frame.f_code.co_name in ["__enter__", "__exit__"]:
+                    tracer = frame.f_back.f_trace
+                    if tracer:
+                        tracer.just_changed = True
+
+            tracer = frame.f_trace
+            if tracer:
+                return tracer
+
+            if not any(name.startswith(ig) for ig in _to_ignore):
+                return LineTracer()
+
+
+class LineTracer(object):
+    __slots__ = ["context", "just_changed"]
+
+    def __init__(self):
+        self.context = LoggingContext.current_context()
+        self.just_changed = False
+
+    def __call__(self, frame, event, arg):
+        if event in 'line':
+            if self.just_changed:
+                self.context = LoggingContext.current_context()
+                self.just_changed = False
+            else:
+                c = LoggingContext.current_context()
+                if c != self.context:
+                    logger.info(
+                        "Context changed! %s -> %s, %s, %s",
+                        self.context, c,
+                        frame.f_code.co_filename, frame.f_lineno
+                    )
+                    self.context = c
+
+        return self

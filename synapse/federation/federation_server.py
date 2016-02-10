@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -126,10 +126,8 @@ class FederationServer(FederationBase):
         results = []
 
         for pdu in pdu_list:
-            d = self._handle_new_pdu(transaction.origin, pdu)
-
             try:
-                yield d
+                yield self._handle_new_pdu(transaction.origin, pdu)
                 results.append({})
             except FederationError as e:
                 self.send_failure(e, transaction.origin)

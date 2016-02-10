@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,8 +15,6 @@
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached
-
-from collections import namedtuple
 
 from canonicaljson import encode_canonical_json
 import logging
@@ -50,12 +48,15 @@ class TransactionStore(SQLBaseStore):
     def _get_received_txn_response(self, txn, transaction_id, origin):
         result = self._simple_select_one_txn(
             txn,
-            table=ReceivedTransactionsTable.table_name,
+            table="received_transactions",
             keyvalues={
                 "transaction_id": transaction_id,
                 "origin": origin,
             },
-            retcols=ReceivedTransactionsTable.fields,
+            retcols=(
+                "transaction_id", "origin", "ts", "response_code", "response_json",
+                "has_been_referenced",
+            ),
             allow_none=True,
         )
 
@@ -79,7 +80,7 @@ class TransactionStore(SQLBaseStore):
         """
 
         return self._simple_insert(
-            table=ReceivedTransactionsTable.table_name,
+            table="received_transactions",
             values={
                 "transaction_id": transaction_id,
                 "origin": origin,
@@ -136,7 +137,7 @@ class TransactionStore(SQLBaseStore):
 
         self._simple_insert_txn(
             txn,
-            table=SentTransactions.table_name,
+            table="sent_transactions",
             values={
                 "id": next_id,
                 "transaction_id": transaction_id,
@@ -171,7 +172,7 @@ class TransactionStore(SQLBaseStore):
                        code, response_json):
         self._simple_update_one_txn(
             txn,
-            table=SentTransactions.table_name,
+            table="sent_transactions",
             keyvalues={
                 "transaction_id": transaction_id,
                 "destination": destination,
@@ -229,11 +230,11 @@ class TransactionStore(SQLBaseStore):
     def _get_destination_retry_timings(self, txn, destination):
         result = self._simple_select_one_txn(
             txn,
-            table=DestinationsTable.table_name,
+            table="destinations",
             keyvalues={
                 "destination": destination,
             },
-            retcols=DestinationsTable.fields,
+            retcols=("destination", "retry_last_ts", "retry_interval"),
             allow_none=True,
         )
 
@@ -304,52 +305,3 @@ class TransactionStore(SQLBaseStore):
 
         txn.execute(query, (self._clock.time_msec(),))
         return self.cursor_to_dict(txn)
-
-
-class ReceivedTransactionsTable(object):
-    table_name = "received_transactions"
-
-    fields = [
-        "transaction_id",
-        "origin",
-        "ts",
-        "response_code",
-        "response_json",
-        "has_been_referenced",
-    ]
-
-
-class SentTransactions(object):
-    table_name = "sent_transactions"
-
-    fields = [
-        "id",
-        "transaction_id",
-        "destination",
-        "ts",
-        "response_code",
-        "response_json",
-    ]
-
-    EntryType = namedtuple("SentTransactionsEntry", fields)
-
-
-class TransactionsToPduTable(object):
-    table_name = "transaction_id_to_pdu"
-
-    fields = [
-        "transaction_id",
-        "destination",
-        "pdu_id",
-        "pdu_origin",
-    ]
-
-
-class DestinationsTable(object):
-    table_name = "destinations"
-
-    fields = [
-        "destination",
-        "retry_last_ts",
-        "retry_interval",
-    ]

@@ -1,4 +1,4 @@
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,10 +29,10 @@ class CaptchaConfig(Config):
         ## Captcha ##
 
         # This Home Server's ReCAPTCHA public key.
-        recaptcha_private_key: "YOUR_PRIVATE_KEY"
+        recaptcha_public_key: "YOUR_PUBLIC_KEY"
 
         # This Home Server's ReCAPTCHA private key.
-        recaptcha_public_key: "YOUR_PUBLIC_KEY"
+        recaptcha_private_key: "YOUR_PRIVATE_KEY"
 
         # Enables ReCaptcha checks when registering, preventing signup
         # unless a captcha is answered. Requires a valid ReCaptcha

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,8 +43,8 @@ class AccountDataServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id, account_data_type):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
-        if user_id != auth_user.to_string():
+        requester = yield self.auth.get_user_by_req(request)
+        if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
         try:
@@ -57,7 +57,7 @@ class AccountDataServlet(RestServlet):
             user_id, account_data_type, body
         )
 
-        yield self.notifier.on_new_event(
+        self.notifier.on_new_event(
             "account_data_key", max_id, users=[user_id]
         )
 
@@ -82,8 +82,8 @@ class RoomAccountDataServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id, room_id, account_data_type):
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
-        if user_id != auth_user.to_string():
+        requester = yield self.auth.get_user_by_req(request)
+        if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
         try:
@@ -99,7 +99,7 @@ class RoomAccountDataServlet(RestServlet):
             user_id, room_id, account_data_type, body
         )
 
-        yield self.notifier.on_new_event(
+        self.notifier.on_new_event(
             "account_data_key", max_id, users=[user_id]
         )
 

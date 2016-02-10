@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ from synapse.api.errors import (
     AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError
 )
 from ._base import BaseHandler
-import synapse.util.stringutils as stringutils
 from synapse.util.async import run_on_reactor
 from synapse.http.client import CaptchaServerHttpClient
 
@@ -40,19 +39,22 @@ class RegistrationHandler(BaseHandler):
     def __init__(self, hs):
         super(RegistrationHandler, self).__init__(hs)
 
+        self.auth = hs.get_auth()
         self.distributor = hs.get_distributor()
         self.distributor.declare("registered_user")
         self.captcha_client = CaptchaServerHttpClient(hs)
 
+        self._next_generated_user_id = None
+
     @defer.inlineCallbacks
-    def check_username(self, localpart):
+    def check_username(self, localpart, guest_access_token=None):
         yield run_on_reactor()
 
-        if urllib.quote(localpart) != localpart:
+        if urllib.quote(localpart.encode('utf-8')) != localpart:
             raise SynapseError(
                 400,
-                "User ID must only contain characters which do not"
-                " require URL encoding."
+                "User ID can only contain characters a-z, 0-9, or '_-./'",
+                Codes.INVALID_USERNAME
             )
 
         user = UserID(localpart, self.hs.hostname)
@@ -62,19 +64,35 @@ class RegistrationHandler(BaseHandler):
 
         users = yield self.store.get_users_by_id_case_insensitive(user_id)
         if users:
-            raise SynapseError(
-                400,
-                "User ID already taken.",
-                errcode=Codes.USER_IN_USE,
-            )
+            if not guest_access_token:
+                raise SynapseError(
+                    400,
+                    "User ID already taken.",
+                    errcode=Codes.USER_IN_USE,
+                )
+            user_data = yield self.auth.get_user_from_macaroon(guest_access_token)
+            if not user_data["is_guest"] or user_data["user"].localpart != localpart:
+                raise AuthError(
+                    403,
+                    "Cannot register taken user ID without valid guest "
+                    "credentials for that user.",
+                    errcode=Codes.FORBIDDEN,
+                )
 
     @defer.inlineCallbacks
-    def register(self, localpart=None, password=None, generate_token=True):
+    def register(
+        self,
+        localpart=None,
+        password=None,
+        generate_token=True,
+        guest_access_token=None,
+        make_guest=False
+    ):
         """Registers a new client on the server.
 
         Args:
             localpart : The local part of the user ID to register. If None,
-              one will be randomly generated.
+              one will be generated.
             password (str) : The password to assign to this user so they can
             login again. This can be None which means they cannot login again
             via a password (e.g. the user is an application service user).
@@ -89,7 +107,19 @@ class RegistrationHandler(BaseHandler):
             password_hash = self.auth_handler().hash(password)
 
         if localpart:
-            yield self.check_username(localpart)
+            yield self.check_username(localpart, guest_access_token=guest_access_token)
+
+            was_guest = guest_access_token is not None
+
+            if not was_guest:
+                try:
+                    int(localpart)
+                    raise RegistrationError(
+                        400,
+                        "Numeric user IDs are reserved for guest users."
+                    )
+                except ValueError:
+                    pass
 
             user = UserID(localpart, self.hs.hostname)
             user_id = user.to_string()
@@ -100,37 +130,37 @@ class RegistrationHandler(BaseHandler):
             yield self.store.register(
                 user_id=user_id,
                 token=token,
-                password_hash=password_hash
+                password_hash=password_hash,
+                was_guest=was_guest,
+                make_guest=make_guest,
             )
 
             yield registered_user(self.distributor, user)
         else:
-            # autogen a random user ID
+            # autogen a sequential user ID
             attempts = 0
-            user_id = None
             token = None
-            while not user_id:
+            user = None
+            while not user:
+                localpart = yield self._generate_user_id(attempts > 0)
+                user = UserID(localpart, self.hs.hostname)
+                user_id = user.to_string()
+                yield self.check_user_id_is_valid(user_id)
+                if generate_token:
+                    token = self.auth_handler().generate_access_token(user_id)
                 try:
-                    localpart = self._generate_user_id()
-                    user = UserID(localpart, self.hs.hostname)
-                    user_id = user.to_string()
-                    yield self.check_user_id_is_valid(user_id)
-                    if generate_token:
-                        token = self.auth_handler().generate_access_token(user_id)
                     yield self.store.register(
                         user_id=user_id,
                         token=token,
-                        password_hash=password_hash)
-
-                    yield registered_user(self.distributor, user)
+                        password_hash=password_hash,
+                        make_guest=make_guest
+                    )
                 except SynapseError:
                     # if user id is taken, just generate another
                     user_id = None
                     token = None
                     attempts += 1
-                    if attempts > 5:
-                        raise RegistrationError(
-                            500, "Cannot generate user ID.")
+            yield registered_user(self.distributor, user)
 
         # We used to generate default identicons here, but nowadays
         # we want clients to generate their own as part of their branding
@@ -156,7 +186,7 @@ class RegistrationHandler(BaseHandler):
             token=token,
             password_hash=""
         )
-        registered_user(self.distributor, user)
+        yield registered_user(self.distributor, user)
         defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
@@ -192,7 +222,7 @@ class RegistrationHandler(BaseHandler):
                 400,
                 "User ID must only contain characters which do not"
                 " require URL encoding."
-                )
+            )
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
 
@@ -262,8 +292,16 @@ class RegistrationHandler(BaseHandler):
                     errcode=Codes.EXCLUSIVE
                 )
 
-    def _generate_user_id(self):
-        return "-" + stringutils.random_string(18)
+    @defer.inlineCallbacks
+    def _generate_user_id(self, reseed=False):
+        if reseed or self._next_generated_user_id is None:
+            self._next_generated_user_id = (
+                yield self.store.find_next_generated_user_id_localpart()
+            )
+
+        id = self._next_generated_user_id
+        self._next_generated_user_id += 1
+        defer.returnValue(str(id))
 
     @defer.inlineCallbacks
     def _validate_captcha(self, ip_addr, private_key, challenge, response):

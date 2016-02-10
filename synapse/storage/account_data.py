@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -83,7 +83,7 @@ class AccountDataStore(SQLBaseStore):
             "get_account_data_for_room", get_account_data_for_room_txn
         )
 
-    def get_updated_account_data_for_user(self, user_id, stream_id):
+    def get_updated_account_data_for_user(self, user_id, stream_id, room_ids=None):
         """Get all the client account_data for a that's changed.
 
         Args:
@@ -120,6 +120,12 @@ class AccountDataStore(SQLBaseStore):
 
             return (global_account_data, account_data_by_room)
 
+        changed = self._account_data_stream_cache.has_entity_changed(
+            user_id, int(stream_id)
+        )
+        if not changed:
+            return ({}, {})
+
         return self.runInteraction(
             "get_updated_account_data_for_user", get_updated_account_data_for_user_txn
         )
@@ -150,6 +156,10 @@ class AccountDataStore(SQLBaseStore):
                     "stream_id": next_id,
                     "content": content_json,
                 }
+            )
+            txn.call_after(
+                self._account_data_stream_cache.entity_has_changed,
+                user_id, next_id,
             )
             self._update_max_stream_id(txn, next_id)
 
@@ -185,6 +195,10 @@ class AccountDataStore(SQLBaseStore):
                     "stream_id": next_id,
                     "content": content_json,
                 }
+            )
+            txn.call_after(
+                self._account_data_stream_cache.entity_has_changed,
+                user_id, next_id,
             )
             self._update_max_stream_id(txn, next_id)
 

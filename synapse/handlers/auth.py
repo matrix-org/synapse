@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -408,7 +408,7 @@ class AuthHandler(BaseHandler):
             macaroon = pymacaroons.Macaroon.deserialize(login_token)
             auth_api = self.hs.get_auth()
             auth_api.validate_macaroon(macaroon, "login", True)
-            return self._get_user_from_macaroon(macaroon)
+            return self.get_user_from_macaroon(macaroon)
         except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
             raise AuthError(401, "Invalid token", errcode=Codes.UNKNOWN_TOKEN)
 
@@ -421,7 +421,7 @@ class AuthHandler(BaseHandler):
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         return macaroon
 
-    def _get_user_from_macaroon(self, macaroon):
+    def get_user_from_macaroon(self, macaroon):
         user_prefix = "user_id = "
         for caveat in macaroon.caveats:
             if caveat.caveat_id.startswith(user_prefix):

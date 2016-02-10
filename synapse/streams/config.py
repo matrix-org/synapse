@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+MAX_LIMIT = 1000
+
+
 class SourcePaginationConfig(object):
 
     """A configuration object which stores pagination parameters for a
@@ -32,7 +35,7 @@ class SourcePaginationConfig(object):
         self.from_key = from_key
         self.to_key = to_key
         self.direction = 'f' if direction == 'f' else 'b'
-        self.limit = int(limit) if limit is not None else None
+        self.limit = min(int(limit), MAX_LIMIT) if limit is not None else None
 
     def __repr__(self):
         return (
@@ -49,7 +52,7 @@ class PaginationConfig(object):
         self.from_token = from_token
         self.to_token = to_token
         self.direction = 'f' if direction == 'f' else 'b'
-        self.limit = int(limit) if limit is not None else None
+        self.limit = min(int(limit), MAX_LIMIT) if limit is not None else None
 
     @classmethod
     def from_request(cls, request, raise_invalid_params=True,

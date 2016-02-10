@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """Tests REST events for /presence paths."""
-
 from tests import unittest
 from twisted.internet import defer
 
@@ -26,7 +25,7 @@ from synapse.api.constants import PresenceState
 from synapse.handlers.presence import PresenceHandler
 from synapse.rest.client.v1 import presence
 from synapse.rest.client.v1 import events
-from synapse.types import UserID
+from synapse.types import Requester, UserID
 from synapse.util.async import run_on_reactor
 
 from collections import namedtuple
@@ -281,6 +280,15 @@ class PresenceEventStreamTestCase(unittest.TestCase):
         }
         EventSources.SOURCE_TYPES["presence"] = PresenceEventSource
 
+        clock = Mock(spec=[
+            "call_later",
+            "cancel_call_later",
+            "time_msec",
+            "looping_call",
+        ])
+
+        clock.time_msec.return_value = 1000000
+
         hs = yield setup_test_homeserver(
             http_client=None,
             resource_for_client=self.mock_resource,
@@ -290,18 +298,11 @@ class PresenceEventStreamTestCase(unittest.TestCase):
                 "get_presence_list",
                 "get_rooms_for_user",
             ]),
-            clock=Mock(spec=[
-                "call_later",
-                "cancel_call_later",
-                "time_msec",
-                "looping_call",
-            ]),
+            clock=clock,
         )
 
-        hs.get_clock().time_msec.return_value = 1000000
-
         def _get_user_by_req(req=None, allow_guest=False):
-            return (UserID.from_string(myid), "", False)
+            return Requester(UserID.from_string(myid), "", False)
 
         hs.get_v1auth().get_user_by_req = _get_user_by_req
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,6 +27,10 @@ logger = logging.getLogger(__name__)
 
 class TransportLayerClient(object):
     """Sends federation HTTP requests to other servers"""
+
+    def __init__(self, hs):
+        self.server_name = hs.hostname
+        self.client = hs.get_http_client()
 
     @log_function
     def get_room_state(self, destination, room_id, event_id):

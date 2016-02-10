@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,16 +14,15 @@
 # limitations under the License.
 
 """Tests REST events for /profile paths."""
-
 from tests import unittest
 from twisted.internet import defer
 
-from mock import Mock, NonCallableMock
+from mock import Mock
 
 from ....utils import MockHttpResource, setup_test_homeserver
 
 from synapse.api.errors import SynapseError, AuthError
-from synapse.types import UserID
+from synapse.types import Requester, UserID
 
 from synapse.rest.client.v1 import profile
 
@@ -53,7 +52,7 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         def _get_user_by_req(request=None, allow_guest=False):
-            return (UserID.from_string(myid), "", False)
+            return Requester(UserID.from_string(myid), "", False)
 
         hs.get_v1auth().get_user_by_req = _get_user_by_req
 

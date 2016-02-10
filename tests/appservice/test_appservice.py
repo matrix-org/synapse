@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
 
     def setUp(self):
         self.service = ApplicationService(
+            id="unique_identifier",
             url="some_url",
             token="some_token",
             namespaces={

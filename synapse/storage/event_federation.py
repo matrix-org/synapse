@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ class EventFederationStore(SQLBaseStore):
             new_front = set()
             front_list = list(front)
             chunks = [
-                front_list[x:x+100]
+                front_list[x:x + 100]
                 for x in xrange(0, len(front), 100)
             ]
             for chunk in chunks:

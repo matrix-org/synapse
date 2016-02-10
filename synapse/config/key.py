@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,8 +22,14 @@ from signedjson.key import (
     read_signing_keys, write_signing_keys, NACL_ED25519
 )
 from unpaddedbase64 import decode_base64
+from synapse.util.stringutils import random_string_with_symbols
 
 import os
+import hashlib
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class KeyConfig(Config):
@@ -40,9 +46,29 @@ class KeyConfig(Config):
             config["perspectives"]
         )
 
-    def default_config(self, config_dir_path, server_name, **kwargs):
+        self.macaroon_secret_key = config.get(
+            "macaroon_secret_key", self.registration_shared_secret
+        )
+
+        if not self.macaroon_secret_key:
+            # Unfortunately, there are people out there that don't have this
+            # set. Lets just be "nice" and derive one from their secret key.
+            logger.warn("Config is missing missing macaroon_secret_key")
+            seed = self.signing_key[0].seed
+            self.macaroon_secret_key = hashlib.sha256(seed)
+
+    def default_config(self, config_dir_path, server_name, is_generating_file=False,
+                       **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)
+
+        if is_generating_file:
+            macaroon_secret_key = random_string_with_symbols(50)
+        else:
+            macaroon_secret_key = None
+
         return """\
+        macaroon_secret_key: "%(macaroon_secret_key)s"
+
         ## Signing Keys ##
 
         # Path to the signing key to sign messages with

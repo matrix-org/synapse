@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,5 +23,6 @@ WEB_CLIENT_PREFIX = "/_matrix/client"
 CONTENT_REPO_PREFIX = "/_matrix/content"
 SERVER_KEY_PREFIX = "/_matrix/key/v1"
 SERVER_KEY_V2_PREFIX = "/_matrix/key/v2"
-MEDIA_PREFIX = "/_matrix/media/v1"
+MEDIA_PREFIX = "/_matrix/media/r0"
+LEGACY_MEDIA_PREFIX = "/_matrix/media/v1"
 APP_SERVICE_PREFIX = "/_matrix/appservice/v1"

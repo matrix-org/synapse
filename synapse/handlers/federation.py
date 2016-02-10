@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,6 +35,8 @@ from synapse.types import UserID
 from synapse.events.utils import prune_event
 
 from synapse.util.retryutils import NotRetryingDestination
+
+from synapse.push.action_generator import ActionGenerator
 
 from twisted.internet import defer
 
@@ -219,18 +221,10 @@ class FederationHandler(BaseHandler):
                 extra_users.append(target_user)
 
             with PreserveLoggingContext():
-                d = self.notifier.on_new_room_event(
+                self.notifier.on_new_room_event(
                     event, event_stream_id, max_stream_id,
                     extra_users=extra_users
                 )
-
-            def log_failure(f):
-                logger.warn(
-                    "Failed to notify about %s: %s",
-                    event.event_id, f.value
-                )
-
-            d.addErrback(log_failure)
 
         if event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
@@ -635,18 +629,10 @@ class FederationHandler(BaseHandler):
             )
 
             with PreserveLoggingContext():
-                d = self.notifier.on_new_room_event(
+                self.notifier.on_new_room_event(
                     event, event_stream_id, max_stream_id,
                     extra_users=[joinee]
                 )
-
-            def log_failure(f):
-                logger.warn(
-                    "Failed to notify about %s: %s",
-                    event.event_id, f.value
-                )
-
-            d.addErrback(log_failure)
 
             logger.debug("Finished joining %s to %s", joinee, room_id)
         finally:
@@ -722,17 +708,9 @@ class FederationHandler(BaseHandler):
             extra_users.append(target_user)
 
         with PreserveLoggingContext():
-            d = self.notifier.on_new_room_event(
+            self.notifier.on_new_room_event(
                 event, event_stream_id, max_stream_id, extra_users=extra_users
             )
-
-        def log_failure(f):
-            logger.warn(
-                "Failed to notify about %s: %s",
-                event.event_id, f.value
-            )
-
-        d.addErrback(log_failure)
 
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.JOIN:
@@ -803,18 +781,10 @@ class FederationHandler(BaseHandler):
 
         target_user = UserID.from_string(event.state_key)
         with PreserveLoggingContext():
-            d = self.notifier.on_new_room_event(
+            self.notifier.on_new_room_event(
                 event, event_stream_id, max_stream_id,
                 extra_users=[target_user],
             )
-
-        def log_failure(f):
-            logger.warn(
-                "Failed to notify about %s: %s",
-                event.event_id, f.value
-            )
-
-        d.addErrback(log_failure)
 
         defer.returnValue(event)
 
@@ -940,17 +910,9 @@ class FederationHandler(BaseHandler):
             extra_users.append(target_user)
 
         with PreserveLoggingContext():
-            d = self.notifier.on_new_room_event(
+            self.notifier.on_new_room_event(
                 event, event_stream_id, max_stream_id, extra_users=extra_users
             )
-
-        def log_failure(f):
-            logger.warn(
-                "Failed to notify about %s: %s",
-                event.event_id, f.value
-            )
-
-        d.addErrback(log_failure)
 
         new_pdu = event
 
@@ -1105,6 +1067,12 @@ class FederationHandler(BaseHandler):
             auth_events=auth_events,
         )
 
+        if not backfilled and not event.internal_metadata.is_outlier():
+            action_generator = ActionGenerator(self.hs)
+            yield action_generator.handle_push_actions_for_event(
+                event, context, self
+            )
+
         event_stream_id, max_stream_id = yield self.store.persist_event(
             event,
             context=context,
@@ -1178,7 +1146,13 @@ class FederationHandler(BaseHandler):
 
             try:
                 self.auth.check(e, auth_events=auth_for_e)
-            except AuthError as err:
+            except SynapseError as err:
+                # we may get SynapseErrors here as well as AuthErrors. For
+                # instance, there are a couple of (ancient) events in some
+                # rooms whose senders do not have the correct sigil; these
+                # cause SynapseErrors in auth.check. We don't want to give up
+                # the attempt to federate altogether in such cases.
+
                 logger.warn(
                     "Rejecting %s because %s",
                     e.event_id, err.msg
@@ -1684,7 +1658,7 @@ class FederationHandler(BaseHandler):
             self.auth.check(event, context.current_state)
             yield self._validate_keyserver(event, auth_events=context.current_state)
             member_handler = self.hs.get_handlers().room_member_handler
-            yield member_handler.change_membership(event, context)
+            yield member_handler.send_membership_event(event, context)
         else:
             destinations = set([x.split(":", 1)[-1] for x in (sender, room_id)])
             yield self.replication_layer.forward_third_party_invite(
@@ -1713,7 +1687,7 @@ class FederationHandler(BaseHandler):
         # TODO: Make sure the signatures actually are correct.
         event.signatures.update(returned_invite.signatures)
         member_handler = self.hs.get_handlers().room_member_handler
-        yield member_handler.change_membership(event, context)
+        yield member_handler.send_membership_event(event, context)
 
     @defer.inlineCallbacks
     def add_display_name_to_third_party_invite(self, event_dict, event, context):

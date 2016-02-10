@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,9 +40,9 @@ class GetFilterRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, user_id, filter_id):
         target_user = UserID.from_string(user_id)
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request)
 
-        if target_user != auth_user:
+        if target_user != requester.user:
             raise AuthError(403, "Cannot get filters for other users")
 
         if not self.hs.is_mine(target_user):
@@ -59,7 +59,7 @@ class GetFilterRestServlet(RestServlet):
                 filter_id=filter_id,
             )
 
-            defer.returnValue((200, filter.filter_json))
+            defer.returnValue((200, filter.get_filter_json()))
         except KeyError:
             raise SynapseError(400, "No such filter")
 
@@ -76,9 +76,9 @@ class CreateFilterRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, user_id):
         target_user = UserID.from_string(user_id)
-        auth_user, _, _ = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request)
 
-        if target_user != auth_user:
+        if target_user != requester.user:
             raise AuthError(403, "Cannot create filters for other users")
 
         if not self.hs.is_mine(target_user):

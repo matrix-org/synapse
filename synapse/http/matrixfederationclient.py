@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -152,7 +152,7 @@ class MatrixFederationHttpClient(object):
 
                         return self.clock.time_bound_deferred(
                             request_deferred,
-                            time_out=timeout/1000. if timeout else 60,
+                            time_out=timeout / 1000. if timeout else 60,
                         )
 
                     response = yield preserve_context_over_fn(

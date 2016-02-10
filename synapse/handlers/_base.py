@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ from synapse.api.errors import LimitExceededError, SynapseError, AuthError
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.api.constants import Membership, EventTypes
 from synapse.types import UserID, RoomAlias
+from synapse.push.action_generator import ActionGenerator
 
 from synapse.util.logcontext import PreserveLoggingContext
 
@@ -52,22 +53,51 @@ class BaseHandler(object):
         self.event_builder_factory = hs.get_event_builder_factory()
 
     @defer.inlineCallbacks
-    def _filter_events_for_client(self, user_id, events, is_guest=False,
-                                  require_all_visible_for_guests=True):
-        # Assumes that user has at some point joined the room if not is_guest.
+    def _filter_events_for_clients(self, user_tuples, events, event_id_to_state):
+        """ Returns dict of user_id -> list of events that user is allowed to
+        see.
+        """
+        forgotten = yield defer.gatherResults([
+            self.store.who_forgot_in_room(
+                room_id,
+            )
+            for room_id in frozenset(e.room_id for e in events)
+        ], consumeErrors=True)
 
-        def allowed(event, membership, visibility):
+        # Set of membership event_ids that have been forgotten
+        event_id_forgotten = frozenset(
+            row["event_id"] for rows in forgotten for row in rows
+        )
+
+        def allowed(event, user_id, is_peeking):
+            state = event_id_to_state[event.event_id]
+
+            visibility_event = state.get((EventTypes.RoomHistoryVisibility, ""), None)
+            if visibility_event:
+                visibility = visibility_event.content.get("history_visibility", "shared")
+            else:
+                visibility = "shared"
+
             if visibility == "world_readable":
                 return True
 
-            if is_guest:
+            if is_peeking:
                 return False
+
+            membership_event = state.get((EventTypes.Member, user_id), None)
+            if membership_event:
+                if membership_event.event_id in event_id_forgotten:
+                    membership = None
+                else:
+                    membership = membership_event.membership
+            else:
+                membership = None
 
             if membership == Membership.JOIN:
                 return True
 
             if event.type == EventTypes.RoomHistoryVisibility:
-                return not is_guest
+                return not is_peeking
 
             if visibility == "shared":
                 return True
@@ -78,54 +108,30 @@ class BaseHandler(object):
 
             return True
 
+        defer.returnValue({
+            user_id: [
+                event
+                for event in events
+                if allowed(event, user_id, is_peeking)
+            ]
+            for user_id, is_peeking in user_tuples
+        })
+
+    @defer.inlineCallbacks
+    def _filter_events_for_client(self, user_id, events, is_peeking=False):
+        # Assumes that user has at some point joined the room if not is_guest.
+        types = (
+            (EventTypes.RoomHistoryVisibility, ""),
+            (EventTypes.Member, user_id),
+        )
         event_id_to_state = yield self.store.get_state_for_events(
             frozenset(e.event_id for e in events),
-            types=(
-                (EventTypes.RoomHistoryVisibility, ""),
-                (EventTypes.Member, user_id),
-            )
+            types=types
         )
-
-        events_to_return = []
-        for event in events:
-            state = event_id_to_state[event.event_id]
-
-            membership_event = state.get((EventTypes.Member, user_id), None)
-            if membership_event:
-                was_forgotten_at_event = yield self.store.was_forgotten_at(
-                    membership_event.state_key,
-                    membership_event.room_id,
-                    membership_event.event_id
-                )
-                if was_forgotten_at_event:
-                    membership = None
-                else:
-                    membership = membership_event.membership
-            else:
-                membership = None
-
-            visibility_event = state.get((EventTypes.RoomHistoryVisibility, ""), None)
-            if visibility_event:
-                visibility = visibility_event.content.get("history_visibility", "shared")
-            else:
-                visibility = "shared"
-
-            should_include = allowed(event, membership, visibility)
-            if should_include:
-                events_to_return.append(event)
-
-        if (require_all_visible_for_guests
-                and is_guest
-                and len(events_to_return) < len(events)):
-            # This indicates that some events in the requested range were not
-            # visible to guest users. To be safe, we reject the entire request,
-            # so that we don't have to worry about interpreting visibility
-            # boundaries.
-            raise AuthError(403, "User %s does not have permission" % (
-                user_id
-            ))
-
-        defer.returnValue(events_to_return)
+        res = yield self._filter_events_for_clients(
+            [(user_id, is_peeking)], events, event_id_to_state
+        )
+        defer.returnValue(res.get(user_id, []))
 
     def ratelimit(self, user_id):
         time_now = self.clock.time()
@@ -136,7 +142,7 @@ class BaseHandler(object):
         )
         if not allowed:
             raise LimitExceededError(
-                retry_after_ms=int(1000*(time_allowed - time_now)),
+                retry_after_ms=int(1000 * (time_allowed - time_now)),
             )
 
     @defer.inlineCallbacks
@@ -182,12 +188,10 @@ class BaseHandler(object):
         )
 
     @defer.inlineCallbacks
-    def handle_new_client_event(self, event, context, extra_destinations=[],
-                                extra_users=[], suppress_auth=False):
+    def handle_new_client_event(self, event, context, extra_users=[]):
         # We now need to go and hit out to wherever we need to hit out to.
 
-        if not suppress_auth:
-            self.auth.check(event, auth_events=context.current_state)
+        self.auth.check(event, auth_events=context.current_state)
 
         yield self.maybe_kick_guest_users(event, context.current_state.values())
 
@@ -260,11 +264,16 @@ class BaseHandler(object):
                         "You don't have permission to redact events"
                     )
 
+        action_generator = ActionGenerator(self.hs)
+        yield action_generator.handle_push_actions_for_event(
+            event, context, self
+        )
+
         (event_stream_id, max_stream_id) = yield self.store.persist_event(
             event, context=context
         )
 
-        destinations = set(extra_destinations)
+        destinations = set()
         for k, s in context.current_state.items():
             try:
                 if k[0] == EventTypes.Member:
@@ -279,18 +288,10 @@ class BaseHandler(object):
 
         with PreserveLoggingContext():
             # Don't block waiting on waking up all the listeners.
-            notify_d = self.notifier.on_new_room_event(
+            self.notifier.on_new_room_event(
                 event, event_stream_id, max_stream_id,
                 extra_users=extra_users
             )
-
-        def log_failure(f):
-            logger.warn(
-                "Failed to notify about %s: %s",
-                event.event_id, f.value
-            )
-
-        notify_d.addErrback(log_failure)
 
         # If invite, remove room_state from unsigned before sending.
         event.unsigned.pop("invite_room_state", None)

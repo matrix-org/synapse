@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,12 +15,12 @@
 import logging
 import urllib
 import yaml
-from simplejson import JSONDecodeError
 import simplejson as json
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
 from synapse.appservice import ApplicationService, AppServiceTransaction
+from synapse.config._base import ConfigError
 from synapse.storage.roommember import RoomsForUser
 from synapse.types import UserID
 from ._base import SQLBaseStore
@@ -144,66 +144,9 @@ class ApplicationServiceStore(SQLBaseStore):
 
         return rooms_for_user_matching_user_id
 
-    def _parse_services_dict(self, results):
-        # SQL results in the form:
-        # [
-        #   {
-        #     'regex': "something",
-        #     'url': "something",
-        #     'namespace': enum,
-        #     'as_id': 0,
-        #     'token': "something",
-        #     'hs_token': "otherthing",
-        #     'id': 0
-        #   }
-        # ]
-        services = {}
-        for res in results:
-            as_token = res["token"]
-            if as_token is None:
-                continue
-            if as_token not in services:
-                # add the service
-                services[as_token] = {
-                    "id": res["id"],
-                    "url": res["url"],
-                    "token": as_token,
-                    "hs_token": res["hs_token"],
-                    "sender": res["sender"],
-                    "namespaces": {
-                        ApplicationService.NS_USERS: [],
-                        ApplicationService.NS_ALIASES: [],
-                        ApplicationService.NS_ROOMS: []
-                    }
-                }
-            # add the namespace regex if one exists
-            ns_int = res["namespace"]
-            if ns_int is None:
-                continue
-            try:
-                services[as_token]["namespaces"][
-                    ApplicationService.NS_LIST[ns_int]].append(
-                    json.loads(res["regex"])
-                )
-            except IndexError:
-                logger.error("Bad namespace enum '%s'. %s", ns_int, res)
-            except JSONDecodeError:
-                logger.error("Bad regex object '%s'", res["regex"])
-
-        service_list = []
-        for service in services.values():
-            service_list.append(ApplicationService(
-                token=service["token"],
-                url=service["url"],
-                namespaces=service["namespaces"],
-                hs_token=service["hs_token"],
-                sender=service["sender"],
-                id=service["id"]
-            ))
-        return service_list
-
     def _load_appservice(self, as_info):
         required_string_fields = [
+            # TODO: Add id here when it's stable to release
             "url", "as_token", "hs_token", "sender_localpart"
         ]
         for field in required_string_fields:
@@ -245,7 +188,7 @@ class ApplicationServiceStore(SQLBaseStore):
             namespaces=as_info["namespaces"],
             hs_token=as_info["hs_token"],
             sender=user_id,
-            id=as_info["as_token"]  # the token is the only unique thing here
+            id=as_info["id"] if "id" in as_info else as_info["as_token"],
         )
 
     def _populate_appservice_cache(self, config_files):
@@ -256,15 +199,38 @@ class ApplicationServiceStore(SQLBaseStore):
             )
             return
 
+        # Dicts of value -> filename
+        seen_as_tokens = {}
+        seen_ids = {}
+
         for config_file in config_files:
             try:
                 with open(config_file, 'r') as f:
                     appservice = self._load_appservice(yaml.load(f))
+                    if appservice.id in seen_ids:
+                        raise ConfigError(
+                            "Cannot reuse ID across application services: "
+                            "%s (files: %s, %s)" % (
+                                appservice.id, config_file, seen_ids[appservice.id],
+                            )
+                        )
+                    seen_ids[appservice.id] = config_file
+                    if appservice.token in seen_as_tokens:
+                        raise ConfigError(
+                            "Cannot reuse as_token across application services: "
+                            "%s (files: %s, %s)" % (
+                                appservice.token,
+                                config_file,
+                                seen_as_tokens[appservice.token],
+                            )
+                        )
+                    seen_as_tokens[appservice.token] = config_file
                     logger.info("Loaded application service: %s", appservice)
                     self.services_cache.append(appservice)
             except Exception as e:
                 logger.error("Failed to load appservice from '%s'", config_file)
                 logger.exception(e)
+                raise
 
 
 class ApplicationServiceTransactionStore(SQLBaseStore):
@@ -310,7 +276,8 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             "application_services_state",
             dict(as_id=service.id),
             ["state"],
-            allow_none=True
+            allow_none=True,
+            desc="get_appservice_state",
         )
         if result:
             defer.returnValue(result.get("state"))

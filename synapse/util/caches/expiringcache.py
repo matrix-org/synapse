@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ class ExpiringCache(object):
         def f():
             self._prune_cache()
 
-        self._clock.looping_call(f, self._expiry_ms/2)
+        self._clock.looping_call(f, self._expiry_ms / 2)
 
     def __setitem__(self, key, value):
         now = self._clock.time_msec()

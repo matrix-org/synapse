@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -103,7 +103,6 @@ class TransactionQueue(object):
         else:
             return not destination.startswith("localhost")
 
-    @defer.inlineCallbacks
     def enqueue_pdu(self, pdu, destinations, order):
         # We loop through all destinations to see whether we already have
         # a transaction in progress. If we do, stick it in the pending_pdus
@@ -140,8 +139,6 @@ class TransactionQueue(object):
                 self._attempt_new_transaction(destination).addErrback(chain)
 
             deferreds.append(deferred)
-
-        yield defer.DeferredList(deferreds, consumeErrors=True)
 
     # NO inlineCallbacks
     def enqueue_edu(self, edu):

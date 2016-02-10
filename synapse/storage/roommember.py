@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -58,6 +58,10 @@ class RoomMemberStore(SQLBaseStore):
             txn.call_after(self.get_rooms_for_user.invalidate, (event.state_key,))
             txn.call_after(self.get_joined_hosts_for_room.invalidate, (event.room_id,))
             txn.call_after(self.get_users_in_room.invalidate, (event.room_id,))
+            txn.call_after(
+                self._membership_stream_cache.entity_has_changed,
+                event.state_key, event.internal_metadata.stream_ordering
+            )
 
     def get_room_member(self, user_id, room_id):
         """Retrieve the current state of a room member.
@@ -110,6 +114,7 @@ class RoomMemberStore(SQLBaseStore):
             membership=membership,
         ).addCallback(self._get_events)
 
+    @cached()
     def get_invites_for_user(self, user_id):
         """ Get all the invite events for a user
         Args:
@@ -240,7 +245,7 @@ class RoomMemberStore(SQLBaseStore):
 
         return rows
 
-    @cached()
+    @cached(max_entries=5000)
     def get_rooms_for_user(self, user_id):
         return self.get_rooms_for_user_where_membership_is(
             user_id, membership_list=[Membership.JOIN],
@@ -287,6 +292,7 @@ class RoomMemberStore(SQLBaseStore):
             txn.execute(sql, (user_id, room_id))
         yield self.runInteraction("forget_membership", f)
         self.was_forgotten_at.invalidate_all()
+        self.who_forgot_in_room.invalidate_all()
         self.did_forget.invalidate((user_id, room_id))
 
     @cachedInlineCallbacks(num_args=2)
@@ -336,3 +342,15 @@ class RoomMemberStore(SQLBaseStore):
             return rows[0][0]
         forgot = yield self.runInteraction("did_forget_membership_at", f)
         defer.returnValue(forgot == 1)
+
+    @cached()
+    def who_forgot_in_room(self, room_id):
+        return self._simple_select_list(
+            table="room_memberships",
+            retcols=("user_id", "event_id"),
+            keyvalues={
+                "room_id": room_id,
+                "forgotten": 1,
+            },
+            desc="who_forgot"
+        )

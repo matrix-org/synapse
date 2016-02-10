@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ from twisted.internet import defer
 
 from httppusher import HttpPusher
 from synapse.push import PusherConfigException
+from synapse.util.logcontext import preserve_fn
 
 import logging
 
@@ -31,35 +32,20 @@ class PusherPool:
         self.pushers = {}
         self.last_pusher_started = -1
 
-        distributor = self.hs.get_distributor()
-        distributor.observe(
-            "user_presence_changed", self.user_presence_changed
-        )
-
-    @defer.inlineCallbacks
-    def user_presence_changed(self, user, state):
-        user_name = user.to_string()
-
-        # until we have read receipts, pushers use this to reset a user's
-        # badge counters to zero
-        for p in self.pushers.values():
-            if p.user_name == user_name:
-                yield p.presence_changed(state)
-
     @defer.inlineCallbacks
     def start(self):
         pushers = yield self.store.get_all_pushers()
         self._start_pushers(pushers)
 
     @defer.inlineCallbacks
-    def add_pusher(self, user_name, access_token, profile_tag, kind, app_id,
+    def add_pusher(self, user_id, access_token, profile_tag, kind, app_id,
                    app_display_name, device_display_name, pushkey, lang, data):
         # we try to create the pusher just to validate the config: it
         # will then get pulled out of the database,
         # recreated, added and started: this means we have only one
         # code path adding pushers.
         self._create_pusher({
-            "user_name": user_name,
+            "user_name": user_id,
             "kind": kind,
             "profile_tag": profile_tag,
             "app_id": app_id,
@@ -74,7 +60,7 @@ class PusherPool:
             "failing_since": None
         })
         yield self._add_pusher_to_store(
-            user_name, access_token, profile_tag, kind, app_id,
+            user_id, access_token, profile_tag, kind, app_id,
             app_display_name, device_display_name,
             pushkey, lang, data
         )
@@ -91,7 +77,7 @@ class PusherPool:
                     "Removing pusher for app id %s, pushkey %s, user %s",
                     app_id, pushkey, p['user_name']
                 )
-                self.remove_pusher(p['app_id'], p['pushkey'], p['user_name'])
+                yield self.remove_pusher(p['app_id'], p['pushkey'], p['user_name'])
 
     @defer.inlineCallbacks
     def remove_pushers_by_user(self, user_id):
@@ -106,14 +92,14 @@ class PusherPool:
                     "Removing pusher for app id %s, pushkey %s, user %s",
                     p['app_id'], p['pushkey'], p['user_name']
                 )
-                self.remove_pusher(p['app_id'], p['pushkey'], p['user_name'])
+                yield self.remove_pusher(p['app_id'], p['pushkey'], p['user_name'])
 
     @defer.inlineCallbacks
-    def _add_pusher_to_store(self, user_name, access_token, profile_tag, kind,
+    def _add_pusher_to_store(self, user_id, access_token, profile_tag, kind,
                              app_id, app_display_name, device_display_name,
                              pushkey, lang, data):
         yield self.store.add_pusher(
-            user_name=user_name,
+            user_id=user_id,
             access_token=access_token,
             profile_tag=profile_tag,
             kind=kind,
@@ -125,14 +111,14 @@ class PusherPool:
             lang=lang,
             data=data,
         )
-        self._refresh_pusher(app_id, pushkey, user_name)
+        yield self._refresh_pusher(app_id, pushkey, user_id)
 
     def _create_pusher(self, pusherdict):
         if pusherdict['kind'] == 'http':
             return HttpPusher(
                 self.hs,
                 profile_tag=pusherdict['profile_tag'],
-                user_name=pusherdict['user_name'],
+                user_id=pusherdict['user_name'],
                 app_id=pusherdict['app_id'],
                 app_display_name=pusherdict['app_display_name'],
                 device_display_name=pusherdict['device_display_name'],
@@ -150,14 +136,14 @@ class PusherPool:
             )
 
     @defer.inlineCallbacks
-    def _refresh_pusher(self, app_id, pushkey, user_name):
+    def _refresh_pusher(self, app_id, pushkey, user_id):
         resultlist = yield self.store.get_pushers_by_app_id_and_pushkey(
             app_id, pushkey
         )
 
         p = None
         for r in resultlist:
-            if r['user_name'] == user_name:
+            if r['user_name'] == user_id:
                 p = r
 
         if p:
@@ -181,17 +167,17 @@ class PusherPool:
                 if fullid in self.pushers:
                     self.pushers[fullid].stop()
                 self.pushers[fullid] = p
-                p.start()
+                preserve_fn(p.start)()
 
         logger.info("Started pushers")
 
     @defer.inlineCallbacks
-    def remove_pusher(self, app_id, pushkey, user_name):
-        fullid = "%s:%s:%s" % (app_id, pushkey, user_name)
+    def remove_pusher(self, app_id, pushkey, user_id):
+        fullid = "%s:%s:%s" % (app_id, pushkey, user_id)
         if fullid in self.pushers:
             logger.info("Stopping pusher %s", fullid)
             self.pushers[fullid].stop()
             del self.pushers[fullid]
-        yield self.store.delete_pusher_by_app_id_pushkey_user_name(
-            app_id, pushkey, user_name
+        yield self.store.delete_pusher_by_app_id_pushkey_user_id(
+            app_id, pushkey, user_id
         )

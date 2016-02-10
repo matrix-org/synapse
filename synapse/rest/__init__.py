@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from synapse.rest.client import (
+    versions,
+)
 
 from synapse.rest.client.v1 import (
     room,
@@ -53,6 +57,8 @@ class ClientRestResource(JsonResource):
 
     @staticmethod
     def register_servlets(client_resource, hs):
+        versions.register_servlets(client_resource)
+
         # "v1"
         room.register_servlets(hs, client_resource)
         events.register_servlets(hs, client_resource)

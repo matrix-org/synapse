@@ -1,4 +1,4 @@
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ REQUIREMENTS = {
     "unpaddedbase64>=1.0.1": ["unpaddedbase64>=1.0.1"],
     "canonicaljson>=1.0.0": ["canonicaljson>=1.0.0"],
     "signedjson>=1.0.0": ["signedjson>=1.0.0"],
-    "pynacl>=0.3.0": ["nacl>=0.3.0", "nacl.bindings"],
+    "pynacl==0.3.0": ["nacl==0.3.0", "nacl.bindings"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
     "Twisted>=15.1.0": ["twisted>=15.1.0"],
     "pyopenssl>=0.14": ["OpenSSL>=0.14"],

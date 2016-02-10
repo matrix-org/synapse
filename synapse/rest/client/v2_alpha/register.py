@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
+# Copyright 2015 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,7 +34,8 @@ from synapse.util.async import run_on_reactor
 if hasattr(hmac, "compare_digest"):
     compare_digest = hmac.compare_digest
 else:
-    compare_digest = lambda a, b: a == b
+    def compare_digest(a, b):
+        return a == b
 
 
 logger = logging.getLogger(__name__)
@@ -116,11 +117,16 @@ class RegisterRestServlet(RestServlet):
             return
 
         # == Normal User Registration == (everyone else)
-        if self.hs.config.disable_registration:
+        if not self.hs.config.enable_registration:
             raise SynapseError(403, "Registration has been disabled")
 
+        guest_access_token = body.get("guest_access_token", None)
+
         if desired_username is not None:
-            yield self.registration_handler.check_username(desired_username)
+            yield self.registration_handler.check_username(
+                desired_username,
+                guest_access_token=guest_access_token
+            )
 
         if self.hs.config.enable_registration_captcha:
             flows = [
@@ -147,10 +153,12 @@ class RegisterRestServlet(RestServlet):
 
         desired_username = params.get("username", None)
         new_password = params.get("password", None)
+        guest_access_token = params.get("guest_access_token", None)
 
         (user_id, token) = yield self.registration_handler.register(
             localpart=desired_username,
-            password=new_password
+            password=new_password,
+            guest_access_token=guest_access_token,
         )
 
         if result and LoginType.EMAIL_IDENTITY in result:
@@ -253,7 +261,10 @@ class RegisterRestServlet(RestServlet):
     def _do_guest_registration(self):
         if not self.hs.config.allow_guest_access:
             defer.returnValue((403, "Guest access is disabled"))
-        user_id, _ = yield self.registration_handler.register(generate_token=False)
+        user_id, _ = yield self.registration_handler.register(
+            generate_token=False,
+            make_guest=True
+        )
         access_token = self.auth_handler.generate_access_token(user_id, ["guest = true"])
         defer.returnValue((200, {
             "user_id": user_id,

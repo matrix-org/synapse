@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +28,6 @@ from synapse.api.constants import PresenceState
 from synapse.api.errors import SynapseError
 from synapse.handlers.presence import PresenceHandler, UserPresenceCache
 from synapse.streams.config import SourcePaginationConfig
-from synapse.storage.transactions import DestinationsTable
 from synapse.types import UserID
 
 OFFLINE = PresenceState.OFFLINE
