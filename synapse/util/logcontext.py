@@ -41,13 +41,13 @@ except:
 
 class LoggingContext(object):
     """Additional context for log formatting. Contexts are scoped within a
-    "with" block. Contexts inherit the state of their parent contexts.
+    "with" block.
     Args:
         name (str): Name for the context for debugging.
     """
 
     __slots__ = [
-        "parent_context", "name", "usage_start", "usage_end", "main_thread",
+        "previous_context", "name", "usage_start", "usage_end", "main_thread",
         "__dict__", "tag", "alive",
     ]
 
@@ -79,7 +79,7 @@ class LoggingContext(object):
     sentinel = Sentinel()
 
     def __init__(self, name=None):
-        self.parent_context = None
+        self.previous_context = LoggingContext.current_context()
         self.name = name
         self.ru_stime = 0.
         self.ru_utime = 0.
@@ -116,9 +116,12 @@ class LoggingContext(object):
 
     def __enter__(self):
         """Enters this logging context into thread local storage"""
-        if self.parent_context is not None:
-            raise Exception("Attempt to enter logging context multiple times")
-        self.parent_context = self.set_current_context(self)
+        old_context = self.set_current_context(self)
+        if self.previous_context != old_context:
+            logger.warn(
+                "Expected previous context %r, found %r",
+                self.previous_context, old_context
+            )
         self.alive = True
         return self
 
@@ -128,7 +131,7 @@ class LoggingContext(object):
         Returns:
             None to avoid suppressing any exeptions that were thrown.
         """
-        current = self.set_current_context(self.parent_context)
+        current = self.set_current_context(self.previous_context)
         if current is not self:
             if current is self.sentinel:
                 logger.debug("Expected logging context %s has been lost", self)
@@ -138,17 +141,11 @@ class LoggingContext(object):
                     current,
                     self
                 )
-        self.parent_context = None
+        self.previous_context = None
         self.alive = False
 
-    def __getattr__(self, name):
-        """Delegate member lookup to parent context"""
-        return getattr(self.parent_context, name)
-
     def copy_to(self, record):
-        """Copy fields from this context and its parents to the record"""
-        if self.parent_context is not None:
-            self.parent_context.copy_to(record)
+        """Copy fields from this context to the record"""
         for key, value in self.__dict__.items():
             setattr(record, key, value)
 
@@ -229,7 +226,7 @@ class PreserveLoggingContext(object):
         )
 
         if self.current_context:
-            self.has_parent = self.current_context.parent_context is not None
+            self.has_parent = self.current_context.previous_context is not None
             if not self.current_context.alive:
                 logger.debug(
                     "Entering dead context: %s",
