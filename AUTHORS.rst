@@ -51,3 +51,6 @@ Steven Hammerton <steven.hammerton at openmarket.com>
 
 Mads Robin Christensen <mads at v42 dot dk>
  * CentOS 7 installation instructions.
+
+Florent Violleau <floviolleau at gmail dot com>
+ * Add Raspberry Pi installation instructions and general troubleshooting items
