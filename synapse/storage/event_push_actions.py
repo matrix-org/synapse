@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class EventPushActionsStore(SQLBaseStore):
-    def _set_push_actions_for_event_and_users(self, txn, event, tuples):
+    def _set_push_actions_for_event_and_users_txn(self, txn, event, tuples):
         """
         :param event: the event set actions for
         :param tuples: list of tuples of (user_id, profile_tag, actions)
@@ -100,7 +100,7 @@ class EventPushActionsStore(SQLBaseStore):
         )
         defer.returnValue(ret)
 
-    def _remove_push_actions_for_event_id(self, txn, room_id, event_id):
+    def _remove_push_actions_for_event_id_txn(self, txn, room_id, event_id):
         # Sad that we have to blow away the cache for the whole room here
         txn.call_after(
             self.get_unread_event_push_actions_by_room_for_user.invalidate_many,

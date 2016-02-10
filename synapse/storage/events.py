@@ -221,12 +221,12 @@ class EventsStore(SQLBaseStore):
                 )
 
             if context.push_actions:
-                self._set_push_actions_for_event_and_users(
+                self._set_push_actions_for_event_and_users_txn(
                     txn, event, context.push_actions
                 )
 
         if event.type == EventTypes.Redaction and event.redacts is not None:
-            self._remove_push_actions_for_event_id(
+            self._remove_push_actions_for_event_id_txn(
                 txn, event.room_id, event.redacts
             )
 
