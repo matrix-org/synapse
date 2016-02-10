@@ -1,3 +1,25 @@
+Changes in synapse v0.13.0 (2016-02-10)
+=======================================
+
+This version includes an upgrade of the schema, specifically adding an index to
+the ``events`` table, which may take a minute to complete.
+
+Changes:
+
+* Improve general performance (PR #540, #543. #544, #54, #549, #567)
+* Change guest user ids to be incrementing integers (PR #550)
+* Improve performance of public room list API (PR #552)
+* Change profile API to omit keys rather than return null (PR #557)
+* Change to forward ``/media/r0`` to ``/media/v1`` (PR #595)
+
+Bug fixes:
+
+* Fix bug with upgrading guest accounts where it would fail if you opened the
+  registration email on a different device (PR #547)
+* Fix bug where unread count could be wrong (PR #568)
+
+
+
 Changes in synapse v0.12.1-rc1 (2016-01-29)
 ===========================================
 
