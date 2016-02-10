@@ -18,7 +18,7 @@ from ._base import BaseHandler
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import Membership, EventTypes
 from synapse.util import unwrapFirstError
-from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
+from synapse.util.logcontext import LoggingContext, preserve_fn
 from synapse.util.metrics import Measure
 
 from twisted.internet import defer
@@ -228,10 +228,14 @@ class SyncHandler(BaseHandler):
         invited = []
         archived = []
         deferreds = []
-        for event in room_list:
-            if event.membership == Membership.JOIN:
-                with PreserveLoggingContext(LoggingContext.current_context()):
-                    room_sync_deferred = self.full_state_sync_for_joined_room(
+
+        room_list_chunks = [room_list[i:i + 10] for i in xrange(0, len(room_list), 10)]
+        for room_list_chunk in room_list_chunks:
+            for event in room_list_chunk:
+                if event.membership == Membership.JOIN:
+                    room_sync_deferred = preserve_fn(
+                        self.full_state_sync_for_joined_room
+                    )(
                         room_id=event.room_id,
                         sync_config=sync_config,
                         now_token=now_token,
@@ -240,20 +244,21 @@ class SyncHandler(BaseHandler):
                         tags_by_room=tags_by_room,
                         account_data_by_room=account_data_by_room,
                     )
-                room_sync_deferred.addCallback(joined.append)
-                deferreds.append(room_sync_deferred)
-            elif event.membership == Membership.INVITE:
-                invite = yield self.store.get_event(event.event_id)
-                invited.append(InvitedSyncResult(
-                    room_id=event.room_id,
-                    invite=invite,
-                ))
-            elif event.membership in (Membership.LEAVE, Membership.BAN):
-                leave_token = now_token.copy_and_replace(
-                    "room_key", "s%d" % (event.stream_ordering,)
-                )
-                with PreserveLoggingContext(LoggingContext.current_context()):
-                    room_sync_deferred = self.full_state_sync_for_archived_room(
+                    room_sync_deferred.addCallback(joined.append)
+                    deferreds.append(room_sync_deferred)
+                elif event.membership == Membership.INVITE:
+                    invite = yield self.store.get_event(event.event_id)
+                    invited.append(InvitedSyncResult(
+                        room_id=event.room_id,
+                        invite=invite,
+                    ))
+                elif event.membership in (Membership.LEAVE, Membership.BAN):
+                    leave_token = now_token.copy_and_replace(
+                        "room_key", "s%d" % (event.stream_ordering,)
+                    )
+                    room_sync_deferred = preserve_fn(
+                        self.full_state_sync_for_archived_room
+                    )(
                         sync_config=sync_config,
                         room_id=event.room_id,
                         leave_event_id=event.event_id,
@@ -262,12 +267,12 @@ class SyncHandler(BaseHandler):
                         tags_by_room=tags_by_room,
                         account_data_by_room=account_data_by_room,
                     )
-                room_sync_deferred.addCallback(archived.append)
-                deferreds.append(room_sync_deferred)
+                    room_sync_deferred.addCallback(archived.append)
+                    deferreds.append(room_sync_deferred)
 
-        yield defer.gatherResults(
-            deferreds, consumeErrors=True
-        ).addErrback(unwrapFirstError)
+            yield defer.gatherResults(
+                deferreds, consumeErrors=True
+            ).addErrback(unwrapFirstError)
 
         account_data_for_user = sync_config.filter_collection.filter_account_data(
             self.account_data_for_user(account_data)
