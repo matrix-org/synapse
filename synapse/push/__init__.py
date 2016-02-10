@@ -17,6 +17,8 @@ from twisted.internet import defer
 
 from synapse.streams.config import PaginationConfig
 from synapse.types import StreamToken
+from synapse.util.logcontext import LoggingContext
+from synapse.util.metrics import Measure
 
 import synapse.util.async
 import push_rule_evaluator as push_rule_evaluator
@@ -25,6 +27,16 @@ import logging
 import random
 
 logger = logging.getLogger(__name__)
+
+
+_NEXT_ID = 1
+
+
+def _get_next_id():
+    global _NEXT_ID
+    _id = _NEXT_ID
+    _NEXT_ID += 1
+    return _id
 
 
 # Pushers could now be moved to pull out of the event_push_actions table instead
@@ -57,6 +69,8 @@ class Pusher(object):
         self.alive = True
         self.badge = None
 
+        self.name = "Pusher-%d" % (_get_next_id(),)
+
         # The last value of last_active_time that we saw
         self.last_last_active_time = 0
         self.has_unread = True
@@ -86,38 +100,46 @@ class Pusher(object):
 
     @defer.inlineCallbacks
     def start(self):
-        if not self.last_token:
-            # First-time setup: get a token to start from (we can't
-            # just start from no token, ie. 'now'
-            # because we need the result to be reproduceable in case
-            # we fail to dispatch the push)
-            config = PaginationConfig(from_token=None, limit='1')
-            chunk = yield self.evStreamHandler.get_stream(
-                self.user_id, config, timeout=0, affect_presence=False
-            )
-            self.last_token = chunk['end']
-            self.store.update_pusher_last_token(
-                self.app_id, self.pushkey, self.user_id, self.last_token
-            )
-            logger.info("Pusher %s for user %s starting from token %s",
-                        self.pushkey, self.user_id, self.last_token)
-
-        wait = 0
-        while self.alive:
-            try:
-                if wait > 0:
-                    yield synapse.util.async.sleep(wait)
-                yield self.get_and_dispatch()
-                wait = 0
-            except:
-                if wait == 0:
-                    wait = 1
-                else:
-                    wait = min(wait * 2, 1800)
-                logger.exception(
-                    "Exception in pusher loop for pushkey %s. Pausing for %ds",
-                    self.pushkey, wait
+        with LoggingContext(self.name):
+            if not self.last_token:
+                # First-time setup: get a token to start from (we can't
+                # just start from no token, ie. 'now'
+                # because we need the result to be reproduceable in case
+                # we fail to dispatch the push)
+                config = PaginationConfig(from_token=None, limit='1')
+                chunk = yield self.evStreamHandler.get_stream(
+                    self.user_id, config, timeout=0, affect_presence=False
                 )
+                self.last_token = chunk['end']
+                yield self.store.update_pusher_last_token(
+                    self.app_id, self.pushkey, self.user_id, self.last_token
+                )
+                logger.info("New pusher %s for user %s starting from token %s",
+                            self.pushkey, self.user_id, self.last_token)
+
+            else:
+                logger.info(
+                    "Old pusher %s for user %s starting",
+                    self.pushkey, self.user_id,
+                )
+
+            wait = 0
+            while self.alive:
+                try:
+                    if wait > 0:
+                        yield synapse.util.async.sleep(wait)
+                    with Measure(self.clock, "push"):
+                        yield self.get_and_dispatch()
+                    wait = 0
+                except:
+                    if wait == 0:
+                        wait = 1
+                    else:
+                        wait = min(wait * 2, 1800)
+                    logger.exception(
+                        "Exception in pusher loop for pushkey %s. Pausing for %ds",
+                        self.pushkey, wait
+                    )
 
     @defer.inlineCallbacks
     def get_and_dispatch(self):
@@ -316,7 +338,7 @@ class Pusher(object):
                         r.room_id, self.user_id, last_unread_event_id
                     )
                 )
-                badge += len(notifs)
+                badge += notifs["notify_count"]
         defer.returnValue(badge)
 
 

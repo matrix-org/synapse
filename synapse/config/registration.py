@@ -23,22 +23,23 @@ from distutils.util import strtobool
 class RegistrationConfig(Config):
 
     def read_config(self, config):
-        self.disable_registration = not bool(
+        self.enable_registration = bool(
             strtobool(str(config["enable_registration"]))
         )
         if "disable_registration" in config:
-            self.disable_registration = bool(
+            self.enable_registration = not bool(
                 strtobool(str(config["disable_registration"]))
             )
 
         self.registration_shared_secret = config.get("registration_shared_secret")
-        self.macaroon_secret_key = config.get("macaroon_secret_key")
+
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
+        self.trusted_third_party_id_servers = config["trusted_third_party_id_servers"]
         self.allow_guest_access = config.get("allow_guest_access", False)
 
     def default_config(self, **kwargs):
         registration_shared_secret = random_string_with_symbols(50)
-        macaroon_secret_key = random_string_with_symbols(50)
+
         return """\
         ## Registration ##
 
@@ -49,8 +50,6 @@ class RegistrationConfig(Config):
         # secret, even if registration is otherwise disabled.
         registration_shared_secret: "%(registration_shared_secret)s"
 
-        macaroon_secret_key: "%(macaroon_secret_key)s"
-
         # Set the number of bcrypt rounds used to generate password hash.
         # Larger numbers increase the work factor needed to generate the hash.
         # The default number of rounds is 12.
@@ -60,6 +59,12 @@ class RegistrationConfig(Config):
         # participate in rooms hosted on this server which have been made
         # accessible to anonymous users.
         allow_guest_access: False
+
+        # The list of identity servers trusted to verify third party
+        # identifiers by this server.
+        trusted_third_party_id_servers:
+            - matrix.org
+            - vector.im
         """ % locals()
 
     def add_arguments(self, parser):
@@ -71,6 +76,6 @@ class RegistrationConfig(Config):
 
     def read_arguments(self, args):
         if args.enable_registration is not None:
-            self.disable_registration = not bool(
+            self.enable_registration = bool(
                 strtobool(str(args.enable_registration))
             )

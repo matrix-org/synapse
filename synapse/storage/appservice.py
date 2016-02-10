@@ -276,7 +276,8 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             "application_services_state",
             dict(as_id=service.id),
             ["state"],
-            allow_none=True
+            allow_none=True,
+            desc="get_appservice_state",
         )
         if result:
             defer.returnValue(result.get("state"))

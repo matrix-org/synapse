@@ -304,7 +304,7 @@ def _flatten_dict(d, prefix=[], result={}):
         if isinstance(value, basestring):
             result[".".join(prefix + [key])] = value.lower()
         elif hasattr(value, "items"):
-            _flatten_dict(value, prefix=(prefix+[key]), result=result)
+            _flatten_dict(value, prefix=(prefix + [key]), result=result)
 
     return result
 

@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
+
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError, Codes
@@ -134,6 +136,7 @@ class RegistrationStore(SQLBaseStore):
             },
             retcols=["name", "password_hash", "is_guest"],
             allow_none=True,
+            desc="get_user_by_id",
         )
 
     def get_users_by_id_case_insensitive(self, user_id):
@@ -350,3 +353,37 @@ class RegistrationStore(SQLBaseStore):
 
         ret = yield self.runInteraction("count_users", _count_users)
         defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def find_next_generated_user_id_localpart(self):
+        """
+        Gets the localpart of the next generated user ID.
+
+        Generated user IDs are integers, and we aim for them to be as small as
+        we can. Unfortunately, it's possible some of them are already taken by
+        existing users, and there may be gaps in the already taken range. This
+        function returns the start of the first allocatable gap. This is to
+        avoid the case of ID 10000000 being pre-allocated, so us wasting the
+        first (and shortest) many generated user IDs.
+        """
+        def _find_next_generated_user_id(txn):
+            txn.execute("SELECT name FROM users")
+            rows = self.cursor_to_dict(txn)
+
+            regex = re.compile("^@(\d+):")
+
+            found = set()
+
+            for r in rows:
+                user_id = r["name"]
+                match = regex.search(user_id)
+                if match:
+                    found.add(int(match.group(1)))
+            for i in xrange(len(found) + 1):
+                if i not in found:
+                    return i
+
+        defer.returnValue((yield self.runInteraction(
+            "find_next_generated_user_id",
+            _find_next_generated_user_id
+        )))

@@ -34,7 +34,7 @@ metrics = synapse.metrics.get_metrics_for(__name__)
 
 
 # Don't bother bumping "last active" time if it differs by less than 60 seconds
-LAST_ACTIVE_GRANULARITY = 60*1000
+LAST_ACTIVE_GRANULARITY = 60 * 1000
 
 # Keep no more than this number of offline serial revisions
 MAX_OFFLINE_SERIALS = 1000
@@ -378,9 +378,9 @@ class PresenceHandler(BaseHandler):
         was_polling = target_user in self._user_cachemap
 
         if now_online and not was_polling:
-            self.start_polling_presence(target_user, state=state)
+            yield self.start_polling_presence(target_user, state=state)
         elif not now_online and was_polling:
-            self.stop_polling_presence(target_user)
+            yield self.stop_polling_presence(target_user)
 
         # TODO(paul): perform a presence push as part of start/stop poll so
         #   we don't have to do this all the time
@@ -394,7 +394,8 @@ class PresenceHandler(BaseHandler):
         if now - prev_state.state.get("last_active", 0) < LAST_ACTIVE_GRANULARITY:
             return
 
-        self.changed_presencelike_data(user, {"last_active": now})
+        with PreserveLoggingContext():
+            self.changed_presencelike_data(user, {"last_active": now})
 
     def get_joined_rooms_for_user(self, user):
         """Get the list of rooms a user is joined to.
@@ -466,11 +467,12 @@ class PresenceHandler(BaseHandler):
                 local_user, room_ids=[room_id], add_to_cache=False
             )
 
-            self.push_update_to_local_and_remote(
-                observed_user=local_user,
-                users_to_push=[user],
-                statuscache=statuscache,
-            )
+            with PreserveLoggingContext():
+                self.push_update_to_local_and_remote(
+                    observed_user=local_user,
+                    users_to_push=[user],
+                    statuscache=statuscache,
+                )
 
     @defer.inlineCallbacks
     def send_presence_invite(self, observer_user, observed_user):
@@ -556,7 +558,7 @@ class PresenceHandler(BaseHandler):
             observer_user.localpart, observed_user.to_string()
         )
 
-        self.start_polling_presence(
+        yield self.start_polling_presence(
             observer_user, target_user=observed_user
         )
 

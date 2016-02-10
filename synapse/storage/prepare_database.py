@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 28
+SCHEMA_VERSION = 29
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -211,7 +211,7 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
     logger.debug("applied_delta_files: %s", applied_delta_files)
 
     for v in range(start_ver, SCHEMA_VERSION + 1):
-        logger.debug("Upgrading schema to v%d", v)
+        logger.info("Upgrading schema to v%d", v)
 
         delta_dir = os.path.join(dir_path, "schema", "delta", str(v))
 

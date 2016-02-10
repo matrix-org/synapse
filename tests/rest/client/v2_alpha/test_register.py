@@ -41,7 +41,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.hs.hostname = "superbig~testing~thing.com"
         self.hs.get_auth = Mock(return_value=self.auth)
         self.hs.get_handlers = Mock(return_value=self.handlers)
-        self.hs.config.disable_registration = False
+        self.hs.config.enable_registration = True
 
         # init the thing we're testing
         self.servlet = RegisterRestServlet(self.hs)
@@ -120,7 +120,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         }))
 
     def test_POST_disabled_registration(self):
-        self.hs.config.disable_registration = True
+        self.hs.config.enable_registration = False
         self.request_data = json.dumps({
             "username": "kermit",
             "password": "monkey"

@@ -429,8 +429,6 @@ class RoomEventContext(ClientV1RestServlet):
             serialize_event(event, time_now) for event in results["state"]
         ]
 
-        logger.info("Responding with %r", results)
-
         defer.returnValue((200, results))
 
 

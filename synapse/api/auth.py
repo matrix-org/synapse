@@ -24,6 +24,7 @@ from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes, SynapseError, EventSizeError
 from synapse.types import Requester, RoomID, UserID, EventID
 from synapse.util.logutils import log_function
+from synapse.util.logcontext import preserve_context_over_fn
 from unpaddedbase64 import decode_base64
 
 import logging
@@ -529,7 +530,8 @@ class Auth(object):
                 default=[""]
             )[0]
             if user and access_token and ip_addr:
-                self.store.insert_client_ip(
+                preserve_context_over_fn(
+                    self.store.insert_client_ip,
                     user=user,
                     access_token=access_token,
                     ip=ip_addr,
@@ -574,7 +576,7 @@ class Auth(object):
             raise AuthError(
                 403,
                 "Application service has not registered this user"
-                )
+            )
         defer.returnValue(user_id)
 
     @defer.inlineCallbacks
@@ -696,6 +698,7 @@ class Auth(object):
     def _look_up_user_by_access_token(self, token):
         ret = yield self.store.get_user_by_access_token(token)
         if not ret:
+            logger.warn("Unrecognised access token - not in store: %s" % (token,))
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Unrecognised access token.",
                 errcode=Codes.UNKNOWN_TOKEN
@@ -713,6 +716,7 @@ class Auth(object):
             token = request.args["access_token"][0]
             service = yield self.store.get_app_service_by_token(token)
             if not service:
+                logger.warn("Unrecognised appservice access token: %s" % (token,))
                 raise AuthError(
                     self.TOKEN_NOT_FOUND_HTTP_STATUS,
                     "Unrecognised access token.",

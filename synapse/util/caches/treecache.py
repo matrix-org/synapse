@@ -58,7 +58,7 @@ class TreeCache(object):
 
             if n:
                 break
-            node_and_keys[i+1][0].pop(k)
+            node_and_keys[i + 1][0].pop(k)
 
         popped, cnt = _strip_and_count_entires(popped)
         self.size -= cnt

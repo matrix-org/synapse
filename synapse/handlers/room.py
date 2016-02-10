@@ -18,13 +18,14 @@ from twisted.internet import defer
 
 from ._base import BaseHandler
 
-from synapse.types import UserID, RoomAlias, RoomID
+from synapse.types import UserID, RoomAlias, RoomID, RoomStreamToken
 from synapse.api.constants import (
     EventTypes, Membership, JoinRules, RoomCreationPreset,
 )
 from synapse.api.errors import AuthError, StoreError, SynapseError, Codes
 from synapse.util import stringutils, unwrapFirstError
 from synapse.util.async import run_on_reactor
+from synapse.util.logcontext import preserve_context_over_fn
 
 from signedjson.sign import verify_signed_json
 from signedjson.key import decode_verify_key_bytes
@@ -46,11 +47,17 @@ def collect_presencelike_data(distributor, user, content):
 
 
 def user_left_room(distributor, user, room_id):
-    return distributor.fire("user_left_room", user=user, room_id=room_id)
+    return preserve_context_over_fn(
+        distributor.fire,
+        "user_left_room", user=user, room_id=room_id
+    )
 
 
 def user_joined_room(distributor, user, room_id):
-    return distributor.fire("user_joined_room", user=user, room_id=room_id)
+    return preserve_context_over_fn(
+        distributor.fire,
+        "user_joined_room", user=user, room_id=room_id
+    )
 
 
 class RoomCreationHandler(BaseHandler):
@@ -876,39 +883,71 @@ class RoomListHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_public_room_list(self):
-        chunk = yield self.store.get_rooms(is_public=True)
+        room_ids = yield self.store.get_public_room_ids()
 
-        room_members = yield defer.gatherResults(
-            [
-                self.store.get_users_in_room(room["room_id"])
-                for room in chunk
-            ],
-            consumeErrors=True,
-        ).addErrback(unwrapFirstError)
+        @defer.inlineCallbacks
+        def handle_room(room_id):
+            aliases = yield self.store.get_aliases_for_room(room_id)
+            if not aliases:
+                defer.returnValue(None)
 
-        avatar_urls = yield defer.gatherResults(
-            [
-                self.get_room_avatar_url(room["room_id"])
-                for room in chunk
-            ],
-            consumeErrors=True,
-        ).addErrback(unwrapFirstError)
+            state = yield self.state_handler.get_current_state(room_id)
 
-        for i, room in enumerate(chunk):
-            room["num_joined_members"] = len(room_members[i])
-            if avatar_urls[i]:
-                room["avatar_url"] = avatar_urls[i]
+            result = {"aliases": aliases, "room_id": room_id}
+
+            name_event = state.get((EventTypes.Name, ""), None)
+            if name_event:
+                name = name_event.content.get("name", None)
+                if name:
+                    result["name"] = name
+
+            topic_event = state.get((EventTypes.Topic, ""), None)
+            if topic_event:
+                topic = topic_event.content.get("topic", None)
+                if topic:
+                    result["topic"] = topic
+
+            canonical_event = state.get((EventTypes.CanonicalAlias, ""), None)
+            if canonical_event:
+                canonical_alias = canonical_event.content.get("alias", None)
+                if canonical_alias:
+                    result["canonical_alias"] = canonical_alias
+
+            visibility_event = state.get((EventTypes.RoomHistoryVisibility, ""), None)
+            visibility = None
+            if visibility_event:
+                visibility = visibility_event.content.get("history_visibility", None)
+            result["world_readable"] = visibility == "world_readable"
+
+            guest_event = state.get((EventTypes.GuestAccess, ""), None)
+            guest = None
+            if guest_event:
+                guest = guest_event.content.get("guest_access", None)
+            result["guest_can_join"] = guest == "can_join"
+
+            avatar_event = state.get(("m.room.avatar", ""), None)
+            if avatar_event:
+                avatar_url = avatar_event.content.get("url", None)
+                if avatar_url:
+                    result["avatar_url"] = avatar_url
+
+            result["num_joined_members"] = sum(
+                1 for (event_type, _), ev in state.items()
+                if event_type == EventTypes.Member and ev.membership == Membership.JOIN
+            )
+
+            defer.returnValue(result)
+
+        result = []
+        for chunk in (room_ids[i:i + 10] for i in xrange(0, len(room_ids), 10)):
+            chunk_result = yield defer.gatherResults([
+                handle_room(room_id)
+                for room_id in chunk
+            ], consumeErrors=True).addErrback(unwrapFirstError)
+            result.extend(v for v in chunk_result if v)
 
         # FIXME (erikj): START is no longer a valid value
-        defer.returnValue({"start": "START", "end": "END", "chunk": chunk})
-
-    @defer.inlineCallbacks
-    def get_room_avatar_url(self, room_id):
-        event = yield self.hs.get_state_handler().get_current_state(
-            room_id, "m.room.avatar"
-        )
-        if event and "url" in event.content:
-            defer.returnValue(event.content["url"])
+        defer.returnValue({"start": "START", "end": "END", "chunk": result})
 
 
 class RoomContextHandler(BaseHandler):
@@ -927,7 +966,7 @@ class RoomContextHandler(BaseHandler):
         Returns:
             dict, or None if the event isn't found
         """
-        before_limit = math.floor(limit/2.)
+        before_limit = math.floor(limit / 2.)
         after_limit = limit - before_limit
 
         now_token = yield self.hs.get_event_sources().get_current_token()
@@ -997,6 +1036,11 @@ class RoomEventSource(object):
 
         to_key = yield self.get_current_key()
 
+        from_token = RoomStreamToken.parse(from_key)
+        if from_token.topological:
+            logger.warn("Stream has topological part!!!! %r", from_key)
+            from_key = "s%s" % (from_token.stream,)
+
         app_service = yield self.store.get_app_service_by_user_id(
             user.to_string()
         )
@@ -1008,14 +1052,29 @@ class RoomEventSource(object):
                 limit=limit,
             )
         else:
-            events, end_key = yield self.store.get_room_events_stream(
-                user_id=user.to_string(),
+            room_events = yield self.store.get_membership_changes_for_user(
+                user.to_string(), from_key, to_key
+            )
+
+            room_to_events = yield self.store.get_room_events_stream_for_rooms(
+                room_ids=room_ids,
                 from_key=from_key,
                 to_key=to_key,
-                limit=limit,
-                room_ids=room_ids,
-                is_guest=is_guest,
+                limit=limit or 10,
             )
+
+            events = list(room_events)
+            events.extend(e for evs, _ in room_to_events.values() for e in evs)
+
+            events.sort(key=lambda e: e.internal_metadata.order)
+
+            if limit:
+                events[:] = events[:limit]
+
+            if events:
+                end_key = events[-1].internal_metadata.after
+            else:
+                end_key = to_key
 
         defer.returnValue((events, end_key))
 

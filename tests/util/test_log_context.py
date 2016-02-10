@@ -5,6 +5,7 @@ from .. import unittest
 from synapse.util.async import sleep
 from synapse.util.logcontext import LoggingContext
 
+
 class LoggingContextTestCase(unittest.TestCase):
 
     def _check_test_key(self, value):
@@ -16,15 +17,6 @@ class LoggingContextTestCase(unittest.TestCase):
         with LoggingContext() as context_one:
             context_one.test_key = "test"
             self._check_test_key("test")
-
-    def test_chaining(self):
-        with LoggingContext() as context_one:
-            context_one.test_key = "one"
-            with LoggingContext() as context_two:
-                self._check_test_key("one")
-                context_two.test_key = "two"
-                self._check_test_key("two")
-            self._check_test_key("one")
 
     @defer.inlineCallbacks
     def test_sleep(self):

@@ -14,7 +14,6 @@
 # limitations under the License.
 
 from ._base import SQLBaseStore
-from synapse.util.caches.stream_change_cache import StreamChangeCache
 from twisted.internet import defer
 
 import ujson as json
@@ -24,14 +23,6 @@ logger = logging.getLogger(__name__)
 
 
 class AccountDataStore(SQLBaseStore):
-    def __init__(self, hs):
-        super(AccountDataStore, self).__init__(hs)
-
-        self._account_data_stream_cache = StreamChangeCache(
-            "AccountDataAndTagsChangeCache",
-            self._account_data_id_gen.get_max_token(None),
-            max_size=10000,
-        )
 
     def get_account_data_for_user(self, user_id):
         """Get all the client account_data for a user.
@@ -165,6 +156,10 @@ class AccountDataStore(SQLBaseStore):
                     "stream_id": next_id,
                     "content": content_json,
                 }
+            )
+            txn.call_after(
+                self._account_data_stream_cache.entity_has_changed,
+                user_id, next_id,
             )
             self._update_max_stream_id(txn, next_id)
 

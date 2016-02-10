@@ -41,7 +41,7 @@ metrics = synapse.metrics.get_metrics_for(__name__)
 
 incoming_requests_counter = metrics.register_counter(
     "requests",
-    labels=["method", "servlet"],
+    labels=["method", "servlet", "tag"],
 )
 outgoing_responses_counter = metrics.register_counter(
     "responses",
@@ -50,23 +50,23 @@ outgoing_responses_counter = metrics.register_counter(
 
 response_timer = metrics.register_distribution(
     "response_time",
-    labels=["method", "servlet"]
+    labels=["method", "servlet", "tag"]
 )
 
 response_ru_utime = metrics.register_distribution(
-    "response_ru_utime", labels=["method", "servlet"]
+    "response_ru_utime", labels=["method", "servlet", "tag"]
 )
 
 response_ru_stime = metrics.register_distribution(
-    "response_ru_stime", labels=["method", "servlet"]
+    "response_ru_stime", labels=["method", "servlet", "tag"]
 )
 
 response_db_txn_count = metrics.register_distribution(
-    "response_db_txn_count", labels=["method", "servlet"]
+    "response_db_txn_count", labels=["method", "servlet", "tag"]
 )
 
 response_db_txn_duration = metrics.register_distribution(
-    "response_db_txn_duration", labels=["method", "servlet"]
+    "response_db_txn_duration", labels=["method", "servlet", "tag"]
 )
 
 
@@ -99,9 +99,8 @@ def request_handler(request_handler):
             request_context.request = request_id
             with request.processing():
                 try:
-                    d = request_handler(self, request)
-                    with PreserveLoggingContext():
-                        yield d
+                    with PreserveLoggingContext(request_context):
+                        yield request_handler(self, request)
                 except CodeMessageException as e:
                     code = e.code
                     if isinstance(e, SynapseError):
@@ -208,6 +207,9 @@ class JsonResource(HttpServer, resource.Resource):
         if request.method == "OPTIONS":
             self._send_response(request, 200, {})
             return
+
+        start_context = LoggingContext.current_context()
+
         # Loop through all the registered callbacks to check if the method
         # and path regex match
         for path_entry in self.path_regexs.get(request.method, []):
@@ -226,7 +228,6 @@ class JsonResource(HttpServer, resource.Resource):
                 servlet_classname = servlet_instance.__class__.__name__
             else:
                 servlet_classname = "%r" % callback
-            incoming_requests_counter.inc(request.method, servlet_classname)
 
             args = [
                 urllib.unquote(u).decode("UTF-8") if u else u for u in m.groups()
@@ -237,21 +238,40 @@ class JsonResource(HttpServer, resource.Resource):
                 code, response = callback_return
                 self._send_response(request, code, response)
 
-            response_timer.inc_by(
-                self.clock.time_msec() - start, request.method, servlet_classname
-            )
-
             try:
                 context = LoggingContext.current_context()
+
+                tag = ""
+                if context:
+                    tag = context.tag
+
+                    if context != start_context:
+                        logger.warn(
+                            "Context have unexpectedly changed %r, %r",
+                            context, self.start_context
+                        )
+                        return
+
+                incoming_requests_counter.inc(request.method, servlet_classname, tag)
+
+                response_timer.inc_by(
+                    self.clock.time_msec() - start, request.method,
+                    servlet_classname, tag
+                )
+
                 ru_utime, ru_stime = context.get_resource_usage()
 
-                response_ru_utime.inc_by(ru_utime, request.method, servlet_classname)
-                response_ru_stime.inc_by(ru_stime, request.method, servlet_classname)
+                response_ru_utime.inc_by(
+                    ru_utime, request.method, servlet_classname, tag
+                )
+                response_ru_stime.inc_by(
+                    ru_stime, request.method, servlet_classname, tag
+                )
                 response_db_txn_count.inc_by(
-                    context.db_txn_count, request.method, servlet_classname
+                    context.db_txn_count, request.method, servlet_classname, tag
                 )
                 response_db_txn_duration.inc_by(
-                    context.db_txn_duration, request.method, servlet_classname
+                    context.db_txn_duration, request.method, servlet_classname, tag
                 )
             except:
                 pass

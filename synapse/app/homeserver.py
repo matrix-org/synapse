@@ -14,27 +14,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-from synapse.rest import ClientRestResource
+import synapse
 
-sys.dont_write_bytecode = True
+import contextlib
+import logging
+import os
+import re
+import resource
+import subprocess
+import sys
+import time
+from synapse.config._base import ConfigError
+
 from synapse.python_dependencies import (
-    check_requirements, DEPENDENCY_LINKS, MissingRequirementError
+    check_requirements, DEPENDENCY_LINKS
 )
 
-if __name__ == '__main__':
-    try:
-        check_requirements()
-    except MissingRequirementError as e:
-        message = "\n".join([
-            "Missing Requirement: %s" % (e.message,),
-            "To install run:",
-            "    pip install --upgrade --force \"%s\"" % (e.dependency,),
-            "",
-        ])
-        sys.stderr.writelines(message)
-        sys.exit(1)
-
+from synapse.rest import ClientRestResource
 from synapse.storage.engines import create_engine, IncorrectDatabaseSetup
 from synapse.storage import are_all_users_on_domain
 from synapse.storage.prepare_database import UpgradeDatabaseException
@@ -60,7 +56,7 @@ from synapse.rest.key.v1.server_key_resource import LocalKey
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.api.urls import (
     FEDERATION_PREFIX, WEB_CLIENT_PREFIX, CONTENT_REPO_PREFIX,
-    SERVER_KEY_PREFIX, MEDIA_PREFIX, STATIC_PREFIX,
+    SERVER_KEY_PREFIX, LEGACY_MEDIA_PREFIX, MEDIA_PREFIX, STATIC_PREFIX,
     SERVER_KEY_V2_PREFIX,
 )
 from synapse.config.homeserver import HomeServerConfig
@@ -72,17 +68,6 @@ from synapse.federation.transport.server import TransportLayerServer
 from synapse import events
 
 from daemonize import Daemonize
-
-import synapse
-
-import contextlib
-import logging
-import os
-import re
-import resource
-import subprocess
-import time
-
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -163,8 +148,10 @@ class SynapseHomeServer(HomeServer):
                     })
 
                 if name in ["media", "federation", "client"]:
+                    media_repo = MediaRepositoryResource(self)
                     resources.update({
-                        MEDIA_PREFIX: MediaRepositoryResource(self),
+                        MEDIA_PREFIX: media_repo,
+                        LEGACY_MEDIA_PREFIX: media_repo,
                         CONTENT_REPO_PREFIX: ContentRepoResource(
                             self, self.config.uploads_path, self.auth, self.content_addr
                         ),
@@ -366,11 +353,20 @@ def setup(config_options):
     Returns:
         HomeServer
     """
-    config = HomeServerConfig.load_config(
-        "Synapse Homeserver",
-        config_options,
-        generate_section="Homeserver"
-    )
+    try:
+        config = HomeServerConfig.load_config(
+            "Synapse Homeserver",
+            config_options,
+            generate_section="Homeserver"
+        )
+    except ConfigError as e:
+        sys.stderr.write("\n" + e.message + "\n")
+        sys.exit(1)
+
+    if not config:
+        # If a config isn't returned, and an exception isn't raised, we're just
+        # generating config files and shouldn't try to continue.
+        sys.exit(0)
 
     config.setup_logging()
 
@@ -690,8 +686,8 @@ def run(hs):
         stats["uptime_seconds"] = uptime
         stats["total_users"] = yield hs.get_datastore().count_all_users()
 
-        all_rooms = yield hs.get_datastore().get_rooms(False)
-        stats["total_room_count"] = len(all_rooms)
+        room_count = yield hs.get_datastore().get_room_count()
+        stats["total_room_count"] = room_count
 
         stats["daily_active_users"] = yield hs.get_datastore().count_daily_users()
         daily_messages = yield hs.get_datastore().count_daily_messages()
@@ -713,6 +709,8 @@ def run(hs):
         phone_home_task.start(60 * 60 * 24, now=False)
 
     def in_thread():
+        # Uncomment to enable tracing of log context changes.
+        # sys.settrace(logcontext_tracer)
         with LoggingContext("run"):
             change_resource_limit(hs.config.soft_file_limit)
             reactor.run()

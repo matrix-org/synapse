@@ -18,9 +18,12 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 
 from synapse.util.logutils import log_function
-from synapse.util.async import run_on_reactor, ObservableDeferred
+from synapse.util.async import ObservableDeferred
+from synapse.util.logcontext import PreserveLoggingContext
 from synapse.types import StreamToken
 import synapse.metrics
+
+from collections import namedtuple
 
 import logging
 
@@ -71,7 +74,8 @@ class _NotifierUserStream(object):
         self.current_token = current_token
         self.last_notified_ms = time_now_ms
 
-        self.notify_deferred = ObservableDeferred(defer.Deferred())
+        with PreserveLoggingContext():
+            self.notify_deferred = ObservableDeferred(defer.Deferred())
 
     def notify(self, stream_key, stream_id, time_now_ms):
         """Notify any listeners for this user of a new event from an
@@ -86,8 +90,10 @@ class _NotifierUserStream(object):
         )
         self.last_notified_ms = time_now_ms
         noify_deferred = self.notify_deferred
-        self.notify_deferred = ObservableDeferred(defer.Deferred())
-        noify_deferred.callback(self.current_token)
+
+        with PreserveLoggingContext():
+            self.notify_deferred = ObservableDeferred(defer.Deferred())
+            noify_deferred.callback(self.current_token)
 
     def remove(self, notifier):
         """ Remove this listener from all the indexes in the Notifier
@@ -116,6 +122,11 @@ class _NotifierUserStream(object):
             return _NotificationListener(defer.succeed(self.current_token))
         else:
             return _NotificationListener(self.notify_deferred.observe())
+
+
+class EventStreamResult(namedtuple("EventStreamResult", ("events", "tokens"))):
+    def __nonzero__(self):
+        return bool(self.events)
 
 
 class Notifier(object):
@@ -177,8 +188,6 @@ class Notifier(object):
             lambda: count(bool, self.appservice_to_user_streams.values()),
         )
 
-    @log_function
-    @defer.inlineCallbacks
     def on_new_room_event(self, event, room_stream_id, max_room_stream_id,
                           extra_users=[]):
         """ Used by handlers to inform the notifier something has happened
@@ -192,12 +201,11 @@ class Notifier(object):
         until all previous events have been persisted before notifying
         the client streams.
         """
-        yield run_on_reactor()
-
-        self.pending_new_room_events.append((
-            room_stream_id, event, extra_users
-        ))
-        self._notify_pending_new_room_events(max_room_stream_id)
+        with PreserveLoggingContext():
+            self.pending_new_room_events.append((
+                room_stream_id, event, extra_users
+            ))
+            self._notify_pending_new_room_events(max_room_stream_id)
 
     def _notify_pending_new_room_events(self, max_room_stream_id):
         """Notify for the room events that were queued waiting for a previous
@@ -244,31 +252,29 @@ class Notifier(object):
             extra_streams=app_streams,
         )
 
-    @defer.inlineCallbacks
-    @log_function
     def on_new_event(self, stream_key, new_token, users=[], rooms=[],
                      extra_streams=set()):
         """ Used to inform listeners that something has happend event wise.
 
         Will wake up all listeners for the given users and rooms.
         """
-        yield run_on_reactor()
-        user_streams = set()
+        with PreserveLoggingContext():
+            user_streams = set()
 
-        for user in users:
-            user_stream = self.user_to_user_stream.get(str(user))
-            if user_stream is not None:
-                user_streams.add(user_stream)
+            for user in users:
+                user_stream = self.user_to_user_stream.get(str(user))
+                if user_stream is not None:
+                    user_streams.add(user_stream)
 
-        for room in rooms:
-            user_streams |= self.room_to_user_streams.get(room, set())
+            for room in rooms:
+                user_streams |= self.room_to_user_streams.get(room, set())
 
-        time_now_ms = self.clock.time_msec()
-        for user_stream in user_streams:
-            try:
-                user_stream.notify(stream_key, new_token, time_now_ms)
-            except:
-                logger.exception("Failed to notify listener")
+            time_now_ms = self.clock.time_msec()
+            for user_stream in user_streams:
+                try:
+                    user_stream.notify(stream_key, new_token, time_now_ms)
+                except:
+                    logger.exception("Failed to notify listener")
 
     @defer.inlineCallbacks
     def wait_for_events(self, user_id, timeout, callback, room_ids=None,
@@ -301,7 +307,7 @@ class Notifier(object):
             def timed_out():
                 if listener:
                     listener.deferred.cancel()
-            timer = self.clock.call_later(timeout/1000., timed_out)
+            timer = self.clock.call_later(timeout / 1000., timed_out)
 
             prev_token = from_token
             while not result:
@@ -318,7 +324,8 @@ class Notifier(object):
                     # that we don't miss any current_token updates.
                     prev_token = current_token
                     listener = user_stream.new_listener(prev_token)
-                    yield listener.deferred
+                    with PreserveLoggingContext():
+                        yield listener.deferred
                 except defer.CancelledError:
                     break
 
@@ -356,7 +363,7 @@ class Notifier(object):
         @defer.inlineCallbacks
         def check_for_updates(before_token, after_token):
             if not after_token.is_after(before_token):
-                defer.returnValue(None)
+                defer.returnValue(EventStreamResult([], (from_token, from_token)))
 
             events = []
             end_token = from_token
@@ -369,6 +376,7 @@ class Notifier(object):
                     continue
                 if only_keys and name not in only_keys:
                     continue
+
                 new_events, new_key = yield source.get_new_events(
                     user=user,
                     from_key=getattr(from_token, keyname),
@@ -388,10 +396,7 @@ class Notifier(object):
                 events.extend(new_events)
                 end_token = end_token.copy_and_replace(keyname, new_key)
 
-            if events:
-                defer.returnValue((events, (from_token, end_token)))
-            else:
-                defer.returnValue(None)
+            defer.returnValue(EventStreamResult(events, (from_token, end_token)))
 
         user_id_for_stream = user.to_string()
         if is_peeking:
@@ -414,9 +419,6 @@ class Notifier(object):
             room_ids=room_ids,
             from_token=from_token,
         )
-
-        if result is None:
-            result = ([], (from_token, from_token))
 
         defer.returnValue(result)
 

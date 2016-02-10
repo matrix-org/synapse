@@ -46,9 +46,10 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config = Mock()
         config.signing_key = [MockKey()]
         config.event_cache_size = 1
-        config.disable_registration = False
+        config.enable_registration = True
         config.macaroon_secret_key = "not even a little secret"
         config.server_name = "server.under.test"
+        config.trusted_third_party_id_servers = []
 
     if "clock" not in kargs:
         kargs["clock"] = MockClock()

@@ -34,7 +34,8 @@ from synapse.util.async import run_on_reactor
 if hasattr(hmac, "compare_digest"):
     compare_digest = hmac.compare_digest
 else:
-    compare_digest = lambda a, b: a == b
+    def compare_digest(a, b):
+        return a == b
 
 
 logger = logging.getLogger(__name__)
@@ -116,7 +117,7 @@ class RegisterRestServlet(RestServlet):
             return
 
         # == Normal User Registration == (everyone else)
-        if self.hs.config.disable_registration:
+        if not self.hs.config.enable_registration:
             raise SynapseError(403, "Registration has been disabled")
 
         guest_access_token = body.get("guest_access_token", None)
@@ -152,6 +153,7 @@ class RegisterRestServlet(RestServlet):
 
         desired_username = params.get("username", None)
         new_password = params.get("password", None)
+        guest_access_token = params.get("guest_access_token", None)
 
         (user_id, token) = yield self.registration_handler.register(
             localpart=desired_username,
