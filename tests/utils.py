@@ -51,6 +51,8 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.server_name = "server.under.test"
         config.trusted_third_party_id_servers = []
 
+    config.database_config = {"name": "sqlite3"}
+
     if "clock" not in kargs:
         kargs["clock"] = MockClock()
 
@@ -60,7 +62,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         hs = HomeServer(
             name, db_pool=db_pool, config=config,
             version_string="Synapse/tests",
-            database_engine=create_engine("sqlite3"),
+            database_engine=create_engine(config),
             get_db_conn=db_pool.get_db_conn,
             **kargs
         )
@@ -69,7 +71,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         hs = HomeServer(
             name, db_pool=None, datastore=datastore, config=config,
             version_string="Synapse/tests",
-            database_engine=create_engine("sqlite3"),
+            database_engine=create_engine(config),
             **kargs
         )
 
@@ -277,17 +279,23 @@ class SQLiteMemoryDbPool(ConnectionPool, object):
             cp_max=1,
         )
 
+        self.config = Mock()
+        self.config.database_config = {"name": "sqlite3"}
+
     def prepare(self):
-        engine = create_engine("sqlite3")
+        engine = self.create_engine()
         return self.runWithConnection(
-            lambda conn: prepare_database(conn, engine)
+            lambda conn: prepare_database(conn, engine, self.config)
         )
 
     def get_db_conn(self):
         conn = self.connect()
-        engine = create_engine("sqlite3")
-        prepare_database(conn, engine)
+        engine = self.create_engine()
+        prepare_database(conn, engine, self.config)
         return conn
+
+    def create_engine(self):
+        return create_engine(self.config)
 
 
 class MemoryDataStore(object):

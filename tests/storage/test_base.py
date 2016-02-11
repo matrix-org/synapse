@@ -48,11 +48,12 @@ class SQLBaseStoreTestCase(unittest.TestCase):
 
         config = Mock()
         config.event_cache_size = 1
+        config.database_config = {"name": "sqlite3"}
         hs = HomeServer(
             "test",
             db_pool=self.db_pool,
             config=config,
-            database_engine=create_engine("sqlite3"),
+            database_engine=create_engine(config),
         )
 
         self.datastore = SQLBaseStore(hs)

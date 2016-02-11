@@ -21,9 +21,10 @@ from ._base import IncorrectDatabaseSetup
 class PostgresEngine(object):
     single_threaded = False
 
-    def __init__(self, database_module):
+    def __init__(self, database_module, config):
         self.module = database_module
         self.module.extensions.register_type(self.module.extensions.UNICODE)
+        self.config = config
 
     def check_database(self, txn):
         txn.execute("SHOW SERVER_ENCODING")
@@ -44,7 +45,7 @@ class PostgresEngine(object):
         )
 
     def prepare_database(self, db_conn):
-        prepare_database(db_conn, self)
+        prepare_database(db_conn, self, config=self.config)
 
     def is_deadlock(self, error):
         if isinstance(error, self.module.DatabaseError):
