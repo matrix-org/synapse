@@ -60,7 +60,7 @@ class RegistrationHandler(BaseHandler):
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
 
-        yield self.check_user_id_is_valid(user_id)
+        yield self.check_user_id_not_appservice_exclusive(user_id)
 
         users = yield self.store.get_users_by_id_case_insensitive(user_id)
         if users:
@@ -145,7 +145,7 @@ class RegistrationHandler(BaseHandler):
                 localpart = yield self._generate_user_id(attempts > 0)
                 user = UserID(localpart, self.hs.hostname)
                 user_id = user.to_string()
-                yield self.check_user_id_is_valid(user_id)
+                yield self.check_user_id_not_appservice_exclusive(user_id)
                 if generate_token:
                     token = self.auth_handler().generate_access_token(user_id)
                 try:
@@ -180,6 +180,11 @@ class RegistrationHandler(BaseHandler):
                 400, "Invalid user localpart for this application service.",
                 errcode=Codes.EXCLUSIVE
             )
+
+        yield self.check_user_id_not_appservice_exclusive(
+            user_id, allowed_appservice=service
+        )
+
         token = self.auth_handler().generate_access_token(user_id)
         yield self.store.register(
             user_id=user_id,
@@ -226,7 +231,7 @@ class RegistrationHandler(BaseHandler):
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
 
-        yield self.check_user_id_is_valid(user_id)
+        yield self.check_user_id_not_appservice_exclusive(user_id)
         token = self.auth_handler().generate_access_token(user_id)
         try:
             yield self.store.register(
@@ -278,12 +283,14 @@ class RegistrationHandler(BaseHandler):
             yield identity_handler.bind_threepid(c, user_id)
 
     @defer.inlineCallbacks
-    def check_user_id_is_valid(self, user_id):
+    def check_user_id_not_appservice_exclusive(self, user_id, allowed_appservice=None):
         # valid user IDs must not clash with any user ID namespaces claimed by
         # application services.
         services = yield self.store.get_app_services()
         interested_services = [
-            s for s in services if s.is_interested_in_user(user_id)
+            s for s in services
+            if s.is_interested_in_user(user_id)
+            and s != allowed_appservice
         ]
         for service in interested_services:
             if service.is_exclusive_user(user_id):
