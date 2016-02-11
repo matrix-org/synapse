@@ -157,7 +157,8 @@ class StreamStore(SQLBaseStore):
         defer.returnValue(results)
 
     @defer.inlineCallbacks
-    def get_room_events_stream_for_rooms(self, room_ids, from_key, to_key, limit=0):
+    def get_room_events_stream_for_rooms(self, room_ids, from_key, to_key, limit=0,
+                                         order='DESC'):
         from_id = RoomStreamToken.parse_stream_token(from_key).stream
 
         room_ids = yield self._events_stream_cache.get_entities_changed(
@@ -172,7 +173,7 @@ class StreamStore(SQLBaseStore):
         for rm_ids in (room_ids[i:i + 20] for i in xrange(0, len(room_ids), 20)):
             res = yield defer.gatherResults([
                 preserve_fn(self.get_room_events_stream_for_room)(
-                    room_id, from_key, to_key, limit,
+                    room_id, from_key, to_key, limit, order=order,
                 )
                 for room_id in room_ids
             ])
@@ -181,7 +182,8 @@ class StreamStore(SQLBaseStore):
         defer.returnValue(results)
 
     @defer.inlineCallbacks
-    def get_room_events_stream_for_room(self, room_id, from_key, to_key, limit=0):
+    def get_room_events_stream_for_room(self, room_id, from_key, to_key, limit=0,
+                                        order='DESC'):
         if from_key is not None:
             from_id = RoomStreamToken.parse_stream_token(from_key).stream
         else:
@@ -206,8 +208,8 @@ class StreamStore(SQLBaseStore):
                     " room_id = ?"
                     " AND not outlier"
                     " AND stream_ordering > ? AND stream_ordering <= ?"
-                    " ORDER BY stream_ordering DESC LIMIT ?"
-                )
+                    " ORDER BY stream_ordering %s LIMIT ?"
+                ) % (order,)
                 txn.execute(sql, (room_id, from_id, to_id, limit))
             else:
                 sql = (
@@ -215,8 +217,8 @@ class StreamStore(SQLBaseStore):
                     " room_id = ?"
                     " AND not outlier"
                     " AND stream_ordering <= ?"
-                    " ORDER BY stream_ordering DESC LIMIT ?"
-                )
+                    " ORDER BY stream_ordering %s LIMIT ?"
+                ) % (order,)
                 txn.execute(sql, (room_id, to_id, limit))
 
             rows = self.cursor_to_dict(txn)
@@ -232,7 +234,8 @@ class StreamStore(SQLBaseStore):
 
         self._set_before_and_after(ret, rows, topo_order=False)
 
-        ret.reverse()
+        if order.lower() == "desc":
+            ret.reverse()
 
         if rows:
             key = "s%d" % min(r["stream_ordering"] for r in rows)

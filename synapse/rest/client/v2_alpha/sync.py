@@ -28,6 +28,7 @@ from synapse.api.errors import SynapseError
 from ._base import client_v2_patterns
 
 import copy
+import itertools
 import logging
 
 import ujson as json
@@ -287,6 +288,15 @@ class SyncRestServlet(RestServlet):
         timeline_events = room.timeline.events
 
         state_events = state_dict.values()
+
+        for event in itertools.chain(state_events, timeline_events):
+            # We've had bug reports that events were coming down under the
+            # wrong room.
+            if event.room_id != room.room_id:
+                logger.warn(
+                    "Event %r is under room %r instead of %r",
+                    event.event_id, room.room_id, event.room_id,
+                )
 
         serialized_state = [serialize(e) for e in state_events]
         serialized_timeline = [serialize(e) for e in timeline_events]

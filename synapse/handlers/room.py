@@ -1061,6 +1061,7 @@ class RoomEventSource(object):
                 from_key=from_key,
                 to_key=to_key,
                 limit=limit or 10,
+                order='ASC',
             )
 
             events = list(room_events)
