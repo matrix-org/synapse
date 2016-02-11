@@ -175,7 +175,7 @@ class StreamStore(SQLBaseStore):
                 preserve_fn(self.get_room_events_stream_for_room)(
                     room_id, from_key, to_key, limit, order=order,
                 )
-                for room_id in room_ids
+                for room_id in rm_ids
             ])
             results.update(dict(zip(rm_ids, res)))
 

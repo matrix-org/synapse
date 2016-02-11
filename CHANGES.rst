@@ -1,3 +1,8 @@
+Changes in synapse v0.13.3 (2016-02-11)
+=======================================
+
+* Fix bug where ``/sync`` would occasionally return events in the wrong room.
+
 Changes in synapse v0.13.2 (2016-02-11)
 =======================================
 
