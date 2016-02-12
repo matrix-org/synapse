@@ -367,8 +367,27 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
                           "Origin, X-Requested-With, Content-Type, Accept")
 
     request.write(json_bytes)
-    request.finish()
+    finish_request(request)
     return NOT_DONE_YET
+
+
+def finish_request(request):
+    """ Finish writing the response to the request.
+
+    Twisted throws a RuntimeException if the connection closed before the
+    response was written but doesn't provide a convenient or reliable way to
+    determine if the connection was closed. So we catch and log the RuntimeException
+
+    You might think that ``request.notifyFinish`` could be used to tell if the
+    request was finished. However the deferred it returns won't fire if the
+    connection was already closed, meaning we'd have to have called the method
+    right at the start of the request. By the time we want to write the response
+    it will already be too late.
+    """
+    try:
+        request.finish()
+    except RuntimeError as e:
+        logger.info("Connection disconnected before response was written: %r", e)
 
 
 def _request_user_agent_is_curl(request):

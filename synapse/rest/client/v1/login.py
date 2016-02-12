@@ -17,6 +17,8 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, LoginError, Codes
 from synapse.types import UserID
+from synapse.http.server import finish_request
+
 from base import ClientV1RestServlet, client_path_patterns
 
 import simplejson as json
@@ -263,7 +265,7 @@ class SAML2RestServlet(ClientV1RestServlet):
                                  '?status=authenticated&access_token=' +
                                  token + '&user_id=' + user_id + '&ava=' +
                                  urllib.quote(json.dumps(saml2_auth.ava)))
-                request.finish()
+                finish_request(request)
                 defer.returnValue(None)
             defer.returnValue((200, {"status": "authenticated",
                                      "user_id": user_id, "token": token,
@@ -272,7 +274,7 @@ class SAML2RestServlet(ClientV1RestServlet):
             request.redirect(urllib.unquote(
                              request.args['RelayState'][0]) +
                              '?status=not_authenticated')
-            request.finish()
+            finish_request(request)
             defer.returnValue(None)
         defer.returnValue((200, {"status": "not_authenticated"}))
 
@@ -309,7 +311,7 @@ class CasRedirectServlet(ClientV1RestServlet):
             "service": "%s?%s" % (hs_redirect_url, client_redirect_url_param)
         })
         request.redirect("%s?%s" % (self.cas_server_url, service_param))
-        request.finish()
+        finish_request(request)
 
 
 class CasTicketServlet(ClientV1RestServlet):
@@ -362,7 +364,7 @@ class CasTicketServlet(ClientV1RestServlet):
         redirect_url = self.add_login_token_to_redirect_url(client_redirect_url,
                                                             login_token)
         request.redirect(redirect_url)
-        request.finish()
+        finish_request(request)
 
     def add_login_token_to_redirect_url(self, url, token):
         url_parts = list(urlparse.urlparse(url))

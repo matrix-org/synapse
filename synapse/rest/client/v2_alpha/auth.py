@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError
 from synapse.api.urls import CLIENT_V2_ALPHA_PREFIX
+from synapse.http.server import finish_request
 from synapse.http.servlet import RestServlet
 
 from ._base import client_v2_patterns
@@ -130,7 +131,7 @@ class AuthRestServlet(RestServlet):
             request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
 
             request.write(html_bytes)
-            request.finish()
+            finish_request(request)
             defer.returnValue(None)
         else:
             raise SynapseError(404, "Unknown auth stage type")
@@ -176,7 +177,7 @@ class AuthRestServlet(RestServlet):
             request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
 
             request.write(html_bytes)
-            request.finish()
+            finish_request(request)
 
             defer.returnValue(None)
         else:
