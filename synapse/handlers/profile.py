@@ -169,8 +169,15 @@ class ProfileHandler(BaseHandler):
             consumeErrors=True
         ).addErrback(unwrapFirstError)
 
-        state["displayname"] = displayname
-        state["avatar_url"] = avatar_url
+        if displayname is None:
+            del state["displayname"]
+        else:
+            state["displayname"] = displayname
+
+        if avatar_url is None:
+            del state["avatar_url"]
+        else:
+            state["avatar_url"] = avatar_url
 
         defer.returnValue(None)
 
