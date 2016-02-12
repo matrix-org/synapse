@@ -216,7 +216,11 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
 
 # TODO: Needs unit testing for room ID + alias joins
 class JoinRoomAliasServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/join/(?P<room_identifier>[^/]*)$")
+
+    def register(self, http_server):
+        # /join/$room_identifier[/$txn_id]
+        PATTERNS = ("/join/(?P<room_identifier>[^/]*)")
+        register_txn_path(self, PATTERNS, http_server)
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_identifier, txn_id=None):
@@ -225,22 +229,60 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
             allow_guest=True,
         )
 
-        handler = self.handlers.room_member_handler
+        # the identifier could be a room alias or a room id. Try one then the
+        # other if it fails to parse, without swallowing other valid
+        # SynapseErrors.
 
-        room_id = None
-        hosts = []
-        if RoomAlias.is_valid(room_identifier):
-            room_alias = RoomAlias.from_string(room_identifier)
-            room_id, hosts = yield handler.lookup_room_alias(room_alias)
-        else:
-            room_id = RoomID.from_string(room_identifier).to_string()
+        identifier = None
+        is_room_alias = False
+        try:
+            identifier = RoomAlias.from_string(room_identifier)
+            is_room_alias = True
+        except SynapseError:
+            identifier = RoomID.from_string(room_identifier)
 
         # TODO: Support for specifying the home server to join with?
 
-        yield handler.do_join(
-            requester, room_id, hosts=hosts
-        )
-        defer.returnValue((200, {"room_id": room_id}))
+        if is_room_alias:
+            handler = self.handlers.room_member_handler
+            ret_dict = yield handler.join_room_alias(
+                requester.user,
+                identifier,
+            )
+            defer.returnValue((200, ret_dict))
+        else:  # room id
+            msg_handler = self.handlers.message_handler
+            content = {"membership": Membership.JOIN}
+            if requester.is_guest:
+                content["kind"] = "guest"
+            yield msg_handler.create_and_send_event(
+                {
+                    "type": EventTypes.Member,
+                    "content": content,
+                    "room_id": identifier.to_string(),
+                    "sender": requester.user.to_string(),
+                    "state_key": requester.user.to_string(),
+                },
+                token_id=requester.access_token_id,
+                txn_id=txn_id,
+                is_guest=requester.is_guest,
+            )
+
+            defer.returnValue((200, {"room_id": identifier.to_string()}))
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, room_identifier, txn_id):
+        try:
+            defer.returnValue(
+                self.txns.get_client_transaction(request, txn_id)
+            )
+        except KeyError:
+            pass
+
+        response = yield self.on_POST(request, room_identifier, txn_id)
+
+        self.txns.store_client_transaction(request, txn_id, response)
+        defer.returnValue(response)
 
 
 # TODO: Needs unit testing

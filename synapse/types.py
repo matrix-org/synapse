@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.api.errors import SynapseError, BadIdentifierError
+from synapse.api.errors import SynapseError
 
 from collections import namedtuple
 
@@ -51,13 +51,13 @@ class DomainSpecificString(
     def from_string(cls, s):
         """Parse the string given by 's' into a structure object."""
         if len(s) < 1 or s[0] != cls.SIGIL:
-            raise BadIdentifierError(400, "Expected %s string to start with '%s'" % (
+            raise SynapseError(400, "Expected %s string to start with '%s'" % (
                 cls.__name__, cls.SIGIL,
             ))
 
         parts = s[1:].split(':', 1)
         if len(parts) != 2:
-            raise BadIdentifierError(
+            raise SynapseError(
                 400, "Expected %s of the form '%slocalname:domain'" % (
                     cls.__name__, cls.SIGIL,
                 )
@@ -68,14 +68,6 @@ class DomainSpecificString(
         # This code will need changing if we want to support multiple domain
         # names on one HS
         return cls(localpart=parts[0], domain=domain)
-
-    @classmethod
-    def is_valid(cls, s):
-        try:
-            cls.from_string(s)
-            return True
-        except:
-            return False
 
     def to_string(self):
         """Return a string encoding the fields of the structure object."""

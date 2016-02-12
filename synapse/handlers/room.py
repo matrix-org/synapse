@@ -527,17 +527,7 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue({"room_id": room_id})
 
     @defer.inlineCallbacks
-    def lookup_room_alias(self, room_alias):
-        """
-        Gets the room ID for an alias.
-
-        Args:
-            room_alias (str): The room alias to look up.
-        Returns:
-            A tuple of the room ID (str) and the hosts hosting the room ([str])
-        Raises:
-            SynapseError if the room couldn't be looked up.
-        """
+    def join_room_alias(self, joinee, room_alias, content={}):
         directory_handler = self.hs.get_handlers().directory_handler
         mapping = yield directory_handler.get_association(room_alias)
 
@@ -549,39 +539,23 @@ class RoomMemberHandler(BaseHandler):
         if not hosts:
             raise SynapseError(404, "No known servers")
 
-        defer.returnValue((room_id, hosts))
+        # If event doesn't include a display name, add one.
+        yield collect_presencelike_data(self.distributor, joinee, content)
 
-    @defer.inlineCallbacks
-    def do_join(self, requester, room_id, hosts=None):
-        """
-        Joins requester to room_id.
-
-        Args:
-            requester (Requester): The user joining the room.
-            room_id (str): The room ID (not alias) being joined.
-            hosts ([str]): A list of hosts which are hopefully in the room.
-        Raises:
-            SynapseError if the room couldn't be joined.
-        """
-        hosts = hosts or []
-
-        content = {"membership": Membership.JOIN}
-        if requester.is_guest:
-            content["kind"] = "guest"
-
-        yield collect_presencelike_data(self.distributor, requester.user, content)
-
+        content.update({"membership": Membership.JOIN})
         builder = self.event_builder_factory.new({
             "type": EventTypes.Member,
-            "state_key": requester.user.to_string(),
+            "state_key": joinee.to_string(),
             "room_id": room_id,
-            "sender": requester.user.to_string(),
-            "membership": Membership.JOIN,  # For backwards compatibility
+            "sender": joinee.to_string(),
+            "membership": Membership.JOIN,
             "content": content,
         })
         event, context = yield self._create_new_client_event(builder)
 
         yield self._do_join(event, context, room_hosts=hosts)
+
+        defer.returnValue({"room_id": room_id})
 
     @defer.inlineCallbacks
     def _do_join(self, event, context, room_hosts=None):

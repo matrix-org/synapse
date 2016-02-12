@@ -84,11 +84,6 @@ class RegistrationError(SynapseError):
     pass
 
 
-class BadIdentifierError(SynapseError):
-    """An error indicating an identifier couldn't be parsed."""
-    pass
-
-
 class UnrecognizedRequestError(SynapseError):
     """An error indicating we don't understand the request you're trying to make"""
     def __init__(self, *args, **kwargs):
