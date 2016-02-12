@@ -404,7 +404,9 @@ class RoomMemberHandler(BaseHandler):
                     remotedomains.add(member.domain)
 
     @defer.inlineCallbacks
-    def update_membership(self, requester, target, room_id, action, txn_id=None):
+    def update_membership(
+            self, requester, target, room_id, action, room_hosts=None, txn_id=None
+    ):
         effective_membership_state = action
         if action in ["kick", "unban"]:
             effective_membership_state = "leave"
@@ -424,10 +426,18 @@ class RoomMemberHandler(BaseHandler):
                 "room_id": room_id,
                 "sender": requester.user.to_string(),
                 "state_key": target.to_string(),
+
+                # For backwards compatibility:
+                "membership": unicode(effective_membership_state),
             },
             token_id=requester.access_token_id,
             txn_id=txn_id,
         )
+
+        if effective_membership_state == "join":
+            # Special case because it may need to do federation dances
+            yield self._do_join(event, context, room_hosts=room_hosts)
+            return
 
         old_state = context.current_state.get((EventTypes.Member, event.state_key))
         old_membership = old_state.content.get("membership") if old_state else None
@@ -550,38 +560,6 @@ class RoomMemberHandler(BaseHandler):
             raise SynapseError(404, "No known servers")
 
         defer.returnValue((room_id, hosts))
-
-    @defer.inlineCallbacks
-    def do_join(self, requester, room_id, hosts=None):
-        """
-        Joins requester to room_id.
-
-        Args:
-            requester (Requester): The user joining the room.
-            room_id (str): The room ID (not alias) being joined.
-            hosts ([str]): A list of hosts which are hopefully in the room.
-        Raises:
-            SynapseError if the room couldn't be joined.
-        """
-        hosts = hosts or []
-
-        content = {"membership": Membership.JOIN}
-        if requester.is_guest:
-            content["kind"] = "guest"
-
-        yield collect_presencelike_data(self.distributor, requester.user, content)
-
-        builder = self.event_builder_factory.new({
-            "type": EventTypes.Member,
-            "state_key": requester.user.to_string(),
-            "room_id": room_id,
-            "sender": requester.user.to_string(),
-            "membership": Membership.JOIN,  # For backwards compatibility
-            "content": content,
-        })
-        event, context = yield self._create_new_client_event(builder)
-
-        yield self._do_join(event, context, room_hosts=hosts)
 
     @defer.inlineCallbacks
     def _do_join(self, event, context, room_hosts=None):

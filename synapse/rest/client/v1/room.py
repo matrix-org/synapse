@@ -237,8 +237,12 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
 
         # TODO: Support for specifying the home server to join with?
 
-        yield handler.do_join(
-            requester, room_id, hosts=hosts
+        yield handler.update_membership(
+            requester,
+            requester.user,
+            room_id,
+            "join",
+            room_hosts=hosts
         )
         defer.returnValue((200, {"room_id": room_id}))
 
