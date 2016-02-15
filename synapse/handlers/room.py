@@ -492,7 +492,50 @@ class RoomMemberHandler(BaseHandler):
                 if not is_guest_access_allowed:
                     raise AuthError(403, "Guest access not allowed")
 
-            yield self._do_join(event, context, room_hosts=room_hosts)
+            room_id = event.room_id
+
+            # XXX: We don't do an auth check if we are doing an invite
+            # join dance for now, since we're kinda implicitly checking
+            # that we are allowed to join when we decide whether or not we
+            # need to do the invite/join dance.
+
+            is_host_in_room = yield self.is_host_in_room(room_id, context)
+            if is_host_in_room:
+                should_do_dance = False
+            elif room_hosts:  # TODO: Shouldn't this be remote_room_host?
+                should_do_dance = True
+            else:
+                inviter = yield self.get_inviter(event)
+                if not inviter:
+                    # return the same error as join_room_alias does
+                    raise SynapseError(404, "No known servers")
+                should_do_dance = not self.hs.is_mine(inviter)
+                room_hosts = [inviter.domain]
+
+            if should_do_dance:
+                handler = self.hs.get_handlers().federation_handler
+                yield handler.do_invite_join(
+                    room_hosts,
+                    room_id,
+                    event.user_id,
+                    event.content,
+                )
+            else:
+                logger.debug("Doing normal join")
+
+                yield self._do_local_membership_update(
+                    event,
+                    context=context,
+                    ratelimit=ratelimit,
+                )
+
+            prev_state = context.current_state.get((event.type, event.state_key))
+            if not prev_state or prev_state.membership != Membership.JOIN:
+                # Only fire user_joined_room if the user has acutally joined the
+                # room. Don't bother if the user is just changing their profile
+                # info.
+                user = UserID.from_string(event.user_id)
+                yield user_joined_room(self.distributor, user, room_id)
         else:
             if event.membership == Membership.LEAVE:
                 is_host_in_room = yield self.is_host_in_room(room_id, context)
@@ -520,6 +563,7 @@ class RoomMemberHandler(BaseHandler):
             yield self._do_local_membership_update(
                 event,
                 context=context,
+                ratelimit=ratelimit,
             )
 
             if prev_state and prev_state.membership == Membership.JOIN:
@@ -552,52 +596,6 @@ class RoomMemberHandler(BaseHandler):
             raise SynapseError(404, "No known servers")
 
         defer.returnValue((RoomID.from_string(room_id), hosts))
-
-    @defer.inlineCallbacks
-    def _do_join(self, event, context, room_hosts=None):
-        room_id = event.room_id
-
-        # XXX: We don't do an auth check if we are doing an invite
-        # join dance for now, since we're kinda implicitly checking
-        # that we are allowed to join when we decide whether or not we
-        # need to do the invite/join dance.
-
-        is_host_in_room = yield self.is_host_in_room(room_id, context)
-        if is_host_in_room:
-            should_do_dance = False
-        elif room_hosts:  # TODO: Shouldn't this be remote_room_host?
-            should_do_dance = True
-        else:
-            inviter = yield self.get_inviter(event)
-            if not inviter:
-                # return the same error as join_room_alias does
-                raise SynapseError(404, "No known servers")
-            should_do_dance = not self.hs.is_mine(inviter)
-            room_hosts = [inviter.domain]
-
-        if should_do_dance:
-            handler = self.hs.get_handlers().federation_handler
-            yield handler.do_invite_join(
-                room_hosts,
-                room_id,
-                event.user_id,
-                event.content,
-            )
-        else:
-            logger.debug("Doing normal join")
-
-            yield self._do_local_membership_update(
-                event,
-                context=context,
-            )
-
-        prev_state = context.current_state.get((event.type, event.state_key))
-        if not prev_state or prev_state.membership != Membership.JOIN:
-            # Only fire user_joined_room if the user has acutally joined the
-            # room. Don't bother if the user is just changing their profile
-            # info.
-            user = UserID.from_string(event.user_id)
-            yield user_joined_room(self.distributor, user, room_id)
 
     @defer.inlineCallbacks
     def get_inviter(self, event):
@@ -653,7 +651,7 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue(room_ids)
 
     @defer.inlineCallbacks
-    def _do_local_membership_update(self, event, context):
+    def _do_local_membership_update(self, event, context, ratelimit=True):
         yield run_on_reactor()
 
         target_user = UserID.from_string(event.state_key)
@@ -662,6 +660,7 @@ class RoomMemberHandler(BaseHandler):
             event,
             context,
             extra_users=[target_user],
+            ratelimit=ratelimit,
         )
 
     @defer.inlineCallbacks
