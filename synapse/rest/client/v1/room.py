@@ -242,23 +242,12 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
                 room_identifier,
             ))
 
-        msg_handler = self.handlers.message_handler
-        content = {"membership": Membership.JOIN}
-        if requester.is_guest:
-            content["kind"] = "guest"
-        yield msg_handler.create_and_send_event(
-            {
-                "type": EventTypes.Member,
-                "content": content,
-                "room_id": room_id,
-                "sender": requester.user.to_string(),
-                "state_key": requester.user.to_string(),
-
-                "membership": Membership.JOIN,  # For backwards compatibility
-            },
-            token_id=requester.access_token_id,
+        yield self.handlers.room_member_handler.update_membership(
+            requester=requester,
+            target=requester.user,
+            room_id=room_id,
+            action="join",
             txn_id=txn_id,
-            is_guest=requester.is_guest,
             room_hosts=room_hosts,
         )
 

@@ -403,7 +403,9 @@ class RoomMemberHandler(BaseHandler):
                     remotedomains.add(member.domain)
 
     @defer.inlineCallbacks
-    def update_membership(self, requester, target, room_id, action, txn_id=None):
+    def update_membership(
+            self, requester, target, room_id, action, txn_id=None, room_hosts=None
+    ):
         effective_membership_state = action
         if action in ["kick", "unban"]:
             effective_membership_state = "leave"
@@ -412,7 +414,7 @@ class RoomMemberHandler(BaseHandler):
 
         msg_handler = self.hs.get_handlers().message_handler
 
-        content = {"membership": unicode(effective_membership_state)}
+        content = {"membership": effective_membership_state}
         if requester.is_guest:
             content["kind"] = "guest"
 
@@ -423,6 +425,9 @@ class RoomMemberHandler(BaseHandler):
                 "room_id": room_id,
                 "sender": requester.user.to_string(),
                 "state_key": target.to_string(),
+
+                # For backwards compatibility:
+                "membership": effective_membership_state,
             },
             token_id=requester.access_token_id,
             txn_id=txn_id,
@@ -447,7 +452,8 @@ class RoomMemberHandler(BaseHandler):
             event,
             context,
             ratelimit=True,
-            is_guest=requester.is_guest
+            is_guest=requester.is_guest,
+            room_hosts=room_hosts,
         )
 
         if action == "forget":
