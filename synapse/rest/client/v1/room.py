@@ -63,24 +63,12 @@ class RoomCreateRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
 
-        room_config = self.get_room_config(request)
-        info = yield self.make_room(
-            room_config,
-            requester.user,
-            None,
-        )
-        room_config.update(info)
-        defer.returnValue((200, info))
-
-    @defer.inlineCallbacks
-    def make_room(self, room_config, auth_user, room_id):
         handler = self.handlers.room_creation_handler
         info = yield handler.create_room(
-            user_id=auth_user.to_string(),
-            room_id=room_id,
-            config=room_config
+            requester, self.get_room_config(request)
         )
-        defer.returnValue(info)
+
+        defer.returnValue((200, info))
 
     def get_room_config(self, request):
         try:
