@@ -404,7 +404,14 @@ class RoomMemberHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def update_membership(
-            self, requester, target, room_id, action, txn_id=None, room_hosts=None
+            self,
+            requester,
+            target,
+            room_id,
+            action,
+            txn_id=None,
+            room_hosts=None,
+            ratelimit=True,
     ):
         effective_membership_state = action
         if action in ["kick", "unban"]:
@@ -451,7 +458,7 @@ class RoomMemberHandler(BaseHandler):
         yield msg_handler.send_event(
             event,
             context,
-            ratelimit=True,
+            ratelimit=ratelimit,
             is_guest=requester.is_guest,
             room_hosts=room_hosts,
         )

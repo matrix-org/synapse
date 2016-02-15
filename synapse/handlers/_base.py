@@ -18,7 +18,7 @@ from twisted.internet import defer
 from synapse.api.errors import LimitExceededError, SynapseError, AuthError
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.api.constants import Membership, EventTypes
-from synapse.types import UserID, RoomAlias
+from synapse.types import UserID, RoomAlias, Requester
 from synapse.push.action_generator import ActionGenerator
 
 from synapse.util.logcontext import PreserveLoggingContext
@@ -319,7 +319,8 @@ class BaseHandler(object):
                 if member_event.type != EventTypes.Member:
                     continue
 
-                if not self.hs.is_mine(UserID.from_string(member_event.state_key)):
+                target_user = UserID.from_string(member_event.state_key)
+                if not self.hs.is_mine(target_user):
                     continue
 
                 if member_event.content["membership"] not in {
@@ -341,18 +342,13 @@ class BaseHandler(object):
                 # and having homeservers have their own users leave keeps more
                 # of that decision-making and control local to the guest-having
                 # homeserver.
-                message_handler = self.hs.get_handlers().message_handler
-                yield message_handler.create_and_send_event(
-                    {
-                        "type": EventTypes.Member,
-                        "state_key": member_event.state_key,
-                        "content": {
-                            "membership": Membership.LEAVE,
-                            "kind": "guest"
-                        },
-                        "room_id": member_event.room_id,
-                        "sender": member_event.state_key
-                    },
+                requester = Requester(target_user, "", True)
+                handler = self.hs.get_handlers().room_member_handler
+                yield handler.update_membership(
+                    requester,
+                    target_user,
+                    member_event.room_id,
+                    "leave",
                     ratelimit=False,
                 )
             except Exception as e:
