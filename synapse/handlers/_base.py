@@ -188,8 +188,11 @@ class BaseHandler(object):
         )
 
     @defer.inlineCallbacks
-    def handle_new_client_event(self, event, context, extra_users=[]):
+    def handle_new_client_event(self, event, context, ratelimit=True, extra_users=[]):
         # We now need to go and hit out to wherever we need to hit out to.
+
+        if ratelimit:
+            self.ratelimit(event.sender)
 
         self.auth.check(event, auth_events=context.current_state)
 

@@ -229,46 +229,40 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
             allow_guest=True,
         )
 
-        # the identifier could be a room alias or a room id. Try one then the
-        # other if it fails to parse, without swallowing other valid
-        # SynapseErrors.
-
-        identifier = None
-        is_room_alias = False
-        try:
-            identifier = RoomAlias.from_string(room_identifier)
-            is_room_alias = True
-        except SynapseError:
-            identifier = RoomID.from_string(room_identifier)
-
-        # TODO: Support for specifying the home server to join with?
-
-        if is_room_alias:
+        if RoomID.is_valid(room_identifier):
+            room_id = room_identifier
+            room_hosts = None
+        elif RoomAlias.is_valid(room_identifier):
             handler = self.handlers.room_member_handler
-            ret_dict = yield handler.join_room_alias(
-                requester,
-                identifier,
-            )
-            defer.returnValue((200, ret_dict))
-        else:  # room id
-            msg_handler = self.handlers.message_handler
-            content = {"membership": Membership.JOIN}
-            if requester.is_guest:
-                content["kind"] = "guest"
-            yield msg_handler.create_and_send_event(
-                {
-                    "type": EventTypes.Member,
-                    "content": content,
-                    "room_id": identifier.to_string(),
-                    "sender": requester.user.to_string(),
-                    "state_key": requester.user.to_string(),
-                },
-                token_id=requester.access_token_id,
-                txn_id=txn_id,
-                is_guest=requester.is_guest,
-            )
+            room_alias = RoomAlias.from_string(room_identifier)
+            room_id, room_hosts = yield handler.lookup_room_alias(room_alias)
+            room_id = room_id.to_string()
+        else:
+            raise SynapseError(400, "%s was not legal room ID or room alias" % (
+                room_identifier,
+            ))
 
-            defer.returnValue((200, {"room_id": identifier.to_string()}))
+        msg_handler = self.handlers.message_handler
+        content = {"membership": Membership.JOIN}
+        if requester.is_guest:
+            content["kind"] = "guest"
+        yield msg_handler.create_and_send_event(
+            {
+                "type": EventTypes.Member,
+                "content": content,
+                "room_id": room_id,
+                "sender": requester.user.to_string(),
+                "state_key": requester.user.to_string(),
+
+                "membership": Membership.JOIN,  # For backwards compatibility
+            },
+            token_id=requester.access_token_id,
+            txn_id=txn_id,
+            is_guest=requester.is_guest,
+            room_hosts=room_hosts,
+        )
+
+        defer.returnValue((200, {"room_id": room_id}))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_identifier, txn_id):

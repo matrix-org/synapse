@@ -216,7 +216,7 @@ class MessageHandler(BaseHandler):
         defer.returnValue((event, context))
 
     @defer.inlineCallbacks
-    def send_event(self, event, context, ratelimit=True, is_guest=False):
+    def send_event(self, event, context, ratelimit=True, is_guest=False, room_hosts=None):
         """
         Persists and notifies local clients and federation of an event.
 
@@ -230,9 +230,6 @@ class MessageHandler(BaseHandler):
 
         assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
 
-        if ratelimit:
-            self.ratelimit(event.sender)
-
         if event.is_state():
             prev_state = context.current_state.get((event.type, event.state_key))
             if prev_state and event.user_id == prev_state.user_id:
@@ -245,11 +242,18 @@ class MessageHandler(BaseHandler):
 
         if event.type == EventTypes.Member:
             member_handler = self.hs.get_handlers().room_member_handler
-            yield member_handler.send_membership_event(event, context, is_guest=is_guest)
+            yield member_handler.send_membership_event(
+                event,
+                context,
+                is_guest=is_guest,
+                ratelimit=ratelimit,
+                room_hosts=room_hosts
+            )
         else:
             yield self.handle_new_client_event(
                 event=event,
                 context=context,
+                ratelimit=ratelimit,
             )
 
         if event.type == EventTypes.Message:
@@ -259,7 +263,8 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def create_and_send_event(self, event_dict, ratelimit=True,
-                              token_id=None, txn_id=None, is_guest=False):
+                              token_id=None, txn_id=None, is_guest=False,
+                              room_hosts=None):
         """
         Creates an event, then sends it.
 
@@ -274,7 +279,8 @@ class MessageHandler(BaseHandler):
             event,
             context,
             ratelimit=ratelimit,
-            is_guest=is_guest
+            is_guest=is_guest,
+            room_hosts=room_hosts,
         )
         defer.returnValue(event)
 

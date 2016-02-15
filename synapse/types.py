@@ -73,6 +73,14 @@ class DomainSpecificString(
         """Return a string encoding the fields of the structure object."""
         return "%s%s:%s" % (self.SIGIL, self.localpart, self.domain)
 
+    @classmethod
+    def is_valid(cls, s):
+        try:
+            cls.from_string(s)
+            return True
+        except:
+            return False
+
     __str__ = to_string
 
     @classmethod

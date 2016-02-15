@@ -455,7 +455,9 @@ class RoomMemberHandler(BaseHandler):
             yield self.forget(requester.user, room_id)
 
     @defer.inlineCallbacks
-    def send_membership_event(self, event, context, is_guest=False, room_hosts=None):
+    def send_membership_event(
+            self, event, context, is_guest=False, room_hosts=None, ratelimit=True
+    ):
         """ Change the membership status of a user in a room.
 
         Args:
@@ -527,8 +529,17 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue({"room_id": room_id})
 
     @defer.inlineCallbacks
-    def join_room_alias(self, requester, room_alias, content={}):
-        joinee = requester.user
+    def lookup_room_alias(self, room_alias):
+        """
+        Get the room ID associated with a room alias.
+
+        Args:
+            room_alias (RoomAlias): The alias to look up.
+        Returns:
+            The room ID as a RoomID object.
+        Raises:
+            SynapseError if room alias could not be found.
+        """
         directory_handler = self.hs.get_handlers().directory_handler
         mapping = yield directory_handler.get_association(room_alias)
 
@@ -540,28 +551,7 @@ class RoomMemberHandler(BaseHandler):
         if not hosts:
             raise SynapseError(404, "No known servers")
 
-        # If event doesn't include a display name, add one.
-        yield collect_presencelike_data(self.distributor, joinee, content)
-
-        content.update({"membership": Membership.JOIN})
-        builder = self.event_builder_factory.new({
-            "type": EventTypes.Member,
-            "state_key": joinee.to_string(),
-            "room_id": room_id,
-            "sender": joinee.to_string(),
-            "membership": Membership.JOIN,
-            "content": content,
-        })
-        event, context = yield self._create_new_client_event(builder)
-
-        yield self.send_membership_event(
-            event,
-            context,
-            is_guest=requester.is_guest,
-            room_hosts=hosts
-        )
-
-        defer.returnValue({"room_id": room_id})
+        defer.returnValue((RoomID.from_string(room_id), hosts))
 
     @defer.inlineCallbacks
     def _do_join(self, event, context, room_hosts=None):
