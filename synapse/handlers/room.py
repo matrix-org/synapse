@@ -24,7 +24,6 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import AuthError, StoreError, SynapseError, Codes
 from synapse.util import stringutils, unwrapFirstError
-from synapse.util.async import run_on_reactor
 from synapse.util.logcontext import preserve_context_over_fn
 
 from signedjson.sign import verify_signed_json
@@ -466,6 +465,7 @@ class RoomMemberHandler(BaseHandler):
             SynapseError if there was a problem changing the membership.
         """
         target_user_id = event.state_key
+        target_user = UserID.from_string(event.state_key)
 
         prev_state = context.current_state.get(
             (EventTypes.Member, target_user_id),
@@ -523,9 +523,10 @@ class RoomMemberHandler(BaseHandler):
             else:
                 logger.debug("Doing normal join")
 
-                yield self._do_local_membership_update(
+                yield self.handle_new_client_event(
                     event,
-                    context=context,
+                    context,
+                    extra_users=[target_user],
                     ratelimit=ratelimit,
                 )
 
@@ -560,9 +561,10 @@ class RoomMemberHandler(BaseHandler):
                 defer.returnValue({})
                 return
 
-            yield self._do_local_membership_update(
+            yield self.handle_new_client_event(
                 event,
-                context=context,
+                context,
+                extra_users=[target_user],
                 ratelimit=ratelimit,
             )
 
@@ -649,19 +651,6 @@ class RoomMemberHandler(BaseHandler):
         room_ids = set(r.room_id for r in rooms)
 
         defer.returnValue(room_ids)
-
-    @defer.inlineCallbacks
-    def _do_local_membership_update(self, event, context, ratelimit=True):
-        yield run_on_reactor()
-
-        target_user = UserID.from_string(event.state_key)
-
-        yield self.handle_new_client_event(
-            event,
-            context,
-            extra_users=[target_user],
-            ratelimit=ratelimit,
-        )
 
     @defer.inlineCallbacks
     def do_3pid_invite(
