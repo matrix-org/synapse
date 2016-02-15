@@ -455,7 +455,7 @@ class RoomMemberHandler(BaseHandler):
             yield self.forget(requester.user, room_id)
 
     @defer.inlineCallbacks
-    def send_membership_event(self, event, context, is_guest=False):
+    def send_membership_event(self, event, context, is_guest=False, room_hosts=None):
         """ Change the membership status of a user in a room.
 
         Args:
@@ -490,7 +490,7 @@ class RoomMemberHandler(BaseHandler):
                 if not is_guest_access_allowed:
                     raise AuthError(403, "Guest access not allowed")
 
-            yield self._do_join(event, context)
+            yield self._do_join(event, context, room_hosts=room_hosts)
         else:
             if event.membership == Membership.LEAVE:
                 is_host_in_room = yield self.is_host_in_room(room_id, context)
@@ -527,7 +527,8 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue({"room_id": room_id})
 
     @defer.inlineCallbacks
-    def join_room_alias(self, joinee, room_alias, content={}):
+    def join_room_alias(self, requester, room_alias, content={}):
+        joinee = requester.user
         directory_handler = self.hs.get_handlers().directory_handler
         mapping = yield directory_handler.get_association(room_alias)
 
@@ -553,7 +554,12 @@ class RoomMemberHandler(BaseHandler):
         })
         event, context = yield self._create_new_client_event(builder)
 
-        yield self._do_join(event, context, room_hosts=hosts)
+        yield self.send_membership_event(
+            event,
+            context,
+            is_guest=requester.is_guest,
+            room_hosts=hosts
+        )
 
         defer.returnValue({"room_id": room_id})
 

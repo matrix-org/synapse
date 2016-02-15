@@ -246,7 +246,7 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
         if is_room_alias:
             handler = self.handlers.room_member_handler
             ret_dict = yield handler.join_room_alias(
-                requester.user,
+                requester,
                 identifier,
             )
             defer.returnValue((200, ret_dict))
