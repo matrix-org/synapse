@@ -16,8 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, AuthError, CodeMessageException
-from synapse.api.constants import EventTypes, Membership
-from synapse.types import UserID
+from synapse.types import UserID, Requester
 from synapse.util import unwrapFirstError
 
 from ._base import BaseHandler
@@ -208,21 +207,18 @@ class ProfileHandler(BaseHandler):
         )
 
         for j in joins:
-            content = {
-                "membership": Membership.JOIN,
-            }
-
-            yield collect_presencelike_data(self.distributor, user, content)
-
-            msg_handler = self.hs.get_handlers().message_handler
+            handler = self.hs.get_handlers().room_member_handler
             try:
-                yield msg_handler.create_and_send_event({
-                    "type": EventTypes.Member,
-                    "room_id": j.room_id,
-                    "state_key": user.to_string(),
-                    "content": content,
-                    "sender": user.to_string()
-                }, ratelimit=False)
+                # Assume the user isn't a guest because we don't let guests set
+                # profile or avatar data.
+                requester = Requester(user, "", False)
+                yield handler.update_membership(
+                    requester,
+                    user,
+                    j.room_id,
+                    "join",  # We treat a profile update like a join.
+                    ratelimit=False,
+                )
             except Exception as e:
                 logger.warn(
                     "Failed to update join event for room %s - %s",

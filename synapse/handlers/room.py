@@ -41,10 +41,6 @@ logger = logging.getLogger(__name__)
 id_server_scheme = "https://"
 
 
-def collect_presencelike_data(distributor, user, content):
-    return distributor.fire("collect_presencelike_data", user, content)
-
-
 def user_left_room(distributor, user, room_id):
     return preserve_context_over_fn(
         distributor.fire,
