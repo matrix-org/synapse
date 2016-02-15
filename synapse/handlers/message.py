@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.streams.config import PaginationConfig
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
@@ -216,7 +216,7 @@ class MessageHandler(BaseHandler):
         defer.returnValue((event, context))
 
     @defer.inlineCallbacks
-    def send_event(self, event, context, ratelimit=True, is_guest=False, room_hosts=None):
+    def send_nonmember_event(self, event, context, ratelimit=True):
         """
         Persists and notifies local clients and federation of an event.
 
@@ -226,61 +226,63 @@ class MessageHandler(BaseHandler):
             ratelimit (bool): Whether to rate limit this send.
             is_guest (bool): Whether the sender is a guest.
         """
+        if event.type == EventTypes.Member:
+            raise SynapseError(
+                500,
+                "Tried to send member even through non-member codepath"
+            )
+
         user = UserID.from_string(event.sender)
 
         assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
 
         if event.is_state():
-            prev_state = context.current_state.get((event.type, event.state_key))
-            if prev_state and event.user_id == prev_state.user_id:
-                prev_content = encode_canonical_json(prev_state.content)
-                next_content = encode_canonical_json(event.content)
-                if prev_content == next_content:
-                    # Duplicate suppression for state updates with same sender
-                    # and content.
-                    defer.returnValue(prev_state)
+            prev_state = self.deduplicate_state_event(event, context)
+            if prev_state is not None:
+                defer.returnValue(prev_state)
 
-        if event.type == EventTypes.Member:
-            member_handler = self.hs.get_handlers().room_member_handler
-            yield member_handler.send_membership_event(
-                event,
-                context,
-                is_guest=is_guest,
-                ratelimit=ratelimit,
-                room_hosts=room_hosts
-            )
-        else:
-            yield self.handle_new_client_event(
-                event=event,
-                context=context,
-                ratelimit=ratelimit,
-            )
+        yield self.handle_new_client_event(
+            event=event,
+            context=context,
+            ratelimit=ratelimit,
+        )
 
         if event.type == EventTypes.Message:
             presence = self.hs.get_handlers().presence_handler
             with PreserveLoggingContext():
                 presence.bump_presence_active_time(user)
 
+    def deduplicate_state_event(self, event, context):
+        prev_state = context.current_state.get((event.type, event.state_key))
+        if prev_state and event.user_id == prev_state.user_id:
+            prev_content = encode_canonical_json(prev_state.content)
+            next_content = encode_canonical_json(event.content)
+            if prev_content == next_content:
+                return prev_state
+        return None
+
     @defer.inlineCallbacks
-    def create_and_send_event(self, event_dict, ratelimit=True,
-                              token_id=None, txn_id=None, is_guest=False,
-                              room_hosts=None):
+    def create_and_send_nonmember_event(
+        self,
+        event_dict,
+        ratelimit=True,
+        token_id=None,
+        txn_id=None
+    ):
         """
         Creates an event, then sends it.
 
-        See self.create_event and self.send_event.
+        See self.create_event and self.send_nonmember_event.
         """
         event, context = yield self.create_event(
             event_dict,
             token_id=token_id,
             txn_id=txn_id
         )
-        yield self.send_event(
+        yield self.send_nonmember_event(
             event,
             context,
             ratelimit=ratelimit,
-            is_guest=is_guest,
-            room_hosts=room_hosts,
         )
         defer.returnValue(event)
 

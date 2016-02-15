@@ -179,13 +179,24 @@ class RoomCreationHandler(BaseHandler):
         )
 
         msg_handler = self.hs.get_handlers().message_handler
+        room_member_handler = self.hs.get_handlers().room_member_handler
 
         for event in creation_events:
-            yield msg_handler.create_and_send_event(event, ratelimit=False)
+            if event["type"] == EventTypes.Member:
+                # TODO(danielwh): This is hideous
+                yield room_member_handler.update_membership(
+                    requester,
+                    user,
+                    room_id,
+                    "join",
+                    ratelimit=False,
+                )
+            else:
+                yield msg_handler.create_and_send_nonmember_event(event, ratelimit=False)
 
         if "name" in config:
             name = config["name"]
-            yield msg_handler.create_and_send_event({
+            yield msg_handler.create_and_send_nonmember_event({
                 "type": EventTypes.Name,
                 "room_id": room_id,
                 "sender": user_id,
@@ -195,7 +206,7 @@ class RoomCreationHandler(BaseHandler):
 
         if "topic" in config:
             topic = config["topic"]
-            yield msg_handler.create_and_send_event({
+            yield msg_handler.create_and_send_nonmember_event({
                 "type": EventTypes.Topic,
                 "room_id": room_id,
                 "sender": user_id,
@@ -204,13 +215,13 @@ class RoomCreationHandler(BaseHandler):
             }, ratelimit=False)
 
         for invitee in invite_list:
-            yield msg_handler.create_and_send_event({
-                "type": EventTypes.Member,
-                "state_key": invitee,
-                "room_id": room_id,
-                "sender": user_id,
-                "content": {"membership": Membership.INVITE},
-            }, ratelimit=False)
+            room_member_handler.update_membership(
+                requester,
+                UserID.from_string(invitee),
+                room_id,
+                "invite",
+                ratelimit=False,
+            )
 
         for invite_3pid in invite_3pid_list:
             id_server = invite_3pid["id_server"]
@@ -222,7 +233,7 @@ class RoomCreationHandler(BaseHandler):
                 medium,
                 address,
                 id_server,
-                token_id=None,
+                requester,
                 txn_id=None,
             )
 
@@ -439,12 +450,14 @@ class RoomMemberHandler(BaseHandler):
                 errcode=Codes.BAD_STATE
             )
 
-        yield msg_handler.send_event(
+        member_handler = self.hs.get_handlers().room_member_handler
+        yield member_handler.send_membership_event(
             event,
             context,
-            ratelimit=ratelimit,
             is_guest=requester.is_guest,
+            ratelimit=ratelimit,
             room_hosts=room_hosts,
+            from_client=True,
         )
 
         if action == "forget":
@@ -452,7 +465,7 @@ class RoomMemberHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def send_membership_event(
-            self, event, context, is_guest=False, room_hosts=None, ratelimit=True
+            self, event, context, is_guest=False, room_hosts=None, ratelimit=True, from_client=True,
     ):
         """ Change the membership status of a user in a room.
 
@@ -461,6 +474,16 @@ class RoomMemberHandler(BaseHandler):
         Raises:
             SynapseError if there was a problem changing the membership.
         """
+        if from_client:
+            user = UserID.from_string(event.sender)
+
+            assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
+
+        if event.is_state():
+            prev_state = self.hs.get_handlers().message_handler.deduplicate_state_event(event, context)
+            if prev_state is not None:
+                return
+
         target_user_id = event.state_key
         target_user = UserID.from_string(event.state_key)
 
@@ -549,13 +572,11 @@ class RoomMemberHandler(BaseHandler):
                         room_id,
                         event.user_id
                     )
-                    defer.returnValue({"room_id": room_id})
                     return
 
             # FIXME: This isn't idempotency.
             if prev_state and prev_state.membership == event.membership:
                 # double same action, treat this event as a NOOP.
-                defer.returnValue({})
                 return
 
             yield self.handle_new_client_event(
@@ -568,8 +589,6 @@ class RoomMemberHandler(BaseHandler):
             if prev_state and prev_state.membership == Membership.JOIN:
                 user = UserID.from_string(event.user_id)
                 user_left_room(self.distributor, user, event.room_id)
-
-        defer.returnValue({"room_id": room_id})
 
     @defer.inlineCallbacks
     def lookup_room_alias(self, room_alias):
@@ -657,7 +676,7 @@ class RoomMemberHandler(BaseHandler):
             medium,
             address,
             id_server,
-            token_id,
+            requester,
             txn_id
     ):
         invitee = yield self._lookup_3pid(
@@ -665,19 +684,12 @@ class RoomMemberHandler(BaseHandler):
         )
 
         if invitee:
-            # make sure it looks like a user ID; it'll throw if it's invalid.
-            UserID.from_string(invitee)
-            yield self.hs.get_handlers().message_handler.create_and_send_event(
-                {
-                    "type": EventTypes.Member,
-                    "content": {
-                        "membership": unicode("invite")
-                    },
-                    "room_id": room_id,
-                    "sender": inviter.to_string(),
-                    "state_key": invitee,
-                },
-                token_id=token_id,
+            handler = self.hs.get_handlers().room_member_handler
+            yield handler.update_membership(
+                requester,
+                UserID.from_string(invitee),
+                room_id,
+                "invite",
                 txn_id=txn_id,
             )
         else:
@@ -687,7 +699,7 @@ class RoomMemberHandler(BaseHandler):
                 address,
                 room_id,
                 inviter,
-                token_id,
+                requester.access_token_id,
                 txn_id=txn_id
             )
 
@@ -798,7 +810,7 @@ class RoomMemberHandler(BaseHandler):
             )
         )
         msg_handler = self.hs.get_handlers().message_handler
-        yield msg_handler.create_and_send_event(
+        yield msg_handler.create_and_send_nonmember_event(
             {
                 "type": EventTypes.ThirdPartyInvite,
                 "content": {
