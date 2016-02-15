@@ -20,7 +20,7 @@ from .appservice import (
 from ._base import Cache
 from .directory import DirectoryStore
 from .events import EventsStore
-from .presence import PresenceStore
+from .presence import PresenceStore, UserPresenceState
 from .profile import ProfileStore
 from .registration import RegistrationStore
 from .room import RoomStore
@@ -47,6 +47,7 @@ from .account_data import AccountDataStore
 
 from util.id_generators import IdGenerator, StreamIdGenerator
 
+from synapse.api.constants import PresenceState
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 
@@ -110,6 +111,9 @@ class DataStore(RoomMemberStore, RoomStore,
         self._account_data_id_gen = StreamIdGenerator(
             db_conn, "account_data_max_stream_id", "stream_id"
         )
+        self._presence_id_gen = StreamIdGenerator(
+            db_conn, "presence_stream", "stream_id"
+        )
 
         self._transaction_id_gen = IdGenerator("sent_transactions", "id", self)
         self._state_groups_id_gen = IdGenerator("state_groups", "id", self)
@@ -119,7 +123,7 @@ class DataStore(RoomMemberStore, RoomStore,
         self._push_rule_id_gen = IdGenerator("push_rules", "id", self)
         self._push_rules_enable_id_gen = IdGenerator("push_rules_enable", "id", self)
 
-        events_max = self._stream_id_gen.get_max_token(None)
+        events_max = self._stream_id_gen.get_max_token()
         event_cache_prefill, min_event_val = self._get_cache_dict(
             db_conn, "events",
             entity_column="room_id",
@@ -135,12 +139,30 @@ class DataStore(RoomMemberStore, RoomStore,
             "MembershipStreamChangeCache", events_max,
         )
 
-        account_max = self._account_data_id_gen.get_max_token(None)
+        account_max = self._account_data_id_gen.get_max_token()
         self._account_data_stream_cache = StreamChangeCache(
             "AccountDataAndTagsChangeCache", account_max,
         )
 
+        self.__presence_on_startup = self._get_active_presence(db_conn)
+
+        presence_cache_prefill, min_presence_val = self._get_cache_dict(
+            db_conn, "presence_stream",
+            entity_column="user_id",
+            stream_column="stream_id",
+            max_value=self._presence_id_gen.get_max_token(),
+        )
+        self.presence_stream_cache = StreamChangeCache(
+            "PresenceStreamChangeCache", min_presence_val,
+            prefilled_cache=presence_cache_prefill
+        )
+
         super(DataStore, self).__init__(hs)
+
+    def take_presence_startup_info(self):
+        active_on_startup = self.__presence_on_startup
+        self.__presence_on_startup = None
+        return active_on_startup
 
     def _get_cache_dict(self, db_conn, table, entity_column, stream_column, max_value):
         # Fetch a mapping of room_id -> max stream position for "recent" rooms.
@@ -161,6 +183,7 @@ class DataStore(RoomMemberStore, RoomStore,
         txn = db_conn.cursor()
         txn.execute(sql, (int(max_value),))
         rows = txn.fetchall()
+        txn.close()
 
         cache = {
             row[0]: int(row[1])
@@ -173,6 +196,27 @@ class DataStore(RoomMemberStore, RoomStore,
             min_val = max_value
 
         return cache, min_val
+
+    def _get_active_presence(self, db_conn):
+        """Fetch non-offline presence from the database so that we can register
+        the appropriate time outs.
+        """
+
+        sql = (
+            "SELECT user_id, state, last_active, last_federation_update,"
+            " last_user_sync, status_msg, currently_active FROM presence_stream"
+            " WHERE state != ?"
+        )
+        sql = self.database_engine.convert_param_style(sql)
+
+        txn = db_conn.cursor()
+        txn.execute(sql, (PresenceState.OFFLINE,))
+        rows = self.cursor_to_dict(txn)
+
+        for row in rows:
+            row["currently_active"] = bool(row["currently_active"])
+
+        return [UserPresenceState(**row) for row in rows]
 
     @defer.inlineCallbacks
     def insert_client_ip(self, user, access_token, ip, user_agent):

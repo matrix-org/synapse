@@ -304,18 +304,6 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
             if event["type"] != EventTypes.Member:
                 continue
             chunk.append(event)
-            # FIXME: should probably be state_key here, not user_id
-            target_user = UserID.from_string(event["user_id"])
-            # Presence is an optional cache; don't fail if we can't fetch it
-            try:
-                presence_handler = self.handlers.presence_handler
-                presence_state = yield presence_handler.get_state(
-                    target_user=target_user,
-                    auth_user=requester.user,
-                )
-                event["content"].update(presence_state)
-            except:
-                pass
 
         defer.returnValue((200, {
             "chunk": chunk
@@ -541,6 +529,10 @@ class RoomTypingRestServlet(ClientV1RestServlet):
         "/rooms/(?P<room_id>[^/]*)/typing/(?P<user_id>[^/]*)$"
     )
 
+    def __init__(self, hs):
+        super(RoomTypingRestServlet, self).__init__(hs)
+        self.presence_handler = hs.get_handlers().presence_handler
+
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, user_id):
         requester = yield self.auth.get_user_by_req(request)
@@ -551,6 +543,8 @@ class RoomTypingRestServlet(ClientV1RestServlet):
         content = _parse_json(request)
 
         typing_handler = self.handlers.typing_notification_handler
+
+        yield self.presence_handler.bump_presence_active_time(requester.user)
 
         if content["typing"]:
             yield typing_handler.started_typing(

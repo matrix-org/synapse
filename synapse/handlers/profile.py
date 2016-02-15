@@ -49,6 +49,9 @@ class ProfileHandler(BaseHandler):
         distributor = hs.get_distributor()
         self.distributor = distributor
 
+        distributor.declare("collect_presencelike_data")
+        distributor.declare("changed_presencelike_data")
+
         distributor.observe("registered_user", self.registered_user)
 
         distributor.observe(

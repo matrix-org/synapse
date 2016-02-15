@@ -17,7 +17,7 @@
 """
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import SynapseError, AuthError
 from synapse.types import UserID
 from .base import ClientV1RestServlet, client_path_patterns
 
@@ -35,8 +35,15 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
-        state = yield self.handlers.presence_handler.get_state(
-            target_user=user, auth_user=requester.user)
+        if requester.user != user:
+            allowed = yield self.handlers.presence_handler.is_visible(
+                observed_user=user, observer_user=requester.user,
+            )
+
+            if not allowed:
+                raise AuthError(403, "You are allowed to see their presence.")
+
+        state = yield self.handlers.presence_handler.get_state(target_user=user)
 
         defer.returnValue((200, state))
 
@@ -44,6 +51,9 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
     def on_PUT(self, request, user_id):
         requester = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
+
+        if requester.user != user:
+            raise AuthError(403, "Can only set your own presence state")
 
         state = {}
         try:
@@ -63,8 +73,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
         except:
             raise SynapseError(400, "Unable to parse state")
 
-        yield self.handlers.presence_handler.set_state(
-            target_user=user, auth_user=requester.user, state=state)
+        yield self.handlers.presence_handler.set_state(user, state)
 
         defer.returnValue((200, {}))
 
@@ -87,11 +96,8 @@ class PresenceListRestServlet(ClientV1RestServlet):
             raise SynapseError(400, "Cannot get another user's presence list")
 
         presence = yield self.handlers.presence_handler.get_presence_list(
-            observer_user=user, accepted=True)
-
-        for p in presence:
-            observed_user = p.pop("observed_user")
-            p["user_id"] = observed_user.to_string()
+            observer_user=user, accepted=True
+        )
 
         defer.returnValue((200, presence))
 

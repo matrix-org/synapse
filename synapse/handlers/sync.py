@@ -582,6 +582,28 @@ class SyncHandler(BaseHandler):
             if room_sync:
                 joined.append(room_sync)
 
+        # For each newly joined room, we want to send down presence of
+        # existing users.
+        presence_handler = self.hs.get_handlers().presence_handler
+        extra_presence_users = set()
+        for room_id in newly_joined_rooms:
+            users = yield self.store.get_users_in_room(event.room_id)
+            extra_presence_users.update(users)
+
+        # For each new member, send down presence.
+        for joined_sync in joined:
+            it = itertools.chain(joined_sync.timeline.events, joined_sync.state.values())
+            for event in it:
+                if event.type == EventTypes.Member:
+                    if event.membership == Membership.JOIN:
+                        extra_presence_users.add(event.state_key)
+
+        states = yield presence_handler.get_states(
+            [u for u in extra_presence_users if u != user_id],
+            as_event=True,
+        )
+        presence.extend(states)
+
         account_data_for_user = sync_config.filter_collection.filter_account_data(
             self.account_data_for_user(account_data)
         )
