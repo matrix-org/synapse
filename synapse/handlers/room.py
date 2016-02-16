@@ -168,31 +168,20 @@ class RoomCreationHandler(BaseHandler):
 
         creation_content = config.get("creation_content", {})
 
-        user = UserID.from_string(user_id)
-        creation_events = self._create_events_for_new_room(
-            user, room_id,
+        msg_handler = self.hs.get_handlers().message_handler
+        room_member_handler = self.hs.get_handlers().room_member_handler
+
+        yield self._send_events_for_new_room(
+            requester,
+            room_id,
+            msg_handler,
+            room_member_handler,
             preset_config=preset_config,
             invite_list=invite_list,
             initial_state=initial_state,
             creation_content=creation_content,
             room_alias=room_alias,
         )
-
-        msg_handler = self.hs.get_handlers().message_handler
-        room_member_handler = self.hs.get_handlers().room_member_handler
-
-        for event in creation_events:
-            if event["type"] == EventTypes.Member:
-                # TODO(danielwh): This is hideous
-                yield room_member_handler.update_membership(
-                    requester,
-                    user,
-                    room_id,
-                    "join",
-                    ratelimit=False,
-                )
-            else:
-                yield msg_handler.create_and_send_nonmember_event(event, ratelimit=False)
 
         if "name" in config:
             name = config["name"]
@@ -229,7 +218,7 @@ class RoomCreationHandler(BaseHandler):
             medium = invite_3pid["medium"]
             yield self.hs.get_handlers().room_member_handler.do_3pid_invite(
                 room_id,
-                user,
+                requester.user,
                 medium,
                 address,
                 id_server,
@@ -247,19 +236,19 @@ class RoomCreationHandler(BaseHandler):
 
         defer.returnValue(result)
 
-    def _create_events_for_new_room(self, creator, room_id, preset_config,
-                                    invite_list, initial_state, creation_content,
-                                    room_alias):
-        config = RoomCreationHandler.PRESETS_DICT[preset_config]
-
-        creator_id = creator.to_string()
-
-        event_keys = {
-            "room_id": room_id,
-            "sender": creator_id,
-            "state_key": "",
-        }
-
+    @defer.inlineCallbacks
+    def _send_events_for_new_room(
+            self,
+            creator,  # A Requester object.
+            room_id,
+            msg_handler,
+            room_member_handler,
+            preset_config,
+            invite_list,
+            initial_state,
+            creation_content,
+            room_alias
+    ):
         def create(etype, content, **kwargs):
             e = {
                 "type": etype,
@@ -271,26 +260,39 @@ class RoomCreationHandler(BaseHandler):
 
             return e
 
-        creation_content.update({"creator": creator.to_string()})
-        creation_event = create(
+        @defer.inlineCallbacks
+        def send(etype, content, **kwargs):
+            event = create(etype, content, **kwargs)
+            yield msg_handler.create_and_send_nonmember_event(event, ratelimit=False)
+
+        config = RoomCreationHandler.PRESETS_DICT[preset_config]
+
+        creator_id = creator.user.to_string()
+
+        event_keys = {
+            "room_id": room_id,
+            "sender": creator_id,
+            "state_key": "",
+        }
+
+        creation_content.update({"creator": creator_id})
+        yield send(
             etype=EventTypes.Create,
             content=creation_content,
         )
 
-        join_event = create(
-            etype=EventTypes.Member,
-            state_key=creator_id,
-            content={
-                "membership": Membership.JOIN,
-            },
+        yield room_member_handler.update_membership(
+            creator,
+            creator.user,
+            room_id,
+            "join",
+            ratelimit=False,
         )
-
-        returned_events = [creation_event, join_event]
 
         if (EventTypes.PowerLevels, '') not in initial_state:
             power_level_content = {
                 "users": {
-                    creator.to_string(): 100,
+                    creator_id: 100,
                 },
                 "users_default": 0,
                 "events": {
@@ -312,45 +314,35 @@ class RoomCreationHandler(BaseHandler):
                 for invitee in invite_list:
                     power_level_content["users"][invitee] = 100
 
-            power_levels_event = create(
+            yield send(
                 etype=EventTypes.PowerLevels,
                 content=power_level_content,
             )
 
-            returned_events.append(power_levels_event)
-
         if room_alias and (EventTypes.CanonicalAlias, '') not in initial_state:
-            room_alias_event = create(
+            yield send(
                 etype=EventTypes.CanonicalAlias,
                 content={"alias": room_alias.to_string()},
             )
 
-            returned_events.append(room_alias_event)
-
         if (EventTypes.JoinRules, '') not in initial_state:
-            join_rules_event = create(
+            yield send(
                 etype=EventTypes.JoinRules,
                 content={"join_rule": config["join_rules"]},
             )
 
-            returned_events.append(join_rules_event)
-
         if (EventTypes.RoomHistoryVisibility, '') not in initial_state:
-            history_event = create(
+            yield send(
                 etype=EventTypes.RoomHistoryVisibility,
                 content={"history_visibility": config["history_visibility"]}
             )
 
-            returned_events.append(history_event)
-
         for (etype, state_key), content in initial_state.items():
-            returned_events.append(create(
+            yield send(
                 etype=etype,
                 state_key=state_key,
                 content=content,
-            ))
-
-        return returned_events
+            )
 
 
 class RoomMemberHandler(BaseHandler):
@@ -465,12 +457,28 @@ class RoomMemberHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def send_membership_event(
-            self, event, context, is_guest=False, room_hosts=None, ratelimit=True, from_client=True,
+            self,
+            event,
+            context,
+            is_guest=False,
+            room_hosts=None,
+            ratelimit=True,
+            from_client=True,
     ):
         """ Change the membership status of a user in a room.
 
         Args:
-            event (SynapseEvent): The membership event
+            event (SynapseEvent): The membership event.
+            context: The context of the event.
+            is_guest (bool): Whether the sender is a guest.
+            room_hosts ([str]): Homeservers which are likely to already be in
+                the room, and could be danced with in order to join this
+                homeserver for the first time.
+            ratelimit (bool): Whether to rate limit this request.
+            from_client (bool): Whether this request is the result of a local
+                client request (rather than over federation). If so, we will
+                perform extra checks, like that this homeserver can act as this
+                client.
         Raises:
             SynapseError if there was a problem changing the membership.
         """
@@ -480,7 +488,8 @@ class RoomMemberHandler(BaseHandler):
             assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
 
         if event.is_state():
-            prev_state = self.hs.get_handlers().message_handler.deduplicate_state_event(event, context)
+            message_handler = self.hs.get_handlers().message_handler
+            prev_state = message_handler.deduplicate_state_event(event, context)
             if prev_state is not None:
                 return
 
