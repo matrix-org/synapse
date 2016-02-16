@@ -482,9 +482,9 @@ class RoomMemberHandler(BaseHandler):
         Raises:
             SynapseError if there was a problem changing the membership.
         """
-        if from_client:
-            user = UserID.from_string(event.sender)
+        user = UserID.from_string(event.sender)
 
+        if from_client:
             assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
 
         if event.is_state():
@@ -502,81 +502,59 @@ class RoomMemberHandler(BaseHandler):
 
         room_id = event.room_id
 
+        handled = False
+
         if event.membership == Membership.JOIN:
             if is_guest and not self._can_guest_join(context.current_state):
                 # This should be an auth check, but guests are a local concept,
                 # so don't really fit into the general auth process.
                 raise AuthError(403, "Guest access not allowed")
 
-            # If we're trying to join a room then we have to do this differently
-            # if this HS is not currently in the room, i.e. we have to do the
-            # invite/join dance.
-
-            # XXX: We don't do an auth check if we are doing an invite
-            # join dance for now, since we're kinda implicitly checking
-            # that we are allowed to join when we decide whether or not we
-            # need to do the invite/join dance.
-
-            is_host_in_room = yield self.is_host_in_room(room_id, context)
-            if is_host_in_room:
-                should_do_dance = False
-            elif room_hosts:  # TODO: Shouldn't this be remote_room_host?
-                should_do_dance = True
-            else:
-                inviter = yield self.get_inviter(event)
-                if not inviter:
-                    # return the same error as join_room_alias does
-                    raise SynapseError(404, "No known servers")
-                should_do_dance = not self.hs.is_mine(inviter)
-                room_hosts = [inviter.domain]
+            should_do_dance, room_hosts = yield self._should_do_dance(
+                room_id,
+                context,
+                (yield self.get_inviter(target_user.to_string(), room_id)),
+                room_hosts,
+            )
 
             if should_do_dance:
-                handler = self.hs.get_handlers().federation_handler
-                yield handler.do_invite_join(
+                if len(room_hosts) == 0:
+                    # return the same error as join_room_alias does
+                    raise SynapseError(404, "No known servers")
+
+                # We don't do an auth check if we are doing an invite
+                # join dance for now, since we're kinda implicitly checking
+                # that we are allowed to join when we decide whether or not we
+                # need to do the invite/join dance.
+                yield self.hs.get_handlers().federation_handler.do_invite_join(
                     room_hosts,
                     room_id,
                     event.user_id,
                     event.content,
                 )
-            else:
-                logger.debug("Doing normal join")
-
-                yield self.handle_new_client_event(
-                    event,
-                    context,
-                    extra_users=[target_user],
-                    ratelimit=ratelimit,
+                handled = True
+        if event.membership == Membership.LEAVE:
+            is_host_in_room = yield self.is_host_in_room(room_id, context)
+            if not is_host_in_room:
+                # Rejecting an invite, rather than leaving a joined room
+                handler = self.hs.get_handlers().federation_handler
+                inviter = yield self.get_inviter(target_user.to_string(), room_id)
+                if not inviter:
+                    # return the same error as join_room_alias does
+                    raise SynapseError(404, "No known servers")
+                yield handler.do_remotely_reject_invite(
+                    [inviter.domain],
+                    room_id,
+                    event.user_id
                 )
-
-            prev_state = context.current_state.get((event.type, event.state_key))
-            if not prev_state or prev_state.membership != Membership.JOIN:
-                # Only fire user_joined_room if the user has acutally joined the
-                # room. Don't bother if the user is just changing their profile
-                # info.
-                user = UserID.from_string(event.user_id)
-                yield user_joined_room(self.distributor, user, room_id)
-        else:
-            if event.membership == Membership.LEAVE:
-                is_host_in_room = yield self.is_host_in_room(room_id, context)
-                if not is_host_in_room:
-                    # Rejecting an invite, rather than leaving a joined room
-                    handler = self.hs.get_handlers().federation_handler
-                    inviter = yield self.get_inviter(event)
-                    if not inviter:
-                        # return the same error as join_room_alias does
-                        raise SynapseError(404, "No known servers")
-                    yield handler.do_remotely_reject_invite(
-                        [inviter.domain],
-                        room_id,
-                        event.user_id
-                    )
-                    return
+                handled = True
 
             # FIXME: This isn't idempotency.
             if prev_state and prev_state.membership == event.membership:
                 # double same action, treat this event as a NOOP.
                 return
 
+        if not handled:
             yield self.handle_new_client_event(
                 event,
                 context,
@@ -584,9 +562,15 @@ class RoomMemberHandler(BaseHandler):
                 ratelimit=ratelimit,
             )
 
+        if event.membership == Membership.JOIN:
+            if not prev_state or prev_state.membership != Membership.JOIN:
+                # Only fire user_joined_room if the user has acutally joined the
+                # room. Don't bother if the user is just changing their profile
+                # info.
+                yield user_joined_room(self.distributor, target_user, room_id)
+        elif event.membership == Membership.LEAVE:
             if prev_state and prev_state.membership == Membership.JOIN:
-                user = UserID.from_string(event.user_id)
-                user_left_room(self.distributor, user, event.room_id)
+                user_left_room(self.distributor, target_user, room_id)
 
     def _can_guest_join(self, current_state):
         """
@@ -599,6 +583,21 @@ class RoomMemberHandler(BaseHandler):
             and "guest_access" in guest_access.content
             and guest_access.content["guest_access"] == "can_join"
         )
+
+    @defer.inlineCallbacks
+    def _should_do_dance(self, room_id, context, inviter, room_hosts=None):
+        # TODO: Shouldn't this be remote_room_host?
+        room_hosts = room_hosts or []
+
+        # TODO(danielwh): This shouldn't need to yield for this check, we have a context.
+        is_host_in_room = yield self.is_host_in_room(room_id, context)
+        if is_host_in_room:
+            defer.returnValue((False, room_hosts))
+
+        if inviter and not self.hs.is_mine(inviter):
+            room_hosts.append(inviter.domain)
+
+        defer.returnValue((True, room_hosts))
 
     @defer.inlineCallbacks
     def lookup_room_alias(self, room_alias):
@@ -625,24 +624,17 @@ class RoomMemberHandler(BaseHandler):
 
         defer.returnValue((RoomID.from_string(room_id), hosts))
 
+    # TODO(danielwh): This should use the context, rather than looking up the store.
     @defer.inlineCallbacks
-    def get_inviter(self, event):
+    def get_inviter(self, user_id, room_id):
         # TODO(markjh): get prev_state from snapshot
         prev_state = yield self.store.get_room_member(
-            event.user_id, event.room_id
+            user_id, room_id
         )
-
         if prev_state and prev_state.membership == Membership.INVITE:
             defer.returnValue(UserID.from_string(prev_state.user_id))
-            return
-        elif "third_party_invite" in event.content:
-            if "sender" in event.content["third_party_invite"]:
-                inviter = UserID.from_string(
-                    event.content["third_party_invite"]["sender"]
-                )
-                defer.returnValue(inviter)
-        defer.returnValue(None)
 
+    # TODO(danielwh): This looks insane. Please make it not insane.
     @defer.inlineCallbacks
     def is_host_in_room(self, room_id, context):
         is_host_in_room = yield self.auth.check_host_in_room(
