@@ -80,13 +80,13 @@ class RoomCreationHandler(BaseHandler):
         """ Creates a new room.
 
         Args:
-            user_id (str): The ID of the user creating the new room.
+            requester (Requester): The user who requested the room creation.
             config (dict) : A dict of configuration options.
         Returns:
             The new room ID.
         Raises:
-            SynapseError if the room ID was taken, couldn't be stored, or
-            something went horribly wrong.
+            SynapseError if the room ID couldn't be stored, or something went
+            horribly wrong.
         """
         user_id = requester.user.to_string()
 
