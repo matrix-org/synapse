@@ -400,7 +400,7 @@ def _filter_ruleset_with_path(ruleset, path):
 
 def _priority_class_from_spec(spec):
     if spec['template'] not in PRIORITY_CLASS_MAP.keys():
-        raise InvalidRuleException("Unknown template: %s" % (spec['kind']))
+        raise InvalidRuleException("Unknown template: %s" % (spec['template']))
     pc = PRIORITY_CLASS_MAP[spec['template']]
 
     if spec['scope'] == 'device':
