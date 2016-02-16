@@ -217,7 +217,7 @@ class ProfileHandler(BaseHandler):
                     user,
                     j.room_id,
                     "join",  # We treat a profile update like a join.
-                    ratelimit=False,
+                    ratelimit=False,  # Try to hide that these events aren't atomic.
                 )
             except Exception as e:
                 logger.warn(
