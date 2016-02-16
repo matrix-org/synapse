@@ -493,35 +493,24 @@ class RoomMemberHandler(BaseHandler):
             if prev_state is not None:
                 return
 
-        target_user_id = event.state_key
         target_user = UserID.from_string(event.state_key)
 
         prev_state = context.current_state.get(
-            (EventTypes.Member, target_user_id),
+            (EventTypes.Member, target_user.to_string()),
             None
         )
 
         room_id = event.room_id
 
-        # If we're trying to join a room then we have to do this differently
-        # if this HS is not currently in the room, i.e. we have to do the
-        # invite/join dance.
         if event.membership == Membership.JOIN:
-            if is_guest:
-                guest_access = context.current_state.get(
-                    (EventTypes.GuestAccess, ""),
-                    None
-                )
-                is_guest_access_allowed = (
-                    guest_access
-                    and guest_access.content
-                    and "guest_access" in guest_access.content
-                    and guest_access.content["guest_access"] == "can_join"
-                )
-                if not is_guest_access_allowed:
-                    raise AuthError(403, "Guest access not allowed")
+            if is_guest and not self._can_guest_join(context.current_state):
+                # This should be an auth check, but guests are a local concept,
+                # so don't really fit into the general auth process.
+                raise AuthError(403, "Guest access not allowed")
 
-            room_id = event.room_id
+            # If we're trying to join a room then we have to do this differently
+            # if this HS is not currently in the room, i.e. we have to do the
+            # invite/join dance.
 
             # XXX: We don't do an auth check if we are doing an invite
             # join dance for now, since we're kinda implicitly checking
@@ -598,6 +587,18 @@ class RoomMemberHandler(BaseHandler):
             if prev_state and prev_state.membership == Membership.JOIN:
                 user = UserID.from_string(event.user_id)
                 user_left_room(self.distributor, user, event.room_id)
+
+    def _can_guest_join(self, current_state):
+        """
+        Returns whether a guest can join a room based on its current state.
+        """
+        guest_access = current_state.get((EventTypes.GuestAccess, ""), None)
+        return (
+            guest_access
+            and guest_access.content
+            and "guest_access" in guest_access.content
+            and guest_access.content["guest_access"] == "can_join"
+        )
 
     @defer.inlineCallbacks
     def lookup_room_alias(self, room_alias):

@@ -253,12 +253,18 @@ class MessageHandler(BaseHandler):
                 presence.bump_presence_active_time(user)
 
     def deduplicate_state_event(self, event, context):
-        prev_state = context.current_state.get((event.type, event.state_key))
-        if prev_state and event.user_id == prev_state.user_id:
-            prev_content = encode_canonical_json(prev_state.content)
+        """
+        Checks whether event is in the latest resolved state in context.
+
+        If so, returns the version of the event in context.
+        Otherwise, returns None.
+        """
+        prev_event = context.current_state.get((event.type, event.state_key))
+        if prev_event and event.user_id == prev_event.user_id:
+            prev_content = encode_canonical_json(prev_event.content)
             next_content = encode_canonical_json(event.content)
             if prev_content == next_content:
-                return prev_state
+                return prev_event
         return None
 
     @defer.inlineCallbacks
