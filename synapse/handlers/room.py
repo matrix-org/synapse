@@ -81,20 +81,20 @@ class RoomCreationHandler(BaseHandler):
     }
 
     @defer.inlineCallbacks
-    def create_room(self, user_id, room_id, config):
+    def create_room(self, requester, config):
         """ Creates a new room.
 
         Args:
-            user_id (str): The ID of the user creating the new room.
-            room_id (str): The proposed ID for the new room. Can be None, in
-            which case one will be created for you.
+            requester (Requester): The user who requested the room creation.
             config (dict) : A dict of configuration options.
         Returns:
             The new room ID.
         Raises:
-            SynapseError if the room ID was taken, couldn't be stored, or
-            something went horribly wrong.
+            SynapseError if the room ID couldn't be stored, or something went
+            horribly wrong.
         """
+        user_id = requester.user.to_string()
+
         self.ratelimit(user_id)
 
         if "room_alias_name" in config:
@@ -126,40 +126,28 @@ class RoomCreationHandler(BaseHandler):
 
         is_public = config.get("visibility", None) == "public"
 
-        if room_id:
-            # Ensure room_id is the correct type
-            room_id_obj = RoomID.from_string(room_id)
-            if not self.hs.is_mine(room_id_obj):
-                raise SynapseError(400, "Room id must be local")
-
-            yield self.store.store_room(
-                room_id=room_id,
-                room_creator_user_id=user_id,
-                is_public=is_public
-            )
-        else:
-            # autogen room IDs and try to create it. We may clash, so just
-            # try a few times till one goes through, giving up eventually.
-            attempts = 0
-            room_id = None
-            while attempts < 5:
-                try:
-                    random_string = stringutils.random_string(18)
-                    gen_room_id = RoomID.create(
-                        random_string,
-                        self.hs.hostname,
-                    )
-                    yield self.store.store_room(
-                        room_id=gen_room_id.to_string(),
-                        room_creator_user_id=user_id,
-                        is_public=is_public
-                    )
-                    room_id = gen_room_id.to_string()
-                    break
-                except StoreError:
-                    attempts += 1
-            if not room_id:
-                raise StoreError(500, "Couldn't generate a room ID.")
+        # autogen room IDs and try to create it. We may clash, so just
+        # try a few times till one goes through, giving up eventually.
+        attempts = 0
+        room_id = None
+        while attempts < 5:
+            try:
+                random_string = stringutils.random_string(18)
+                gen_room_id = RoomID.create(
+                    random_string,
+                    self.hs.hostname,
+                )
+                yield self.store.store_room(
+                    room_id=gen_room_id.to_string(),
+                    room_creator_user_id=user_id,
+                    is_public=is_public
+                )
+                room_id = gen_room_id.to_string()
+                break
+            except StoreError:
+                attempts += 1
+        if not room_id:
+            raise StoreError(500, "Couldn't generate a room ID.")
 
         if room_alias:
             directory_handler = self.hs.get_handlers().directory_handler
