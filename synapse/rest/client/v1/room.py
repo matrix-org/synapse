@@ -230,11 +230,11 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
 
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
-            room_hosts = None
+            remote_room_hosts = None
         elif RoomAlias.is_valid(room_identifier):
             handler = self.handlers.room_member_handler
             room_alias = RoomAlias.from_string(room_identifier)
-            room_id, room_hosts = yield handler.lookup_room_alias(room_alias)
+            room_id, remote_room_hosts = yield handler.lookup_room_alias(room_alias)
             room_id = room_id.to_string()
         else:
             raise SynapseError(400, "%s was not legal room ID or room alias" % (
@@ -247,7 +247,7 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
             room_id=room_id,
             action="join",
             txn_id=txn_id,
-            room_hosts=room_hosts,
+            remote_room_hosts=remote_room_hosts,
         )
 
         defer.returnValue((200, {"room_id": room_id}))

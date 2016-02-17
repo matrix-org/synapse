@@ -397,7 +397,7 @@ class RoomMemberHandler(BaseHandler):
             room_id,
             action,
             txn_id=None,
-            room_hosts=None,
+            remote_room_hosts=None,
             ratelimit=True,
     ):
         effective_membership_state = action
@@ -448,7 +448,7 @@ class RoomMemberHandler(BaseHandler):
             context,
             is_guest=requester.is_guest,
             ratelimit=ratelimit,
-            room_hosts=room_hosts,
+            remote_room_hosts=remote_room_hosts,
             from_client=True,
         )
 
@@ -461,11 +461,12 @@ class RoomMemberHandler(BaseHandler):
             event,
             context,
             is_guest=False,
-            room_hosts=None,
+            remote_room_hosts=None,
             ratelimit=True,
             from_client=True,
     ):
-        """ Change the membership status of a user in a room.
+        """
+        Change the membership status of a user in a room.
 
         Args:
             event (SynapseEvent): The membership event.
@@ -482,78 +483,64 @@ class RoomMemberHandler(BaseHandler):
         Raises:
             SynapseError if there was a problem changing the membership.
         """
-        user = UserID.from_string(event.sender)
+        target_user = UserID.from_string(event.state_key)
+        room_id = event.room_id
 
         if from_client:
-            assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
+            sender = UserID.from_string(event.sender)
+            assert self.hs.is_mine(sender), "Sender must be our own: %s" % (sender,)
 
         if event.is_state():
             message_handler = self.hs.get_handlers().message_handler
-            prev_state = message_handler.deduplicate_state_event(event, context)
-            if prev_state is not None:
+            prev_event = message_handler.deduplicate_state_event(event, context)
+            if prev_event is not None:
                 return
 
-        target_user = UserID.from_string(event.state_key)
-
-        prev_state = context.current_state.get(
-            (EventTypes.Member, target_user.to_string()),
-            None
-        )
-
-        room_id = event.room_id
-
-        handled = False
+        action = "send"
 
         if event.membership == Membership.JOIN:
             if is_guest and not self._can_guest_join(context.current_state):
                 # This should be an auth check, but guests are a local concept,
                 # so don't really fit into the general auth process.
                 raise AuthError(403, "Guest access not allowed")
-
-            should_do_dance, room_hosts = self._should_do_dance(
+            do_remote_join_dance, remote_room_hosts = self._should_do_dance(
                 context,
-                (self.get_inviter(target_user.to_string(), context.current_state)),
-                room_hosts,
+                (self.get_inviter(event.state_key, context.current_state)),
+                remote_room_hosts,
             )
-
-            if should_do_dance:
-                if len(room_hosts) == 0:
-                    # return the same error as join_room_alias does
-                    raise SynapseError(404, "No known servers")
-
-                # We don't do an auth check if we are doing an invite
-                # join dance for now, since we're kinda implicitly checking
-                # that we are allowed to join when we decide whether or not we
-                # need to do the invite/join dance.
-                yield self.hs.get_handlers().federation_handler.do_invite_join(
-                    room_hosts,
-                    room_id,
-                    event.user_id,
-                    event.content,
-                )
-                handled = True
-        if event.membership == Membership.LEAVE:
+            if do_remote_join_dance:
+                action = "remote_join"
+        elif event.membership == Membership.LEAVE:
             is_host_in_room = self.is_host_in_room(context.current_state)
             if not is_host_in_room:
-                # Rejecting an invite, rather than leaving a joined room
-                handler = self.hs.get_handlers().federation_handler
-                inviter = self.get_inviter(target_user.to_string(), context.current_state)
-                if not inviter:
-                    # return the same error as join_room_alias does
-                    raise SynapseError(404, "No known servers")
-                yield handler.do_remotely_reject_invite(
-                    [inviter.domain],
-                    room_id,
-                    event.user_id
-                )
-                handled = True
+                action = "remote_reject"
 
-            # FIXME: This isn't idempotency.
-            if prev_state and prev_state.membership == event.membership:
-                # double same action, treat this event as a NOOP.
-                return
+        federation_handler = self.hs.get_handlers().federation_handler
 
-        if not handled:
+        if action == "remote_join":
+            if len(remote_room_hosts) == 0:
+                raise SynapseError(404, "No known servers")
+
+            # We don't do an auth check if we are doing an invite
+            # join dance for now, since we're kinda implicitly checking
+            # that we are allowed to join when we decide whether or not we
+            # need to do the invite/join dance.
+            yield federation_handler.do_invite_join(
+                remote_room_hosts,
+                event.room_id,
+                event.user_id,
+                event.content,
+            )
+        elif action == "remote_reject":
+            inviter = self.get_inviter(target_user.to_string(), context.current_state)
+            if not inviter:
+                raise SynapseError(404, "No known servers")
+            yield federation_handler.do_remotely_reject_invite(
+                [inviter.domain],
+                room_id,
+                event.user_id
+            )
+        else:
             yield self.handle_new_client_event(
                 event,
                 context,
@@ -561,14 +548,19 @@ class RoomMemberHandler(BaseHandler):
                 ratelimit=ratelimit,
             )
 
+        prev_member_event = context.current_state.get(
+            (EventTypes.Member, target_user.to_string()),
+            None
+        )
+
         if event.membership == Membership.JOIN:
-            if not prev_state or prev_state.membership != Membership.JOIN:
+            if not prev_member_event or prev_member_event.membership != Membership.JOIN:
                 # Only fire user_joined_room if the user has acutally joined the
                 # room. Don't bother if the user is just changing their profile
                 # info.
                 yield user_joined_room(self.distributor, target_user, room_id)
         elif event.membership == Membership.LEAVE:
-            if prev_state and prev_state.membership == Membership.JOIN:
+            if prev_member_event and prev_member_event.membership == Membership.JOIN:
                 user_left_room(self.distributor, target_user, room_id)
 
     def _can_guest_join(self, current_state):
@@ -604,7 +596,9 @@ class RoomMemberHandler(BaseHandler):
         Args:
             room_alias (RoomAlias): The alias to look up.
         Returns:
-            The room ID as a RoomID object.
+            A tuple of:
+                The room ID as a RoomID object.
+                Hosts likely to be participating in the room ([str]).
         Raises:
             SynapseError if room alias could not be found.
         """
@@ -615,11 +609,9 @@ class RoomMemberHandler(BaseHandler):
             raise SynapseError(404, "No such room alias")
 
         room_id = mapping["room_id"]
-        hosts = mapping["servers"]
-        if not hosts:
-            raise SynapseError(404, "No known servers")
+        servers = mapping["servers"]
 
-        defer.returnValue((RoomID.from_string(room_id), hosts))
+        defer.returnValue((RoomID.from_string(room_id), servers))
 
     def get_inviter(self, user_id, current_state):
         prev_state = current_state.get((EventTypes.Member, user_id))
