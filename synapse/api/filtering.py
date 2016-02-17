@@ -198,7 +198,10 @@ class Filter(object):
         sender = event.get("sender", None)
         if not sender:
             # Presence events have their 'sender' in content.user_id
-            sender = event.get("content", {}).get("user_id", None)
+            content = event.get("content")
+            # account_data has been allowed to have non-dict content, so check type first
+            if isinstance(content, dict):
+                sender = content.get("user_id")
 
         return self.check_fields(
             event.get("room_id", None),
