@@ -165,7 +165,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
         else:
             yield msg_handler.send_nonmember_event(event, context)
 
-        defer.returnValue((200, {}))
+        defer.returnValue((200, {"event_id": event.event_id}))
 
 
 # TODO: Needs unit testing for generic events + feedback
