@@ -150,11 +150,11 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
             event_dict["state_key"] = state_key
 
         msg_handler = self.handlers.message_handler
-        yield msg_handler.create_and_send_event(
+        event = yield msg_handler.create_and_send_event(
             event_dict, token_id=requester.access_token_id, txn_id=txn_id,
         )
 
-        defer.returnValue((200, {}))
+        defer.returnValue((200, {"event_id": event.event_id}))
 
 
 # TODO: Needs unit testing for generic events + feedback
