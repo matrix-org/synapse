@@ -810,7 +810,6 @@ def should_notify(old_state, new_state):
         return True
 
     if old_state.state != new_state.state:
-        # Nothing to report.
         return True
 
     return False
