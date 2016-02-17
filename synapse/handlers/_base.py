@@ -147,7 +147,7 @@ class BaseHandler(object):
 
     @defer.inlineCallbacks
     def _create_new_client_event(self, builder):
-        latest_ret = yield self.store.get_latest_events_in_room(
+        latest_ret = yield self.store.get_latest_event_ids_and_hashes_in_room(
             builder.room_id,
         )
 
@@ -156,7 +156,10 @@ class BaseHandler(object):
         else:
             depth = 1
 
-        prev_events = [(e, h) for e, h, _ in latest_ret]
+        prev_events = [
+            (event_id, prev_hashes)
+            for event_id, prev_hashes, _ in latest_ret
+        ]
 
         builder.prev_events = prev_events
         builder.depth = depth
@@ -164,6 +167,31 @@ class BaseHandler(object):
         state_handler = self.state_handler
 
         context = yield state_handler.compute_event_context(builder)
+
+        # If we've received an invite over federation, there are no latest
+        # events in the room, because we don't know enough about the graph
+        # fragment we received to treat it like a graph, so the above returned
+        # no relevant events. It may have returned some events (if we have
+        # joined and left the room), but not useful ones, like the invite. So we
+        # forcibly set our context to the invite we received over federation.
+        if (
+            not self.is_host_in_room(context.current_state) and
+            builder.type == EventTypes.Member
+        ):
+            prev_member_event = yield self.store.get_room_member(
+                builder.sender, builder.room_id
+            )
+            if prev_member_event:
+                builder.prev_events = (
+                    prev_member_event.event_id,
+                    prev_member_event.prev_events
+                )
+
+                context = yield state_handler.compute_event_context(
+                    builder,
+                    old_state=(prev_member_event,),
+                    outlier=True
+                )
 
         if builder.is_state():
             builder.prev_state = yield self.store.add_event_hashes(
@@ -186,6 +214,25 @@ class BaseHandler(object):
         defer.returnValue(
             (event, context,)
         )
+
+    def is_host_in_room(self, current_state):
+        room_members = [
+            (state_key, event.membership)
+            for ((event_type, state_key), event) in current_state.items()
+            if event_type == EventTypes.Member
+        ]
+        if len(room_members) == 0:
+            # has the room been created so we can join it?
+            create_event = current_state.get(("m.room.create", ""))
+            if create_event:
+                return True
+        for (state_key, membership) in room_members:
+            if (
+                UserID.from_string(state_key).domain == self.hs.hostname
+                and membership == Membership.JOIN
+            ):
+                return True
+        return False
 
     @defer.inlineCallbacks
     def handle_new_client_event(self, event, context, ratelimit=True, extra_users=[]):

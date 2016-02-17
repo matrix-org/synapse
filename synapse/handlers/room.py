@@ -510,10 +510,9 @@ class RoomMemberHandler(BaseHandler):
                 # so don't really fit into the general auth process.
                 raise AuthError(403, "Guest access not allowed")
 
-            should_do_dance, room_hosts = yield self._should_do_dance(
-                room_id,
+            should_do_dance, room_hosts = self._should_do_dance(
                 context,
-                (yield self.get_inviter(target_user.to_string(), room_id)),
+                (self.get_inviter(target_user.to_string(), context.current_state)),
                 room_hosts,
             )
 
@@ -534,11 +533,11 @@ class RoomMemberHandler(BaseHandler):
                 )
                 handled = True
         if event.membership == Membership.LEAVE:
-            is_host_in_room = yield self.is_host_in_room(room_id, context)
+            is_host_in_room = self.is_host_in_room(context.current_state)
             if not is_host_in_room:
                 # Rejecting an invite, rather than leaving a joined room
                 handler = self.hs.get_handlers().federation_handler
-                inviter = yield self.get_inviter(target_user.to_string(), room_id)
+                inviter = self.get_inviter(target_user.to_string(), context.current_state)
                 if not inviter:
                     # return the same error as join_room_alias does
                     raise SynapseError(404, "No known servers")
@@ -584,20 +583,18 @@ class RoomMemberHandler(BaseHandler):
             and guest_access.content["guest_access"] == "can_join"
         )
 
-    @defer.inlineCallbacks
-    def _should_do_dance(self, room_id, context, inviter, room_hosts=None):
+    def _should_do_dance(self, context, inviter, room_hosts=None):
         # TODO: Shouldn't this be remote_room_host?
         room_hosts = room_hosts or []
 
-        # TODO(danielwh): This shouldn't need to yield for this check, we have a context.
-        is_host_in_room = yield self.is_host_in_room(room_id, context)
+        is_host_in_room = self.is_host_in_room(context.current_state)
         if is_host_in_room:
-            defer.returnValue((False, room_hosts))
+            return False, room_hosts
 
         if inviter and not self.hs.is_mine(inviter):
             room_hosts.append(inviter.domain)
 
-        defer.returnValue((True, room_hosts))
+        return True, room_hosts
 
     @defer.inlineCallbacks
     def lookup_room_alias(self, room_alias):
@@ -624,36 +621,11 @@ class RoomMemberHandler(BaseHandler):
 
         defer.returnValue((RoomID.from_string(room_id), hosts))
 
-    # TODO(danielwh): This should use the context, rather than looking up the store.
-    @defer.inlineCallbacks
-    def get_inviter(self, user_id, room_id):
-        # TODO(markjh): get prev_state from snapshot
-        prev_state = yield self.store.get_room_member(
-            user_id, room_id
-        )
+    def get_inviter(self, user_id, current_state):
+        prev_state = current_state.get((EventTypes.Member, user_id))
         if prev_state and prev_state.membership == Membership.INVITE:
-            defer.returnValue(UserID.from_string(prev_state.user_id))
-
-    # TODO(danielwh): This looks insane. Please make it not insane.
-    @defer.inlineCallbacks
-    def is_host_in_room(self, room_id, context):
-        is_host_in_room = yield self.auth.check_host_in_room(
-            room_id,
-            self.hs.hostname
-        )
-        if not is_host_in_room:
-            # is *anyone* in the room?
-            room_member_keys = [
-                v for (k, v) in context.current_state.keys() if (
-                    k == "m.room.member"
-                )
-            ]
-            if len(room_member_keys) == 0:
-                # has the room been created so we can join it?
-                create_event = context.current_state.get(("m.room.create", ""))
-                if create_event:
-                    is_host_in_room = True
-        defer.returnValue(is_host_in_room)
+            return UserID.from_string(prev_state.user_id)
+        return None
 
     @defer.inlineCallbacks
     def get_joined_rooms_for_user(self, user):
