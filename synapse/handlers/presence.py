@@ -443,10 +443,12 @@ class PresenceHandler(BaseHandler):
 
             missing = [user_id for user_id, state in states.items() if not state]
             if missing:
-                states.update({
+                new = {
                     user_id: UserPresenceState.default(user_id)
                     for user_id in missing
-                })
+                }
+                states.update(new)
+                self.user_to_current_state.update(new)
 
         defer.returnValue(states)
 
