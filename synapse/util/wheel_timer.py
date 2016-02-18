@@ -46,11 +46,14 @@ class WheelTimer(object):
             then (int): When to return the object strictly after.
         """
         then_key = int(then / self.bucket_size) + 1
-        for entry in self.entries:
-            # Add to first bucket we find. This should gracefully handle inserts
-            # for times in the past.
-            if entry.end_key >= then_key:
-                entry.queue.append(obj)
+
+        if self.entries:
+            min_key = self.entries[0].end_key
+            max_key = self.entries[-1].end_key
+
+            if then_key <= max_key:
+                # The max here is to protect against inserts for times in the past
+                self.entries[max(min_key, then_key) - min_key].queue.append(obj)
                 return
 
         next_key = int(now / self.bucket_size) + 1
