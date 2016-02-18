@@ -775,6 +775,8 @@ class PresenceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def is_visible(self, observed_user, observer_user):
+        """Returns whether a user can see another user's presence.
+        """
         observer_rooms = yield self.store.get_rooms_for_user(observer_user.to_string())
         observed_rooms = yield self.store.get_rooms_for_user(observed_user.to_string())
 
