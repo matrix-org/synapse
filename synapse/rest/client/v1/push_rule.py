@@ -60,7 +60,6 @@ class PushRuleRestServlet(ClientV1RestServlet):
                 spec['template'],
                 spec['rule_id'],
                 content,
-                device=spec['device'] if 'device' in spec else None
             )
         except InvalidRuleException as e:
             raise SynapseError(400, e.message)
@@ -153,23 +152,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
                 elif pattern_type == "user_localpart":
                     c["pattern"] = user.localpart
 
-            if r['priority_class'] > PRIORITY_CLASS_MAP['override']:
-                # per-device rule
-                profile_tag = _profile_tag_from_conditions(r["conditions"])
-                r = _strip_device_condition(r)
-                if not profile_tag:
-                    continue
-                if profile_tag not in rules['device']:
-                    rules['device'][profile_tag] = {}
-                    rules['device'][profile_tag] = (
-                        _add_empty_priority_class_arrays(
-                            rules['device'][profile_tag]
-                        )
-                    )
-
-                rulearray = rules['device'][profile_tag][template_name]
-            else:
-                rulearray = rules['global'][template_name]
+            rulearray = rules['global'][template_name]
 
             template_rule = _rule_to_template(r)
             if template_rule:
@@ -194,24 +177,6 @@ class PushRuleRestServlet(ClientV1RestServlet):
         elif path[0] == 'global':
             path = path[1:]
             result = _filter_ruleset_with_path(rules['global'], path)
-            defer.returnValue((200, result))
-        elif path[0] == 'device':
-            path = path[1:]
-            if path == []:
-                raise UnrecognizedRequestError(
-                    PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR
-                )
-            if path[0] == '':
-                defer.returnValue((200, rules['device']))
-
-            profile_tag = path[0]
-            path = path[1:]
-            if profile_tag not in rules['device']:
-                ret = {}
-                ret = _add_empty_priority_class_arrays(ret)
-                defer.returnValue((200, ret))
-            ruleset = rules['device'][profile_tag]
-            result = _filter_ruleset_with_path(ruleset, path)
             defer.returnValue((200, result))
         else:
             raise UnrecognizedRequestError()
@@ -252,15 +217,8 @@ def _rule_spec_from_path(path):
 
     scope = path[1]
     path = path[2:]
-    if scope not in ['global', 'device']:
+    if scope != 'global':
         raise UnrecognizedRequestError()
-
-    device = None
-    if scope == 'device':
-        if len(path) == 0:
-            raise UnrecognizedRequestError()
-        device = path[0]
-        path = path[1:]
 
     if len(path) == 0:
         raise UnrecognizedRequestError()
@@ -278,8 +236,6 @@ def _rule_spec_from_path(path):
         'template': template,
         'rule_id': rule_id
     }
-    if device:
-        spec['profile_tag'] = device
 
     path = path[1:]
 
@@ -289,7 +245,7 @@ def _rule_spec_from_path(path):
     return spec
 
 
-def _rule_tuple_from_request_object(rule_template, rule_id, req_obj, device=None):
+def _rule_tuple_from_request_object(rule_template, rule_id, req_obj):
     if rule_template in ['override', 'underride']:
         if 'conditions' not in req_obj:
             raise InvalidRuleException("Missing 'conditions'")
@@ -322,12 +278,6 @@ def _rule_tuple_from_request_object(rule_template, rule_id, req_obj, device=None
     else:
         raise InvalidRuleException("Unknown rule template: %s" % (rule_template,))
 
-    if device:
-        conditions.append({
-            'kind': 'device',
-            'profile_tag': device
-        })
-
     if 'actions' not in req_obj:
         raise InvalidRuleException("No actions found")
     actions = req_obj['actions']
@@ -347,17 +297,6 @@ def _add_empty_priority_class_arrays(d):
     for pc in PRIORITY_CLASS_MAP.keys():
         d[pc] = []
     return d
-
-
-def _profile_tag_from_conditions(conditions):
-    """
-    Given a list of conditions, return the profile tag of the
-    device rule if there is one
-    """
-    for c in conditions:
-        if c['kind'] == 'device':
-            return c['profile_tag']
-    return None
 
 
 def _filter_ruleset_with_path(ruleset, path):
@@ -403,19 +342,11 @@ def _priority_class_from_spec(spec):
         raise InvalidRuleException("Unknown template: %s" % (spec['template']))
     pc = PRIORITY_CLASS_MAP[spec['template']]
 
-    if spec['scope'] == 'device':
-        pc += len(PRIORITY_CLASS_MAP)
-
     return pc
 
 
 def _priority_class_to_template_name(pc):
-    if pc > PRIORITY_CLASS_MAP['override']:
-        # per-device
-        prio_class_index = pc - len(PRIORITY_CLASS_MAP)
-        return PRIORITY_CLASS_INVERSE_MAP[prio_class_index]
-    else:
-        return PRIORITY_CLASS_INVERSE_MAP[pc]
+    return PRIORITY_CLASS_INVERSE_MAP[pc]
 
 
 def _rule_to_template(rule):
@@ -445,23 +376,12 @@ def _rule_to_template(rule):
     return templaterule
 
 
-def _strip_device_condition(rule):
-    for i, c in enumerate(rule['conditions']):
-        if c['kind'] == 'device':
-            del rule['conditions'][i]
-    return rule
-
-
 def _namespaced_rule_id_from_spec(spec):
     return _namespaced_rule_id(spec, spec['rule_id'])
 
 
 def _namespaced_rule_id(spec, rule_id):
-    if spec['scope'] == 'global':
-        scope = 'global'
-    else:
-        scope = 'device/%s' % (spec['profile_tag'])
-    return "%s/%s/%s" % (scope, spec['template'], rule_id)
+    return "global/%s/%s" % (spec['template'], rule_id)
 
 
 def _rule_id_from_namespaced(in_rule_id):
