@@ -31,7 +31,7 @@ class ReceiptsStore(SQLBaseStore):
         super(ReceiptsStore, self).__init__(hs)
 
         self._receipts_stream_cache = StreamChangeCache(
-            "ReceiptsRoomChangeCache", self._receipts_id_gen.get_max_token(None)
+            "ReceiptsRoomChangeCache", self._receipts_id_gen.get_max_token()
         )
 
     @cached(num_args=2)
@@ -222,7 +222,7 @@ class ReceiptsStore(SQLBaseStore):
         defer.returnValue(results)
 
     def get_max_receipt_stream_id(self):
-        return self._receipts_id_gen.get_max_token(self)
+        return self._receipts_id_gen.get_max_token()
 
     def insert_linearized_receipt_txn(self, txn, room_id, receipt_type,
                                       user_id, event_id, data, stream_id):
@@ -347,7 +347,7 @@ class ReceiptsStore(SQLBaseStore):
             room_id, receipt_type, user_id, event_ids, data
         )
 
-        max_persisted_id = yield self._stream_id_gen.get_max_token(self)
+        max_persisted_id = yield self._stream_id_gen.get_max_token()
 
         defer.returnValue((stream_id, max_persisted_id))
 
