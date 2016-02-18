@@ -298,10 +298,11 @@ class PresenceHandler(BaseHandler):
             if not state:
                 continue
 
-            if self.hs.is_mine_id(user_id):
-                if state.state == PresenceState.OFFLINE:
-                    continue
+            if state.state == PresenceState.OFFLINE:
+                # No timeouts are associated with offline states.
+                continue
 
+            if self.hs.is_mine_id(user_id):
                 if state.state == PresenceState.ONLINE:
                     if now - state.last_active > IDLE_TIMER:
                         # Currently online, but last activity ages ago so auto
@@ -331,11 +332,10 @@ class PresenceHandler(BaseHandler):
                 # This is to protect against forgetful/buggy servers, so that
                 # no one gets stuck online forever.
                 if now - state.last_federation_update > FEDERATION_TIMEOUT:
-                    if state.state != PresenceState.OFFLINE:
-                        # The other side seems to have disappeared.
-                        changes[user_id] = state.copy_and_replace(
-                            state=PresenceState.OFFLINE,
-                        )
+                    # The other side seems to have disappeared.
+                    changes[user_id] = state.copy_and_replace(
+                        state=PresenceState.OFFLINE,
+                    )
 
         preserve_fn(self._update_states)(changes.values())
 
