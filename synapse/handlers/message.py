@@ -229,7 +229,7 @@ class MessageHandler(BaseHandler):
         if event.type == EventTypes.Member:
             raise SynapseError(
                 500,
-                "Tried to send member even through non-member codepath"
+                "Tried to send member event through non-member codepath"
             )
 
         user = UserID.from_string(event.sender)

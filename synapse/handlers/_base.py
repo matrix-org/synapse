@@ -222,7 +222,8 @@ class BaseHandler(object):
             if event_type == EventTypes.Member
         ]
         if len(room_members) == 0:
-            # has the room been created so we can join it?
+            # Have we just created the room, and is this about to be the very
+            # first member event?
             create_event = current_state.get(("m.room.create", ""))
             if create_event:
                 return True

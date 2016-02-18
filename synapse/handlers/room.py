@@ -490,11 +490,10 @@ class RoomMemberHandler(BaseHandler):
             sender = UserID.from_string(event.sender)
             assert self.hs.is_mine(sender), "Sender must be our own: %s" % (sender,)
 
-        if event.is_state():
-            message_handler = self.hs.get_handlers().message_handler
-            prev_event = message_handler.deduplicate_state_event(event, context)
-            if prev_event is not None:
-                return
+        message_handler = self.hs.get_handlers().message_handler
+        prev_event = message_handler.deduplicate_state_event(event, context)
+        if prev_event is not None:
+            return
 
         action = "send"
 
