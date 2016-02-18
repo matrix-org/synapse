@@ -212,6 +212,7 @@ class DataStore(RoomMemberStore, RoomStore,
         txn = db_conn.cursor()
         txn.execute(sql, (PresenceState.OFFLINE,))
         rows = self.cursor_to_dict(txn)
+        txn.close()
 
         for row in rows:
             row["currently_active"] = bool(row["currently_active"])
