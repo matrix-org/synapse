@@ -208,6 +208,11 @@ class PresenceHandler(BaseHandler):
         to_federation_ping = {}  # These need sending keep-alives
         for new_state in new_states:
             user_id = new_state.user_id
+
+            # Its fine to not hit the database here, as the only thing not in
+            # the current state cache are OFFLINE states, where the only field
+            # of interest is last_active which is safe enough to assume is 0
+            # here.
             prev_state = self.user_to_current_state.get(
                 user_id, UserPresenceState.default(user_id)
             )
@@ -326,6 +331,7 @@ class PresenceHandler(BaseHandler):
                     if now - state.last_user_sync > SYNC_ONLINE_TIMEOUT:
                         changes[user_id] = state.copy_and_replace(
                             state=PresenceState.OFFLINE,
+                            status_msg=None,
                         )
             else:
                 # We expect to be poked occaisonally by the other side.
@@ -335,6 +341,7 @@ class PresenceHandler(BaseHandler):
                     # The other side seems to have disappeared.
                     changes[user_id] = state.copy_and_replace(
                         state=PresenceState.OFFLINE,
+                        status_msg=None,
                     )
 
         preserve_fn(self._update_states)(changes.values())
@@ -348,10 +355,13 @@ class PresenceHandler(BaseHandler):
 
         prev_state = yield self.current_state_for_user(user_id)
 
-        yield self._update_states([prev_state.copy_and_replace(
-            state=PresenceState.ONLINE,
-            last_active=self.clock.time_msec(),
-        )])
+        new_fields = {
+            "last_active": self.clock.time_msec(),
+        }
+        if prev_state.state == PresenceState.UNAVAILABLE:
+            new_fields["state"] = PresenceState.ONLINE
+
+        yield self._update_states([prev_state.copy_and_replace(**new_fields)])
 
     @defer.inlineCallbacks
     def user_syncing(self, user_id, affect_presence=True):
@@ -618,7 +628,7 @@ class PresenceHandler(BaseHandler):
 
         new_fields = {
             "state": presence,
-            "status_msg": status_msg
+            "status_msg": status_msg if presence != PresenceState.OFFLINE else None
         }
 
         if presence == PresenceState.ONLINE:
