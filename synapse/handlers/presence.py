@@ -252,9 +252,9 @@ class PresenceHandler(BaseHandler):
                 )
 
             if new_state.state == PresenceState.ONLINE:
-                currently_active = now - new_state.last_active_ts < LAST_ACTIVE_GRANULARITY
+                active = now - new_state.last_active_ts < LAST_ACTIVE_GRANULARITY
                 new_state = new_state.copy_and_replace(
-                    currently_active=currently_active,
+                    currently_active=active,
                 )
 
             # Check whether the change was something worth notifying about
