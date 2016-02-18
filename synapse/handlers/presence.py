@@ -271,7 +271,6 @@ class PresenceHandler(BaseHandler):
         changes = handle_timeouts(
             states,
             is_mine_fn=self.hs.is_mine_id,
-            user_to_current_state=self.user_to_current_state,
             user_to_num_current_syncs=self.user_to_num_current_syncs,
             now=now,
         )
