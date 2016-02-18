@@ -80,9 +80,9 @@ class PusherStore(SQLBaseStore):
         defer.returnValue(rows)
 
     @defer.inlineCallbacks
-    def add_pusher(self, user_id, access_token, profile_tag, kind, app_id,
+    def add_pusher(self, user_id, access_token, kind, app_id,
                    app_display_name, device_display_name,
-                   pushkey, pushkey_ts, lang, data):
+                   pushkey, pushkey_ts, lang, data, profile_tag=""):
         try:
             next_id = yield self._pushers_id_gen.get_next()
             yield self._simple_upsert(
@@ -95,12 +95,12 @@ class PusherStore(SQLBaseStore):
                 dict(
                     access_token=access_token,
                     kind=kind,
-                    profile_tag=profile_tag,
                     app_display_name=app_display_name,
                     device_display_name=device_display_name,
                     ts=pushkey_ts,
                     lang=lang,
                     data=encode_canonical_json(data),
+                    profile_tag=profile_tag,
                 ),
                 insertion_values=dict(
                     id=next_id,

@@ -45,7 +45,7 @@ class PusherRestServlet(ClientV1RestServlet):
             )
             defer.returnValue((200, {}))
 
-        reqd = ['profile_tag', 'kind', 'app_id', 'app_display_name',
+        reqd = ['kind', 'app_id', 'app_display_name',
                 'device_display_name', 'pushkey', 'lang', 'data']
         missing = []
         for i in reqd:
@@ -73,14 +73,14 @@ class PusherRestServlet(ClientV1RestServlet):
             yield pusher_pool.add_pusher(
                 user_id=user.to_string(),
                 access_token=requester.access_token_id,
-                profile_tag=content['profile_tag'],
                 kind=content['kind'],
                 app_id=content['app_id'],
                 app_display_name=content['app_display_name'],
                 device_display_name=content['device_display_name'],
                 pushkey=content['pushkey'],
                 lang=content['lang'],
-                data=content['data']
+                data=content['data'],
+                profile_tag=content.get('profile_tag', ""),
             )
         except PusherConfigException as pce:
             raise SynapseError(400, "Config Error: " + pce.message,
