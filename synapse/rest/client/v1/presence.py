@@ -41,7 +41,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
             )
 
             if not allowed:
-                raise AuthError(403, "You are allowed to see their presence.")
+                raise AuthError(403, "You are not allowed to see their presence.")
 
         state = yield self.handlers.presence_handler.get_state(target_user=user)
 
