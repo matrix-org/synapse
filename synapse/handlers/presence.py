@@ -127,24 +127,24 @@ class PresenceHandler(BaseHandler):
             self.wheel_timer.insert(
                 now=now,
                 obj=state.user_id,
-                then=state.last_active + IDLE_TIMER,
+                then=state.last_active_ts + IDLE_TIMER,
             )
             self.wheel_timer.insert(
                 now=now,
                 obj=state.user_id,
-                then=state.last_user_sync + SYNC_ONLINE_TIMEOUT,
+                then=state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
             )
             if self.hs.is_mine_id(state.user_id):
                 self.wheel_timer.insert(
                     now=now,
                     obj=state.user_id,
-                    then=state.last_federation_update + FEDERATION_PING_INTERVAL,
+                    then=state.last_federation_update_ts + FEDERATION_PING_INTERVAL,
                 )
             else:
                 self.wheel_timer.insert(
                     now=now,
                     obj=state.user_id,
-                    then=state.last_federation_update + FEDERATION_TIMEOUT,
+                    then=state.last_federation_update_ts + FEDERATION_TIMEOUT,
                 )
 
         # Set of users who have presence in the `user_to_current_state` that
@@ -225,7 +225,7 @@ class PresenceHandler(BaseHandler):
                     self.wheel_timer.insert(
                         now=now,
                         obj=user_id,
-                        then=new_state.last_active + IDLE_TIMER
+                        then=new_state.last_active_ts + IDLE_TIMER
                     )
 
                 if new_state.state != PresenceState.OFFLINE:
@@ -233,14 +233,14 @@ class PresenceHandler(BaseHandler):
                     self.wheel_timer.insert(
                         now=now,
                         obj=user_id,
-                        then=new_state.last_user_sync + SYNC_ONLINE_TIMEOUT
+                        then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT
                     )
 
-                    last_federate = new_state.last_federation_update
+                    last_federate = new_state.last_federation_update_ts
                     if now - last_federate > FEDERATION_PING_INTERVAL:
                         # Been a while since we've poked remote servers
                         new_state = new_state.copy_and_replace(
-                            last_federation_update=now,
+                            last_federation_update_ts=now,
                         )
                         to_federation_ping[user_id] = new_state
 
@@ -248,11 +248,11 @@ class PresenceHandler(BaseHandler):
                 self.wheel_timer.insert(
                     now=now,
                     obj=user_id,
-                    then=new_state.last_federation_update + FEDERATION_TIMEOUT
+                    then=new_state.last_federation_update_ts + FEDERATION_TIMEOUT
                 )
 
             if new_state.state == PresenceState.ONLINE:
-                currently_active = now - new_state.last_active < LAST_ACTIVE_GRANULARITY
+                currently_active = now - new_state.last_active_ts < LAST_ACTIVE_GRANULARITY
                 new_state = new_state.copy_and_replace(
                     currently_active=currently_active,
                 )
@@ -260,7 +260,7 @@ class PresenceHandler(BaseHandler):
             # Check whether the change was something worth notifying about
             if should_notify(prev_state, new_state):
                 new_state.copy_and_replace(
-                    last_federation_update=now,
+                    last_federation_update_ts=now,
                 )
                 to_notify[user_id] = new_state
 
@@ -309,18 +309,18 @@ class PresenceHandler(BaseHandler):
 
             if self.hs.is_mine_id(user_id):
                 if state.state == PresenceState.ONLINE:
-                    if now - state.last_active > IDLE_TIMER:
+                    if now - state.last_active_ts > IDLE_TIMER:
                         # Currently online, but last activity ages ago so auto
                         # idle
                         changes[user_id] = state.copy_and_replace(
                             state=PresenceState.UNAVAILABLE,
                         )
-                    elif now - state.last_active > LAST_ACTIVE_GRANULARITY:
+                    elif now - state.last_active_ts > LAST_ACTIVE_GRANULARITY:
                         # So that we send down a notification that we've
                         # stopped updating.
                         changes[user_id] = state
 
-                if now - state.last_federation_update > FEDERATION_PING_INTERVAL:
+                if now - state.last_federation_update_ts > FEDERATION_PING_INTERVAL:
                     # Need to send ping to other servers to ensure they don't
                     # timeout and set us to offline
                     changes[user_id] = state
@@ -328,7 +328,7 @@ class PresenceHandler(BaseHandler):
                 # If there are have been no sync for a while (and none ongoing),
                 # set presence to offline
                 if not self.user_to_num_current_syncs.get(user_id, 0):
-                    if now - state.last_user_sync > SYNC_ONLINE_TIMEOUT:
+                    if now - state.last_user_sync_ts > SYNC_ONLINE_TIMEOUT:
                         changes[user_id] = state.copy_and_replace(
                             state=PresenceState.OFFLINE,
                             status_msg=None,
@@ -337,7 +337,7 @@ class PresenceHandler(BaseHandler):
                 # We expect to be poked occaisonally by the other side.
                 # This is to protect against forgetful/buggy servers, so that
                 # no one gets stuck online forever.
-                if now - state.last_federation_update > FEDERATION_TIMEOUT:
+                if now - state.last_federation_update_ts > FEDERATION_TIMEOUT:
                     # The other side seems to have disappeared.
                     changes[user_id] = state.copy_and_replace(
                         state=PresenceState.OFFLINE,
@@ -356,7 +356,7 @@ class PresenceHandler(BaseHandler):
         prev_state = yield self.current_state_for_user(user_id)
 
         new_fields = {
-            "last_active": self.clock.time_msec(),
+            "last_active_ts": self.clock.time_msec(),
         }
         if prev_state.state == PresenceState.UNAVAILABLE:
             new_fields["state"] = PresenceState.ONLINE
@@ -388,12 +388,12 @@ class PresenceHandler(BaseHandler):
                 # just update the last sync times.
                 yield self._update_states([prev_state.copy_and_replace(
                     state=PresenceState.ONLINE,
-                    last_active=self.clock.time_msec(),
-                    last_user_sync=self.clock.time_msec(),
+                    last_active_ts=self.clock.time_msec(),
+                    last_user_sync_ts=self.clock.time_msec(),
                 )])
             else:
                 yield self._update_states([prev_state.copy_and_replace(
-                    last_user_sync=self.clock.time_msec(),
+                    last_user_sync_ts=self.clock.time_msec(),
                 )])
 
         @defer.inlineCallbacks
@@ -403,7 +403,7 @@ class PresenceHandler(BaseHandler):
 
                 prev_state = yield self.current_state_for_user(user_id)
                 yield self._update_states([prev_state.copy_and_replace(
-                    last_user_sync=self.clock.time_msec(),
+                    last_user_sync_ts=self.clock.time_msec(),
                 )])
 
         @contextmanager
@@ -553,12 +553,12 @@ class PresenceHandler(BaseHandler):
 
             new_fields = {
                 "state": presence_state,
-                "last_federation_update": now,
+                "last_federation_update_ts": now,
             }
 
             last_active_ago = push.get("last_active_ago", None)
             if last_active_ago is not None:
-                new_fields["last_active"] = now - last_active_ago
+                new_fields["last_active_ts"] = now - last_active_ago
 
             new_fields["status_msg"] = push.get("status_msg", None)
 
@@ -632,7 +632,7 @@ class PresenceHandler(BaseHandler):
         }
 
         if presence == PresenceState.ONLINE:
-            new_fields["last_active"] = self.clock.time_msec()
+            new_fields["last_active_ts"] = self.clock.time_msec()
 
         yield self._update_states([prev_state.copy_and_replace(**new_fields)])
 
@@ -823,7 +823,7 @@ def should_notify(old_state, new_state):
         if new_state.currently_active != old_state.currently_active:
             return True
 
-    if new_state.last_active - old_state.last_active > LAST_ACTIVE_GRANULARITY:
+    if new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
         # Always notify for a transition where last active gets bumped.
         return True
 
@@ -841,8 +841,8 @@ def _format_user_presence_state(state, now):
         "presence": state.state,
         "user_id": state.user_id,
     }
-    if state.last_active:
-        content["last_active_ago"] = now - state.last_active
+    if state.last_active_ts:
+        content["last_active_ago"] = now - state.last_active_ts
     if state.status_msg and state.state != PresenceState.OFFLINE:
         content["status_msg"] = state.status_msg
     if state.state == PresenceState.ONLINE:

@@ -22,8 +22,9 @@ from twisted.internet import defer
 
 
 class UserPresenceState(namedtuple("UserPresenceState",
-                        ("user_id", "state", "last_active", "last_federation_update",
-                            "last_user_sync", "status_msg", "currently_active"))):
+                        ("user_id", "state", "last_active_ts",
+                            "last_federation_update_ts", "last_user_sync_ts",
+                            "status_msg", "currently_active"))):
     """Represents the current presence state of the user.
 
     user_id (str)
@@ -46,9 +47,9 @@ class UserPresenceState(namedtuple("UserPresenceState",
         return cls(
             user_id=user_id,
             state=PresenceState.OFFLINE,
-            last_active=0,
-            last_federation_update=0,
-            last_user_sync=0,
+            last_active_ts=0,
+            last_federation_update_ts=0,
+            last_user_sync_ts=0,
             status_msg=None,
             currently_active=False,
         )
@@ -82,9 +83,9 @@ class PresenceStore(SQLBaseStore):
                     "stream_id": stream_id,
                     "user_id": state.user_id,
                     "state": state.state,
-                    "last_active": state.last_active,
-                    "last_federation_update": state.last_federation_update,
-                    "last_user_sync": state.last_user_sync,
+                    "last_active_ts": state.last_active_ts,
+                    "last_federation_update_ts": state.last_federation_update_ts,
+                    "last_user_sync_ts": state.last_user_sync_ts,
                     "status_msg": state.status_msg,
                     "currently_active": state.currently_active,
                 }
@@ -121,9 +122,9 @@ class PresenceStore(SQLBaseStore):
             retcols=(
                 "user_id",
                 "state",
-                "last_active",
-                "last_federation_update",
-                "last_user_sync",
+                "last_active_ts",
+                "last_federation_update_ts",
+                "last_user_sync_ts",
                 "status_msg",
                 "currently_active",
             ),

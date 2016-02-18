@@ -18,9 +18,9 @@
      stream_id BIGINT,
      user_id TEXT,
      state TEXT,
-     last_active BIGINT,
-     last_federation_update BIGINT,
-     last_user_sync BIGINT,
+     last_active_ts BIGINT,
+     last_federation_update_ts BIGINT,
+     last_user_sync_ts BIGINT,
      status_msg TEXT,
      currently_active BOOLEAN
  );

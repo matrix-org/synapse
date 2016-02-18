@@ -203,8 +203,8 @@ class DataStore(RoomMemberStore, RoomStore,
         """
 
         sql = (
-            "SELECT user_id, state, last_active, last_federation_update,"
-            " last_user_sync, status_msg, currently_active FROM presence_stream"
+            "SELECT user_id, state, last_active_ts, last_federation_update_ts,"
+            " last_user_sync_ts, status_msg, currently_active FROM presence_stream"
             " WHERE state != ?"
         )
         sql = self.database_engine.convert_param_style(sql)
