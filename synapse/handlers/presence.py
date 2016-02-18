@@ -606,6 +606,12 @@ class PresenceHandler(BaseHandler):
         status_msg = state.get("status_msg", None)
         presence = state["presence"]
 
+        valid_presence = (
+            PresenceState.ONLINE, PresenceState.UNAVAILABLE, PresenceState.OFFLINE
+        )
+        if presence not in valid_presence:
+            raise SynapseError(400, "Invalid presence state")
+
         user_id = target_user.to_string()
 
         prev_state = yield self.current_state_for_user(user_id)
