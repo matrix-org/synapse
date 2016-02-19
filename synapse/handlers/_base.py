@@ -111,22 +111,24 @@ class BaseHandler(object):
                 # return True
                 pass
 
-            if visibility == "shared":
-                # user can also see the event if he has become a member since
-                # the event
-                #
-                # XXX: if the user has subsequently joined and then left again,
-                # ideally we would share history up to the point they left. But
-                # we don't know when they left.
-                return not is_peeking
+            if visibility == "joined":
+                # we weren't a member at the time of the event, so we can't
+                # see this event.
+                return False
+
             elif visibility == "invited":
                 # user can also see the event if he was *invited* at the time
                 # of the event.
                 return membership == Membership.INVITE
 
-            # presumably visibility is "joined"; we weren't a member at the
-            # time of the event, so we're done.
-            return False
+            else:
+                # visibility is shared: user can also see the event if he has
+                # become a member since the event
+                #
+                # XXX: if the user has subsequently joined and then left again,
+                # ideally we would share history up to the point they left. But
+                # we don't know when they left.
+                return not is_peeking
 
         defer.returnValue({
             user_id: [
