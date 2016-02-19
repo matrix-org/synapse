@@ -49,7 +49,7 @@ class PresenceUpdateTestCase(unittest.TestCase):
         self.assertEquals(new_state.status_msg, state.status_msg)
         self.assertEquals(state.last_federation_update_ts, now)
 
-        self.assertEquals(wheel_timer.insert.call_count, 2)
+        self.assertEquals(wheel_timer.insert.call_count, 3)
         wheel_timer.insert.assert_has_calls([
             call(
                 now=now,
@@ -60,7 +60,12 @@ class PresenceUpdateTestCase(unittest.TestCase):
                 now=now,
                 obj=user_id,
                 then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT
-            )
+            ),
+            call(
+                now=now,
+                obj=user_id,
+                then=new_state.last_active_ts + LAST_ACTIVE_GRANULARITY
+            ),
         ], any_order=True)
 
     def test_online_to_online(self):
@@ -91,7 +96,7 @@ class PresenceUpdateTestCase(unittest.TestCase):
         self.assertEquals(new_state.status_msg, state.status_msg)
         self.assertEquals(state.last_federation_update_ts, now)
 
-        self.assertEquals(wheel_timer.insert.call_count, 2)
+        self.assertEquals(wheel_timer.insert.call_count, 3)
         wheel_timer.insert.assert_has_calls([
             call(
                 now=now,
@@ -102,7 +107,12 @@ class PresenceUpdateTestCase(unittest.TestCase):
                 now=now,
                 obj=user_id,
                 then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT
-            )
+            ),
+            call(
+                now=now,
+                obj=user_id,
+                then=new_state.last_active_ts + LAST_ACTIVE_GRANULARITY
+            ),
         ], any_order=True)
 
     def test_online_to_online_last_active(self):
@@ -153,6 +163,7 @@ class PresenceUpdateTestCase(unittest.TestCase):
         prev_state = UserPresenceState.default(user_id)
         prev_state = prev_state.copy_and_replace(
             state=PresenceState.ONLINE,
+            last_active_ts=now,
         )
 
         new_state = prev_state.copy_and_replace(

@@ -44,6 +44,12 @@ logger = logging.getLogger(__name__)
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 
+notified_presence_counter = metrics.register_counter("notified_presence")
+presence_updates_counter = metrics.register_counter("presence_updates")
+presence_updates_counter = metrics.register_counter("presence_updates")
+timers_fired_counter = metrics.register_counter("timers_fired")
+federation_presence_counter = metrics.register_counter("federation_presence")
+
 
 # If a user was last active in the last LAST_ACTIVE_GRANULARITY, consider them
 # "currently_active"
@@ -170,6 +176,8 @@ class PresenceHandler(BaseHandler):
             5000,
         )
 
+        metrics.register_callback("wheel_timer_size", lambda: len(self.wheel_timer))
+
     @defer.inlineCallbacks
     def _on_shutdown(self):
         """Gets called when shutting down. This lets us persist any updates that
@@ -233,7 +241,10 @@ class PresenceHandler(BaseHandler):
 
         # TODO: We should probably ensure there are no races hereafter
 
+        presence_updates_counter.inc_by(len(new_states))
+
         if to_notify:
+            notified_presence_counter.inc_by(len(to_notify))
             yield self._persist_and_notify(to_notify.values())
 
         self.unpersisted_users_changes |= set(s.user_id for s in new_states)
@@ -267,6 +278,8 @@ class PresenceHandler(BaseHandler):
             )
             for user_id in set(users_to_check)
         ]
+
+        timers_fired_counter.inc_by(len(states))
 
         changes = handle_timeouts(
             states,
@@ -499,6 +512,7 @@ class PresenceHandler(BaseHandler):
             updates.append(prev_state.copy_and_replace(**new_fields))
 
         if updates:
+            federation_presence_counter.inc_by(len(updates))
             yield self._update_states(updates)
 
     @defer.inlineCallbacks
@@ -981,6 +995,18 @@ def handle_update(prev_state, new_state, is_mine, wheel_timer, now):
                 then=new_state.last_active_ts + IDLE_TIMER
             )
 
+            active = now - new_state.last_active_ts < LAST_ACTIVE_GRANULARITY
+            new_state = new_state.copy_and_replace(
+                currently_active=active,
+            )
+
+            if active:
+                wheel_timer.insert(
+                    now=now,
+                    obj=user_id,
+                    then=new_state.last_active_ts + LAST_ACTIVE_GRANULARITY
+                )
+
         if new_state.state != PresenceState.OFFLINE:
             # User has stopped syncing
             wheel_timer.insert(
@@ -1002,12 +1028,6 @@ def handle_update(prev_state, new_state, is_mine, wheel_timer, now):
             now=now,
             obj=user_id,
             then=new_state.last_federation_update_ts + FEDERATION_TIMEOUT
-        )
-
-    if new_state.state == PresenceState.ONLINE:
-        active = now - new_state.last_active_ts < LAST_ACTIVE_GRANULARITY
-        new_state = new_state.copy_and_replace(
-            currently_active=active,
         )
 
     # Check whether the change was something worth notifying about
