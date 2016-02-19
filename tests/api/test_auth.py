@@ -281,9 +281,9 @@ class AuthTestCase(unittest.TestCase):
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("type = access")
         macaroon.add_first_party_caveat("user_id = %s" % (user,))
-        macaroon.add_first_party_caveat("time < 1") # ms
+        macaroon.add_first_party_caveat("time < 1")  # ms
 
-        self.hs.clock.now = 5000 # seconds
+        self.hs.clock.now = 5000  # seconds
 
         yield self.auth.get_user_from_macaroon(macaroon.serialize())
         # TODO(daniel): Turn on the check that we validate expiration, when we

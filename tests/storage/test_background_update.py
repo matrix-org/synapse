@@ -1,12 +1,10 @@
 from tests import unittest
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
-from synapse.types import UserID, RoomID, RoomAlias
-
 from tests.utils import setup_test_homeserver
 
 from mock import Mock
+
 
 class BackgroundUpdateTestCase(unittest.TestCase):
 
@@ -24,8 +22,8 @@ class BackgroundUpdateTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_do_background_update(self):
-        desired_count = 1000;
-        duration_ms = 42;
+        desired_count = 1000
+        duration_ms = 42
 
         @defer.inlineCallbacks
         def update(progress, count):

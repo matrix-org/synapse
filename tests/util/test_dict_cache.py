@@ -14,7 +14,6 @@
 # limitations under the License.
 
 
-from twisted.internet import defer
 from tests import unittest
 
 from synapse.util.caches.dictionary_cache import DictionaryCache

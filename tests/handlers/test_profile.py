@@ -41,8 +41,10 @@ class ProfileTestCase(unittest.TestCase):
         ])
 
         self.query_handlers = {}
+
         def register_query_handler(query_type, handler):
             self.query_handlers[query_type] = handler
+
         self.mock_federation.register_query_handler = register_query_handler
 
         hs = yield setup_test_homeserver(
@@ -63,7 +65,7 @@ class ProfileTestCase(unittest.TestCase):
         self.store = hs.get_datastore()
 
         self.frank = UserID.from_string("@1234ABCD:test")
-        self.bob   = UserID.from_string("@4567:test")
+        self.bob = UserID.from_string("@4567:test")
         self.alice = UserID.from_string("@alice:remote")
 
         yield self.store.create_profile(self.frank.localpart)
@@ -133,8 +135,9 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_set_my_avatar(self):
-        yield self.handler.set_avatar_url(self.frank, self.frank,
-                "http://my.server/pic.gif")
+        yield self.handler.set_avatar_url(
+            self.frank, self.frank, "http://my.server/pic.gif"
+        )
 
         self.assertEquals(
             (yield self.store.get_profile_avatar_url(self.frank.localpart)),

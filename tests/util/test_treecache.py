@@ -18,6 +18,7 @@ from .. import unittest
 
 from synapse.util.caches.treecache import TreeCache
 
+
 class TreeCacheTestCase(unittest.TestCase):
     def test_get_set_onelevel(self):
         cache = TreeCache()

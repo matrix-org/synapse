@@ -88,8 +88,8 @@ class RoomMemberStoreTestCase(unittest.TestCase):
             [m.room_id for m in (
                 yield self.store.get_rooms_for_user_where_membership_is(
                     self.u_alice.to_string(), [Membership.JOIN]
-                ))
-            ]
+                )
+            )]
         )
         self.assertFalse(
             (yield self.store.user_rooms_intersect(
@@ -108,11 +108,11 @@ class RoomMemberStoreTestCase(unittest.TestCase):
                 yield self.store.get_room_members(self.room.to_string())
             )}
         )
-        self.assertTrue(
-            (yield self.store.user_rooms_intersect(
-                [self.u_alice.to_string(), self.u_bob.to_string()]
-            ))
-        )
+        self.assertTrue((
+            yield self.store.user_rooms_intersect([
+                self.u_alice.to_string(), self.u_bob.to_string()
+            ])
+        ))
 
     @defer.inlineCallbacks
     def test_room_hosts(self):
@@ -136,9 +136,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
 
         self.assertEquals(
             {"test", "elsewhere"},
-            (yield
-                self.store.get_joined_hosts_for_room(self.room.to_string())
-            )
+            (yield self.store.get_joined_hosts_for_room(self.room.to_string()))
         )
 
         # Should still have both hosts
@@ -146,9 +144,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
 
         self.assertEquals(
             {"test", "elsewhere"},
-            (yield
-                self.store.get_joined_hosts_for_room(self.room.to_string())
-            )
+            (yield self.store.get_joined_hosts_for_room(self.room.to_string()))
         )
 
         # Should have only one host after other leaves

@@ -152,7 +152,7 @@ class MockHttpResource(HttpServer):
 
         mock_request.getClientIP.return_value = "-"
 
-        mock_request.requestHeaders.getRawHeaders.return_value=[
+        mock_request.requestHeaders.getRawHeaders.return_value = [
             "X-Matrix origin=test,key=,sig="
         ]
 
@@ -360,13 +360,12 @@ class MemoryDataStore(object):
 
     def get_rooms_for_user_where_membership_is(self, user_id, membership_list):
         return [
-            self.members[r].get(user_id) for r in self.members
-            if user_id in self.members[r] and
-                self.members[r][user_id].membership in membership_list
+            m[user_id] for m in self.members.values()
+            if user_id in m and m[user_id].membership in membership_list
         ]
 
     def get_room_events_stream(self, user_id=None, from_key=None, to_key=None,
-                            limit=0, with_feedback=False):
+                               limit=0, with_feedback=False):
         return ([], from_key)  # TODO
 
     def get_joined_hosts_for_room(self, room_id):
@@ -376,7 +375,6 @@ class MemoryDataStore(object):
         if event.type == EventTypes.Member:
             room_id = event.room_id
             user = event.state_key
-            membership = event.membership
             self.members.setdefault(room_id, {})[user] = event
 
         if hasattr(event, "state_key"):
@@ -456,9 +454,9 @@ class DeferredMockCallable(object):
                 d.callback(None)
                 return result
 
-        failure = AssertionError("Was not expecting call(%s)" %
+        failure = AssertionError("Was not expecting call(%s)" % (
             _format_call(args, kwargs)
-        )
+        ))
 
         for _, _, d in self.expectations:
             try:
@@ -479,14 +477,12 @@ class DeferredMockCallable(object):
         )
 
         timer = reactor.callLater(
-            timeout/1000,
+            timeout / 1000,
             deferred.errback,
-            AssertionError(
-                "%d pending calls left: %s"% (
-                    len([e for e in self.expectations if not e[2].called]),
-                    [e for e in self.expectations if not e[2].called]
-                )
-            )
+            AssertionError("%d pending calls left: %s" % (
+                len([e for e in self.expectations if not e[2].called]),
+                [e for e in self.expectations if not e[2].called]
+            ))
         )
 
         yield deferred
@@ -500,8 +496,8 @@ class DeferredMockCallable(object):
             calls = self.calls
             self.calls = []
 
-            raise AssertionError("Expected not to received any calls, got:\n" +
-                "\n".join([
+            raise AssertionError(
+                "Expected not to received any calls, got:\n" + "\n".join([
                     "call(%s)" % _format_call(c[0], c[1]) for c in calls
                 ])
             )
