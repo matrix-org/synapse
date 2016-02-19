@@ -81,9 +81,9 @@ class RoomTypingTestCase(RestTestCase):
                 return defer.succeed([])
 
         @defer.inlineCallbacks
-        def fetch_room_distributions_into(room_id, localusers=None,
-                remotedomains=None, ignore_user=None):
-
+        def fetch_room_distributions_into(
+            room_id, localusers=None, remotedomains=None, ignore_user=None
+        ):
             members = yield get_room_members(room_id)
             for member in members:
                 if ignore_user is not None and member == ignore_user:
@@ -96,7 +96,8 @@ class RoomTypingTestCase(RestTestCase):
                     if remotedomains is not None:
                         remotedomains.add(member.domain)
         hs.get_handlers().room_member_handler.fetch_room_distributions_into = (
-                fetch_room_distributions_into)
+            fetch_room_distributions_into
+        )
 
         synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
@@ -109,8 +110,8 @@ class RoomTypingTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_set_typing(self):
-        (code, _) = yield self.mock_resource.trigger("PUT",
-            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+        (code, _) = yield self.mock_resource.trigger(
+            "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             '{"typing": true, "timeout": 30000}'
         )
         self.assertEquals(200, code)
@@ -120,41 +121,38 @@ class RoomTypingTestCase(RestTestCase):
             from_key=0,
             room_ids=[self.room_id],
         )
-        self.assertEquals(
-            events[0],
-            [
-                {"type": "m.typing",
-                 "room_id": self.room_id,
-                 "content": {
-                     "user_ids": [self.user_id],
-                }},
-            ]
-        )
+        self.assertEquals(events[0], [{
+            "type": "m.typing",
+            "room_id": self.room_id,
+            "content": {
+                "user_ids": [self.user_id],
+            }
+        }])
 
     @defer.inlineCallbacks
     def test_set_not_typing(self):
-        (code, _) = yield self.mock_resource.trigger("PUT",
-            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+        (code, _) = yield self.mock_resource.trigger(
+            "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             '{"typing": false}'
         )
         self.assertEquals(200, code)
 
     @defer.inlineCallbacks
     def test_typing_timeout(self):
-        (code, _) = yield self.mock_resource.trigger("PUT",
-            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+        (code, _) = yield self.mock_resource.trigger(
+            "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             '{"typing": true, "timeout": 30000}'
         )
         self.assertEquals(200, code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
 
-        self.clock.advance_time(31);
+        self.clock.advance_time(31)
 
         self.assertEquals(self.event_source.get_current_key(), 2)
 
-        (code, _) = yield self.mock_resource.trigger("PUT",
-            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+        (code, _) = yield self.mock_resource.trigger(
+            "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             '{"typing": true, "timeout": 30000}'
         )
         self.assertEquals(200, code)

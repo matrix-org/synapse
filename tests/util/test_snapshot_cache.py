@@ -19,6 +19,7 @@ from .. import unittest
 from synapse.util.caches.snapshot_cache import SnapshotCache
 from twisted.internet.defer import Deferred
 
+
 class SnapshotCacheTestCase(unittest.TestCase):
 
     def setUp(self):

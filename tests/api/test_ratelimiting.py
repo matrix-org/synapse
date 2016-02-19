@@ -2,6 +2,7 @@ from synapse.api.ratelimiting import Ratelimiter
 
 from tests import unittest
 
+
 class TestRatelimiter(unittest.TestCase):
 
     def test_allowed(self):

@@ -1,7 +1,7 @@
 from synapse.rest.client.v2_alpha.register import RegisterRestServlet
 from synapse.api.errors import SynapseError
 from twisted.internet import defer
-from mock import Mock, MagicMock
+from mock import Mock
 from tests import unittest
 import json
 
@@ -24,7 +24,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
 
         self.auth_result = (False, None, None)
         self.auth_handler = Mock(
-            check_auth=Mock(side_effect=lambda x,y,z: self.auth_result)
+            check_auth=Mock(side_effect=lambda x, y, z: self.auth_result)
         )
         self.registration_handler = Mock()
         self.identity_handler = Mock()

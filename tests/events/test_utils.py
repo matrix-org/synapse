@@ -19,6 +19,7 @@ from .. import unittest
 from synapse.events import FrozenEvent
 from synapse.events.utils import prune_event
 
+
 class PruneEventTestCase(unittest.TestCase):
     """ Asserts that a new event constructed with `evdict` will look like
     `matchdict` when it is redacted. """

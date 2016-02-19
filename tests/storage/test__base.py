@@ -174,11 +174,13 @@ class CacheDecoratorTestCase(unittest.TestCase):
 
         # There must have been at least 2 evictions, meaning if we calculate
         # all 12 values again, we must get called at least 2 more times
-        for k in range(0,12):
+        for k in range(0, 12):
             yield a.func(k)
 
-        self.assertTrue(callcount[0] >= 14,
-            msg="Expected callcount >= 14, got %d" % (callcount[0]))
+        self.assertTrue(
+            callcount[0] >= 14,
+            msg="Expected callcount >= 14, got %d" % (callcount[0])
+        )
 
     def test_prefill(self):
         callcount = [0]

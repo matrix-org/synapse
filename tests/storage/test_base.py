@@ -17,7 +17,7 @@
 from tests import unittest
 from twisted.internet import defer
 
-from mock import Mock, call
+from mock import Mock
 
 from collections import OrderedDict
 
@@ -62,13 +62,12 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.rowcount = 1
 
         yield self.datastore._simple_insert(
-                table="tablename",
-                values={"columname": "Value"}
+            table="tablename",
+            values={"columname": "Value"}
         )
 
         self.mock_txn.execute.assert_called_with(
-                "INSERT INTO tablename (columname) VALUES(?)",
-                ("Value",)
+            "INSERT INTO tablename (columname) VALUES(?)", ("Value",)
         )
 
     @defer.inlineCallbacks
@@ -76,14 +75,14 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.rowcount = 1
 
         yield self.datastore._simple_insert(
-                table="tablename",
-                # Use OrderedDict() so we can assert on the SQL generated
-                values=OrderedDict([("colA", 1), ("colB", 2), ("colC", 3)])
+            table="tablename",
+            # Use OrderedDict() so we can assert on the SQL generated
+            values=OrderedDict([("colA", 1), ("colB", 2), ("colC", 3)])
         )
 
         self.mock_txn.execute.assert_called_with(
-                "INSERT INTO tablename (colA, colB, colC) VALUES(?, ?, ?)",
-                (1, 2, 3,)
+            "INSERT INTO tablename (colA, colB, colC) VALUES(?, ?, ?)",
+            (1, 2, 3,)
         )
 
     @defer.inlineCallbacks
@@ -92,15 +91,14 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.fetchall.return_value = [("Value",)]
 
         value = yield self.datastore._simple_select_one_onecol(
-                table="tablename",
-                keyvalues={"keycol": "TheKey"},
-                retcol="retcol"
+            table="tablename",
+            keyvalues={"keycol": "TheKey"},
+            retcol="retcol"
         )
 
         self.assertEquals("Value", value)
         self.mock_txn.execute.assert_called_with(
-                "SELECT retcol FROM tablename WHERE keycol = ?",
-                ["TheKey"]
+            "SELECT retcol FROM tablename WHERE keycol = ?", ["TheKey"]
         )
 
     @defer.inlineCallbacks
@@ -109,15 +107,15 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.fetchone.return_value = (1, 2, 3)
 
         ret = yield self.datastore._simple_select_one(
-                table="tablename",
-                keyvalues={"keycol": "TheKey"},
-                retcols=["colA", "colB", "colC"]
+            table="tablename",
+            keyvalues={"keycol": "TheKey"},
+            retcols=["colA", "colB", "colC"]
         )
 
         self.assertEquals({"colA": 1, "colB": 2, "colC": 3}, ret)
         self.mock_txn.execute.assert_called_with(
-                "SELECT colA, colB, colC FROM tablename WHERE keycol = ?",
-                ["TheKey"]
+            "SELECT colA, colB, colC FROM tablename WHERE keycol = ?",
+            ["TheKey"]
         )
 
     @defer.inlineCallbacks
@@ -126,32 +124,32 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.fetchone.return_value = None
 
         ret = yield self.datastore._simple_select_one(
-                table="tablename",
-                keyvalues={"keycol": "Not here"},
-                retcols=["colA"],
-                allow_none=True
+            table="tablename",
+            keyvalues={"keycol": "Not here"},
+            retcols=["colA"],
+            allow_none=True
         )
 
         self.assertFalse(ret)
 
     @defer.inlineCallbacks
     def test_select_list(self):
-        self.mock_txn.rowcount = 3;
+        self.mock_txn.rowcount = 3
         self.mock_txn.fetchall.return_value = ((1,), (2,), (3,))
         self.mock_txn.description = (
-                ("colA", None, None, None, None, None, None),
+            ("colA", None, None, None, None, None, None),
         )
 
         ret = yield self.datastore._simple_select_list(
-                table="tablename",
-                keyvalues={"keycol": "A set"},
-                retcols=["colA"],
+            table="tablename",
+            keyvalues={"keycol": "A set"},
+            retcols=["colA"],
         )
 
         self.assertEquals([{"colA": 1}, {"colA": 2}, {"colA": 3}], ret)
         self.mock_txn.execute.assert_called_with(
-                "SELECT colA FROM tablename WHERE keycol = ?",
-                ["A set"]
+            "SELECT colA FROM tablename WHERE keycol = ?",
+            ["A set"]
         )
 
     @defer.inlineCallbacks
@@ -159,14 +157,14 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.rowcount = 1
 
         yield self.datastore._simple_update_one(
-                table="tablename",
-                keyvalues={"keycol": "TheKey"},
-                updatevalues={"columnname": "New Value"}
+            table="tablename",
+            keyvalues={"keycol": "TheKey"},
+            updatevalues={"columnname": "New Value"}
         )
 
         self.mock_txn.execute.assert_called_with(
-                "UPDATE tablename SET columnname = ? WHERE keycol = ?",
-                ["New Value", "TheKey"]
+            "UPDATE tablename SET columnname = ? WHERE keycol = ?",
+            ["New Value", "TheKey"]
         )
 
     @defer.inlineCallbacks
@@ -174,15 +172,15 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.rowcount = 1
 
         yield self.datastore._simple_update_one(
-                table="tablename",
-                keyvalues=OrderedDict([("colA", 1), ("colB", 2)]),
-                updatevalues=OrderedDict([("colC", 3), ("colD", 4)])
+            table="tablename",
+            keyvalues=OrderedDict([("colA", 1), ("colB", 2)]),
+            updatevalues=OrderedDict([("colC", 3), ("colD", 4)])
         )
 
         self.mock_txn.execute.assert_called_with(
-                "UPDATE tablename SET colC = ?, colD = ? WHERE " +
-                    "colA = ? AND colB = ?",
-                [3, 4, 1, 2]
+            "UPDATE tablename SET colC = ?, colD = ? WHERE"
+            " colA = ? AND colB = ?",
+            [3, 4, 1, 2]
         )
 
     @defer.inlineCallbacks
@@ -190,11 +188,10 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.rowcount = 1
 
         yield self.datastore._simple_delete_one(
-                table="tablename",
-                keyvalues={"keycol": "Go away"},
+            table="tablename",
+            keyvalues={"keycol": "Go away"},
         )
 
         self.mock_txn.execute.assert_called_with(
-                "DELETE FROM tablename WHERE keycol = ?",
-                ["Go away"]
+            "DELETE FROM tablename WHERE keycol = ?", ["Go away"]
         )

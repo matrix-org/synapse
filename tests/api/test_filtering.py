@@ -21,7 +21,6 @@ from tests.utils import (
     MockHttpResource, DeferredMockCallable, setup_test_homeserver
 )
 
-from synapse.types import UserID
 from synapse.api.filtering import Filter
 from synapse.events import FrozenEvent
 
@@ -356,7 +355,6 @@ class FilteringTestCase(unittest.TestCase):
                 "types": ["m.*"]
             }
         }
-        user = UserID.from_string("@" + user_localpart + ":test")
         filter_id = yield self.datastore.add_user_filter(
             user_localpart=user_localpart,
             user_filter=user_filter_json,
@@ -411,7 +409,6 @@ class FilteringTestCase(unittest.TestCase):
                 }
             }
         }
-        user = UserID.from_string("@" + user_localpart + ":test")
         filter_id = yield self.datastore.add_user_filter(
             user_localpart=user_localpart,
             user_filter=user_filter_json,
@@ -440,7 +437,6 @@ class FilteringTestCase(unittest.TestCase):
                 }
             }
         }
-        user = UserID.from_string("@" + user_localpart + ":test")
         filter_id = yield self.datastore.add_user_filter(
             user_localpart=user_localpart,
             user_filter=user_filter_json,
@@ -476,12 +472,12 @@ class FilteringTestCase(unittest.TestCase):
         )
 
         self.assertEquals(filter_id, 0)
-        self.assertEquals(user_filter_json,
-            (yield self.datastore.get_user_filter(
+        self.assertEquals(user_filter_json, (
+            yield self.datastore.get_user_filter(
                 user_localpart=user_localpart,
                 filter_id=0,
-            ))
-        )
+            )
+        ))
 
     @defer.inlineCallbacks
     def test_get_filter(self):

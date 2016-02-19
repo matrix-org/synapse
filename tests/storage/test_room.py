@@ -37,7 +37,8 @@ class RoomStoreTestCase(unittest.TestCase):
         self.alias = RoomAlias.from_string("#a-room-name:test")
         self.u_creator = UserID.from_string("@creator:test")
 
-        yield self.store.store_room(self.room.to_string(),
+        yield self.store.store_room(
+            self.room.to_string(),
             room_creator_user_id=self.u_creator.to_string(),
             is_public=True
         )
@@ -45,9 +46,11 @@ class RoomStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_get_room(self):
         self.assertDictContainsSubset(
-            {"room_id": self.room.to_string(),
-             "creator": self.u_creator.to_string(),
-             "is_public": True},
+            {
+                "room_id": self.room.to_string(),
+                "creator": self.u_creator.to_string(),
+                "is_public": True
+            },
             (yield self.store.get_room(self.room.to_string()))
         )
 
@@ -65,7 +68,8 @@ class RoomEventsStoreTestCase(unittest.TestCase):
 
         self.room = RoomID.from_string("!abcde:test")
 
-        yield self.store.store_room(self.room.to_string(),
+        yield self.store.store_room(
+            self.room.to_string(),
             room_creator_user_id="@creator:text",
             is_public=True
         )
