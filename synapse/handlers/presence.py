@@ -428,13 +428,21 @@ class PresenceHandler(BaseHandler):
 
         hosts_to_states = {}
         for room_id, states in room_ids_to_states.items():
+            local_states = filter(self.hs.is_mine_id, states)
+            if not local_states:
+                continue
+
             hosts = yield self.store.get_joined_hosts_for_room(room_id)
             for host in hosts:
-                hosts_to_states.setdefault(host, []).extend(states)
+                hosts_to_states.setdefault(host, []).extend(local_states)
 
         for user_id, states in users_to_states.items():
+            local_states = filter(self.hs.is_mine_id, states)
+            if not local_states:
+                continue
+
             host = UserID.from_string(user_id).domain
-            hosts_to_states.setdefault(host, []).extend(states)
+            hosts_to_states.setdefault(host, []).extend(local_states)
 
         # TODO: de-dup hosts_to_states, as a single host might have multiple
         # of same presence
