@@ -428,7 +428,7 @@ class PresenceHandler(BaseHandler):
 
         hosts_to_states = {}
         for room_id, states in room_ids_to_states.items():
-            local_states = filter(self.hs.is_mine_id, states)
+            local_states = filter(lambda s: self.hs.is_mine_id(s.user_id), states)
             if not local_states:
                 continue
 
@@ -437,7 +437,7 @@ class PresenceHandler(BaseHandler):
                 hosts_to_states.setdefault(host, []).extend(local_states)
 
         for user_id, states in users_to_states.items():
-            local_states = filter(self.hs.is_mine_id, states)
+            local_states = filter(lambda s: self.hs.is_mine_id(s.user_id), states)
             if not local_states:
                 continue
 
