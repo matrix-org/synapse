@@ -995,6 +995,18 @@ def handle_update(prev_state, new_state, is_mine, wheel_timer, now):
                 then=new_state.last_active_ts + IDLE_TIMER
             )
 
+            active = now - new_state.last_active_ts < LAST_ACTIVE_GRANULARITY
+            new_state = new_state.copy_and_replace(
+                currently_active=active,
+            )
+
+            if active:
+                wheel_timer.insert(
+                    now=now,
+                    obj=user_id,
+                    then=new_state.last_active_ts + LAST_ACTIVE_GRANULARITY
+                )
+
         if new_state.state != PresenceState.OFFLINE:
             # User has stopped syncing
             wheel_timer.insert(
@@ -1016,12 +1028,6 @@ def handle_update(prev_state, new_state, is_mine, wheel_timer, now):
             now=now,
             obj=user_id,
             then=new_state.last_federation_update_ts + FEDERATION_TIMEOUT
-        )
-
-    if new_state.state == PresenceState.ONLINE:
-        active = now - new_state.last_active_ts < LAST_ACTIVE_GRANULARITY
-        new_state = new_state.copy_and_replace(
-            currently_active=active,
         )
 
     # Check whether the change was something worth notifying about
