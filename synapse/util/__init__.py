@@ -42,7 +42,7 @@ class Clock(object):
 
     def time_msec(self):
         """Returns the current system time in miliseconds since epoch."""
-        return self.time() * 1000
+        return int(self.time() * 1000)
 
     def looping_call(self, f, msec):
         l = task.LoopingCall(f)

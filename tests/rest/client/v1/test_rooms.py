@@ -953,12 +953,6 @@ class RoomInitialSyncTestCase(RestTestCase):
 
         synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
-        # Since I'm getting my own presence I need to exist as far as presence
-        # is concerned.
-        hs.get_handlers().presence_handler.registered_user(
-            UserID.from_string(self.user_id)
-        )
-
         # create the room
         self.room_id = yield self.create_room_as(self.user_id)
 

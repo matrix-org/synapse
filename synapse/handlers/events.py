@@ -19,6 +19,8 @@ from synapse.util.logutils import log_function
 from synapse.types import UserID
 from synapse.events.utils import serialize_event
 from synapse.util.logcontext import preserve_context_over_fn
+from synapse.api.constants import Membership, EventTypes
+from synapse.events import EventBase
 
 from ._base import BaseHandler
 
@@ -126,11 +128,12 @@ class EventStreamHandler(BaseHandler):
         If `only_keys` is not None, events from keys will be sent down.
         """
         auth_user = UserID.from_string(auth_user_id)
+        presence_handler = self.hs.get_handlers().presence_handler
 
-        try:
-            if affect_presence:
-                yield self.started_stream(auth_user)
-
+        context = yield presence_handler.user_syncing(
+            auth_user_id, affect_presence=affect_presence,
+        )
+        with context:
             if timeout:
                 # If they've set a timeout set a minimum limit.
                 timeout = max(timeout, 500)
@@ -145,6 +148,34 @@ class EventStreamHandler(BaseHandler):
                 is_guest=is_guest, explicit_room_id=room_id
             )
 
+            # When the user joins a new room, or another user joins a currently
+            # joined room, we need to send down presence for those users.
+            to_add = []
+            for event in events:
+                if not isinstance(event, EventBase):
+                    continue
+                if event.type == EventTypes.Member:
+                    if event.membership != Membership.JOIN:
+                        continue
+                    # Send down presence.
+                    if event.state_key == auth_user_id:
+                        # Send down presence for everyone in the room.
+                        users = yield self.store.get_users_in_room(event.room_id)
+                        states = yield presence_handler.get_states(
+                            users,
+                            as_event=True,
+                        )
+                        to_add.extend(states)
+                    else:
+
+                        ev = yield presence_handler.get_state(
+                            UserID.from_string(event.state_key),
+                            as_event=True,
+                        )
+                        to_add.append(ev)
+
+            events.extend(to_add)
+
             time_now = self.clock.time_msec()
 
             chunks = [
@@ -158,10 +189,6 @@ class EventStreamHandler(BaseHandler):
             }
 
             defer.returnValue(chunk)
-
-        finally:
-            if affect_presence:
-                self.stopped_stream(auth_user)
 
 
 class EventHandler(BaseHandler):

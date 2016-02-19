@@ -32,7 +32,6 @@ class PresenceState(object):
     OFFLINE = u"offline"
     UNAVAILABLE = u"unavailable"
     ONLINE = u"online"
-    FREE_FOR_CHAT = u"free_for_chat"
 
 
 class JoinRules(object):

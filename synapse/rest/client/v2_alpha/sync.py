@@ -25,6 +25,7 @@ from synapse.events.utils import (
 )
 from synapse.api.filtering import FilterCollection, DEFAULT_FILTER_COLLECTION
 from synapse.api.errors import SynapseError
+from synapse.api.constants import PresenceState
 from ._base import client_v2_patterns
 
 import copy
@@ -82,6 +83,7 @@ class SyncRestServlet(RestServlet):
         self.sync_handler = hs.get_handlers().sync_handler
         self.clock = hs.get_clock()
         self.filtering = hs.get_filtering()
+        self.presence_handler = hs.get_handlers().presence_handler
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -139,17 +141,19 @@ class SyncRestServlet(RestServlet):
         else:
             since_token = None
 
-        if set_presence == "online":
-            yield self.event_stream_handler.started_stream(user)
+        affect_presence = set_presence != PresenceState.OFFLINE
 
-        try:
+        if affect_presence:
+            yield self.presence_handler.set_state(user, {"presence": set_presence})
+
+        context = yield self.presence_handler.user_syncing(
+            user.to_string(), affect_presence=affect_presence,
+        )
+        with context:
             sync_result = yield self.sync_handler.wait_for_sync_for_user(
                 sync_config, since_token=since_token, timeout=timeout,
                 full_state=full_state
             )
-        finally:
-            if set_presence == "online":
-                self.event_stream_handler.stopped_stream(user)
 
         time_now = self.clock.time_msec()
 

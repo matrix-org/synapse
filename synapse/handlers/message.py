@@ -21,7 +21,6 @@ from synapse.streams.config import PaginationConfig
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
 from synapse.util import unwrapFirstError
-from synapse.util.logcontext import PreserveLoggingContext
 from synapse.util.caches.snapshot_cache import SnapshotCache
 from synapse.types import UserID, RoomStreamToken, StreamToken
 
@@ -249,8 +248,7 @@ class MessageHandler(BaseHandler):
 
         if event.type == EventTypes.Message:
             presence = self.hs.get_handlers().presence_handler
-            with PreserveLoggingContext():
-                presence.bump_presence_active_time(user)
+            yield presence.bump_presence_active_time(user)
 
     def deduplicate_state_event(self, event, context):
         """
@@ -674,10 +672,6 @@ class MessageHandler(BaseHandler):
             room_id=room_id,
         )
 
-        # TODO(paul): I wish I was called with user objects not user_id
-        #   strings...
-        auth_user = UserID.from_string(user_id)
-
         # TODO: These concurrently
         time_now = self.clock.time_msec()
         state = [
@@ -702,13 +696,11 @@ class MessageHandler(BaseHandler):
         @defer.inlineCallbacks
         def get_presence():
             states = yield presence_handler.get_states(
-                target_users=[UserID.from_string(m.user_id) for m in room_members],
-                auth_user=auth_user,
+                [m.user_id for m in room_members],
                 as_event=True,
-                check_auth=False,
             )
 
-            defer.returnValue(states.values())
+            defer.returnValue(states)
 
         @defer.inlineCallbacks
         def get_receipts():

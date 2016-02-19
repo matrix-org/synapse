@@ -70,9 +70,6 @@ class ProfileTestCase(unittest.TestCase):
 
         self.handler = hs.get_handlers().profile_handler
 
-        # TODO(paul): Icky signal declarings.. booo
-        hs.get_distributor().declare("changed_presencelike_data")
-
     @defer.inlineCallbacks
     def test_get_my_name(self):
         yield self.store.set_profile_displayname(

@@ -130,7 +130,7 @@ class StreamIdGenerator(object):
 
         return manager()
 
-    def get_max_token(self, store):
+    def get_max_token(self):
         """Returns the maximum stream id such that all stream ids less than or
         equal to it have been successfully persisted.
         """
