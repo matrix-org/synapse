@@ -46,7 +46,6 @@ metrics = synapse.metrics.get_metrics_for(__name__)
 
 notified_presence_counter = metrics.register_counter("notified_presence")
 presence_updates_counter = metrics.register_counter("presence_updates")
-presence_updates_counter = metrics.register_counter("presence_updates")
 timers_fired_counter = metrics.register_counter("timers_fired")
 federation_presence_counter = metrics.register_counter("federation_presence")
 
