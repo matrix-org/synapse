@@ -46,6 +46,9 @@ metrics = synapse.metrics.get_metrics_for(__name__)
 
 notified_presence_counter = metrics.register_counter("notified_presence")
 presence_updates_counter = metrics.register_counter("presence_updates")
+presence_updates_counter = metrics.register_counter("presence_updates")
+timers_fired_counter = metrics.register_counter("timers_fired")
+federation_presence_counter = metrics.register_counter("federation_presence")
 
 
 # If a user was last active in the last LAST_ACTIVE_GRANULARITY, consider them
@@ -275,6 +278,8 @@ class PresenceHandler(BaseHandler):
             )
             for user_id in set(users_to_check)
         ]
+
+        timers_fired_counter.inc_by(len(states))
 
         changes = handle_timeouts(
             states,
@@ -507,6 +512,7 @@ class PresenceHandler(BaseHandler):
             updates.append(prev_state.copy_and_replace(**new_fields))
 
         if updates:
+            federation_presence_counter.inc_by(len(updates))
             yield self._update_states(updates)
 
     @defer.inlineCallbacks
