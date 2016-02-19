@@ -89,3 +89,9 @@ class WheelTimer(object):
             ret.extend(self.entries.pop(0).queue)
 
         return ret
+
+    def __len__(self):
+        l = 0
+        for entry in self.entries:
+            l += len(entry.queue)
+        return l

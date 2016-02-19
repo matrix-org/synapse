@@ -44,6 +44,9 @@ logger = logging.getLogger(__name__)
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 
+notified_presence_counter = metrics.register_counter("notified_presence")
+presence_updates_counter = metrics.register_counter("presence_updates")
+
 
 # If a user was last active in the last LAST_ACTIVE_GRANULARITY, consider them
 # "currently_active"
@@ -170,6 +173,8 @@ class PresenceHandler(BaseHandler):
             5000,
         )
 
+        metrics.register_callback("wheel_timer_size", lambda: len(self.wheel_timer))
+
     @defer.inlineCallbacks
     def _on_shutdown(self):
         """Gets called when shutting down. This lets us persist any updates that
@@ -233,7 +238,10 @@ class PresenceHandler(BaseHandler):
 
         # TODO: We should probably ensure there are no races hereafter
 
+        presence_updates_counter.inc_by(len(new_states))
+
         if to_notify:
+            notified_presence_counter.inc_by(len(to_notify))
             yield self._persist_and_notify(to_notify.values())
 
         self.unpersisted_users_changes |= set(s.user_id for s in new_states)
