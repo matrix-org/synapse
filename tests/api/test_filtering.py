@@ -456,6 +456,22 @@ class FilteringTestCase(unittest.TestCase):
         results = user_filter.filter_room_state(events)
         self.assertEquals([], results)
 
+    def test_filter_rooms(self):
+        definition = {
+            "rooms": ["!allowed:example.com", "!excluded:example.com"],
+            "not_rooms": ["!excluded:example.com"],
+        }
+
+        room_ids = [
+            "!allowed:example.com",  # Allowed because in rooms and not in not_rooms.
+            "!excluded:example.com",  # Disallowed because in not_rooms.
+            "!not_included:example.com",  # Disallowed because not in rooms.
+        ]
+
+        filtered_room_ids = list(Filter(definition).filter_rooms(room_ids))
+
+        self.assertEquals(filtered_room_ids, ["!allowed:example.com"])
+
     @defer.inlineCallbacks
     def test_add_filter(self):
         user_filter_json = {
@@ -500,3 +516,5 @@ class FilteringTestCase(unittest.TestCase):
         )
 
         self.assertEquals(filter.get_filter_json(), user_filter_json)
+
+        self.assertRegexpMatches(repr(filter), r"<FilterCollection \{.*\}>")
