@@ -48,6 +48,7 @@ notified_presence_counter = metrics.register_counter("notified_presence")
 presence_updates_counter = metrics.register_counter("presence_updates")
 timers_fired_counter = metrics.register_counter("timers_fired")
 federation_presence_counter = metrics.register_counter("federation_presence")
+bump_active_time_counter = metrics.register_counter("bump_active_time")
 
 
 # If a user was last active in the last LAST_ACTIVE_GRANULARITY, consider them
@@ -295,6 +296,8 @@ class PresenceHandler(BaseHandler):
         with the app.
         """
         user_id = user.to_string()
+
+        bump_active_time_counter.inc()
 
         prev_state = yield self.current_state_for_user(user_id)
 
