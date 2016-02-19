@@ -433,8 +433,10 @@ class PresenceHandler(BaseHandler):
                 hosts_to_states.setdefault(host, []).extend(states)
 
         for user_id, states in users_to_states.items():
-            host = UserID.from_string(user_id).domain
-            hosts_to_states.setdefault(host, []).extend(states)
+            # Only send presence updates to host if  the user is ours.
+            if self.hs.is_mine_id(user_id):
+                host = UserID.from_string(user_id).domain
+                hosts_to_states.setdefault(host, []).extend(states)
 
         # TODO: de-dup hosts_to_states, as a single host might have multiple
         # of same presence
