@@ -152,7 +152,7 @@ def _condition_checker(evaluator, conditions, uid, display_name, cache):
             elif res is True:
                 continue
 
-        res = evaluator.matches(cond, uid, display_name, None)
+        res = evaluator.matches(cond, uid, display_name)
         if _id:
             cache[_id] = bool(res)
 

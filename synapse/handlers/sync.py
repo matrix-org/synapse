@@ -582,6 +582,28 @@ class SyncHandler(BaseHandler):
             if room_sync:
                 joined.append(room_sync)
 
+        # For each newly joined room, we want to send down presence of
+        # existing users.
+        presence_handler = self.hs.get_handlers().presence_handler
+        extra_presence_users = set()
+        for room_id in newly_joined_rooms:
+            users = yield self.store.get_users_in_room(event.room_id)
+            extra_presence_users.update(users)
+
+        # For each new member, send down presence.
+        for joined_sync in joined:
+            it = itertools.chain(joined_sync.timeline.events, joined_sync.state.values())
+            for event in it:
+                if event.type == EventTypes.Member:
+                    if event.membership == Membership.JOIN:
+                        extra_presence_users.add(event.state_key)
+
+        states = yield presence_handler.get_states(
+            [u for u in extra_presence_users if u != user_id],
+            as_event=True,
+        )
+        presence.extend(states)
+
         account_data_for_user = sync_config.filter_collection.filter_account_data(
             self.account_data_for_user(account_data)
         )
@@ -821,15 +843,17 @@ class SyncHandler(BaseHandler):
         # TODO(mjark) Check for new redactions in the state events.
 
         with Measure(self.clock, "compute_state_delta"):
+            current_state = yield self.get_state_at(
+                room_id, stream_position=now_token
+            )
+
             if full_state:
                 if batch:
                     state = yield self.store.get_state_for_event(
                         batch.events[0].event_id
                     )
                 else:
-                    state = yield self.get_state_at(
-                        room_id, stream_position=now_token
-                    )
+                    state = current_state
 
                 timeline_state = {
                     (event.type, event.state_key): event
@@ -840,6 +864,7 @@ class SyncHandler(BaseHandler):
                     timeline_contains=timeline_state,
                     timeline_start=state,
                     previous={},
+                    current=current_state,
                 )
             elif batch.limited:
                 state_at_previous_sync = yield self.get_state_at(
@@ -859,6 +884,7 @@ class SyncHandler(BaseHandler):
                     timeline_contains=timeline_state,
                     timeline_start=state_at_timeline_start,
                     previous=state_at_previous_sync,
+                    current=current_state,
                 )
             else:
                 state = {}
@@ -918,7 +944,7 @@ def _action_has_highlight(actions):
     return False
 
 
-def _calculate_state(timeline_contains, timeline_start, previous):
+def _calculate_state(timeline_contains, timeline_start, previous, current):
     """Works out what state to include in a sync response.
 
     Args:
@@ -926,6 +952,7 @@ def _calculate_state(timeline_contains, timeline_start, previous):
         timeline_start (dict): state at the start of the timeline
         previous (dict): state at the end of the previous sync (or empty dict
             if this is an initial sync)
+        current (dict): state at the end of the timeline
 
     Returns:
         dict
@@ -936,14 +963,16 @@ def _calculate_state(timeline_contains, timeline_start, previous):
             timeline_contains.values(),
             previous.values(),
             timeline_start.values(),
+            current.values(),
         )
     }
 
+    c_ids = set(e.event_id for e in current.values())
     tc_ids = set(e.event_id for e in timeline_contains.values())
     p_ids = set(e.event_id for e in previous.values())
     ts_ids = set(e.event_id for e in timeline_start.values())
 
-    state_ids = (ts_ids - p_ids) - tc_ids
+    state_ids = ((c_ids | ts_ids) - p_ids) - tc_ids
 
     evs = (event_id_to_state[e] for e in state_ids)
     return {

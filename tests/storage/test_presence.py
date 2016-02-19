@@ -35,32 +35,6 @@ class PresenceStoreTestCase(unittest.TestCase):
         self.u_banana = UserID.from_string("@banana:test")
 
     @defer.inlineCallbacks
-    def test_state(self):
-        yield self.store.create_presence(
-            self.u_apple.localpart
-        )
-
-        state = yield self.store.get_presence_state(
-            self.u_apple.localpart
-        )
-
-        self.assertEquals(
-            {"state": None, "status_msg": None, "mtime": None}, state
-        )
-
-        yield self.store.set_presence_state(
-            self.u_apple.localpart, {"state": "online", "status_msg": "Here"}
-        )
-
-        state = yield self.store.get_presence_state(
-            self.u_apple.localpart
-        )
-
-        self.assertEquals(
-            {"state": "online", "status_msg": "Here", "mtime": 1000000}, state
-        )
-
-    @defer.inlineCallbacks
     def test_visibility(self):
         self.assertFalse((yield self.store.is_presence_visible(
             observed_localpart=self.u_apple.localpart,

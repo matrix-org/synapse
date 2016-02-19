@@ -224,12 +224,12 @@ class MockClock(object):
     def time_msec(self):
         return self.time() * 1000
 
-    def call_later(self, delay, callback):
+    def call_later(self, delay, callback, *args, **kwargs):
         current_context = LoggingContext.current_context()
 
         def wrapped_callback():
             LoggingContext.thread_local.current_context = current_context
-            callback()
+            callback(*args, **kwargs)
 
         t = [self.now + delay, wrapped_callback, False]
         self.timers.append(t)

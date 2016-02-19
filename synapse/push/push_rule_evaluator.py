@@ -33,7 +33,7 @@ INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
 
 @defer.inlineCallbacks
-def evaluator_for_user_id_and_profile_tag(user_id, profile_tag, room_id, store):
+def evaluator_for_user_id(user_id, room_id, store):
     rawrules = yield store.get_push_rules_for_user(user_id)
     enabled_map = yield store.get_push_rules_enabled_for_user(user_id)
     our_member_event = yield store.get_current_state(
@@ -43,7 +43,7 @@ def evaluator_for_user_id_and_profile_tag(user_id, profile_tag, room_id, store):
     )
 
     defer.returnValue(PushRuleEvaluator(
-        user_id, profile_tag, rawrules, enabled_map,
+        user_id, rawrules, enabled_map,
         room_id, our_member_event, store
     ))
 
@@ -77,10 +77,9 @@ def _room_member_count(ev, condition, room_member_count):
 class PushRuleEvaluator:
     DEFAULT_ACTIONS = []
 
-    def __init__(self, user_id, profile_tag, raw_rules, enabled_map, room_id,
+    def __init__(self, user_id, raw_rules, enabled_map, room_id,
                  our_member_event, store):
         self.user_id = user_id
-        self.profile_tag = profile_tag
         self.room_id = room_id
         self.our_member_event = our_member_event
         self.store = store
@@ -152,7 +151,7 @@ class PushRuleEvaluator:
             matches = True
             for c in conditions:
                 matches = evaluator.matches(
-                    c, self.user_id, my_display_name, self.profile_tag
+                    c, self.user_id, my_display_name
                 )
                 if not matches:
                     break
@@ -189,13 +188,9 @@ class PushRuleEvaluatorForEvent(object):
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
 
-    def matches(self, condition, user_id, display_name, profile_tag):
+    def matches(self, condition, user_id, display_name):
         if condition['kind'] == 'event_match':
             return self._event_match(condition, user_id)
-        elif condition['kind'] == 'device':
-            if 'profile_tag' not in condition:
-                return True
-            return condition['profile_tag'] == profile_tag
         elif condition['kind'] == 'contains_display_name':
             return self._contains_display_name(display_name)
         elif condition['kind'] == 'room_member_count':

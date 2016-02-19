@@ -150,9 +150,20 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
             event_dict["state_key"] = state_key
 
         msg_handler = self.handlers.message_handler
-        event = yield msg_handler.create_and_send_event(
-            event_dict, token_id=requester.access_token_id, txn_id=txn_id,
+        event, context = yield msg_handler.create_event(
+            event_dict,
+            token_id=requester.access_token_id,
+            txn_id=txn_id,
         )
+
+        if event_type == EventTypes.Member:
+            yield self.handlers.room_member_handler.send_membership_event(
+                event,
+                context,
+                is_guest=requester.is_guest,
+            )
+        else:
+            yield msg_handler.send_nonmember_event(event, context)
 
         defer.returnValue((200, {"event_id": event.event_id}))
 
@@ -171,7 +182,7 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
         content = _parse_json(request)
 
         msg_handler = self.handlers.message_handler
-        event = yield msg_handler.create_and_send_event(
+        event = yield msg_handler.create_and_send_nonmember_event(
             {
                 "type": event_type,
                 "content": content,
@@ -217,46 +228,29 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
             allow_guest=True,
         )
 
-        # the identifier could be a room alias or a room id. Try one then the
-        # other if it fails to parse, without swallowing other valid
-        # SynapseErrors.
-
-        identifier = None
-        is_room_alias = False
-        try:
-            identifier = RoomAlias.from_string(room_identifier)
-            is_room_alias = True
-        except SynapseError:
-            identifier = RoomID.from_string(room_identifier)
-
-        # TODO: Support for specifying the home server to join with?
-
-        if is_room_alias:
+        if RoomID.is_valid(room_identifier):
+            room_id = room_identifier
+            remote_room_hosts = None
+        elif RoomAlias.is_valid(room_identifier):
             handler = self.handlers.room_member_handler
-            ret_dict = yield handler.join_room_alias(
-                requester.user,
-                identifier,
-            )
-            defer.returnValue((200, ret_dict))
-        else:  # room id
-            msg_handler = self.handlers.message_handler
-            content = {"membership": Membership.JOIN}
-            if requester.is_guest:
-                content["kind"] = "guest"
-            yield msg_handler.create_and_send_event(
-                {
-                    "type": EventTypes.Member,
-                    "content": content,
-                    "room_id": identifier.to_string(),
-                    "sender": requester.user.to_string(),
-                    "state_key": requester.user.to_string(),
-                },
-                token_id=requester.access_token_id,
-                txn_id=txn_id,
-                is_guest=requester.is_guest,
-            )
+            room_alias = RoomAlias.from_string(room_identifier)
+            room_id, remote_room_hosts = yield handler.lookup_room_alias(room_alias)
+            room_id = room_id.to_string()
+        else:
+            raise SynapseError(400, "%s was not legal room ID or room alias" % (
+                room_identifier,
+            ))
 
-            defer.returnValue((200, {"room_id": identifier.to_string()}))
+        yield self.handlers.room_member_handler.update_membership(
+            requester=requester,
+            target=requester.user,
+            room_id=room_id,
+            action="join",
+            txn_id=txn_id,
+            remote_room_hosts=remote_room_hosts,
+        )
+
+        defer.returnValue((200, {"room_id": room_id}))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_identifier, txn_id):
@@ -304,18 +298,6 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
             if event["type"] != EventTypes.Member:
                 continue
             chunk.append(event)
-            # FIXME: should probably be state_key here, not user_id
-            target_user = UserID.from_string(event["user_id"])
-            # Presence is an optional cache; don't fail if we can't fetch it
-            try:
-                presence_handler = self.handlers.presence_handler
-                presence_state = yield presence_handler.get_state(
-                    target_user=target_user,
-                    auth_user=requester.user,
-                )
-                event["content"].update(presence_state)
-            except:
-                pass
 
         defer.returnValue((200, {
             "chunk": chunk
@@ -451,7 +433,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 content["medium"],
                 content["address"],
                 content["id_server"],
-                requester.access_token_id,
+                requester,
                 txn_id
             )
             defer.returnValue((200, {}))
@@ -507,7 +489,7 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
         content = _parse_json(request)
 
         msg_handler = self.handlers.message_handler
-        event = yield msg_handler.create_and_send_event(
+        event = yield msg_handler.create_and_send_nonmember_event(
             {
                 "type": EventTypes.Redaction,
                 "content": content,
@@ -541,6 +523,10 @@ class RoomTypingRestServlet(ClientV1RestServlet):
         "/rooms/(?P<room_id>[^/]*)/typing/(?P<user_id>[^/]*)$"
     )
 
+    def __init__(self, hs):
+        super(RoomTypingRestServlet, self).__init__(hs)
+        self.presence_handler = hs.get_handlers().presence_handler
+
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, user_id):
         requester = yield self.auth.get_user_by_req(request)
@@ -551,6 +537,8 @@ class RoomTypingRestServlet(ClientV1RestServlet):
         content = _parse_json(request)
 
         typing_handler = self.handlers.typing_notification_handler
+
+        yield self.presence_handler.bump_presence_active_time(requester.user)
 
         if content["typing"]:
             yield typing_handler.started_typing(
