@@ -53,9 +53,15 @@ class BaseHandler(object):
         self.event_builder_factory = hs.get_event_builder_factory()
 
     @defer.inlineCallbacks
-    def _filter_events_for_clients(self, user_tuples, events, event_id_to_state):
+    def filter_events_for_clients(self, user_tuples, events, event_id_to_state):
         """ Returns dict of user_id -> list of events that user is allowed to
         see.
+
+        :param (str, bool) user_tuples: (user id, is_peeking) for each
+            user to be checked. is_peeking should be true if:
+              * the user is not currently a member of the room, and:
+              * the user has not been a member of the room since the given
+                events
         """
         forgotten = yield defer.gatherResults([
             self.store.who_forgot_in_room(
@@ -72,18 +78,20 @@ class BaseHandler(object):
         def allowed(event, user_id, is_peeking):
             state = event_id_to_state[event.event_id]
 
+            # get the room_visibility at the time of the event.
             visibility_event = state.get((EventTypes.RoomHistoryVisibility, ""), None)
             if visibility_event:
                 visibility = visibility_event.content.get("history_visibility", "shared")
             else:
                 visibility = "shared"
 
+            # if it was world_readable, it's easy: everyone can read it
             if visibility == "world_readable":
                 return True
 
-            if is_peeking:
-                return False
-
+            # get the user's membership at the time of the event. (or rather,
+            # just *after* the event. Which means that people can see their
+            # own join events, but not (currently) their own leave events.)
             membership_event = state.get((EventTypes.Member, user_id), None)
             if membership_event:
                 if membership_event.event_id in event_id_forgotten:
@@ -93,20 +101,32 @@ class BaseHandler(object):
             else:
                 membership = None
 
+            # if the user was a member of the room at the time of the event,
+            # they can see it.
             if membership == Membership.JOIN:
                 return True
 
             if event.type == EventTypes.RoomHistoryVisibility:
-                return not is_peeking
+                # XXX why are m.room.history_visibility events special?
+                # return True
+                pass
 
             if visibility == "shared":
-                return True
-            elif visibility == "joined":
-                return membership == Membership.JOIN
+                # user can also see the event if he has become a member since
+                # the event
+                #
+                # XXX: if the user has subsequently joined and then left again,
+                # ideally we would share history up to the point they left. But
+                # we don't know when they left.
+                return not is_peeking
             elif visibility == "invited":
+                # user can also see the event if he was *invited* at the time
+                # of the event.
                 return membership == Membership.INVITE
 
-            return True
+            # presumably visibility is "joined"; we weren't a member at the
+            # time of the event, so we're done.
+            return False
 
         defer.returnValue({
             user_id: [
@@ -119,7 +139,17 @@ class BaseHandler(object):
 
     @defer.inlineCallbacks
     def _filter_events_for_client(self, user_id, events, is_peeking=False):
-        # Assumes that user has at some point joined the room if not is_guest.
+        """
+        Check which events a user is allowed to see
+
+        :param str user_id: user id to be checked
+        :param [synapse.events.EventBase] events: list of events to be checked
+        :param bool is_peeking should be True if:
+              * the user is not currently a member of the room, and:
+              * the user has not been a member of the room since the given
+                events
+        :rtype [synapse.events.EventBase]
+        """
         types = (
             (EventTypes.RoomHistoryVisibility, ""),
             (EventTypes.Member, user_id),
@@ -128,7 +158,7 @@ class BaseHandler(object):
             frozenset(e.event_id for e in events),
             types=types
         )
-        res = yield self._filter_events_for_clients(
+        res = yield self.filter_events_for_clients(
             [(user_id, is_peeking)], events, event_id_to_state
         )
         defer.returnValue(res.get(user_id, []))

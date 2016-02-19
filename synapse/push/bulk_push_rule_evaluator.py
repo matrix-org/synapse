@@ -103,7 +103,7 @@ class BulkPushRuleEvaluator:
 
         users_dict = yield self.store.are_guests(self.rules_by_user.keys())
 
-        filtered_by_user = yield handler._filter_events_for_clients(
+        filtered_by_user = yield handler.filter_events_for_clients(
             users_dict.items(), [event], {event.event_id: current_state}
         )
 
