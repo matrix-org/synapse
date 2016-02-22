@@ -61,6 +61,9 @@ class CounterMetricTestCase(unittest.TestCase):
             'vector{method="PUT"} 1',
         ])
 
+        # Check that passing too few values errors
+        self.assertRaises(ValueError, counter.inc)
+
 
 class CallbackMetricTestCase(unittest.TestCase):
 
