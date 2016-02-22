@@ -106,23 +106,18 @@ class BaseHandler(object):
             if membership == Membership.JOIN:
                 return True
 
-            if event.type == EventTypes.RoomHistoryVisibility:
-                # XXX why are m.room.history_visibility events special?
-                # return True
-                pass
-
             if visibility == "joined":
                 # we weren't a member at the time of the event, so we can't
                 # see this event.
                 return False
 
             elif visibility == "invited":
-                # user can also see the event if he was *invited* at the time
+                # user can also see the event if they were *invited* at the time
                 # of the event.
                 return membership == Membership.INVITE
 
             else:
-                # visibility is shared: user can also see the event if he has
+                # visibility is shared: user can also see the event if they have
                 # become a member since the event
                 #
                 # XXX: if the user has subsequently joined and then left again,
