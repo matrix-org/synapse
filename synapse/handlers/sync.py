@@ -845,16 +845,20 @@ class SyncHandler(BaseHandler):
         # TODO(mjark) Check for new redactions in the state events.
 
         with Measure(self.clock, "compute_state_delta"):
-            current_state = yield self.get_state_at(
-                room_id, stream_position=now_token
-            )
-
             if full_state:
                 if batch:
+                    current_state = yield self.store.get_state_for_event(
+                        batch.events[-1].event_id
+                    )
+
                     state = yield self.store.get_state_for_event(
                         batch.events[0].event_id
                     )
                 else:
+                    current_state = yield self.get_state_at(
+                        room_id, stream_position=now_token
+                    )
+
                     state = current_state
 
                 timeline_state = {
@@ -871,6 +875,10 @@ class SyncHandler(BaseHandler):
             elif batch.limited:
                 state_at_previous_sync = yield self.get_state_at(
                     room_id, stream_position=since_token
+                )
+
+                current_state = yield self.store.get_state_for_event(
+                    batch.events[-1].event_id
                 )
 
                 state_at_timeline_start = yield self.store.get_state_for_event(
