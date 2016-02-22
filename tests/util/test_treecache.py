@@ -77,3 +77,9 @@ class TreeCacheTestCase(unittest.TestCase):
         cache[("b",)] = "B"
         cache.clear()
         self.assertEquals(len(cache), 0)
+
+    def test_contains(self):
+        cache = TreeCache()
+        cache[("a",)] = "A"
+        self.assertTrue(("a",) in cache)
+        self.assertFalse(("b",) in cache)
