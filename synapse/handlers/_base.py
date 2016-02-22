@@ -81,9 +81,6 @@ class BaseHandler(object):
             if visibility == "world_readable":
                 return True
 
-            if is_peeking:
-                return False
-
             membership_event = state.get((EventTypes.Member, user_id), None)
             if membership_event:
                 if membership_event.event_id in event_id_forgotten:
@@ -96,11 +93,8 @@ class BaseHandler(object):
             if membership == Membership.JOIN:
                 return True
 
-            if event.type == EventTypes.RoomHistoryVisibility:
-                return not is_peeking
-
             if visibility == "shared":
-                return True
+                return not is_peeking
             elif visibility == "joined":
                 return membership == Membership.JOIN
             elif visibility == "invited":
