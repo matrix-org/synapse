@@ -1,5 +1,7 @@
 #!/bin/bash -eu
 
+: ${WORKSPACE:="$(pwd)"}
+
 export PYTHONDONTWRITEBYTECODE=yep
 
 # Output test results as junit xml
