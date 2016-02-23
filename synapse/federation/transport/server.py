@@ -425,7 +425,17 @@ class On3pidBindServlet(BaseFederationServlet):
             last_exception = None
             for invite in content["invites"]:
                 try:
-                    yield self.handler.exchange_third_party_invite(invite)
+                    if "signed" not in invite or "token" not in invite["signed"]:
+                        message = ("Rejecting received notification of third-"
+                                   "party invite without signed: %s" % (invite,))
+                        logger.info(message)
+                        raise SynapseError(400, message)
+                    yield self.handler.exchange_third_party_invite(
+                        invite["sender"],
+                        invite["mxid"],
+                        invite["room_id"],
+                        invite["signed"],
+                    )
                 except Exception as e:
                     last_exception = e
             if last_exception:

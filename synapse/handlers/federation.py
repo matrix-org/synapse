@@ -14,6 +14,9 @@
 # limitations under the License.
 
 """Contains handlers for federation events."""
+from signedjson.key import decode_verify_key_bytes
+from signedjson.sign import verify_signed_json
+from unpaddedbase64 import decode_base64
 
 from ._base import BaseHandler
 
@@ -1620,19 +1623,15 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def exchange_third_party_invite(self, invite):
-        sender = invite["sender"]
-        room_id = invite["room_id"]
-
-        if "signed" not in invite or "token" not in invite["signed"]:
-            logger.info(
-                "Discarding received notification of third party invite "
-                "without signed: %s" % (invite,)
-            )
-            return
-
+    def exchange_third_party_invite(
+            self,
+            sender_user_id,
+            target_user_id,
+            room_id,
+            signed,
+    ):
         third_party_invite = {
-            "signed": invite["signed"],
+            "signed": signed,
         }
 
         event_dict = {
@@ -1642,8 +1641,8 @@ class FederationHandler(BaseHandler):
                 "third_party_invite": third_party_invite,
             },
             "room_id": room_id,
-            "sender": sender,
-            "state_key": invite["mxid"],
+            "sender": sender_user_id,
+            "state_key": target_user_id,
         }
 
         if (yield self.auth.check_host_in_room(room_id, self.hs.hostname)):
@@ -1656,11 +1655,11 @@ class FederationHandler(BaseHandler):
             )
 
             self.auth.check(event, context.current_state)
-            yield self._validate_keyserver(event, auth_events=context.current_state)
+            yield self._check_signature(event, auth_events=context.current_state)
             member_handler = self.hs.get_handlers().room_member_handler
             yield member_handler.send_membership_event(event, context, from_client=False)
         else:
-            destinations = set([x.split(":", 1)[-1] for x in (sender, room_id)])
+            destinations = set(x.split(":", 1)[-1] for x in (sender_user_id, room_id))
             yield self.replication_layer.forward_third_party_invite(
                 destinations,
                 room_id,
@@ -1681,7 +1680,7 @@ class FederationHandler(BaseHandler):
         )
 
         self.auth.check(event, auth_events=context.current_state)
-        yield self._validate_keyserver(event, auth_events=context.current_state)
+        yield self._check_signature(event, auth_events=context.current_state)
 
         returned_invite = yield self.send_invite(origin, event)
         # TODO: Make sure the signatures actually are correct.
@@ -1711,17 +1710,69 @@ class FederationHandler(BaseHandler):
         defer.returnValue((event, context))
 
     @defer.inlineCallbacks
-    def _validate_keyserver(self, event, auth_events):
-        token = event.content["third_party_invite"]["signed"]["token"]
+    def _check_signature(self, event, auth_events):
+        """
+        Checks that the signature in the event is consistent with its invite.
+        :param event (Event): The m.room.member event to check
+        :param auth_events (dict<(event type, state_key), event>)
+
+        :raises
+            AuthError if signature didn't match any keys, or key has been
+                revoked,
+            SynapseError if a transient error meant a key couldn't be checked
+                for revocation.
+        """
+        signed = event.content["third_party_invite"]["signed"]
+        token = signed["token"]
 
         invite_event = auth_events.get(
             (EventTypes.ThirdPartyInvite, token,)
         )
 
+        if not invite_event:
+            raise AuthError(403, "Could not find invite")
+
+        last_exception = None
+        for public_key_object in self.hs.get_auth().get_public_keys(invite_event):
+            try:
+                for server, signature_block in signed["signatures"].items():
+                    for key_name, encoded_signature in signature_block.items():
+                        if not key_name.startswith("ed25519:"):
+                            continue
+
+                        public_key = public_key_object["public_key"]
+                        verify_key = decode_verify_key_bytes(
+                            key_name,
+                            decode_base64(public_key)
+                        )
+                        verify_signed_json(signed, server, verify_key)
+                        if "key_validity_url" in public_key_object:
+                            yield self._check_key_revocation(
+                                public_key,
+                                public_key_object["key_validity_url"]
+                            )
+                        return
+            except Exception as e:
+                last_exception = e
+        raise last_exception
+
+    @defer.inlineCallbacks
+    def _check_key_revocation(self, public_key, url):
+        """
+        Checks whether public_key has been revoked.
+
+        :param public_key (str): base-64 encoded public key.
+        :param url (str): Key revocation URL.
+
+        :raises
+            AuthError if they key has been revoked.
+            SynapseError if a transient error meant a key couldn't be checked
+                for revocation.
+        """
         try:
             response = yield self.hs.get_simple_http_client().get_json(
-                invite_event.content["key_validity_url"],
-                {"public_key": invite_event.content["public_key"]}
+                url,
+                {"public_key": public_key}
             )
         except Exception:
             raise SynapseError(

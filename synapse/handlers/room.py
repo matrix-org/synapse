@@ -398,6 +398,7 @@ class RoomMemberHandler(BaseHandler):
             action,
             txn_id=None,
             remote_room_hosts=None,
+            third_party_signed=None,
             ratelimit=True,
     ):
         effective_membership_state = action
@@ -405,6 +406,15 @@ class RoomMemberHandler(BaseHandler):
             effective_membership_state = "leave"
         elif action == "forget":
             effective_membership_state = "leave"
+
+        if third_party_signed is not None:
+            replication = self.hs.get_replication_layer()
+            yield replication.exchange_third_party_invite(
+                third_party_signed["sender"],
+                target.to_string(),
+                room_id,
+                third_party_signed,
+            )
 
         msg_handler = self.hs.get_handlers().message_handler
 
@@ -759,7 +769,7 @@ class RoomMemberHandler(BaseHandler):
         if room_avatar_event:
             room_avatar_url = room_avatar_event.content.get("url", "")
 
-        token, public_key, key_validity_url, display_name = (
+        token, public_keys, fallback_public_key, display_name = (
             yield self._ask_id_server_for_third_party_invite(
                 id_server=id_server,
                 medium=medium,
@@ -774,14 +784,18 @@ class RoomMemberHandler(BaseHandler):
                 inviter_avatar_url=inviter_avatar_url
             )
         )
+
         msg_handler = self.hs.get_handlers().message_handler
         yield msg_handler.create_and_send_nonmember_event(
             {
                 "type": EventTypes.ThirdPartyInvite,
                 "content": {
                     "display_name": display_name,
-                    "key_validity_url": key_validity_url,
-                    "public_key": public_key,
+                    "public_keys": public_keys,
+
+                    # For backwards compatibility:
+                    "key_validity_url": fallback_public_key["key_validity_url"],
+                    "public_key": fallback_public_key["public_key"],
                 },
                 "room_id": room_id,
                 "sender": user.to_string(),
@@ -806,6 +820,34 @@ class RoomMemberHandler(BaseHandler):
             inviter_display_name,
             inviter_avatar_url
     ):
+        """
+        Asks an identity server for a third party invite.
+
+        :param id_server (str): hostname + optional port for the identity server.
+        :param medium (str): The literal string "email".
+        :param address (str): The third party address being invited.
+        :param room_id (str): The ID of the room to which the user is invited.
+        :param inviter_user_id (str): The user ID of the inviter.
+        :param room_alias (str): An alias for the room, for cosmetic
+            notifications.
+        :param room_avatar_url (str): The URL of the room's avatar, for cosmetic
+            notifications.
+        :param room_join_rules (str): The join rules of the email
+            (e.g. "public").
+        :param room_name (str): The m.room.name of the room.
+        :param inviter_display_name (str): The current display name of the
+            inviter.
+        :param inviter_avatar_url (str): The URL of the inviter's avatar.
+
+        :return: A deferred tuple containing:
+            token (str): The token which must be signed to prove authenticity.
+            public_keys ([{"public_key": str, "key_validity_url": str}]):
+                public_key is a base64-encoded ed25519 public key.
+            fallback_public_key: One element from public_keys.
+            display_name (str): A user-friendly name to represent the invited
+                user.
+        """
+
         is_url = "%s%s/_matrix/identity/api/v1/store-invite" % (
             id_server_scheme, id_server,
         )
@@ -826,12 +868,21 @@ class RoomMemberHandler(BaseHandler):
         )
         # TODO: Check for success
         token = data["token"]
-        public_key = data["public_key"]
+        public_keys = data.get("public_keys", [])
+        if "public_key" in data:
+            fallback_public_key = {
+                "public_key": data["public_key"],
+                "key_validity_url": "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
+                    id_server_scheme, id_server,
+                ),
+            }
+        else:
+            fallback_public_key = public_keys[0]
+
+        if not public_keys:
+            public_keys.append(fallback_public_key)
         display_name = data["display_name"]
-        key_validity_url = "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
-            id_server_scheme, id_server,
-        )
-        defer.returnValue((token, public_key, key_validity_url, display_name))
+        defer.returnValue((token, public_keys, fallback_public_key, display_name))
 
     def forget(self, user, room_id):
         return self.store.forget(user.to_string(), room_id)

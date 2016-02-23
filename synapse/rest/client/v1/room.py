@@ -228,6 +228,8 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
             allow_guest=True,
         )
 
+        content = _parse_json(request)
+
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
             remote_room_hosts = None
@@ -248,6 +250,7 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
             action="join",
             txn_id=txn_id,
             remote_room_hosts=remote_room_hosts,
+            third_party_signed=content.get("third_party_signed", None),
         )
 
         defer.returnValue((200, {"room_id": room_id}))
@@ -451,6 +454,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             room_id=room_id,
             action=membership_action,
             txn_id=txn_id,
+            third_party_signed=content.get("third_party_signed", None),
         )
 
         defer.returnValue((200, {}))
