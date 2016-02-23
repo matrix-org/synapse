@@ -854,13 +854,15 @@ class PresenceEventSource(object):
             else:
                 room_ids = set(room_ids)
 
+            max_token = self.store.get_current_presence_token()
+
             plist = yield self.store.get_presence_list_accepted(user.localpart)
             friends = set(row["observed_user_id"] for row in plist)
             friends.add(user_id)  # So that we receive our own presence
 
             user_ids_changed = set()
             changed = None
-            if from_key and from_key < 100:
+            if from_key and max_token - from_key < 100:
                 # For small deltas, its quicker to get all changes and then
                 # work out if we share a room or they're in our presence list
                 changed = stream_change_cache.get_all_entities_changed(from_key)
@@ -883,8 +885,7 @@ class PresenceEventSource(object):
                     users = yield self.store.get_users_in_room(room_id)
                     user_ids_to_check.update(users)
 
-                plist = yield self.store.get_presence_list_accepted(user.localpart)
-                user_ids_to_check.update([row["observed_user_id"] for row in plist])
+                user_ids_to_check.update(friends)
 
                 # Always include yourself. Only really matters for when the user is
                 # not in any rooms, but still.
@@ -899,7 +900,6 @@ class PresenceEventSource(object):
 
             updates = yield presence.current_state_for_users(user_ids_changed)
 
-        max_token = self.store.get_current_presence_token()
         now = self.clock.time_msec()
 
         defer.returnValue(([
