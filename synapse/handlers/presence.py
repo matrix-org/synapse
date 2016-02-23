@@ -845,35 +845,54 @@ class PresenceEventSource(object):
             room_ids = room_ids or []
 
             presence = self.hs.get_handlers().presence_handler
+            stream_change_cache = self.store.presence_stream_cache
 
             if not room_ids:
                 rooms = yield self.store.get_rooms_for_user(user_id)
                 room_ids = set(e.room_id for e in rooms)
-
-            user_ids_to_check = set()
-            for room_id in room_ids:
-                users = yield self.store.get_users_in_room(room_id)
-                user_ids_to_check.update(users)
+            else:
+                room_ids = set(room_ids)
 
             plist = yield self.store.get_presence_list_accepted(user.localpart)
-            user_ids_to_check.update([row["observed_user_id"] for row in plist])
+            friends = set(row["observed_user_id"] for row in plist)
+            friends.add(user_id)  # So that we receive our own presence
 
-            # Always include yourself. Only really matters for when the user is
-            # not in any rooms, but still.
-            user_ids_to_check.add(user_id)
+            user_ids_changed = set()
+            if from_key and from_key < 100:
+                changed = stream_change_cache.get_all_entities_changed(from_key)
 
-            max_token = self.store.get_current_presence_token()
-
-            if from_key:
-                user_ids_changed = self.store.presence_stream_cache.get_entities_changed(
-                    user_ids_to_check, from_key,
-                )
+                for other_user_id in changed:
+                    if other_user_id in friends:
+                        user_ids_changed.add(other_user_id)
+                        continue
+                    other_rooms = yield self.store.get_rooms_for_user(other_user_id)
+                    if room_ids.intersection(e.room_id for e in other_rooms):
+                        user_ids_changed.add(other_user_id)
+                        continue
             else:
-                user_ids_changed = user_ids_to_check
+                user_ids_to_check = set()
+                for room_id in room_ids:
+                    users = yield self.store.get_users_in_room(room_id)
+                    user_ids_to_check.update(users)
+
+                plist = yield self.store.get_presence_list_accepted(user.localpart)
+                user_ids_to_check.update([row["observed_user_id"] for row in plist])
+
+                # Always include yourself. Only really matters for when the user is
+                # not in any rooms, but still.
+                user_ids_to_check.add(user_id)
+
+                if from_key:
+                    user_ids_changed = stream_change_cache.get_entities_changed(
+                        user_ids_to_check, from_key,
+                    )
+                else:
+                    user_ids_changed = user_ids_to_check
 
             updates = yield presence.current_state_for_users(user_ids_changed)
 
-            now = self.clock.time_msec()
+        max_token = self.store.get_current_presence_token()
+        now = self.clock.time_msec()
 
         defer.returnValue(([
             {

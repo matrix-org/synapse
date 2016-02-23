@@ -85,6 +85,22 @@ class StreamChangeCache(object):
 
         return result
 
+    def get_all_entities_changed(self, stream_pos):
+        """Returns all entites that have had new things since the given
+        position. If the position is too old it will return None.
+        """
+        assert type(stream_pos) is int
+
+        if stream_pos >= self._earliest_known_stream_pos:
+            keys = self._cache.keys()
+            i = keys.bisect_right(stream_pos)
+
+            return (
+                self._cache[k] for k in keys[i:]
+            )
+        else:
+            return None
+
     def entity_has_changed(self, entity, stream_pos):
         """Informs the cache that the entity has been changed at the given
         position.
