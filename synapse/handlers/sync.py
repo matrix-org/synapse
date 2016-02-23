@@ -121,7 +121,7 @@ class SyncResult(collections.namedtuple("SyncResult", [
         events.
         """
         return bool(
-            self.presence or self.joined or self.invited or self.archived
+            self.presence or self.joined or self.invited or self.archived or self.account_data
         )
 
 
