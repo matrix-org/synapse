@@ -858,11 +858,14 @@ class PresenceEventSource(object):
             friends.add(user_id)  # So that we receive our own presence
 
             user_ids_changed = set()
+            changed = None
             if from_key and from_key < 100:
                 # For small deltas, its quicker to get all changes and then
                 # work out if we share a room or they're in our presence list
                 changed = stream_change_cache.get_all_entities_changed(from_key)
 
+            # get_all_entities_changed can return None
+            if changed is not None:
                 for other_user_id in changed:
                     if other_user_id in friends:
                         user_ids_changed.add(other_user_id)
