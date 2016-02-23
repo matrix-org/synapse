@@ -46,6 +46,7 @@ logger = logging.getLogger(__name__)
 metrics = synapse.metrics.get_metrics_for(__name__)
 
 notified_presence_counter = metrics.register_counter("notified_presence")
+federation_presence_out_counter = metrics.register_counter("federation_presence_out")
 presence_updates_counter = metrics.register_counter("presence_updates")
 timers_fired_counter = metrics.register_counter("timers_fired")
 federation_presence_counter = metrics.register_counter("federation_presence")
@@ -259,6 +260,8 @@ class PresenceHandler(BaseHandler):
                 if user_id not in to_notify
             }
             if to_federation_ping:
+                federation_presence_out_counter.inc_by(len(to_federation_ping))
+
                 _, _, hosts_to_states = yield self._get_interested_parties(
                     to_federation_ping.values()
                 )
@@ -835,7 +838,7 @@ class PresenceEventSource(object):
         # We don't try and limit the presence updates by the current token, as
         # sending down the rare duplicate is not a concern.
 
-        with Measure(self.clock, "Presence.get_new_events"):
+        with Measure(self.clock, "presence.get_new_events"):
             user_id = user.to_string()
             if from_key is not None:
                 from_key = int(from_key)
@@ -872,14 +875,14 @@ class PresenceEventSource(object):
 
             now = self.clock.time_msec()
 
-            defer.returnValue(([
-                {
-                    "type": "m.presence",
-                    "content": _format_user_presence_state(s, now),
-                }
-                for s in updates.values()
-                if include_offline or s.state != PresenceState.OFFLINE
-            ], max_token))
+        defer.returnValue(([
+            {
+                "type": "m.presence",
+                "content": _format_user_presence_state(s, now),
+            }
+            for s in updates.values()
+            if include_offline or s.state != PresenceState.OFFLINE
+        ], max_token))
 
     def get_current_key(self):
         return self.store.get_current_presence_token()
