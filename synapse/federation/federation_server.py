@@ -543,8 +543,19 @@ class FederationServer(FederationBase):
         return event
 
     @defer.inlineCallbacks
-    def exchange_third_party_invite(self, invite):
-        ret = yield self.handler.exchange_third_party_invite(invite)
+    def exchange_third_party_invite(
+            self,
+            sender_user_id,
+            target_user_id,
+            room_id,
+            signed,
+    ):
+        ret = yield self.handler.exchange_third_party_invite(
+            sender_user_id,
+            target_user_id,
+            room_id,
+            signed,
+        )
         defer.returnValue(ret)
 
     @defer.inlineCallbacks

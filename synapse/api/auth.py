@@ -434,30 +434,45 @@ class Auth(object):
 
         if event.user_id != invite_event.user_id:
             return False
-        try:
-            public_key = invite_event.content["public_key"]
-            if signed["mxid"] != event.state_key:
-                return False
-            if signed["token"] != token:
-                return False
-            for server, signature_block in signed["signatures"].items():
-                for key_name, encoded_signature in signature_block.items():
-                    if not key_name.startswith("ed25519:"):
-                        return False
-                    verify_key = decode_verify_key_bytes(
-                        key_name,
-                        decode_base64(public_key)
-                    )
-                    verify_signed_json(signed, server, verify_key)
 
-                    # We got the public key from the invite, so we know that the
-                    # correct server signed the signed bundle.
-                    # The caller is responsible for checking that the signing
-                    # server has not revoked that public key.
-                    return True
+        if signed["mxid"] != event.state_key:
             return False
-        except (KeyError, SignatureVerifyException,):
+        if signed["token"] != token:
             return False
+
+        for public_key_object in self.get_public_keys(invite_event):
+            public_key = public_key_object["public_key"]
+            try:
+                for server, signature_block in signed["signatures"].items():
+                    for key_name, encoded_signature in signature_block.items():
+                        if not key_name.startswith("ed25519:"):
+                            continue
+                        verify_key = decode_verify_key_bytes(
+                            key_name,
+                            decode_base64(public_key)
+                        )
+                        verify_signed_json(signed, server, verify_key)
+
+                        # We got the public key from the invite, so we know that the
+                        # correct server signed the signed bundle.
+                        # The caller is responsible for checking that the signing
+                        # server has not revoked that public key.
+                        return True
+            except (KeyError, SignatureVerifyException,):
+                continue
+        return False
+
+    def get_public_keys(self, invite_event):
+        public_keys = []
+        if "public_key" in invite_event.content:
+            o = {
+                "public_key": invite_event.content["public_key"],
+            }
+            if "key_validity_url" in invite_event.content:
+                o["key_validity_url"] = invite_event.content["key_validity_url"]
+            public_keys.append(o)
+        public_keys.extend(invite_event.content.get("public_keys", []))
+        return public_keys
 
     def _get_power_level_event(self, auth_events):
         key = (EventTypes.PowerLevels, "", )
