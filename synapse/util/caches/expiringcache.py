@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.util.caches import cache_counter, caches_by_name
+
 import logging
 
 
@@ -47,6 +49,8 @@ class ExpiringCache(object):
 
         self._cache = {}
 
+        caches_by_name[cache_name] = self._cache
+
     def start(self):
         if not self._expiry_ms:
             # Don't bother starting the loop if things never expire
@@ -72,7 +76,11 @@ class ExpiringCache(object):
                 self._cache.pop(k)
 
     def __getitem__(self, key):
-        entry = self._cache[key]
+        try:
+            entry = self._cache[key]
+            cache_counter.inc_hits(self._cache_name)
+        finally:
+            cache_counter.inc_misses(self._cache_name)
 
         if self._reset_expiry_on_get:
             entry.time = self._clock.time_msec()
@@ -105,8 +113,11 @@ class ExpiringCache(object):
 
         logger.debug(
             "[%s] _prune_cache before: %d, after len: %d",
-            self._cache_name, begin_length, len(self._cache.keys())
+            self._cache_name, begin_length, len(self._cache)
         )
+
+    def __len__(self):
+        return len(self._cache)
 
 
 class _CacheEntry(object):
