@@ -859,6 +859,8 @@ class PresenceEventSource(object):
 
             user_ids_changed = set()
             if from_key and from_key < 100:
+                # For small deltas, its quicker to get all changes and then
+                # work out if we share a room or they're in our presence list
                 changed = stream_change_cache.get_all_entities_changed(from_key)
 
                 for other_user_id in changed:
@@ -870,6 +872,8 @@ class PresenceEventSource(object):
                         user_ids_changed.add(other_user_id)
                         continue
             else:
+                # Too many possible updates. Find all users we can see and check
+                # if any of them have changed.
                 user_ids_to_check = set()
                 for room_id in room_ids:
                     users = yield self.store.get_users_in_room(room_id)
