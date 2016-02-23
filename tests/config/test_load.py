@@ -60,6 +60,22 @@ class ConfigLoadingTestCase(unittest.TestCase):
         config2 = HomeServerConfig.load_config("", ["-c", self.file])
         self.assertEqual(config1.macaroon_secret_key, config2.macaroon_secret_key)
 
+    def test_disable_registration(self):
+        self.generate_config()
+        self.add_lines_to_config([
+            "enable_registration: true",
+            "disable_registration: true",
+        ])
+        # Check that disable_registration clobbers enable_registration.
+        config = HomeServerConfig.load_config("", ["-c", self.file])
+        self.assertFalse(config.enable_registration)
+
+        # Check that either config value is clobbered by the command line.
+        config = HomeServerConfig.load_config("", [
+            "-c", self.file, "--enable-registration"
+        ])
+        self.assertTrue(config.enable_registration)
+
     def generate_config(self):
         HomeServerConfig.load_config("", [
             "--generate-config",
@@ -76,3 +92,8 @@ class ConfigLoadingTestCase(unittest.TestCase):
         contents = [l for l in contents if needle not in l]
         with open(self.file, "w") as f:
             f.write("".join(contents))
+
+    def add_lines_to_config(self, lines):
+        with open(self.file, "a") as f:
+            for line in lines:
+                f.write(line + "\n")
