@@ -522,6 +522,7 @@ class PresenceHandler(BaseHandler):
                 new_fields["last_active_ts"] = now - last_active_ago
 
             new_fields["status_msg"] = push.get("status_msg", None)
+            new_fields["currently_active"] = push.get("currently_active", False)
 
             prev_state = yield self.current_state_for_user(user_id)
             updates.append(prev_state.copy_and_replace(**new_fields))
