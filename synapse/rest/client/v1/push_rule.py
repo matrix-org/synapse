@@ -200,14 +200,6 @@ class PushRuleRestServlet(ClientV1RestServlet):
         else:
             raise UnrecognizedRequestError()
 
-    def get_rule_attr(self, user_id, namespaced_rule_id, attr):
-        if attr == 'enabled':
-            return self.hs.get_datastore().get_push_rule_enabled_by_user_rule_id(
-                user_id, namespaced_rule_id
-            )
-        else:
-            raise UnrecognizedRequestError()
-
 
 def _rule_spec_from_path(path):
     if len(path) < 2:
