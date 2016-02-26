@@ -404,10 +404,12 @@ def _parse_json(request):
     try:
         content = json.loads(request.content.read())
         if type(content) != dict:
-            raise SynapseError(400, "Content must be a JSON object.")
+            raise SynapseError(
+                400, "Content must be a JSON object.", errcode=Codes.BAD_JSON
+            )
         return content
     except ValueError:
-        raise SynapseError(400, "Content not JSON.")
+        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
 
 def register_servlets(hs, http_server):
