@@ -157,6 +157,7 @@ class RegistrationHandler(BaseHandler):
                     )
                 except SynapseError:
                     # if user id is taken, just generate another
+                    user = None
                     user_id = None
                     token = None
                     attempts += 1
