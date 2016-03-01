@@ -293,6 +293,12 @@ class BaseHandler(object):
 
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.INVITE:
+                def is_inviter_member_event(e):
+                    return (
+                        e.type == EventTypes.Member and
+                        e.sender == event.sender
+                    )
+
                 event.unsigned["invite_room_state"] = [
                     {
                         "type": e.type,
@@ -306,7 +312,7 @@ class BaseHandler(object):
                         EventTypes.CanonicalAlias,
                         EventTypes.RoomAvatar,
                         EventTypes.Name,
-                    )
+                    ) or is_inviter_member_event(e)
                 ]
 
                 invitee = UserID.from_string(event.state_key)

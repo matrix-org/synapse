@@ -294,6 +294,31 @@ class PushRuleStore(SQLBaseStore):
             self.get_push_rules_enabled_for_user.invalidate, (user_id,)
         )
 
+    def set_push_rule_actions(self, user_id, rule_id, actions, is_default_rule):
+        actions_json = json.dumps(actions)
+
+        def set_push_rule_actions_txn(txn):
+            if is_default_rule:
+                # Add a dummy rule to the rules table with the user specified
+                # actions.
+                priority_class = -1
+                priority = 1
+                self._upsert_push_rule_txn(
+                    txn, user_id, rule_id, priority_class, priority,
+                    "[]", actions_json
+                )
+            else:
+                self._simple_update_one_txn(
+                    txn,
+                    "push_rules",
+                    {'user_name': user_id, 'rule_id': rule_id},
+                    {'actions': actions_json},
+                )
+
+        return self.runInteraction(
+            "set_push_rule_actions", set_push_rule_actions_txn,
+        )
+
 
 class RuleNotFoundException(Exception):
     pass

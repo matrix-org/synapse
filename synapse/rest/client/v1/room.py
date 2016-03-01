@@ -228,7 +228,12 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
             allow_guest=True,
         )
 
-        content = _parse_json(request)
+        try:
+            content = _parse_json(request)
+        except:
+            # Turns out we used to ignore the body entirely, and some clients
+            # cheekily send invalid bodies.
+            content = {}
 
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
@@ -427,7 +432,12 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         }:
             raise AuthError(403, "Guest access not allowed")
 
-        content = _parse_json(request)
+        try:
+            content = _parse_json(request)
+        except:
+            # Turns out we used to ignore the body entirely, and some clients
+            # cheekily send invalid bodies.
+            content = {}
 
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
             yield self.handlers.room_member_handler.do_3pid_invite(

@@ -22,7 +22,7 @@ from .base import ClientV1RestServlet, client_path_patterns
 from synapse.storage.push_rule import (
     InconsistentRuleException, RuleNotFoundException
 )
-import synapse.push.baserules as baserules
+from synapse.push.baserules import list_with_base_rules, BASE_RULE_IDS
 from synapse.push.rulekinds import (
     PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
 )
@@ -54,6 +54,10 @@ class PushRuleRestServlet(ClientV1RestServlet):
         if 'attr' in spec:
             yield self.set_rule_attr(requester.user.to_string(), spec, content)
             defer.returnValue((200, {}))
+
+        if spec['rule_id'].startswith('.'):
+            # Rule ids starting with '.' are reserved for server default rules.
+            raise SynapseError(400, "cannot add new rule_ids that start with '.'")
 
         try:
             (conditions, actions) = _rule_tuple_from_request_object(
@@ -128,7 +132,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
             ruleslist.append(rule)
 
         # We're going to be mutating this a lot, so do a deep copy
-        ruleslist = copy.deepcopy(baserules.list_with_base_rules(ruleslist))
+        ruleslist = copy.deepcopy(list_with_base_rules(ruleslist))
 
         rules = {'global': {}, 'device': {}}
 
@@ -197,13 +201,17 @@ class PushRuleRestServlet(ClientV1RestServlet):
             return self.hs.get_datastore().set_push_rule_enabled(
                 user_id, namespaced_rule_id, val
             )
-        else:
-            raise UnrecognizedRequestError()
-
-    def get_rule_attr(self, user_id, namespaced_rule_id, attr):
-        if attr == 'enabled':
-            return self.hs.get_datastore().get_push_rule_enabled_by_user_rule_id(
-                user_id, namespaced_rule_id
+        elif spec['attr'] == 'actions':
+            actions = val.get('actions')
+            _check_actions(actions)
+            namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
+            rule_id = spec['rule_id']
+            is_default_rule = rule_id.startswith(".")
+            if is_default_rule:
+                if namespaced_rule_id not in BASE_RULE_IDS:
+                    raise SynapseError(404, "Unknown rule %r" % (namespaced_rule_id,))
+            return self.hs.get_datastore().set_push_rule_actions(
+                user_id, namespaced_rule_id, actions, is_default_rule
             )
         else:
             raise UnrecognizedRequestError()
@@ -282,6 +290,15 @@ def _rule_tuple_from_request_object(rule_template, rule_id, req_obj):
         raise InvalidRuleException("No actions found")
     actions = req_obj['actions']
 
+    _check_actions(actions)
+
+    return conditions, actions
+
+
+def _check_actions(actions):
+    if not isinstance(actions, list):
+        raise InvalidRuleException("No actions found")
+
     for a in actions:
         if a in ['notify', 'dont_notify', 'coalesce']:
             pass
@@ -289,8 +306,6 @@ def _rule_tuple_from_request_object(rule_template, rule_id, req_obj):
             pass
         else:
             raise InvalidRuleException("Unrecognised action")
-
-    return conditions, actions
 
 
 def _add_empty_priority_class_arrays(d):
@@ -332,7 +347,9 @@ def _filter_ruleset_with_path(ruleset, path):
 
     attr = path[0]
     if attr in the_rule:
-        return the_rule[attr]
+        # Make sure we return a JSON object as the attribute may be a
+        # JSON value.
+        return {attr: the_rule[attr]}
     else:
         raise UnrecognizedRequestError()
 
