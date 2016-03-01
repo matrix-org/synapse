@@ -521,8 +521,24 @@ class RoomMemberHandler(BaseHandler):
                 action = "remote_join"
         elif event.membership == Membership.LEAVE:
             is_host_in_room = self.is_host_in_room(context.current_state)
+
             if not is_host_in_room:
-                action = "remote_reject"
+                # perhaps we've been invited
+                inviter = self.get_inviter(target_user.to_string(), context.current_state)
+                if not inviter:
+                    raise SynapseError(404, "Not a known room")
+
+                if inviter.domain == self.server_name:
+                    # the inviter was on our server, but has now left. Carry on
+                    # with the normal rejection codepath.
+                    #
+                    # This is a bit of a hack, because the room might still be
+                    # active on other servers.
+                    pass
+                else:
+                    # send the rejection to the inviter's HS.
+                    remote_room_hosts = [inviter.domain]
+                    action = "remote_reject"
 
         federation_handler = self.hs.get_handlers().federation_handler
 
@@ -541,11 +557,8 @@ class RoomMemberHandler(BaseHandler):
                 event.content,
             )
         elif action == "remote_reject":
-            inviter = self.get_inviter(target_user.to_string(), context.current_state)
-            if not inviter:
-                raise SynapseError(404, "No known servers")
             yield federation_handler.do_remotely_reject_invite(
-                [inviter.domain],
+                remote_room_hosts,
                 room_id,
                 event.user_id
             )

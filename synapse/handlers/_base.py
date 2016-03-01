@@ -199,8 +199,7 @@ class BaseHandler(object):
         # events in the room, because we don't know enough about the graph
         # fragment we received to treat it like a graph, so the above returned
         # no relevant events. It may have returned some events (if we have
-        # joined and left the room), but not useful ones, like the invite. So we
-        # forcibly set our context to the invite we received over federation.
+        # joined and left the room), but not useful ones, like the invite.
         if (
             not self.is_host_in_room(context.current_state) and
             builder.type == EventTypes.Member
@@ -208,7 +207,18 @@ class BaseHandler(object):
             prev_member_event = yield self.store.get_room_member(
                 builder.sender, builder.room_id
             )
-            if prev_member_event:
+
+            # if we have the prev_member_event in context, we didn't receive
+            # the invite over federation. (More likely is that the inviting
+            # user, and all other local users, have left, making
+            # is_host_in_room return false).
+            #
+            context_events = (e.event_id for e in context.current_state.values())
+
+            if prev_member_event and not prev_member_event.event_id in context_events:
+                # The prev_member_event is missing from context, so it must
+                # have arrived over federation and is an outlier. We forcibly
+                # set our context to the invite we received over federation
                 builder.prev_events = (
                     prev_member_event.event_id,
                     prev_member_event.prev_events
