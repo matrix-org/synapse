@@ -115,6 +115,22 @@ class PresenceStore(SQLBaseStore):
                 args
             )
 
+    def get_all_presence_updates(self, last_id, current_id):
+        def get_all_presence_updates_txn(txn):
+            sql = (
+                "SELECT stream_id, user_id, state, last_active_ts,"
+                " last_federation_update_ts, last_user_sync_ts, status_msg,"
+                " currently_active"
+                " FROM presence_stream"
+                " WHERE ? < stream_id AND stream_id <= ?"
+            )
+            txn.execute(sql, (last_id, current_id))
+            return txn.fetchall()
+
+        return self.runInteraction(
+            "get_all_presence_updates", get_all_presence_updates_txn
+        )
+
     @defer.inlineCallbacks
     def get_presence_for_users(self, user_ids):
         rows = yield self._simple_select_many_batch(

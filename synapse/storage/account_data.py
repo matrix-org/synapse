@@ -83,8 +83,40 @@ class AccountDataStore(SQLBaseStore):
             "get_account_data_for_room", get_account_data_for_room_txn
         )
 
-    def get_updated_account_data_for_user(self, user_id, stream_id, room_ids=None):
-        """Get all the client account_data for a that's changed.
+    def get_all_updated_account_data(self, last_global_id, last_room_id,
+                                     current_id, limit):
+        """Get all the client account_data that has changed on the server
+        Args:
+            last_global_id(int): The position to fetch from for top level data
+            last_room_id(int): The position to fetch from for per room data
+            current_id(int): The position to fetch up to.
+        Returns:
+            A deferred pair of lists of tuples of stream_id int, user_id string,
+            room_id string, type string, and content string.
+        """
+        def get_updated_account_data_txn(txn):
+            sql = (
+                "SELECT stream_id, user_id, account_data_type, content"
+                " FROM account_data WHERE ? < stream_id AND stream_id <= ?"
+                " ORDER BY stream_id ASC LIMIT ?"
+            )
+            txn.execute(sql, (last_global_id, current_id, limit))
+            global_results = txn.fetchall()
+
+            sql = (
+                "SELECT stream_id, user_id, room_id, account_data_type, content"
+                " FROM room_account_data WHERE ? < stream_id AND stream_id <= ?"
+                " ORDER BY stream_id ASC LIMIT ?"
+            )
+            txn.execute(sql, (last_room_id, current_id, limit))
+            room_results = txn.fetchall()
+            return (global_results, room_results)
+        return self.runInteraction(
+            "get_all_updated_account_data_txn", get_updated_account_data_txn
+        )
+
+    def get_updated_account_data_for_user(self, user_id, stream_id):
+        """Get all the client account_data for a that's changed for a user
 
         Args:
             user_id(str): The user to get the account_data for.
