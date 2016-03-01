@@ -79,7 +79,7 @@ class ExpiringCache(object):
         try:
             entry = self._cache[key]
             cache_counter.inc_hits(self._cache_name)
-        finally:
+        except KeyError:
             cache_counter.inc_misses(self._cache_name)
 
         if self._reset_expiry_on_get:
