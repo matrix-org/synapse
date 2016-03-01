@@ -130,6 +130,10 @@ class PresenceHandler(BaseHandler):
             for state in active_presence
         }
 
+        metrics.register_callback(
+            "user_to_current_state_size", lambda: len(self.user_to_current_state)
+        )
+
         now = self.clock.time_msec()
         for state in active_presence:
             self.wheel_timer.insert(
