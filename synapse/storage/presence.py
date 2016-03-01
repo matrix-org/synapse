@@ -58,8 +58,8 @@ class UserPresenceState(namedtuple("UserPresenceState",
 class PresenceStore(SQLBaseStore):
     @defer.inlineCallbacks
     def update_presence(self, presence_states):
-        stream_ordering_manager = yield self._presence_id_gen.get_next_mult(
-            self, len(presence_states)
+        stream_ordering_manager = self._presence_id_gen.get_next_mult(
+            len(presence_states)
         )
 
         with stream_ordering_manager as stream_orderings:
