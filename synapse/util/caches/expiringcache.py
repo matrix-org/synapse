@@ -81,6 +81,7 @@ class ExpiringCache(object):
             cache_counter.inc_hits(self._cache_name)
         except KeyError:
             cache_counter.inc_misses(self._cache_name)
+            raise
 
         if self._reset_expiry_on_get:
             entry.time = self._clock.time_msec()
