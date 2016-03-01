@@ -215,7 +215,7 @@ class BaseHandler(object):
             #
             context_events = (e.event_id for e in context.current_state.values())
 
-            if prev_member_event and not prev_member_event.event_id in context_events:
+            if prev_member_event and prev_member_event.event_id not in context_events:
                 # The prev_member_event is missing from context, so it must
                 # have arrived over federation and is an outlier. We forcibly
                 # set our context to the invite we received over federation
