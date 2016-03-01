@@ -40,7 +40,7 @@ class RegistrationStore(SQLBaseStore):
         Raises:
             StoreError if there was a problem adding this.
         """
-        next_id = yield self._access_tokens_id_gen.get_next()
+        next_id = self._access_tokens_id_gen.get_next()
 
         yield self._simple_insert(
             "access_tokens",
@@ -62,7 +62,7 @@ class RegistrationStore(SQLBaseStore):
         Raises:
             StoreError if there was a problem adding this.
         """
-        next_id = yield self._refresh_tokens_id_gen.get_next()
+        next_id = self._refresh_tokens_id_gen.get_next()
 
         yield self._simple_insert(
             "refresh_tokens",
@@ -99,7 +99,7 @@ class RegistrationStore(SQLBaseStore):
     def _register(self, txn, user_id, token, password_hash, was_guest, make_guest):
         now = int(self.clock.time())
 
-        next_id = self._access_tokens_id_gen.get_next_txn(txn)
+        next_id = self._access_tokens_id_gen.get_next()
 
         try:
             if was_guest:

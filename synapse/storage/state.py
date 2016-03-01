@@ -83,7 +83,7 @@ class StateStore(SQLBaseStore):
             if event.is_state():
                 state_events[(event.type, event.state_key)] = event
 
-            state_group = self._state_groups_id_gen.get_next_txn(txn)
+            state_group = self._state_groups_id_gen.get_next()
             self._simple_insert_txn(
                 txn,
                 table="state_groups",

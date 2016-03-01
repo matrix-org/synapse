@@ -163,12 +163,12 @@ class AccountDataStore(SQLBaseStore):
             )
             self._update_max_stream_id(txn, next_id)
 
-        with (yield self._account_data_id_gen.get_next(self)) as next_id:
+        with self._account_data_id_gen.get_next() as next_id:
             yield self.runInteraction(
                 "add_room_account_data", add_account_data_txn, next_id
             )
 
-        result = yield self._account_data_id_gen.get_max_token()
+        result = self._account_data_id_gen.get_max_token()
         defer.returnValue(result)
 
     @defer.inlineCallbacks
@@ -202,12 +202,12 @@ class AccountDataStore(SQLBaseStore):
             )
             self._update_max_stream_id(txn, next_id)
 
-        with (yield self._account_data_id_gen.get_next(self)) as next_id:
+        with self._account_data_id_gen.get_next() as next_id:
             yield self.runInteraction(
                 "add_user_account_data", add_account_data_txn, next_id
             )
 
-        result = yield self._account_data_id_gen.get_max_token()
+        result = self._account_data_id_gen.get_max_token()
         defer.returnValue(result)
 
     def _update_max_stream_id(self, txn, next_id):
