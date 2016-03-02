@@ -208,14 +208,22 @@ class BaseHandler(object):
                 builder.sender, builder.room_id
             )
 
-            # if we have the prev_member_event in context, we didn't receive
-            # the invite over federation. (More likely is that the inviting
-            # user, and all other local users, have left, making
-            # is_host_in_room return false).
+            # The prev_member_event may already be in context.current_state,
+            # despite us not being present in the room; in particular, if
+            # inviting user, and all other local users, have already left.
             #
-            context_events = (e.event_id for e in context.current_state.values())
+            # In that case, we have all the information we need, and we don't
+            # want to drop "context" - not least because we may need to handle
+            # the invite locally, which will require us to have the whole
+            # context (not just prev_member_event) to auth it.
+            #
+            context_event_ids = (
+                e.event_id for e in context.current_state.values()
+            )
 
-            if prev_member_event and prev_member_event.event_id not in context_events:
+            if (prev_member_event and
+                prev_member_event.event_id not in context_event_ids
+            ):
                 # The prev_member_event is missing from context, so it must
                 # have arrived over federation and is an outlier. We forcibly
                 # set our context to the invite we received over federation

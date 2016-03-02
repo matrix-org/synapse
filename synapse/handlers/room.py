@@ -528,7 +528,7 @@ class RoomMemberHandler(BaseHandler):
                 if not inviter:
                     raise SynapseError(404, "Not a known room")
 
-                if inviter.domain == self.server_name:
+                if self.hs.is_mine(inviter):
                     # the inviter was on our server, but has now left. Carry on
                     # with the normal rejection codepath.
                     #
@@ -537,7 +537,8 @@ class RoomMemberHandler(BaseHandler):
                     pass
                 else:
                     # send the rejection to the inviter's HS.
-                    remote_room_hosts = [inviter.domain]
+                    remote_room_hosts = remote_room_hosts or []
+                    remote_room_hosts.append(inviter.domain)
                     action = "remote_reject"
 
         federation_handler = self.hs.get_handlers().federation_handler
