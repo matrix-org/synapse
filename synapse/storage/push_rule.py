@@ -412,6 +412,12 @@ class PushRuleStore(SQLBaseStore):
             "get_all_push_rule_updates", get_all_push_rule_updates_txn
         )
 
+    def get_push_rules_stream_token(self):
+        """Get the position of the push rules stream.
+        Returns a pair of a stream id for the push_rules stream and the
+        room stream ordering it corresponds to."""
+        return self._push_rules_stream_id_gen.get_max_token()
+
 
 class RuleNotFoundException(Exception):
     pass

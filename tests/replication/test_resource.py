@@ -35,7 +35,8 @@ class ReplicationResourceCase(unittest.TestCase):
                 "send_message",
             ]),
         )
-        self.user = UserID.from_string("@seeing:red")
+        self.user_id = "@seeing:red"
+        self.user = UserID.from_string(self.user_id)
 
         self.hs.get_ratelimiter().send_message.return_value = (True, 0)
 
@@ -101,7 +102,7 @@ class ReplicationResourceCase(unittest.TestCase):
         event_id = yield self.send_text_message(room_id, "Hello, World")
         get = self.get(receipts="-1")
         yield self.hs.get_handlers().receipts_handler.received_client_receipt(
-            room_id, "m.read", self.user.to_string(), event_id
+            room_id, "m.read", self.user_id, event_id
         )
         code, body = yield get
         self.assertEquals(code, 200)
@@ -129,6 +130,7 @@ class ReplicationResourceCase(unittest.TestCase):
     test_timeout_room_account_data = _test_timeout("room_account_data")
     test_timeout_tag_account_data = _test_timeout("tag_account_data")
     test_timeout_backfill = _test_timeout("backfill")
+    test_timeout_push_rules = _test_timeout("push_rules")
 
     @defer.inlineCallbacks
     def send_text_message(self, room_id, message):
