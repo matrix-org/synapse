@@ -221,7 +221,8 @@ class BaseHandler(object):
                 e.event_id for e in context.current_state.values()
             )
 
-            if (prev_member_event and
+            if (
+                prev_member_event and
                 prev_member_event.event_id not in context_event_ids
             ):
                 # The prev_member_event is missing from context, so it must
