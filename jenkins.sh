@@ -18,6 +18,7 @@ export DUMP_COVERAGE_COMMAND="coverage help"
 export PEP8SUFFIX="--output-file=violations.flake8.log || echo flake8 finished with status code \$?"
 
 rm .coverage* || echo "No coverage files to remove"
+rm violations.flake8.log || echo "no flake8 violations log to remove"
 
 tox
 
