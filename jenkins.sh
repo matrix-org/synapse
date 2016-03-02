@@ -3,6 +3,7 @@
 : ${WORKSPACE:="$(pwd)"}
 
 export PYTHONDONTWRITEBYTECODE=yep
+export SYNAPSE_CACHE_FACTOR=1
 
 # Output test results as junit xml
 export TRIAL_FLAGS="--reporter=subunit"
