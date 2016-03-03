@@ -212,17 +212,21 @@ class DirectoryHandler(BaseHandler):
             )
 
     @defer.inlineCallbacks
-    def send_room_alias_update_event(self, user_id, room_id):
+    def send_room_alias_update_event(self, requester, user_id, room_id):
         aliases = yield self.store.get_aliases_for_room(room_id)
 
         msg_handler = self.hs.get_handlers().message_handler
-        yield msg_handler.create_and_send_nonmember_event({
-            "type": EventTypes.Aliases,
-            "state_key": self.hs.hostname,
-            "room_id": room_id,
-            "sender": user_id,
-            "content": {"aliases": aliases},
-        }, ratelimit=False)
+        yield msg_handler.create_and_send_nonmember_event(
+            requester,
+            {
+                "type": EventTypes.Aliases,
+                "state_key": self.hs.hostname,
+                "room_id": room_id,
+                "sender": user_id,
+                "content": {"aliases": aliases},
+            },
+            ratelimit=False
+        )
 
     @defer.inlineCallbacks
     def get_association_from_room_alias(self, room_alias):

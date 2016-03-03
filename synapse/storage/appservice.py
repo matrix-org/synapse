@@ -34,8 +34,8 @@ class ApplicationServiceStore(SQLBaseStore):
     def __init__(self, hs):
         super(ApplicationServiceStore, self).__init__(hs)
         self.hostname = hs.hostname
-        self.services_cache = []
-        self._populate_appservice_cache(
+        self.services_cache = ApplicationServiceStore.load_appservices(
+            hs.hostname,
             hs.config.app_service_config_files
         )
 
@@ -144,21 +144,23 @@ class ApplicationServiceStore(SQLBaseStore):
 
         return rooms_for_user_matching_user_id
 
-    def _load_appservice(self, as_info):
+    @classmethod
+    def _load_appservice(cls, hostname, as_info, config_filename):
         required_string_fields = [
-            # TODO: Add id here when it's stable to release
-            "url", "as_token", "hs_token", "sender_localpart"
+            "id", "url", "as_token", "hs_token", "sender_localpart"
         ]
         for field in required_string_fields:
             if not isinstance(as_info.get(field), basestring):
-                raise KeyError("Required string field: '%s'", field)
+                raise KeyError("Required string field: '%s' (%s)" % (
+                    field, config_filename,
+                ))
 
         localpart = as_info["sender_localpart"]
         if urllib.quote(localpart) != localpart:
             raise ValueError(
                 "sender_localpart needs characters which are not URL encoded."
             )
-        user = UserID(localpart, self.hostname)
+        user = UserID(localpart, hostname)
         user_id = user.to_string()
 
         # namespace checks
@@ -188,25 +190,30 @@ class ApplicationServiceStore(SQLBaseStore):
             namespaces=as_info["namespaces"],
             hs_token=as_info["hs_token"],
             sender=user_id,
-            id=as_info["id"] if "id" in as_info else as_info["as_token"],
+            id=as_info["id"],
         )
 
-    def _populate_appservice_cache(self, config_files):
-        """Populates a cache of Application Services from the config files."""
+    @classmethod
+    def load_appservices(cls, hostname, config_files):
+        """Returns a list of Application Services from the config files."""
         if not isinstance(config_files, list):
             logger.warning(
                 "Expected %s to be a list of AS config files.", config_files
             )
-            return
+            return []
 
         # Dicts of value -> filename
         seen_as_tokens = {}
         seen_ids = {}
 
+        appservices = []
+
         for config_file in config_files:
             try:
                 with open(config_file, 'r') as f:
-                    appservice = self._load_appservice(yaml.load(f))
+                    appservice = ApplicationServiceStore._load_appservice(
+                        hostname, yaml.load(f), config_file
+                    )
                     if appservice.id in seen_ids:
                         raise ConfigError(
                             "Cannot reuse ID across application services: "
@@ -226,11 +233,12 @@ class ApplicationServiceStore(SQLBaseStore):
                         )
                     seen_as_tokens[appservice.token] = config_file
                     logger.info("Loaded application service: %s", appservice)
-                    self.services_cache.append(appservice)
+                    appservices.append(appservice)
             except Exception as e:
                 logger.error("Failed to load appservice from '%s'", config_file)
                 logger.exception(e)
                 raise
+        return appservices
 
 
 class ApplicationServiceTransactionStore(SQLBaseStore):

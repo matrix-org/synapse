@@ -50,7 +50,7 @@ class UpgradeDatabaseException(PrepareDatabaseException):
     pass
 
 
-def prepare_database(db_conn, database_engine):
+def prepare_database(db_conn, database_engine, config):
     """Prepares a database for usage. Will either create all necessary tables
     or upgrade from an older schema version.
     """
@@ -61,10 +61,10 @@ def prepare_database(db_conn, database_engine):
         if version_info:
             user_version, delta_files, upgraded = version_info
             _upgrade_existing_database(
-                cur, user_version, delta_files, upgraded, database_engine
+                cur, user_version, delta_files, upgraded, database_engine, config
             )
         else:
-            _setup_new_database(cur, database_engine)
+            _setup_new_database(cur, database_engine, config)
 
         # cur.execute("PRAGMA user_version = %d" % (SCHEMA_VERSION,))
 
@@ -75,7 +75,7 @@ def prepare_database(db_conn, database_engine):
         raise
 
 
-def _setup_new_database(cur, database_engine):
+def _setup_new_database(cur, database_engine, config):
     """Sets up the database by finding a base set of "full schemas" and then
     applying any necessary deltas.
 
@@ -148,11 +148,12 @@ def _setup_new_database(cur, database_engine):
         applied_delta_files=[],
         upgraded=False,
         database_engine=database_engine,
+        config=config,
     )
 
 
 def _upgrade_existing_database(cur, current_version, applied_delta_files,
-                               upgraded, database_engine):
+                               upgraded, database_engine, config):
     """Upgrades an existing database.
 
     Delta files can either be SQL stored in *.sql files, or python modules
@@ -245,7 +246,7 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
                         module_name, absolute_path, python_file
                     )
                 logger.debug("Running script %s", relative_path)
-                module.run_upgrade(cur, database_engine)
+                module.run_upgrade(cur, database_engine, config=config)
             elif ext == ".pyc":
                 # Sometimes .pyc files turn up anyway even though we've
                 # disabled their generation; e.g. from distribution package

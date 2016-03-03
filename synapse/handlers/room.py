@@ -18,7 +18,7 @@ from twisted.internet import defer
 
 from ._base import BaseHandler
 
-from synapse.types import UserID, RoomAlias, RoomID, RoomStreamToken
+from synapse.types import UserID, RoomAlias, RoomID, RoomStreamToken, Requester
 from synapse.api.constants import (
     EventTypes, Membership, JoinRules, RoomCreationPreset,
 )
@@ -90,7 +90,7 @@ class RoomCreationHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        self.ratelimit(user_id)
+        self.ratelimit(requester)
 
         if "room_alias_name" in config:
             for wchar in string.whitespace:
@@ -185,23 +185,29 @@ class RoomCreationHandler(BaseHandler):
 
         if "name" in config:
             name = config["name"]
-            yield msg_handler.create_and_send_nonmember_event({
-                "type": EventTypes.Name,
-                "room_id": room_id,
-                "sender": user_id,
-                "state_key": "",
-                "content": {"name": name},
-            }, ratelimit=False)
+            yield msg_handler.create_and_send_nonmember_event(
+                requester,
+                {
+                    "type": EventTypes.Name,
+                    "room_id": room_id,
+                    "sender": user_id,
+                    "state_key": "",
+                    "content": {"name": name},
+                },
+                ratelimit=False)
 
         if "topic" in config:
             topic = config["topic"]
-            yield msg_handler.create_and_send_nonmember_event({
-                "type": EventTypes.Topic,
-                "room_id": room_id,
-                "sender": user_id,
-                "state_key": "",
-                "content": {"topic": topic},
-            }, ratelimit=False)
+            yield msg_handler.create_and_send_nonmember_event(
+                requester,
+                {
+                    "type": EventTypes.Topic,
+                    "room_id": room_id,
+                    "sender": user_id,
+                    "state_key": "",
+                    "content": {"topic": topic},
+                },
+                ratelimit=False)
 
         for invitee in invite_list:
             room_member_handler.update_membership(
@@ -231,7 +237,7 @@ class RoomCreationHandler(BaseHandler):
         if room_alias:
             result["room_alias"] = room_alias.to_string()
             yield directory_handler.send_room_alias_update_event(
-                user_id, room_id
+                requester, user_id, room_id
             )
 
         defer.returnValue(result)
@@ -263,7 +269,11 @@ class RoomCreationHandler(BaseHandler):
         @defer.inlineCallbacks
         def send(etype, content, **kwargs):
             event = create(etype, content, **kwargs)
-            yield msg_handler.create_and_send_nonmember_event(event, ratelimit=False)
+            yield msg_handler.create_and_send_nonmember_event(
+                creator,
+                event,
+                ratelimit=False
+            )
 
         config = RoomCreationHandler.PRESETS_DICT[preset_config]
 
@@ -454,12 +464,11 @@ class RoomMemberHandler(BaseHandler):
 
         member_handler = self.hs.get_handlers().room_member_handler
         yield member_handler.send_membership_event(
+            requester,
             event,
             context,
-            is_guest=requester.is_guest,
             ratelimit=ratelimit,
             remote_room_hosts=remote_room_hosts,
-            from_client=True,
         )
 
         if action == "forget":
@@ -468,17 +477,19 @@ class RoomMemberHandler(BaseHandler):
     @defer.inlineCallbacks
     def send_membership_event(
             self,
+            requester,
             event,
             context,
-            is_guest=False,
             remote_room_hosts=None,
             ratelimit=True,
-            from_client=True,
     ):
         """
         Change the membership status of a user in a room.
 
         Args:
+            requester (Requester): The local user who requested the membership
+                event. If None, certain checks, like whether this homeserver can
+                act as the sender, will be skipped.
             event (SynapseEvent): The membership event.
             context: The context of the event.
             is_guest (bool): Whether the sender is a guest.
@@ -486,10 +497,6 @@ class RoomMemberHandler(BaseHandler):
                 the room, and could be danced with in order to join this
                 homeserver for the first time.
             ratelimit (bool): Whether to rate limit this request.
-            from_client (bool): Whether this request is the result of a local
-                client request (rather than over federation). If so, we will
-                perform extra checks, like that this homeserver can act as this
-                client.
         Raises:
             SynapseError if there was a problem changing the membership.
         """
@@ -498,9 +505,15 @@ class RoomMemberHandler(BaseHandler):
         target_user = UserID.from_string(event.state_key)
         room_id = event.room_id
 
-        if from_client:
+        if requester is not None:
             sender = UserID.from_string(event.sender)
+            assert sender == requester.user, (
+                "Sender (%s) must be same as requester (%s)" %
+                (sender, requester.user)
+            )
             assert self.hs.is_mine(sender), "Sender must be our own: %s" % (sender,)
+        else:
+            requester = Requester(target_user, None, False)
 
         message_handler = self.hs.get_handlers().message_handler
         prev_event = message_handler.deduplicate_state_event(event, context)
@@ -510,7 +523,7 @@ class RoomMemberHandler(BaseHandler):
         action = "send"
 
         if event.membership == Membership.JOIN:
-            if is_guest and not self._can_guest_join(context.current_state):
+            if requester.is_guest and not self._can_guest_join(context.current_state):
                 # This should be an auth check, but guests are a local concept,
                 # so don't really fit into the general auth process.
                 raise AuthError(403, "Guest access not allowed")
@@ -566,6 +579,7 @@ class RoomMemberHandler(BaseHandler):
             )
         else:
             yield self.handle_new_client_event(
+                requester,
                 event,
                 context,
                 extra_users=[target_user],
@@ -684,12 +698,12 @@ class RoomMemberHandler(BaseHandler):
             )
         else:
             yield self._make_and_store_3pid_invite(
+                requester,
                 id_server,
                 medium,
                 address,
                 room_id,
                 inviter,
-                requester.access_token_id,
                 txn_id=txn_id
             )
 
@@ -747,12 +761,12 @@ class RoomMemberHandler(BaseHandler):
     @defer.inlineCallbacks
     def _make_and_store_3pid_invite(
             self,
+            requester,
             id_server,
             medium,
             address,
             room_id,
             user,
-            token_id,
             txn_id
     ):
         room_state = yield self.hs.get_state_handler().get_current_state(room_id)
@@ -802,6 +816,7 @@ class RoomMemberHandler(BaseHandler):
 
         msg_handler = self.hs.get_handlers().message_handler
         yield msg_handler.create_and_send_nonmember_event(
+            requester,
             {
                 "type": EventTypes.ThirdPartyInvite,
                 "content": {
@@ -816,7 +831,6 @@ class RoomMemberHandler(BaseHandler):
                 "sender": user.to_string(),
                 "state_key": token,
             },
-            token_id=token_id,
             txn_id=txn_id,
         )
 

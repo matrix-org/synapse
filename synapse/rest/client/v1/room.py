@@ -158,12 +158,12 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
 
         if event_type == EventTypes.Member:
             yield self.handlers.room_member_handler.send_membership_event(
+                requester,
                 event,
                 context,
-                is_guest=requester.is_guest,
             )
         else:
-            yield msg_handler.send_nonmember_event(event, context)
+            yield msg_handler.send_nonmember_event(requester, event, context)
 
         defer.returnValue((200, {"event_id": event.event_id}))
 
@@ -183,13 +183,13 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
 
         msg_handler = self.handlers.message_handler
         event = yield msg_handler.create_and_send_nonmember_event(
+            requester,
             {
                 "type": event_type,
                 "content": content,
                 "room_id": room_id,
                 "sender": requester.user.to_string(),
             },
-            token_id=requester.access_token_id,
             txn_id=txn_id,
         )
 
@@ -504,6 +504,7 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
 
         msg_handler = self.handlers.message_handler
         event = yield msg_handler.create_and_send_nonmember_event(
+            requester,
             {
                 "type": EventTypes.Redaction,
                 "content": content,
@@ -511,7 +512,6 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
                 "sender": requester.user.to_string(),
                 "redacts": event_id,
             },
-            token_id=requester.access_token_id,
             txn_id=txn_id,
         )
 

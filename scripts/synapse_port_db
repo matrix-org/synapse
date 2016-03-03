@@ -309,8 +309,8 @@ class Porter(object):
                 **self.postgres_config["args"]
             )
 
-            sqlite_engine = create_engine("sqlite3")
-            postgres_engine = create_engine("psycopg2")
+            sqlite_engine = create_engine(FakeConfig(sqlite_config))
+            postgres_engine = create_engine(FakeConfig(postgres_config))
 
             self.sqlite_store = Store(sqlite_db_pool, sqlite_engine)
             self.postgres_store = Store(postgres_db_pool, postgres_engine)
@@ -792,3 +792,8 @@ if __name__ == "__main__":
     if end_error_exec_info:
         exc_type, exc_value, exc_traceback = end_error_exec_info
         traceback.print_exception(exc_type, exc_value, exc_traceback)
+
+
+class FakeConfig:
+    def __init__(self, database_config):
+        self.database_config = database_config
