@@ -539,7 +539,7 @@ class RoomMemberHandler(BaseHandler):
                     pass
                 else:
                     # send the rejection to the inviter's HS.
-                    remote_room_hosts = remote_room_hosts + [inviter.doman]
+                    remote_room_hosts = remote_room_hosts + [inviter.domain]
                     action = "remote_reject"
 
         federation_handler = self.hs.get_handlers().federation_handler
