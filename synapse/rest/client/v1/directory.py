@@ -75,7 +75,11 @@ class ClientDirectoryServer(ClientV1RestServlet):
                 yield dir_handler.create_association(
                     user_id, room_alias, room_id, servers
                 )
-                yield dir_handler.send_room_alias_update_event(user_id, room_id)
+                yield dir_handler.send_room_alias_update_event(
+                    requester,
+                    user_id,
+                    room_id
+                )
             except SynapseError as e:
                 raise e
             except:

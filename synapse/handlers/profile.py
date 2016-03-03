@@ -89,13 +89,13 @@ class ProfileHandler(BaseHandler):
                 defer.returnValue(result["displayname"])
 
     @defer.inlineCallbacks
-    def set_displayname(self, target_user, auth_user, new_displayname):
+    def set_displayname(self, target_user, requester, new_displayname):
         """target_user is the user whose displayname is to be changed;
         auth_user is the user attempting to make this change."""
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
-        if target_user != auth_user:
+        if target_user != requester.user:
             raise AuthError(400, "Cannot set another user's displayname")
 
         if new_displayname == '':
@@ -109,7 +109,7 @@ class ProfileHandler(BaseHandler):
             "displayname": new_displayname,
         })
 
-        yield self._update_join_states(target_user)
+        yield self._update_join_states(requester)
 
     @defer.inlineCallbacks
     def get_avatar_url(self, target_user):
@@ -139,13 +139,13 @@ class ProfileHandler(BaseHandler):
             defer.returnValue(result["avatar_url"])
 
     @defer.inlineCallbacks
-    def set_avatar_url(self, target_user, auth_user, new_avatar_url):
+    def set_avatar_url(self, target_user, requester, new_avatar_url):
         """target_user is the user whose avatar_url is to be changed;
         auth_user is the user attempting to make this change."""
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
-        if target_user != auth_user:
+        if target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
 
         yield self.store.set_profile_avatar_url(
@@ -156,7 +156,7 @@ class ProfileHandler(BaseHandler):
             "avatar_url": new_avatar_url,
         })
 
-        yield self._update_join_states(target_user)
+        yield self._update_join_states(requester)
 
     @defer.inlineCallbacks
     def collect_presencelike_data(self, user, state):
@@ -199,11 +199,12 @@ class ProfileHandler(BaseHandler):
         defer.returnValue(response)
 
     @defer.inlineCallbacks
-    def _update_join_states(self, user):
+    def _update_join_states(self, requester):
+        user = requester.user
         if not self.hs.is_mine(user):
             return
 
-        self.ratelimit(user.to_string())
+        self.ratelimit(requester)
 
         joins = yield self.store.get_rooms_for_user(
             user.to_string(),
