@@ -284,7 +284,7 @@ class Notifier(object):
 
     @defer.inlineCallbacks
     def wait_for_events(self, user_id, timeout, callback, room_ids=None,
-                        from_token=StreamToken("s0", "0", "0", "0", "0")):
+                        from_token=StreamToken.START):
         """Wait until the callback returns a non empty response or the
         timeout fires.
         """

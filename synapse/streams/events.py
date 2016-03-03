@@ -38,9 +38,12 @@ class EventSources(object):
             name: cls(hs)
             for name, cls in EventSources.SOURCE_TYPES.items()
         }
+        self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
     def get_current_token(self, direction='f'):
+        push_rules_key, _ = self.store.get_push_rules_stream_token()
+
         token = StreamToken(
             room_key=(
                 yield self.sources["room"].get_current_key(direction)
@@ -57,5 +60,6 @@ class EventSources(object):
             account_data_key=(
                 yield self.sources["account_data"].get_current_key()
             ),
+            push_rules_key=push_rules_key,
         )
         defer.returnValue(token)
