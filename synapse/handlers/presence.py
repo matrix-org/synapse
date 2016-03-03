@@ -130,6 +130,10 @@ class PresenceHandler(BaseHandler):
             for state in active_presence
         }
 
+        metrics.register_callback(
+            "user_to_current_state_size", lambda: len(self.user_to_current_state)
+        )
+
         now = self.clock.time_msec()
         for state in active_presence:
             self.wheel_timer.insert(
@@ -773,6 +777,25 @@ class PresenceHandler(BaseHandler):
         )
 
         defer.returnValue(observer_user.to_string() in accepted_observers)
+
+    @defer.inlineCallbacks
+    def get_all_presence_updates(self, last_id, current_id):
+        """
+        Gets a list of presence update rows from between the given stream ids.
+        Each row has:
+        - stream_id(str)
+        - user_id(str)
+        - state(str)
+        - last_active_ts(int)
+        - last_federation_update_ts(int)
+        - last_user_sync_ts(int)
+        - status_msg(int)
+        - currently_active(int)
+        """
+        # TODO(markjh): replicate the unpersisted changes.
+        # This could use the in-memory stores for recent changes.
+        rows = yield self.store.get_all_presence_updates(last_id, current_id)
+        defer.returnValue(rows)
 
 
 def should_notify(old_state, new_state):

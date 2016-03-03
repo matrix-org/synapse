@@ -226,7 +226,7 @@ class PushRuleStore(SQLBaseStore):
 
         if txn.rowcount == 0:
             # We didn't update a row with the given rule_id so insert one
-            push_rule_id = self._push_rule_id_gen.get_next_txn(txn)
+            push_rule_id = self._push_rule_id_gen.get_next()
 
             self._simple_insert_txn(
                 txn,
@@ -279,7 +279,7 @@ class PushRuleStore(SQLBaseStore):
         defer.returnValue(ret)
 
     def _set_push_rule_enabled_txn(self, txn, user_id, rule_id, enabled):
-        new_id = self._push_rules_enable_id_gen.get_next_txn(txn)
+        new_id = self._push_rules_enable_id_gen.get_next()
         self._simple_upsert_txn(
             txn,
             "push_rules_enable",

@@ -58,8 +58,8 @@ class UserPresenceState(namedtuple("UserPresenceState",
 class PresenceStore(SQLBaseStore):
     @defer.inlineCallbacks
     def update_presence(self, presence_states):
-        stream_ordering_manager = yield self._presence_id_gen.get_next_mult(
-            self, len(presence_states)
+        stream_ordering_manager = self._presence_id_gen.get_next_mult(
+            len(presence_states)
         )
 
         with stream_ordering_manager as stream_orderings:
@@ -114,6 +114,22 @@ class PresenceStore(SQLBaseStore):
                 sql % (",".join("?" for _ in states),),
                 args
             )
+
+    def get_all_presence_updates(self, last_id, current_id):
+        def get_all_presence_updates_txn(txn):
+            sql = (
+                "SELECT stream_id, user_id, state, last_active_ts,"
+                " last_federation_update_ts, last_user_sync_ts, status_msg,"
+                " currently_active"
+                " FROM presence_stream"
+                " WHERE ? < stream_id AND stream_id <= ?"
+            )
+            txn.execute(sql, (last_id, current_id))
+            return txn.fetchall()
+
+        return self.runInteraction(
+            "get_all_presence_updates", get_all_presence_updates_txn
+        )
 
     @defer.inlineCallbacks
     def get_presence_for_users(self, user_ids):

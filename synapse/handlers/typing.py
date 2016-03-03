@@ -25,6 +25,7 @@ from synapse.types import UserID
 import logging
 
 from collections import namedtuple
+import ujson as json
 
 logger = logging.getLogger(__name__)
 
@@ -218,6 +219,19 @@ class TypingNotificationHandler(BaseHandler):
             self.notifier.on_new_event(
                 "typing_key", self._latest_room_serial, rooms=[room_id]
             )
+
+    def get_all_typing_updates(self, last_id, current_id):
+        # TODO: Work out a way to do this without scanning the entire state.
+        rows = []
+        for room_id, serial in self._room_serials.items():
+            if last_id < serial and serial <= current_id:
+                typing = self._room_typing[room_id]
+                typing_bytes = json.dumps([
+                    u.to_string() for u in typing
+                ], ensure_ascii=False)
+                rows.append((serial, room_id, typing_bytes))
+        rows.sort()
+        return rows
 
 
 class TypingNotificationEventSource(object):

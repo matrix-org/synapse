@@ -117,7 +117,7 @@ class TransactionStore(SQLBaseStore):
     def _prep_send_transaction(self, txn, transaction_id, destination,
                                origin_server_ts):
 
-        next_id = self._transaction_id_gen.get_next_txn(txn)
+        next_id = self._transaction_id_gen.get_next()
 
         # First we find out what the prev_txns should be.
         # Since we know that we are only sending one transaction at a time,

@@ -13,51 +13,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
 from collections import deque
 import contextlib
 import threading
 
 
 class IdGenerator(object):
-    def __init__(self, table, column, store):
+    def __init__(self, db_conn, table, column):
         self.table = table
         self.column = column
-        self.store = store
         self._lock = threading.Lock()
-        self._next_id = None
+        cur = db_conn.cursor()
+        self._next_id = self._load_next_id(cur)
+        cur.close()
 
-    @defer.inlineCallbacks
+    def _load_next_id(self, txn):
+        txn.execute("SELECT MAX(%s) FROM %s" % (self.column, self.table,))
+        val, = txn.fetchone()
+        return val + 1 if val else 1
+
     def get_next(self):
-        if self._next_id is None:
-            yield self.store.runInteraction(
-                "IdGenerator_%s" % (self.table,),
-                self.get_next_txn,
-            )
-
         with self._lock:
             i = self._next_id
             self._next_id += 1
-            defer.returnValue(i)
-
-    def get_next_txn(self, txn):
-        with self._lock:
-            if self._next_id:
-                i = self._next_id
-                self._next_id += 1
-                return i
-            else:
-                txn.execute(
-                    "SELECT MAX(%s) FROM %s" % (self.column, self.table,)
-                )
-
-                val, = txn.fetchone()
-                cur = val or 0
-                cur += 1
-                self._next_id = cur + 1
-
-                return cur
+            return i
 
 
 class StreamIdGenerator(object):
@@ -69,7 +48,7 @@ class StreamIdGenerator(object):
     persistence of events can complete out of order.
 
     Usage:
-        with stream_id_gen.get_next_txn(txn) as stream_id:
+        with stream_id_gen.get_next() as stream_id:
             # ... persist event ...
     """
     def __init__(self, db_conn, table, column):
@@ -79,15 +58,21 @@ class StreamIdGenerator(object):
         self._lock = threading.Lock()
 
         cur = db_conn.cursor()
-        self._current_max = self._get_or_compute_current_max(cur)
+        self._current_max = self._load_current_max(cur)
         cur.close()
 
         self._unfinished_ids = deque()
 
-    def get_next(self, store):
+    def _load_current_max(self, txn):
+        txn.execute("SELECT MAX(%s) FROM %s" % (self.column, self.table))
+        rows = txn.fetchall()
+        val, = rows[0]
+        return int(val) if val else 1
+
+    def get_next(self):
         """
         Usage:
-            with yield stream_id_gen.get_next as stream_id:
+            with stream_id_gen.get_next() as stream_id:
                 # ... persist event ...
         """
         with self._lock:
@@ -106,10 +91,10 @@ class StreamIdGenerator(object):
 
         return manager()
 
-    def get_next_mult(self, store, n):
+    def get_next_mult(self, n):
         """
         Usage:
-            with yield stream_id_gen.get_next(store, n) as stream_ids:
+            with stream_id_gen.get_next(n) as stream_ids:
                 # ... persist events ...
         """
         with self._lock:
@@ -137,15 +122,5 @@ class StreamIdGenerator(object):
         with self._lock:
             if self._unfinished_ids:
                 return self._unfinished_ids[0] - 1
-
-            return self._current_max
-
-    def _get_or_compute_current_max(self, txn):
-        with self._lock:
-            txn.execute("SELECT MAX(%s) FROM %s" % (self.column, self.table))
-            rows = txn.fetchall()
-            val, = rows[0]
-
-            self._current_max = int(val) if val else 1
 
             return self._current_max

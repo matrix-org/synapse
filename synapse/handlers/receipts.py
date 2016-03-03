@@ -36,8 +36,6 @@ class ReceiptsHandler(BaseHandler):
         )
         self.clock = self.hs.get_clock()
 
-        self._receipt_cache = None
-
     @defer.inlineCallbacks
     def received_client_receipt(self, room_id, receipt_type, user_id,
                                 event_id):

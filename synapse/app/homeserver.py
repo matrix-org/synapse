@@ -63,6 +63,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.util.logcontext import LoggingContext
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
+from synapse.replication.resource import ReplicationResource, REPLICATION_PREFIX
 from synapse.federation.transport.server import TransportLayerServer
 
 from synapse import events
@@ -168,6 +169,9 @@ class SynapseHomeServer(HomeServer):
 
                 if name == "metrics" and self.get_config().enable_metrics:
                     resources[METRICS_PREFIX] = MetricsResource(self)
+
+                if name == "replication":
+                    resources[REPLICATION_PREFIX] = ReplicationResource(self)
 
         root_resource = create_resource_tree(resources)
         if tls:
