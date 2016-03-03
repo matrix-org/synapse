@@ -22,12 +22,10 @@ from .base import ClientV1RestServlet, client_path_patterns
 from synapse.storage.push_rule import (
     InconsistentRuleException, RuleNotFoundException
 )
-from synapse.push.baserules import list_with_base_rules, BASE_RULE_IDS
-from synapse.push.rulekinds import (
-    PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
-)
+from synapse.push.clientformat import format_push_rules_for_user
+from synapse.push.baserules import BASE_RULE_IDS
+from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 
-import copy
 import simplejson as json
 
 
@@ -133,48 +131,9 @@ class PushRuleRestServlet(ClientV1RestServlet):
         # is probably not going to make a whole lot of difference
         rawrules = yield self.store.get_push_rules_for_user(user_id)
 
-        ruleslist = []
-        for rawrule in rawrules:
-            rule = dict(rawrule)
-            rule["conditions"] = json.loads(rawrule["conditions"])
-            rule["actions"] = json.loads(rawrule["actions"])
-            ruleslist.append(rule)
-
-        # We're going to be mutating this a lot, so do a deep copy
-        ruleslist = copy.deepcopy(list_with_base_rules(ruleslist))
-
-        rules = {'global': {}, 'device': {}}
-
-        rules['global'] = _add_empty_priority_class_arrays(rules['global'])
-
         enabled_map = yield self.store.get_push_rules_enabled_for_user(user_id)
 
-        for r in ruleslist:
-            rulearray = None
-
-            template_name = _priority_class_to_template_name(r['priority_class'])
-
-            # Remove internal stuff.
-            for c in r["conditions"]:
-                c.pop("_id", None)
-
-                pattern_type = c.pop("pattern_type", None)
-                if pattern_type == "user_id":
-                    c["pattern"] = user_id
-                elif pattern_type == "user_localpart":
-                    c["pattern"] = requester.user.localpart
-
-            rulearray = rules['global'][template_name]
-
-            template_rule = _rule_to_template(r)
-            if template_rule:
-                if r['rule_id'] in enabled_map:
-                    template_rule['enabled'] = enabled_map[r['rule_id']]
-                elif 'enabled' in r:
-                    template_rule['enabled'] = r['enabled']
-                else:
-                    template_rule['enabled'] = True
-                rulearray.append(template_rule)
+        rules = format_push_rules_for_user(requester.user, rawrules, enabled_map)
 
         path = request.postpath[1:]
 
@@ -322,12 +281,6 @@ def _check_actions(actions):
             raise InvalidRuleException("Unrecognised action")
 
 
-def _add_empty_priority_class_arrays(d):
-    for pc in PRIORITY_CLASS_MAP.keys():
-        d[pc] = []
-    return d
-
-
 def _filter_ruleset_with_path(ruleset, path):
     if path == []:
         raise UnrecognizedRequestError(
@@ -376,47 +329,12 @@ def _priority_class_from_spec(spec):
     return pc
 
 
-def _priority_class_to_template_name(pc):
-    return PRIORITY_CLASS_INVERSE_MAP[pc]
-
-
-def _rule_to_template(rule):
-    unscoped_rule_id = None
-    if 'rule_id' in rule:
-        unscoped_rule_id = _rule_id_from_namespaced(rule['rule_id'])
-
-    template_name = _priority_class_to_template_name(rule['priority_class'])
-    if template_name in ['override', 'underride']:
-        templaterule = {k: rule[k] for k in ["conditions", "actions"]}
-    elif template_name in ["sender", "room"]:
-        templaterule = {'actions': rule['actions']}
-        unscoped_rule_id = rule['conditions'][0]['pattern']
-    elif template_name == 'content':
-        if len(rule["conditions"]) != 1:
-            return None
-        thecond = rule["conditions"][0]
-        if "pattern" not in thecond:
-            return None
-        templaterule = {'actions': rule['actions']}
-        templaterule["pattern"] = thecond["pattern"]
-
-    if unscoped_rule_id:
-            templaterule['rule_id'] = unscoped_rule_id
-    if 'default' in rule:
-        templaterule['default'] = rule['default']
-    return templaterule
-
-
 def _namespaced_rule_id_from_spec(spec):
     return _namespaced_rule_id(spec, spec['rule_id'])
 
 
 def _namespaced_rule_id(spec, rule_id):
     return "global/%s/%s" % (spec['template'], rule_id)
-
-
-def _rule_id_from_namespaced(in_rule_id):
-    return in_rule_id.split('/')[-1]
 
 
 class InvalidRuleException(Exception):
