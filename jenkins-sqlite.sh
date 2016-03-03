@@ -45,7 +45,7 @@ export PERL5LIB PERL_MB_OPT PERL_MM_OPT
 
 ./install-deps.pl
 
-: ${PORT_BASE:=8000}
+: ${PORT_BASE:=9000}
 
 echo >&2 "Running sytest with SQLite3";
 ./run-tests.pl --coverage -O tap --synapse-directory $WORKSPACE \
