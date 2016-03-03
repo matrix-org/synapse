@@ -18,7 +18,7 @@ from synapse.types import Requester, UserID
 
 from twisted.internet import defer
 from tests import unittest
-from tests.utils import setup_test_homeserver
+from tests.utils import setup_test_homeserver, requester_for_user
 from mock import Mock, NonCallableMock
 import json
 import contextlib
@@ -133,12 +133,15 @@ class ReplicationResourceCase(unittest.TestCase):
     @defer.inlineCallbacks
     def send_text_message(self, room_id, message):
         handler = self.hs.get_handlers().message_handler
-        event = yield handler.create_and_send_nonmember_event({
-            "type": "m.room.message",
-            "content": {"body": "message", "msgtype": "m.text"},
-            "room_id": room_id,
-            "sender": self.user.to_string(),
-        })
+        event = yield handler.create_and_send_nonmember_event(
+            requester_for_user(self.user),
+            {
+                "type": "m.room.message",
+                "content": {"body": "message", "msgtype": "m.text"},
+                "room_id": room_id,
+                "sender": self.user.to_string(),
+            }
+        )
         defer.returnValue(event.event_id)
 
     @defer.inlineCallbacks

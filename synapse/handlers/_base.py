@@ -160,10 +160,10 @@ class BaseHandler(object):
         )
         defer.returnValue(res.get(user_id, []))
 
-    def ratelimit(self, user_id):
+    def ratelimit(self, requester):
         time_now = self.clock.time()
         allowed, time_allowed = self.ratelimiter.send_message(
-            user_id, time_now,
+            requester.user.to_string(), time_now,
             msg_rate_hz=self.hs.config.rc_messages_per_second,
             burst_count=self.hs.config.rc_message_burst_count,
         )
@@ -263,11 +263,18 @@ class BaseHandler(object):
         return False
 
     @defer.inlineCallbacks
-    def handle_new_client_event(self, event, context, ratelimit=True, extra_users=[]):
+    def handle_new_client_event(
+        self,
+        requester,
+        event,
+        context,
+        ratelimit=True,
+        extra_users=[]
+    ):
         # We now need to go and hit out to wherever we need to hit out to.
 
         if ratelimit:
-            self.ratelimit(event.sender)
+            self.ratelimit(requester)
 
         self.auth.check(event, auth_events=context.current_state)
 
