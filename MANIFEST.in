@@ -21,5 +21,6 @@ recursive-include synapse/static *.html
 recursive-include synapse/static *.js
 
 exclude jenkins.sh
+exclude jenkins*.sh
 
 prune demo/etc
