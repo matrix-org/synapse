@@ -58,6 +58,9 @@ if [[ -z "$POSTGRES_DB_2" ]]; then
     exit 1
 fi
 
+mkdir -p "localhost-$(($PORT_BASE + 1))"
+mkdir -p "localhost-$(($PORT_BASE + 2))"
+
 cat > localhost-$(($PORT_BASE + 1))/database.yaml << EOF
 name: psycopg2
 args:
