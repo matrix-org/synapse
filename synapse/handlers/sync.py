@@ -209,9 +209,9 @@ class SyncHandler(BaseHandler):
             key=None
         )
 
-        membership_list = (Membership.INVITE, Membership.JOIN)
-        if sync_config.filter_collection.include_leave:
-            membership_list += (Membership.LEAVE, Membership.BAN)
+        membership_list = (
+            Membership.INVITE, Membership.JOIN, Membership.LEAVE, Membership.BAN
+        )
 
         room_list = yield self.store.get_rooms_for_user_where_membership_is(
             user_id=sync_config.user.to_string(),
@@ -257,6 +257,12 @@ class SyncHandler(BaseHandler):
                         invite=invite,
                     ))
                 elif event.membership in (Membership.LEAVE, Membership.BAN):
+                    # Always send down rooms we were banned or kicked from.
+                    if not sync_config.filter_collection.include_leave:
+                        if event.membership == Membership.LEAVE:
+                            if sync_config.user.to_string() == event.sender:
+                                continue
+
                     leave_token = now_token.copy_and_replace(
                         "room_key", "s%d" % (event.stream_ordering,)
                     )
