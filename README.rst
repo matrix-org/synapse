@@ -565,4 +565,21 @@ sphinxcontrib-napoleon::
 Building internal API documentation::
 
     python setup.py build_sphinx
-    
+
+
+
+Halp!! Synapse eats all my RAM!
+===============================
+
+Synapse's architecture is quite RAM hungry currently - we deliberately
+cache a lot of recent room data and metadata in RAM in order to speed up
+common requests.  We'll improve this in future, but for now the easiest
+way to either reduce the RAM usage (at the risk of slowing things down)
+is to set the almost-undocumented ``SYNAPSE_CACHE_FACTOR`` environment
+variable.  Roughly speaking, a SYNAPSE_CACHE_FACTOR of 1.0 will max out
+at around 3-4GB of resident memory - this is what we currently run the
+matrix.org on.  The default setting is currently 0.1, which is probably
+around a ~700MB footprint.  You can dial it down further to 0.02 if
+desired, which targets roughly ~512MB.  Conversely you can dial it up if
+you need performance for lots of users and have a box with a lot of RAM.
+

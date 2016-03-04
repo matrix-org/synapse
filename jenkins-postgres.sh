@@ -22,7 +22,7 @@ export PEP8SUFFIX="--output-file=violations.flake8.log || echo flake8 finished w
 
 rm .coverage* || echo "No coverage files to remove"
 
-tox
+tox --notest
 
 : ${GIT_BRANCH:="origin/$(git rev-parse --abbrev-ref HEAD)"}
 
@@ -49,32 +49,38 @@ export PERL5LIB PERL_MB_OPT PERL_MM_OPT
 
 : ${PORT_BASE:=8000}
 
-echo >&2 "Running sytest with SQLite3";
-./run-tests.pl --coverage -O tap --synapse-directory $WORKSPACE \
-    --python $TOX_BIN/python --all --port-base $PORT_BASE > results-sqlite3.tap
 
-RUN_POSTGRES=""
+if [[ -z "$POSTGRES_DB_1" ]]; then
+    echo >&2 "Variable POSTGRES_DB_1 not set"
+    exit 1
+fi
 
-for port in $(($PORT_BASE + 1)) $(($PORT_BASE + 2)); do
-    if psql synapse_jenkins_$port <<< ""; then
-        RUN_POSTGRES="$RUN_POSTGRES:$port"
-        cat > localhost-$port/database.yaml << EOF
+if [[ -z "$POSTGRES_DB_2" ]]; then
+    echo >&2 "Variable POSTGRES_DB_2 not set"
+    exit 1
+fi
+
+mkdir -p "localhost-$(($PORT_BASE + 1))"
+mkdir -p "localhost-$(($PORT_BASE + 2))"
+
+cat > localhost-$(($PORT_BASE + 1))/database.yaml << EOF
 name: psycopg2
 args:
-    database: synapse_jenkins_$port
+    database: $POSTGRES_DB_1
 EOF
-    fi
-done
+
+cat > localhost-$(($PORT_BASE + 2))/database.yaml << EOF
+name: psycopg2
+args:
+    database: $POSTGRES_DB_2
+EOF
+
 
 # Run if both postgresql databases exist
-if test "$RUN_POSTGRES" = ":$(($PORT_BASE + 1)):$(($PORT_BASE + 2))"; then
-    echo >&2 "Running sytest with PostgreSQL";
-    $TOX_BIN/pip install psycopg2
-    ./run-tests.pl --coverage -O tap --synapse-directory $WORKSPACE \
-        --python $TOX_BIN/python --all --port-base $PORT_BASE > results-postgresql.tap
-else
-    echo >&2 "Skipping running sytest with PostgreSQL, $RUN_POSTGRES"
-fi
+echo >&2 "Running sytest with PostgreSQL";
+$TOX_BIN/pip install psycopg2
+./run-tests.pl --coverage -O tap --synapse-directory $WORKSPACE \
+    --python $TOX_BIN/python --all --port-base $PORT_BASE > results-postgresql.tap
 
 cd ..
 cp sytest/.coverage.* .

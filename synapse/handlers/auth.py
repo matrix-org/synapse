@@ -477,4 +477,4 @@ class AuthHandler(BaseHandler):
         Returns:
             Whether self.hash(password) == stored_hash (bool).
         """
-        return bcrypt.checkpw(password, stored_hash)
+        return bcrypt.hashpw(password, stored_hash) == stored_hash

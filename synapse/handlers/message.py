@@ -215,7 +215,7 @@ class MessageHandler(BaseHandler):
         defer.returnValue((event, context))
 
     @defer.inlineCallbacks
-    def send_nonmember_event(self, event, context, ratelimit=True):
+    def send_nonmember_event(self, requester, event, context, ratelimit=True):
         """
         Persists and notifies local clients and federation of an event.
 
@@ -241,6 +241,7 @@ class MessageHandler(BaseHandler):
                 defer.returnValue(prev_state)
 
         yield self.handle_new_client_event(
+            requester=requester,
             event=event,
             context=context,
             ratelimit=ratelimit,
@@ -268,9 +269,9 @@ class MessageHandler(BaseHandler):
     @defer.inlineCallbacks
     def create_and_send_nonmember_event(
         self,
+        requester,
         event_dict,
         ratelimit=True,
-        token_id=None,
         txn_id=None
     ):
         """
@@ -280,10 +281,11 @@ class MessageHandler(BaseHandler):
         """
         event, context = yield self.create_event(
             event_dict,
-            token_id=token_id,
+            token_id=requester.access_token_id,
             txn_id=txn_id
         )
         yield self.send_nonmember_event(
+            requester,
             event,
             context,
             ratelimit=ratelimit,

@@ -22,7 +22,7 @@ export PEP8SUFFIX="--output-file=violations.flake8.log || echo flake8 finished w
 
 rm .coverage* || echo "No coverage files to remove"
 
-tox
+tox --notest
 
 : ${GIT_BRANCH:="origin/$(git rev-parse --abbrev-ref HEAD)"}
 
@@ -47,34 +47,11 @@ export PERL5LIB PERL_MB_OPT PERL_MM_OPT
 
 ./install-deps.pl
 
-: ${PORT_BASE:=8000}
+: ${PORT_BASE:=8500}
 
 echo >&2 "Running sytest with SQLite3";
 ./run-tests.pl --coverage -O tap --synapse-directory $WORKSPACE \
     --python $TOX_BIN/python --all --port-base $PORT_BASE > results-sqlite3.tap
-
-RUN_POSTGRES=""
-
-for port in $(($PORT_BASE + 1)) $(($PORT_BASE + 2)); do
-    if psql synapse_jenkins_$port <<< ""; then
-        RUN_POSTGRES="$RUN_POSTGRES:$port"
-        cat > localhost-$port/database.yaml << EOF
-name: psycopg2
-args:
-    database: synapse_jenkins_$port
-EOF
-    fi
-done
-
-# Run if both postgresql databases exist
-if test "$RUN_POSTGRES" = ":$(($PORT_BASE + 1)):$(($PORT_BASE + 2))"; then
-    echo >&2 "Running sytest with PostgreSQL";
-    $TOX_BIN/pip install psycopg2
-    ./run-tests.pl --coverage -O tap --synapse-directory $WORKSPACE \
-        --python $TOX_BIN/python --all --port-base $PORT_BASE > results-postgresql.tap
-else
-    echo >&2 "Skipping running sytest with PostgreSQL, $RUN_POSTGRES"
-fi
 
 cd ..
 cp sytest/.coverage.* .

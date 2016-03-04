@@ -160,10 +160,10 @@ class BaseHandler(object):
         )
         defer.returnValue(res.get(user_id, []))
 
-    def ratelimit(self, user_id):
+    def ratelimit(self, requester):
         time_now = self.clock.time()
         allowed, time_allowed = self.ratelimiter.send_message(
-            user_id, time_now,
+            requester.user.to_string(), time_now,
             msg_rate_hz=self.hs.config.rc_messages_per_second,
             burst_count=self.hs.config.rc_message_burst_count,
         )
@@ -199,8 +199,7 @@ class BaseHandler(object):
         # events in the room, because we don't know enough about the graph
         # fragment we received to treat it like a graph, so the above returned
         # no relevant events. It may have returned some events (if we have
-        # joined and left the room), but not useful ones, like the invite. So we
-        # forcibly set our context to the invite we received over federation.
+        # joined and left the room), but not useful ones, like the invite.
         if (
             not self.is_host_in_room(context.current_state) and
             builder.type == EventTypes.Member
@@ -208,7 +207,27 @@ class BaseHandler(object):
             prev_member_event = yield self.store.get_room_member(
                 builder.sender, builder.room_id
             )
-            if prev_member_event:
+
+            # The prev_member_event may already be in context.current_state,
+            # despite us not being present in the room; in particular, if
+            # inviting user, and all other local users, have already left.
+            #
+            # In that case, we have all the information we need, and we don't
+            # want to drop "context" - not least because we may need to handle
+            # the invite locally, which will require us to have the whole
+            # context (not just prev_member_event) to auth it.
+            #
+            context_event_ids = (
+                e.event_id for e in context.current_state.values()
+            )
+
+            if (
+                prev_member_event and
+                prev_member_event.event_id not in context_event_ids
+            ):
+                # The prev_member_event is missing from context, so it must
+                # have arrived over federation and is an outlier. We forcibly
+                # set our context to the invite we received over federation
                 builder.prev_events = (
                     prev_member_event.event_id,
                     prev_member_event.prev_events
@@ -263,11 +282,18 @@ class BaseHandler(object):
         return False
 
     @defer.inlineCallbacks
-    def handle_new_client_event(self, event, context, ratelimit=True, extra_users=[]):
+    def handle_new_client_event(
+        self,
+        requester,
+        event,
+        context,
+        ratelimit=True,
+        extra_users=[]
+    ):
         # We now need to go and hit out to wherever we need to hit out to.
 
         if ratelimit:
-            self.ratelimit(event.sender)
+            self.ratelimit(requester)
 
         self.auth.check(event, auth_events=context.current_state)
 
@@ -307,12 +333,8 @@ class BaseHandler(object):
                         "sender": e.sender,
                     }
                     for k, e in context.current_state.items()
-                    if e.type in (
-                        EventTypes.JoinRules,
-                        EventTypes.CanonicalAlias,
-                        EventTypes.RoomAvatar,
-                        EventTypes.Name,
-                    ) or is_inviter_member_event(e)
+                    if e.type in self.hs.config.room_invite_state_types
+                    or is_inviter_member_event(e)
                 ]
 
                 invitee = UserID.from_string(event.state_key)
@@ -347,6 +369,12 @@ class BaseHandler(object):
                         403,
                         "You don't have permission to redact events"
                     )
+
+        if event.type == EventTypes.Create and context.current_state:
+            raise AuthError(
+                403,
+                "Changing the room create event is forbidden",
+            )
 
         action_generator = ActionGenerator(self.hs)
         yield action_generator.handle_push_actions_for_event(
