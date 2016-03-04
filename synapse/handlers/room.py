@@ -210,7 +210,7 @@ class RoomCreationHandler(BaseHandler):
                 ratelimit=False)
 
         for invitee in invite_list:
-            room_member_handler.update_membership(
+            yield room_member_handler.update_membership(
                 requester,
                 UserID.from_string(invitee),
                 room_id,
