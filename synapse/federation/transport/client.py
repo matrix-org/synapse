@@ -160,6 +160,7 @@ class TransportLayerClient(object):
             path=path,
             args=args,
             retry_on_dns_fail=retry_on_dns_fail,
+            timeout=10000,
         )
 
         defer.returnValue(content)
