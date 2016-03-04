@@ -293,7 +293,7 @@ class ReplicationResource(Resource):
                 push_rules, current_position, limit
             )
             writer.write_header_and_rows("push_rules", rows, (
-                "position", "stream_ordering", "user_id", "rule_id", "op",
+                "position", "event_stream_ordering", "user_id", "rule_id", "op",
                 "priority_class", "priority", "conditions", "actions"
             ))
 

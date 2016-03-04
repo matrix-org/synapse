@@ -17,7 +17,7 @@
 
 CREATE TABLE push_rules_stream(
     stream_id BIGINT NOT NULL,
-    stream_ordering BIGINT NOT NULL,
+    event_stream_ordering BIGINT NOT NULL,
     user_id TEXT NOT NULL,
     rule_id TEXT NOT NULL,
     op TEXT NOT NULL, -- One of "ENABLE", "DISABLE", "ACTIONS", "ADD", "DELETE"
