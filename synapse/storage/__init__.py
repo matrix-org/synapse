@@ -161,7 +161,7 @@ class DataStore(RoomMemberStore, RoomStore,
         )
 
         push_rules_prefill, push_rules_id = self._get_cache_dict(
-            db_conn, "presence_stream",
+            db_conn, "push_rules_stream",
             entity_column="user_id",
             stream_column="stream_id",
             max_value=self._push_rules_stream_id_gen.get_max_token()[0],
