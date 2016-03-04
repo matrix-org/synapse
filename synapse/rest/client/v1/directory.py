@@ -122,9 +122,6 @@ class ClientDirectoryServer(ClientV1RestServlet):
 
         requester = yield self.auth.get_user_by_req(request)
         user = requester.user
-        is_admin = yield self.auth.is_server_admin(user)
-        if not is_admin:
-            raise AuthError(403, "You need to be a server admin")
 
         room_alias = RoomAlias.from_string(room_alias)
 
