@@ -333,12 +333,8 @@ class BaseHandler(object):
                         "sender": e.sender,
                     }
                     for k, e in context.current_state.items()
-                    if e.type in (
-                        EventTypes.JoinRules,
-                        EventTypes.CanonicalAlias,
-                        EventTypes.RoomAvatar,
-                        EventTypes.Name,
-                    ) or is_inviter_member_event(e)
+                    if e.type in self.hs.config.room_invite_state_types
+                    or is_inviter_member_event(e)
                 ]
 
                 invitee = UserID.from_string(event.state_key)

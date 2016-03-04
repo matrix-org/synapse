@@ -23,6 +23,7 @@ from .captcha import CaptchaConfig
 from .voip import VoipConfig
 from .registration import RegistrationConfig
 from .metrics import MetricsConfig
+from .api import ApiConfig
 from .appservice import AppServiceConfig
 from .key import KeyConfig
 from .saml2 import SAML2Config
@@ -32,7 +33,7 @@ from .password import PasswordConfig
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
-                       VoipConfig, RegistrationConfig, MetricsConfig,
+                       VoipConfig, RegistrationConfig, MetricsConfig, ApiConfig,
                        AppServiceConfig, KeyConfig, SAML2Config, CasConfig,
                        PasswordConfig,):
     pass
