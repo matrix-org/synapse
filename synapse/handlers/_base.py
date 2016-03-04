@@ -199,8 +199,7 @@ class BaseHandler(object):
         # events in the room, because we don't know enough about the graph
         # fragment we received to treat it like a graph, so the above returned
         # no relevant events. It may have returned some events (if we have
-        # joined and left the room), but not useful ones, like the invite. So we
-        # forcibly set our context to the invite we received over federation.
+        # joined and left the room), but not useful ones, like the invite.
         if (
             not self.is_host_in_room(context.current_state) and
             builder.type == EventTypes.Member
@@ -208,7 +207,27 @@ class BaseHandler(object):
             prev_member_event = yield self.store.get_room_member(
                 builder.sender, builder.room_id
             )
-            if prev_member_event:
+
+            # The prev_member_event may already be in context.current_state,
+            # despite us not being present in the room; in particular, if
+            # inviting user, and all other local users, have already left.
+            #
+            # In that case, we have all the information we need, and we don't
+            # want to drop "context" - not least because we may need to handle
+            # the invite locally, which will require us to have the whole
+            # context (not just prev_member_event) to auth it.
+            #
+            context_event_ids = (
+                e.event_id for e in context.current_state.values()
+            )
+
+            if (
+                prev_member_event and
+                prev_member_event.event_id not in context_event_ids
+            ):
+                # The prev_member_event is missing from context, so it must
+                # have arrived over federation and is an outlier. We forcibly
+                # set our context to the invite we received over federation
                 builder.prev_events = (
                     prev_member_event.event_id,
                     prev_member_event.prev_events
