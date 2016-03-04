@@ -212,7 +212,7 @@ class MessageHandler(BaseHandler):
                     content["avatar_url"] = yield profile.get_avatar_url(target)
                 except Exception as e:
                     logger.info(
-                        "Failed to get profile infomration for %r: %s",
+                        "Failed to get profile information for %r: %s",
                         target, e
                     )
 
