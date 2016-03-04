@@ -160,6 +160,11 @@ class DataStore(RoomMemberStore, RoomStore,
             prefilled_cache=presence_cache_prefill
         )
 
+        self.push_rules_stream_cache = StreamChangeCache(
+            "PushRulesStreamChangeCache",
+            self._push_rules_stream_id_gen.get_max_token()[0],
+        )
+
         super(DataStore, self).__init__(hs)
 
     def take_presence_startup_info(self):

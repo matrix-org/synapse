@@ -244,28 +244,16 @@ class PushRuleStore(SQLBaseStore):
             )
 
         if update_stream:
-            self._simple_insert_txn(
-                txn,
-                table="push_rules_stream",
-                values={
-                    "stream_id": stream_id,
-                    "stream_ordering": stream_ordering,
-                    "user_id": user_id,
-                    "rule_id": rule_id,
-                    "op": "ADD",
+            self._insert_push_rules_update_txn(
+                txn, stream_id, stream_ordering, user_id, rule_id,
+                op="ADD",
+                data={
                     "priority_class": priority_class,
                     "priority": priority,
                     "conditions": conditions_json,
                     "actions": actions_json,
                 }
             )
-
-        txn.call_after(
-            self.get_push_rules_for_user.invalidate, (user_id,)
-        )
-        txn.call_after(
-            self.get_push_rules_enabled_for_user.invalidate, (user_id,)
-        )
 
     @defer.inlineCallbacks
     def delete_push_rule(self, user_id, rule_id):
@@ -284,22 +272,10 @@ class PushRuleStore(SQLBaseStore):
                 "push_rules",
                 {'user_name': user_id, 'rule_id': rule_id},
             )
-            self._simple_insert_txn(
-                txn,
-                table="push_rules_stream",
-                values={
-                    "stream_id": stream_id,
-                    "stream_ordering": stream_ordering,
-                    "user_id": user_id,
-                    "rule_id": rule_id,
-                    "op": "DELETE",
-                }
-            )
-            txn.call_after(
-                self.get_push_rules_for_user.invalidate, (user_id,)
-            )
-            txn.call_after(
-                self.get_push_rules_enabled_for_user.invalidate, (user_id,)
+
+            self._insert_push_rules_update_txn(
+                txn, stream_id, stream_ordering, user_id, rule_id,
+                op="DELETE"
             )
 
         with self._push_rules_stream_id_gen.get_next() as (stream_id, stream_ordering):
@@ -328,23 +304,9 @@ class PushRuleStore(SQLBaseStore):
             {'id': new_id},
         )
 
-        self._simple_insert_txn(
-            txn,
-            "push_rules_stream",
-            values={
-                "stream_id": stream_id,
-                "stream_ordering": stream_ordering,
-                "user_id": user_id,
-                "rule_id": rule_id,
-                "op": "ENABLE" if enabled else "DISABLE",
-            }
-        )
-
-        txn.call_after(
-            self.get_push_rules_for_user.invalidate, (user_id,)
-        )
-        txn.call_after(
-            self.get_push_rules_enabled_for_user.invalidate, (user_id,)
+        self._insert_push_rules_update_txn(
+            txn, stream_id, stream_ordering, user_id, rule_id,
+            op="ENABLE" if enabled else "DISABLE"
         )
 
     @defer.inlineCallbacks
@@ -370,24 +332,9 @@ class PushRuleStore(SQLBaseStore):
                     {'actions': actions_json},
                 )
 
-            self._simple_insert_txn(
-                txn,
-                "push_rules_stream",
-                values={
-                    "stream_id": stream_id,
-                    "stream_ordering": stream_ordering,
-                    "user_id": user_id,
-                    "rule_id": rule_id,
-                    "op": "ACTIONS",
-                    "actions": actions_json,
-                }
-            )
-
-            txn.call_after(
-                self.get_push_rules_for_user.invalidate, (user_id,)
-            )
-            txn.call_after(
-                self.get_push_rules_enabled_for_user.invalidate, (user_id,)
+            self._insert_push_rules_update_txn(
+                txn, stream_id, stream_ordering, user_id, rule_id,
+                op="ACTIONS", data={"actions": actions_json}
             )
 
         with self._push_rules_stream_id_gen.get_next() as (stream_id, stream_ordering):
@@ -396,6 +343,31 @@ class PushRuleStore(SQLBaseStore):
                 stream_id, stream_ordering
             )
 
+    def _insert_push_rules_update_txn(
+        self, txn, stream_id, stream_ordering, user_id, rule_id, op, data=None
+    ):
+        values = {
+            "stream_id": stream_id,
+            "stream_ordering": stream_ordering,
+            "user_id": user_id,
+            "rule_id": rule_id,
+            "op": op,
+        }
+        if data is not None:
+            values.update(data)
+
+        self._simple_insert_txn(txn, "push_rules_stream", values=values)
+
+        txn.call_after(
+            self.get_push_rules_for_user.invalidate, (user_id,)
+        )
+        txn.call_after(
+            self.get_push_rules_enabled_for_user.invalidate, (user_id,)
+        )
+        txn.call_after(
+            self.push_rules_stream_cache.entity_has_changed, user_id, stream_id
+        )
+
     def get_all_push_rule_updates(self, last_id, current_id, limit):
         """Get all the push rules changes that have happend on the server"""
         def get_all_push_rule_updates_txn(txn):
@@ -403,7 +375,7 @@ class PushRuleStore(SQLBaseStore):
                 "SELECT stream_id, stream_ordering, user_id, rule_id,"
                 " op, priority_class, priority, conditions, actions"
                 " FROM push_rules_stream"
-                " WHERE ? < stream_id and stream_id <= ?"
+                " WHERE ? < stream_id AND stream_id <= ?"
                 " ORDER BY stream_id ASC LIMIT ?"
             )
             txn.execute(sql, (last_id, current_id, limit))
@@ -417,6 +389,23 @@ class PushRuleStore(SQLBaseStore):
         Returns a pair of a stream id for the push_rules stream and the
         room stream ordering it corresponds to."""
         return self._push_rules_stream_id_gen.get_max_token()
+
+    def have_push_rules_changed_for_user(self, user_id, last_id):
+        if not self.push_rules_stream_cache.has_entity_changed(user_id, last_id):
+            logger.error("FNARG")
+            return defer.succeed(False)
+        else:
+            def have_push_rules_changed_txn(txn):
+                sql = (
+                    "SELECT COUNT(stream_id) FROM push_rules_stream"
+                    " WHERE user_id = ? AND ? < stream_id"
+                )
+                txn.execute(sql, (user_id, last_id))
+                count, = txn.fetchone()
+                return bool(count)
+            return self.runInteraction(
+                "have_push_rules_changed", have_push_rules_changed_txn
+            )
 
 
 class RuleNotFoundException(Exception):
