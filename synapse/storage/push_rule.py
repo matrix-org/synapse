@@ -392,7 +392,6 @@ class PushRuleStore(SQLBaseStore):
 
     def have_push_rules_changed_for_user(self, user_id, last_id):
         if not self.push_rules_stream_cache.has_entity_changed(user_id, last_id):
-            logger.error("FNARG")
             return defer.succeed(False)
         else:
             def have_push_rules_changed_txn(txn):
