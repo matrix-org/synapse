@@ -29,6 +29,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+VISIBILITY_PRIORITY = (
+    "world_readable",
+    "shared",
+    "invited",
+    "joined",
+)
+
+
 class BaseHandler(object):
     """
     Common base class for the event handlers.
@@ -85,9 +93,27 @@ class BaseHandler(object):
             else:
                 visibility = "shared"
 
+            if visibility not in VISIBILITY_PRIORITY:
+                visibility = "shared"
+
             # if it was world_readable, it's easy: everyone can read it
             if visibility == "world_readable":
                 return True
+
+            # Always allow history visibility events on boundaries. This is done
+            # by setting the effective visibility to the least restrictive
+            # of the old vs new.
+            if event.type == EventTypes.RoomHistoryVisibility:
+                prev_content = event.unsigned.get("prev_content", {})
+                prev_visibility = prev_content.get("history_visibility", None)
+
+                if prev_visibility not in VISIBILITY_PRIORITY:
+                    prev_visibility = "shared"
+
+                new_priority = VISIBILITY_PRIORITY.index(visibility)
+                old_priority = VISIBILITY_PRIORITY.index(prev_visibility)
+                if old_priority < new_priority:
+                    visibility = prev_visibility
 
             # get the user's membership at the time of the event. (or rather,
             # just *after* the event. Which means that people can see their
