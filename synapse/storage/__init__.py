@@ -45,7 +45,7 @@ from .search import SearchStore
 from .tags import TagsStore
 from .account_data import AccountDataStore
 
-from util.id_generators import IdGenerator, StreamIdGenerator
+from util.id_generators import IdGenerator, StreamIdGenerator, ChainedIdGenerator
 
 from synapse.api.constants import PresenceState
 from synapse.util.caches.stream_change_cache import StreamChangeCache
@@ -122,6 +122,9 @@ class DataStore(RoomMemberStore, RoomStore,
         self._pushers_id_gen = IdGenerator(db_conn, "pushers", "id")
         self._push_rule_id_gen = IdGenerator(db_conn, "push_rules", "id")
         self._push_rules_enable_id_gen = IdGenerator(db_conn, "push_rules_enable", "id")
+        self._push_rules_stream_id_gen = ChainedIdGenerator(
+            self._stream_id_gen, db_conn, "push_rules_stream", "stream_id"
+        )
 
         events_max = self._stream_id_gen.get_max_token()
         event_cache_prefill, min_event_val = self._get_cache_dict(
@@ -155,6 +158,18 @@ class DataStore(RoomMemberStore, RoomStore,
         self.presence_stream_cache = StreamChangeCache(
             "PresenceStreamChangeCache", min_presence_val,
             prefilled_cache=presence_cache_prefill
+        )
+
+        push_rules_prefill, push_rules_id = self._get_cache_dict(
+            db_conn, "push_rules_stream",
+            entity_column="user_id",
+            stream_column="stream_id",
+            max_value=self._push_rules_stream_id_gen.get_max_token()[0],
+        )
+
+        self.push_rules_stream_cache = StreamChangeCache(
+            "PushRulesStreamChangeCache", push_rules_id,
+            prefilled_cache=push_rules_prefill,
         )
 
         super(DataStore, self).__init__(hs)

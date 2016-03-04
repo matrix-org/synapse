@@ -22,12 +22,10 @@ from .base import ClientV1RestServlet, client_path_patterns
 from synapse.storage.push_rule import (
     InconsistentRuleException, RuleNotFoundException
 )
-from synapse.push.baserules import list_with_base_rules, BASE_RULE_IDS
-from synapse.push.rulekinds import (
-    PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
-)
+from synapse.push.clientformat import format_push_rules_for_user
+from synapse.push.baserules import BASE_RULE_IDS
+from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 
-import copy
 import simplejson as json
 
 
@@ -35,6 +33,11 @@ class PushRuleRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/pushrules/.*$")
     SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR = (
         "Unrecognised request: You probably wanted a trailing slash")
+
+    def __init__(self, hs):
+        super(PushRuleRestServlet, self).__init__(hs)
+        self.store = hs.get_datastore()
+        self.notifier = hs.get_notifier()
 
     @defer.inlineCallbacks
     def on_PUT(self, request):
@@ -51,8 +54,11 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
         content = _parse_json(request)
 
+        user_id = requester.user.to_string()
+
         if 'attr' in spec:
-            yield self.set_rule_attr(requester.user.to_string(), spec, content)
+            yield self.set_rule_attr(user_id, spec, content)
+            self.notify_user(user_id)
             defer.returnValue((200, {}))
 
         if spec['rule_id'].startswith('.'):
@@ -77,8 +83,8 @@ class PushRuleRestServlet(ClientV1RestServlet):
             after = _namespaced_rule_id(spec, after[0])
 
         try:
-            yield self.hs.get_datastore().add_push_rule(
-                user_id=requester.user.to_string(),
+            yield self.store.add_push_rule(
+                user_id=user_id,
                 rule_id=_namespaced_rule_id_from_spec(spec),
                 priority_class=priority_class,
                 conditions=conditions,
@@ -86,6 +92,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
                 before=before,
                 after=after
             )
+            self.notify_user(user_id)
         except InconsistentRuleException as e:
             raise SynapseError(400, e.message)
         except RuleNotFoundException as e:
@@ -98,13 +105,15 @@ class PushRuleRestServlet(ClientV1RestServlet):
         spec = _rule_spec_from_path(request.postpath)
 
         requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
 
         namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
 
         try:
-            yield self.hs.get_datastore().delete_push_rule(
-                requester.user.to_string(), namespaced_rule_id
+            yield self.store.delete_push_rule(
+                user_id, namespaced_rule_id
             )
+            self.notify_user(user_id)
             defer.returnValue((200, {}))
         except StoreError as e:
             if e.code == 404:
@@ -115,58 +124,16 @@ class PushRuleRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request):
         requester = yield self.auth.get_user_by_req(request)
-        user = requester.user
+        user_id = requester.user.to_string()
 
         # we build up the full structure and then decide which bits of it
         # to send which means doing unnecessary work sometimes but is
         # is probably not going to make a whole lot of difference
-        rawrules = yield self.hs.get_datastore().get_push_rules_for_user(
-            user.to_string()
-        )
+        rawrules = yield self.store.get_push_rules_for_user(user_id)
 
-        ruleslist = []
-        for rawrule in rawrules:
-            rule = dict(rawrule)
-            rule["conditions"] = json.loads(rawrule["conditions"])
-            rule["actions"] = json.loads(rawrule["actions"])
-            ruleslist.append(rule)
+        enabled_map = yield self.store.get_push_rules_enabled_for_user(user_id)
 
-        # We're going to be mutating this a lot, so do a deep copy
-        ruleslist = copy.deepcopy(list_with_base_rules(ruleslist))
-
-        rules = {'global': {}, 'device': {}}
-
-        rules['global'] = _add_empty_priority_class_arrays(rules['global'])
-
-        enabled_map = yield self.hs.get_datastore().\
-            get_push_rules_enabled_for_user(user.to_string())
-
-        for r in ruleslist:
-            rulearray = None
-
-            template_name = _priority_class_to_template_name(r['priority_class'])
-
-            # Remove internal stuff.
-            for c in r["conditions"]:
-                c.pop("_id", None)
-
-                pattern_type = c.pop("pattern_type", None)
-                if pattern_type == "user_id":
-                    c["pattern"] = user.to_string()
-                elif pattern_type == "user_localpart":
-                    c["pattern"] = user.localpart
-
-            rulearray = rules['global'][template_name]
-
-            template_rule = _rule_to_template(r)
-            if template_rule:
-                if r['rule_id'] in enabled_map:
-                    template_rule['enabled'] = enabled_map[r['rule_id']]
-                elif 'enabled' in r:
-                    template_rule['enabled'] = r['enabled']
-                else:
-                    template_rule['enabled'] = True
-                rulearray.append(template_rule)
+        rules = format_push_rules_for_user(requester.user, rawrules, enabled_map)
 
         path = request.postpath[1:]
 
@@ -188,6 +155,12 @@ class PushRuleRestServlet(ClientV1RestServlet):
     def on_OPTIONS(self, _):
         return 200, {}
 
+    def notify_user(self, user_id):
+        stream_id, _ = self.store.get_push_rules_stream_token()
+        self.notifier.on_new_event(
+            "push_rules_key", stream_id, users=[user_id]
+        )
+
     def set_rule_attr(self, user_id, spec, val):
         if spec['attr'] == 'enabled':
             if isinstance(val, dict) and "enabled" in val:
@@ -198,7 +171,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
                 # bools directly, so let's not break them.
                 raise SynapseError(400, "Value for 'enabled' must be boolean")
             namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
-            return self.hs.get_datastore().set_push_rule_enabled(
+            return self.store.set_push_rule_enabled(
                 user_id, namespaced_rule_id, val
             )
         elif spec['attr'] == 'actions':
@@ -210,7 +183,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
             if is_default_rule:
                 if namespaced_rule_id not in BASE_RULE_IDS:
                     raise SynapseError(404, "Unknown rule %r" % (namespaced_rule_id,))
-            return self.hs.get_datastore().set_push_rule_actions(
+            return self.store.set_push_rule_actions(
                 user_id, namespaced_rule_id, actions, is_default_rule
             )
         else:
@@ -308,12 +281,6 @@ def _check_actions(actions):
             raise InvalidRuleException("Unrecognised action")
 
 
-def _add_empty_priority_class_arrays(d):
-    for pc in PRIORITY_CLASS_MAP.keys():
-        d[pc] = []
-    return d
-
-
 def _filter_ruleset_with_path(ruleset, path):
     if path == []:
         raise UnrecognizedRequestError(
@@ -362,47 +329,12 @@ def _priority_class_from_spec(spec):
     return pc
 
 
-def _priority_class_to_template_name(pc):
-    return PRIORITY_CLASS_INVERSE_MAP[pc]
-
-
-def _rule_to_template(rule):
-    unscoped_rule_id = None
-    if 'rule_id' in rule:
-        unscoped_rule_id = _rule_id_from_namespaced(rule['rule_id'])
-
-    template_name = _priority_class_to_template_name(rule['priority_class'])
-    if template_name in ['override', 'underride']:
-        templaterule = {k: rule[k] for k in ["conditions", "actions"]}
-    elif template_name in ["sender", "room"]:
-        templaterule = {'actions': rule['actions']}
-        unscoped_rule_id = rule['conditions'][0]['pattern']
-    elif template_name == 'content':
-        if len(rule["conditions"]) != 1:
-            return None
-        thecond = rule["conditions"][0]
-        if "pattern" not in thecond:
-            return None
-        templaterule = {'actions': rule['actions']}
-        templaterule["pattern"] = thecond["pattern"]
-
-    if unscoped_rule_id:
-            templaterule['rule_id'] = unscoped_rule_id
-    if 'default' in rule:
-        templaterule['default'] = rule['default']
-    return templaterule
-
-
 def _namespaced_rule_id_from_spec(spec):
     return _namespaced_rule_id(spec, spec['rule_id'])
 
 
 def _namespaced_rule_id(spec, rule_id):
     return "global/%s/%s" % (spec['template'], rule_id)
-
-
-def _rule_id_from_namespaced(in_rule_id):
-    return in_rule_id.split('/')[-1]
 
 
 class InvalidRuleException(Exception):

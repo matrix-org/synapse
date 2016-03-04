@@ -36,6 +36,7 @@ STREAM_NAMES = (
     ("receipts",),
     ("user_account_data", "room_account_data", "tag_account_data",),
     ("backfill",),
+    ("push_rules",),
 )
 
 
@@ -63,6 +64,7 @@ class ReplicationResource(Resource):
     * "room_account_data: Per room per user account data.
     * "tag_account_data": Per room per user tags.
     * "backfill": Old events that have been backfilled from other servers.
+    * "push_rules": Per user changes to push rules.
 
     The API takes two additional query parameters:
 
@@ -117,14 +119,16 @@ class ReplicationResource(Resource):
     def current_replication_token(self):
         stream_token = yield self.sources.get_current_token()
         backfill_token = yield self.store.get_current_backfill_token()
+        push_rules_token, room_stream_token = self.store.get_push_rules_stream_token()
 
         defer.returnValue(_ReplicationToken(
-            stream_token.room_stream_id,
+            room_stream_token,
             int(stream_token.presence_key),
             int(stream_token.typing_key),
             int(stream_token.receipt_key),
             int(stream_token.account_data_key),
             backfill_token,
+            push_rules_token,
         ))
 
     @request_handler
@@ -146,6 +150,7 @@ class ReplicationResource(Resource):
             yield self.presence(writer, current_token)  # TODO: implement limit
             yield self.typing(writer, current_token)  # TODO: implement limit
             yield self.receipts(writer, current_token, limit)
+            yield self.push_rules(writer, current_token, limit)
             self.streams(writer, current_token)
 
             logger.info("Replicated %d rows", writer.total)
@@ -277,6 +282,21 @@ class ReplicationResource(Resource):
                 "position", "user_id", "room_id", "tags"
             ))
 
+    @defer.inlineCallbacks
+    def push_rules(self, writer, current_token, limit):
+        current_position = current_token.push_rules
+
+        push_rules = parse_integer(writer.request, "push_rules")
+
+        if push_rules is not None:
+            rows = yield self.store.get_all_push_rule_updates(
+                push_rules, current_position, limit
+            )
+            writer.write_header_and_rows("push_rules", rows, (
+                "position", "event_stream_ordering", "user_id", "rule_id", "op",
+                "priority_class", "priority", "conditions", "actions"
+            ))
+
 
 class _Writer(object):
     """Writes the streams as a JSON object as the response to the request"""
@@ -307,12 +327,16 @@ class _Writer(object):
 
 class _ReplicationToken(collections.namedtuple("_ReplicationToken", (
     "events", "presence", "typing", "receipts", "account_data", "backfill",
+    "push_rules"
 ))):
     __slots__ = []
 
     def __new__(cls, *args):
         if len(args) == 1:
-            return cls(*(int(value) for value in args[0].split("_")))
+            streams = [int(value) for value in args[0].split("_")]
+            if len(streams) < len(cls._fields):
+                streams.extend([0] * (len(cls._fields) - len(streams)))
+            return cls(*streams)
         else:
             return super(_ReplicationToken, cls).__new__(cls, *args)
 
