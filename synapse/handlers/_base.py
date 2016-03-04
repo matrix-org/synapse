@@ -374,6 +374,12 @@ class BaseHandler(object):
                         "You don't have permission to redact events"
                     )
 
+        if event.type == EventTypes.Create and context.current_state:
+            raise AuthError(
+                403,
+                "Changing the room create event is forbidden",
+            )
+
         action_generator = ActionGenerator(self.hs)
         yield action_generator.handle_push_actions_for_event(
             event, context, self
