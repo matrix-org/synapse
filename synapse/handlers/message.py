@@ -196,12 +196,25 @@ class MessageHandler(BaseHandler):
 
         if builder.type == EventTypes.Member:
             membership = builder.content.get("membership", None)
+            target = UserID.from_string(builder.state_key)
+
             if membership == Membership.JOIN:
-                joinee = UserID.from_string(builder.state_key)
                 # If event doesn't include a display name, add one.
                 yield collect_presencelike_data(
-                    self.distributor, joinee, builder.content
+                    self.distributor, target, builder.content
                 )
+            elif membership == Membership.INVITE:
+                profile = self.hs.get_handlers().profile_handler
+                content = builder.content
+
+                try:
+                    content["displayname"] = yield profile.get_displayname(target)
+                    content["avatar_url"] = yield profile.get_avatar_url(target)
+                except Exception as e:
+                    logger.info(
+                        "Failed to get profile infomration for %r: %s",
+                        target, e
+                    )
 
         if token_id is not None:
             builder.internal_metadata.token_id = token_id
