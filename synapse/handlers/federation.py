@@ -472,7 +472,7 @@ class FederationHandler(BaseHandler):
                         limit=100,
                         extremities=[e for e in extremities.keys()]
                     )
-                except SynapseError:
+                except SynapseError as e:
                     logger.info(
                         "Failed to backfill from %s because %s",
                         dom, e,

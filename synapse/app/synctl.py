@@ -29,13 +29,13 @@ NORMAL = "\x1b[m"
 
 
 def start(configfile):
-    print "Starting ...",
+    print ("Starting ...")
     args = SYNAPSE
     args.extend(["--daemonize", "-c", configfile])
 
     try:
         subprocess.check_call(args)
-        print GREEN + "started" + NORMAL
+        print (GREEN + "started" + NORMAL)
     except subprocess.CalledProcessError as e:
         print (
             RED +
@@ -48,7 +48,7 @@ def stop(pidfile):
     if os.path.exists(pidfile):
         pid = int(open(pidfile).read())
         os.kill(pid, signal.SIGTERM)
-        print GREEN + "stopped" + NORMAL
+        print (GREEN + "stopped" + NORMAL)
 
 
 def main():

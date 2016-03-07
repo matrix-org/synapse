@@ -69,7 +69,7 @@ class ExpiringCache(object):
         if self._max_len and len(self._cache.keys()) > self._max_len:
             sorted_entries = sorted(
                 self._cache.items(),
-                key=lambda (k, v): v.time,
+                key=lambda item: item[1].time,
             )
 
             for k, _ in sorted_entries[self._max_len:]:
