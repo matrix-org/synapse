@@ -241,7 +241,7 @@ class RegistrationHandler(BaseHandler):
                 password_hash=None
             )
             yield registered_user(self.distributor, user)
-        except Exception, e:
+        except Exception as e:
             yield self.store.add_access_token_to_user(user_id, token)
             # Ignore Registration errors
             logger.exception(e)

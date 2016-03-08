@@ -252,7 +252,7 @@ class SAML2RestServlet(ClientV1RestServlet):
             SP = Saml2Client(conf)
             saml2_auth = SP.parse_authn_request_response(
                 request.args['SAMLResponse'][0], BINDING_HTTP_POST)
-        except Exception, e:        # Not authenticated
+        except Exception as e:        # Not authenticated
             logger.exception(e)
         if saml2_auth and saml2_auth.status_ok() and not saml2_auth.not_signed:
             username = saml2_auth.name_id.text
