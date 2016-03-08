@@ -54,13 +54,13 @@ class RoomPermissionsTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -419,13 +419,13 @@ class RoomsMemberListTestCase(RestTestCase):
 
         self.auth_user_id = self.user_id
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -501,13 +501,13 @@ class RoomsCreateTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -593,14 +593,14 @@ class RoomTopicTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
 
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -708,13 +708,13 @@ class RoomMemberStateTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -840,13 +840,13 @@ class RoomMessagesTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -942,13 +942,13 @@ class RoomInitialSyncTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -1014,13 +1014,13 @@ class RoomMessageListTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -1032,7 +1032,7 @@ class RoomMessageListTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_topo_token_is_accepted(self):
-        token = "t1-0_0_0_0_0"
+        token = "t1-0_0_0_0_0_0"
         (code, response) = yield self.mock_resource.trigger_get(
             "/rooms/%s/messages?access_token=x&from=%s" %
             (self.room_id, token))
@@ -1044,7 +1044,7 @@ class RoomMessageListTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_stream_token_is_accepted_for_fwd_pagianation(self):
-        token = "s0_0_0_0_0"
+        token = "s0_0_0_0_0_0"
         (code, response) = yield self.mock_resource.trigger_get(
             "/rooms/%s/messages?access_token=x&from=%s" %
             (self.room_id, token))

@@ -20,6 +20,7 @@ from synapse.api.constants import Membership, EventTypes
 from synapse.util import unwrapFirstError
 from synapse.util.logcontext import LoggingContext, preserve_fn
 from synapse.util.metrics import Measure
+from synapse.push.clientformat import format_push_rules_for_user
 
 from twisted.internet import defer
 
@@ -209,9 +210,9 @@ class SyncHandler(BaseHandler):
             key=None
         )
 
-        membership_list = (Membership.INVITE, Membership.JOIN)
-        if sync_config.filter_collection.include_leave:
-            membership_list += (Membership.LEAVE, Membership.BAN)
+        membership_list = (
+            Membership.INVITE, Membership.JOIN, Membership.LEAVE, Membership.BAN
+        )
 
         room_list = yield self.store.get_rooms_for_user_where_membership_is(
             user_id=sync_config.user.to_string(),
@@ -222,6 +223,10 @@ class SyncHandler(BaseHandler):
             yield self.store.get_account_data_for_user(
                 sync_config.user.to_string()
             )
+        )
+
+        account_data['m.push_rules'] = yield self.push_rules_for_user(
+            sync_config.user
         )
 
         tags_by_room = yield self.store.get_tags_for_user(
@@ -257,6 +262,12 @@ class SyncHandler(BaseHandler):
                         invite=invite,
                     ))
                 elif event.membership in (Membership.LEAVE, Membership.BAN):
+                    # Always send down rooms we were banned or kicked from.
+                    if not sync_config.filter_collection.include_leave:
+                        if event.membership == Membership.LEAVE:
+                            if sync_config.user.to_string() == event.sender:
+                                continue
+
                     leave_token = now_token.copy_and_replace(
                         "room_key", "s%d" % (event.stream_ordering,)
                     )
@@ -321,6 +332,14 @@ class SyncHandler(BaseHandler):
         )
 
         defer.returnValue(room_sync)
+
+    @defer.inlineCallbacks
+    def push_rules_for_user(self, user):
+        user_id = user.to_string()
+        rawrules = yield self.store.get_push_rules_for_user(user_id)
+        enabled_map = yield self.store.get_push_rules_enabled_for_user(user_id)
+        rules = format_push_rules_for_user(user, rawrules, enabled_map)
+        defer.returnValue(rules)
 
     def account_data_for_user(self, account_data):
         account_data_events = []
@@ -480,6 +499,15 @@ class SyncHandler(BaseHandler):
                 since_token.account_data_key,
             )
         )
+
+        push_rules_changed = yield self.store.have_push_rules_changed_for_user(
+            user_id, int(since_token.push_rules_key)
+        )
+
+        if push_rules_changed:
+            account_data["m.push_rules"] = yield self.push_rules_for_user(
+                sync_config.user
+            )
 
         # Get a list of membership change events that have happened.
         rooms_changed = yield self.store.get_membership_changes_for_user(

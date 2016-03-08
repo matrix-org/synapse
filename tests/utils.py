@@ -20,6 +20,7 @@ from synapse.storage.prepare_database import prepare_database
 from synapse.storage.engines import create_engine
 from synapse.server import HomeServer
 from synapse.federation.transport import server
+from synapse.types import Requester
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 from synapse.util.logcontext import LoggingContext
@@ -50,6 +51,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.macaroon_secret_key = "not even a little secret"
         config.server_name = "server.under.test"
         config.trusted_third_party_id_servers = []
+        config.room_invite_state_types = []
 
     config.database_config = {"name": "sqlite3"}
 
@@ -510,3 +512,7 @@ class DeferredMockCallable(object):
                     "call(%s)" % _format_call(c[0], c[1]) for c in calls
                 ])
             )
+
+
+def requester_for_user(user):
+    return Requester(user, None, False)

@@ -86,7 +86,7 @@ class ProfileTestCase(unittest.TestCase):
 
         self.assertEquals(200, code)
         self.assertEquals(mocked_set.call_args[0][0].localpart, "1234ABCD")
-        self.assertEquals(mocked_set.call_args[0][1].localpart, "1234ABCD")
+        self.assertEquals(mocked_set.call_args[0][1].user.localpart, "1234ABCD")
         self.assertEquals(mocked_set.call_args[0][2], "Frank Jr.")
 
     @defer.inlineCallbacks
@@ -155,5 +155,5 @@ class ProfileTestCase(unittest.TestCase):
 
         self.assertEquals(200, code)
         self.assertEquals(mocked_set.call_args[0][0].localpart, "1234ABCD")
-        self.assertEquals(mocked_set.call_args[0][1].localpart, "1234ABCD")
+        self.assertEquals(mocked_set.call_args[0][1].user.localpart, "1234ABCD")
         self.assertEquals(mocked_set.call_args[0][2], "http://my.server/pic.gif")

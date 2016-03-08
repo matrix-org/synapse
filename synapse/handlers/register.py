@@ -157,6 +157,7 @@ class RegistrationHandler(BaseHandler):
                     )
                 except SynapseError:
                     # if user id is taken, just generate another
+                    user = None
                     user_id = None
                     token = None
                     attempts += 1
@@ -240,7 +241,7 @@ class RegistrationHandler(BaseHandler):
                 password_hash=None
             )
             yield registered_user(self.distributor, user)
-        except Exception, e:
+        except Exception as e:
             yield self.store.add_access_token_to_user(user_id, token)
             # Ignore Registration errors
             logger.exception(e)
