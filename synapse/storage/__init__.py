@@ -45,7 +45,7 @@ from .search import SearchStore
 from .tags import TagsStore
 from .account_data import AccountDataStore
 
-from util.id_generators import IdGenerator, StreamIdGenerator, ChainedIdGenerator
+from .util.id_generators import IdGenerator, StreamIdGenerator, ChainedIdGenerator
 
 from synapse.api.constants import PresenceState
 from synapse.util.caches.stream_change_cache import StreamChangeCache

@@ -16,7 +16,7 @@
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
 from twisted.internet import defer
 
-from base import ClientV1RestServlet, client_path_patterns
+from .base import ClientV1RestServlet, client_path_patterns
 from synapse.api.errors import SynapseError, Codes, AuthError
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership

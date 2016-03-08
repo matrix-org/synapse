@@ -18,8 +18,8 @@ import ujson as json
 
 from twisted.internet import defer
 
-import baserules
-from push_rule_evaluator import PushRuleEvaluatorForEvent
+from .baserules import list_with_base_rules
+from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
 from synapse.api.constants import EventTypes
 
@@ -39,7 +39,7 @@ def _get_rules(room_id, user_ids, store):
     rules_enabled_by_user = yield store.bulk_get_push_rules_enabled(user_ids)
 
     rules_by_user = {
-        uid: baserules.list_with_base_rules([
+        uid: list_with_base_rules([
             decode_rule_json(rule_list)
             for rule_list in rules_by_user.get(uid, [])
         ])

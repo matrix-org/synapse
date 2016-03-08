@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from _base import SQLBaseStore
+from ._base import SQLBaseStore
 
 
 class MediaRepositoryStore(SQLBaseStore):
