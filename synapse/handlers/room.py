@@ -884,6 +884,10 @@ class RoomMemberHandler(BaseHandler):
             inviter_user_id=inviter_user_id,
         )
 
+        guest_user_info = yield self.hs.get_auth().get_user_by_access_token(
+            guest_access_token
+        )
+
         is_url = "%s%s/_matrix/identity/api/v1/store-invite" % (
             id_server_scheme, id_server,
         )
@@ -900,6 +904,7 @@ class RoomMemberHandler(BaseHandler):
                 "sender": inviter_user_id,
                 "sender_display_name": inviter_display_name,
                 "sender_avatar_url": inviter_avatar_url,
+                "guest_user_id": guest_user_info["user"].to_string(),
                 "guest_access_token": guest_access_token,
             }
         )
