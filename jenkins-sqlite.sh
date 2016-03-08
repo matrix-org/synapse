@@ -22,7 +22,7 @@ export PEP8SUFFIX="--output-file=violations.flake8.log || echo flake8 finished w
 
 rm .coverage* || echo "No coverage files to remove"
 
-tox --notest
+tox --notest -e py27
 TOX_BIN=$WORKSPACE/.tox/py27/bin
 
 : ${GIT_BRANCH:="origin/$(git rev-parse --abbrev-ref HEAD)"}
