@@ -23,10 +23,9 @@ export PEP8SUFFIX="--output-file=violations.flake8.log || echo flake8 finished w
 rm .coverage* || echo "No coverage files to remove"
 
 tox --notest
+TOX_BIN=$WORKSPACE/.tox/py27/bin
 
 : ${GIT_BRANCH:="origin/$(git rev-parse --abbrev-ref HEAD)"}
-
-TOX_BIN=$WORKSPACE/.tox/py27/bin
 
 if [[ ! -e .sytest-base ]]; then
   git clone https://github.com/matrix-org/sytest.git .sytest-base --mirror
@@ -40,18 +39,8 @@ cd sytest
 
 git checkout "${GIT_BRANCH}" || (echo >&2 "No ref ${GIT_BRANCH} found, falling back to develop" ; git checkout develop)
 
-: ${PERL5LIB:=$WORKSPACE/perl5/lib/perl5}
-: ${PERL_MB_OPT:=--install_base=$WORKSPACE/perl5}
-: ${PERL_MM_OPT:=INSTALL_BASE=$WORKSPACE/perl5}
-export PERL5LIB PERL_MB_OPT PERL_MM_OPT
-
-./install-deps.pl
-
 : ${PORT_BASE:=8500}
-
-echo >&2 "Running sytest with SQLite3";
-./run-tests.pl --coverage -O tap --synapse-directory $WORKSPACE \
-    --python $TOX_BIN/python --all --port-base $PORT_BASE > results-sqlite3.tap
+./jenkins/install_and_run.sh --python $TOX_BIN/python --port-base $PORT_BASE
 
 cd ..
 cp sytest/.coverage.* .

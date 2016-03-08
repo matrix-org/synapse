@@ -24,9 +24,10 @@ rm .coverage* || echo "No coverage files to remove"
 
 tox --notest
 
-: ${GIT_BRANCH:="origin/$(git rev-parse --abbrev-ref HEAD)"}
-
 TOX_BIN=$WORKSPACE/.tox/py27/bin
+$TOX_BIN/pip install psycopg2
+
+: ${GIT_BRANCH:="origin/$(git rev-parse --abbrev-ref HEAD)"}
 
 if [[ ! -e .sytest-base ]]; then
   git clone https://github.com/matrix-org/sytest.git .sytest-base --mirror
@@ -40,47 +41,12 @@ cd sytest
 
 git checkout "${GIT_BRANCH}" || (echo >&2 "No ref ${GIT_BRANCH} found, falling back to develop" ; git checkout develop)
 
-: ${PERL5LIB:=$WORKSPACE/perl5/lib/perl5}
-: ${PERL_MB_OPT:=--install_base=$WORKSPACE/perl5}
-: ${PERL_MM_OPT:=INSTALL_BASE=$WORKSPACE/perl5}
-export PERL5LIB PERL_MB_OPT PERL_MM_OPT
-
-./install-deps.pl
-
 : ${PORT_BASE:=8000}
 
+./jenkins/prep_sytest_for_postgres.sh
 
-if [[ -z "$POSTGRES_DB_1" ]]; then
-    echo >&2 "Variable POSTGRES_DB_1 not set"
-    exit 1
-fi
-
-if [[ -z "$POSTGRES_DB_2" ]]; then
-    echo >&2 "Variable POSTGRES_DB_2 not set"
-    exit 1
-fi
-
-mkdir -p "localhost-$(($PORT_BASE + 1))"
-mkdir -p "localhost-$(($PORT_BASE + 2))"
-
-cat > localhost-$(($PORT_BASE + 1))/database.yaml << EOF
-name: psycopg2
-args:
-    database: $POSTGRES_DB_1
-EOF
-
-cat > localhost-$(($PORT_BASE + 2))/database.yaml << EOF
-name: psycopg2
-args:
-    database: $POSTGRES_DB_2
-EOF
-
-
-# Run if both postgresql databases exist
 echo >&2 "Running sytest with PostgreSQL";
-$TOX_BIN/pip install psycopg2
-./run-tests.pl --coverage -O tap --synapse-directory $WORKSPACE \
-    --python $TOX_BIN/python --all --port-base $PORT_BASE > results-postgresql.tap
+./jenkins/install_and_run.sh --python $TOX_BIN/python --port-base $PORT_BASE
 
 cd ..
 cp sytest/.coverage.* .
