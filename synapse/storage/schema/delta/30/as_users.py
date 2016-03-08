@@ -20,7 +20,11 @@ logger = logging.getLogger(__name__)
 
 def run_upgrade(cur, database_engine, config, *args, **kwargs):
     # NULL indicates user was not registered by an appservice.
-    cur.execute("ALTER TABLE users ADD COLUMN appservice_id TEXT")
+    try:
+        cur.execute("ALTER TABLE users ADD COLUMN appservice_id TEXT")
+    except:
+        # Maybe we already added the column? Hope so...
+        pass
 
     cur.execute("SELECT name FROM users")
     rows = cur.fetchall()
