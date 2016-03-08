@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-import baserules
+from .baserules import list_with_base_rules
 
 import logging
 import simplejson as json
@@ -91,7 +91,7 @@ class PushRuleEvaluator:
             rule['actions'] = json.loads(raw_rule['actions'])
             rules.append(rule)
 
-        self.rules = baserules.list_with_base_rules(rules)
+        self.rules = list_with_base_rules(rules)
 
         self.enabled_map = enabled_map
 

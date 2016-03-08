@@ -21,7 +21,7 @@ from synapse.util.logcontext import LoggingContext
 from synapse.util.metrics import Measure
 
 import synapse.util.async
-import push_rule_evaluator as push_rule_evaluator
+from .push_rule_evaluator import evaluator_for_user_id
 
 import logging
 import random
@@ -185,7 +185,7 @@ class Pusher(object):
         processed = False
 
         rule_evaluator = yield \
-            push_rule_evaluator.evaluator_for_user_id(
+            evaluator_for_user_id(
                 self.user_id, single_event['room_id'], self.store
             )
 

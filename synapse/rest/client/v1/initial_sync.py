@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.streams.config import PaginationConfig
-from base import ClientV1RestServlet, client_path_patterns
+from .base import ClientV1RestServlet, client_path_patterns
 
 
 # TODO: Needs unit testing

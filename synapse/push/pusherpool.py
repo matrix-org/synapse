@@ -16,7 +16,7 @@
 
 from twisted.internet import defer
 
-from httppusher import HttpPusher
+from .httppusher import HttpPusher
 from synapse.push import PusherConfigException
 from synapse.util.logcontext import preserve_fn
 
