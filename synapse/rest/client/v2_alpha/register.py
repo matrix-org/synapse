@@ -187,7 +187,7 @@ class RegisterRestServlet(RestServlet):
             else:
                 logger.info("bind_email not specified: not binding email")
 
-        result = self._create_registration_details(user_id, token)
+        result = yield self._create_registration_details(user_id, token)
         defer.returnValue((200, result))
 
     def on_OPTIONS(self, _):
@@ -198,7 +198,7 @@ class RegisterRestServlet(RestServlet):
         (user_id, token) = yield self.registration_handler.appservice_register(
             username, as_token
         )
-        defer.returnValue(self._create_registration_details(user_id, token))
+        defer.returnValue((yield self._create_registration_details(user_id, token)))
 
     @defer.inlineCallbacks
     def _do_shared_secret_registration(self, username, password, mac):
@@ -225,14 +225,17 @@ class RegisterRestServlet(RestServlet):
         (user_id, token) = yield self.registration_handler.register(
             localpart=username, password=password
         )
-        defer.returnValue(self._create_registration_details(user_id, token))
+        defer.returnValue((yield self._create_registration_details(user_id, token)))
 
+    @defer.inlineCallbacks
     def _create_registration_details(self, user_id, token):
-        return {
+        refresh_token = yield self.auth_handler.issue_refresh_token(user_id)
+        defer.returnValue({
             "user_id": user_id,
             "access_token": token,
             "home_server": self.hs.hostname,
-        }
+            "refresh_token": refresh_token,
+        })
 
     @defer.inlineCallbacks
     def onEmailTokenRequest(self, request):
