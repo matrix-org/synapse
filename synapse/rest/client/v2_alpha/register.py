@@ -228,10 +228,13 @@ class RegisterRestServlet(RestServlet):
         defer.returnValue(self._create_registration_details(user_id, token))
 
     def _create_registration_details(self, user_id, token):
+        auth_handler = self.hs.get_handlers().auth_handler
+        refresh_token = auth_handler.generate_refresh_token(user_id)
         return {
             "user_id": user_id,
             "access_token": token,
             "home_server": self.hs.hostname,
+            "refresh_token": refresh_token,
         }
 
     @defer.inlineCallbacks
