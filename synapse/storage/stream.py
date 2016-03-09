@@ -217,8 +217,8 @@ class StreamStore(SQLBaseStore):
                     " room_id = ?"
                     " AND not outlier"
                     " AND stream_ordering <= ?"
-                    " ORDER BY stream_ordering %s LIMIT ?"
-                ) % (order,)
+                    " ORDER BY topological_ordering %s, stream_ordering %s LIMIT ?"
+                ) % (order, order,)
                 txn.execute(sql, (room_id, to_id, limit))
 
             rows = self.cursor_to_dict(txn)
