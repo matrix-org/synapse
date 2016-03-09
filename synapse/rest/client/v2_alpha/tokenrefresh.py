@@ -16,9 +16,9 @@
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError, StoreError, SynapseError
-from synapse.http.servlet import RestServlet
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
-from ._base import client_v2_patterns, parse_json_dict_from_request
+from ._base import client_v2_patterns
 
 
 class TokenRefreshRestServlet(RestServlet):
@@ -35,7 +35,7 @@ class TokenRefreshRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        body = parse_json_dict_from_request(request)
+        body = parse_json_object_from_request(request)
         try:
             old_refresh_token = body["refresh_token"]
             auth_handler = self.hs.get_handlers().auth_handler

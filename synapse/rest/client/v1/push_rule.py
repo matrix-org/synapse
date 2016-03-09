@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import (
-    SynapseError, Codes, UnrecognizedRequestError, NotFoundError, StoreError
+    SynapseError, UnrecognizedRequestError, NotFoundError, StoreError
 )
 from .base import ClientV1RestServlet, client_path_patterns
 from synapse.storage.push_rule import (
@@ -25,8 +25,7 @@ from synapse.storage.push_rule import (
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.baserules import BASE_RULE_IDS
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
-
-import simplejson as json
+from synapse.http.servlet import parse_json_object_from_request
 
 
 class PushRuleRestServlet(ClientV1RestServlet):
@@ -52,7 +51,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         if '/' in spec['rule_id'] or '\\' in spec['rule_id']:
             raise SynapseError(400, "rule_id may not contain slashes")
 
-        content = _parse_json(request)
+        content = parse_json_object_from_request(request)
 
         user_id = requester.user.to_string()
 
@@ -339,15 +338,6 @@ def _namespaced_rule_id(spec, rule_id):
 
 class InvalidRuleException(Exception):
     pass
-
-
-# XXX: C+ped from rest/room.py - surely this should be common?
-def _parse_json(request):
-    try:
-        content = json.loads(request.content.read())
-        return content
-    except ValueError:
-        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
 
 def register_servlets(hs, http_server):

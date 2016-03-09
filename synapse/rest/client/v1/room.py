@@ -22,6 +22,7 @@ from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
 from synapse.types import UserID, RoomID, RoomAlias
 from synapse.events.utils import serialize_event
+from synapse.http.servlet import parse_json_object_from_request
 
 import simplejson as json
 import logging
@@ -137,7 +138,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
     def on_PUT(self, request, room_id, event_type, state_key, txn_id=None):
         requester = yield self.auth.get_user_by_req(request)
 
-        content = _parse_json(request)
+        content = parse_json_object_from_request(request)
 
         event_dict = {
             "type": event_type,
@@ -179,7 +180,7 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_type, txn_id=None):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
-        content = _parse_json(request)
+        content = parse_json_object_from_request(request)
 
         msg_handler = self.handlers.message_handler
         event = yield msg_handler.create_and_send_nonmember_event(
@@ -229,7 +230,7 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
         )
 
         try:
-            content = _parse_json(request)
+            content = parse_json_object_from_request(request)
         except:
             # Turns out we used to ignore the body entirely, and some clients
             # cheekily send invalid bodies.
@@ -433,7 +434,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             raise AuthError(403, "Guest access not allowed")
 
         try:
-            content = _parse_json(request)
+            content = parse_json_object_from_request(request)
         except:
             # Turns out we used to ignore the body entirely, and some clients
             # cheekily send invalid bodies.
@@ -500,7 +501,7 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_id, txn_id=None):
         requester = yield self.auth.get_user_by_req(request)
-        content = _parse_json(request)
+        content = parse_json_object_from_request(request)
 
         msg_handler = self.handlers.message_handler
         event = yield msg_handler.create_and_send_nonmember_event(
@@ -548,7 +549,7 @@ class RoomTypingRestServlet(ClientV1RestServlet):
         room_id = urllib.unquote(room_id)
         target_user = UserID.from_string(urllib.unquote(user_id))
 
-        content = _parse_json(request)
+        content = parse_json_object_from_request(request)
 
         typing_handler = self.handlers.typing_notification_handler
 
@@ -580,7 +581,7 @@ class SearchRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
 
-        content = _parse_json(request)
+        content = parse_json_object_from_request(request)
 
         batch = request.args.get("next_batch", [None])[0]
         results = yield self.handlers.search_handler.search(
@@ -590,17 +591,6 @@ class SearchRestServlet(ClientV1RestServlet):
         )
 
         defer.returnValue((200, results))
-
-
-def _parse_json(request):
-    try:
-        content = json.loads(request.content.read())
-        if type(content) != dict:
-            raise SynapseError(400, "Content must be a JSON object.",
-                               errcode=Codes.NOT_JSON)
-        return content
-    except ValueError:
-        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
 
 def register_txn_path(servlet, regex_string, http_server, with_get=False):

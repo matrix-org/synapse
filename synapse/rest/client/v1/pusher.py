@@ -17,9 +17,10 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, Codes
 from synapse.push import PusherConfigException
+from synapse.http.servlet import parse_json_object_from_request
+
 from .base import ClientV1RestServlet, client_path_patterns
 
-import simplejson as json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ class PusherRestServlet(ClientV1RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         user = requester.user
 
-        content = _parse_json(request)
+        content = parse_json_object_from_request(request)
 
         pusher_pool = self.hs.get_pusherpool()
 
@@ -90,18 +91,6 @@ class PusherRestServlet(ClientV1RestServlet):
 
     def on_OPTIONS(self, _):
         return 200, {}
-
-
-# XXX: C+ped from rest/room.py - surely this should be common?
-def _parse_json(request):
-    try:
-        content = json.loads(request.content.read())
-        if type(content) != dict:
-            raise SynapseError(400, "Content must be a JSON object.",
-                               errcode=Codes.NOT_JSON)
-        return content
-    except ValueError:
-        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
 
 def register_servlets(hs, http_server):

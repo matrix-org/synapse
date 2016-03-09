@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError, LoginError, Codes
 from synapse.types import UserID
 from synapse.http.server import finish_request
+from synapse.http.servlet import parse_json_object_from_request
 
 from .base import ClientV1RestServlet, client_path_patterns
 
@@ -79,7 +80,7 @@ class LoginRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        login_submission = _parse_json(request)
+        login_submission = parse_json_object_from_request(request)
         try:
             if login_submission["type"] == LoginRestServlet.PASS_TYPE:
                 if not self.password_enabled:
@@ -398,18 +399,6 @@ class CasTicketServlet(ClientV1RestServlet):
             raise LoginError(401, "Invalid CAS response", errcode=Codes.UNAUTHORIZED)
 
         return (user, attributes)
-
-
-def _parse_json(request):
-    try:
-        content = json.loads(request.content.read())
-        if type(content) != dict:
-            raise SynapseError(
-                400, "Content must be a JSON object.", errcode=Codes.BAD_JSON
-            )
-        return content
-    except ValueError:
-        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
 
 def register_servlets(hs, http_server):
