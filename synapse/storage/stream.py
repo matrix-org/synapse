@@ -184,6 +184,9 @@ class StreamStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_room_events_stream_for_room(self, room_id, from_key, to_key, limit=0,
                                         order='DESC'):
+        # Note: If from_key is None then we return in topological order. This
+        # is because in that case we're using this as a "get the last few messages
+        # in a room" function, rather than "get new messages since last sync"
         if from_key is not None:
             from_id = RoomStreamToken.parse_stream_token(from_key).stream
         else:
