@@ -17,10 +17,10 @@ from twisted.internet import defer
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import LoginError, SynapseError, Codes
-from synapse.http.servlet import RestServlet
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.util.async import run_on_reactor
 
-from ._base import client_v2_patterns, parse_json_dict_from_request
+from ._base import client_v2_patterns
 
 import logging
 
@@ -41,7 +41,7 @@ class PasswordRestServlet(RestServlet):
     def on_POST(self, request):
         yield run_on_reactor()
 
-        body = parse_json_dict_from_request(request)
+        body = parse_json_object_from_request(request)
 
         authed, result, params = yield self.auth_handler.check_auth([
             [LoginType.PASSWORD],
@@ -114,7 +114,7 @@ class ThreepidRestServlet(RestServlet):
     def on_POST(self, request):
         yield run_on_reactor()
 
-        body = parse_json_dict_from_request(request)
+        body = parse_json_object_from_request(request)
 
         threePidCreds = body.get('threePidCreds')
         threePidCreds = body.get('three_pid_creds', threePidCreds)

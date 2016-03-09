@@ -17,9 +17,9 @@ from twisted.internet import defer
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
-from synapse.http.servlet import RestServlet
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
-from ._base import client_v2_patterns, parse_json_dict_from_request
+from ._base import client_v2_patterns
 
 import logging
 import hmac
@@ -73,7 +73,7 @@ class RegisterRestServlet(RestServlet):
             ret = yield self.onEmailTokenRequest(request)
             defer.returnValue(ret)
 
-        body = parse_json_dict_from_request(request)
+        body = parse_json_object_from_request(request)
 
         # we do basic sanity checks here because the auth layer will store these
         # in sessions. Pull out the username/password provided to us.
@@ -236,7 +236,7 @@ class RegisterRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def onEmailTokenRequest(self, request):
-        body = parse_json_dict_from_request(request)
+        body = parse_json_object_from_request(request)
 
         required = ['id_server', 'client_secret', 'email', 'send_attempt']
         absent = []

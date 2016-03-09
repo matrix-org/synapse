@@ -17,11 +17,9 @@
 """
 
 from synapse.api.urls import CLIENT_V2_ALPHA_PREFIX
-from synapse.api.errors import SynapseError
 import re
 
 import logging
-import simplejson
 
 
 logger = logging.getLogger(__name__)
@@ -44,23 +42,3 @@ def client_v2_patterns(path_regex, releases=(0,)):
         new_prefix = CLIENT_V2_ALPHA_PREFIX.replace("/v2_alpha", "/r%d" % release)
         patterns.append(re.compile("^" + new_prefix + path_regex))
     return patterns
-
-
-def parse_request_allow_empty(request):
-    content = request.content.read()
-    if content is None or content == '':
-        return None
-    try:
-        return simplejson.loads(content)
-    except simplejson.JSONDecodeError:
-        raise SynapseError(400, "Content not JSON.")
-
-
-def parse_json_dict_from_request(request):
-    try:
-        content = simplejson.loads(request.content.read())
-        if type(content) != dict:
-            raise SynapseError(400, "Content must be a JSON object.")
-        return content
-    except simplejson.JSONDecodeError:
-        raise SynapseError(400, "Content not JSON.")
