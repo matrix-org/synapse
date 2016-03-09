@@ -232,7 +232,7 @@ class StreamStore(SQLBaseStore):
             get_prev_content=True
         )
 
-        self._set_before_and_after(ret, rows, topo_order=False)
+        self._set_before_and_after(ret, rows, topo_order=from_id is None)
 
         if order.lower() == "desc":
             ret.reverse()
