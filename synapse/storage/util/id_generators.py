@@ -34,7 +34,7 @@ def _load_max_id(db_conn, table, column):
     cur.execute("SELECT MAX(%s) FROM %s" % (column, table,))
     val, = cur.fetchone()
     cur.close()
-    return val if val else 1
+    return int(val) if val else 1
 
 
 class StreamIdGenerator(object):
