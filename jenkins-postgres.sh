@@ -46,7 +46,8 @@ git checkout "${GIT_BRANCH}" || (echo >&2 "No ref ${GIT_BRANCH} found, falling b
 ./jenkins/prep_sytest_for_postgres.sh
 
 echo >&2 "Running sytest with PostgreSQL";
-./jenkins/install_and_run.sh --python $TOX_BIN/python \
+./jenkins/install_and_run.sh --coverage \
+                             --python $TOX_BIN/python \
                              --synapse-directory $WORKSPACE \
                              --port-base $PORT_BASE
 

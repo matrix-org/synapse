@@ -40,7 +40,8 @@ cd sytest
 git checkout "${GIT_BRANCH}" || (echo >&2 "No ref ${GIT_BRANCH} found, falling back to develop" ; git checkout develop)
 
 : ${PORT_BASE:=8500}
-./jenkins/install_and_run.sh --python $TOX_BIN/python \
+./jenkins/install_and_run.sh --coverage \
+                             --python $TOX_BIN/python \
                              --synapse-directory $WORKSPACE \
                              --port-base $PORT_BASE
 
