@@ -65,9 +65,9 @@ class RegisterRestServletTestCase(unittest.TestCase):
         (code, result) = yield self.servlet.on_POST(self.request)
         self.assertEquals(code, 200)
         det_data = {
-             "user_id": user_id,
-             "access_token": token,
-             "home_server": self.hs.hostname
+            "user_id": user_id,
+            "access_token": token,
+            "home_server": self.hs.hostname
         }
         self.assertDictContainsSubset(det_data, result)
         self.assertIn("refresh_token", result)
@@ -118,9 +118,9 @@ class RegisterRestServletTestCase(unittest.TestCase):
         (code, result) = yield self.servlet.on_POST(self.request)
         self.assertEquals(code, 200)
         det_data = {
-             "user_id": user_id,
-             "access_token": token,
-             "home_server": self.hs.hostname
+            "user_id": user_id,
+            "access_token": token,
+            "home_server": self.hs.hostname
         }
         self.assertDictContainsSubset(det_data, result)
         self.assertIn("refresh_token", result)
