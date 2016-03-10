@@ -52,12 +52,17 @@ def run_upgrade(cur, database_engine, config, *args, **kwargs):
                         " service (IDs %s and %s); assigning arbitrarily to %s" %
                         (user_id, owned[user_id], appservice.id, owned[user_id])
                     )
-                owned[user_id] = appservice.id
+                owned.setdefault(appservice.id, []).append(user_id)
 
-    for user_id, as_id in owned.items():
-        cur.execute(
-            database_engine.convert_param_style(
-                "UPDATE users SET appservice_id = ? WHERE name = ?"
-            ),
-            (as_id, user_id)
-        )
+    for as_id, user_ids in owned.items():
+        n = 100
+        user_chunks = (user_ids[i:i + 100] for i in xrange(0, len(user_ids), n))
+        for chunk in user_chunks:
+            cur.execute(
+                database_engine.convert_param_style(
+                    "UPDATE users SET appservice_id = ? WHERE name IN (%s)" % (
+                        ",".join("?" for _ in chunk),
+                    )
+                ),
+                [as_id] + chunk
+            )
