@@ -182,6 +182,8 @@ class RegistrationHandler(BaseHandler):
                 errcode=Codes.EXCLUSIVE
             )
 
+        service_id = service.id if service.is_exclusive_user(user_id) else None
+
         yield self.check_user_id_not_appservice_exclusive(
             user_id, allowed_appservice=service
         )
@@ -190,7 +192,8 @@ class RegistrationHandler(BaseHandler):
         yield self.store.register(
             user_id=user_id,
             token=token,
-            password_hash=""
+            password_hash="",
+            appservice_id=service_id,
         )
         yield registered_user(self.distributor, user)
         defer.returnValue((user_id, token))
