@@ -76,7 +76,7 @@ class RegistrationStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def register(self, user_id, token, password_hash,
-                 was_guest=False, make_guest=False):
+                 was_guest=False, make_guest=False, appservice_id=None):
         """Attempts to register an account.
 
         Args:
@@ -87,16 +87,32 @@ class RegistrationStore(SQLBaseStore):
                 upgraded to a non-guest account.
             make_guest (boolean): True if the the new user should be guest,
                 false to add a regular user account.
+            appservice_id (str): The ID of the appservice registering the user.
         Raises:
             StoreError if the user_id could not be registered.
         """
         yield self.runInteraction(
             "register",
-            self._register, user_id, token, password_hash, was_guest, make_guest
+            self._register,
+            user_id,
+            token,
+            password_hash,
+            was_guest,
+            make_guest,
+            appservice_id
         )
         self.is_guest.invalidate((user_id,))
 
-    def _register(self, txn, user_id, token, password_hash, was_guest, make_guest):
+    def _register(
+        self,
+        txn,
+        user_id,
+        token,
+        password_hash,
+        was_guest,
+        make_guest,
+        appservice_id
+    ):
         now = int(self.clock.time())
 
         next_id = self._access_tokens_id_gen.get_next()
@@ -111,9 +127,21 @@ class RegistrationStore(SQLBaseStore):
                             [password_hash, now, 1 if make_guest else 0, user_id])
             else:
                 txn.execute("INSERT INTO users "
-                            "(name, password_hash, creation_ts, is_guest) "
-                            "VALUES (?,?,?,?)",
-                            [user_id, password_hash, now, 1 if make_guest else 0])
+                            "("
+                            "   name,"
+                            "   password_hash,"
+                            "   creation_ts,"
+                            "   is_guest,"
+                            "   appservice_id"
+                            ") "
+                            "VALUES (?,?,?,?,?)",
+                            [
+                                user_id,
+                                password_hash,
+                                now,
+                                1 if make_guest else 0,
+                                appservice_id,
+                            ])
         except self.database_engine.module.IntegrityError:
             raise StoreError(
                 400, "User ID already taken.", errcode=Codes.USER_IN_USE
