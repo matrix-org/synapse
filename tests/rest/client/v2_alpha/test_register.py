@@ -62,12 +62,15 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.registration_handler.appservice_register = Mock(
             return_value=(user_id, token)
         )
-        result = yield self.servlet.on_POST(self.request)
-        self.assertEquals(result, (200, {
+        (code, result) = yield self.servlet.on_POST(self.request)
+        self.assertEquals(code, 200)
+        det_data = {
             "user_id": user_id,
             "access_token": token,
             "home_server": self.hs.hostname
-        }))
+        }
+        self.assertDictContainsSubset(det_data, result)
+        self.assertIn("refresh_token", result)
 
     @defer.inlineCallbacks
     def test_POST_appservice_registration_invalid(self):
@@ -112,12 +115,15 @@ class RegisterRestServletTestCase(unittest.TestCase):
         })
         self.registration_handler.register = Mock(return_value=(user_id, token))
 
-        result = yield self.servlet.on_POST(self.request)
-        self.assertEquals(result, (200, {
+        (code, result) = yield self.servlet.on_POST(self.request)
+        self.assertEquals(code, 200)
+        det_data = {
             "user_id": user_id,
             "access_token": token,
             "home_server": self.hs.hostname
-        }))
+        }
+        self.assertDictContainsSubset(det_data, result)
+        self.assertIn("refresh_token", result)
 
     def test_POST_disabled_registration(self):
         self.hs.config.enable_registration = False
