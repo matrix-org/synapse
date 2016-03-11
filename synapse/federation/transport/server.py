@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.api.urls import FEDERATION_PREFIX as PREFIX
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import JsonResource
+from synapse.http.servlet import parse_json_object_from_request
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 import functools
@@ -419,8 +420,7 @@ class On3pidBindServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        content_bytes = request.content.read()
-        content = json.loads(content_bytes)
+        content = parse_json_object_from_request(request)
         if "invites" in content:
             last_exception = None
             for invite in content["invites"]:

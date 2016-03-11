@@ -19,9 +19,9 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, AuthError
 from synapse.types import UserID
+from synapse.http.servlet import parse_json_object_from_request
 from .base import ClientV1RestServlet, client_path_patterns
 
-import simplejson as json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -56,9 +56,10 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
             raise AuthError(403, "Can only set your own presence state")
 
         state = {}
-        try:
-            content = json.loads(request.content.read())
 
+        content = parse_json_object_from_request(request)
+
+        try:
             state["presence"] = content.pop("presence")
 
             if "status_msg" in content:
@@ -113,11 +114,7 @@ class PresenceListRestServlet(ClientV1RestServlet):
             raise SynapseError(
                 400, "Cannot modify another user's presence list")
 
-        try:
-            content = json.loads(request.content.read())
-        except:
-            logger.exception("JSON parse error")
-            raise SynapseError(400, "Unable to parse content")
+        content = parse_json_object_from_request(request)
 
         if "invite" in content:
             for u in content["invite"]:

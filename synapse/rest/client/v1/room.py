@@ -24,7 +24,6 @@ from synapse.types import UserID, RoomID, RoomAlias
 from synapse.events.utils import serialize_event
 from synapse.http.servlet import parse_json_object_from_request
 
-import simplejson as json
 import logging
 import urllib
 
@@ -72,15 +71,10 @@ class RoomCreateRestServlet(ClientV1RestServlet):
         defer.returnValue((200, info))
 
     def get_room_config(self, request):
-        try:
-            user_supplied_config = json.loads(request.content.read())
-            if "visibility" not in user_supplied_config:
-                # default visibility
-                user_supplied_config["visibility"] = "public"
-            return user_supplied_config
-        except (ValueError, TypeError):
-            raise SynapseError(400, "Body must be JSON.",
-                               errcode=Codes.BAD_JSON)
+        user_supplied_config = parse_json_object_from_request(request)
+        # default visibility
+        user_supplied_config.setdefault("visibility", "public")
+        return user_supplied_config
 
     def on_OPTIONS(self, request):
         return (200, {})

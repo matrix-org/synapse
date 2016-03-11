@@ -95,7 +95,8 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set.side_effect = AuthError(400, "message")
 
         (code, response) = yield self.mock_resource.trigger(
-            "PUT", "/profile/%s/displayname" % ("@4567:test"), '"Frank Jr."'
+            "PUT", "/profile/%s/displayname" % ("@4567:test"),
+            '{"displayname": "Frank Jr."}'
         )
 
         self.assertTrue(
@@ -121,7 +122,8 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set.side_effect = SynapseError(400, "message")
 
         (code, response) = yield self.mock_resource.trigger(
-            "PUT", "/profile/%s/displayname" % ("@opaque:elsewhere"), None
+            "PUT", "/profile/%s/displayname" % ("@opaque:elsewhere"),
+            '{"displayname":"bob"}'
         )
 
         self.assertTrue(
