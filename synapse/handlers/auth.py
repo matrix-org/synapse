@@ -438,7 +438,7 @@ class AuthHandler(BaseHandler):
         except_access_token_ids = [requester.access_token_id] if requester else []
 
         yield self.store.user_set_password_hash(user_id, password_hash)
-        yield self.store.user_delete_access_tokens_except(
+        yield self.store.user_delete_access_tokens(
             user_id, except_access_token_ids
         )
         yield self.hs.get_pusherpool().remove_pushers_by_user_except_access_tokens(

@@ -195,20 +195,7 @@ class RegistrationStore(SQLBaseStore):
         })
 
     @defer.inlineCallbacks
-    def user_delete_access_tokens(self, user_id):
-        yield self.runInteraction(
-            "user_delete_access_tokens",
-            self._user_delete_access_tokens, user_id
-        )
-
-    def _user_delete_access_tokens(self, txn, user_id):
-        txn.execute(
-            "DELETE FROM access_tokens WHERE user_id = ?",
-            (user_id, )
-        )
-
-    @defer.inlineCallbacks
-    def user_delete_access_tokens_except(self, user_id, except_token_ids):
+    def user_delete_access_tokens(self, user_id, except_token_ids):
         def f(txn):
             txn.execute(
                 "SELECT id, token FROM access_tokens WHERE user_id = ? LIMIT 50",
@@ -226,7 +213,7 @@ class RegistrationStore(SQLBaseStore):
                 ), [r[0] for r in rows]
             )
             return len(rows) == 50
-        while (yield self.runInteraction("user_delete_access_tokens_except", f)):
+        while (yield self.runInteraction("user_delete_access_tokens", f)):
             pass
 
     @cached()
