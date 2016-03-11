@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from synapse.http.server import request_handler, respond_with_json_bytes
-from synapse.http.servlet import parse_integer
+from synapse.http.servlet import parse_integer, parse_json_object_from_request
 from synapse.api.errors import SynapseError, Codes
 
 from twisted.web.resource import Resource
@@ -22,7 +22,6 @@ from twisted.internet import defer
 
 
 from io import BytesIO
-import json
 import logging
 logger = logging.getLogger(__name__)
 
@@ -126,14 +125,7 @@ class RemoteKey(Resource):
     @request_handler
     @defer.inlineCallbacks
     def async_render_POST(self, request):
-        try:
-            content = json.loads(request.content.read())
-            if type(content) != dict:
-                raise ValueError()
-        except ValueError:
-            raise SynapseError(
-                400, "Content must be JSON object.", errcode=Codes.NOT_JSON
-            )
+        content = parse_json_object_from_request(request)
 
         query = content["server_keys"]
 

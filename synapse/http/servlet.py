@@ -128,13 +128,20 @@ def parse_json_object_from_request(request):
             if it wasn't a JSON object.
     """
     try:
-        content = simplejson.loads(request.content.read())
-        if type(content) != dict:
-            message = "Content must be a JSON object."
-            raise SynapseError(400, message, errcode=Codes.BAD_JSON)
-        return content
+        content_bytes = request.content.read()
+    except:
+        raise SynapseError(400, "Error reading JSON content.")
+
+    try:
+        content = simplejson.loads(content_bytes)
     except simplejson.JSONDecodeError:
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
+
+    if type(content) != dict:
+        message = "Content must be a JSON object."
+        raise SynapseError(400, message, errcode=Codes.BAD_JSON)
+
+    return content
 
 
 class RestServlet(object):
