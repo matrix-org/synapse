@@ -208,14 +208,26 @@ class RegistrationStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def flush_user(self, user_id):
-        rows = yield self._execute(
-            'flush_user', None,
-            "SELECT token FROM access_tokens WHERE user_id = ?",
-            user_id
-        )
-        for r in rows:
-            self.get_user_by_access_token.invalidate((r,))
+    def user_delete_access_tokens_except(self, user_id, except_token_ids):
+        def f(txn):
+            txn.execute(
+                "SELECT id, token FROM access_tokens WHERE user_id = ? LIMIT 50",
+                    (user_id,)
+            )
+            rows = txn.fetchall()
+            for r in rows:
+                if r[0] in except_token_ids:
+                    continue
+
+                txn.call_after(self.get_user_by_access_token.invalidate, (r[1],))
+            txn.execute(
+                "DELETE FROM access_tokens WHERE id in (%s)" % ",".join(
+                    ["?" for _ in rows]
+                ), [r[0] for r in rows]
+            )
+            return len(rows) == 50
+        while (yield self.runInteraction("user_delete_access_tokens_except", f)):
+            pass
 
     @cached()
     def get_user_by_access_token(self, token):
