@@ -212,7 +212,7 @@ class RegistrationStore(SQLBaseStore):
         def f(txn):
             txn.execute(
                 "SELECT id, token FROM access_tokens WHERE user_id = ? LIMIT 50",
-                    (user_id,)
+                (user_id,)
             )
             rows = txn.fetchall()
             for r in rows:

@@ -439,10 +439,10 @@ class AuthHandler(BaseHandler):
 
         yield self.store.user_set_password_hash(user_id, password_hash)
         yield self.store.user_delete_access_tokens_except(
-                user_id, except_access_token_ids
+            user_id, except_access_token_ids
         )
         yield self.hs.get_pusherpool().remove_pushers_by_user_except_access_tokens(
-                user_id, except_access_token_ids
+            user_id, except_access_token_ids
         )
 
     @defer.inlineCallbacks
