@@ -195,24 +195,48 @@ class RegistrationStore(SQLBaseStore):
         })
 
     @defer.inlineCallbacks
-    def user_delete_access_tokens(self, user_id, except_token_ids):
+    def user_delete_access_tokens(self, user_id, except_token_ids=[]):
         def f(txn):
-            txn.execute(
-                "SELECT id, token FROM access_tokens "
-                "WHERE user_id = ? AND id NOT IN ? LIMIT 50",
-                (user_id, except_token_ids)
-            )
+            sql = "SELECT token FROM access_tokens WHERE user_id = ?"
+            clauses = [user_id]
+
+            if except_token_ids:
+                sql += " AND id NOT IN (%s)" % (
+                    ",".join(["?" for _ in except_token_ids]),
+                )
+                clauses += except_token_ids
+
+            txn.execute(sql, clauses)
+
             rows = txn.fetchall()
-            for r in rows:
-                txn.call_after(self.get_user_by_access_token.invalidate, (r[1],))
-            txn.execute(
-                "DELETE FROM access_tokens WHERE id in (%s)" % ",".join(
-                    ["?" for _ in rows]
-                ), [r[0] for r in rows]
+
+            n = 100
+            chunks = [rows[i:i + n] for i in xrange(0, len(rows), n)]
+            for chunk in chunks:
+                for row in chunk:
+                    txn.call_after(self.get_user_by_access_token.invalidate, (row[0],))
+
+                txn.execute(
+                    "DELETE FROM access_tokens WHERE token in (%s)" % (
+                        ",".join(["?" for _ in chunk]),
+                    ), [r[0] for r in chunk]
+                )
+
+        yield self.runInteraction("user_delete_access_tokens", f)
+
+    def delete_access_token(self, access_token):
+        def f(txn):
+            self._simple_delete_one_txn(
+                txn,
+                table="access_tokens",
+                keyvalues={
+                    "token": access_token
+                },
             )
-            return len(rows) == 50
-        while (yield self.runInteraction("user_delete_access_tokens", f)):
-            pass
+
+            txn.call_after(self.get_user_by_access_token.invalidate, (access_token,))
+
+        return self.runInteraction("delete_access_token", f)
 
     @cached()
     def get_user_by_access_token(self, token):
