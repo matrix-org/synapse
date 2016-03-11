@@ -199,7 +199,7 @@ class RegistrationStore(SQLBaseStore):
         def f(txn):
             txn.execute(
                 "SELECT id, token FROM access_tokens "
-                "WHERE user_id = ? AND id not in LIMIT 50",
+                "WHERE user_id = ? AND id NOT IN ? LIMIT 50",
                 (user_id, except_token_ids)
             )
             rows = txn.fetchall()
