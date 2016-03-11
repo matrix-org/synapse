@@ -184,6 +184,9 @@ class StreamStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_room_events_stream_for_room(self, room_id, from_key, to_key, limit=0,
                                         order='DESC'):
+        # Note: If from_key is None then we return in topological order. This
+        # is because in that case we're using this as a "get the last few messages
+        # in a room" function, rather than "get new messages since last sync"
         if from_key is not None:
             from_id = RoomStreamToken.parse_stream_token(from_key).stream
         else:
@@ -217,8 +220,8 @@ class StreamStore(SQLBaseStore):
                     " room_id = ?"
                     " AND not outlier"
                     " AND stream_ordering <= ?"
-                    " ORDER BY stream_ordering %s LIMIT ?"
-                ) % (order,)
+                    " ORDER BY topological_ordering %s, stream_ordering %s LIMIT ?"
+                ) % (order, order,)
                 txn.execute(sql, (room_id, to_id, limit))
 
             rows = self.cursor_to_dict(txn)
@@ -232,7 +235,7 @@ class StreamStore(SQLBaseStore):
             get_prev_content=True
         )
 
-        self._set_before_and_after(ret, rows, topo_order=False)
+        self._set_before_and_after(ret, rows, topo_order=from_id is None)
 
         if order.lower() == "desc":
             ret.reverse()
