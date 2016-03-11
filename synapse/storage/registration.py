@@ -195,27 +195,24 @@ class RegistrationStore(SQLBaseStore):
         })
 
     @defer.inlineCallbacks
-    def user_delete_access_tokens(self, user_id):
-        yield self.runInteraction(
-            "user_delete_access_tokens",
-            self._user_delete_access_tokens, user_id
-        )
-
-    def _user_delete_access_tokens(self, txn, user_id):
-        txn.execute(
-            "DELETE FROM access_tokens WHERE user_id = ?",
-            (user_id, )
-        )
-
-    @defer.inlineCallbacks
-    def flush_user(self, user_id):
-        rows = yield self._execute(
-            'flush_user', None,
-            "SELECT token FROM access_tokens WHERE user_id = ?",
-            user_id
-        )
-        for r in rows:
-            self.get_user_by_access_token.invalidate((r,))
+    def user_delete_access_tokens(self, user_id, except_token_ids):
+        def f(txn):
+            txn.execute(
+                "SELECT id, token FROM access_tokens "
+                "WHERE user_id = ? AND id not in LIMIT 50",
+                (user_id, except_token_ids)
+            )
+            rows = txn.fetchall()
+            for r in rows:
+                txn.call_after(self.get_user_by_access_token.invalidate, (r[1],))
+            txn.execute(
+                "DELETE FROM access_tokens WHERE id in (%s)" % ",".join(
+                    ["?" for _ in rows]
+                ), [r[0] for r in rows]
+            )
+            return len(rows) == 50
+        while (yield self.runInteraction("user_delete_access_tokens", f)):
+            pass
 
     @cached()
     def get_user_by_access_token(self, token):

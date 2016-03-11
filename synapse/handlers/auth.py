@@ -432,13 +432,18 @@ class AuthHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def set_password(self, user_id, newpassword):
+    def set_password(self, user_id, newpassword, requester=None):
         password_hash = self.hash(newpassword)
 
+        except_access_token_ids = [requester.access_token_id] if requester else []
+
         yield self.store.user_set_password_hash(user_id, password_hash)
-        yield self.store.user_delete_access_tokens(user_id)
-        yield self.hs.get_pusherpool().remove_pushers_by_user(user_id)
-        yield self.store.flush_user(user_id)
+        yield self.store.user_delete_access_tokens(
+            user_id, except_access_token_ids
+        )
+        yield self.hs.get_pusherpool().remove_pushers_by_user(
+            user_id, except_access_token_ids
+        )
 
     @defer.inlineCallbacks
     def add_threepid(self, user_id, medium, address, validated_at):
