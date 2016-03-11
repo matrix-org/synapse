@@ -92,7 +92,7 @@ class PusherPool:
                 yield self.remove_pusher(p['app_id'], p['pushkey'], p['user_name'])
 
     @defer.inlineCallbacks
-    def remove_pushers_by_user_except_access_tokens(self, user_id, except_token_ids):
+    def remove_pushers_by_user(self, user_id, except_token_ids=[]):
         all = yield self.store.get_all_pushers()
         logger.info(
             "Removing all pushers for user %s except access tokens ids %r",

@@ -198,14 +198,12 @@ class RegistrationStore(SQLBaseStore):
     def user_delete_access_tokens(self, user_id, except_token_ids):
         def f(txn):
             txn.execute(
-                "SELECT id, token FROM access_tokens WHERE user_id = ? LIMIT 50",
-                (user_id,)
+                "SELECT id, token FROM access_tokens "
+                "WHERE user_id = ? AND id not in LIMIT 50",
+                (user_id,except_token_ids)
             )
             rows = txn.fetchall()
             for r in rows:
-                if r[0] in except_token_ids:
-                    continue
-
                 txn.call_after(self.get_user_by_access_token.invalidate, (r[1],))
             txn.execute(
                 "DELETE FROM access_tokens WHERE id in (%s)" % ",".join(

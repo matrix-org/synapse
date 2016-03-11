@@ -441,7 +441,7 @@ class AuthHandler(BaseHandler):
         yield self.store.user_delete_access_tokens(
             user_id, except_access_token_ids
         )
-        yield self.hs.get_pusherpool().remove_pushers_by_user_except_access_tokens(
+        yield self.hs.get_pusherpool().remove_pushers_by_user(
             user_id, except_access_token_ids
         )
 
