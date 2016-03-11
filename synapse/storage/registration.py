@@ -197,26 +197,29 @@ class RegistrationStore(SQLBaseStore):
     @defer.inlineCallbacks
     def user_delete_access_tokens(self, user_id, except_token_ids=[]):
         def f(txn):
-            txn.execute(
-                "SELECT token FROM access_tokens"
-                " WHERE user_id = ? AND id NOT IN (%s)" % (
+            sql = "SELECT token FROM access_tokens WHERE user_id = ?"
+            clauses = [user_id]
+
+            if except_token_ids:
+                sql += " AND id NOT IN (%s)" % (
                     ",".join(["?" for _ in except_token_ids]),
-                ),
-                [user_id] + except_token_ids
-            )
+                )
+                clauses += except_token_ids
 
-            while True:
-                rows = txn.fetchmany(100)
-                if not rows:
-                    break
+            txn.execute(sql, clauses)
 
-                for row in rows:
+            rows = txn.fetchall()
+
+            n = 100
+            chunks = [rows[i:i + n] for i in xrange(0, len(rows), n)]
+            for chunk in chunks:
+                for row in chunk:
                     txn.call_after(self.get_user_by_access_token.invalidate, (row[0],))
 
                 txn.execute(
                     "DELETE FROM access_tokens WHERE token in (%s)" % (
-                        ",".join(["?" for _ in rows]),
-                    ), [r[0] for r in rows]
+                        ",".join(["?" for _ in chunk]),
+                    ), [r[0] for r in chunk]
                 )
 
         yield self.runInteraction("user_delete_access_tokens", f)
