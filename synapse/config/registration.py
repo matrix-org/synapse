@@ -37,6 +37,10 @@ class RegistrationConfig(Config):
         self.trusted_third_party_id_servers = config["trusted_third_party_id_servers"]
         self.allow_guest_access = config.get("allow_guest_access", False)
 
+        self.invite_3pid_guest = (
+            self.allow_guest_access and config.get("invite_3pid_guest", False)
+        )
+
     def default_config(self, **kwargs):
         registration_shared_secret = random_string_with_symbols(50)
 
