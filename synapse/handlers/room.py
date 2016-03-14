@@ -877,36 +877,43 @@ class RoomMemberHandler(BaseHandler):
                 user.
         """
 
-        registration_handler = self.hs.get_handlers().registration_handler
-        guest_access_token = yield registration_handler.guest_access_token_for(
-            medium=medium,
-            address=address,
-            inviter_user_id=inviter_user_id,
-        )
-
-        guest_user_info = yield self.hs.get_auth().get_user_by_access_token(
-            guest_access_token
-        )
-
         is_url = "%s%s/_matrix/identity/api/v1/store-invite" % (
             id_server_scheme, id_server,
         )
+
+        invite_config = {
+            "medium": medium,
+            "address": address,
+            "room_id": room_id,
+            "room_alias": room_alias,
+            "room_avatar_url": room_avatar_url,
+            "room_join_rules": room_join_rules,
+            "room_name": room_name,
+            "sender": inviter_user_id,
+            "sender_display_name": inviter_display_name,
+            "sender_avatar_url": inviter_avatar_url,
+        }
+
+        if self.hs.config.invite_3pid_guest:
+            registration_handler = self.hs.get_handlers().registration_handler
+            guest_access_token = yield registration_handler.guest_access_token_for(
+                medium=medium,
+                address=address,
+                inviter_user_id=inviter_user_id,
+            )
+
+            guest_user_info = yield self.hs.get_auth().get_user_by_access_token(
+                guest_access_token
+            )
+
+            invite_config.update({
+                "guest_access_token": guest_access_token,
+                "guest_user_id": guest_user_info["user"].to_string(),
+            })
+
         data = yield self.hs.get_simple_http_client().post_urlencoded_get_json(
             is_url,
-            {
-                "medium": medium,
-                "address": address,
-                "room_id": room_id,
-                "room_alias": room_alias,
-                "room_avatar_url": room_avatar_url,
-                "room_join_rules": room_join_rules,
-                "room_name": room_name,
-                "sender": inviter_user_id,
-                "sender_display_name": inviter_display_name,
-                "sender_avatar_url": inviter_avatar_url,
-                "guest_user_id": guest_user_info["user"].to_string(),
-                "guest_access_token": guest_access_token,
-            }
+            invite_config
         )
         # TODO: Check for success
         token = data["token"]
