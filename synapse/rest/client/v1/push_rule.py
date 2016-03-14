@@ -25,7 +25,7 @@ from synapse.storage.push_rule import (
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.baserules import BASE_RULE_IDS
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.servlet import parse_json_value_from_request
 
 
 class PushRuleRestServlet(ClientV1RestServlet):
@@ -51,7 +51,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         if '/' in spec['rule_id'] or '\\' in spec['rule_id']:
             raise SynapseError(400, "rule_id may not contain slashes")
 
-        content = parse_json_object_from_request(request)
+        content = parse_json_value_from_request(request)
 
         user_id = requester.user.to_string()
 

@@ -119,13 +119,13 @@ def parse_string(request, name, default=None, required=False,
             return default
 
 
-def parse_json_object_from_request(request):
-    """Parse a JSON object from the body of a twisted HTTP request.
+def parse_json_value_from_request(request):
+    """Parse a JSON value from the body of a twisted HTTP request.
 
     :param request: the twisted HTTP request.
+    :returns: The JSON value.
     :raises
-        SynapseError if the request body couldn't be decoded as JSON or
-            if it wasn't a JSON object.
+        SynapseError if the request body couldn't be decoded as JSON.
     """
     try:
         content_bytes = request.content.read()
@@ -136,6 +136,19 @@ def parse_json_object_from_request(request):
         content = simplejson.loads(content_bytes)
     except simplejson.JSONDecodeError:
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
+
+    return content
+
+
+def parse_json_object_from_request(request):
+    """Parse a JSON object from the body of a twisted HTTP request.
+
+    :param request: the twisted HTTP request.
+    :raises
+        SynapseError if the request body couldn't be decoded as JSON or
+            if it wasn't a JSON object.
+    """
+    content = parse_json_value_from_request(request)
 
     if type(content) != dict:
         message = "Content must be a JSON object."
