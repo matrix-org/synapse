@@ -813,7 +813,23 @@ class FederationHandler(BaseHandler):
             target_hosts,
             signed_event
         )
-        defer.returnValue(None)
+
+        context = yield self.state_handler.compute_event_context(event)
+
+        event_stream_id, max_stream_id = yield self.store.persist_event(
+            event,
+            context=context,
+            backfilled=False,
+        )
+
+        target_user = UserID.from_string(event.state_key)
+        with PreserveLoggingContext():
+            self.notifier.on_new_room_event(
+                event, event_stream_id, max_stream_id,
+                extra_users=[target_user],
+            )
+
+        defer.returnValue(event)
 
     @defer.inlineCallbacks
     def _make_and_verify_event(self, target_hosts, room_id, user_id, membership,
