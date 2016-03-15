@@ -37,6 +37,7 @@ STREAM_NAMES = (
     ("user_account_data", "room_account_data", "tag_account_data",),
     ("backfill",),
     ("push_rules",),
+    ("pushers",),
 )
 
 
@@ -65,6 +66,7 @@ class ReplicationResource(Resource):
     * "tag_account_data": Per room per user tags.
     * "backfill": Old events that have been backfilled from other servers.
     * "push_rules": Per user changes to push rules.
+    * "pushers": Per user changes to their pushers.
 
     The API takes two additional query parameters:
 
@@ -120,6 +122,7 @@ class ReplicationResource(Resource):
         stream_token = yield self.sources.get_current_token()
         backfill_token = yield self.store.get_current_backfill_token()
         push_rules_token, room_stream_token = self.store.get_push_rules_stream_token()
+        pushers_token = self.store.get_pushers_stream_token()
 
         defer.returnValue(_ReplicationToken(
             room_stream_token,
@@ -129,6 +132,7 @@ class ReplicationResource(Resource):
             int(stream_token.account_data_key),
             backfill_token,
             push_rules_token,
+            pushers_token,
         ))
 
     @request_handler
@@ -151,6 +155,7 @@ class ReplicationResource(Resource):
             yield self.typing(writer, current_token)  # TODO: implement limit
             yield self.receipts(writer, current_token, limit)
             yield self.push_rules(writer, current_token, limit)
+            yield self.pushers(writer, current_token, limit)
             self.streams(writer, current_token)
 
             logger.info("Replicated %d rows", writer.total)
@@ -297,6 +302,24 @@ class ReplicationResource(Resource):
                 "priority_class", "priority", "conditions", "actions"
             ))
 
+    @defer.inlineCallbacks
+    def pushers(self, writer, current_token, limit):
+        current_position = current_token.pushers
+
+        pushers = parse_integer(writer.request, "pushers")
+        if pushers is not None:
+            updated, deleted = yield self.store.get_all_updated_pushers(
+                pushers, current_position, limit
+            )
+            writer.write_header_and_rows("pushers", updated, (
+                "position", "user_id", "access_token", "profile_tag", "kind",
+                "app_id", "app_display_name", "device_display_name", "pushkey",
+                "ts", "lang", "data"
+            ))
+            writer.write_header_and_rows("deleted", deleted, (
+                "position", "user_id", "app_id", "pushkey"
+            ))
+
 
 class _Writer(object):
     """Writes the streams as a JSON object as the response to the request"""
@@ -327,7 +350,7 @@ class _Writer(object):
 
 class _ReplicationToken(collections.namedtuple("_ReplicationToken", (
     "events", "presence", "typing", "receipts", "account_data", "backfill",
-    "push_rules"
+    "push_rules", "pushers"
 ))):
     __slots__ = []
 

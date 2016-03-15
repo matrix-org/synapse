@@ -119,11 +119,14 @@ class DataStore(RoomMemberStore, RoomStore,
         self._state_groups_id_gen = IdGenerator(db_conn, "state_groups", "id")
         self._access_tokens_id_gen = IdGenerator(db_conn, "access_tokens", "id")
         self._refresh_tokens_id_gen = IdGenerator(db_conn, "refresh_tokens", "id")
-        self._pushers_id_gen = IdGenerator(db_conn, "pushers", "id")
         self._push_rule_id_gen = IdGenerator(db_conn, "push_rules", "id")
         self._push_rules_enable_id_gen = IdGenerator(db_conn, "push_rules_enable", "id")
         self._push_rules_stream_id_gen = ChainedIdGenerator(
             self._stream_id_gen, db_conn, "push_rules_stream", "stream_id"
+        )
+        self._pushers_id_gen = StreamIdGenerator(
+            db_conn, "pushers", "id",
+            extra_tables=[("deleted_pushers", "stream_id")],
         )
 
         events_max = self._stream_id_gen.get_max_token()
