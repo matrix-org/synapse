@@ -99,9 +99,7 @@ class StreamChangeCache(object):
             keys = self._cache.keys()
             i = keys.bisect_right(stream_pos)
 
-            return (
-                self._cache[k] for k in keys[i:]
-            )
+            return [self._cache[k] for k in keys[i:]]
         else:
             return None
 
