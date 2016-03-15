@@ -4,7 +4,7 @@ Changes in synapse v0.14.0-rc1 (2016-03-14)
 Features:
 
 * Add event_id to response to state event PUT (PR #581)
-* Allow guest users to access to messages in rooms they have joined (PR #587)
+* Allow guest users access to messages in rooms they have joined (PR #587)
 * Add config for what state is included in a room invite (PR #598)
 * Send the inviter's member event in room invite state (PR #607)
 * Add error codes for malformed/bad JSON in /login (PR #608)
