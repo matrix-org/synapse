@@ -136,7 +136,7 @@ class PusherStore(SQLBaseStore):
     @defer.inlineCallbacks
     def delete_pusher_by_app_id_pushkey_user_id(self, app_id, pushkey, user_id):
         def delete_pusher_txn(txn, stream_id):
-            self._simple_delete_one(
+            self._simple_delete_one_txn(
                 txn,
                 "pushers",
                 {"app_id": app_id, "pushkey": pushkey, "user_name": user_id}
@@ -145,7 +145,7 @@ class PusherStore(SQLBaseStore):
                 txn,
                 "deleted_pushers",
                 {"app_id": app_id, "pushkey": pushkey, "user_id": user_id},
-                {"stream_id", stream_id},
+                {"stream_id": stream_id},
             )
         with self._pushers_id_gen.get_next() as stream_id:
             yield self.runInteraction(
