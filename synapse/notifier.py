@@ -282,6 +282,12 @@ class Notifier(object):
 
             self.notify_replication()
 
+    def on_new_replication_data(self):
+        """Used to inform replication listeners that something has happend
+        without waking up any of the normal user event streams"""
+        with PreserveLoggingContext():
+            self.notify_replication()
+
     @defer.inlineCallbacks
     def wait_for_events(self, user_id, timeout, callback, room_ids=None,
                         from_token=StreamToken.START):
