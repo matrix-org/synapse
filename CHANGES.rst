@@ -1,3 +1,42 @@
+Changes in synapse v0.14.0-rc1 (2016-03-14)
+===========================================
+
+Features:
+
+* Add event_id to response to state event PUT (PR #581)
+* Allow guest users to access to messages in rooms they have joined (PR #587)
+* Add config for what state is included in a room invite (PR #598)
+* Send the inviter's member event in room invite state (PR #607)
+* Add error codes for malformed/bad JSON in /login (PR #608)
+* Add support for changing the actions for default rules (PR #609)
+* Add environment variable SYNAPSE_CACHE_FACTOR, default it to 0.1 (PR #612)
+* Add ability for alias creators to delete aliases (PR #614)
+* Add profile information to invites (PR #624)
+
+Changes:
+
+* Enforce user_id exclusivity for AS registrations (PR #572)
+* Make adding push rules idempotent (PR #587)
+* Improve presence performance (PR #582, #586)
+* Change presence semantics for ``last_active_ago`` (PR #582, #586)
+* Don't allow ``m.room.create`` to be changed (PR #596)
+* Add 800x600 to default list of valid thumbnail sizes (PR #616)
+* Always include kicks and bans in full /sync (PR #625)
+* Send history visibility on boundary changes (PR #626)
+* Register endpoint now returns a refresh_token (PR #637)
+
+Bug fixes:
+
+* Fix bug where we returned incorrect state in /sync (PR #573)
+* Always return a JSON object from push rule API (PR #606)
+* Fix bug where registering without a user id sometimes failed (PR #610)
+* Report size of ExpiringCache in cache size metrics (PR #611)
+* Fix rejection of invites to empty rooms (PR #615)
+* Fix usage of ``bcrypt`` to not use ``checkpw`` (PR #619)
+* Pin ``pysaml2`` dependency (PR #634)
+* Fix bug in ``/sync`` where timeline order was incorrect for backfilled events
+  (PR #635)
+
 Changes in synapse v0.13.3 (2016-02-11)
 =======================================
 
