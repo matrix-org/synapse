@@ -22,9 +22,10 @@ class RegisterRestServletTestCase(unittest.TestCase):
             side_effect=lambda x: defer.succeed(self.appservice))
         )
 
-        self.auth_result = (False, None, None)
+        self.auth_result = (False, None, None, None)
         self.auth_handler = Mock(
-            check_auth=Mock(side_effect=lambda x, y, z: self.auth_result)
+            check_auth=Mock(side_effect=lambda x, y, z: self.auth_result),
+            get_session_data=Mock(return_value=None)
         )
         self.registration_handler = Mock()
         self.identity_handler = Mock()
@@ -112,7 +113,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.auth_result = (True, None, {
             "username": "kermit",
             "password": "monkey"
-        })
+        }, None)
         self.registration_handler.register = Mock(return_value=(user_id, token))
 
         (code, result) = yield self.servlet.on_POST(self.request)
@@ -135,7 +136,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.auth_result = (True, None, {
             "username": "kermit",
             "password": "monkey"
-        })
+        }, None)
         self.registration_handler.register = Mock(return_value=("@user:id", "t"))
         d = self.servlet.on_POST(self.request)
         return self.assertFailure(d, SynapseError)

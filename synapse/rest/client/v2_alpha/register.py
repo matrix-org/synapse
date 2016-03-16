@@ -139,13 +139,33 @@ class RegisterRestServlet(RestServlet):
                 [LoginType.EMAIL_IDENTITY]
             ]
 
-        authed, result, params = yield self.auth_handler.check_auth(
+        authed, result, params, session_id = yield self.auth_handler.check_auth(
             flows, body, self.hs.get_ip_from_request(request)
         )
 
         if not authed:
             defer.returnValue((401, result))
             return
+
+        # have we already registered a user for this session
+        registered_user_id = self.auth_handler.get_session_data(
+            session_id, "registered_user_id", None
+        )
+        if registered_user_id is not None:
+            logger.info(
+                "Already registered user ID %r for this session",
+                registered_user_id
+            )
+            access_token = yield self.auth_handler.issue_access_token(registered_user_id)
+            refresh_token = yield self.auth_handler.issue_refresh_token(
+                registered_user_id
+            )
+            defer.returnValue((200, {
+                "user_id": registered_user_id,
+                "access_token": access_token,
+                "home_server": self.hs.hostname,
+                "refresh_token": refresh_token,
+            }))
 
         # NB: This may be from the auth handler and NOT from the POST
         if 'password' not in params:
@@ -159,6 +179,12 @@ class RegisterRestServlet(RestServlet):
             localpart=desired_username,
             password=new_password,
             guest_access_token=guest_access_token,
+        )
+
+        # remember that we've now registered that user account, and with what
+        # user ID (since the user may not have specified)
+        self.auth_handler.set_session_data(
+            session_id, "registered_user_id", user_id
         )
 
         if result and LoginType.EMAIL_IDENTITY in result:

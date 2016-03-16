@@ -43,7 +43,7 @@ class PasswordRestServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
 
-        authed, result, params = yield self.auth_handler.check_auth([
+        authed, result, params, _ = yield self.auth_handler.check_auth([
             [LoginType.PASSWORD],
             [LoginType.EMAIL_IDENTITY]
         ], body, self.hs.get_ip_from_request(request))

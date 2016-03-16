@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 class AuthHandler(BaseHandler):
+    SESSION_EXPIRE_MS = 48 * 60 * 60 * 1000
 
     def __init__(self, hs):
         super(AuthHandler, self).__init__(hs)
@@ -66,15 +67,18 @@ class AuthHandler(BaseHandler):
                         'auth' key: this method prompts for auth if none is sent.
             clientip (str): The IP address of the client.
         Returns:
-            A tuple of (authed, dict, dict) where authed is true if the client
-            has successfully completed an auth flow. If it is true, the first
-            dict contains the authenticated credentials of each stage.
+            A tuple of (authed, dict, dict, session_id) where authed is true if
+            the client has successfully completed an auth flow. If it is true
+            the first dict contains the authenticated credentials of each stage.
 
             If authed is false, the first dictionary is the server response to
             the login request and should be passed back to the client.
 
             In either case, the second dict contains the parameters for this
             request (which may have been given only in a previous call).
+
+            session_id is the ID of this session, either passed in by the client
+            or assigned by the call to check_auth
         """
 
         authdict = None
@@ -103,7 +107,10 @@ class AuthHandler(BaseHandler):
 
         if not authdict:
             defer.returnValue(
-                (False, self._auth_dict_for_flows(flows, session), clientdict)
+                (
+                    False, self._auth_dict_for_flows(flows, session),
+                    clientdict, session['id']
+                )
             )
 
         if 'creds' not in session:
@@ -122,12 +129,11 @@ class AuthHandler(BaseHandler):
         for f in flows:
             if len(set(f) - set(creds.keys())) == 0:
                 logger.info("Auth completed with creds: %r", creds)
-                self._remove_session(session)
-                defer.returnValue((True, creds, clientdict))
+                defer.returnValue((True, creds, clientdict, session['id']))
 
         ret = self._auth_dict_for_flows(flows, session)
         ret['completed'] = creds.keys()
-        defer.returnValue((False, ret, clientdict))
+        defer.returnValue((False, ret, clientdict, session['id']))
 
     @defer.inlineCallbacks
     def add_oob_auth(self, stagetype, authdict, clientip):
@@ -153,6 +159,29 @@ class AuthHandler(BaseHandler):
             self._save_session(sess)
             defer.returnValue(True)
         defer.returnValue(False)
+
+    def set_session_data(self, session_id, key, value):
+        """
+        Store a key-value pair into the sessions data associated with this
+        request. This data is stored server-side and cannot be modified by
+        the client.
+        :param session_id: (string) The ID of this session as returned from check_auth
+        :param key: (string) The key to store the data under
+        :param value: (any) The data to store
+        """
+        sess = self._get_session_info(session_id)
+        sess.setdefault('serverdict', {})[key] = value
+        self._save_session(sess)
+
+    def get_session_data(self, session_id, key, default=None):
+        """
+        Retrieve data stored with set_session_data
+        :param session_id: (string) The ID of this session as returned from check_auth
+        :param key: (string) The key to store the data under
+        :param default: (any) Value to return if the key has not been set
+        """
+        sess = self._get_session_info(session_id)
+        return sess.setdefault('serverdict', {}).get(key, default)
 
     @defer.inlineCallbacks
     def _check_password_auth(self, authdict, _):
@@ -455,11 +484,18 @@ class AuthHandler(BaseHandler):
     def _save_session(self, session):
         # TODO: Persistent storage
         logger.debug("Saving session %s", session)
+        session["last_used"] = self.hs.get_clock().time_msec()
         self.sessions[session["id"]] = session
+        self._prune_sessions()
 
-    def _remove_session(self, session):
-        logger.debug("Removing session %s", session)
-        del self.sessions[session["id"]]
+    def _prune_sessions(self):
+        for sid, sess in self.sessions.items():
+            last_used = 0
+            if 'last_used' in sess:
+                last_used = sess['last_used']
+            now = self.hs.get_clock().time_msec()
+            if last_used < now - AuthHandler.SESSION_EXPIRE_MS:
+                del self.sessions[sid]
 
     def hash(self, password):
         """Computes a secure hash of password.
