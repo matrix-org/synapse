@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 class AuthHandler(BaseHandler):
-    SESSION_EXPIRE_SECS = 48 * 60 * 60
+    SESSION_EXPIRE_MS = 48 * 60 * 60 * 1000
 
     def __init__(self, hs):
         super(AuthHandler, self).__init__(hs)
@@ -494,7 +494,7 @@ class AuthHandler(BaseHandler):
             last_used = 0
             if 'last_used' in sess:
                 last_used = sess['last_used']
-            if last_used < time.time() - AuthHandler.SESSION_EXPIRE_SECS:
+            if last_used < self.hs.get_clock().time() - AuthHandler.SESSION_EXPIRE_MS:
                 del self.sessions[sid]
 
     def hash(self, password):
