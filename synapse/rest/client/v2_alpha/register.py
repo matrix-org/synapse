@@ -123,7 +123,6 @@ class RegisterRestServlet(RestServlet):
         guest_access_token = body.get("guest_access_token", None)
 
         session_id = self.auth_handler.get_session_id(body)
-        logger.error("session id: %r", session_id)
         registered_user_id = None
         if session_id:
             # if we get a registered user id out of here, it means we previously
@@ -133,8 +132,6 @@ class RegisterRestServlet(RestServlet):
             registered_user_id = self.auth_handler.get_session_data(
                 session_id, "registered_user_id", None
             )
-        logger.error("already regged: %r", registered_user_id)
-        logger.error("check: %r", desired_username)
 
         if desired_username is not None:
             yield self.registration_handler.check_username(
