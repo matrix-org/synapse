@@ -16,7 +16,6 @@
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType
-from synapse.types import UserID
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
