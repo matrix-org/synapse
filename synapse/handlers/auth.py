@@ -493,7 +493,8 @@ class AuthHandler(BaseHandler):
             last_used = 0
             if 'last_used' in sess:
                 last_used = sess['last_used']
-            if last_used < self.hs.get_clock().time_msec() - AuthHandler.SESSION_EXPIRE_MS:
+            now = self.hs.get_clock().time_msec()
+            if last_used < now - AuthHandler.SESSION_EXPIRE_MS:
                 del self.sessions[sid]
 
     def hash(self, password):
