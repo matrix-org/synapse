@@ -16,6 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType
+from synapse.types import UserID
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
@@ -122,10 +123,25 @@ class RegisterRestServlet(RestServlet):
 
         guest_access_token = body.get("guest_access_token", None)
 
+        session_id = self.auth_handler.get_session_id(body)
+        logger.error("session id: %r", session_id)
+        registered_user_id = None
+        if session_id:
+            # if we get a registered user id out of here, it means we previously
+            # registered a user for this session, so we could just return the
+            # user here. We carry on and go through the auth checks though,
+            # for paranoia.
+            registered_user_id = self.auth_handler.get_session_data(
+                session_id, "registered_user_id", None
+            )
+        logger.error("already regged: %r", registered_user_id)
+        logger.error("check: %r", desired_username)
+
         if desired_username is not None:
             yield self.registration_handler.check_username(
                 desired_username,
-                guest_access_token=guest_access_token
+                guest_access_token=guest_access_token,
+                assigned_user_id=registered_user_id,
             )
 
         if self.hs.config.enable_registration_captcha:
@@ -147,10 +163,6 @@ class RegisterRestServlet(RestServlet):
             defer.returnValue((401, result))
             return
 
-        # have we already registered a user for this session
-        registered_user_id = self.auth_handler.get_session_data(
-            session_id, "registered_user_id", None
-        )
         if registered_user_id is not None:
             logger.info(
                 "Already registered user ID %r for this session",
