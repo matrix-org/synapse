@@ -525,6 +525,26 @@ Logging In To An Existing Account
 Just enter the ``@localpart:my.domain.here`` Matrix user ID and password into
 the form and click the Login button.
 
+Password reset
+==============
+
+Synapse does not yet support a password-reset function (see
+https://matrix.org/jira/browse/SYN-11). In the meantime, it is possible to
+manually reset a user's password via direct database access.
+
+First calculate the hash of the new password:
+
+    $ source ~/.synapse/bin/activate
+    $ ./scripts/hash_password
+    Password: 
+    Confirm password: 
+    $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+Then update the `users` table in the database:
+
+    UPDATE users SET password_hash='$2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+        WHERE name='@test:test.com';
+
 
 Identity Servers
 ================
