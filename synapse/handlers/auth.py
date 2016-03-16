@@ -27,7 +27,6 @@ import logging
 import bcrypt
 import pymacaroons
 import simplejson
-import time
 
 import synapse.util.stringutils as stringutils
 
@@ -485,7 +484,7 @@ class AuthHandler(BaseHandler):
     def _save_session(self, session):
         # TODO: Persistent storage
         logger.debug("Saving session %s", session)
-        session["last_used"] = time.time()
+        session["last_used"] = self.hs.get_clock().time_msec()
         self.sessions[session["id"]] = session
         self._prune_sessions()
 
