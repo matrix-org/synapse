@@ -292,7 +292,7 @@ class AuthHandler(BaseHandler):
         if not session_id:
             # create a new session
             while session_id is None or session_id in self.sessions:
-                session_id = stringutils.random_string_with_symbols(24)
+                session_id = stringutils.random_string(24)
             self.sessions[session_id] = {
                 "id": session_id,
             }
