@@ -149,7 +149,7 @@ class RegisterRestServlet(RestServlet):
 
         # have we already registered a user for this session
         registered_user_id = self.auth_handler.get_session_data(
-                session_id, "registered_user_id", None
+            session_id, "registered_user_id", None
         )
         if registered_user_id is not None:
             logger.info(
@@ -157,7 +157,9 @@ class RegisterRestServlet(RestServlet):
                 registered_user_id
             )
             access_token = yield self.auth_handler.issue_access_token(registered_user_id)
-            refresh_token = yield self.auth_handler.issue_refresh_token(registered_user_id)
+            refresh_token = yield self.auth_handler.issue_refresh_token(
+                registered_user_id
+            )
             defer.returnValue((200, {
                 "user_id": registered_user_id,
                 "access_token": access_token,
@@ -181,9 +183,8 @@ class RegisterRestServlet(RestServlet):
 
         # remember that we've now registered that user account, and with what
         # user ID (since the user may not have specified)
-        logger.info("%r", body)
         self.auth_handler.set_session_data(
-                session_id, "registered_user_id", user_id
+            session_id, "registered_user_id", user_id
         )
 
         if result and LoginType.EMAIL_IDENTITY in result:

@@ -490,7 +490,7 @@ class AuthHandler(BaseHandler):
         self._prune_sessions()
 
     def _prune_sessions(self):
-        for sid,sess in self.sessions.items():
+        for sid, sess in self.sessions.items():
             last_used = 0
             if 'last_used' in sess:
                 last_used = sess['last_used']
