@@ -29,6 +29,10 @@ logger = logging.getLogger(__name__)
 class PusherRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/pushers/set$")
 
+    def __init__(self, hs):
+        super(PusherRestServlet, self).__init__(hs)
+        self.notifier = hs.get_notifier()
+
     @defer.inlineCallbacks
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
@@ -86,6 +90,8 @@ class PusherRestServlet(ClientV1RestServlet):
         except PusherConfigException as pce:
             raise SynapseError(400, "Config Error: " + pce.message,
                                errcode=Codes.MISSING_PARAM)
+
+        self.notifier.on_new_replication_data()
 
         defer.returnValue((200, {}))
 
