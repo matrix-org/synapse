@@ -86,9 +86,12 @@ def used_names(prefix, item, defs, names):
     for name, funcs in defs.get('class', {}).items():
         used_names(prefix + name + ".", name, funcs, names)
 
+    path = prefix.rstrip('.')
     for used in defs.get('uses', ()):
         if used in names:
-            names[used].setdefault('used', {}).setdefault(item, []).append(prefix.rstrip('.'))
+            if item:
+                names[item].setdefault('uses', []).append(used)
+            names[used].setdefault('used', {}).setdefault(item, []).append(path)
 
 
 if __name__ == '__main__':
@@ -112,6 +115,10 @@ if __name__ == '__main__':
     parser.add_argument(
         "--referrers", default=0, type=int,
         help="Include referrers up to the given depth"
+    )
+    parser.add_argument(
+        "--referred", default=0, type=int,
+        help="Include referred down to the given depth"
     )
     parser.add_argument(
         "--format", default="yaml",
@@ -156,6 +163,20 @@ if __name__ == '__main__':
                 referrers.add(used_by)
         for name, definition in names.items():
             if not name in referrers:
+                continue
+            if ignore and any(pattern.match(name) for pattern in ignore):
+                continue
+            result[name] = definition
+
+    referred_depth = args.referred
+    referred = set()
+    while referred_depth:
+        referred_depth -= 1
+        for entry in result.values():
+            for uses in entry.get("uses", ()):
+                referred.add(uses)
+        for name, definition in names.items():
+            if not name in referred:
                 continue
             if ignore and any(pattern.match(name) for pattern in ignore):
                 continue
