@@ -91,11 +91,6 @@ class RoomMemberStoreTestCase(unittest.TestCase):
                 )
             )]
         )
-        self.assertFalse(
-            (yield self.store.user_rooms_intersect(
-                [self.u_alice.to_string(), self.u_bob.to_string()]
-            ))
-        )
 
     @defer.inlineCallbacks
     def test_two_members(self):
@@ -108,11 +103,6 @@ class RoomMemberStoreTestCase(unittest.TestCase):
                 yield self.store.get_room_members(self.room.to_string())
             )}
         )
-        self.assertTrue((
-            yield self.store.user_rooms_intersect([
-                self.u_alice.to_string(), self.u_bob.to_string()
-            ])
-        ))
 
     @defer.inlineCallbacks
     def test_room_hosts(self):

@@ -252,30 +252,6 @@ class RoomMemberStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def user_rooms_intersect(self, user_id_list):
-        """ Checks whether all the users whose IDs are given in a list share a
-        room.
-
-        This is a "hot path" function that's called a lot, e.g. by presence for
-        generating the event stream. As such, it is implemented locally by
-        wrapping logic around heavily-cached database queries.
-        """
-        if len(user_id_list) < 2:
-            defer.returnValue(True)
-
-        deferreds = [self.get_rooms_for_user(u) for u in user_id_list]
-
-        results = yield defer.DeferredList(deferreds, consumeErrors=True)
-
-        # A list of sets of strings giving room IDs for each user
-        room_id_lists = [set([r.room_id for r in result[1]]) for result in results]
-
-        # There isn't a setintersection(*list_of_sets)
-        ret = len(room_id_lists.pop(0).intersection(*room_id_lists)) > 0
-
-        defer.returnValue(ret)
-
-    @defer.inlineCallbacks
     def forget(self, user_id, room_id):
         """Indicate that user_id wishes to discard history for room_id."""
         def f(txn):
