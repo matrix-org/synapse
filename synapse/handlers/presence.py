@@ -73,10 +73,6 @@ FEDERATION_PING_INTERVAL = 25 * 60 * 1000
 assert LAST_ACTIVE_GRANULARITY < IDLE_TIMER
 
 
-def collect_presencelike_data(distributor, user, content):
-    return distributor.fire("collect_presencelike_data", user, content)
-
-
 class PresenceHandler(BaseHandler):
 
     def __init__(self, hs):
