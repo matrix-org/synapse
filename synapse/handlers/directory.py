@@ -257,7 +257,8 @@ class DirectoryHandler(BaseHandler):
             room_id, EventTypes.CanonicalAlias, ""
         )
 
-        if alias_event.content.get("alias", "") != room_alias.to_string():
+        alias_str = room_alias.to_string()
+        if not alias_event or alias_event.content.get("alias", "") != alias_str:
             return
 
         msg_handler = self.hs.get_handlers().message_handler
