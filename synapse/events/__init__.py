@@ -168,5 +168,7 @@ class FrozenEvent(EventBase):
 
     def __repr__(self):
         return "<FrozenEvent event_id='%s', type='%s', state_key='%s'>" % (
-            self.event_id, self.type, self.get("state_key", None),
+            self.get("event_id", None),
+            self.get("type", None),
+            self.get("state_key", None),
         )
