@@ -166,7 +166,12 @@ class FederationServer(FederationBase):
         received_edus_counter.inc()
 
         if edu_type in self.edu_handlers:
-            yield self.edu_handlers[edu_type](origin, content)
+            try:
+                yield self.edu_handlers[edu_type](origin, content)
+            except SynapseError as e:
+                logger.info("Failed to handle edu %r: %r", edu_type, e)
+            except Exception as e:
+                logger.exception("Failed to handle edu %r", edu_type, e)
         else:
             logger.warn("Received EDU of type %s with no handler", edu_type)
 
