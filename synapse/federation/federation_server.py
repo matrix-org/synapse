@@ -137,8 +137,8 @@ class FederationServer(FederationBase):
                 logger.exception("Failed to handle PDU")
 
         if hasattr(transaction, "edus"):
-            for edu in [Edu(**x) for x in transaction.edus]:
-                self.received_edu(
+            for edu in (Edu(**x) for x in transaction.edus):
+                yield self.received_edu(
                     transaction.origin,
                     edu.edu_type,
                     edu.content
@@ -161,11 +161,12 @@ class FederationServer(FederationBase):
         )
         defer.returnValue((200, response))
 
+    @defer.inlineCallbacks
     def received_edu(self, origin, edu_type, content):
         received_edus_counter.inc()
 
         if edu_type in self.edu_handlers:
-            self.edu_handlers[edu_type](origin, content)
+            yield self.edu_handlers[edu_type](origin, content)
         else:
             logger.warn("Received EDU of type %s with no handler", edu_type)
 
