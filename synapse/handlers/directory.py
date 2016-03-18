@@ -32,6 +32,8 @@ class DirectoryHandler(BaseHandler):
     def __init__(self, hs):
         super(DirectoryHandler, self).__init__(hs)
 
+        self.state = hs.get_state_handler()
+
         self.federation = hs.get_replication_layer()
         self.federation.register_query_handler(
             "directory", self.on_directory_query
@@ -93,7 +95,7 @@ class DirectoryHandler(BaseHandler):
         yield self._create_association(room_alias, room_id, servers)
 
     @defer.inlineCallbacks
-    def delete_association(self, user_id, room_alias):
+    def delete_association(self, requester, user_id, room_alias):
         # association deletion for human users
 
         can_delete = yield self._user_can_delete_alias(room_alias, user_id)
@@ -112,7 +114,25 @@ class DirectoryHandler(BaseHandler):
                 errcode=Codes.EXCLUSIVE
             )
 
-        yield self._delete_association(room_alias)
+        room_id = yield self._delete_association(room_alias)
+
+        try:
+            yield self.send_room_alias_update_event(
+                requester,
+                requester.user.to_string(),
+                room_id
+            )
+
+            yield self._update_canonical_alias(
+                requester,
+                requester.user.to_string(),
+                room_id,
+                room_alias,
+            )
+        except AuthError as e:
+            logger.info("Failed to update alias events: %s", e)
+
+        defer.returnValue(room_id)
 
     @defer.inlineCallbacks
     def delete_appservice_association(self, service, room_alias):
@@ -129,11 +149,9 @@ class DirectoryHandler(BaseHandler):
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
 
-        yield self.store.delete_room_alias(room_alias)
+        room_id = yield self.store.delete_room_alias(room_alias)
 
-        # TODO - Looks like _update_room_alias_event has never been implemented
-        # if room_id:
-        #    yield self._update_room_alias_events(user_id, room_id)
+        defer.returnValue(room_id)
 
     @defer.inlineCallbacks
     def get_association(self, room_alias):
@@ -229,6 +247,29 @@ class DirectoryHandler(BaseHandler):
                 "room_id": room_id,
                 "sender": user_id,
                 "content": {"aliases": aliases},
+            },
+            ratelimit=False
+        )
+
+    @defer.inlineCallbacks
+    def _update_canonical_alias(self, requester, user_id, room_id, room_alias):
+        alias_event = yield self.state.get_current_state(
+            room_id, EventTypes.CanonicalAlias, ""
+        )
+
+        alias_str = room_alias.to_string()
+        if not alias_event or alias_event.content.get("alias", "") != alias_str:
+            return
+
+        msg_handler = self.hs.get_handlers().message_handler
+        yield msg_handler.create_and_send_nonmember_event(
+            requester,
+            {
+                "type": EventTypes.CanonicalAlias,
+                "state_key": "",
+                "room_id": room_id,
+                "sender": user_id,
+                "content": {},
             },
             ratelimit=False
         )

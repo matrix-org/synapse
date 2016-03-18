@@ -127,8 +127,9 @@ class ClientDirectoryServer(ClientV1RestServlet):
         room_alias = RoomAlias.from_string(room_alias)
 
         yield dir_handler.delete_association(
-            user.to_string(), room_alias
+            requester, user.to_string(), room_alias
         )
+
         logger.info(
             "User %s deleted alias %s",
             user.to_string(),
