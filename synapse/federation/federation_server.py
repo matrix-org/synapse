@@ -531,7 +531,6 @@ class FederationServer(FederationBase):
         yield self.handler.on_receive_pdu(
             origin,
             pdu,
-            backfilled=False,
             state=state,
             auth_chain=auth_chain,
         )
