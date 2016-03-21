@@ -317,3 +317,19 @@ class DirectoryHandler(BaseHandler):
 
         is_admin = yield self.auth.is_server_admin(UserID.from_string(user_id))
         defer.returnValue(is_admin)
+
+    @defer.inlineCallbacks
+    def edit_published_room_list(self, requester, room_id, visibility):
+        if requester.is_guest:
+            raise AuthError(403, "Guests cannot edit the published room list")
+
+        if visibility not in ["public", "private"]:
+            raise SynapseError(400, "Invalide visibility setting")
+
+        room = yield self.store.get_room(room_id)
+        if room is None:
+            raise SynapseError(400, "Unknown room")
+
+        yield self.auth.check_can_change_room_list(room_id, requester.user)
+
+        yield self.store.set_room_is_public(room_id, visibility == "public")

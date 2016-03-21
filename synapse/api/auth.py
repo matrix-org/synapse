@@ -814,17 +814,16 @@ class Auth(object):
 
         return auth_ids
 
-    @log_function
-    def _can_send_event(self, event, auth_events):
+    def _get_send_level(self, etype, state_key, auth_events):
         key = (EventTypes.PowerLevels, "", )
         send_level_event = auth_events.get(key)
         send_level = None
         if send_level_event:
             send_level = send_level_event.content.get("events", {}).get(
-                event.type
+                etype
             )
             if send_level is None:
-                if hasattr(event, "state_key"):
+                if state_key is not None:
                     send_level = send_level_event.content.get(
                         "state_default", 50
                     )
@@ -838,6 +837,13 @@ class Auth(object):
         else:
             send_level = 0
 
+        return send_level
+
+    @log_function
+    def _can_send_event(self, event, auth_events):
+        send_level = self._get_send_level(
+            event.type, event.get("state_key", None), auth_events
+        )
         user_level = self._get_user_power_level(event.user_id, auth_events)
 
         if user_level < send_level:
@@ -982,3 +988,43 @@ class Auth(object):
                     "You don't have permission to add ops level greater "
                     "than your own"
                 )
+
+    @defer.inlineCallbacks
+    def check_can_change_room_list(self, room_id, user):
+        """Check if the user is allowed to edit the room's entry in the
+        published room list.
+
+        Args:
+            room_id (str)
+            user (UserID)
+        """
+
+        is_admin = yield self.is_server_admin(user)
+        if is_admin:
+            defer.returnValue(True)
+
+        user_id = user.to_string()
+        yield self.check_joined_room(room_id, user_id)
+
+        # We currently require the user is a "moderator" in the room. We do this
+        # by checking if they would (theoretically) be able to change the
+        # m.room.aliases events
+        power_level_event = yield self.state.get_current_state(
+            room_id, EventTypes.PowerLevels, ""
+        )
+
+        auth_events = {}
+        if power_level_event:
+            auth_events[(EventTypes.PowerLevels, "")] = power_level_event
+
+        send_level = self._get_send_level(
+            EventTypes.Aliases, "", auth_events
+        )
+        user_level = self._get_user_power_level(user_id, auth_events)
+
+        if user_level < send_level:
+            raise AuthError(
+                403,
+                "This server requires you to be a moderator in the room to"
+                " edit its room list entry"
+            )
