@@ -123,7 +123,6 @@ class FederationHandler(BaseHandler):
 
         # FIXME (erikj): Awful hack to make the case where we are not currently
         # in the room work
-        current_state = None
         is_in_room = yield self.auth.check_host_in_room(
             event.room_id,
             self.server_name
@@ -187,7 +186,6 @@ class FederationHandler(BaseHandler):
                     event,
                     state=state,
                     backfilled=backfilled,
-                    current_state=current_state,
                 )
             except AuthError as e:
                 raise FederationError(
