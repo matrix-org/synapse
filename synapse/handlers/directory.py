@@ -320,6 +320,12 @@ class DirectoryHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def edit_published_room_list(self, requester, room_id, visibility):
+        """Edit the entry of the room in the published room list.
+
+        requester
+        room_id (str)
+        visibility (str): "public" or "private"
+        """
         if requester.is_guest:
             raise AuthError(403, "Guests cannot edit the published room list")
 
