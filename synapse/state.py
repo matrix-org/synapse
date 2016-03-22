@@ -90,18 +90,8 @@ class StateHandler(object):
         """
         event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
 
-        cache = None
-        if self._state_cache is not None:
-            cache = self._state_cache.get(frozenset(event_ids), None)
-
-        if cache:
-            cache.ts = self.clock.time_msec()
-
-            event_dict = yield self.store.get_events(cache.state.values())
-            state = {(e.type, e.state_key): e for e in event_dict.values()}
-        else:
-            res = yield self.resolve_state_groups(room_id, event_ids)
-            state = res[1]
+        res = yield self.resolve_state_groups(room_id, event_ids)
+        state = res[1]
 
         if event_type:
             defer.returnValue(state.get((event_type, state_key)))
@@ -193,8 +183,33 @@ class StateHandler(object):
         """
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
+        state_groups = yield self.store.get_state_groups(
+            room_id, event_ids
+        )
+
+        logger.debug(
+            "resolve_state_groups state_groups %s",
+            state_groups.keys()
+        )
+
+        group_names = frozenset(state_groups.keys())
+        if len(group_names) == 1:
+            name, state_list = state_groups.items().pop()
+            state = {
+                (e.type, e.state_key): e
+                for e in state_list
+            }
+            prev_state = state.get((event_type, state_key), None)
+            if prev_state:
+                prev_state = prev_state.event_id
+                prev_states = [prev_state]
+            else:
+                prev_states = []
+
+            defer.returnValue((name, state, prev_states))
+
         if self._state_cache is not None:
-            cache = self._state_cache.get(frozenset(event_ids), None)
+            cache = self._state_cache.get(group_names, None)
             if cache and cache.state_group:
                 cache.ts = self.clock.time_msec()
 
@@ -211,40 +226,6 @@ class StateHandler(object):
                     (cache.state_group, state, prev_states)
                 )
 
-        state_groups = yield self.store.get_state_groups(
-            room_id, event_ids
-        )
-
-        logger.debug(
-            "resolve_state_groups state_groups %s",
-            state_groups.keys()
-        )
-
-        group_names = set(state_groups.keys())
-        if len(group_names) == 1:
-            name, state_list = state_groups.items().pop()
-            state = {
-                (e.type, e.state_key): e
-                for e in state_list
-            }
-            prev_state = state.get((event_type, state_key), None)
-            if prev_state:
-                prev_state = prev_state.event_id
-                prev_states = [prev_state]
-            else:
-                prev_states = []
-
-            if self._state_cache is not None:
-                cache = _StateCacheEntry(
-                    state={key: event.event_id for key, event in state.items()},
-                    state_group=name,
-                    ts=self.clock.time_msec()
-                )
-
-                self._state_cache[frozenset(event_ids)] = cache
-
-            defer.returnValue((name, state, prev_states))
-
         new_state, prev_states = self._resolve_events(
             state_groups.values(), event_type, state_key
         )
@@ -256,7 +237,7 @@ class StateHandler(object):
                 ts=self.clock.time_msec()
             )
 
-            self._state_cache[frozenset(event_ids)] = cache
+            self._state_cache[group_names] = cache
 
         defer.returnValue((None, new_state, prev_states))
 
