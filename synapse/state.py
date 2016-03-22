@@ -18,6 +18,7 @@ from twisted.internet import defer
 
 from synapse.util.logutils import log_function
 from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.metrics import Measure
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.api.auth import AuthEventTypes
@@ -263,48 +264,49 @@ class StateHandler(object):
         from (type, state_key) to event. prev_states is a list of event_ids.
         :rtype: (dict[(str, str), synapse.events.FrozenEvent], list[str])
         """
-        state = {}
-        for st in state_sets:
-            for e in st:
-                state.setdefault(
-                    (e.type, e.state_key),
-                    {}
-                )[e.event_id] = e
+        with Measure(self.clock, "state._resolve_events"):
+            state = {}
+            for st in state_sets:
+                for e in st:
+                    state.setdefault(
+                        (e.type, e.state_key),
+                        {}
+                    )[e.event_id] = e
 
-        unconflicted_state = {
-            k: v.values()[0] for k, v in state.items()
-            if len(v.values()) == 1
-        }
+            unconflicted_state = {
+                k: v.values()[0] for k, v in state.items()
+                if len(v.values()) == 1
+            }
 
-        conflicted_state = {
-            k: v.values()
-            for k, v in state.items()
-            if len(v.values()) > 1
-        }
+            conflicted_state = {
+                k: v.values()
+                for k, v in state.items()
+                if len(v.values()) > 1
+            }
 
-        if event_type:
-            prev_states_events = conflicted_state.get(
-                (event_type, state_key), []
-            )
-            prev_states = [s.event_id for s in prev_states_events]
-        else:
-            prev_states = []
+            if event_type:
+                prev_states_events = conflicted_state.get(
+                    (event_type, state_key), []
+                )
+                prev_states = [s.event_id for s in prev_states_events]
+            else:
+                prev_states = []
 
-        auth_events = {
-            k: e for k, e in unconflicted_state.items()
-            if k[0] in AuthEventTypes
-        }
+            auth_events = {
+                k: e for k, e in unconflicted_state.items()
+                if k[0] in AuthEventTypes
+            }
 
-        try:
-            resolved_state = self._resolve_state_events(
-                conflicted_state, auth_events
-            )
-        except:
-            logger.exception("Failed to resolve state")
-            raise
+            try:
+                resolved_state = self._resolve_state_events(
+                    conflicted_state, auth_events
+                )
+            except:
+                logger.exception("Failed to resolve state")
+                raise
 
-        new_state = unconflicted_state
-        new_state.update(resolved_state)
+            new_state = unconflicted_state
+            new_state.update(resolved_state)
 
         return new_state, prev_states
 
