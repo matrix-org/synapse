@@ -28,6 +28,7 @@ from collections import namedtuple
 
 import logging
 import hashlib
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +36,11 @@ logger = logging.getLogger(__name__)
 KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
 
 
-SIZE_OF_CACHE = 1000
-EVICTION_TIMEOUT_SECONDS = 20
+CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.1))
+
+
+SIZE_OF_CACHE = int(5000 * CACHE_SIZE_FACTOR)
+EVICTION_TIMEOUT_SECONDS = 60 * 60
 
 
 class _StateCacheEntry(object):
@@ -92,7 +96,9 @@ class StateHandler(object):
 
         if cache:
             cache.ts = self.clock.time_msec()
-            state = cache.state
+
+            event_dict = yield self.store.get_events(cache.state.values())
+            state = {(e.type, e.state_key): e for e in event_dict.values()}
         else:
             res = yield self.resolve_state_groups(room_id, event_ids)
             state = res[1]
@@ -191,14 +197,18 @@ class StateHandler(object):
             cache = self._state_cache.get(frozenset(event_ids), None)
             if cache and cache.state_group:
                 cache.ts = self.clock.time_msec()
-                prev_state = cache.state.get((event_type, state_key), None)
+
+                event_dict = yield self.store.get_events(cache.state.values())
+                state = {(e.type, e.state_key): e for e in event_dict.values()}
+
+                prev_state = state.get((event_type, state_key), None)
                 if prev_state:
                     prev_state = prev_state.event_id
                     prev_states = [prev_state]
                 else:
                     prev_states = []
                 defer.returnValue(
-                    (cache.state_group, cache.state, prev_states)
+                    (cache.state_group, state, prev_states)
                 )
 
         state_groups = yield self.store.get_state_groups(
@@ -226,7 +236,7 @@ class StateHandler(object):
 
             if self._state_cache is not None:
                 cache = _StateCacheEntry(
-                    state=state,
+                    state={key: event.event_id for key, event in state.items()},
                     state_group=name,
                     ts=self.clock.time_msec()
                 )
@@ -241,7 +251,7 @@ class StateHandler(object):
 
         if self._state_cache is not None:
             cache = _StateCacheEntry(
-                state=new_state,
+                state={key: event.event_id for key, event in new_state.items()},
                 state_group=None,
                 ts=self.clock.time_msec()
             )
