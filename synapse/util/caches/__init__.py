@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import synapse.metrics
+from lrucache import LruCache
 
 DEBUG_CACHES = False
 
@@ -25,3 +26,10 @@ cache_counter = metrics.register_cache(
     lambda: {(name,): len(caches_by_name[name]) for name in caches_by_name.keys()},
     labels=["name"],
 )
+
+_string_cache = LruCache(5000)
+caches_by_name["string_cache"] = _string_cache
+
+
+def intern_string(string):
+    return _string_cache.setdefault(string, string)

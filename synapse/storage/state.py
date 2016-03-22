@@ -15,6 +15,7 @@
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedList
+from synapse.util.caches import intern_string
 
 from twisted.internet import defer
 
@@ -155,7 +156,9 @@ class StateStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_current_state_for_key(self, room_id, event_type, state_key):
-        event_ids = yield self._get_current_state_for_key(room_id, event_type, state_key)
+        event_ids = yield self._get_current_state_for_key(
+            room_id, intern_string(event_type), intern_string(state_key)
+        )
         events = yield self._get_events(event_ids, get_prev_content=False)
         defer.returnValue(events)
 
@@ -202,7 +205,7 @@ class StateStore(SQLBaseStore):
 
             results = {}
             for row in rows:
-                key = (row["type"], row["state_key"])
+                key = (intern_string(row["type"]), intern_string(row["state_key"]))
                 results.setdefault(row["state_group"], {})[key] = row["event_id"]
             return results
 
@@ -393,7 +396,10 @@ class StateStore(SQLBaseStore):
                     # cache absence of the key, on the assumption that if we've
                     # explicitly asked for some types then we will probably ask
                     # for them again.
-                    state_dict = {key: None for key in types}
+                    state_dict = {
+                        (intern_string(etype), intern_string(state_key)): None
+                        for (etype, state_key) in types
+                    }
                     state_dict.update(results[group])
                     results[group] = state_dict
                 else:
