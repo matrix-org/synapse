@@ -324,7 +324,7 @@ class DirectoryHandler(BaseHandler):
             raise AuthError(403, "Guests cannot edit the published room list")
 
         if visibility not in ["public", "private"]:
-            raise SynapseError(400, "Invalide visibility setting")
+            raise SynapseError(400, "Invalid visibility setting")
 
         room = yield self.store.get_room(room_id)
         if room is None:
