@@ -65,27 +65,20 @@ def intern_string(string):
 def intern_dict(dictionary):
     """Takes a dictionary and interns well known keys and their values
     """
-    return _intern_known_values({
-        _intern_key(key): value for key, value in dictionary.items()
-    })
+    return {
+        KNOWN_KEYS.get(key, key): _intern_known_values(key, value)
+        for key, value in dictionary.items()
+    }
 
 
-def _intern_known_values(dictionary):
+def _intern_known_values(key, value):
     intern_str_keys = ("event_id", "room_id")
     intern_unicode_keys = ("sender", "user_id", "type", "state_key")
 
-    for key in intern_str_keys:
-        val = dictionary.get(key, None)
-        if val is not None:
-            dictionary[key] = intern(val.encode('ascii'))
+    if key in intern_str_keys:
+        return intern(value.encode('ascii'))
 
-    for key in intern_unicode_keys:
-        val = dictionary.get(key, None)
-        if val is not None:
-            dictionary[key] = intern_string(val)
+    if key in intern_unicode_keys:
+        return intern_string(value)
 
-    return dictionary
-
-
-def _intern_key(key):
-    return KNOWN_KEYS.get(key, key)
+    return value
