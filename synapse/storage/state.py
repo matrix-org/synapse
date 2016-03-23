@@ -14,9 +14,7 @@
 # limitations under the License.
 
 from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import (
-    cached, cachedInlineCallbacks, cachedList
-)
+from synapse.util.caches.descriptors import cached, cachedList
 
 from twisted.internet import defer
 
@@ -155,8 +153,14 @@ class StateStore(SQLBaseStore):
         events = yield self._get_events(event_ids, get_prev_content=False)
         defer.returnValue(events)
 
-    @cachedInlineCallbacks(num_args=3)
+    @defer.inlineCallbacks
     def get_current_state_for_key(self, room_id, event_type, state_key):
+        event_ids = yield self._get_current_state_for_key(room_id, event_type, state_key)
+        events = yield self._get_events(event_ids, get_prev_content=False)
+        defer.returnValue(events)
+
+    @cached(num_args=3)
+    def _get_current_state_for_key(self, room_id, event_type, state_key):
         def f(txn):
             sql = (
                 "SELECT event_id FROM current_state_events"
@@ -167,9 +171,7 @@ class StateStore(SQLBaseStore):
             txn.execute(sql, args)
             results = txn.fetchall()
             return [r[0] for r in results]
-        event_ids = yield self.runInteraction("get_current_state_for_key", f)
-        events = yield self._get_events(event_ids, get_prev_content=False)
-        defer.returnValue(events)
+        return self.runInteraction("get_current_state_for_key", f)
 
     def _get_state_groups_from_groups(self, groups, types):
         """Returns dictionary state_group -> (dict of (type, state_key) -> event id)
