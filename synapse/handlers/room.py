@@ -947,6 +947,9 @@ class RoomListHandler(BaseHandler):
         def handle_room(room_id):
             aliases = yield self.store.get_aliases_for_room(room_id)
 
+            # We pull each bit of state out indvidually to avoid pulling the
+            # full state into memory. Due to how the caching works this should
+            # be fairly quick, even if not originally in the cache.
             def get_state(etype, state_key):
                 return self.state_handler.get_current_state(room_id, etype, state_key)
 
