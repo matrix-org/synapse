@@ -1,3 +1,24 @@
+Changes in synapse v0.14.0-rc2 (2016-03-23)
+===========================================
+
+Features:
+
+* Add published room list API (PR #657)
+
+Changes:
+
+* Change various caches to consume less memory (PR #656, #658, #660, #662,
+  #663, #665)
+* Allow rooms to be published without requiring an alias (PR #664)
+* Intern common strings in caches to reduce memory footprint (#666)
+
+Bug fixes:
+
+* Fix reject invites over federation (PR #646)
+* Fix bug where registration was not idempotent (PR #649)
+* Update aliases event after deleting aliases (PR #652)
+* Fix unread notification count, which was sometimes wrong (PR #661)
+
 Changes in synapse v0.14.0-rc1 (2016-03-14)
 ===========================================
 
