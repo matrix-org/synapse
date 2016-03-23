@@ -284,9 +284,7 @@ class StateStore(SQLBaseStore):
             desc="_get_state_group_for_events",
         )
 
-        defer.returnValue({
-            intern(row["event_id"].encode('ascii')): row["state_group"] for row in rows
-        })
+        defer.returnValue({row["event_id"]: row["state_group"] for row in rows})
 
     def _get_some_state_from_cache(self, group, types):
         """Checks if group is in cache. See `_get_state_for_groups`
