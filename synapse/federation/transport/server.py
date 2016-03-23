@@ -175,7 +175,7 @@ class BaseFederationServlet(object):
 
 
 class FederationSendServlet(BaseFederationServlet):
-    PATH = "/send/([^/]*)/"
+    PATH = "/send/(?P<transaction_id>[^/]*)/"
 
     def __init__(self, handler, server_name, **kwargs):
         super(FederationSendServlet, self).__init__(
@@ -250,7 +250,7 @@ class FederationPullServlet(BaseFederationServlet):
 
 
 class FederationEventServlet(BaseFederationServlet):
-    PATH = "/event/([^/]*)/"
+    PATH = "/event/(?P<event_id>[^/]*)/"
 
     # This is when someone asks for a data item for a given server data_id pair.
     def on_GET(self, origin, content, query, event_id):
@@ -258,7 +258,7 @@ class FederationEventServlet(BaseFederationServlet):
 
 
 class FederationStateServlet(BaseFederationServlet):
-    PATH = "/state/([^/]*)/"
+    PATH = "/state/(?P<context>[^/]*)/"
 
     # This is when someone asks for all data for a given context.
     def on_GET(self, origin, content, query, context):
@@ -270,7 +270,7 @@ class FederationStateServlet(BaseFederationServlet):
 
 
 class FederationBackfillServlet(BaseFederationServlet):
-    PATH = "/backfill/([^/]*)/"
+    PATH = "/backfill/(?P<context>[^/]*)/"
 
     def on_GET(self, origin, content, query, context):
         versions = query["v"]
@@ -285,7 +285,7 @@ class FederationBackfillServlet(BaseFederationServlet):
 
 
 class FederationQueryServlet(BaseFederationServlet):
-    PATH = "/query/([^/]*)"
+    PATH = "/query/(?P<query_type>[^/]*)"
 
     # This is when we receive a server-server Query
     def on_GET(self, origin, content, query, query_type):
@@ -296,7 +296,7 @@ class FederationQueryServlet(BaseFederationServlet):
 
 
 class FederationMakeJoinServlet(BaseFederationServlet):
-    PATH = "/make_join/([^/]*)/([^/]*)"
+    PATH = "/make_join/(?P<context>[^/]*)/(?P<user_id>[^/]*)"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, context, user_id):
@@ -305,7 +305,7 @@ class FederationMakeJoinServlet(BaseFederationServlet):
 
 
 class FederationMakeLeaveServlet(BaseFederationServlet):
-    PATH = "/make_leave/([^/]*)/([^/]*)"
+    PATH = "/make_leave/(?P<context>[^/]*)/(?P<user_id>[^/]*)"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, context, user_id):
@@ -314,7 +314,7 @@ class FederationMakeLeaveServlet(BaseFederationServlet):
 
 
 class FederationSendLeaveServlet(BaseFederationServlet):
-    PATH = "/send_leave/([^/]*)/([^/]*)"
+    PATH = "/send_leave/(?P<room_id>[^/]*)/(?P<txid>[^/]*)"
 
     @defer.inlineCallbacks
     def on_PUT(self, origin, content, query, room_id, txid):
@@ -323,14 +323,14 @@ class FederationSendLeaveServlet(BaseFederationServlet):
 
 
 class FederationEventAuthServlet(BaseFederationServlet):
-    PATH = "/event_auth/([^/]*)/([^/]*)"
+    PATH = "/event_auth(?P<context>[^/]*)/(?P<event_id>[^/]*)"
 
     def on_GET(self, origin, content, query, context, event_id):
         return self.handler.on_event_auth(origin, context, event_id)
 
 
 class FederationSendJoinServlet(BaseFederationServlet):
-    PATH = "/send_join/([^/]*)/([^/]*)"
+    PATH = "/send_join/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
 
     @defer.inlineCallbacks
     def on_PUT(self, origin, content, query, context, event_id):
@@ -341,7 +341,7 @@ class FederationSendJoinServlet(BaseFederationServlet):
 
 
 class FederationInviteServlet(BaseFederationServlet):
-    PATH = "/invite/([^/]*)/([^/]*)"
+    PATH = "/invite/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
 
     @defer.inlineCallbacks
     def on_PUT(self, origin, content, query, context, event_id):
@@ -352,7 +352,7 @@ class FederationInviteServlet(BaseFederationServlet):
 
 
 class FederationThirdPartyInviteExchangeServlet(BaseFederationServlet):
-    PATH = "/exchange_third_party_invite/([^/]*)"
+    PATH = "/exchange_third_party_invite/(?P<room_id>[^/]*)"
 
     @defer.inlineCallbacks
     def on_PUT(self, origin, content, query, room_id):
@@ -381,7 +381,7 @@ class FederationClientKeysClaimServlet(BaseFederationServlet):
 
 
 class FederationQueryAuthServlet(BaseFederationServlet):
-    PATH = "/query_auth/([^/]*)/([^/]*)"
+    PATH = "/query_auth/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, context, event_id):
@@ -394,7 +394,7 @@ class FederationQueryAuthServlet(BaseFederationServlet):
 
 class FederationGetMissingEventsServlet(BaseFederationServlet):
     # TODO(paul): Why does this path alone end with "/?" optional?
-    PATH = "/get_missing_events/([^/]*)/?"
+    PATH = "/get_missing_events/(?P<room_id>[^/]*)/?"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, room_id):

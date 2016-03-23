@@ -49,9 +49,14 @@ class StreamIdGenerator(object):
         with stream_id_gen.get_next() as stream_id:
             # ... persist event ...
     """
-    def __init__(self, db_conn, table, column):
+    def __init__(self, db_conn, table, column, extra_tables=[]):
         self._lock = threading.Lock()
         self._current_max = _load_max_id(db_conn, table, column)
+        for table, column in extra_tables:
+            self._current_max = max(
+                self._current_max,
+                _load_max_id(db_conn, table, column)
+            )
         self._unfinished_ids = deque()
 
     def get_next(self):

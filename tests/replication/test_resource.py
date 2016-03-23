@@ -131,6 +131,7 @@ class ReplicationResourceCase(unittest.TestCase):
     test_timeout_tag_account_data = _test_timeout("tag_account_data")
     test_timeout_backfill = _test_timeout("backfill")
     test_timeout_push_rules = _test_timeout("push_rules")
+    test_timeout_pushers = _test_timeout("pushers")
 
     @defer.inlineCallbacks
     def send_text_message(self, room_id, message):

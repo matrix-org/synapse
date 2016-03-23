@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 def register_servlets(hs, http_server):
     ClientDirectoryServer(hs).register(http_server)
+    ClientDirectoryListServer(hs).register(http_server)
 
 
 class ClientDirectoryServer(ClientV1RestServlet):
@@ -127,12 +128,54 @@ class ClientDirectoryServer(ClientV1RestServlet):
         room_alias = RoomAlias.from_string(room_alias)
 
         yield dir_handler.delete_association(
-            user.to_string(), room_alias
+            requester, user.to_string(), room_alias
         )
+
         logger.info(
             "User %s deleted alias %s",
             user.to_string(),
             room_alias.to_string()
+        )
+
+        defer.returnValue((200, {}))
+
+
+class ClientDirectoryListServer(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/directory/list/room/(?P<room_id>[^/]*)$")
+
+    def __init__(self, hs):
+        super(ClientDirectoryListServer, self).__init__(hs)
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id):
+        room = yield self.store.get_room(room_id)
+        if room is None:
+            raise SynapseError(400, "Unknown room")
+
+        defer.returnValue((200, {
+            "visibility": "public" if room["is_public"] else "private"
+        }))
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, room_id):
+        requester = yield self.auth.get_user_by_req(request)
+
+        content = parse_json_object_from_request(request)
+        visibility = content.get("visibility", "public")
+
+        yield self.handlers.directory_handler.edit_published_room_list(
+            requester, room_id, visibility,
+        )
+
+        defer.returnValue((200, {}))
+
+    @defer.inlineCallbacks
+    def on_DELETE(self, request, room_id):
+        requester = yield self.auth.get_user_by_req(request)
+
+        yield self.handlers.directory_handler.edit_published_room_list(
+            requester, room_id, "private",
         )
 
         defer.returnValue((200, {}))

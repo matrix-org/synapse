@@ -525,7 +525,6 @@ Logging In To An Existing Account
 Just enter the ``@localpart:my.domain.here`` Matrix user ID and password into
 the form and click the Login button.
 
-
 Identity Servers
 ================
 
@@ -545,6 +544,26 @@ as the primary means of identity and E2E encryption is not complete. As such,
 we are running a single identity server (https://matrix.org) at the current
 time.
 
+Password reset
+==============
+
+If a user has registered an email address to their account using an identity
+server, they can request a password-reset token via clients such as Vector.
+
+A manual password reset can be done via direct database access as follows.
+
+First calculate the hash of the new password:
+
+    $ source ~/.synapse/bin/activate
+    $ ./scripts/hash_password
+    Password: 
+    Confirm password: 
+    $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+Then update the `users` table in the database:
+
+    UPDATE users SET password_hash='$2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+        WHERE name='@test:test.com';
 
 Where's the spec?!
 ==================

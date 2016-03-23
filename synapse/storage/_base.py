@@ -18,6 +18,7 @@ from synapse.api.errors import StoreError
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.caches.dictionary_cache import DictionaryCache
 from synapse.util.caches.descriptors import Cache
+from synapse.util.caches import intern_dict
 import synapse.metrics
 
 
@@ -26,6 +27,10 @@ from twisted.internet import defer
 import sys
 import time
 import threading
+import os
+
+
+CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.1))
 
 
 logger = logging.getLogger(__name__)
@@ -163,7 +168,9 @@ class SQLBaseStore(object):
         self._get_event_cache = Cache("*getEvent*", keylen=3, lru=True,
                                       max_entries=hs.config.event_cache_size)
 
-        self._state_group_cache = DictionaryCache("*stateGroupCache*", 2000)
+        self._state_group_cache = DictionaryCache(
+            "*stateGroupCache*", 2000 * CACHE_SIZE_FACTOR
+        )
 
         self._event_fetch_lock = threading.Condition()
         self._event_fetch_list = []
@@ -344,7 +351,7 @@ class SQLBaseStore(object):
         """
         col_headers = list(column[0] for column in cursor.description)
         results = list(
-            dict(zip(col_headers, row)) for row in cursor.fetchall()
+            intern_dict(dict(zip(col_headers, row))) for row in cursor.fetchall()
         )
         return results
 

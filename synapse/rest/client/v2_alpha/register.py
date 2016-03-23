@@ -122,10 +122,22 @@ class RegisterRestServlet(RestServlet):
 
         guest_access_token = body.get("guest_access_token", None)
 
+        session_id = self.auth_handler.get_session_id(body)
+        registered_user_id = None
+        if session_id:
+            # if we get a registered user id out of here, it means we previously
+            # registered a user for this session, so we could just return the
+            # user here. We carry on and go through the auth checks though,
+            # for paranoia.
+            registered_user_id = self.auth_handler.get_session_data(
+                session_id, "registered_user_id", None
+            )
+
         if desired_username is not None:
             yield self.registration_handler.check_username(
                 desired_username,
-                guest_access_token=guest_access_token
+                guest_access_token=guest_access_token,
+                assigned_user_id=registered_user_id,
             )
 
         if self.hs.config.enable_registration_captcha:
@@ -139,13 +151,29 @@ class RegisterRestServlet(RestServlet):
                 [LoginType.EMAIL_IDENTITY]
             ]
 
-        authed, result, params = yield self.auth_handler.check_auth(
+        authed, result, params, session_id = yield self.auth_handler.check_auth(
             flows, body, self.hs.get_ip_from_request(request)
         )
 
         if not authed:
             defer.returnValue((401, result))
             return
+
+        if registered_user_id is not None:
+            logger.info(
+                "Already registered user ID %r for this session",
+                registered_user_id
+            )
+            access_token = yield self.auth_handler.issue_access_token(registered_user_id)
+            refresh_token = yield self.auth_handler.issue_refresh_token(
+                registered_user_id
+            )
+            defer.returnValue((200, {
+                "user_id": registered_user_id,
+                "access_token": access_token,
+                "home_server": self.hs.hostname,
+                "refresh_token": refresh_token,
+            }))
 
         # NB: This may be from the auth handler and NOT from the POST
         if 'password' not in params:
@@ -159,6 +187,12 @@ class RegisterRestServlet(RestServlet):
             localpart=desired_username,
             password=new_password,
             guest_access_token=guest_access_token,
+        )
+
+        # remember that we've now registered that user account, and with what
+        # user ID (since the user may not have specified)
+        self.auth_handler.set_session_data(
+            session_id, "registered_user_id", user_id
         )
 
         if result and LoginType.EMAIL_IDENTITY in result:

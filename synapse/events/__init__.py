@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from synapse.util.frozenutils import freeze
+from synapse.util.caches import intern_dict
 
 
 # Whether we should use frozen_dict in FrozenEvent. Using frozen_dicts prevents
@@ -140,6 +141,10 @@ class FrozenEvent(EventBase):
 
         unsigned = dict(event_dict.pop("unsigned", {}))
 
+        # We intern these strings because they turn up a lot (especially when
+        # caching).
+        event_dict = intern_dict(event_dict)
+
         if USE_FROZEN_DICTS:
             frozen_dict = freeze(event_dict)
         else:
@@ -168,5 +173,7 @@ class FrozenEvent(EventBase):
 
     def __repr__(self):
         return "<FrozenEvent event_id='%s', type='%s', state_key='%s'>" % (
-            self.event_id, self.type, self.get("state_key", None),
+            self.get("event_id", None),
+            self.get("type", None),
+            self.get("state_key", None),
         )
