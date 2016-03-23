@@ -418,6 +418,7 @@ class FederationClient(FederationBase):
                     "Failed to make_%s via %s: %s",
                     membership, destination, e.message
                 )
+                raise
 
         raise RuntimeError("Failed to send to any server.")
 

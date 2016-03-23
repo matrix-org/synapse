@@ -15,6 +15,7 @@
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedList
+from synapse.util.caches import intern_string
 
 from twisted.internet import defer
 
@@ -393,7 +394,10 @@ class StateStore(SQLBaseStore):
                     # cache absence of the key, on the assumption that if we've
                     # explicitly asked for some types then we will probably ask
                     # for them again.
-                    state_dict = {key: None for key in types}
+                    state_dict = {
+                        (intern_string(etype), intern_string(state_key)): None
+                        for (etype, state_key) in types
+                    }
                     state_dict.update(results[group])
                     results[group] = state_dict
                 else:
