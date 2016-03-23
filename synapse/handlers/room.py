@@ -953,6 +953,13 @@ class RoomListHandler(BaseHandler):
             def get_state(etype, state_key):
                 return self.state_handler.get_current_state(room_id, etype, state_key)
 
+            # Double check that this is actually a public room.
+            join_rules_event = yield get_state(EventTypes.JoinRules, "")
+            if join_rules_event:
+                join_rule = join_rules_event.content.get("join_rule", None)
+                if join_rule and join_rule != JoinRules.PUBLIC:
+                    defer.returnValue(None)
+
             result = {"room_id": room_id}
             if aliases:
                 result["aliases"] = aliases
