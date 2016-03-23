@@ -39,7 +39,7 @@ KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
 CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.1))
 
 
-SIZE_OF_CACHE = int(5000 * CACHE_SIZE_FACTOR)
+SIZE_OF_CACHE = int(1000 * CACHE_SIZE_FACTOR)
 EVICTION_TIMEOUT_SECONDS = 60 * 60
 
 
