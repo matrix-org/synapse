@@ -119,7 +119,8 @@ class RoomCreationHandler(BaseHandler):
 
         invite_3pid_list = config.get("invite_3pid", [])
 
-        is_public = config.get("visibility", None) == "public"
+        visibility = config.get("visibility", None)
+        is_public = visibility == "public"
 
         # autogen room IDs and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.
@@ -155,9 +156,9 @@ class RoomCreationHandler(BaseHandler):
 
         preset_config = config.get(
             "preset",
-            RoomCreationPreset.PUBLIC_CHAT
-            if is_public
-            else RoomCreationPreset.PRIVATE_CHAT
+            RoomCreationPreset.PRIVATE_CHAT
+            if visibility == "private"
+            else RoomCreationPreset.PUBLIC_CHAT
         )
 
         raw_initial_state = config.get("initial_state", [])
