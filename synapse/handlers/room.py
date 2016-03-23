@@ -119,7 +119,8 @@ class RoomCreationHandler(BaseHandler):
 
         invite_3pid_list = config.get("invite_3pid", [])
 
-        is_public = config.get("visibility", None) == "public"
+        visibility = config.get("visibility", None)
+        is_public = visibility == "public"
 
         # autogen room IDs and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.
@@ -155,9 +156,9 @@ class RoomCreationHandler(BaseHandler):
 
         preset_config = config.get(
             "preset",
-            RoomCreationPreset.PUBLIC_CHAT
-            if is_public
-            else RoomCreationPreset.PRIVATE_CHAT
+            RoomCreationPreset.PRIVATE_CHAT
+            if visibility == "private"
+            else RoomCreationPreset.PUBLIC_CHAT
         )
 
         raw_initial_state = config.get("initial_state", [])
@@ -946,53 +947,62 @@ class RoomListHandler(BaseHandler):
         @defer.inlineCallbacks
         def handle_room(room_id):
             aliases = yield self.store.get_aliases_for_room(room_id)
-            if not aliases:
-                defer.returnValue(None)
 
-            state = yield self.state_handler.get_current_state(room_id)
+            # We pull each bit of state out indvidually to avoid pulling the
+            # full state into memory. Due to how the caching works this should
+            # be fairly quick, even if not originally in the cache.
+            def get_state(etype, state_key):
+                return self.state_handler.get_current_state(room_id, etype, state_key)
 
-            result = {"aliases": aliases, "room_id": room_id}
+            # Double check that this is actually a public room.
+            join_rules_event = yield get_state(EventTypes.JoinRules, "")
+            if join_rules_event:
+                join_rule = join_rules_event.content.get("join_rule", None)
+                if join_rule and join_rule != JoinRules.PUBLIC:
+                    defer.returnValue(None)
 
-            name_event = state.get((EventTypes.Name, ""), None)
+            result = {"room_id": room_id}
+            if aliases:
+                result["aliases"] = aliases
+
+            name_event = yield get_state(EventTypes.Name, "")
             if name_event:
                 name = name_event.content.get("name", None)
                 if name:
                     result["name"] = name
 
-            topic_event = state.get((EventTypes.Topic, ""), None)
+            topic_event = yield get_state(EventTypes.Topic, "")
             if topic_event:
                 topic = topic_event.content.get("topic", None)
                 if topic:
                     result["topic"] = topic
 
-            canonical_event = state.get((EventTypes.CanonicalAlias, ""), None)
+            canonical_event = yield get_state(EventTypes.CanonicalAlias, "")
             if canonical_event:
                 canonical_alias = canonical_event.content.get("alias", None)
                 if canonical_alias:
                     result["canonical_alias"] = canonical_alias
 
-            visibility_event = state.get((EventTypes.RoomHistoryVisibility, ""), None)
+            visibility_event = yield get_state(EventTypes.RoomHistoryVisibility, "")
             visibility = None
             if visibility_event:
                 visibility = visibility_event.content.get("history_visibility", None)
             result["world_readable"] = visibility == "world_readable"
 
-            guest_event = state.get((EventTypes.GuestAccess, ""), None)
+            guest_event = yield get_state(EventTypes.GuestAccess, "")
             guest = None
             if guest_event:
                 guest = guest_event.content.get("guest_access", None)
             result["guest_can_join"] = guest == "can_join"
 
-            avatar_event = state.get(("m.room.avatar", ""), None)
+            avatar_event = yield get_state("m.room.avatar", "")
             if avatar_event:
                 avatar_url = avatar_event.content.get("url", None)
                 if avatar_url:
                     result["avatar_url"] = avatar_url
 
-            result["num_joined_members"] = sum(
-                1 for (event_type, _), ev in state.items()
-                if event_type == EventTypes.Member and ev.membership == Membership.JOIN
-            )
+            joined_users = yield self.store.get_users_in_room(room_id)
+            result["num_joined_members"] = len(joined_users)
 
             defer.returnValue(result)
 
