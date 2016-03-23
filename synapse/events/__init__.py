@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from synapse.util.frozenutils import freeze
-from synapse.util.caches import intern_string
+from synapse.util.caches import intern_dict
 
 
 # Whether we should use frozen_dict in FrozenEvent. Using frozen_dicts prevents
@@ -143,14 +143,7 @@ class FrozenEvent(EventBase):
 
         # We intern these strings because they turn up a lot (especially when
         # caching).
-        event_dict["type"] = intern_string(event_dict["type"])
-        if "state_key" in event_dict:
-            event_dict["state_key"] = intern_string(event_dict["state_key"])
-        if "sender" in event_dict:
-            event_dict["sender"] = intern_string(event_dict["sender"])
-
-        event_dict["event_id"] = intern(event_dict["event_id"].encode('ascii'))
-        event_dict["room_id"] = intern(event_dict["room_id"].encode('ascii'))
+        event_dict = intern_dict(event_dict)
 
         if USE_FROZEN_DICTS:
             frozen_dict = freeze(event_dict)

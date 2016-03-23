@@ -62,18 +62,17 @@ class ReceiptsStore(SQLBaseStore):
 
     @cachedInlineCallbacks(num_args=2)
     def get_receipts_for_user(self, user_id, receipt_type):
-        def f(txn):
-            sql = (
-                "SELECT room_id,event_id "
-                "FROM receipts_linearized "
-                "WHERE user_id = ? AND receipt_type = ? "
-            )
-            txn.execute(sql, (user_id, receipt_type))
-            return txn.fetchall()
+        rows = yield self._simple_select_list(
+            table="receipts_linearized",
+            keyvalues={
+                "user_id": user_id,
+                "receipt_type": receipt_type,
+            },
+            retcols=("room_id", "event_id"),
+            desc="get_receipts_for_user",
+        )
 
-        defer.returnValue(dict(
-            (yield self.runInteraction("get_receipts_for_user", f))
-        ))
+        defer.returnValue({row["room_id"]: row["event_id"] for row in rows})
 
     @defer.inlineCallbacks
     def get_linearized_receipts_for_rooms(self, room_ids, to_key, from_key=None):

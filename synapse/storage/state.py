@@ -156,9 +156,7 @@ class StateStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_current_state_for_key(self, room_id, event_type, state_key):
-        event_ids = yield self._get_current_state_for_key(
-            room_id, intern_string(event_type), intern_string(state_key)
-        )
+        event_ids = yield self._get_current_state_for_key(room_id, event_type, state_key)
         events = yield self._get_events(event_ids, get_prev_content=False)
         defer.returnValue(events)
 
@@ -205,7 +203,7 @@ class StateStore(SQLBaseStore):
 
             results = {}
             for row in rows:
-                key = (intern_string(row["type"]), intern_string(row["state_key"]))
+                key = (row["type"], row["state_key"])
                 results.setdefault(row["state_group"], {})[key] = row["event_id"]
             return results
 
@@ -286,7 +284,9 @@ class StateStore(SQLBaseStore):
             desc="_get_state_group_for_events",
         )
 
-        defer.returnValue({row["event_id"]: row["state_group"] for row in rows})
+        defer.returnValue({
+            intern(row["event_id"].encode('ascii')): row["state_group"] for row in rows
+        })
 
     def _get_some_state_from_cache(self, group, types):
         """Checks if group is in cache. See `_get_state_for_groups`
