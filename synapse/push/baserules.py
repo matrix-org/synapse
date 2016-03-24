@@ -160,7 +160,27 @@ BASE_APPEND_OVRRIDE_RULES = [
         'actions': [
             'dont_notify',
         ]
-    }
+    },
+    # Will we sometimes want to know about people joining and leaving?
+    # Perhaps: if so, this could be expanded upon. Seems the most usual case
+    # is that we don't though. We add this override rule so that even if
+    # the room rule is set to notify, we don't get notifications about
+    # join/leave/avatar/displayname events.
+    # See also: https://matrix.org/jira/browse/SYN-607
+    {
+        'rule_id': 'global/override/.m.rule.member_event',
+        'conditions': [
+            {
+                'kind': 'event_match',
+                'key': 'type',
+                'pattern': 'm.room.member',
+                '_id': '_member',
+            }
+        ],
+        'actions': [
+            'dont_notify'
+        ]
+    },
 ]
 
 
@@ -261,25 +281,6 @@ BASE_APPEND_UNDERRIDE_RULES = [
             }
         ]
     },
-    # This is too simple: https://matrix.org/jira/browse/SYN-607
-    # Removing for now
-    # {
-    #     'rule_id': 'global/underride/.m.rule.member_event',
-    #     'conditions': [
-    #         {
-    #             'kind': 'event_match',
-    #             'key': 'type',
-    #             'pattern': 'm.room.member',
-    #             '_id': '_member',
-    #         }
-    #     ],
-    #     'actions': [
-    #         'notify', {
-    #             'set_tweak': 'highlight',
-    #             'value': False
-    #         }
-    #     ]
-    # },
     {
         'rule_id': 'global/underride/.m.rule.message',
         'conditions': [
