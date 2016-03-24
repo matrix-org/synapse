@@ -25,7 +25,7 @@ class ResponseCache(object):
     """
 
     def __init__(self):
-        self.pending_result_cache = {}  # Request that haven't finished yet.
+        self.pending_result_cache = {}  # Requests that haven't finished yet.
 
     def get(self, key):
         result = self.pending_result_cache.get(key)
