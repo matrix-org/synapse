@@ -115,6 +115,8 @@ class SyncRestServlet(RestServlet):
             )
         )
 
+        request_key = (user, timeout, since, filter_id, full_state)
+
         if filter_id:
             if filter_id.startswith('{'):
                 try:
@@ -134,6 +136,7 @@ class SyncRestServlet(RestServlet):
             user=user,
             filter_collection=filter,
             is_guest=requester.is_guest,
+            request_key=request_key,
         )
 
         if since is not None:
