@@ -25,6 +25,7 @@ from synapse.api.constants import (
 from synapse.api.errors import AuthError, StoreError, SynapseError, Codes
 from synapse.util import stringutils, unwrapFirstError
 from synapse.util.logcontext import preserve_context_over_fn
+from synapse.util.caches.response_cache import ResponseCache
 
 from signedjson.sign import verify_signed_json
 from signedjson.key import decode_verify_key_bytes
@@ -939,9 +940,18 @@ class RoomMemberHandler(BaseHandler):
 
 
 class RoomListHandler(BaseHandler):
+    def __init__(self, hs):
+        super(RoomListHandler, self).__init__(hs)
+        self.response_cache = ResponseCache()
+
+    def get_public_room_list(self):
+        result = self.response_cache.get(())
+        if not result:
+            result = self.response_cache.set((), self._get_public_room_list())
+        return result
 
     @defer.inlineCallbacks
-    def get_public_room_list(self):
+    def _get_public_room_list(self):
         room_ids = yield self.store.get_public_room_ids()
 
         @defer.inlineCallbacks

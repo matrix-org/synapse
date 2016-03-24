@@ -20,6 +20,7 @@ from synapse.api.constants import Membership, EventTypes
 from synapse.util import unwrapFirstError
 from synapse.util.logcontext import LoggingContext, preserve_fn
 from synapse.util.metrics import Measure
+from synapse.util.caches.response_cache import ResponseCache
 from synapse.push.clientformat import format_push_rules_for_user
 
 from twisted.internet import defer
@@ -35,6 +36,7 @@ SyncConfig = collections.namedtuple("SyncConfig", [
     "user",
     "filter_collection",
     "is_guest",
+    "request_key",
 ])
 
 
@@ -136,8 +138,8 @@ class SyncHandler(BaseHandler):
         super(SyncHandler, self).__init__(hs)
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
+        self.response_cache = ResponseCache()
 
-    @defer.inlineCallbacks
     def wait_for_sync_for_user(self, sync_config, since_token=None, timeout=0,
                                full_state=False):
         """Get the sync for a client if we have new data for it now. Otherwise
@@ -146,7 +148,19 @@ class SyncHandler(BaseHandler):
         Returns:
             A Deferred SyncResult.
         """
+        result = self.response_cache.get(sync_config.request_key)
+        if not result:
+            result = self.response_cache.set(
+                sync_config.request_key,
+                self._wait_for_sync_for_user(
+                    sync_config, since_token, timeout, full_state
+                )
+            )
+        return result
 
+    @defer.inlineCallbacks
+    def _wait_for_sync_for_user(self, sync_config, since_token, timeout,
+                                full_state):
         context = LoggingContext.current_context()
         if context:
             if since_token is None:
