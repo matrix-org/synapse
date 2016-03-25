@@ -77,7 +77,7 @@ class ReplicationResource(Resource):
     The response is a JSON object with keys for each stream with updates. Under
     each key is a JSON object with:
 
-    * "postion": The current position of the stream.
+    * "position": The current position of the stream.
     * "field_names": The names of the fields in each row.
     * "rows": The updates as an array of arrays.
 
