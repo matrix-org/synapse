@@ -16,10 +16,10 @@
 from tests import unittest
 
 from synapse.api.errors import SynapseError
-from synapse.server import BaseHomeServer
+from synapse.server import HomeServer
 from synapse.types import UserID, RoomAlias
 
-mock_homeserver = BaseHomeServer(hostname="my.domain")
+mock_homeserver = HomeServer(hostname="my.domain")
 
 
 class UserIDTestCase(unittest.TestCase):
@@ -33,7 +33,6 @@ class UserIDTestCase(unittest.TestCase):
     def test_pase_empty(self):
         with self.assertRaises(SynapseError):
             UserID.from_string("")
-
 
     def test_build(self):
         user = UserID("5678efgh", "my.domain")

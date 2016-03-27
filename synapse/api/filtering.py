@@ -15,6 +15,8 @@
 from synapse.api.errors import SynapseError
 from synapse.types import UserID, RoomID
 
+import ujson as json
+
 
 class Filtering(object):
 
@@ -28,14 +30,14 @@ class Filtering(object):
         return result
 
     def add_user_filter(self, user_localpart, user_filter):
-        self._check_valid_filter(user_filter)
+        self.check_valid_filter(user_filter)
         return self.store.add_user_filter(user_localpart, user_filter)
 
     # TODO(paul): surely we should probably add a delete_user_filter or
     #   replace_user_filter at some point? There's no REST API specified for
     #   them however
 
-    def _check_valid_filter(self, user_filter_json):
+    def check_valid_filter(self, user_filter_json):
         """Check if the provided filter is valid.
 
         This inspects all definitions contained within the filter.
@@ -129,52 +131,58 @@ class Filtering(object):
 
 class FilterCollection(object):
     def __init__(self, filter_json):
-        self.filter_json = filter_json
+        self._filter_json = filter_json
 
-        room_filter_json = self.filter_json.get("room", {})
+        room_filter_json = self._filter_json.get("room", {})
 
-        self.room_filter = Filter({
+        self._room_filter = Filter({
             k: v for k, v in room_filter_json.items()
             if k in ("rooms", "not_rooms")
         })
 
-        self.room_timeline_filter = Filter(room_filter_json.get("timeline", {}))
-        self.room_state_filter = Filter(room_filter_json.get("state", {}))
-        self.room_ephemeral_filter = Filter(room_filter_json.get("ephemeral", {}))
-        self.room_account_data = Filter(room_filter_json.get("account_data", {}))
-        self.presence_filter = Filter(self.filter_json.get("presence", {}))
-        self.account_data = Filter(self.filter_json.get("account_data", {}))
+        self._room_timeline_filter = Filter(room_filter_json.get("timeline", {}))
+        self._room_state_filter = Filter(room_filter_json.get("state", {}))
+        self._room_ephemeral_filter = Filter(room_filter_json.get("ephemeral", {}))
+        self._room_account_data = Filter(room_filter_json.get("account_data", {}))
+        self._presence_filter = Filter(filter_json.get("presence", {}))
+        self._account_data = Filter(filter_json.get("account_data", {}))
 
-        self.include_leave = self.filter_json.get("room", {}).get(
+        self.include_leave = filter_json.get("room", {}).get(
             "include_leave", False
         )
 
+    def __repr__(self):
+        return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
+
+    def get_filter_json(self):
+        return self._filter_json
+
     def timeline_limit(self):
-        return self.room_timeline_filter.limit()
+        return self._room_timeline_filter.limit()
 
     def presence_limit(self):
-        return self.presence_filter.limit()
+        return self._presence_filter.limit()
 
     def ephemeral_limit(self):
-        return self.room_ephemeral_filter.limit()
+        return self._room_ephemeral_filter.limit()
 
     def filter_presence(self, events):
-        return self.presence_filter.filter(events)
+        return self._presence_filter.filter(events)
 
     def filter_account_data(self, events):
-        return self.account_data.filter(events)
+        return self._account_data.filter(events)
 
     def filter_room_state(self, events):
-        return self.room_state_filter.filter(self.room_filter.filter(events))
+        return self._room_state_filter.filter(self._room_filter.filter(events))
 
     def filter_room_timeline(self, events):
-        return self.room_timeline_filter.filter(self.room_filter.filter(events))
+        return self._room_timeline_filter.filter(self._room_filter.filter(events))
 
     def filter_room_ephemeral(self, events):
-        return self.room_ephemeral_filter.filter(self.room_filter.filter(events))
+        return self._room_ephemeral_filter.filter(self._room_filter.filter(events))
 
     def filter_room_account_data(self, events):
-        return self.room_account_data.filter(self.room_filter.filter(events))
+        return self._room_account_data.filter(self._room_filter.filter(events))
 
 
 class Filter(object):
@@ -187,18 +195,19 @@ class Filter(object):
         Returns:
             bool: True if the event matches
         """
-        if isinstance(event, dict):
-            return self.check_fields(
-                event.get("room_id", None),
-                event.get("sender", None),
-                event.get("type", None),
-            )
-        else:
-            return self.check_fields(
-                getattr(event, "room_id", None),
-                getattr(event, "sender", None),
-                event.type,
-            )
+        sender = event.get("sender", None)
+        if not sender:
+            # Presence events have their 'sender' in content.user_id
+            content = event.get("content")
+            # account_data has been allowed to have non-dict content, so check type first
+            if isinstance(content, dict):
+                sender = content.get("user_id")
+
+        return self.check_fields(
+            event.get("room_id", None),
+            sender,
+            event.get("type", None),
+        )
 
     def check_fields(self, room_id, sender, event_type):
         """Checks whether the filter matches the given event fields.
@@ -258,3 +267,6 @@ def _matches_wildcard(actual_value, filter_value):
         return actual_value.startswith(type_prefix)
     else:
         return actual_value == filter_value
+
+
+DEFAULT_FILTER_COLLECTION = FilterCollection({})

@@ -15,14 +15,12 @@
 
 from ._base import client_v2_patterns
 
-from synapse.http.servlet import RestServlet
-from synapse.api.errors import AuthError, SynapseError
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.api.errors import AuthError
 
 from twisted.internet import defer
 
 import logging
-
-import simplejson as json
 
 logger = logging.getLogger(__name__)
 
@@ -47,17 +45,13 @@ class AccountDataServlet(RestServlet):
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
-        try:
-            content_bytes = request.content.read()
-            body = json.loads(content_bytes)
-        except:
-            raise SynapseError(400, "Invalid JSON")
+        body = parse_json_object_from_request(request)
 
         max_id = yield self.store.add_account_data_for_user(
             user_id, account_data_type, body
         )
 
-        yield self.notifier.on_new_event(
+        self.notifier.on_new_event(
             "account_data_key", max_id, users=[user_id]
         )
 
@@ -86,20 +80,13 @@ class RoomAccountDataServlet(RestServlet):
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
-        try:
-            content_bytes = request.content.read()
-            body = json.loads(content_bytes)
-        except:
-            raise SynapseError(400, "Invalid JSON")
-
-        if not isinstance(body, dict):
-            raise ValueError("Expected a JSON object")
+        body = parse_json_object_from_request(request)
 
         max_id = yield self.store.add_account_data_to_room(
             user_id, room_id, account_data_type, body
         )
 
-        yield self.notifier.on_new_event(
+        self.notifier.on_new_event(
             "account_data_key", max_id, users=[user_id]
         )
 

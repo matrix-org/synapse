@@ -58,7 +58,7 @@ class EventFederationStore(SQLBaseStore):
             new_front = set()
             front_list = list(front)
             chunks = [
-                front_list[x:x+100]
+                front_list[x:x + 100]
                 for x in xrange(0, len(front), 100)
             ]
             for chunk in chunks:
@@ -114,10 +114,10 @@ class EventFederationStore(SQLBaseStore):
             retcol="event_id",
         )
 
-    def get_latest_events_in_room(self, room_id):
+    def get_latest_event_ids_and_hashes_in_room(self, room_id):
         return self.runInteraction(
-            "get_latest_events_in_room",
-            self._get_latest_events_in_room,
+            "get_latest_event_ids_and_hashes_in_room",
+            self._get_latest_event_ids_and_hashes_in_room,
             room_id,
         )
 
@@ -132,7 +132,7 @@ class EventFederationStore(SQLBaseStore):
             desc="get_latest_event_ids_in_room",
         )
 
-    def _get_latest_events_in_room(self, txn, room_id):
+    def _get_latest_event_ids_and_hashes_in_room(self, txn, room_id):
         sql = (
             "SELECT e.event_id, e.depth FROM events as e "
             "INNER JOIN event_forward_extremities as f "

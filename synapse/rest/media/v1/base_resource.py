@@ -16,7 +16,7 @@
 from .thumbnailer import Thumbnailer
 
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
-from synapse.http.server import respond_with_json
+from synapse.http.server import respond_with_json, finish_request
 from synapse.util.stringutils import random_string
 from synapse.api.errors import (
     cs_error, Codes, SynapseError
@@ -28,6 +28,7 @@ from twisted.protocols.basic import FileSender
 
 from synapse.util.async import ObservableDeferred
 from synapse.util.stringutils import is_ascii
+from synapse.util.logcontext import preserve_context_over_fn
 
 import os
 
@@ -237,7 +238,7 @@ class BaseMediaResource(Resource):
             with open(file_path, "rb") as f:
                 yield FileSender().beginFileTransfer(f, request)
 
-            request.finish()
+            finish_request(request)
         else:
             self._respond_404(request)
 
@@ -276,7 +277,8 @@ class BaseMediaResource(Resource):
         )
         self._makedirs(t_path)
 
-        t_len = yield threads.deferToThread(
+        t_len = yield preserve_context_over_fn(
+            threads.deferToThread,
             self._generate_thumbnail,
             input_path, t_path, t_width, t_height, t_method, t_type
         )
@@ -298,7 +300,8 @@ class BaseMediaResource(Resource):
         )
         self._makedirs(t_path)
 
-        t_len = yield threads.deferToThread(
+        t_len = yield preserve_context_over_fn(
+            threads.deferToThread,
             self._generate_thumbnail,
             input_path, t_path, t_width, t_height, t_method, t_type
         )
@@ -372,7 +375,7 @@ class BaseMediaResource(Resource):
                     media_id, t_width, t_height, t_type, t_method, t_len
                 ))
 
-        yield threads.deferToThread(generate_thumbnails)
+        yield preserve_context_over_fn(threads.deferToThread, generate_thumbnails)
 
         for l in local_thumbnails:
             yield self.store.store_local_thumbnail(*l)
@@ -445,7 +448,7 @@ class BaseMediaResource(Resource):
                     t_width, t_height, t_type, t_method, t_len
                 ])
 
-        yield threads.deferToThread(generate_thumbnails)
+        yield preserve_context_over_fn(threads.deferToThread, generate_thumbnails)
 
         for r in remote_thumbnails:
             yield self.store.store_remote_media_thumbnail(*r)

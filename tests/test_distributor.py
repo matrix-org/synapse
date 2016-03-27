@@ -44,8 +44,10 @@ class DistributorTestCase(unittest.TestCase):
         self.dist.declare("whine")
 
         d_inner = defer.Deferred()
+
         def observer():
             return d_inner
+
         self.dist.observe("whine", observer)
 
         d_outer = self.dist.fire("whine")
@@ -66,8 +68,8 @@ class DistributorTestCase(unittest.TestCase):
 
         observers[0].side_effect = Exception("Awoogah!")
 
-        with patch("synapse.util.distributor.logger",
-                spec=["warning"]
+        with patch(
+            "synapse.util.distributor.logger", spec=["warning"]
         ) as mock_logger:
             d = self.dist.fire("alarm", "Go")
             yield d
@@ -77,8 +79,9 @@ class DistributorTestCase(unittest.TestCase):
             observers[1].assert_called_once_with("Go")
 
             self.assertEquals(mock_logger.warning.call_count, 1)
-            self.assertIsInstance(mock_logger.warning.call_args[0][0],
-                    str)
+            self.assertIsInstance(
+                mock_logger.warning.call_args[0][0], str
+            )
 
     @defer.inlineCallbacks
     def test_signal_catch_no_suppress(self):

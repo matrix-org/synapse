@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
+from synapse.util.logcontext import PreserveLoggingContext
 
 from twisted.internet import defer, reactor, task
 
@@ -42,11 +42,11 @@ class Clock(object):
 
     def time_msec(self):
         """Returns the current system time in miliseconds since epoch."""
-        return self.time() * 1000
+        return int(self.time() * 1000)
 
     def looping_call(self, f, msec):
         l = task.LoopingCall(f)
-        l.start(msec/1000.0, now=False)
+        l.start(msec / 1000.0, now=False)
         return l
 
     def stop_looping_call(self, loop):
@@ -61,10 +61,8 @@ class Clock(object):
             *args: Postional arguments to pass to function.
             **kwargs: Key arguments to pass to function.
         """
-        current_context = LoggingContext.current_context()
-
         def wrapped_callback(*args, **kwargs):
-            with PreserveLoggingContext(current_context):
+            with PreserveLoggingContext():
                 callback(*args, **kwargs)
 
         with PreserveLoggingContext():

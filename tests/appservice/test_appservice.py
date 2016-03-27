@@ -14,7 +14,7 @@
 # limitations under the License.
 from synapse.appservice import ApplicationService
 
-from mock import Mock, PropertyMock
+from mock import Mock
 from tests import unittest
 
 

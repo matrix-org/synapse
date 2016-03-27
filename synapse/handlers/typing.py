@@ -19,11 +19,13 @@ from ._base import BaseHandler
 
 from synapse.api.errors import SynapseError, AuthError
 from synapse.util.logcontext import PreserveLoggingContext
+from synapse.util.metrics import Measure
 from synapse.types import UserID
 
 import logging
 
 from collections import namedtuple
+import ujson as json
 
 logger = logging.getLogger(__name__)
 
@@ -218,10 +220,24 @@ class TypingNotificationHandler(BaseHandler):
                 "typing_key", self._latest_room_serial, rooms=[room_id]
             )
 
+    def get_all_typing_updates(self, last_id, current_id):
+        # TODO: Work out a way to do this without scanning the entire state.
+        rows = []
+        for room_id, serial in self._room_serials.items():
+            if last_id < serial and serial <= current_id:
+                typing = self._room_typing[room_id]
+                typing_bytes = json.dumps([
+                    u.to_string() for u in typing
+                ], ensure_ascii=False)
+                rows.append((serial, room_id, typing_bytes))
+        rows.sort()
+        return rows
+
 
 class TypingNotificationEventSource(object):
     def __init__(self, hs):
         self.hs = hs
+        self.clock = hs.get_clock()
         self._handler = None
         self._room_member_handler = None
 
@@ -247,19 +263,20 @@ class TypingNotificationEventSource(object):
         }
 
     def get_new_events(self, from_key, room_ids, **kwargs):
-        from_key = int(from_key)
-        handler = self.handler()
+        with Measure(self.clock, "typing.get_new_events"):
+            from_key = int(from_key)
+            handler = self.handler()
 
-        events = []
-        for room_id in room_ids:
-            if room_id not in handler._room_serials:
-                continue
-            if handler._room_serials[room_id] <= from_key:
-                continue
+            events = []
+            for room_id in room_ids:
+                if room_id not in handler._room_serials:
+                    continue
+                if handler._room_serials[room_id] <= from_key:
+                    continue
 
-            events.append(self._make_event_for(room_id))
+                events.append(self._make_event_for(room_id))
 
-        return events, handler._latest_room_serial
+            return events, handler._latest_room_serial
 
     def get_current_key(self):
         return self.handler()._latest_room_serial

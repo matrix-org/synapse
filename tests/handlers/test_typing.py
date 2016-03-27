@@ -138,9 +138,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.room_member_handler.get_joined_rooms_for_user = get_joined_rooms_for_user
 
         @defer.inlineCallbacks
-        def fetch_room_distributions_into(room_id, localusers=None,
-                remotedomains=None, ignore_user=None):
-
+        def fetch_room_distributions_into(
+            room_id, localusers=None, remotedomains=None, ignore_user=None
+        ):
             members = yield get_room_members(room_id)
             for member in members:
                 if ignore_user is not None and member == ignore_user:
@@ -153,7 +153,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
                     if remotedomains is not None:
                         remotedomains.add(member.domain)
         self.room_member_handler.fetch_room_distributions_into = (
-                fetch_room_distributions_into)
+            fetch_room_distributions_into
+        )
 
         def check_joined_room(room_id, user_id):
             if user_id not in [u.to_string() for u in self.room_members]:
@@ -207,9 +208,12 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
-            call("farm",
+            call(
+                "farm",
                 path="/_matrix/federation/v1/send/1000000/",
-                data=_expect_edu("farm", "m.typing",
+                data=_expect_edu(
+                    "farm",
+                    "m.typing",
                     content={
                         "room_id": self.room_id,
                         "user_id": self.u_apple.to_string(),
@@ -237,9 +241,12 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 
-        yield self.mock_federation_resource.trigger("PUT",
+        yield self.mock_federation_resource.trigger(
+            "PUT",
             "/_matrix/federation/v1/send/1000000/",
-            _make_edu_json("farm", "m.typing",
+            _make_edu_json(
+                "farm",
+                "m.typing",
                 content={
                     "room_id": self.room_id,
                     "user_id": self.u_onion.to_string(),
@@ -257,16 +264,13 @@ class TypingNotificationsTestCase(unittest.TestCase):
             room_ids=[self.room_id],
             from_key=0
         )
-        self.assertEquals(
-            events[0],
-            [
-                {"type": "m.typing",
-                 "room_id": self.room_id,
-                 "content": {
-                     "user_ids": [self.u_onion.to_string()],
-                }},
-            ]
-        )
+        self.assertEquals(events[0], [{
+            "type": "m.typing",
+            "room_id": self.room_id,
+            "content": {
+                "user_ids": [self.u_onion.to_string()],
+            },
+        }])
 
     @defer.inlineCallbacks
     def test_stopped_typing(self):
@@ -274,9 +278,12 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         put_json = self.mock_http_client.put_json
         put_json.expect_call_and_return(
-            call("farm",
+            call(
+                "farm",
                 path="/_matrix/federation/v1/send/1000000/",
-                data=_expect_edu("farm", "m.typing",
+                data=_expect_edu(
+                    "farm",
+                    "m.typing",
                     content={
                         "room_id": self.room_id,
                         "user_id": self.u_apple.to_string(),
@@ -317,16 +324,13 @@ class TypingNotificationsTestCase(unittest.TestCase):
             room_ids=[self.room_id],
             from_key=0,
         )
-        self.assertEquals(
-            events[0],
-            [
-                {"type": "m.typing",
-                 "room_id": self.room_id,
-                 "content": {
-                     "user_ids": [],
-                }},
-            ]
-        )
+        self.assertEquals(events[0], [{
+            "type": "m.typing",
+            "room_id": self.room_id,
+            "content": {
+                "user_ids": [],
+            },
+        }])
 
     @defer.inlineCallbacks
     def test_typing_timeout(self):
@@ -351,16 +355,13 @@ class TypingNotificationsTestCase(unittest.TestCase):
             room_ids=[self.room_id],
             from_key=0,
         )
-        self.assertEquals(
-            events[0],
-            [
-                {"type": "m.typing",
-                 "room_id": self.room_id,
-                 "content": {
-                     "user_ids": [self.u_apple.to_string()],
-                }},
-            ]
-        )
+        self.assertEquals(events[0], [{
+            "type": "m.typing",
+            "room_id": self.room_id,
+            "content": {
+                "user_ids": [self.u_apple.to_string()],
+            },
+        }])
 
         self.clock.advance_time(11)
 
@@ -373,16 +374,13 @@ class TypingNotificationsTestCase(unittest.TestCase):
             room_ids=[self.room_id],
             from_key=1,
         )
-        self.assertEquals(
-            events[0],
-            [
-                {"type": "m.typing",
-                 "room_id": self.room_id,
-                 "content": {
-                     "user_ids": [],
-                }},
-            ]
-        )
+        self.assertEquals(events[0], [{
+            "type": "m.typing",
+            "room_id": self.room_id,
+            "content": {
+                "user_ids": [],
+            },
+        }])
 
         # SYN-230 - see if we can still set after timeout
 
@@ -403,13 +401,10 @@ class TypingNotificationsTestCase(unittest.TestCase):
             room_ids=[self.room_id],
             from_key=0,
         )
-        self.assertEquals(
-            events[0],
-            [
-                {"type": "m.typing",
-                 "room_id": self.room_id,
-                 "content": {
-                     "user_ids": [self.u_apple.to_string()],
-                }},
-            ]
-        )
+        self.assertEquals(events[0], [{
+            "type": "m.typing",
+            "room_id": self.room_id,
+            "content": {
+                "user_ids": [self.u_apple.to_string()],
+            },
+        }])

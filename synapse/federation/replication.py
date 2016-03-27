@@ -54,8 +54,6 @@ class ReplicationLayer(FederationClient, FederationServer):
         self.keyring = hs.get_keyring()
 
         self.transport_layer = transport_layer
-        self.transport_layer.register_received_handler(self)
-        self.transport_layer.register_request_handler(self)
 
         self.federation_client = self
 

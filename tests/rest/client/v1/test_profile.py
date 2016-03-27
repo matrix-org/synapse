@@ -65,8 +65,9 @@ class ProfileTestCase(unittest.TestCase):
         mocked_get = self.mock_handler.get_displayname
         mocked_get.return_value = defer.succeed("Frank")
 
-        (code, response) = yield self.mock_resource.trigger("GET",
-                "/profile/%s/displayname" % (myid), None)
+        (code, response) = yield self.mock_resource.trigger(
+            "GET", "/profile/%s/displayname" % (myid), None
+        )
 
         self.assertEquals(200, code)
         self.assertEquals({"displayname": "Frank"}, response)
@@ -77,13 +78,15 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set = self.mock_handler.set_displayname
         mocked_set.return_value = defer.succeed(())
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                "/profile/%s/displayname" % (myid),
-                '{"displayname": "Frank Jr."}')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT",
+            "/profile/%s/displayname" % (myid),
+            '{"displayname": "Frank Jr."}'
+        )
 
         self.assertEquals(200, code)
         self.assertEquals(mocked_set.call_args[0][0].localpart, "1234ABCD")
-        self.assertEquals(mocked_set.call_args[0][1].localpart, "1234ABCD")
+        self.assertEquals(mocked_set.call_args[0][1].user.localpart, "1234ABCD")
         self.assertEquals(mocked_set.call_args[0][2], "Frank Jr.")
 
     @defer.inlineCallbacks
@@ -91,19 +94,24 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set = self.mock_handler.set_displayname
         mocked_set.side_effect = AuthError(400, "message")
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                "/profile/%s/displayname" % ("@4567:test"), '"Frank Jr."')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", "/profile/%s/displayname" % ("@4567:test"),
+            '{"displayname": "Frank Jr."}'
+        )
 
-        self.assertTrue(400 <= code < 499,
-                msg="code %d is in the 4xx range" % (code))
+        self.assertTrue(
+            400 <= code < 499,
+            msg="code %d is in the 4xx range" % (code)
+        )
 
     @defer.inlineCallbacks
     def test_get_other_name(self):
         mocked_get = self.mock_handler.get_displayname
         mocked_get.return_value = defer.succeed("Bob")
 
-        (code, response) = yield self.mock_resource.trigger("GET",
-                "/profile/%s/displayname" % ("@opaque:elsewhere"), None)
+        (code, response) = yield self.mock_resource.trigger(
+            "GET", "/profile/%s/displayname" % ("@opaque:elsewhere"), None
+        )
 
         self.assertEquals(200, code)
         self.assertEquals({"displayname": "Bob"}, response)
@@ -113,19 +121,24 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set = self.mock_handler.set_displayname
         mocked_set.side_effect = SynapseError(400, "message")
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                "/profile/%s/displayname" % ("@opaque:elsewhere"), None)
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", "/profile/%s/displayname" % ("@opaque:elsewhere"),
+            '{"displayname":"bob"}'
+        )
 
-        self.assertTrue(400 <= code <= 499,
-                msg="code %d is in the 4xx range" % (code))
+        self.assertTrue(
+            400 <= code <= 499,
+            msg="code %d is in the 4xx range" % (code)
+        )
 
     @defer.inlineCallbacks
     def test_get_my_avatar(self):
         mocked_get = self.mock_handler.get_avatar_url
         mocked_get.return_value = defer.succeed("http://my.server/me.png")
 
-        (code, response) = yield self.mock_resource.trigger("GET",
-                "/profile/%s/avatar_url" % (myid), None)
+        (code, response) = yield self.mock_resource.trigger(
+            "GET", "/profile/%s/avatar_url" % (myid), None
+        )
 
         self.assertEquals(200, code)
         self.assertEquals({"avatar_url": "http://my.server/me.png"}, response)
@@ -136,12 +149,13 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set = self.mock_handler.set_avatar_url
         mocked_set.return_value = defer.succeed(())
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                "/profile/%s/avatar_url" % (myid),
-                '{"avatar_url": "http://my.server/pic.gif"}')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT",
+            "/profile/%s/avatar_url" % (myid),
+            '{"avatar_url": "http://my.server/pic.gif"}'
+        )
 
         self.assertEquals(200, code)
         self.assertEquals(mocked_set.call_args[0][0].localpart, "1234ABCD")
-        self.assertEquals(mocked_set.call_args[0][1].localpart, "1234ABCD")
-        self.assertEquals(mocked_set.call_args[0][2],
-                "http://my.server/pic.gif")
+        self.assertEquals(mocked_set.call_args[0][1].user.localpart, "1234ABCD")
+        self.assertEquals(mocked_set.call_args[0][2], "http://my.server/pic.gif")

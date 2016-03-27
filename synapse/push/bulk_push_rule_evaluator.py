@@ -18,8 +18,8 @@ import ujson as json
 
 from twisted.internet import defer
 
-import baserules
-from push_rule_evaluator import PushRuleEvaluatorForEvent
+from .baserules import list_with_base_rules
+from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
 from synapse.api.constants import EventTypes
 
@@ -39,7 +39,7 @@ def _get_rules(room_id, user_ids, store):
     rules_enabled_by_user = yield store.bulk_get_push_rules_enabled(user_ids)
 
     rules_by_user = {
-        uid: baserules.list_with_base_rules([
+        uid: list_with_base_rules([
             decode_rule_json(rule_list)
             for rule_list in rules_by_user.get(uid, [])
         ])
@@ -98,25 +98,21 @@ class BulkPushRuleEvaluator:
         self.store = store
 
     @defer.inlineCallbacks
-    def action_for_event_by_user(self, event, handler):
+    def action_for_event_by_user(self, event, handler, current_state):
         actions_by_user = {}
 
         users_dict = yield self.store.are_guests(self.rules_by_user.keys())
 
-        filtered_by_user = yield handler._filter_events_for_clients(
-            users_dict.items(), [event]
+        filtered_by_user = yield handler.filter_events_for_clients(
+            users_dict.items(), [event], {event.event_id: current_state}
         )
 
         evaluator = PushRuleEvaluatorForEvent(event, len(self.users_in_room))
 
         condition_cache = {}
 
-        member_state = yield self.store.get_state_for_event(
-            event.event_id,
-        )
-
         display_names = {}
-        for ev in member_state.values():
+        for ev in current_state.values():
             nm = ev.content.get("displayname", None)
             if nm and ev.type == EventTypes.Member:
                 display_names[ev.state_key] = nm
@@ -156,7 +152,7 @@ def _condition_checker(evaluator, conditions, uid, display_name, cache):
             elif res is True:
                 continue
 
-        res = evaluator.matches(cond, uid, display_name, None)
+        res = evaluator.matches(cond, uid, display_name)
         if _id:
             cache[_id] = bool(res)
 

@@ -16,14 +16,14 @@
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
 from twisted.internet import defer
 
-from base import ClientV1RestServlet, client_path_patterns
+from .base import ClientV1RestServlet, client_path_patterns
 from synapse.api.errors import SynapseError, Codes, AuthError
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
 from synapse.types import UserID, RoomID, RoomAlias
 from synapse.events.utils import serialize_event
+from synapse.http.servlet import parse_json_object_from_request
 
-import simplejson as json
 import logging
 import urllib
 
@@ -63,35 +63,18 @@ class RoomCreateRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
 
-        room_config = self.get_room_config(request)
-        info = yield self.make_room(
-            room_config,
-            requester.user,
-            None,
-        )
-        room_config.update(info)
-        defer.returnValue((200, info))
-
-    @defer.inlineCallbacks
-    def make_room(self, room_config, auth_user, room_id):
         handler = self.handlers.room_creation_handler
         info = yield handler.create_room(
-            user_id=auth_user.to_string(),
-            room_id=room_id,
-            config=room_config
+            requester, self.get_room_config(request)
         )
-        defer.returnValue(info)
+
+        defer.returnValue((200, info))
 
     def get_room_config(self, request):
-        try:
-            user_supplied_config = json.loads(request.content.read())
-            if "visibility" not in user_supplied_config:
-                # default visibility
-                user_supplied_config["visibility"] = "public"
-            return user_supplied_config
-        except (ValueError, TypeError):
-            raise SynapseError(400, "Body must be JSON.",
-                               errcode=Codes.BAD_JSON)
+        user_supplied_config = parse_json_object_from_request(request)
+        # default visibility
+        user_supplied_config.setdefault("visibility", "public")
+        return user_supplied_config
 
     def on_OPTIONS(self, request):
         return (200, {})
@@ -149,7 +132,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
     def on_PUT(self, request, room_id, event_type, state_key, txn_id=None):
         requester = yield self.auth.get_user_by_req(request)
 
-        content = _parse_json(request)
+        content = parse_json_object_from_request(request)
 
         event_dict = {
             "type": event_type,
@@ -162,11 +145,22 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
             event_dict["state_key"] = state_key
 
         msg_handler = self.handlers.message_handler
-        yield msg_handler.create_and_send_event(
-            event_dict, token_id=requester.access_token_id, txn_id=txn_id,
+        event, context = yield msg_handler.create_event(
+            event_dict,
+            token_id=requester.access_token_id,
+            txn_id=txn_id,
         )
 
-        defer.returnValue((200, {}))
+        if event_type == EventTypes.Member:
+            yield self.handlers.room_member_handler.send_membership_event(
+                requester,
+                event,
+                context,
+            )
+        else:
+            yield msg_handler.send_nonmember_event(requester, event, context)
+
+        defer.returnValue((200, {"event_id": event.event_id}))
 
 
 # TODO: Needs unit testing for generic events + feedback
@@ -180,17 +174,17 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_type, txn_id=None):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
-        content = _parse_json(request)
+        content = parse_json_object_from_request(request)
 
         msg_handler = self.handlers.message_handler
-        event = yield msg_handler.create_and_send_event(
+        event = yield msg_handler.create_and_send_nonmember_event(
+            requester,
             {
                 "type": event_type,
                 "content": content,
                 "room_id": room_id,
                 "sender": requester.user.to_string(),
             },
-            token_id=requester.access_token_id,
             txn_id=txn_id,
         )
 
@@ -229,46 +223,37 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
             allow_guest=True,
         )
 
-        # the identifier could be a room alias or a room id. Try one then the
-        # other if it fails to parse, without swallowing other valid
-        # SynapseErrors.
-
-        identifier = None
-        is_room_alias = False
         try:
-            identifier = RoomAlias.from_string(room_identifier)
-            is_room_alias = True
-        except SynapseError:
-            identifier = RoomID.from_string(room_identifier)
+            content = parse_json_object_from_request(request)
+        except:
+            # Turns out we used to ignore the body entirely, and some clients
+            # cheekily send invalid bodies.
+            content = {}
 
-        # TODO: Support for specifying the home server to join with?
-
-        if is_room_alias:
+        if RoomID.is_valid(room_identifier):
+            room_id = room_identifier
+            remote_room_hosts = None
+        elif RoomAlias.is_valid(room_identifier):
             handler = self.handlers.room_member_handler
-            ret_dict = yield handler.join_room_alias(
-                requester.user,
-                identifier,
-            )
-            defer.returnValue((200, ret_dict))
-        else:  # room id
-            msg_handler = self.handlers.message_handler
-            content = {"membership": Membership.JOIN}
-            if requester.is_guest:
-                content["kind"] = "guest"
-            yield msg_handler.create_and_send_event(
-                {
-                    "type": EventTypes.Member,
-                    "content": content,
-                    "room_id": identifier.to_string(),
-                    "sender": requester.user.to_string(),
-                    "state_key": requester.user.to_string(),
-                },
-                token_id=requester.access_token_id,
-                txn_id=txn_id,
-                is_guest=requester.is_guest,
-            )
+            room_alias = RoomAlias.from_string(room_identifier)
+            room_id, remote_room_hosts = yield handler.lookup_room_alias(room_alias)
+            room_id = room_id.to_string()
+        else:
+            raise SynapseError(400, "%s was not legal room ID or room alias" % (
+                room_identifier,
+            ))
 
-            defer.returnValue((200, {"room_id": identifier.to_string()}))
+        yield self.handlers.room_member_handler.update_membership(
+            requester=requester,
+            target=requester.user,
+            room_id=room_id,
+            action="join",
+            txn_id=txn_id,
+            remote_room_hosts=remote_room_hosts,
+            third_party_signed=content.get("third_party_signed", None),
+        )
+
+        defer.returnValue((200, {"room_id": room_id}))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_identifier, txn_id):
@@ -316,18 +301,6 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
             if event["type"] != EventTypes.Member:
                 continue
             chunk.append(event)
-            # FIXME: should probably be state_key here, not user_id
-            target_user = UserID.from_string(event["user_id"])
-            # Presence is an optional cache; don't fail if we can't fetch it
-            try:
-                presence_handler = self.handlers.presence_handler
-                presence_state = yield presence_handler.get_state(
-                    target_user=target_user,
-                    auth_user=requester.user,
-                )
-                event["content"].update(presence_state)
-            except:
-                pass
 
         defer.returnValue((200, {
             "chunk": chunk
@@ -429,8 +402,6 @@ class RoomEventContext(ClientV1RestServlet):
             serialize_event(event, time_now) for event in results["state"]
         ]
 
-        logger.info("Responding with %r", results)
-
         defer.returnValue((200, results))
 
 
@@ -456,7 +427,12 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         }:
             raise AuthError(403, "Guest access not allowed")
 
-        content = _parse_json(request)
+        try:
+            content = parse_json_object_from_request(request)
+        except:
+            # Turns out we used to ignore the body entirely, and some clients
+            # cheekily send invalid bodies.
+            content = {}
 
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
             yield self.handlers.room_member_handler.do_3pid_invite(
@@ -465,7 +441,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 content["medium"],
                 content["address"],
                 content["id_server"],
-                requester.access_token_id,
+                requester,
                 txn_id
             )
             defer.returnValue((200, {}))
@@ -483,6 +459,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             room_id=room_id,
             action=membership_action,
             txn_id=txn_id,
+            third_party_signed=content.get("third_party_signed", None),
         )
 
         defer.returnValue((200, {}))
@@ -518,10 +495,11 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_id, txn_id=None):
         requester = yield self.auth.get_user_by_req(request)
-        content = _parse_json(request)
+        content = parse_json_object_from_request(request)
 
         msg_handler = self.handlers.message_handler
-        event = yield msg_handler.create_and_send_event(
+        event = yield msg_handler.create_and_send_nonmember_event(
+            requester,
             {
                 "type": EventTypes.Redaction,
                 "content": content,
@@ -529,7 +507,6 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
                 "sender": requester.user.to_string(),
                 "redacts": event_id,
             },
-            token_id=requester.access_token_id,
             txn_id=txn_id,
         )
 
@@ -555,6 +532,10 @@ class RoomTypingRestServlet(ClientV1RestServlet):
         "/rooms/(?P<room_id>[^/]*)/typing/(?P<user_id>[^/]*)$"
     )
 
+    def __init__(self, hs):
+        super(RoomTypingRestServlet, self).__init__(hs)
+        self.presence_handler = hs.get_handlers().presence_handler
+
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, user_id):
         requester = yield self.auth.get_user_by_req(request)
@@ -562,9 +543,11 @@ class RoomTypingRestServlet(ClientV1RestServlet):
         room_id = urllib.unquote(room_id)
         target_user = UserID.from_string(urllib.unquote(user_id))
 
-        content = _parse_json(request)
+        content = parse_json_object_from_request(request)
 
         typing_handler = self.handlers.typing_notification_handler
+
+        yield self.presence_handler.bump_presence_active_time(requester.user)
 
         if content["typing"]:
             yield typing_handler.started_typing(
@@ -592,7 +575,7 @@ class SearchRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
 
-        content = _parse_json(request)
+        content = parse_json_object_from_request(request)
 
         batch = request.args.get("next_batch", [None])[0]
         results = yield self.handlers.search_handler.search(
@@ -602,17 +585,6 @@ class SearchRestServlet(ClientV1RestServlet):
         )
 
         defer.returnValue((200, results))
-
-
-def _parse_json(request):
-    try:
-        content = json.loads(request.content.read())
-        if type(content) != dict:
-            raise SynapseError(400, "Content must be a JSON object.",
-                               errcode=Codes.NOT_JSON)
-        return content
-    except ValueError:
-        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
 
 def register_txn_path(servlet, regex_string, http_server, with_get=False):

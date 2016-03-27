@@ -58,6 +58,10 @@ class RoomMemberStore(SQLBaseStore):
             txn.call_after(self.get_rooms_for_user.invalidate, (event.state_key,))
             txn.call_after(self.get_joined_hosts_for_room.invalidate, (event.room_id,))
             txn.call_after(self.get_users_in_room.invalidate, (event.room_id,))
+            txn.call_after(
+                self._membership_stream_cache.entity_has_changed,
+                event.state_key, event.internal_metadata.stream_ordering
+            )
 
     def get_room_member(self, user_id, room_id):
         """Retrieve the current state of a room member.
@@ -110,6 +114,7 @@ class RoomMemberStore(SQLBaseStore):
             membership=membership,
         ).addCallback(self._get_events)
 
+    @cached()
     def get_invites_for_user(self, user_id):
         """ Get all the invite events for a user
         Args:
@@ -240,35 +245,11 @@ class RoomMemberStore(SQLBaseStore):
 
         return rows
 
-    @cached()
+    @cached(max_entries=5000)
     def get_rooms_for_user(self, user_id):
         return self.get_rooms_for_user_where_membership_is(
             user_id, membership_list=[Membership.JOIN],
         )
-
-    @defer.inlineCallbacks
-    def user_rooms_intersect(self, user_id_list):
-        """ Checks whether all the users whose IDs are given in a list share a
-        room.
-
-        This is a "hot path" function that's called a lot, e.g. by presence for
-        generating the event stream. As such, it is implemented locally by
-        wrapping logic around heavily-cached database queries.
-        """
-        if len(user_id_list) < 2:
-            defer.returnValue(True)
-
-        deferreds = [self.get_rooms_for_user(u) for u in user_id_list]
-
-        results = yield defer.DeferredList(deferreds, consumeErrors=True)
-
-        # A list of sets of strings giving room IDs for each user
-        room_id_lists = [set([r.room_id for r in result[1]]) for result in results]
-
-        # There isn't a setintersection(*list_of_sets)
-        ret = len(room_id_lists.pop(0).intersection(*room_id_lists)) > 0
-
-        defer.returnValue(ret)
 
     @defer.inlineCallbacks
     def forget(self, user_id, room_id):

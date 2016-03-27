@@ -15,16 +15,15 @@
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError
-from synapse.http.servlet import RestServlet
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import UserID
 
 from canonicaljson import encode_canonical_json
 
 from ._base import client_v2_patterns
 
-import simplejson as json
 import logging
+import simplejson as json
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +67,9 @@ class KeyUploadServlet(RestServlet):
         user_id = requester.user.to_string()
         # TODO: Check that the device_id matches that in the authentication
         # or derive the device_id from the authentication instead.
-        try:
-            body = json.loads(request.content.read())
-        except:
-            raise SynapseError(400, "Invalid key JSON")
+
+        body = parse_json_object_from_request(request)
+
         time_now = self.clock.time_msec()
 
         # TODO: Validate the JSON to make sure it has the right keys.
@@ -173,10 +171,7 @@ class KeyQueryServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, user_id, device_id):
         yield self.auth.get_user_by_req(request)
-        try:
-            body = json.loads(request.content.read())
-        except:
-            raise SynapseError(400, "Invalid key JSON")
+        body = parse_json_object_from_request(request)
         result = yield self.handle_request(body)
         defer.returnValue(result)
 
@@ -272,10 +267,7 @@ class OneTimeKeyServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, user_id, device_id, algorithm):
         yield self.auth.get_user_by_req(request)
-        try:
-            body = json.loads(request.content.read())
-        except:
-            raise SynapseError(400, "Invalid key JSON")
+        body = parse_json_object_from_request(request)
         result = yield self.handle_request(body)
         defer.returnValue(result)
 

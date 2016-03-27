@@ -125,6 +125,15 @@ Installing prerequisites on Mac OS X::
     sudo easy_install pip
     sudo pip install virtualenv
 
+Installing prerequisites on Raspbian::
+
+    sudo apt-get install build-essential python2.7-dev libffi-dev \
+                         python-pip python-setuptools sqlite3 \
+                         libssl-dev python-virtualenv libjpeg-dev
+    sudo pip install --upgrade pip
+    sudo pip install --upgrade ndg-httpsclient
+    sudo pip install --upgrade virtualenv
+
 To install the synapse homeserver run::
 
     virtualenv -p python2.7 ~/.synapse
@@ -309,6 +318,18 @@ Synapse requires pip 1.7 or later, so if your OS provides too old a version you
 may need to manually upgrade it::
 
     sudo pip install --upgrade pip
+
+Installing may fail with ``Could not find any downloads that satisfy the requirement pymacaroons-pynacl (from matrix-synapse==0.12.0)``.
+You can fix this by manually upgrading pip and virtualenv::
+
+    sudo pip install --upgrade virtualenv
+
+You can next rerun ``virtualenv -p python2.7 synapse`` to update the virtual env.
+
+Installing may fail during installing virtualenv with ``InsecurePlatformWarning: A true SSLContext object is not available. This prevents urllib3 from configuring SSL appropriately and may cause certain SSL connections to fail. For more information, see https://urllib3.readthedocs.org/en/latest/security.html#insecureplatformwarning.``
+You can fix this  by manually installing ndg-httpsclient::
+
+    pip install --upgrade ndg-httpsclient
 
 Installing may fail with ``mock requires setuptools>=17.1. Aborting installation``.
 You can fix this by upgrading setuptools::
@@ -504,7 +525,6 @@ Logging In To An Existing Account
 Just enter the ``@localpart:my.domain.here`` Matrix user ID and password into
 the form and click the Login button.
 
-
 Identity Servers
 ================
 
@@ -524,6 +544,26 @@ as the primary means of identity and E2E encryption is not complete. As such,
 we are running a single identity server (https://matrix.org) at the current
 time.
 
+Password reset
+==============
+
+If a user has registered an email address to their account using an identity
+server, they can request a password-reset token via clients such as Vector.
+
+A manual password reset can be done via direct database access as follows.
+
+First calculate the hash of the new password:
+
+    $ source ~/.synapse/bin/activate
+    $ ./scripts/hash_password
+    Password: 
+    Confirm password: 
+    $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+Then update the `users` table in the database:
+
+    UPDATE users SET password_hash='$2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+        WHERE name='@test:test.com';
 
 Where's the spec?!
 ==================
@@ -544,4 +584,21 @@ sphinxcontrib-napoleon::
 Building internal API documentation::
 
     python setup.py build_sphinx
+
+
+
+Halp!! Synapse eats all my RAM!
+===============================
+
+Synapse's architecture is quite RAM hungry currently - we deliberately
+cache a lot of recent room data and metadata in RAM in order to speed up
+common requests.  We'll improve this in future, but for now the easiest
+way to either reduce the RAM usage (at the risk of slowing things down)
+is to set the almost-undocumented ``SYNAPSE_CACHE_FACTOR`` environment
+variable.  Roughly speaking, a SYNAPSE_CACHE_FACTOR of 1.0 will max out
+at around 3-4GB of resident memory - this is what we currently run the
+matrix.org on.  The default setting is currently 0.1, which is probably
+around a ~700MB footprint.  You can dial it down further to 0.02 if
+desired, which targets roughly ~512MB.  Conversely you can dial it up if
+you need performance for lots of users and have a box with a lot of RAM.
 

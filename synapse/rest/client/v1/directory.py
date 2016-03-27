@@ -18,9 +18,10 @@ from twisted.internet import defer
 
 from synapse.api.errors import AuthError, SynapseError, Codes
 from synapse.types import RoomAlias
+from synapse.http.servlet import parse_json_object_from_request
+
 from .base import ClientV1RestServlet, client_path_patterns
 
-import simplejson as json
 import logging
 
 
@@ -45,7 +46,7 @@ class ClientDirectoryServer(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_alias):
-        content = _parse_json(request)
+        content = parse_json_object_from_request(request)
         if "room_id" not in content:
             raise SynapseError(400, "Missing room_id key",
                                errcode=Codes.BAD_JSON)
@@ -75,7 +76,11 @@ class ClientDirectoryServer(ClientV1RestServlet):
                 yield dir_handler.create_association(
                     user_id, room_alias, room_id, servers
                 )
-                yield dir_handler.send_room_alias_update_event(user_id, room_id)
+                yield dir_handler.send_room_alias_update_event(
+                    requester,
+                    user_id,
+                    room_id
+                )
             except SynapseError as e:
                 raise e
             except:
@@ -118,15 +123,13 @@ class ClientDirectoryServer(ClientV1RestServlet):
 
         requester = yield self.auth.get_user_by_req(request)
         user = requester.user
-        is_admin = yield self.auth.is_server_admin(user)
-        if not is_admin:
-            raise AuthError(403, "You need to be a server admin")
 
         room_alias = RoomAlias.from_string(room_alias)
 
         yield dir_handler.delete_association(
-            user.to_string(), room_alias
+            requester, user.to_string(), room_alias
         )
+
         logger.info(
             "User %s deleted alias %s",
             user.to_string(),
@@ -134,14 +137,3 @@ class ClientDirectoryServer(ClientV1RestServlet):
         )
 
         defer.returnValue((200, {}))
-
-
-def _parse_json(request):
-    try:
-        content = json.loads(request.content.read())
-        if type(content) != dict:
-            raise SynapseError(400, "Content must be a JSON object.",
-                               errcode=Codes.NOT_JSON)
-        return content
-    except ValueError:
-        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)

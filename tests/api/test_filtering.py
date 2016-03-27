@@ -13,26 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
 from tests import unittest
 from twisted.internet import defer
 
-from mock import Mock, NonCallableMock
+from mock import Mock
 from tests.utils import (
     MockHttpResource, DeferredMockCallable, setup_test_homeserver
 )
 
-from synapse.types import UserID
-from synapse.api.filtering import FilterCollection, Filter
+from synapse.api.filtering import Filter
+from synapse.events import FrozenEvent
 
 user_localpart = "test_user"
 # MockEvent = namedtuple("MockEvent", "sender type room_id")
 
 
 def MockEvent(**kwargs):
-    ev = NonCallableMock(spec_set=kwargs.keys())
-    ev.configure_mock(**kwargs)
-    return ev
+    return FrozenEvent(kwargs)
 
 
 class FilteringTestCase(unittest.TestCase):
@@ -358,7 +355,6 @@ class FilteringTestCase(unittest.TestCase):
                 "types": ["m.*"]
             }
         }
-        user = UserID.from_string("@" + user_localpart + ":test")
         filter_id = yield self.datastore.add_user_filter(
             user_localpart=user_localpart,
             user_filter=user_filter_json,
@@ -384,19 +380,20 @@ class FilteringTestCase(unittest.TestCase):
                 "types": ["m.*"]
             }
         }
-        user = UserID.from_string("@" + user_localpart + ":test")
+
         filter_id = yield self.datastore.add_user_filter(
-            user_localpart=user_localpart,
+            user_localpart=user_localpart + "2",
             user_filter=user_filter_json,
         )
         event = MockEvent(
+            event_id="$asdasd:localhost",
             sender="@foo:bar",
             type="custom.avatar.3d.crazy",
         )
         events = [event]
 
         user_filter = yield self.filtering.get_user_filter(
-            user_localpart=user_localpart,
+            user_localpart=user_localpart + "2",
             filter_id=filter_id,
         )
 
@@ -412,7 +409,6 @@ class FilteringTestCase(unittest.TestCase):
                 }
             }
         }
-        user = UserID.from_string("@" + user_localpart + ":test")
         filter_id = yield self.datastore.add_user_filter(
             user_localpart=user_localpart,
             user_filter=user_filter_json,
@@ -441,7 +437,6 @@ class FilteringTestCase(unittest.TestCase):
                 }
             }
         }
-        user = UserID.from_string("@" + user_localpart + ":test")
         filter_id = yield self.datastore.add_user_filter(
             user_localpart=user_localpart,
             user_filter=user_filter_json,
@@ -461,6 +456,22 @@ class FilteringTestCase(unittest.TestCase):
         results = user_filter.filter_room_state(events)
         self.assertEquals([], results)
 
+    def test_filter_rooms(self):
+        definition = {
+            "rooms": ["!allowed:example.com", "!excluded:example.com"],
+            "not_rooms": ["!excluded:example.com"],
+        }
+
+        room_ids = [
+            "!allowed:example.com",  # Allowed because in rooms and not in not_rooms.
+            "!excluded:example.com",  # Disallowed because in not_rooms.
+            "!not_included:example.com",  # Disallowed because not in rooms.
+        ]
+
+        filtered_room_ids = list(Filter(definition).filter_rooms(room_ids))
+
+        self.assertEquals(filtered_room_ids, ["!allowed:example.com"])
+
     @defer.inlineCallbacks
     def test_add_filter(self):
         user_filter_json = {
@@ -477,12 +488,12 @@ class FilteringTestCase(unittest.TestCase):
         )
 
         self.assertEquals(filter_id, 0)
-        self.assertEquals(user_filter_json,
-            (yield self.datastore.get_user_filter(
+        self.assertEquals(user_filter_json, (
+            yield self.datastore.get_user_filter(
                 user_localpart=user_localpart,
                 filter_id=0,
-            ))
-        )
+            )
+        ))
 
     @defer.inlineCallbacks
     def test_get_filter(self):
@@ -504,4 +515,6 @@ class FilteringTestCase(unittest.TestCase):
             filter_id=filter_id,
         )
 
-        self.assertEquals(filter.filter_json, user_filter_json)
+        self.assertEquals(filter.get_filter_json(), user_filter_json)
+
+        self.assertRegexpMatches(repr(filter), r"<FilterCollection \{.*\}>")

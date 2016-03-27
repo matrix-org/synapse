@@ -28,6 +28,10 @@ logger = logging.getLogger(__name__)
 class TransportLayerClient(object):
     """Sends federation HTTP requests to other servers"""
 
+    def __init__(self, hs):
+        self.server_name = hs.hostname
+        self.client = hs.get_http_client()
+
     @log_function
     def get_room_state(self, destination, room_id, event_id):
         """ Requests all state for a given room from the given server at the
@@ -156,6 +160,7 @@ class TransportLayerClient(object):
             path=path,
             args=args,
             retry_on_dns_fail=retry_on_dns_fail,
+            timeout=10000,
         )
 
         defer.returnValue(content)

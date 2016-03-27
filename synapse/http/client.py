@@ -103,7 +103,7 @@ class SimpleHttpClient(object):
         # TODO: Do we ever want to log message contents?
         logger.debug("post_urlencoded_get_json args: %s", args)
 
-        query_bytes = urllib.urlencode(args, True)
+        query_bytes = urllib.urlencode(encode_urlencode_args(args), True)
 
         response = yield self.request(
             "POST",
@@ -330,7 +330,7 @@ class CaptchaServerHttpClient(SimpleHttpClient):
 
     @defer.inlineCallbacks
     def post_urlencoded_get_raw(self, url, args={}):
-        query_bytes = urllib.urlencode(args, True)
+        query_bytes = urllib.urlencode(encode_urlencode_args(args), True)
 
         response = yield self.request(
             "POST",
@@ -348,6 +348,19 @@ class CaptchaServerHttpClient(SimpleHttpClient):
         except PartialDownloadError as e:
             # twisted dislikes google's response, no content length.
             defer.returnValue(e.response)
+
+
+def encode_urlencode_args(args):
+    return {k: encode_urlencode_arg(v) for k, v in args.items()}
+
+
+def encode_urlencode_arg(arg):
+    if isinstance(arg, unicode):
+        return arg.encode('utf-8')
+    elif isinstance(arg, list):
+        return [encode_urlencode_arg(i) for i in arg]
+    else:
+        return arg
 
 
 def _print_ex(e):

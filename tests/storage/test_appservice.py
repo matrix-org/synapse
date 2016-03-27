@@ -35,7 +35,8 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
     def setUp(self):
         self.as_yaml_files = []
         config = Mock(
-            app_service_config_files=self.as_yaml_files
+            app_service_config_files=self.as_yaml_files,
+            event_cache_size=1,
         )
         hs = yield setup_test_homeserver(config=config)
 
@@ -109,7 +110,8 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.as_yaml_files = []
 
         config = Mock(
-            app_service_config_files=self.as_yaml_files
+            app_service_config_files=self.as_yaml_files,
+            event_cache_size=1,
         )
         hs = yield setup_test_homeserver(config=config)
         self.db_pool = hs.get_db_pool()
@@ -438,8 +440,8 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f1 = self._write_config(suffix="1")
         f2 = self._write_config(suffix="2")
 
-        config = Mock(app_service_config_files=[f1, f2])
-        hs = yield setup_test_homeserver(config=config)
+        config = Mock(app_service_config_files=[f1, f2], event_cache_size=1)
+        hs = yield setup_test_homeserver(config=config, datastore=Mock())
 
         ApplicationServiceStore(hs)
 
@@ -448,8 +450,8 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f1 = self._write_config(id="id", suffix="1")
         f2 = self._write_config(id="id", suffix="2")
 
-        config = Mock(app_service_config_files=[f1, f2])
-        hs = yield setup_test_homeserver(config=config)
+        config = Mock(app_service_config_files=[f1, f2], event_cache_size=1)
+        hs = yield setup_test_homeserver(config=config, datastore=Mock())
 
         with self.assertRaises(ConfigError) as cm:
             ApplicationServiceStore(hs)
@@ -464,8 +466,8 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f1 = self._write_config(as_token="as_token", suffix="1")
         f2 = self._write_config(as_token="as_token", suffix="2")
 
-        config = Mock(app_service_config_files=[f1, f2])
-        hs = yield setup_test_homeserver(config=config)
+        config = Mock(app_service_config_files=[f1, f2], event_cache_size=1)
+        hs = yield setup_test_homeserver(config=config, datastore=Mock())
 
         with self.assertRaises(ConfigError) as cm:
             ApplicationServiceStore(hs)

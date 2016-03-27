@@ -1,6 +1,11 @@
-#!/bin/bash -eu
+#!/bin/bash
+
+set -eux
+
+: ${WORKSPACE:="$(pwd)"}
 
 export PYTHONDONTWRITEBYTECODE=yep
+export SYNAPSE_CACHE_FACTOR=1
 
 # Output test results as junit xml
 export TRIAL_FLAGS="--reporter=subunit"
@@ -26,7 +31,7 @@ TOX_BIN=$WORKSPACE/.tox/py27/bin
 if [[ ! -e .sytest-base ]]; then
   git clone https://github.com/matrix-org/sytest.git .sytest-base --mirror
 else
-  (cd .sytest-base; git fetch)
+  (cd .sytest-base; git fetch -p)
 fi
 
 rm -rf sytest
@@ -52,7 +57,7 @@ RUN_POSTGRES=""
 
 for port in $(($PORT_BASE + 1)) $(($PORT_BASE + 2)); do
     if psql synapse_jenkins_$port <<< ""; then
-        RUN_POSTGRES=$RUN_POSTGRES:$port
+        RUN_POSTGRES="$RUN_POSTGRES:$port"
         cat > localhost-$port/database.yaml << EOF
 name: psycopg2
 args:
@@ -62,7 +67,7 @@ EOF
 done
 
 # Run if both postgresql databases exist
-if test $RUN_POSTGRES = ":$(($PORT_BASE + 1)):$(($PORT_BASE + 2))"; then
+if test "$RUN_POSTGRES" = ":$(($PORT_BASE + 1)):$(($PORT_BASE + 2))"; then
     echo >&2 "Running sytest with PostgreSQL";
     $TOX_BIN/pip install psycopg2
     ./run-tests.pl --coverage -O tap --synapse-directory $WORKSPACE \

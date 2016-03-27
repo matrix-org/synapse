@@ -16,12 +16,11 @@
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError, SynapseError
-from synapse.http.servlet import RestServlet
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import UserID
 
 from ._base import client_v2_patterns
 
-import simplejson as json
 import logging
 
 
@@ -59,7 +58,7 @@ class GetFilterRestServlet(RestServlet):
                 filter_id=filter_id,
             )
 
-            defer.returnValue((200, filter.filter_json))
+            defer.returnValue((200, filter.get_filter_json()))
         except KeyError:
             raise SynapseError(400, "No such filter")
 
@@ -84,12 +83,7 @@ class CreateFilterRestServlet(RestServlet):
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only create filters for local users")
 
-        try:
-            content = json.loads(request.content.read())
-
-            # TODO(paul): check for required keys and invalid keys
-        except:
-            raise SynapseError(400, "Invalid filter definition")
+        content = parse_json_object_from_request(request)
 
         filter_id = yield self.filtering.add_user_filter(
             user_localpart=target_user.localpart,

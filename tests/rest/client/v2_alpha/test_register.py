@@ -1,7 +1,7 @@
 from synapse.rest.client.v2_alpha.register import RegisterRestServlet
 from synapse.api.errors import SynapseError
 from twisted.internet import defer
-from mock import Mock, MagicMock
+from mock import Mock
 from tests import unittest
 import json
 
@@ -22,9 +22,10 @@ class RegisterRestServletTestCase(unittest.TestCase):
             side_effect=lambda x: defer.succeed(self.appservice))
         )
 
-        self.auth_result = (False, None, None)
+        self.auth_result = (False, None, None, None)
         self.auth_handler = Mock(
-            check_auth=Mock(side_effect=lambda x,y,z: self.auth_result)
+            check_auth=Mock(side_effect=lambda x, y, z: self.auth_result),
+            get_session_data=Mock(return_value=None)
         )
         self.registration_handler = Mock()
         self.identity_handler = Mock()
@@ -41,7 +42,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.hs.hostname = "superbig~testing~thing.com"
         self.hs.get_auth = Mock(return_value=self.auth)
         self.hs.get_handlers = Mock(return_value=self.handlers)
-        self.hs.config.disable_registration = False
+        self.hs.config.enable_registration = True
 
         # init the thing we're testing
         self.servlet = RegisterRestServlet(self.hs)
@@ -62,12 +63,15 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.registration_handler.appservice_register = Mock(
             return_value=(user_id, token)
         )
-        result = yield self.servlet.on_POST(self.request)
-        self.assertEquals(result, (200, {
+        (code, result) = yield self.servlet.on_POST(self.request)
+        self.assertEquals(code, 200)
+        det_data = {
             "user_id": user_id,
             "access_token": token,
             "home_server": self.hs.hostname
-        }))
+        }
+        self.assertDictContainsSubset(det_data, result)
+        self.assertIn("refresh_token", result)
 
     @defer.inlineCallbacks
     def test_POST_appservice_registration_invalid(self):
@@ -109,18 +113,21 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.auth_result = (True, None, {
             "username": "kermit",
             "password": "monkey"
-        })
+        }, None)
         self.registration_handler.register = Mock(return_value=(user_id, token))
 
-        result = yield self.servlet.on_POST(self.request)
-        self.assertEquals(result, (200, {
+        (code, result) = yield self.servlet.on_POST(self.request)
+        self.assertEquals(code, 200)
+        det_data = {
             "user_id": user_id,
             "access_token": token,
             "home_server": self.hs.hostname
-        }))
+        }
+        self.assertDictContainsSubset(det_data, result)
+        self.assertIn("refresh_token", result)
 
     def test_POST_disabled_registration(self):
-        self.hs.config.disable_registration = True
+        self.hs.config.enable_registration = False
         self.request_data = json.dumps({
             "username": "kermit",
             "password": "monkey"
@@ -129,7 +136,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.auth_result = (True, None, {
             "username": "kermit",
             "password": "monkey"
-        })
+        }, None)
         self.registration_handler.register = Mock(return_value=("@user:id", "t"))
         d = self.servlet.on_POST(self.request)
         return self.assertFailure(d, SynapseError)

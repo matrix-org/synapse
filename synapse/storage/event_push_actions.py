@@ -24,34 +24,30 @@ logger = logging.getLogger(__name__)
 
 
 class EventPushActionsStore(SQLBaseStore):
-    @defer.inlineCallbacks
-    def set_push_actions_for_event_and_users(self, event, tuples):
+    def _set_push_actions_for_event_and_users_txn(self, txn, event, tuples):
         """
         :param event: the event set actions for
-        :param tuples: list of tuples of (user_id, profile_tag, actions)
+        :param tuples: list of tuples of (user_id, actions)
         """
         values = []
-        for uid, profile_tag, actions in tuples:
+        for uid, actions in tuples:
             values.append({
                 'room_id': event.room_id,
                 'event_id': event.event_id,
                 'user_id': uid,
-                'profile_tag': profile_tag,
-                'actions': json.dumps(actions)
+                'actions': json.dumps(actions),
+                'stream_ordering': event.internal_metadata.stream_ordering,
+                'topological_ordering': event.depth,
+                'notif': 1,
+                'highlight': 1 if _action_has_highlight(actions) else 0,
             })
 
-        def f(txn):
-            for uid, _, __ in tuples:
-                txn.call_after(
-                    self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
-                    (event.room_id, uid)
-                )
-            return self._simple_insert_many_txn(txn, "event_push_actions", values)
-
-        yield self.runInteraction(
-            "set_actions_for_event_and_users",
-            f,
-        )
+        for uid, __ in tuples:
+            txn.call_after(
+                self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
+                (event.room_id, uid)
+            )
+        self._simple_insert_many_txn(txn, "event_push_actions", values)
 
     @cachedInlineCallbacks(num_args=3, lru=True, tree=True)
     def get_unread_event_push_actions_by_room_for_user(
@@ -68,32 +64,34 @@ class EventPushActionsStore(SQLBaseStore):
             )
             results = txn.fetchall()
             if len(results) == 0:
-                return []
+                return {"notify_count": 0, "highlight_count": 0}
 
             stream_ordering = results[0][0]
             topological_ordering = results[0][1]
 
             sql = (
-                "SELECT ea.event_id, ea.actions"
-                " FROM event_push_actions ea, events e"
-                " WHERE ea.room_id = e.room_id"
-                " AND ea.event_id = e.event_id"
-                " AND ea.user_id = ?"
-                " AND ea.room_id = ?"
+                "SELECT sum(notif), sum(highlight)"
+                " FROM event_push_actions ea"
+                " WHERE"
+                " user_id = ?"
+                " AND room_id = ?"
                 " AND ("
-                "       e.topological_ordering > ?"
-                "       OR (e.topological_ordering = ? AND e.stream_ordering > ?)"
+                "       topological_ordering > ?"
+                "       OR (topological_ordering = ? AND stream_ordering > ?)"
                 ")"
             )
             txn.execute(sql, (
                 user_id, room_id,
                 topological_ordering, topological_ordering, stream_ordering
-            )
-            )
-            return [
-                {"event_id": row[0], "actions": json.loads(row[1])}
-                for row in txn.fetchall()
-            ]
+            ))
+            row = txn.fetchone()
+            if row:
+                return {
+                    "notify_count": row[0] or 0,
+                    "highlight_count": row[1] or 0,
+                }
+            else:
+                return {"notify_count": 0, "highlight_count": 0}
 
         ret = yield self.runInteraction(
             "get_unread_event_push_actions_by_room",
@@ -101,19 +99,24 @@ class EventPushActionsStore(SQLBaseStore):
         )
         defer.returnValue(ret)
 
-    @defer.inlineCallbacks
-    def remove_push_actions_for_event_id(self, room_id, event_id):
-        def f(txn):
-            # Sad that we have to blow away the cache for the whole room here
-            txn.call_after(
-                self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
-                (room_id,)
-            )
-            txn.execute(
-                "DELETE FROM event_push_actions WHERE room_id = ? AND event_id = ?",
-                (room_id, event_id)
-            )
-        yield self.runInteraction(
-            "remove_push_actions_for_event_id",
-            f
+    def _remove_push_actions_for_event_id_txn(self, txn, room_id, event_id):
+        # Sad that we have to blow away the cache for the whole room here
+        txn.call_after(
+            self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
+            (room_id,)
         )
+        txn.execute(
+            "DELETE FROM event_push_actions WHERE room_id = ? AND event_id = ?",
+            (room_id, event_id)
+        )
+
+
+def _action_has_highlight(actions):
+    for action in actions:
+        try:
+            if action.get("set_tweak", None) == "highlight":
+                return action.get("value", True)
+        except AttributeError:
+            pass
+
+    return False

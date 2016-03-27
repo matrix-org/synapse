@@ -36,6 +36,7 @@ def fetch_server_key(server_name, ssl_context_factory, path=KEY_API_V1):
 
     factory = SynapseKeyClientFactory()
     factory.path = path
+    factory.host = server_name
     endpoint = matrix_federation_endpoint(
         reactor, server_name, ssl_context_factory, timeout=30
     )
@@ -81,6 +82,8 @@ class SynapseKeyClientProtocol(HTTPClient):
         self.host = self.transport.getHost()
         logger.debug("Connected to %s", self.host)
         self.sendCommand(b"GET", self.path)
+        if self.host:
+            self.sendHeader(b"Host", self.host)
         self.endHeaders()
         self.timer = reactor.callLater(
             self.timeout,

@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from synapse.config._base import ConfigError
 
 if __name__ == "__main__":
     import sys
@@ -21,9 +22,13 @@ if __name__ == "__main__":
 
     if action == "read":
         key = sys.argv[2]
-        config = HomeServerConfig.load_config("", sys.argv[3:])
+        try:
+            config = HomeServerConfig.load_config("", sys.argv[3:])
+        except ConfigError as e:
+            sys.stderr.write("\n" + e.message + "\n")
+            sys.exit(1)
 
-        print getattr(config, key)
+        print (getattr(config, key))
         sys.exit(0)
     else:
         sys.stderr.write("Unknown command %r\n" % (action,))

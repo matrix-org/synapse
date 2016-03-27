@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from _base import SQLBaseStore
+from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 from twisted.internet import defer
@@ -39,6 +39,7 @@ class KeyStore(SQLBaseStore):
             table="server_tls_certificates",
             keyvalues={"server_name": server_name},
             retcols=("tls_certificate",),
+            desc="get_server_certificate",
         )
         tls_certificate = OpenSSL.crypto.load_certificate(
             OpenSSL.crypto.FILETYPE_ASN1, tls_certificate_bytes,

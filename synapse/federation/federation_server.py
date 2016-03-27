@@ -126,10 +126,8 @@ class FederationServer(FederationBase):
         results = []
 
         for pdu in pdu_list:
-            d = self._handle_new_pdu(transaction.origin, pdu)
-
             try:
-                yield d
+                yield self._handle_new_pdu(transaction.origin, pdu)
                 results.append({})
             except FederationError as e:
                 self.send_failure(e, transaction.origin)
@@ -139,8 +137,8 @@ class FederationServer(FederationBase):
                 logger.exception("Failed to handle PDU")
 
         if hasattr(transaction, "edus"):
-            for edu in [Edu(**x) for x in transaction.edus]:
-                self.received_edu(
+            for edu in (Edu(**x) for x in transaction.edus):
+                yield self.received_edu(
                     transaction.origin,
                     edu.edu_type,
                     edu.content
@@ -163,11 +161,17 @@ class FederationServer(FederationBase):
         )
         defer.returnValue((200, response))
 
+    @defer.inlineCallbacks
     def received_edu(self, origin, edu_type, content):
         received_edus_counter.inc()
 
         if edu_type in self.edu_handlers:
-            self.edu_handlers[edu_type](origin, content)
+            try:
+                yield self.edu_handlers[edu_type](origin, content)
+            except SynapseError as e:
+                logger.info("Failed to handle edu %r: %r", edu_type, e)
+            except Exception as e:
+                logger.exception("Failed to handle edu %r", edu_type, e)
         else:
             logger.warn("Received EDU of type %s with no handler", edu_type)
 
@@ -545,8 +549,19 @@ class FederationServer(FederationBase):
         return event
 
     @defer.inlineCallbacks
-    def exchange_third_party_invite(self, invite):
-        ret = yield self.handler.exchange_third_party_invite(invite)
+    def exchange_third_party_invite(
+            self,
+            sender_user_id,
+            target_user_id,
+            room_id,
+            signed,
+    ):
+        ret = yield self.handler.exchange_third_party_invite(
+            sender_user_id,
+            target_user_id,
+            room_id,
+            signed,
+        )
         defer.returnValue(ret)
 
     @defer.inlineCallbacks

@@ -17,10 +17,10 @@ from twisted.internet import defer
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import LoginError, SynapseError, Codes
-from synapse.http.servlet import RestServlet
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.util.async import run_on_reactor
 
-from ._base import client_v2_patterns, parse_json_dict_from_request
+from ._base import client_v2_patterns
 
 import logging
 
@@ -41,9 +41,9 @@ class PasswordRestServlet(RestServlet):
     def on_POST(self, request):
         yield run_on_reactor()
 
-        body = parse_json_dict_from_request(request)
+        body = parse_json_object_from_request(request)
 
-        authed, result, params = yield self.auth_handler.check_auth([
+        authed, result, params, _ = yield self.auth_handler.check_auth([
             [LoginType.PASSWORD],
             [LoginType.EMAIL_IDENTITY]
         ], body, self.hs.get_ip_from_request(request))
@@ -79,7 +79,7 @@ class PasswordRestServlet(RestServlet):
         new_password = params['new_password']
 
         yield self.auth_handler.set_password(
-            user_id, new_password
+            user_id, new_password, requester
         )
 
         defer.returnValue((200, {}))
@@ -114,11 +114,12 @@ class ThreepidRestServlet(RestServlet):
     def on_POST(self, request):
         yield run_on_reactor()
 
-        body = parse_json_dict_from_request(request)
+        body = parse_json_object_from_request(request)
 
-        if 'threePidCreds' not in body:
+        threePidCreds = body.get('threePidCreds')
+        threePidCreds = body.get('three_pid_creds', threePidCreds)
+        if threePidCreds is None:
             raise SynapseError(400, "Missing param", Codes.MISSING_PARAM)
-        threePidCreds = body['threePidCreds']
 
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()

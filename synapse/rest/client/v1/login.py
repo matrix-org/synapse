@@ -17,7 +17,10 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, LoginError, Codes
 from synapse.types import UserID
-from base import ClientV1RestServlet, client_path_patterns
+from synapse.http.server import finish_request
+from synapse.http.servlet import parse_json_object_from_request
+
+from .base import ClientV1RestServlet, client_path_patterns
 
 import simplejson as json
 import urllib
@@ -77,7 +80,7 @@ class LoginRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        login_submission = _parse_json(request)
+        login_submission = parse_json_object_from_request(request)
         try:
             if login_submission["type"] == LoginRestServlet.PASS_TYPE:
                 if not self.password_enabled:
@@ -89,7 +92,7 @@ class LoginRestServlet(ClientV1RestServlet):
                                          LoginRestServlet.SAML2_TYPE):
                 relay_state = ""
                 if "relay_state" in login_submission:
-                    relay_state = "&RelayState="+urllib.quote(
+                    relay_state = "&RelayState=" + urllib.quote(
                                   login_submission["relay_state"])
                 result = {
                     "uri": "%s%s" % (self.idp_redirect_url, relay_state)
@@ -250,7 +253,7 @@ class SAML2RestServlet(ClientV1RestServlet):
             SP = Saml2Client(conf)
             saml2_auth = SP.parse_authn_request_response(
                 request.args['SAMLResponse'][0], BINDING_HTTP_POST)
-        except Exception, e:        # Not authenticated
+        except Exception as e:        # Not authenticated
             logger.exception(e)
         if saml2_auth and saml2_auth.status_ok() and not saml2_auth.not_signed:
             username = saml2_auth.name_id.text
@@ -263,7 +266,7 @@ class SAML2RestServlet(ClientV1RestServlet):
                                  '?status=authenticated&access_token=' +
                                  token + '&user_id=' + user_id + '&ava=' +
                                  urllib.quote(json.dumps(saml2_auth.ava)))
-                request.finish()
+                finish_request(request)
                 defer.returnValue(None)
             defer.returnValue((200, {"status": "authenticated",
                                      "user_id": user_id, "token": token,
@@ -272,7 +275,7 @@ class SAML2RestServlet(ClientV1RestServlet):
             request.redirect(urllib.unquote(
                              request.args['RelayState'][0]) +
                              '?status=not_authenticated')
-            request.finish()
+            finish_request(request)
             defer.returnValue(None)
         defer.returnValue((200, {"status": "not_authenticated"}))
 
@@ -309,7 +312,7 @@ class CasRedirectServlet(ClientV1RestServlet):
             "service": "%s?%s" % (hs_redirect_url, client_redirect_url_param)
         })
         request.redirect("%s?%s" % (self.cas_server_url, service_param))
-        request.finish()
+        finish_request(request)
 
 
 class CasTicketServlet(ClientV1RestServlet):
@@ -362,7 +365,7 @@ class CasTicketServlet(ClientV1RestServlet):
         redirect_url = self.add_login_token_to_redirect_url(client_redirect_url,
                                                             login_token)
         request.redirect(redirect_url)
-        request.finish()
+        finish_request(request)
 
     def add_login_token_to_redirect_url(self, url, token):
         url_parts = list(urlparse.urlparse(url))
@@ -396,16 +399,6 @@ class CasTicketServlet(ClientV1RestServlet):
             raise LoginError(401, "Invalid CAS response", errcode=Codes.UNAUTHORIZED)
 
         return (user, attributes)
-
-
-def _parse_json(request):
-    try:
-        content = json.loads(request.content.read())
-        if type(content) != dict:
-            raise SynapseError(400, "Content must be a JSON object.")
-        return content
-    except ValueError:
-        raise SynapseError(400, "Content not JSON.")
 
 
 def register_servlets(hs, http_server):

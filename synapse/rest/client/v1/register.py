@@ -18,14 +18,14 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, Codes
 from synapse.api.constants import LoginType
-from base import ClientV1RestServlet, client_path_patterns
+from .base import ClientV1RestServlet, client_path_patterns
 import synapse.util.stringutils as stringutils
+from synapse.http.servlet import parse_json_object_from_request
 
 from synapse.util.async import run_on_reactor
 
 from hashlib import sha1
 import hmac
-import simplejson as json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,8 @@ logger = logging.getLogger(__name__)
 if hasattr(hmac, "compare_digest"):
     compare_digest = hmac.compare_digest
 else:
-    compare_digest = lambda a, b: a == b
+    def compare_digest(a, b):
+        return a == b
 
 
 class RegisterRestServlet(ClientV1RestServlet):
@@ -58,7 +59,7 @@ class RegisterRestServlet(ClientV1RestServlet):
         # }
         # TODO: persistent storage
         self.sessions = {}
-        self.disable_registration = hs.config.disable_registration
+        self.enable_registration = hs.config.enable_registration
 
     def on_GET(self, request):
         if self.hs.config.enable_registration_captcha:
@@ -97,7 +98,7 @@ class RegisterRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        register_json = _parse_json(request)
+        register_json = parse_json_object_from_request(request)
 
         session = (register_json["session"]
                    if "session" in register_json else None)
@@ -112,7 +113,7 @@ class RegisterRestServlet(ClientV1RestServlet):
             is_using_shared_secret = login_type == LoginType.SHARED_SECRET
 
             can_register = (
-                not self.disable_registration
+                self.enable_registration
                 or is_application_server
                 or is_using_shared_secret
             )
@@ -352,16 +353,6 @@ class RegisterRestServlet(ClientV1RestServlet):
             raise SynapseError(
                 403, "HMAC incorrect",
             )
-
-
-def _parse_json(request):
-    try:
-        content = json.loads(request.content.read())
-        if type(content) != dict:
-            raise SynapseError(400, "Content must be a JSON object.")
-        return content
-    except ValueError:
-        raise SynapseError(400, "Content not JSON.")
 
 
 def register_servlets(hs, http_server):

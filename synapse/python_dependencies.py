@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 
 REQUIREMENTS = {
     "frozendict>=0.4": ["frozendict"],
-    "unpaddedbase64>=1.0.1": ["unpaddedbase64>=1.0.1"],
+    "unpaddedbase64>=1.1.0": ["unpaddedbase64>=1.1.0"],
     "canonicaljson>=1.0.0": ["canonicaljson>=1.0.0"],
     "signedjson>=1.0.0": ["signedjson>=1.0.0"],
-    "pynacl>=0.3.0": ["nacl>=0.3.0", "nacl.bindings"],
+    "pynacl==0.3.0": ["nacl==0.3.0", "nacl.bindings"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
     "Twisted>=15.1.0": ["twisted>=15.1.0"],
     "pyopenssl>=0.14": ["OpenSSL>=0.14"],
@@ -34,12 +34,12 @@ REQUIREMENTS = {
     "pydenticon": ["pydenticon"],
     "ujson": ["ujson"],
     "blist": ["blist"],
-    "pysaml2": ["saml2"],
+    "pysaml2>=3.0.0,<4.0.0": ["saml2>=3.0.0,<4.0.0"],
     "pymacaroons-pynacl": ["pymacaroons"],
 }
 CONDITIONAL_REQUIREMENTS = {
     "web_client": {
-        "matrix_angular_sdk>=0.6.6": ["syweb>=0.6.6"],
+        "matrix_angular_sdk>=0.6.8": ["syweb>=0.6.8"],
     }
 }
 

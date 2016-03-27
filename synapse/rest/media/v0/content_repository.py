@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import respond_with_json_bytes
+from synapse.http.server import respond_with_json_bytes, finish_request
 
 from synapse.util.stringutils import random_string
 from synapse.api.errors import (
@@ -144,7 +144,7 @@ class ContentRepoResource(resource.Resource):
             # after the file has been sent, clean up and finish the request
             def cbFinished(ignored):
                 f.close()
-                request.finish()
+                finish_request(request)
             d.addCallback(cbFinished)
         else:
             respond_with_json_bytes(

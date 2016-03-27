@@ -16,8 +16,9 @@
 
 from twisted.internet import defer
 
-from httppusher import HttpPusher
+from .httppusher import HttpPusher
 from synapse.push import PusherConfigException
+from synapse.util.logcontext import preserve_fn
 
 import logging
 
@@ -28,6 +29,7 @@ class PusherPool:
     def __init__(self, _hs):
         self.hs = _hs
         self.store = self.hs.get_datastore()
+        self.clock = self.hs.get_clock()
         self.pushers = {}
         self.last_pusher_started = -1
 
@@ -37,8 +39,11 @@ class PusherPool:
         self._start_pushers(pushers)
 
     @defer.inlineCallbacks
-    def add_pusher(self, user_id, access_token, profile_tag, kind, app_id,
-                   app_display_name, device_display_name, pushkey, lang, data):
+    def add_pusher(self, user_id, access_token, kind, app_id,
+                   app_display_name, device_display_name, pushkey, lang, data,
+                   profile_tag=""):
+        time_now_msec = self.clock.time_msec()
+
         # we try to create the pusher just to validate the config: it
         # will then get pulled out of the database,
         # recreated, added and started: this means we have only one
@@ -46,23 +51,31 @@ class PusherPool:
         self._create_pusher({
             "user_name": user_id,
             "kind": kind,
-            "profile_tag": profile_tag,
             "app_id": app_id,
             "app_display_name": app_display_name,
             "device_display_name": device_display_name,
             "pushkey": pushkey,
-            "ts": self.hs.get_clock().time_msec(),
+            "ts": time_now_msec,
             "lang": lang,
             "data": data,
             "last_token": None,
             "last_success": None,
             "failing_since": None
         })
-        yield self._add_pusher_to_store(
-            user_id, access_token, profile_tag, kind, app_id,
-            app_display_name, device_display_name,
-            pushkey, lang, data
+        yield self.store.add_pusher(
+            user_id=user_id,
+            access_token=access_token,
+            kind=kind,
+            app_id=app_id,
+            app_display_name=app_display_name,
+            device_display_name=device_display_name,
+            pushkey=pushkey,
+            pushkey_ts=time_now_msec,
+            lang=lang,
+            data=data,
+            profile_tag=profile_tag,
         )
+        yield self._refresh_pusher(app_id, pushkey, user_id)
 
     @defer.inlineCallbacks
     def remove_pushers_by_app_id_and_pushkey_not_user(self, app_id, pushkey,
@@ -76,47 +89,27 @@ class PusherPool:
                     "Removing pusher for app id %s, pushkey %s, user %s",
                     app_id, pushkey, p['user_name']
                 )
-                self.remove_pusher(p['app_id'], p['pushkey'], p['user_name'])
+                yield self.remove_pusher(p['app_id'], p['pushkey'], p['user_name'])
 
     @defer.inlineCallbacks
-    def remove_pushers_by_user(self, user_id):
+    def remove_pushers_by_user(self, user_id, except_token_ids=[]):
         all = yield self.store.get_all_pushers()
         logger.info(
-            "Removing all pushers for user %s",
-            user_id,
+            "Removing all pushers for user %s except access tokens ids %r",
+            user_id, except_token_ids
         )
         for p in all:
-            if p['user_name'] == user_id:
+            if p['user_name'] == user_id and p['access_token'] not in except_token_ids:
                 logger.info(
                     "Removing pusher for app id %s, pushkey %s, user %s",
                     p['app_id'], p['pushkey'], p['user_name']
                 )
-                self.remove_pusher(p['app_id'], p['pushkey'], p['user_name'])
-
-    @defer.inlineCallbacks
-    def _add_pusher_to_store(self, user_id, access_token, profile_tag, kind,
-                             app_id, app_display_name, device_display_name,
-                             pushkey, lang, data):
-        yield self.store.add_pusher(
-            user_id=user_id,
-            access_token=access_token,
-            profile_tag=profile_tag,
-            kind=kind,
-            app_id=app_id,
-            app_display_name=app_display_name,
-            device_display_name=device_display_name,
-            pushkey=pushkey,
-            pushkey_ts=self.hs.get_clock().time_msec(),
-            lang=lang,
-            data=data,
-        )
-        self._refresh_pusher(app_id, pushkey, user_id)
+                yield self.remove_pusher(p['app_id'], p['pushkey'], p['user_name'])
 
     def _create_pusher(self, pusherdict):
         if pusherdict['kind'] == 'http':
             return HttpPusher(
                 self.hs,
-                profile_tag=pusherdict['profile_tag'],
                 user_id=pusherdict['user_name'],
                 app_id=pusherdict['app_id'],
                 app_display_name=pusherdict['app_display_name'],
@@ -166,7 +159,7 @@ class PusherPool:
                 if fullid in self.pushers:
                     self.pushers[fullid].stop()
                 self.pushers[fullid] = p
-                p.start()
+                preserve_fn(p.start)()
 
         logger.info("Started pushers")
 

@@ -54,13 +54,13 @@ class RoomPermissionsTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -82,19 +82,22 @@ class RoomPermissionsTestCase(RestTestCase):
                                                              is_public=True)
 
         # send a message in one of the rooms
-        self.created_rmid_msg_path = ("/rooms/%s/send/m.room.message/a1" %
-                                (self.created_rmid))
+        self.created_rmid_msg_path = (
+            "/rooms/%s/send/m.room.message/a1" % (self.created_rmid)
+        )
         (code, response) = yield self.mock_resource.trigger(
-                           "PUT",
-                           self.created_rmid_msg_path,
-                           '{"msgtype":"m.text","body":"test msg"}')
+            "PUT",
+            self.created_rmid_msg_path,
+            '{"msgtype":"m.text","body":"test msg"}'
+        )
         self.assertEquals(200, code, msg=str(response))
 
         # set topic for public room
         (code, response) = yield self.mock_resource.trigger(
-                           "PUT",
-                           "/rooms/%s/state/m.room.topic" % self.created_public_rmid,
-                           '{"topic":"Public Room Topic"}')
+            "PUT",
+            "/rooms/%s/state/m.room.topic" % self.created_public_rmid,
+            '{"topic":"Public Room Topic"}'
+        )
         self.assertEquals(200, code, msg=str(response))
 
         # auth as user_id now
@@ -102,37 +105,6 @@ class RoomPermissionsTestCase(RestTestCase):
 
     def tearDown(self):
         pass
-
-#    @defer.inlineCallbacks
-#    def test_get_message(self):
-#        # get message in uncreated room, expect 403
-#        (code, response) = yield self.mock_resource.trigger_get(
-#                           "/rooms/noroom/messages/someid/m1")
-#        self.assertEquals(403, code, msg=str(response))
-#
-#        # get message in created room not joined (no state), expect 403
-#        (code, response) = yield self.mock_resource.trigger_get(
-#                           self.created_rmid_msg_path)
-#        self.assertEquals(403, code, msg=str(response))
-#
-#        # get message in created room and invited, expect 403
-#        yield self.invite(room=self.created_rmid, src=self.rmcreator_id,
-#                          targ=self.user_id)
-#        (code, response) = yield self.mock_resource.trigger_get(
-#                           self.created_rmid_msg_path)
-#        self.assertEquals(403, code, msg=str(response))
-#
-#        # get message in created room and joined, expect 200
-#        yield self.join(room=self.created_rmid, user=self.user_id)
-#        (code, response) = yield self.mock_resource.trigger_get(
-#                           self.created_rmid_msg_path)
-#        self.assertEquals(200, code, msg=str(response))
-#
-#        # get message in created room and left, expect 403
-#        yield self.leave(room=self.created_rmid, user=self.user_id)
-#        (code, response) = yield self.mock_resource.trigger_get(
-#                           self.created_rmid_msg_path)
-#        self.assertEquals(403, code, msg=str(response))
 
     @defer.inlineCallbacks
     def test_send_message(self):
@@ -195,25 +167,30 @@ class RoomPermissionsTestCase(RestTestCase):
 
         # set/get topic in uncreated room, expect 403
         (code, response) = yield self.mock_resource.trigger(
-                           "PUT", "/rooms/%s/state/m.room.topic" % self.uncreated_rmid,
-                           topic_content)
+            "PUT", "/rooms/%s/state/m.room.topic" % self.uncreated_rmid,
+            topic_content
+        )
         self.assertEquals(403, code, msg=str(response))
         (code, response) = yield self.mock_resource.trigger_get(
-                           "/rooms/%s/state/m.room.topic" % self.uncreated_rmid)
+            "/rooms/%s/state/m.room.topic" % self.uncreated_rmid
+        )
         self.assertEquals(403, code, msg=str(response))
 
         # set/get topic in created PRIVATE room not joined, expect 403
         (code, response) = yield self.mock_resource.trigger(
-                           "PUT", topic_path, topic_content)
+            "PUT", topic_path, topic_content
+        )
         self.assertEquals(403, code, msg=str(response))
         (code, response) = yield self.mock_resource.trigger_get(topic_path)
         self.assertEquals(403, code, msg=str(response))
 
         # set topic in created PRIVATE room and invited, expect 403
-        yield self.invite(room=self.created_rmid, src=self.rmcreator_id,
-                          targ=self.user_id)
+        yield self.invite(
+            room=self.created_rmid, src=self.rmcreator_id, targ=self.user_id
+        )
         (code, response) = yield self.mock_resource.trigger(
-                           "PUT", topic_path, topic_content)
+            "PUT", topic_path, topic_content
+        )
         self.assertEquals(403, code, msg=str(response))
 
         # get topic in created PRIVATE room and invited, expect 403
@@ -226,7 +203,8 @@ class RoomPermissionsTestCase(RestTestCase):
         # Only room ops can set topic by default
         self.auth_user_id = self.rmcreator_id
         (code, response) = yield self.mock_resource.trigger(
-                           "PUT", topic_path, topic_content)
+            "PUT", topic_path, topic_content
+        )
         self.assertEquals(200, code, msg=str(response))
         self.auth_user_id = self.user_id
 
@@ -237,30 +215,31 @@ class RoomPermissionsTestCase(RestTestCase):
         # set/get topic in created PRIVATE room and left, expect 403
         yield self.leave(room=self.created_rmid, user=self.user_id)
         (code, response) = yield self.mock_resource.trigger(
-                           "PUT", topic_path, topic_content)
+            "PUT", topic_path, topic_content
+        )
         self.assertEquals(403, code, msg=str(response))
         (code, response) = yield self.mock_resource.trigger_get(topic_path)
         self.assertEquals(200, code, msg=str(response))
 
         # get topic in PUBLIC room, not joined, expect 403
         (code, response) = yield self.mock_resource.trigger_get(
-                           "/rooms/%s/state/m.room.topic" % self.created_public_rmid)
+            "/rooms/%s/state/m.room.topic" % self.created_public_rmid
+        )
         self.assertEquals(403, code, msg=str(response))
 
         # set topic in PUBLIC room, not joined, expect 403
         (code, response) = yield self.mock_resource.trigger(
-                           "PUT",
-                           "/rooms/%s/state/m.room.topic" % self.created_public_rmid,
-                           topic_content)
+            "PUT",
+            "/rooms/%s/state/m.room.topic" % self.created_public_rmid,
+            topic_content
+        )
         self.assertEquals(403, code, msg=str(response))
 
     @defer.inlineCallbacks
     def _test_get_membership(self, room=None, members=[], expect_code=None):
-        path = "/rooms/%s/state/m.room.member/%s"
         for member in members:
-            (code, response) = yield self.mock_resource.trigger_get(
-                               path %
-                               (room, member))
+            path = "/rooms/%s/state/m.room.member/%s" % (room, member)
+            (code, response) = yield self.mock_resource.trigger_get(path)
             self.assertEquals(expect_code, code)
 
     @defer.inlineCallbacks
@@ -440,13 +419,13 @@ class RoomsMemberListTestCase(RestTestCase):
 
         self.auth_user_id = self.user_id
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -461,20 +440,23 @@ class RoomsMemberListTestCase(RestTestCase):
     def test_get_member_list(self):
         room_id = yield self.create_room_as(self.user_id)
         (code, response) = yield self.mock_resource.trigger_get(
-                           "/rooms/%s/members" % room_id)
+            "/rooms/%s/members" % room_id
+        )
         self.assertEquals(200, code, msg=str(response))
 
     @defer.inlineCallbacks
     def test_get_member_list_no_room(self):
         (code, response) = yield self.mock_resource.trigger_get(
-                           "/rooms/roomdoesnotexist/members")
+            "/rooms/roomdoesnotexist/members"
+        )
         self.assertEquals(403, code, msg=str(response))
 
     @defer.inlineCallbacks
     def test_get_member_list_no_permission(self):
         room_id = yield self.create_room_as("@some_other_guy:red")
         (code, response) = yield self.mock_resource.trigger_get(
-                           "/rooms/%s/members" % room_id)
+            "/rooms/%s/members" % room_id
+        )
         self.assertEquals(403, code, msg=str(response))
 
     @defer.inlineCallbacks
@@ -519,13 +501,13 @@ class RoomsCreateTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -611,14 +593,14 @@ class RoomTopicTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
 
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -636,34 +618,41 @@ class RoomTopicTestCase(RestTestCase):
     @defer.inlineCallbacks
     def test_invalid_puts(self):
         # missing keys or invalid json
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           self.path, '{}')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", self.path, '{}'
+        )
         self.assertEquals(400, code, msg=str(response))
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           self.path, '{"_name":"bob"}')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", self.path, '{"_name":"bob"}'
+        )
         self.assertEquals(400, code, msg=str(response))
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           self.path, '{"nao')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", self.path, '{"nao'
+        )
         self.assertEquals(400, code, msg=str(response))
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           self.path, '[{"_name":"bob"},{"_name":"jill"}]')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", self.path, '[{"_name":"bob"},{"_name":"jill"}]'
+        )
         self.assertEquals(400, code, msg=str(response))
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           self.path, 'text only')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", self.path, 'text only'
+        )
         self.assertEquals(400, code, msg=str(response))
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           self.path, '')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", self.path, ''
+        )
         self.assertEquals(400, code, msg=str(response))
 
         # valid key, wrong type
         content = '{"topic":["Topic name"]}'
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           self.path, content)
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", self.path, content
+        )
         self.assertEquals(400, code, msg=str(response))
 
     @defer.inlineCallbacks
@@ -674,8 +663,9 @@ class RoomTopicTestCase(RestTestCase):
 
         # valid put
         content = '{"topic":"Topic name"}'
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           self.path, content)
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", self.path, content
+        )
         self.assertEquals(200, code, msg=str(response))
 
         # valid get
@@ -687,8 +677,9 @@ class RoomTopicTestCase(RestTestCase):
     def test_rooms_topic_with_extra_keys(self):
         # valid put with extra keys
         content = '{"topic":"Seasons","subtopic":"Summer"}'
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           self.path, content)
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", self.path, content
+        )
         self.assertEquals(200, code, msg=str(response))
 
         # valid get
@@ -717,13 +708,13 @@ class RoomMemberStateTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -740,33 +731,38 @@ class RoomMemberStateTestCase(RestTestCase):
     def test_invalid_puts(self):
         path = "/rooms/%s/state/m.room.member/%s" % (self.room_id, self.user_id)
         # missing keys or invalid json
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           path, '{}')
+        (code, response) = yield self.mock_resource.trigger("PUT", path, '{}')
         self.assertEquals(400, code, msg=str(response))
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           path, '{"_name":"bob"}')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", path, '{"_name":"bob"}'
+        )
         self.assertEquals(400, code, msg=str(response))
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           path, '{"nao')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", path, '{"nao'
+        )
         self.assertEquals(400, code, msg=str(response))
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           path, '[{"_name":"bob"},{"_name":"jill"}]')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", path, '[{"_name":"bob"},{"_name":"jill"}]'
+        )
         self.assertEquals(400, code, msg=str(response))
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           path, 'text only')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", path, 'text only'
+        )
         self.assertEquals(400, code, msg=str(response))
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           path, '')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", path, ''
+        )
         self.assertEquals(400, code, msg=str(response))
 
         # valid keys, wrong types
-        content = ('{"membership":["%s","%s","%s"]}' %
-                  (Membership.INVITE, Membership.JOIN, Membership.LEAVE))
+        content = ('{"membership":["%s","%s","%s"]}' % (
+            Membership.INVITE, Membership.JOIN, Membership.LEAVE
+        ))
         (code, response) = yield self.mock_resource.trigger("PUT", path, content)
         self.assertEquals(400, code, msg=str(response))
 
@@ -813,8 +809,9 @@ class RoomMemberStateTestCase(RestTestCase):
         )
 
         # valid invite message with custom key
-        content = ('{"membership":"%s","invite_text":"%s"}' %
-                    (Membership.INVITE, "Join us!"))
+        content = ('{"membership":"%s","invite_text":"%s"}' % (
+            Membership.INVITE, "Join us!"
+        ))
         (code, response) = yield self.mock_resource.trigger("PUT", path, content)
         self.assertEquals(200, code, msg=str(response))
 
@@ -843,13 +840,13 @@ class RoomMessagesTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -867,28 +864,34 @@ class RoomMessagesTestCase(RestTestCase):
         path = "/rooms/%s/send/m.room.message/mid1" % (
             urllib.quote(self.room_id))
         # missing keys or invalid json
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           path, '{}')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", path, '{}'
+        )
         self.assertEquals(400, code, msg=str(response))
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           path, '{"_name":"bob"}')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", path, '{"_name":"bob"}'
+        )
         self.assertEquals(400, code, msg=str(response))
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           path, '{"nao')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", path, '{"nao'
+        )
         self.assertEquals(400, code, msg=str(response))
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           path, '[{"_name":"bob"},{"_name":"jill"}]')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", path, '[{"_name":"bob"},{"_name":"jill"}]'
+        )
         self.assertEquals(400, code, msg=str(response))
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           path, 'text only')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", path, 'text only'
+        )
         self.assertEquals(400, code, msg=str(response))
 
-        (code, response) = yield self.mock_resource.trigger("PUT",
-                           path, '')
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", path, ''
+        )
         self.assertEquals(400, code, msg=str(response))
 
     @defer.inlineCallbacks
@@ -939,13 +942,13 @@ class RoomInitialSyncTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -953,19 +956,14 @@ class RoomInitialSyncTestCase(RestTestCase):
 
         synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
-        # Since I'm getting my own presence I need to exist as far as presence
-        # is concerned.
-        hs.get_handlers().presence_handler.registered_user(
-            UserID.from_string(self.user_id)
-        )
-
         # create the room
         self.room_id = yield self.create_room_as(self.user_id)
 
     @defer.inlineCallbacks
     def test_initial_sync(self):
         (code, response) = yield self.mock_resource.trigger_get(
-                "/rooms/%s/initialSync" % self.room_id)
+            "/rooms/%s/initialSync" % self.room_id
+        )
         self.assertEquals(200, code)
 
         self.assertEquals(self.room_id, response["room_id"])
@@ -989,8 +987,8 @@ class RoomInitialSyncTestCase(RestTestCase):
 
         self.assertTrue("presence" in response)
 
-        presence_by_user = {e["content"]["user_id"]: e
-            for e in response["presence"]
+        presence_by_user = {
+            e["content"]["user_id"]: e for e in response["presence"]
         }
         self.assertTrue(self.user_id in presence_by_user)
         self.assertEquals("m.presence", presence_by_user[self.user_id]["type"])
@@ -1016,13 +1014,13 @@ class RoomMessageListTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def _get_user_by_access_token(token=None, allow_guest=False):
+        def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth()._get_user_by_access_token = _get_user_by_access_token
+        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -1034,7 +1032,7 @@ class RoomMessageListTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_topo_token_is_accepted(self):
-        token = "t1-0_0_0_0_0"
+        token = "t1-0_0_0_0_0_0"
         (code, response) = yield self.mock_resource.trigger_get(
             "/rooms/%s/messages?access_token=x&from=%s" %
             (self.room_id, token))
@@ -1045,8 +1043,13 @@ class RoomMessageListTestCase(RestTestCase):
         self.assertTrue("end" in response)
 
     @defer.inlineCallbacks
-    def test_stream_token_is_rejected(self):
+    def test_stream_token_is_accepted_for_fwd_pagianation(self):
+        token = "s0_0_0_0_0_0"
         (code, response) = yield self.mock_resource.trigger_get(
-            "/rooms/%s/messages?access_token=x&from=s0_0_0_0" %
-            self.room_id)
-        self.assertEquals(400, code)
+            "/rooms/%s/messages?access_token=x&from=%s" %
+            (self.room_id, token))
+        self.assertEquals(200, code)
+        self.assertTrue("start" in response)
+        self.assertEquals(token, response['start'])
+        self.assertTrue("chunk" in response)
+        self.assertTrue("end" in response)

@@ -37,9 +37,12 @@ def around(target):
     def _around(code):
         name = code.__name__
         orig = getattr(target, name)
+
         def new(*args, **kwargs):
             return code(orig, *args, **kwargs)
+
         setattr(target, name, new)
+
     return _around
 
 
@@ -53,9 +56,7 @@ class TestCase(unittest.TestCase):
 
         method = getattr(self, methodName)
 
-        level = getattr(method, "loglevel",
-                    getattr(self, "loglevel",
-                        NEVER))
+        level = getattr(method, "loglevel", getattr(self, "loglevel", NEVER))
 
         @around(self)
         def setUp(orig):

@@ -17,6 +17,7 @@ from tests import unittest
 
 from tests.utils import MockClock
 
+
 class MockClockTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -60,7 +61,7 @@ class MockClockTestCase(unittest.TestCase):
 
         def _cb1():
             invoked[1] = 1
-        t1 = self.clock.call_later(20, _cb1)
+        self.clock.call_later(20, _cb1)
 
         self.clock.cancel_call_later(t0)
 

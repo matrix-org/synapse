@@ -37,7 +37,7 @@ class LruCache(object):
     """
     def __init__(self, max_size, keylen=1, cache_type=dict):
         cache = cache_type()
-        self.size = 0
+        self.cache = cache  # Used for introspection.
         list_root = []
         list_root[:] = [list_root, list_root, None, None]
 
@@ -60,7 +60,6 @@ class LruCache(object):
             prev_node[NEXT] = node
             next_node[PREV] = node
             cache[key] = node
-            self.size += 1
 
         def move_node_to_front(node):
             prev_node = node[PREV]
@@ -79,7 +78,6 @@ class LruCache(object):
             next_node = node[NEXT]
             prev_node[NEXT] = next_node
             next_node[PREV] = prev_node
-            self.size -= 1
 
         @synchronized
         def cache_get(key, default=None):
@@ -98,7 +96,7 @@ class LruCache(object):
                 node[VALUE] = value
             else:
                 add_node(key, value)
-                if self.size > max_size:
+                if len(cache) > max_size:
                     todelete = list_root[PREV]
                     delete_node(todelete)
                     cache.pop(todelete[KEY], None)
@@ -110,7 +108,7 @@ class LruCache(object):
                 return node[VALUE]
             else:
                 add_node(key, value)
-                if self.size > max_size:
+                if len(cache) > max_size:
                     todelete = list_root[PREV]
                     delete_node(todelete)
                     cache.pop(todelete[KEY], None)
@@ -145,7 +143,7 @@ class LruCache(object):
 
         @synchronized
         def cache_len():
-            return self.size
+            return len(cache)
 
         @synchronized
         def cache_contains(key):

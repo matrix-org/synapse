@@ -24,6 +24,7 @@ from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes, SynapseError, EventSizeError
 from synapse.types import Requester, RoomID, UserID, EventID
 from synapse.util.logutils import log_function
+from synapse.util.logcontext import preserve_context_over_fn
 from unpaddedbase64 import decode_base64
 
 import logging
@@ -433,30 +434,45 @@ class Auth(object):
 
         if event.user_id != invite_event.user_id:
             return False
-        try:
-            public_key = invite_event.content["public_key"]
-            if signed["mxid"] != event.state_key:
-                return False
-            if signed["token"] != token:
-                return False
-            for server, signature_block in signed["signatures"].items():
-                for key_name, encoded_signature in signature_block.items():
-                    if not key_name.startswith("ed25519:"):
-                        return False
-                    verify_key = decode_verify_key_bytes(
-                        key_name,
-                        decode_base64(public_key)
-                    )
-                    verify_signed_json(signed, server, verify_key)
 
-                    # We got the public key from the invite, so we know that the
-                    # correct server signed the signed bundle.
-                    # The caller is responsible for checking that the signing
-                    # server has not revoked that public key.
-                    return True
+        if signed["mxid"] != event.state_key:
             return False
-        except (KeyError, SignatureVerifyException,):
+        if signed["token"] != token:
             return False
+
+        for public_key_object in self.get_public_keys(invite_event):
+            public_key = public_key_object["public_key"]
+            try:
+                for server, signature_block in signed["signatures"].items():
+                    for key_name, encoded_signature in signature_block.items():
+                        if not key_name.startswith("ed25519:"):
+                            continue
+                        verify_key = decode_verify_key_bytes(
+                            key_name,
+                            decode_base64(public_key)
+                        )
+                        verify_signed_json(signed, server, verify_key)
+
+                        # We got the public key from the invite, so we know that the
+                        # correct server signed the signed bundle.
+                        # The caller is responsible for checking that the signing
+                        # server has not revoked that public key.
+                        return True
+            except (KeyError, SignatureVerifyException,):
+                continue
+        return False
+
+    def get_public_keys(self, invite_event):
+        public_keys = []
+        if "public_key" in invite_event.content:
+            o = {
+                "public_key": invite_event.content["public_key"],
+            }
+            if "key_validity_url" in invite_event.content:
+                o["key_validity_url"] = invite_event.content["key_validity_url"]
+            public_keys.append(o)
+        public_keys.extend(invite_event.content.get("public_keys", []))
+        return public_keys
 
     def _get_power_level_event(self, auth_events):
         key = (EventTypes.PowerLevels, "", )
@@ -518,7 +534,7 @@ class Auth(object):
                 )
 
             access_token = request.args["access_token"][0]
-            user_info = yield self._get_user_by_access_token(access_token)
+            user_info = yield self.get_user_by_access_token(access_token)
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
@@ -529,7 +545,8 @@ class Auth(object):
                 default=[""]
             )[0]
             if user and access_token and ip_addr:
-                self.store.insert_client_ip(
+                preserve_context_over_fn(
+                    self.store.insert_client_ip,
                     user=user,
                     access_token=access_token,
                     ip=ip_addr,
@@ -574,11 +591,11 @@ class Auth(object):
             raise AuthError(
                 403,
                 "Application service has not registered this user"
-                )
+            )
         defer.returnValue(user_id)
 
     @defer.inlineCallbacks
-    def _get_user_by_access_token(self, token):
+    def get_user_by_access_token(self, token):
         """ Get a registered user's ID.
 
         Args:
@@ -696,6 +713,7 @@ class Auth(object):
     def _look_up_user_by_access_token(self, token):
         ret = yield self.store.get_user_by_access_token(token)
         if not ret:
+            logger.warn("Unrecognised access token - not in store: %s" % (token,))
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Unrecognised access token.",
                 errcode=Codes.UNKNOWN_TOKEN
@@ -713,6 +731,7 @@ class Auth(object):
             token = request.args["access_token"][0]
             service = yield self.store.get_app_service_by_token(token)
             if not service:
+                logger.warn("Unrecognised appservice access token: %s" % (token,))
                 raise AuthError(
                     self.TOKEN_NOT_FOUND_HTTP_STATUS,
                     "Unrecognised access token.",
