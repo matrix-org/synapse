@@ -29,7 +29,7 @@ Matthew Hodgson <matthew at matrix.org>
 
 Emmanuel Rohee <manu at matrix.org>
  * Supporting iOS clients (testability and fallback registration)
-  
+
 Turned to Dust <dwinslow86 at gmail.com>
  * ArchLinux installation instructions
 
@@ -54,3 +54,6 @@ Mads Robin Christensen <mads at v42 dot dk>
 
 Florent Violleau <floviolleau at gmail dot com>
  * Add Raspberry Pi installation instructions and general troubleshooting items
+
+Niklas Riekenbrauck <nikriek at gmail dot.com>
+ * Add JWT support for registration and login
