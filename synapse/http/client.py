@@ -21,7 +21,7 @@ import synapse.metrics
 
 from canonicaljson import encode_canonical_json
 
-from twisted.internet import defer, reactor, ssl
+from twisted.internet import defer, reactor, ssl, protocol
 from twisted.web.client import (
     Agent, readBody, FileBodyProducer, PartialDownloadError,
 )

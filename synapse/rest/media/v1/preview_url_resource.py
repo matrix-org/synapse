@@ -13,10 +13,11 @@
 # limitations under the License.
 
 from twisted.web.resource import Resource
+from twisted.internet import defer
 from lxml import html
 from synapse.http.client import SimpleHttpClient
-from synapse.http.server import respond_with_json_bytes
-from simplejson import json
+from synapse.http.server import request_handler, respond_with_json_bytes
+import ujson as json
 
 import logging
 logger = logging.getLogger(__name__)
@@ -75,7 +76,7 @@ class PreviewUrlResource(Resource):
             # "og:url"         : "https://twitter.com/matrixdotorg/status/684074366691356672"
             # "og:title"       : "Matrix on Twitter"
             # "og:image"       : "https://pbs.twimg.com/profile_images/500400952029888512/yI0qtFi7_400x400.png"
-            # "og:description" : "“Synapse 0.12 is out! Lots of polishing, performance &amp;amp; bugfixes: /sync API, /r0 prefix, fulltext search, 3PID invites https://t.co/5alhXLLEGP”"
+            # "og:description" : "Synapse 0.12 is out! Lots of polishing, performance &amp;amp; bugfixes: /sync API, /r0 prefix, fulltext search, 3PID invites https://t.co/5alhXLLEGP"
             # "og:site_name"   : "Twitter"
 
             og = {}
@@ -143,15 +144,15 @@ class PreviewUrlResource(Resource):
             os.remove(fname)
             raise
 
-        return {
+        yield ({
             "media_type": media_type,
             "media_length": length,
             "download_name": download_name,
             "created_ts": time_now_ms,
             "filesystem_id": file_id,
             "filename": fname,
-        }
-
+        })
+        return
 
     def _is_media(content_type):
         if content_type.lower().startswith("image/"):
@@ -159,6 +160,6 @@ class PreviewUrlResource(Resource):
 
     def _is_html(content_type):
         content_type = content_type.lower()
-        if content_type == "text/html" or
-           content_type.startswith("application/xhtml"):
+        if (content_type == "text/html" or
+            content_type.startswith("application/xhtml")):
             return True
