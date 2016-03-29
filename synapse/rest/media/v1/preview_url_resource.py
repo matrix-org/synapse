@@ -57,15 +57,15 @@ class PreviewUrlResource(BaseMediaResource):
 
             if self._is_media(media_info['media_type']):
                 dims = yield self._generate_local_thumbnails(
-                        media_info.filesystem_id, media_info
+                        media_info['filesystem_id'], media_info
                       )
 
                 og = {
-                    "og:description" : media_info.download_name,
-                    "og:image" : "mxc://%s/%s" % (self.server_name, media_info.filesystem_id),
+                    "og:description" : media_info['download_name'],
+                    "og:image" : "mxc://%s/%s" % (self.server_name, media_info['filesystem_id']),
                     "og:image:type" : media_info['media_type'],
-                    "og:image:width" : dims.width,
-                    "og:image:height" : dims.height,
+                    "og:image:width" : dims['width'],
+                    "og:image:height" : dims['height'],
                 }
 
                 # define our OG response for this media
@@ -123,6 +123,7 @@ class PreviewUrlResource(BaseMediaResource):
                 length, headers = yield self.client.get_file(
                     url, output_stream=f, max_size=self.max_spider_size,
                 )
+                # FIXME: handle 404s sanely - don't spider an error page
             media_type = headers["Content-Type"][0]
             time_now_ms = self.clock.time_msec()
 
