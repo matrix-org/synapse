@@ -317,7 +317,7 @@ class Pusher(object):
     @defer.inlineCallbacks
     def _get_badge_count(self):
         invites, joins = yield defer.gatherResults([
-            self.store.get_invites_for_user(self.user_id),
+            self.store.get_invited_rooms_for_user(self.user_id),
             self.store.get_rooms_for_user(self.user_id),
         ], consumeErrors=True)
 

@@ -18,6 +18,7 @@ from twisted.internet import defer
 
 from synapse.util.logutils import log_function
 from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.metrics import Measure
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.api.auth import AuthEventTypes
@@ -27,6 +28,7 @@ from collections import namedtuple
 
 import logging
 import hashlib
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +36,11 @@ logger = logging.getLogger(__name__)
 KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
 
 
-SIZE_OF_CACHE = 1000
-EVICTION_TIMEOUT_SECONDS = 20
+CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.1))
+
+
+SIZE_OF_CACHE = int(1000 * CACHE_SIZE_FACTOR)
+EVICTION_TIMEOUT_SECONDS = 60 * 60
 
 
 class _StateCacheEntry(object):
@@ -85,16 +90,8 @@ class StateHandler(object):
         """
         event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
 
-        cache = None
-        if self._state_cache is not None:
-            cache = self._state_cache.get(frozenset(event_ids), None)
-
-        if cache:
-            cache.ts = self.clock.time_msec()
-            state = cache.state
-        else:
-            res = yield self.resolve_state_groups(room_id, event_ids)
-            state = res[1]
+        res = yield self.resolve_state_groups(room_id, event_ids)
+        state = res[1]
 
         if event_type:
             defer.returnValue(state.get((event_type, state_key)))
@@ -186,20 +183,6 @@ class StateHandler(object):
         """
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
-        if self._state_cache is not None:
-            cache = self._state_cache.get(frozenset(event_ids), None)
-            if cache and cache.state_group:
-                cache.ts = self.clock.time_msec()
-                prev_state = cache.state.get((event_type, state_key), None)
-                if prev_state:
-                    prev_state = prev_state.event_id
-                    prev_states = [prev_state]
-                else:
-                    prev_states = []
-                defer.returnValue(
-                    (cache.state_group, cache.state, prev_states)
-                )
-
         state_groups = yield self.store.get_state_groups(
             room_id, event_ids
         )
@@ -209,7 +192,7 @@ class StateHandler(object):
             state_groups.keys()
         )
 
-        group_names = set(state_groups.keys())
+        group_names = frozenset(state_groups.keys())
         if len(group_names) == 1:
             name, state_list = state_groups.items().pop()
             state = {
@@ -223,16 +206,25 @@ class StateHandler(object):
             else:
                 prev_states = []
 
-            if self._state_cache is not None:
-                cache = _StateCacheEntry(
-                    state=state,
-                    state_group=name,
-                    ts=self.clock.time_msec()
-                )
-
-                self._state_cache[frozenset(event_ids)] = cache
-
             defer.returnValue((name, state, prev_states))
+
+        if self._state_cache is not None:
+            cache = self._state_cache.get(group_names, None)
+            if cache and cache.state_group:
+                cache.ts = self.clock.time_msec()
+
+                event_dict = yield self.store.get_events(cache.state.values())
+                state = {(e.type, e.state_key): e for e in event_dict.values()}
+
+                prev_state = state.get((event_type, state_key), None)
+                if prev_state:
+                    prev_state = prev_state.event_id
+                    prev_states = [prev_state]
+                else:
+                    prev_states = []
+                defer.returnValue(
+                    (cache.state_group, state, prev_states)
+                )
 
         new_state, prev_states = self._resolve_events(
             state_groups.values(), event_type, state_key
@@ -240,12 +232,12 @@ class StateHandler(object):
 
         if self._state_cache is not None:
             cache = _StateCacheEntry(
-                state=new_state,
+                state={key: event.event_id for key, event in new_state.items()},
                 state_group=None,
                 ts=self.clock.time_msec()
             )
 
-            self._state_cache[frozenset(event_ids)] = cache
+            self._state_cache[group_names] = cache
 
         defer.returnValue((None, new_state, prev_states))
 
@@ -263,48 +255,49 @@ class StateHandler(object):
         from (type, state_key) to event. prev_states is a list of event_ids.
         :rtype: (dict[(str, str), synapse.events.FrozenEvent], list[str])
         """
-        state = {}
-        for st in state_sets:
-            for e in st:
-                state.setdefault(
-                    (e.type, e.state_key),
-                    {}
-                )[e.event_id] = e
+        with Measure(self.clock, "state._resolve_events"):
+            state = {}
+            for st in state_sets:
+                for e in st:
+                    state.setdefault(
+                        (e.type, e.state_key),
+                        {}
+                    )[e.event_id] = e
 
-        unconflicted_state = {
-            k: v.values()[0] for k, v in state.items()
-            if len(v.values()) == 1
-        }
+            unconflicted_state = {
+                k: v.values()[0] for k, v in state.items()
+                if len(v.values()) == 1
+            }
 
-        conflicted_state = {
-            k: v.values()
-            for k, v in state.items()
-            if len(v.values()) > 1
-        }
+            conflicted_state = {
+                k: v.values()
+                for k, v in state.items()
+                if len(v.values()) > 1
+            }
 
-        if event_type:
-            prev_states_events = conflicted_state.get(
-                (event_type, state_key), []
-            )
-            prev_states = [s.event_id for s in prev_states_events]
-        else:
-            prev_states = []
+            if event_type:
+                prev_states_events = conflicted_state.get(
+                    (event_type, state_key), []
+                )
+                prev_states = [s.event_id for s in prev_states_events]
+            else:
+                prev_states = []
 
-        auth_events = {
-            k: e for k, e in unconflicted_state.items()
-            if k[0] in AuthEventTypes
-        }
+            auth_events = {
+                k: e for k, e in unconflicted_state.items()
+                if k[0] in AuthEventTypes
+            }
 
-        try:
-            resolved_state = self._resolve_state_events(
-                conflicted_state, auth_events
-            )
-        except:
-            logger.exception("Failed to resolve state")
-            raise
+            try:
+                resolved_state = self._resolve_state_events(
+                    conflicted_state, auth_events
+                )
+            except:
+                logger.exception("Failed to resolve state")
+                raise
 
-        new_state = unconflicted_state
-        new_state.update(resolved_state)
+            new_state = unconflicted_state
+            new_state.update(resolved_state)
 
         return new_state, prev_states
 

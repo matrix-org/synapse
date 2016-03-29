@@ -155,7 +155,7 @@ class DirectoryStore(SQLBaseStore):
 
         return room_id
 
-    @cached()
+    @cached(max_entries=5000)
     def get_aliases_for_room(self, room_id):
         return self._simple_select_onecol(
             "room_aliases",
