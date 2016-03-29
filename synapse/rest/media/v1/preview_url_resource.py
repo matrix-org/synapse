@@ -53,7 +53,7 @@ class PreviewUrlResource(BaseMediaResource):
 
             media_info = yield self._download_url(url, requester.user)
 
-            logger.warn("got media_info of '%s'" % media_info)
+            logger.debug("got media_info of '%s'" % media_info)
 
             if self._is_media(media_info['media_type']):
                 dims = yield self._generate_local_thumbnails(
@@ -71,7 +71,6 @@ class PreviewUrlResource(BaseMediaResource):
                 # define our OG response for this media
             elif self._is_html(media_info['media_type']):
                 tree = html.parse(media_info['filename'])
-                logger.warn(html.tostring(tree))
 
                 # suck it up into lxml and define our OG response.
                 # if we see any URLs in the OG response, then spider them
@@ -120,7 +119,7 @@ class PreviewUrlResource(BaseMediaResource):
 
         try:
             with open(fname, "wb") as f:
-                logger.warn("Trying to get url '%s'" % url)
+                logger.debug("Trying to get url '%s'" % url)
                 length, headers = yield self.client.get_file(
                     url, output_stream=f, max_size=self.max_spider_size,
                 )
