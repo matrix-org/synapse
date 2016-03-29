@@ -56,7 +56,7 @@ As a first cut, let's do #2 and have the receiver hit the API to calculate its o
 API
 ---
 
-GET /_matrix/media/r0/previewUrl?url=http://wherever.com
+GET /_matrix/media/r0/preview_url?url=http://wherever.com
 200 OK
 {
     "og:type"        : "article"

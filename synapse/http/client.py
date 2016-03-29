@@ -26,6 +26,7 @@ from twisted.web.client import (
     Agent, readBody, FileBodyProducer, PartialDownloadError,
 )
 from twisted.web.http_headers import Headers
+from twisted.web._newclient import ResponseDone
 
 from StringIO import StringIO
 
@@ -266,7 +267,7 @@ class SimpleHttpClient(object):
 
         headers = dict(response.headers.getAllRawHeaders())
 
-        if headers['Content-Length'] > max_size:
+        if 'Content-Length' in headers and headers['Content-Length'] > max_size:
             logger.warn("Requested URL is too large > %r bytes" % (self.max_size,))
             # XXX: do we want to explicitly drop the connection here somehow? if so, how?
             raise # what should we be raising here?

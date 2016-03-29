@@ -12,26 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .base_resource import BaseMediaResource
+from synapse.api.errors import Codes
 from twisted.web.resource import Resource
+from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
 from lxml import html
+from synapse.util.stringutils import random_string
 from synapse.http.client import SimpleHttpClient
-from synapse.http.server import request_handler, respond_with_json_bytes
+from synapse.http.server import request_handler, respond_with_json, respond_with_json_bytes
+
+import os
 import ujson as json
 
 import logging
 logger = logging.getLogger(__name__)
 
-class PreviewUrlResource(Resource):
+class PreviewUrlResource(BaseMediaResource):
     isLeaf = True
 
     def __init__(self, hs, filepaths):
-        Resource.__init__(self)
+        BaseMediaResource.__init__(self, hs, filepaths)
         self.client = SimpleHttpClient(hs)
-        self.filepaths = filepaths
-        self.max_spider_size = hs.config.max_spider_size
-        self.server_name = hs.hostname
-        self.clock = hs.get_clock()
 
     def render_GET(self, request):
         self._async_render_GET(request)
@@ -40,57 +42,76 @@ class PreviewUrlResource(Resource):
     @request_handler
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
-        url = request.args.get("url")
         
         try:
+            # XXX: if get_user_by_req fails, what should we do in an async render?
+            requester = yield self.auth.get_user_by_req(request)
+            url = request.args.get("url")[0]
+
             # TODO: keep track of whether there's an ongoing request for this preview
             # and block and return their details if there is one.
 
-            media_info = self._download_url(url)
+            media_info = yield self._download_url(url, requester.user)
+
+            logger.warn("got media_info of '%s'" % media_info)
+
+            if self._is_media(media_info['media_type']):
+                dims = yield self._generate_local_thumbnails(
+                        media_info.filesystem_id, media_info
+                      )
+
+                og = {
+                    "og:description" : media_info.download_name,
+                    "og:image" : "mxc://%s/%s" % (self.server_name, media_info.filesystem_id),
+                    "og:image:type" : media_info['media_type'],
+                    "og:image:width" : dims.width,
+                    "og:image:height" : dims.height,
+                }
+
+                # define our OG response for this media
+            elif self._is_html(media_info['media_type']):
+                tree = html.parse(media_info['filename'])
+                logger.warn(html.tostring(tree))
+
+                # suck it up into lxml and define our OG response.
+                # if we see any URLs in the OG response, then spider them
+                # (although the client could choose to do this by asking for previews of those URLs to avoid DoSing the server)
+
+                # "og:type"        : "article"
+                # "og:url"         : "https://twitter.com/matrixdotorg/status/684074366691356672"
+                # "og:title"       : "Matrix on Twitter"
+                # "og:image"       : "https://pbs.twimg.com/profile_images/500400952029888512/yI0qtFi7_400x400.png"
+                # "og:description" : "Synapse 0.12 is out! Lots of polishing, performance &amp;amp; bugfixes: /sync API, /r0 prefix, fulltext search, 3PID invites https://t.co/5alhXLLEGP"
+                # "og:site_name"   : "Twitter"
+
+                og = {}
+                for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
+                    og[tag.attrib['property']] = tag.attrib['content']
+
+                # TODO: store our OG details in a cache (and expire them when stale)
+                # TODO: delete the content to stop diskfilling, as we only ever cared about its OG
+            else:
+                logger.warn("Failed to find any OG data in %s", url)
+                og = {}
+
+            respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
         except:
-            os.remove(fname)
+            # XXX: if we don't explicitly respond here, the request never returns.
+            # isn't this what server.py's wrapper is meant to be doing for us?
+            respond_with_json(
+                request,
+                500,
+                {
+                    "error": "Internal server error",
+                    "errcode": Codes.UNKNOWN,
+                },
+                send_cors=True
+            )
             raise
 
-        if self._is_media(media_type):
-            dims = yield self._generate_local_thumbnails(
-                    media_info.filesystem_id, media_info
-                  )
 
-            og = {
-                "og:description" : media_info.download_name,
-                "og:image" : "mxc://%s/%s" % (self.server_name, media_info.filesystem_id),
-                "og:image:type" : media_info.media_type,
-                "og:image:width" : dims.width,
-                "og:image:height" : dims.height,
-            }
-
-            # define our OG response for this media
-        elif self._is_html(media_type):
-            tree = html.parse(media_info.filename)
-
-            # suck it up into lxml and define our OG response.
-            # if we see any URLs in the OG response, then spider them
-            # (although the client could choose to do this by asking for previews of those URLs to avoid DoSing the server)
-
-            # "og:type"        : "article"
-            # "og:url"         : "https://twitter.com/matrixdotorg/status/684074366691356672"
-            # "og:title"       : "Matrix on Twitter"
-            # "og:image"       : "https://pbs.twimg.com/profile_images/500400952029888512/yI0qtFi7_400x400.png"
-            # "og:description" : "Synapse 0.12 is out! Lots of polishing, performance &amp;amp; bugfixes: /sync API, /r0 prefix, fulltext search, 3PID invites https://t.co/5alhXLLEGP"
-            # "og:site_name"   : "Twitter"
-
-            og = {}
-            for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
-                og[tag.attrib['property']] = tag.attrib['content']
-
-            # TODO: store our OG details in a cache (and expire them when stale)
-            # TODO: delete the content to stop diskfilling, as we only ever cared about its OG
-
-        respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
-
-    def _download_url(url):
-        requester = yield self.auth.get_user_by_req(request)
-
+    @defer.inlineCallbacks
+    def _download_url(self, url, user):
         # XXX: horrible duplication with base_resource's _download_remote_file()
         file_id = random_string(24)
 
@@ -99,6 +120,7 @@ class PreviewUrlResource(Resource):
 
         try:
             with open(fname, "wb") as f:
+                logger.warn("Trying to get url '%s'" % url)
                 length, headers = yield self.client.get_file(
                     url, output_stream=f, max_size=self.max_spider_size,
                 )
@@ -137,14 +159,14 @@ class PreviewUrlResource(Resource):
                 time_now_ms=self.clock.time_msec(),
                 upload_name=download_name,
                 media_length=length,
-                user_id=requester.user,
+                user_id=user,
             )
 
         except:
             os.remove(fname)
             raise
 
-        yield ({
+        defer.returnValue({
             "media_type": media_type,
             "media_length": length,
             "download_name": download_name,
@@ -152,14 +174,13 @@ class PreviewUrlResource(Resource):
             "filesystem_id": file_id,
             "filename": fname,
         })
-        return
 
-    def _is_media(content_type):
+    def _is_media(self, content_type):
         if content_type.lower().startswith("image/"):
             return True
 
-    def _is_html(content_type):
+    def _is_html(self, content_type):
         content_type = content_type.lower()
-        if (content_type == "text/html" or
+        if (content_type.startswith("text/html") or
             content_type.startswith("application/xhtml")):
             return True
