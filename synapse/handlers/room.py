@@ -416,8 +416,6 @@ class RoomMemberHandler(BaseHandler):
         effective_membership_state = action
         if action in ["kick", "unban"]:
             effective_membership_state = "leave"
-        elif action == "forget":
-            effective_membership_state = "leave"
 
         if third_party_signed is not None:
             replication = self.hs.get_replication_layer()
@@ -472,9 +470,6 @@ class RoomMemberHandler(BaseHandler):
             ratelimit=ratelimit,
             remote_room_hosts=remote_room_hosts,
         )
-
-        if action == "forget":
-            yield self.forget(requester.user, room_id)
 
     @defer.inlineCallbacks
     def send_membership_event(
@@ -935,8 +930,23 @@ class RoomMemberHandler(BaseHandler):
         display_name = data["display_name"]
         defer.returnValue((token, public_keys, fallback_public_key, display_name))
 
+    @defer.inlineCallbacks
     def forget(self, user, room_id):
-        return self.store.forget(user.to_string(), room_id)
+        user_id = user.to_string()
+
+        member = yield self.state_handler.get_current_state(
+            room_id=room_id,
+            event_type=EventTypes.Member,
+            state_key=user_id
+        )
+        membership = member.membership if member else None
+
+        if membership is not None and membership != Membership.LEAVE:
+            raise SynapseError(400, "User %s in room %s" % (
+                user_id, room_id
+            ))
+
+        yield self.store.forget(user_id, room_id)
 
 
 class RoomListHandler(BaseHandler):
