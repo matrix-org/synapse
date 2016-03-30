@@ -407,7 +407,6 @@ class RoomEventContext(ClientV1RestServlet):
 
 class RoomForgetRestServlet(ClientV1RestServlet):
     def register(self, http_server):
-        # /rooms/$roomid/[invite|join|leave]
         PATTERNS = ("/rooms/(?P<room_id>[^/]*)/forget")
         register_txn_path(self, PATTERNS, http_server)
 
