@@ -429,3 +429,33 @@ class StateStore(SQLBaseStore):
             }
 
         defer.returnValue(results)
+
+    def get_all_new_state_groups(self, last_id, current_id, limit):
+        def get_all_new_state_groups_txn(txn):
+            sql = (
+                "SELECT id, room_id, event_id FROM state_groups"
+                " WHERE ? < id AND id <= ? ORDER BY id LIMIT ?"
+            )
+            txn.execute(sql, (last_id, current_id, limit))
+            groups = txn.fetchall()
+
+            if not groups:
+                return ([], [])
+
+            lower_bound = groups[0][0]
+            upper_bound = groups[-1][0]
+            sql = (
+                "SELECT state_group, type, state_key, event_id"
+                " FROM state_groups_state"
+                " WHERE ? <= state_group AND state_group <= ?"
+            )
+
+            txn.execute(sql, (lower_bound, upper_bound))
+            state_group_state = txn.fetchall()
+            return (groups, state_group_state)
+        return self.runInteraction(
+            "get_all_new_state_groups", get_all_new_state_groups_txn
+        )
+
+    def get_state_stream_token(self):
+        return self._state_groups_id_gen.get_max_token()
