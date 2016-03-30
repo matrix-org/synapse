@@ -1114,7 +1114,8 @@ class EventsStore(SQLBaseStore):
                 new_forward_events = []
 
             sql = (
-                "SELECT -e.stream_ordering, ej.internal_metadata, ej.json"
+                "SELECT -e.stream_ordering, ej.internal_metadata, ej.json,"
+                " eg.state_group"
                 " FROM events as e"
                 " JOIN event_json as ej"
                 " ON e.event_id = ej.event_id AND e.room_id = ej.room_id"
