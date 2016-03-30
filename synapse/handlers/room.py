@@ -946,7 +946,8 @@ class RoomMemberHandler(BaseHandler):
                 user_id, room_id
             ))
 
-        yield self.store.forget(user_id, room_id)
+        if membership:
+            yield self.store.forget(user_id, room_id)
 
 
 class RoomListHandler(BaseHandler):
