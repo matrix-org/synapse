@@ -115,19 +115,17 @@ class RoomMemberStore(SQLBaseStore):
         ).addCallback(self._get_events)
 
     @cached()
-    def get_invites_for_user(self, user_id):
-        """ Get all the invite events for a user
+    def get_invited_rooms_for_user(self, user_id):
+        """ Get all the rooms the user is invited to
         Args:
             user_id (str): The user ID.
         Returns:
-            A deferred list of event objects.
+            A deferred list of RoomsForUser.
         """
 
         return self.get_rooms_for_user_where_membership_is(
             user_id, [Membership.INVITE]
-        ).addCallback(lambda invites: self._get_events([
-            invite.event_id for invite in invites
-        ]))
+        )
 
     def get_leave_and_ban_events_for_user(self, user_id):
         """ Get all the leave events for a user
@@ -250,30 +248,6 @@ class RoomMemberStore(SQLBaseStore):
         return self.get_rooms_for_user_where_membership_is(
             user_id, membership_list=[Membership.JOIN],
         )
-
-    @defer.inlineCallbacks
-    def user_rooms_intersect(self, user_id_list):
-        """ Checks whether all the users whose IDs are given in a list share a
-        room.
-
-        This is a "hot path" function that's called a lot, e.g. by presence for
-        generating the event stream. As such, it is implemented locally by
-        wrapping logic around heavily-cached database queries.
-        """
-        if len(user_id_list) < 2:
-            defer.returnValue(True)
-
-        deferreds = [self.get_rooms_for_user(u) for u in user_id_list]
-
-        results = yield defer.DeferredList(deferreds, consumeErrors=True)
-
-        # A list of sets of strings giving room IDs for each user
-        room_id_lists = [set([r.room_id for r in result[1]]) for result in results]
-
-        # There isn't a setintersection(*list_of_sets)
-        ret = len(room_id_lists.pop(0).intersection(*room_id_lists)) > 0
-
-        defer.returnValue(ret)
 
     @defer.inlineCallbacks
     def forget(self, user_id, room_id):

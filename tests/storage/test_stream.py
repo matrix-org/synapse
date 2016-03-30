@@ -156,13 +156,13 @@ class StreamStoreTestCase(unittest.TestCase):
             self.room1, self.u_bob, Membership.JOIN
         )
 
-        event1 = yield self.event_injector.inject_room_member(
+        yield self.event_injector.inject_room_member(
             self.room1, self.u_alice, Membership.JOIN
         )
 
         start = yield self.store.get_room_events_max_id()
 
-        event2 = yield self.event_injector.inject_room_member(
+        yield self.event_injector.inject_room_member(
             self.room1, self.u_alice, Membership.JOIN,
         )
 

@@ -18,8 +18,7 @@ from twisted.internet import defer
 
 from .base import ClientV1RestServlet, client_path_patterns
 from synapse.types import UserID
-
-import simplejson as json
+from synapse.http.servlet import parse_json_object_from_request
 
 
 class ProfileDisplaynameRestServlet(ClientV1RestServlet):
@@ -44,14 +43,15 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         user = UserID.from_string(user_id)
 
+        content = parse_json_object_from_request(request)
+
         try:
-            content = json.loads(request.content.read())
             new_name = content["displayname"]
         except:
             defer.returnValue((400, "Unable to parse name"))
 
         yield self.handlers.profile_handler.set_displayname(
-            user, requester.user, new_name)
+            user, requester, new_name)
 
         defer.returnValue((200, {}))
 
@@ -81,14 +81,14 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
+        content = parse_json_object_from_request(request)
         try:
-            content = json.loads(request.content.read())
             new_name = content["avatar_url"]
         except:
             defer.returnValue((400, "Unable to parse name"))
 
         yield self.handlers.profile_handler.set_avatar_url(
-            user, requester.user, new_name)
+            user, requester, new_name)
 
         defer.returnValue((200, {}))
 

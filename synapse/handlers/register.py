@@ -47,7 +47,8 @@ class RegistrationHandler(BaseHandler):
         self._next_generated_user_id = None
 
     @defer.inlineCallbacks
-    def check_username(self, localpart, guest_access_token=None):
+    def check_username(self, localpart, guest_access_token=None,
+                       assigned_user_id=None):
         yield run_on_reactor()
 
         if urllib.quote(localpart.encode('utf-8')) != localpart:
@@ -60,7 +61,16 @@ class RegistrationHandler(BaseHandler):
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
 
-        yield self.check_user_id_is_valid(user_id)
+        if assigned_user_id:
+            if user_id == assigned_user_id:
+                return
+            else:
+                raise SynapseError(
+                    400,
+                    "A different user ID has already been registered for this session",
+                )
+
+        yield self.check_user_id_not_appservice_exclusive(user_id)
 
         users = yield self.store.get_users_by_id_case_insensitive(user_id)
         if users:
@@ -145,7 +155,7 @@ class RegistrationHandler(BaseHandler):
                 localpart = yield self._generate_user_id(attempts > 0)
                 user = UserID(localpart, self.hs.hostname)
                 user_id = user.to_string()
-                yield self.check_user_id_is_valid(user_id)
+                yield self.check_user_id_not_appservice_exclusive(user_id)
                 if generate_token:
                     token = self.auth_handler().generate_access_token(user_id)
                 try:
@@ -157,6 +167,7 @@ class RegistrationHandler(BaseHandler):
                     )
                 except SynapseError:
                     # if user id is taken, just generate another
+                    user = None
                     user_id = None
                     token = None
                     attempts += 1
@@ -180,11 +191,19 @@ class RegistrationHandler(BaseHandler):
                 400, "Invalid user localpart for this application service.",
                 errcode=Codes.EXCLUSIVE
             )
+
+        service_id = service.id if service.is_exclusive_user(user_id) else None
+
+        yield self.check_user_id_not_appservice_exclusive(
+            user_id, allowed_appservice=service
+        )
+
         token = self.auth_handler().generate_access_token(user_id)
         yield self.store.register(
             user_id=user_id,
             token=token,
-            password_hash=""
+            password_hash="",
+            appservice_id=service_id,
         )
         yield registered_user(self.distributor, user)
         defer.returnValue((user_id, token))
@@ -226,7 +245,7 @@ class RegistrationHandler(BaseHandler):
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
 
-        yield self.check_user_id_is_valid(user_id)
+        yield self.check_user_id_not_appservice_exclusive(user_id)
         token = self.auth_handler().generate_access_token(user_id)
         try:
             yield self.store.register(
@@ -235,7 +254,7 @@ class RegistrationHandler(BaseHandler):
                 password_hash=None
             )
             yield registered_user(self.distributor, user)
-        except Exception, e:
+        except Exception as e:
             yield self.store.add_access_token_to_user(user_id, token)
             # Ignore Registration errors
             logger.exception(e)
@@ -278,12 +297,14 @@ class RegistrationHandler(BaseHandler):
             yield identity_handler.bind_threepid(c, user_id)
 
     @defer.inlineCallbacks
-    def check_user_id_is_valid(self, user_id):
+    def check_user_id_not_appservice_exclusive(self, user_id, allowed_appservice=None):
         # valid user IDs must not clash with any user ID namespaces claimed by
         # application services.
         services = yield self.store.get_app_services()
         interested_services = [
-            s for s in services if s.is_interested_in_user(user_id)
+            s for s in services
+            if s.is_interested_in_user(user_id)
+            and s != allowed_appservice
         ]
         for service in interested_services:
             if service.is_exclusive_user(user_id):
@@ -342,3 +363,18 @@ class RegistrationHandler(BaseHandler):
 
     def auth_handler(self):
         return self.hs.get_handlers().auth_handler
+
+    @defer.inlineCallbacks
+    def guest_access_token_for(self, medium, address, inviter_user_id):
+        access_token = yield self.store.get_3pid_guest_access_token(medium, address)
+        if access_token:
+            defer.returnValue(access_token)
+
+        _, access_token = yield self.register(
+            generate_token=True,
+            make_guest=True
+        )
+        access_token = yield self.store.save_or_get_3pid_guest_access_token(
+            medium, address, access_token, inviter_user_id
+        )
+        defer.returnValue(access_token)

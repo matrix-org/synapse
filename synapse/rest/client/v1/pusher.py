@@ -17,9 +17,10 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, Codes
 from synapse.push import PusherConfigException
+from synapse.http.servlet import parse_json_object_from_request
+
 from .base import ClientV1RestServlet, client_path_patterns
 
-import simplejson as json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -28,12 +29,16 @@ logger = logging.getLogger(__name__)
 class PusherRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/pushers/set$")
 
+    def __init__(self, hs):
+        super(PusherRestServlet, self).__init__(hs)
+        self.notifier = hs.get_notifier()
+
     @defer.inlineCallbacks
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
         user = requester.user
 
-        content = _parse_json(request)
+        content = parse_json_object_from_request(request)
 
         pusher_pool = self.hs.get_pusherpool()
 
@@ -45,7 +50,7 @@ class PusherRestServlet(ClientV1RestServlet):
             )
             defer.returnValue((200, {}))
 
-        reqd = ['profile_tag', 'kind', 'app_id', 'app_display_name',
+        reqd = ['kind', 'app_id', 'app_display_name',
                 'device_display_name', 'pushkey', 'lang', 'data']
         missing = []
         for i in reqd:
@@ -73,35 +78,25 @@ class PusherRestServlet(ClientV1RestServlet):
             yield pusher_pool.add_pusher(
                 user_id=user.to_string(),
                 access_token=requester.access_token_id,
-                profile_tag=content['profile_tag'],
                 kind=content['kind'],
                 app_id=content['app_id'],
                 app_display_name=content['app_display_name'],
                 device_display_name=content['device_display_name'],
                 pushkey=content['pushkey'],
                 lang=content['lang'],
-                data=content['data']
+                data=content['data'],
+                profile_tag=content.get('profile_tag', ""),
             )
         except PusherConfigException as pce:
             raise SynapseError(400, "Config Error: " + pce.message,
                                errcode=Codes.MISSING_PARAM)
 
+        self.notifier.on_new_replication_data()
+
         defer.returnValue((200, {}))
 
     def on_OPTIONS(self, _):
         return 200, {}
-
-
-# XXX: C+ped from rest/room.py - surely this should be common?
-def _parse_json(request):
-    try:
-        content = json.loads(request.content.read())
-        if type(content) != dict:
-            raise SynapseError(400, "Content must be a JSON object.",
-                               errcode=Codes.NOT_JSON)
-        return content
-    except ValueError:
-        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
 
 def register_servlets(hs, http_server):

@@ -15,8 +15,6 @@
 
 from twisted.internet import defer
 
-from mock import Mock
-
 from . import V2AlphaRestTestCase
 
 from synapse.rest.client.v2_alpha import filter
@@ -53,9 +51,8 @@ class FilterTestCase(V2AlphaRestTestCase):
 
     @defer.inlineCallbacks
     def test_add_filter(self):
-        (code, response) = yield self.mock_resource.trigger("POST",
-            "/user/%s/filter" % (self.USER_ID),
-            '{"type": ["m.*"]}'
+        (code, response) = yield self.mock_resource.trigger(
+            "POST", "/user/%s/filter" % (self.USER_ID), '{"type": ["m.*"]}'
         )
         self.assertEquals(200, code)
         self.assertEquals({"filter_id": "0"}, response)
@@ -70,8 +67,8 @@ class FilterTestCase(V2AlphaRestTestCase):
             {"type": ["m.*"]}
         ]
 
-        (code, response) = yield self.mock_resource.trigger("GET",
-            "/user/%s/filter/0" % (self.USER_ID), None
+        (code, response) = yield self.mock_resource.trigger_get(
+            "/user/%s/filter/0" % (self.USER_ID)
         )
         self.assertEquals(200, code)
         self.assertEquals({"type": ["m.*"]}, response)
@@ -82,14 +79,14 @@ class FilterTestCase(V2AlphaRestTestCase):
             {"type": ["m.*"]}
         ]
 
-        (code, response) = yield self.mock_resource.trigger("GET",
-            "/user/%s/filter/2" % (self.USER_ID), None
+        (code, response) = yield self.mock_resource.trigger_get(
+            "/user/%s/filter/2" % (self.USER_ID)
         )
         self.assertEquals(404, code)
 
     @defer.inlineCallbacks
     def test_get_filter_no_user(self):
-        (code, response) = yield self.mock_resource.trigger("GET",
-            "/user/%s/filter/0" % (self.USER_ID), None
+        (code, response) = yield self.mock_resource.trigger_get(
+            "/user/%s/filter/0" % (self.USER_ID)
         )
         self.assertEquals(404, code)

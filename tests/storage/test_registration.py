@@ -33,8 +33,10 @@ class RegistrationStoreTestCase(unittest.TestCase):
         self.store = hs.get_datastore()
 
         self.user_id = "@my-user:test"
-        self.tokens = ["AbCdEfGhIjKlMnOpQrStUvWxYz",
-                        "BcDeFgHiJkLmNoPqRsTuVwXyZa"]
+        self.tokens = [
+            "AbCdEfGhIjKlMnOpQrStUvWxYz",
+            "BcDeFgHiJkLmNoPqRsTuVwXyZa"
+        ]
         self.pwhash = "{xx1}123456789"
 
     @defer.inlineCallbacks

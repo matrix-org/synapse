@@ -21,7 +21,7 @@ from synapse.util.logcontext import LoggingContext
 from synapse.util.metrics import Measure
 
 import synapse.util.async
-import push_rule_evaluator as push_rule_evaluator
+from .push_rule_evaluator import evaluator_for_user_id
 
 import logging
 import random
@@ -47,14 +47,13 @@ class Pusher(object):
     MAX_BACKOFF = 60 * 60 * 1000
     GIVE_UP_AFTER = 24 * 60 * 60 * 1000
 
-    def __init__(self, _hs, profile_tag, user_id, app_id,
+    def __init__(self, _hs, user_id, app_id,
                  app_display_name, device_display_name, pushkey, pushkey_ts,
                  data, last_token, last_success, failing_since):
         self.hs = _hs
         self.evStreamHandler = self.hs.get_handlers().event_stream_handler
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
-        self.profile_tag = profile_tag
         self.user_id = user_id
         self.app_id = app_id
         self.app_display_name = app_display_name
@@ -186,8 +185,8 @@ class Pusher(object):
         processed = False
 
         rule_evaluator = yield \
-            push_rule_evaluator.evaluator_for_user_id_and_profile_tag(
-                self.user_id, self.profile_tag, single_event['room_id'], self.store
+            evaluator_for_user_id(
+                self.user_id, single_event['room_id'], self.store
             )
 
         actions = yield rule_evaluator.actions_for_event(single_event)
@@ -318,7 +317,7 @@ class Pusher(object):
     @defer.inlineCallbacks
     def _get_badge_count(self):
         invites, joins = yield defer.gatherResults([
-            self.store.get_invites_for_user(self.user_id),
+            self.store.get_invited_rooms_for_user(self.user_id),
             self.store.get_rooms_for_user(self.user_id),
         ], consumeErrors=True)
 

@@ -14,15 +14,9 @@
 # limitations under the License.
 
 
-from tests import unittest
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, Membership
-from synapse.types import UserID, RoomID
-
-from tests.utils import setup_test_homeserver
-
-from mock import Mock
+from synapse.api.constants import EventTypes
 
 
 class EventInjector:

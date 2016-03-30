@@ -18,7 +18,7 @@ from twisted.internet import defer
 from synapse.api.errors import AuthError, SynapseError
 from synapse.types import UserID
 
-from base import ClientV1RestServlet, client_path_patterns
+from .base import ClientV1RestServlet, client_path_patterns
 
 import logging
 

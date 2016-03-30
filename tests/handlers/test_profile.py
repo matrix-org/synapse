@@ -23,7 +23,7 @@ from synapse.api.errors import AuthError
 from synapse.handlers.profile import ProfileHandler
 from synapse.types import UserID
 
-from tests.utils import setup_test_homeserver
+from tests.utils import setup_test_homeserver, requester_for_user
 
 
 class ProfileHandlers(object):
@@ -41,8 +41,10 @@ class ProfileTestCase(unittest.TestCase):
         ])
 
         self.query_handlers = {}
+
         def register_query_handler(query_type, handler):
             self.query_handlers[query_type] = handler
+
         self.mock_federation.register_query_handler = register_query_handler
 
         hs = yield setup_test_homeserver(
@@ -63,15 +65,12 @@ class ProfileTestCase(unittest.TestCase):
         self.store = hs.get_datastore()
 
         self.frank = UserID.from_string("@1234ABCD:test")
-        self.bob   = UserID.from_string("@4567:test")
+        self.bob = UserID.from_string("@4567:test")
         self.alice = UserID.from_string("@alice:remote")
 
         yield self.store.create_profile(self.frank.localpart)
 
         self.handler = hs.get_handlers().profile_handler
-
-        # TODO(paul): Icky signal declarings.. booo
-        hs.get_distributor().declare("changed_presencelike_data")
 
     @defer.inlineCallbacks
     def test_get_my_name(self):
@@ -85,7 +84,11 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_set_my_name(self):
-        yield self.handler.set_displayname(self.frank, self.frank, "Frank Jr.")
+        yield self.handler.set_displayname(
+            self.frank,
+            requester_for_user(self.frank),
+            "Frank Jr."
+        )
 
         self.assertEquals(
             (yield self.store.get_profile_displayname(self.frank.localpart)),
@@ -94,7 +97,11 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_set_my_name_noauth(self):
-        d = self.handler.set_displayname(self.frank, self.bob, "Frank Jr.")
+        d = self.handler.set_displayname(
+            self.frank,
+            requester_for_user(self.bob),
+            "Frank Jr."
+        )
 
         yield self.assertFailure(d, AuthError)
 
@@ -136,8 +143,9 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_set_my_avatar(self):
-        yield self.handler.set_avatar_url(self.frank, self.frank,
-                "http://my.server/pic.gif")
+        yield self.handler.set_avatar_url(
+            self.frank, requester_for_user(self.frank), "http://my.server/pic.gif"
+        )
 
         self.assertEquals(
             (yield self.store.get_profile_avatar_url(self.frank.localpart)),

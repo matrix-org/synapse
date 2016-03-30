@@ -18,6 +18,7 @@ from synapse.api.errors import (
     cs_exception, SynapseError, CodeMessageException, UnrecognizedRequestError, Codes
 )
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
+from synapse.util.caches import intern_dict
 import synapse.metrics
 import synapse.events
 
@@ -229,11 +230,12 @@ class JsonResource(HttpServer, resource.Resource):
             else:
                 servlet_classname = "%r" % callback
 
-            args = [
-                urllib.unquote(u).decode("UTF-8") if u else u for u in m.groups()
-            ]
+            kwargs = intern_dict({
+                name: urllib.unquote(value).decode("UTF-8") if value else value
+                for name, value in m.groupdict().items()
+            })
 
-            callback_return = yield callback(request, *args)
+            callback_return = yield callback(request, **kwargs)
             if callback_return is not None:
                 code, response = callback_return
                 self._send_response(request, code, response)
@@ -367,8 +369,27 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
                           "Origin, X-Requested-With, Content-Type, Accept")
 
     request.write(json_bytes)
-    request.finish()
+    finish_request(request)
     return NOT_DONE_YET
+
+
+def finish_request(request):
+    """ Finish writing the response to the request.
+
+    Twisted throws a RuntimeException if the connection closed before the
+    response was written but doesn't provide a convenient or reliable way to
+    determine if the connection was closed. So we catch and log the RuntimeException
+
+    You might think that ``request.notifyFinish`` could be used to tell if the
+    request was finished. However the deferred it returns won't fire if the
+    connection was already closed, meaning we'd have to have called the method
+    right at the start of the request. By the time we want to write the response
+    it will already be too late.
+    """
+    try:
+        request.finish()
+    except RuntimeError as e:
+        logger.info("Connection disconnected before response was written: %r", e)
 
 
 def _request_user_agent_is_curl(request):

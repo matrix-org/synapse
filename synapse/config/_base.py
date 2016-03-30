@@ -104,7 +104,7 @@ class Config(object):
         dir_path = cls.abspath(dir_path)
         try:
             os.makedirs(dir_path)
-        except OSError, e:
+        except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
         if not os.path.isdir(dir_path):

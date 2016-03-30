@@ -23,8 +23,9 @@ import struct
 class Sqlite3Engine(object):
     single_threaded = True
 
-    def __init__(self, database_module):
+    def __init__(self, database_module, config):
         self.module = database_module
+        self.config = config
 
     def check_database(self, txn):
         pass
@@ -38,7 +39,7 @@ class Sqlite3Engine(object):
 
     def prepare_database(self, db_conn):
         prepare_sqlite3_database(db_conn)
-        prepare_database(db_conn, self)
+        prepare_database(db_conn, self, config=self.config)
 
     def is_deadlock(self, error):
         return False

@@ -18,6 +18,7 @@ from .. import unittest
 
 from synapse.util.caches.treecache import TreeCache
 
+
 class TreeCacheTestCase(unittest.TestCase):
     def test_get_set_onelevel(self):
         cache = TreeCache()
@@ -76,3 +77,9 @@ class TreeCacheTestCase(unittest.TestCase):
         cache[("b",)] = "B"
         cache.clear()
         self.assertEquals(len(cache), 0)
+
+    def test_contains(self):
+        cache = TreeCache()
+        cache[("a",)] = "A"
+        self.assertTrue(("a",) in cache)
+        self.assertFalse(("b",) in cache)

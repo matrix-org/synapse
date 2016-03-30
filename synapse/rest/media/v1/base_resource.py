@@ -16,7 +16,7 @@
 from .thumbnailer import Thumbnailer
 
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
-from synapse.http.server import respond_with_json
+from synapse.http.server import respond_with_json, finish_request
 from synapse.util.stringutils import random_string
 from synapse.api.errors import (
     cs_error, Codes, SynapseError
@@ -238,7 +238,7 @@ class BaseMediaResource(Resource):
             with open(file_path, "rb") as f:
                 yield FileSender().beginFileTransfer(f, request)
 
-            request.finish()
+            finish_request(request)
         else:
             self._respond_404(request)
 

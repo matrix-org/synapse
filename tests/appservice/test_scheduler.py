@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.appservice import ApplicationServiceState, AppServiceTransaction
+from synapse.appservice import ApplicationServiceState
 from synapse.appservice.scheduler import (
     _ServiceQueuer, _TransactionController, _Recoverer
 )
@@ -235,7 +235,7 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         srv_2_event2 = Mock(event_id="srv2b")
 
         send_return_list = [srv_1_defer, srv_2_defer]
-        self.txn_ctrl.send = Mock(side_effect=lambda x,y: send_return_list.pop(0))
+        self.txn_ctrl.send = Mock(side_effect=lambda x, y: send_return_list.pop(0))
 
         # send events for different ASes and make sure they are sent
         self.queuer.enqueue(srv1, srv_1_event)

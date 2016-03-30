@@ -73,6 +73,14 @@ class DomainSpecificString(
         """Return a string encoding the fields of the structure object."""
         return "%s%s:%s" % (self.SIGIL, self.localpart, self.domain)
 
+    @classmethod
+    def is_valid(cls, s):
+        try:
+            cls.from_string(s)
+            return True
+        except:
+            return False
+
     __str__ = to_string
 
     @classmethod
@@ -107,6 +115,7 @@ class StreamToken(
         "typing_key",
         "receipt_key",
         "account_data_key",
+        "push_rules_key",
     ))
 ):
     _SEPARATOR = "_"
@@ -142,6 +151,7 @@ class StreamToken(
             or (int(other.typing_key) < int(self.typing_key))
             or (int(other.receipt_key) < int(self.receipt_key))
             or (int(other.account_data_key) < int(self.account_data_key))
+            or (int(other.push_rules_key) < int(self.push_rules_key))
         )
 
     def copy_and_advance(self, key, new_value):
@@ -164,6 +174,11 @@ class StreamToken(
         d = self._asdict()
         d[key] = new_value
         return StreamToken(**d)
+
+
+StreamToken.START = StreamToken(
+    *(["s0"] + ["0"] * (len(StreamToken._fields) - 1))
+)
 
 
 class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):

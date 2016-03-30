@@ -18,7 +18,7 @@ from twisted.internet import defer
 from synapse.api.errors import LimitExceededError, SynapseError, AuthError
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.api.constants import Membership, EventTypes
-from synapse.types import UserID, RoomAlias
+from synapse.types import UserID, RoomAlias, Requester
 from synapse.push.action_generator import ActionGenerator
 
 from synapse.util.logcontext import PreserveLoggingContext
@@ -27,6 +27,14 @@ import logging
 
 
 logger = logging.getLogger(__name__)
+
+
+VISIBILITY_PRIORITY = (
+    "world_readable",
+    "shared",
+    "invited",
+    "joined",
+)
 
 
 class BaseHandler(object):
@@ -53,9 +61,15 @@ class BaseHandler(object):
         self.event_builder_factory = hs.get_event_builder_factory()
 
     @defer.inlineCallbacks
-    def _filter_events_for_clients(self, user_tuples, events, event_id_to_state):
+    def filter_events_for_clients(self, user_tuples, events, event_id_to_state):
         """ Returns dict of user_id -> list of events that user is allowed to
         see.
+
+        :param (str, bool) user_tuples: (user id, is_peeking) for each
+            user to be checked. is_peeking should be true if:
+              * the user is not currently a member of the room, and:
+              * the user has not been a member of the room since the given
+                events
         """
         forgotten = yield defer.gatherResults([
             self.store.who_forgot_in_room(
@@ -72,18 +86,38 @@ class BaseHandler(object):
         def allowed(event, user_id, is_peeking):
             state = event_id_to_state[event.event_id]
 
+            # get the room_visibility at the time of the event.
             visibility_event = state.get((EventTypes.RoomHistoryVisibility, ""), None)
             if visibility_event:
                 visibility = visibility_event.content.get("history_visibility", "shared")
             else:
                 visibility = "shared"
 
+            if visibility not in VISIBILITY_PRIORITY:
+                visibility = "shared"
+
+            # if it was world_readable, it's easy: everyone can read it
             if visibility == "world_readable":
                 return True
 
-            if is_peeking:
-                return False
+            # Always allow history visibility events on boundaries. This is done
+            # by setting the effective visibility to the least restrictive
+            # of the old vs new.
+            if event.type == EventTypes.RoomHistoryVisibility:
+                prev_content = event.unsigned.get("prev_content", {})
+                prev_visibility = prev_content.get("history_visibility", None)
 
+                if prev_visibility not in VISIBILITY_PRIORITY:
+                    prev_visibility = "shared"
+
+                new_priority = VISIBILITY_PRIORITY.index(visibility)
+                old_priority = VISIBILITY_PRIORITY.index(prev_visibility)
+                if old_priority < new_priority:
+                    visibility = prev_visibility
+
+            # get the user's membership at the time of the event. (or rather,
+            # just *after* the event. Which means that people can see their
+            # own join events, but not (currently) their own leave events.)
             membership_event = state.get((EventTypes.Member, user_id), None)
             if membership_event:
                 if membership_event.event_id in event_id_forgotten:
@@ -93,20 +127,29 @@ class BaseHandler(object):
             else:
                 membership = None
 
+            # if the user was a member of the room at the time of the event,
+            # they can see it.
             if membership == Membership.JOIN:
                 return True
 
-            if event.type == EventTypes.RoomHistoryVisibility:
-                return not is_peeking
+            if visibility == "joined":
+                # we weren't a member at the time of the event, so we can't
+                # see this event.
+                return False
 
-            if visibility == "shared":
-                return True
-            elif visibility == "joined":
-                return membership == Membership.JOIN
             elif visibility == "invited":
+                # user can also see the event if they were *invited* at the time
+                # of the event.
                 return membership == Membership.INVITE
 
-            return True
+            else:
+                # visibility is shared: user can also see the event if they have
+                # become a member since the event
+                #
+                # XXX: if the user has subsequently joined and then left again,
+                # ideally we would share history up to the point they left. But
+                # we don't know when they left.
+                return not is_peeking
 
         defer.returnValue({
             user_id: [
@@ -119,7 +162,17 @@ class BaseHandler(object):
 
     @defer.inlineCallbacks
     def _filter_events_for_client(self, user_id, events, is_peeking=False):
-        # Assumes that user has at some point joined the room if not is_guest.
+        """
+        Check which events a user is allowed to see
+
+        :param str user_id: user id to be checked
+        :param [synapse.events.EventBase] events: list of events to be checked
+        :param bool is_peeking should be True if:
+              * the user is not currently a member of the room, and:
+              * the user has not been a member of the room since the given
+                events
+        :rtype [synapse.events.EventBase]
+        """
         types = (
             (EventTypes.RoomHistoryVisibility, ""),
             (EventTypes.Member, user_id),
@@ -128,15 +181,15 @@ class BaseHandler(object):
             frozenset(e.event_id for e in events),
             types=types
         )
-        res = yield self._filter_events_for_clients(
+        res = yield self.filter_events_for_clients(
             [(user_id, is_peeking)], events, event_id_to_state
         )
         defer.returnValue(res.get(user_id, []))
 
-    def ratelimit(self, user_id):
+    def ratelimit(self, requester):
         time_now = self.clock.time()
         allowed, time_allowed = self.ratelimiter.send_message(
-            user_id, time_now,
+            requester.user.to_string(), time_now,
             msg_rate_hz=self.hs.config.rc_messages_per_second,
             burst_count=self.hs.config.rc_message_burst_count,
         )
@@ -147,7 +200,7 @@ class BaseHandler(object):
 
     @defer.inlineCallbacks
     def _create_new_client_event(self, builder):
-        latest_ret = yield self.store.get_latest_events_in_room(
+        latest_ret = yield self.store.get_latest_event_ids_and_hashes_in_room(
             builder.room_id,
         )
 
@@ -156,7 +209,10 @@ class BaseHandler(object):
         else:
             depth = 1
 
-        prev_events = [(e, h) for e, h, _ in latest_ret]
+        prev_events = [
+            (event_id, prev_hashes)
+            for event_id, prev_hashes, _ in latest_ret
+        ]
 
         builder.prev_events = prev_events
         builder.depth = depth
@@ -164,6 +220,50 @@ class BaseHandler(object):
         state_handler = self.state_handler
 
         context = yield state_handler.compute_event_context(builder)
+
+        # If we've received an invite over federation, there are no latest
+        # events in the room, because we don't know enough about the graph
+        # fragment we received to treat it like a graph, so the above returned
+        # no relevant events. It may have returned some events (if we have
+        # joined and left the room), but not useful ones, like the invite.
+        if (
+            not self.is_host_in_room(context.current_state) and
+            builder.type == EventTypes.Member
+        ):
+            prev_member_event = yield self.store.get_room_member(
+                builder.sender, builder.room_id
+            )
+
+            # The prev_member_event may already be in context.current_state,
+            # despite us not being present in the room; in particular, if
+            # inviting user, and all other local users, have already left.
+            #
+            # In that case, we have all the information we need, and we don't
+            # want to drop "context" - not least because we may need to handle
+            # the invite locally, which will require us to have the whole
+            # context (not just prev_member_event) to auth it.
+            #
+            context_event_ids = (
+                e.event_id for e in context.current_state.values()
+            )
+
+            if (
+                prev_member_event and
+                prev_member_event.event_id not in context_event_ids
+            ):
+                # The prev_member_event is missing from context, so it must
+                # have arrived over federation and is an outlier. We forcibly
+                # set our context to the invite we received over federation
+                builder.prev_events = (
+                    prev_member_event.event_id,
+                    prev_member_event.prev_events
+                )
+
+                context = yield state_handler.compute_event_context(
+                    builder,
+                    old_state=(prev_member_event,),
+                    outlier=True
+                )
 
         if builder.is_state():
             builder.prev_state = yield self.store.add_event_hashes(
@@ -187,9 +287,39 @@ class BaseHandler(object):
             (event, context,)
         )
 
+    def is_host_in_room(self, current_state):
+        room_members = [
+            (state_key, event.membership)
+            for ((event_type, state_key), event) in current_state.items()
+            if event_type == EventTypes.Member
+        ]
+        if len(room_members) == 0:
+            # Have we just created the room, and is this about to be the very
+            # first member event?
+            create_event = current_state.get(("m.room.create", ""))
+            if create_event:
+                return True
+        for (state_key, membership) in room_members:
+            if (
+                UserID.from_string(state_key).domain == self.hs.hostname
+                and membership == Membership.JOIN
+            ):
+                return True
+        return False
+
     @defer.inlineCallbacks
-    def handle_new_client_event(self, event, context, extra_users=[]):
+    def handle_new_client_event(
+        self,
+        requester,
+        event,
+        context,
+        ratelimit=True,
+        extra_users=[]
+    ):
         # We now need to go and hit out to wherever we need to hit out to.
+
+        if ratelimit:
+            self.ratelimit(requester)
 
         self.auth.check(event, auth_events=context.current_state)
 
@@ -215,6 +345,12 @@ class BaseHandler(object):
 
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.INVITE:
+                def is_inviter_member_event(e):
+                    return (
+                        e.type == EventTypes.Member and
+                        e.sender == event.sender
+                    )
+
                 event.unsigned["invite_room_state"] = [
                     {
                         "type": e.type,
@@ -223,12 +359,8 @@ class BaseHandler(object):
                         "sender": e.sender,
                     }
                     for k, e in context.current_state.items()
-                    if e.type in (
-                        EventTypes.JoinRules,
-                        EventTypes.CanonicalAlias,
-                        EventTypes.RoomAvatar,
-                        EventTypes.Name,
-                    )
+                    if e.type in self.hs.config.room_invite_state_types
+                    or is_inviter_member_event(e)
                 ]
 
                 invitee = UserID.from_string(event.state_key)
@@ -263,6 +395,12 @@ class BaseHandler(object):
                         403,
                         "You don't have permission to redact events"
                     )
+
+        if event.type == EventTypes.Create and context.current_state:
+            raise AuthError(
+                403,
+                "Changing the room create event is forbidden",
+            )
 
         action_generator = ActionGenerator(self.hs)
         yield action_generator.handle_push_actions_for_event(
@@ -316,7 +454,8 @@ class BaseHandler(object):
                 if member_event.type != EventTypes.Member:
                     continue
 
-                if not self.hs.is_mine(UserID.from_string(member_event.state_key)):
+                target_user = UserID.from_string(member_event.state_key)
+                if not self.hs.is_mine(target_user):
                     continue
 
                 if member_event.content["membership"] not in {
@@ -338,18 +477,13 @@ class BaseHandler(object):
                 # and having homeservers have their own users leave keeps more
                 # of that decision-making and control local to the guest-having
                 # homeserver.
-                message_handler = self.hs.get_handlers().message_handler
-                yield message_handler.create_and_send_event(
-                    {
-                        "type": EventTypes.Member,
-                        "state_key": member_event.state_key,
-                        "content": {
-                            "membership": Membership.LEAVE,
-                            "kind": "guest"
-                        },
-                        "room_id": member_event.room_id,
-                        "sender": member_event.state_key
-                    },
+                requester = Requester(target_user, "", True)
+                handler = self.hs.get_handlers().room_member_handler
+                yield handler.update_membership(
+                    requester,
+                    target_user,
+                    member_event.room_id,
+                    "leave",
                     ratelimit=False,
                 )
             except Exception as e:

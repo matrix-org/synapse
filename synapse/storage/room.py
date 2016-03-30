@@ -77,6 +77,14 @@ class RoomStore(SQLBaseStore):
             allow_none=True,
         )
 
+    def set_room_is_public(self, room_id, is_public):
+        return self._simple_update_one(
+            table="rooms",
+            keyvalues={"room_id": room_id},
+            updatevalues={"is_public": is_public},
+            desc="set_room_is_public",
+        )
+
     def get_public_room_ids(self):
         return self._simple_select_onecol(
             table="rooms",

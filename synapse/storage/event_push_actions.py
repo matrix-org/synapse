@@ -27,15 +27,14 @@ class EventPushActionsStore(SQLBaseStore):
     def _set_push_actions_for_event_and_users_txn(self, txn, event, tuples):
         """
         :param event: the event set actions for
-        :param tuples: list of tuples of (user_id, profile_tag, actions)
+        :param tuples: list of tuples of (user_id, actions)
         """
         values = []
-        for uid, profile_tag, actions in tuples:
+        for uid, actions in tuples:
             values.append({
                 'room_id': event.room_id,
                 'event_id': event.event_id,
                 'user_id': uid,
-                'profile_tag': profile_tag,
                 'actions': json.dumps(actions),
                 'stream_ordering': event.internal_metadata.stream_ordering,
                 'topological_ordering': event.depth,
@@ -43,14 +42,14 @@ class EventPushActionsStore(SQLBaseStore):
                 'highlight': 1 if _action_has_highlight(actions) else 0,
             })
 
-        for uid, _, __ in tuples:
+        for uid, __ in tuples:
             txn.call_after(
                 self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
                 (event.room_id, uid)
             )
         self._simple_insert_many_txn(txn, "event_push_actions", values)
 
-    @cachedInlineCallbacks(num_args=3, lru=True, tree=True)
+    @cachedInlineCallbacks(num_args=3, lru=True, tree=True, max_entries=5000)
     def get_unread_event_push_actions_by_room_for_user(
             self, room_id, user_id, last_read_event_id
     ):

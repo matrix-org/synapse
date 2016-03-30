@@ -13,13 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
+"""This module is responsible for keeping track of presence status of local
+and remote users.
 
-from synapse.api.errors import SynapseError, AuthError
+The methods that define policy are:
+    - PresenceHandler._update_states
+    - PresenceHandler._handle_timeouts
+    - should_notify
+"""
+
+from twisted.internet import defer, reactor
+from contextlib import contextmanager
+
+from synapse.api.errors import SynapseError
 from synapse.api.constants import PresenceState
+from synapse.storage.presence import UserPresenceState
 
-from synapse.util.logcontext import PreserveLoggingContext
+from synapse.util.logcontext import preserve_fn
 from synapse.util.logutils import log_function
+from synapse.util.metrics import Measure
+from synapse.util.wheel_timer import WheelTimer
 from synapse.types import UserID
 import synapse.metrics
 
@@ -32,85 +45,43 @@ logger = logging.getLogger(__name__)
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 
+notified_presence_counter = metrics.register_counter("notified_presence")
+federation_presence_out_counter = metrics.register_counter("federation_presence_out")
+presence_updates_counter = metrics.register_counter("presence_updates")
+timers_fired_counter = metrics.register_counter("timers_fired")
+federation_presence_counter = metrics.register_counter("federation_presence")
+bump_active_time_counter = metrics.register_counter("bump_active_time")
 
-# Don't bother bumping "last active" time if it differs by less than 60 seconds
+
+# If a user was last active in the last LAST_ACTIVE_GRANULARITY, consider them
+# "currently_active"
 LAST_ACTIVE_GRANULARITY = 60 * 1000
 
-# Keep no more than this number of offline serial revisions
-MAX_OFFLINE_SERIALS = 1000
+# How long to wait until a new /events or /sync request before assuming
+# the client has gone.
+SYNC_ONLINE_TIMEOUT = 30 * 1000
 
+# How long to wait before marking the user as idle. Compared against last active
+IDLE_TIMER = 5 * 60 * 1000
 
-# TODO(paul): Maybe there's one of these I can steal from somewhere
-def partition(l, func):
-    """Partition the list by the result of func applied to each element."""
-    ret = {}
+# How often we expect remote servers to resend us presence.
+FEDERATION_TIMEOUT = 30 * 60 * 1000
 
-    for x in l:
-        key = func(x)
-        if key not in ret:
-            ret[key] = []
-        ret[key].append(x)
+# How often to resend presence to remote servers
+FEDERATION_PING_INTERVAL = 25 * 60 * 1000
 
-    return ret
-
-
-def partitionbool(l, func):
-    def boolfunc(x):
-        return bool(func(x))
-
-    ret = partition(l, boolfunc)
-    return ret.get(True, []), ret.get(False, [])
-
-
-def user_presence_changed(distributor, user, statuscache):
-    return distributor.fire("user_presence_changed", user, statuscache)
-
-
-def collect_presencelike_data(distributor, user, content):
-    return distributor.fire("collect_presencelike_data", user, content)
+assert LAST_ACTIVE_GRANULARITY < IDLE_TIMER
 
 
 class PresenceHandler(BaseHandler):
 
-    STATE_LEVELS = {
-        PresenceState.OFFLINE: 0,
-        PresenceState.UNAVAILABLE: 1,
-        PresenceState.ONLINE: 2,
-        PresenceState.FREE_FOR_CHAT: 3,
-    }
-
     def __init__(self, hs):
         super(PresenceHandler, self).__init__(hs)
-
-        self.homeserver = hs
-
+        self.hs = hs
         self.clock = hs.get_clock()
-
-        distributor = hs.get_distributor()
-        distributor.observe("registered_user", self.registered_user)
-
-        distributor.observe(
-            "started_user_eventstream", self.started_user_eventstream
-        )
-        distributor.observe(
-            "stopped_user_eventstream", self.stopped_user_eventstream
-        )
-
-        distributor.observe("user_joined_room", self.user_joined_room)
-
-        distributor.declare("collect_presencelike_data")
-
-        distributor.declare("changed_presencelike_data")
-        distributor.observe(
-            "changed_presencelike_data", self.changed_presencelike_data
-        )
-
-        # outbound signal from the presence module to advertise when a user's
-        # presence has changed
-        distributor.declare("user_presence_changed")
-
-        self.distributor = distributor
-
+        self.store = hs.get_datastore()
+        self.wheel_timer = WheelTimer()
+        self.notifier = hs.get_notifier()
         self.federation = hs.get_replication_layer()
 
         self.federation.register_edu_handler(
@@ -138,348 +109,552 @@ class PresenceHandler(BaseHandler):
             )
         )
 
-        # IN-MEMORY store, mapping local userparts to sets of local users to
-        # be informed of state changes.
-        self._local_pushmap = {}
-        # map local users to sets of remote /domain names/ who are interested
-        # in them
-        self._remote_sendmap = {}
-        # map remote users to sets of local users who're interested in them
-        self._remote_recvmap = {}
-        # list of (serial, set of(userids)) tuples, ordered by serial, latest
-        # first
-        self._remote_offline_serials = []
+        distributor = hs.get_distributor()
+        distributor.observe("user_joined_room", self.user_joined_room)
 
-        # map any user to a UserPresenceCache
-        self._user_cachemap = {}
-        self._user_cachemap_latest_serial = 0
+        active_presence = self.store.take_presence_startup_info()
 
-        # map room_ids to the latest presence serial for a member of that
-        # room
-        self._room_serials = {}
+        # A dictionary of the current state of users. This is prefilled with
+        # non-offline presence from the DB. We should fetch from the DB if
+        # we can't find a users presence in here.
+        self.user_to_current_state = {
+            state.user_id: state
+            for state in active_presence
+        }
 
         metrics.register_callback(
-            "userCachemap:size",
-            lambda: len(self._user_cachemap),
+            "user_to_current_state_size", lambda: len(self.user_to_current_state)
         )
 
-    def _get_or_make_usercache(self, user):
-        """If the cache entry doesn't exist, initialise a new one."""
-        if user not in self._user_cachemap:
-            self._user_cachemap[user] = UserPresenceCache()
-        return self._user_cachemap[user]
-
-    def _get_or_offline_usercache(self, user):
-        """If the cache entry doesn't exist, return an OFFLINE one but do not
-        store it into the cache."""
-        if user in self._user_cachemap:
-            return self._user_cachemap[user]
-        else:
-            return UserPresenceCache()
-
-    def registered_user(self, user):
-        return self.store.create_presence(user.localpart)
-
-    @defer.inlineCallbacks
-    def is_presence_visible(self, observer_user, observed_user):
-        assert(self.hs.is_mine(observed_user))
-
-        if observer_user == observed_user:
-            defer.returnValue(True)
-
-        if (yield self.store.user_rooms_intersect(
-                [u.to_string() for u in observer_user, observed_user])):
-            defer.returnValue(True)
-
-        if (yield self.store.is_presence_visible(
-                observed_localpart=observed_user.localpart,
-                observer_userid=observer_user.to_string())):
-            defer.returnValue(True)
-
-        defer.returnValue(False)
-
-    @defer.inlineCallbacks
-    def get_state(self, target_user, auth_user, as_event=False, check_auth=True):
-        """Get the current presence state of the given user.
-
-        Args:
-            target_user (UserID): The user whose presence we want
-            auth_user (UserID): The user requesting the presence, used for
-                checking if said user is allowed to see the persence of the
-                `target_user`
-            as_event (bool): Format the return as an event or not?
-            check_auth (bool): Perform the auth checks or not?
-
-        Returns:
-            dict: The presence state of the `target_user`, whose format depends
-            on the `as_event` argument.
-        """
-        if self.hs.is_mine(target_user):
-            if check_auth:
-                visible = yield self.is_presence_visible(
-                    observer_user=auth_user,
-                    observed_user=target_user
+        now = self.clock.time_msec()
+        for state in active_presence:
+            self.wheel_timer.insert(
+                now=now,
+                obj=state.user_id,
+                then=state.last_active_ts + IDLE_TIMER,
+            )
+            self.wheel_timer.insert(
+                now=now,
+                obj=state.user_id,
+                then=state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
+            )
+            if self.hs.is_mine_id(state.user_id):
+                self.wheel_timer.insert(
+                    now=now,
+                    obj=state.user_id,
+                    then=state.last_federation_update_ts + FEDERATION_PING_INTERVAL,
                 )
-
-                if not visible:
-                    raise SynapseError(404, "Presence information not visible")
-
-            if target_user in self._user_cachemap:
-                state = self._user_cachemap[target_user].get_state()
             else:
-                state = yield self.store.get_presence_state(target_user.localpart)
-                if "mtime" in state:
-                    del state["mtime"]
-                state["presence"] = state.pop("state")
-        else:
-            # TODO(paul): Have remote server send us permissions set
-            state = self._get_or_offline_usercache(target_user).get_state()
-
-        if "last_active" in state:
-            state["last_active_ago"] = int(
-                self.clock.time_msec() - state.pop("last_active")
-            )
-
-        if as_event:
-            content = state
-
-            content["user_id"] = target_user.to_string()
-
-            if "last_active" in content:
-                content["last_active_ago"] = int(
-                    self._clock.time_msec() - content.pop("last_active")
+                self.wheel_timer.insert(
+                    now=now,
+                    obj=state.user_id,
+                    then=state.last_federation_update_ts + FEDERATION_TIMEOUT,
                 )
 
-            defer.returnValue({"type": "m.presence", "content": content})
-        else:
-            defer.returnValue(state)
+        # Set of users who have presence in the `user_to_current_state` that
+        # have not yet been persisted
+        self.unpersisted_users_changes = set()
 
-    @defer.inlineCallbacks
-    def get_states(self, target_users, auth_user, as_event=False, check_auth=True):
-        """A batched version of the `get_state` method that accepts a list of
-        `target_users`
+        reactor.addSystemEventTrigger("before", "shutdown", self._on_shutdown)
 
-        Args:
-            target_users (list): The list of UserID's whose presence we want
-            auth_user (UserID): The user requesting the presence, used for
-                checking if said user is allowed to see the persence of the
-                `target_users`
-            as_event (bool): Format the return as an event or not?
-            check_auth (bool): Perform the auth checks or not?
+        self.serial_to_user = {}
+        self._next_serial = 1
 
-        Returns:
-            dict: A mapping from user -> presence_state
-        """
-        local_users, remote_users = partitionbool(
-            target_users,
-            lambda u: self.hs.is_mine(u)
+        # Keeps track of the number of *ongoing* syncs. While this is non zero
+        # a user will never go offline.
+        self.user_to_num_current_syncs = {}
+
+        # Start a LoopingCall in 30s that fires every 5s.
+        # The initial delay is to allow disconnected clients a chance to
+        # reconnect before we treat them as offline.
+        self.clock.call_later(
+            0 * 1000,
+            self.clock.looping_call,
+            self._handle_timeouts,
+            5000,
         )
 
-        if check_auth:
-            for user in local_users:
-                visible = yield self.is_presence_visible(
-                    observer_user=auth_user,
-                    observed_user=user
+        metrics.register_callback("wheel_timer_size", lambda: len(self.wheel_timer))
+
+    @defer.inlineCallbacks
+    def _on_shutdown(self):
+        """Gets called when shutting down. This lets us persist any updates that
+        we haven't yet persisted, e.g. updates that only changes some internal
+        timers. This allows changes to persist across startup without having to
+        persist every single change.
+
+        If this does not run it simply means that some of the timers will fire
+        earlier than they should when synapse is restarted. This affect of this
+        is some spurious presence changes that will self-correct.
+        """
+        logger.info(
+            "Performing _on_shutdown. Persiting %d unpersisted changes",
+            len(self.user_to_current_state)
+        )
+
+        if self.unpersisted_users_changes:
+            yield self.store.update_presence([
+                self.user_to_current_state[user_id]
+                for user_id in self.unpersisted_users_changes
+            ])
+        logger.info("Finished _on_shutdown")
+
+    @defer.inlineCallbacks
+    def _update_states(self, new_states):
+        """Updates presence of users. Sets the appropriate timeouts. Pokes
+        the notifier and federation if and only if the changed presence state
+        should be sent to clients/servers.
+        """
+        now = self.clock.time_msec()
+
+        with Measure(self.clock, "presence_update_states"):
+
+            # NOTE: We purposefully don't yield between now and when we've
+            # calculated what we want to do with the new states, to avoid races.
+
+            to_notify = {}  # Changes we want to notify everyone about
+            to_federation_ping = {}  # These need sending keep-alives
+
+            for new_state in new_states:
+                user_id = new_state.user_id
+
+                # Its fine to not hit the database here, as the only thing not in
+                # the current state cache are OFFLINE states, where the only field
+                # of interest is last_active which is safe enough to assume is 0
+                # here.
+                prev_state = self.user_to_current_state.get(
+                    user_id, UserPresenceState.default(user_id)
                 )
 
-                if not visible:
-                    raise SynapseError(404, "Presence information not visible")
+                new_state, should_notify, should_ping = handle_update(
+                    prev_state, new_state,
+                    is_mine=self.hs.is_mine_id(user_id),
+                    wheel_timer=self.wheel_timer,
+                    now=now
+                )
 
-        results = {}
-        if local_users:
-            for user in local_users:
-                if user in self._user_cachemap:
-                    results[user] = self._user_cachemap[user].get_state()
+                self.user_to_current_state[user_id] = new_state
 
-            local_to_user = {u.localpart: u for u in local_users}
+                if should_notify:
+                    to_notify[user_id] = new_state
+                elif should_ping:
+                    to_federation_ping[user_id] = new_state
 
-            states = yield self.store.get_presence_states(
-                [u.localpart for u in local_users if u not in results]
+            # TODO: We should probably ensure there are no races hereafter
+
+            presence_updates_counter.inc_by(len(new_states))
+
+            if to_notify:
+                notified_presence_counter.inc_by(len(to_notify))
+                yield self._persist_and_notify(to_notify.values())
+
+            self.unpersisted_users_changes |= set(s.user_id for s in new_states)
+            self.unpersisted_users_changes -= set(to_notify.keys())
+
+            to_federation_ping = {
+                user_id: state for user_id, state in to_federation_ping.items()
+                if user_id not in to_notify
+            }
+            if to_federation_ping:
+                federation_presence_out_counter.inc_by(len(to_federation_ping))
+
+                _, _, hosts_to_states = yield self._get_interested_parties(
+                    to_federation_ping.values()
+                )
+
+                self._push_to_remotes(hosts_to_states)
+
+    def _handle_timeouts(self):
+        """Checks the presence of users that have timed out and updates as
+        appropriate.
+        """
+        now = self.clock.time_msec()
+
+        with Measure(self.clock, "presence_handle_timeouts"):
+            # Fetch the list of users that *may* have timed out. Things may have
+            # changed since the timeout was set, so we won't necessarily have to
+            # take any action.
+            users_to_check = self.wheel_timer.fetch(now)
+
+            states = [
+                self.user_to_current_state.get(
+                    user_id, UserPresenceState.default(user_id)
+                )
+                for user_id in set(users_to_check)
+            ]
+
+            timers_fired_counter.inc_by(len(states))
+
+            changes = handle_timeouts(
+                states,
+                is_mine_fn=self.hs.is_mine_id,
+                user_to_num_current_syncs=self.user_to_num_current_syncs,
+                now=now,
             )
 
-            for local_part, state in states.items():
-                if state is None:
-                    continue
-                res = {"presence": state["state"]}
-                if "status_msg" in state and state["status_msg"]:
-                    res["status_msg"] = state["status_msg"]
-                results[local_to_user[local_part]] = res
+        preserve_fn(self._update_states)(changes)
 
-        for user in remote_users:
-            # TODO(paul): Have remote server send us permissions set
-            results[user] = self._get_or_offline_usercache(user).get_state()
+    @defer.inlineCallbacks
+    def bump_presence_active_time(self, user):
+        """We've seen the user do something that indicates they're interacting
+        with the app.
+        """
+        user_id = user.to_string()
 
-        for state in results.values():
-            if "last_active" in state:
-                state["last_active_ago"] = int(
-                    self.clock.time_msec() - state.pop("last_active")
+        bump_active_time_counter.inc()
+
+        prev_state = yield self.current_state_for_user(user_id)
+
+        new_fields = {
+            "last_active_ts": self.clock.time_msec(),
+        }
+        if prev_state.state == PresenceState.UNAVAILABLE:
+            new_fields["state"] = PresenceState.ONLINE
+
+        yield self._update_states([prev_state.copy_and_replace(**new_fields)])
+
+    @defer.inlineCallbacks
+    def user_syncing(self, user_id, affect_presence=True):
+        """Returns a context manager that should surround any stream requests
+        from the user.
+
+        This allows us to keep track of who is currently streaming and who isn't
+        without having to have timers outside of this module to avoid flickering
+        when users disconnect/reconnect.
+
+        Args:
+            user_id (str)
+            affect_presence (bool): If false this function will be a no-op.
+                Useful for streams that are not associated with an actual
+                client that is being used by a user.
+        """
+        if affect_presence:
+            curr_sync = self.user_to_num_current_syncs.get(user_id, 0)
+            self.user_to_num_current_syncs[user_id] = curr_sync + 1
+
+            prev_state = yield self.current_state_for_user(user_id)
+            if prev_state.state == PresenceState.OFFLINE:
+                # If they're currently offline then bring them online, otherwise
+                # just update the last sync times.
+                yield self._update_states([prev_state.copy_and_replace(
+                    state=PresenceState.ONLINE,
+                    last_active_ts=self.clock.time_msec(),
+                    last_user_sync_ts=self.clock.time_msec(),
+                )])
+            else:
+                yield self._update_states([prev_state.copy_and_replace(
+                    last_user_sync_ts=self.clock.time_msec(),
+                )])
+
+        @defer.inlineCallbacks
+        def _end():
+            if affect_presence:
+                self.user_to_num_current_syncs[user_id] -= 1
+
+                prev_state = yield self.current_state_for_user(user_id)
+                yield self._update_states([prev_state.copy_and_replace(
+                    last_user_sync_ts=self.clock.time_msec(),
+                )])
+
+        @contextmanager
+        def _user_syncing():
+            try:
+                yield
+            finally:
+                preserve_fn(_end)()
+
+        defer.returnValue(_user_syncing())
+
+    @defer.inlineCallbacks
+    def current_state_for_user(self, user_id):
+        """Get the current presence state for a user.
+        """
+        res = yield self.current_state_for_users([user_id])
+        defer.returnValue(res[user_id])
+
+    @defer.inlineCallbacks
+    def current_state_for_users(self, user_ids):
+        """Get the current presence state for multiple users.
+
+        Returns:
+            dict: `user_id` -> `UserPresenceState`
+        """
+        states = {
+            user_id: self.user_to_current_state.get(user_id, None)
+            for user_id in user_ids
+        }
+
+        missing = [user_id for user_id, state in states.items() if not state]
+        if missing:
+            # There are things not in our in memory cache. Lets pull them out of
+            # the database.
+            res = yield self.store.get_presence_for_users(missing)
+            states.update({state.user_id: state for state in res})
+
+            missing = [user_id for user_id, state in states.items() if not state]
+            if missing:
+                new = {
+                    user_id: UserPresenceState.default(user_id)
+                    for user_id in missing
+                }
+                states.update(new)
+                self.user_to_current_state.update(new)
+
+        defer.returnValue(states)
+
+    @defer.inlineCallbacks
+    def _get_interested_parties(self, states):
+        """Given a list of states return which entities (rooms, users, servers)
+        are interested in the given states.
+
+        Returns:
+            3-tuple: `(room_ids_to_states, users_to_states, hosts_to_states)`,
+            with each item being a dict of `entity_name` -> `[UserPresenceState]`
+        """
+        room_ids_to_states = {}
+        users_to_states = {}
+        for state in states:
+            events = yield self.store.get_rooms_for_user(state.user_id)
+            for e in events:
+                room_ids_to_states.setdefault(e.room_id, []).append(state)
+
+            plist = yield self.store.get_presence_list_observers_accepted(state.user_id)
+            for u in plist:
+                users_to_states.setdefault(u, []).append(state)
+
+            # Always notify self
+            users_to_states.setdefault(state.user_id, []).append(state)
+
+        hosts_to_states = {}
+        for room_id, states in room_ids_to_states.items():
+            local_states = filter(lambda s: self.hs.is_mine_id(s.user_id), states)
+            if not local_states:
+                continue
+
+            hosts = yield self.store.get_joined_hosts_for_room(room_id)
+            for host in hosts:
+                hosts_to_states.setdefault(host, []).extend(local_states)
+
+        for user_id, states in users_to_states.items():
+            local_states = filter(lambda s: self.hs.is_mine_id(s.user_id), states)
+            if not local_states:
+                continue
+
+            host = UserID.from_string(user_id).domain
+            hosts_to_states.setdefault(host, []).extend(local_states)
+
+        # TODO: de-dup hosts_to_states, as a single host might have multiple
+        # of same presence
+
+        defer.returnValue((room_ids_to_states, users_to_states, hosts_to_states))
+
+    @defer.inlineCallbacks
+    def _persist_and_notify(self, states):
+        """Persist states in the database, poke the notifier and send to
+        interested remote servers
+        """
+        stream_id, max_token = yield self.store.update_presence(states)
+
+        parties = yield self._get_interested_parties(states)
+        room_ids_to_states, users_to_states, hosts_to_states = parties
+
+        self.notifier.on_new_event(
+            "presence_key", stream_id, rooms=room_ids_to_states.keys(),
+            users=[UserID.from_string(u) for u in users_to_states.keys()]
+        )
+
+        self._push_to_remotes(hosts_to_states)
+
+    def _push_to_remotes(self, hosts_to_states):
+        """Sends state updates to remote servers.
+
+        Args:
+            hosts_to_states (dict): Mapping `server_name` -> `[UserPresenceState]`
+        """
+        now = self.clock.time_msec()
+        for host, states in hosts_to_states.items():
+            self.federation.send_edu(
+                destination=host,
+                edu_type="m.presence",
+                content={
+                    "push": [
+                        _format_user_presence_state(state, now)
+                        for state in states
+                    ]
+                }
+            )
+
+    @defer.inlineCallbacks
+    def incoming_presence(self, origin, content):
+        """Called when we receive a `m.presence` EDU from a remote server.
+        """
+        now = self.clock.time_msec()
+        updates = []
+        for push in content.get("push", []):
+            # A "push" contains a list of presence that we are probably interested
+            # in.
+            # TODO: Actually check if we're interested, rather than blindly
+            # accepting presence updates.
+            user_id = push.get("user_id", None)
+            if not user_id:
+                logger.info(
+                    "Got presence update from %r with no 'user_id': %r",
+                    origin, push,
                 )
+                continue
 
+            presence_state = push.get("presence", None)
+            if not presence_state:
+                logger.info(
+                    "Got presence update from %r with no 'presence_state': %r",
+                    origin, push,
+                )
+                continue
+
+            new_fields = {
+                "state": presence_state,
+                "last_federation_update_ts": now,
+            }
+
+            last_active_ago = push.get("last_active_ago", None)
+            if last_active_ago is not None:
+                new_fields["last_active_ts"] = now - last_active_ago
+
+            new_fields["status_msg"] = push.get("status_msg", None)
+            new_fields["currently_active"] = push.get("currently_active", False)
+
+            prev_state = yield self.current_state_for_user(user_id)
+            updates.append(prev_state.copy_and_replace(**new_fields))
+
+        if updates:
+            federation_presence_counter.inc_by(len(updates))
+            yield self._update_states(updates)
+
+    @defer.inlineCallbacks
+    def get_state(self, target_user, as_event=False):
+        results = yield self.get_states(
+            [target_user.to_string()],
+            as_event=as_event,
+        )
+
+        defer.returnValue(results[0])
+
+    @defer.inlineCallbacks
+    def get_states(self, target_user_ids, as_event=False):
+        """Get the presence state for users.
+
+        Args:
+            target_user_ids (list)
+            as_event (bool): Whether to format it as a client event or not.
+
+        Returns:
+            list
+        """
+
+        updates = yield self.current_state_for_users(target_user_ids)
+        updates = updates.values()
+
+        for user_id in set(target_user_ids) - set(u.user_id for u in updates):
+            updates.append(UserPresenceState.default(user_id))
+
+        now = self.clock.time_msec()
         if as_event:
-            for user, state in results.items():
-                content = state
-                content["user_id"] = user.to_string()
+            defer.returnValue([
+                {
+                    "type": "m.presence",
+                    "content": _format_user_presence_state(state, now),
+                }
+                for state in updates
+            ])
+        else:
+            defer.returnValue([
+                _format_user_presence_state(state, now) for state in updates
+            ])
 
-                if "last_active" in content:
-                    content["last_active_ago"] = int(
-                        self._clock.time_msec() - content.pop("last_active")
-                    )
+    @defer.inlineCallbacks
+    def set_state(self, target_user, state):
+        """Set the presence state of the user.
+        """
+        status_msg = state.get("status_msg", None)
+        presence = state["presence"]
 
-                results[user] = {"type": "m.presence", "content": content}
+        valid_presence = (
+            PresenceState.ONLINE, PresenceState.UNAVAILABLE, PresenceState.OFFLINE
+        )
+        if presence not in valid_presence:
+            raise SynapseError(400, "Invalid presence state")
+
+        user_id = target_user.to_string()
+
+        prev_state = yield self.current_state_for_user(user_id)
+
+        new_fields = {
+            "state": presence,
+            "status_msg": status_msg if presence != PresenceState.OFFLINE else None
+        }
+
+        if presence == PresenceState.ONLINE:
+            new_fields["last_active_ts"] = self.clock.time_msec()
+
+        yield self._update_states([prev_state.copy_and_replace(**new_fields)])
+
+    @defer.inlineCallbacks
+    def user_joined_room(self, user, room_id):
+        """Called (via the distributor) when a user joins a room. This funciton
+        sends presence updates to servers, either:
+            1. the joining user is a local user and we send their presence to
+               all servers in the room.
+            2. the joining user is a remote user and so we send presence for all
+               local users in the room.
+        """
+        # We only need to send presence to servers that don't have it yet. We
+        # don't need to send to local clients here, as that is done as part
+        # of the event stream/sync.
+        # TODO: Only send to servers not already in the room.
+        if self.hs.is_mine(user):
+            state = yield self.current_state_for_user(user.to_string())
+
+            hosts = yield self.store.get_joined_hosts_for_room(room_id)
+            self._push_to_remotes({host: (state,) for host in hosts})
+        else:
+            user_ids = yield self.store.get_users_in_room(room_id)
+            user_ids = filter(self.hs.is_mine_id, user_ids)
+
+            states = yield self.current_state_for_users(user_ids)
+
+            self._push_to_remotes({user.domain: states.values()})
+
+    @defer.inlineCallbacks
+    def get_presence_list(self, observer_user, accepted=None):
+        """Returns the presence for all users in their presence list.
+        """
+        if not self.hs.is_mine(observer_user):
+            raise SynapseError(400, "User is not hosted on this Home Server")
+
+        presence_list = yield self.store.get_presence_list(
+            observer_user.localpart, accepted=accepted
+        )
+
+        results = yield self.get_states(
+            target_user_ids=[row["observed_user_id"] for row in presence_list],
+            as_event=False,
+        )
+
+        is_accepted = {
+            row["observed_user_id"]: row["accepted"] for row in presence_list
+        }
+
+        for result in results:
+            result.update({
+                "accepted": is_accepted,
+            })
 
         defer.returnValue(results)
 
     @defer.inlineCallbacks
-    @log_function
-    def set_state(self, target_user, auth_user, state):
-        # return
-        # TODO (erikj): Turn this back on. Why did we end up sending EDUs
-        # everywhere?
-
-        if not self.hs.is_mine(target_user):
-            raise SynapseError(400, "User is not hosted on this Home Server")
-
-        if target_user != auth_user:
-            raise AuthError(400, "Cannot set another user's presence")
-
-        if "status_msg" not in state:
-            state["status_msg"] = None
-
-        for k in state.keys():
-            if k not in ("presence", "status_msg"):
-                raise SynapseError(
-                    400, "Unexpected presence state key '%s'" % (k,)
-                )
-
-        if state["presence"] not in self.STATE_LEVELS:
-            raise SynapseError(400, "'%s' is not a valid presence state" % (
-                state["presence"],
-            ))
-
-        logger.debug("Updating presence state of %s to %s",
-                     target_user.localpart, state["presence"])
-
-        state_to_store = dict(state)
-        state_to_store["state"] = state_to_store.pop("presence")
-
-        statuscache = self._get_or_offline_usercache(target_user)
-        was_level = self.STATE_LEVELS[statuscache.get_state()["presence"]]
-        now_level = self.STATE_LEVELS[state["presence"]]
-
-        yield self.store.set_presence_state(
-            target_user.localpart, state_to_store
-        )
-        yield collect_presencelike_data(self.distributor, target_user, state)
-
-        if now_level > was_level:
-            state["last_active"] = self.clock.time_msec()
-
-        now_online = state["presence"] != PresenceState.OFFLINE
-        was_polling = target_user in self._user_cachemap
-
-        if now_online and not was_polling:
-            yield self.start_polling_presence(target_user, state=state)
-        elif not now_online and was_polling:
-            yield self.stop_polling_presence(target_user)
-
-        # TODO(paul): perform a presence push as part of start/stop poll so
-        #   we don't have to do this all the time
-        yield self.changed_presencelike_data(target_user, state)
-
-    def bump_presence_active_time(self, user, now=None):
-        if now is None:
-            now = self.clock.time_msec()
-
-        prev_state = self._get_or_make_usercache(user)
-        if now - prev_state.state.get("last_active", 0) < LAST_ACTIVE_GRANULARITY:
-            return
-
-        with PreserveLoggingContext():
-            self.changed_presencelike_data(user, {"last_active": now})
-
-    def get_joined_rooms_for_user(self, user):
-        """Get the list of rooms a user is joined to.
-
-        Args:
-            user(UserID): The user.
-        Returns:
-            A Deferred of a list of room id strings.
-        """
-        rm_handler = self.homeserver.get_handlers().room_member_handler
-        return rm_handler.get_joined_rooms_for_user(user)
-
-    def get_joined_users_for_room_id(self, room_id):
-        rm_handler = self.homeserver.get_handlers().room_member_handler
-        return rm_handler.get_room_members(room_id)
-
-    @defer.inlineCallbacks
-    def changed_presencelike_data(self, user, state):
-        """Updates the presence state of a local user.
-
-        Args:
-            user(UserID): The user being updated.
-            state(dict): The new presence state for the user.
-        Returns:
-            A Deferred
-        """
-        self._user_cachemap_latest_serial += 1
-        statuscache = yield self.update_presence_cache(user, state)
-        yield self.push_presence(user, statuscache=statuscache)
-
-    @log_function
-    def started_user_eventstream(self, user):
-        # TODO(paul): Use "last online" state
-        return self.set_state(user, user, {"presence": PresenceState.ONLINE})
-
-    @log_function
-    def stopped_user_eventstream(self, user):
-        # TODO(paul): Save current state as "last online" state
-        return self.set_state(user, user, {"presence": PresenceState.OFFLINE})
-
-    @defer.inlineCallbacks
-    def user_joined_room(self, user, room_id):
-        """Called via the distributor whenever a user joins a room.
-        Notifies the new member of the presence of the current members.
-        Notifies the current members of the room of the new member's presence.
-
-        Args:
-            user(UserID): The user who joined the room.
-            room_id(str): The room id the user joined.
-        """
-        if self.hs.is_mine(user):
-            # No actual update but we need to bump the serial anyway for the
-            # event source
-            self._user_cachemap_latest_serial += 1
-            statuscache = yield self.update_presence_cache(
-                user, room_ids=[room_id]
-            )
-            self.push_update_to_local_and_remote(
-                observed_user=user,
-                room_ids=[room_id],
-                statuscache=statuscache,
-            )
-
-        # We also want to tell them about current presence of people.
-        curr_users = yield self.get_joined_users_for_room_id(room_id)
-
-        for local_user in [c for c in curr_users if self.hs.is_mine(c)]:
-            statuscache = yield self.update_presence_cache(
-                local_user, room_ids=[room_id], add_to_cache=False
-            )
-
-            with PreserveLoggingContext():
-                self.push_update_to_local_and_remote(
-                    observed_user=local_user,
-                    users_to_push=[user],
-                    statuscache=statuscache,
-                )
-
-    @defer.inlineCallbacks
     def send_presence_invite(self, observer_user, observed_user):
-        """Request the presence of a local or remote user for a local user"""
-        if not self.hs.is_mine(observer_user):
-            raise SynapseError(400, "User is not hosted on this Home Server")
-
+        """Sends a presence invite.
+        """
         yield self.store.add_presence_list_pending(
             observer_user.localpart, observed_user.to_string()
         )
@@ -497,50 +672,32 @@ class PresenceHandler(BaseHandler):
             )
 
     @defer.inlineCallbacks
-    def _should_accept_invite(self, observed_user, observer_user):
-        if not self.hs.is_mine(observed_user):
-            defer.returnValue(False)
-
-        row = yield self.store.has_presence_state(observed_user.localpart)
-        if not row:
-            defer.returnValue(False)
-
-        # TODO(paul): Eventually we'll ask the user's permission for this
-        # before accepting. For now just accept any invite request
-        defer.returnValue(True)
-
-    @defer.inlineCallbacks
     def invite_presence(self, observed_user, observer_user):
-        """Handles a m.presence_invite EDU. A remote or local user has
-        requested presence updates for a local user. If the invite is accepted
-        then allow the local or remote user to see the presence of the local
-        user.
-
-        Args:
-            observed_user(UserID): The local user whose presence is requested.
-            observer_user(UserID): The remote or local user requesting presence.
+        """Handles new presence invites.
         """
-        accept = yield self._should_accept_invite(observed_user, observer_user)
+        if not self.hs.is_mine(observed_user):
+            raise SynapseError(400, "User is not hosted on this Home Server")
 
-        if accept:
-            yield self.store.allow_presence_visible(
-                observed_user.localpart, observer_user.to_string()
-            )
-
+        # TODO: Don't auto accept
         if self.hs.is_mine(observer_user):
-            if accept:
-                yield self.accept_presence(observed_user, observer_user)
-            else:
-                yield self.deny_presence(observed_user, observer_user)
+            yield self.accept_presence(observed_user, observer_user)
         else:
-            edu_type = "m.presence_accept" if accept else "m.presence_deny"
-
-            yield self.federation.send_edu(
+            self.federation.send_edu(
                 destination=observer_user.domain,
-                edu_type=edu_type,
+                edu_type="m.presence_accept",
                 content={
                     "observed_user": observed_user.to_string(),
                     "observer_user": observer_user.to_string(),
+                }
+            )
+
+            state_dict = yield self.get_state(observed_user, as_event=False)
+
+            self.federation.send_edu(
+                destination=observer_user.domain,
+                edu_type="m.presence",
+                content={
+                    "push": [state_dict]
                 }
             )
 
@@ -549,7 +706,6 @@ class PresenceHandler(BaseHandler):
         """Handles a m.presence_accept EDU. Mark a presence invite from a
         local or remote user as accepted in a local user's presence list.
         Starts polling for presence updates from the local or remote user.
-
         Args:
             observed_user(UserID): The user to update in the presence list.
             observer_user(UserID): The owner of the presence list to update.
@@ -558,15 +714,10 @@ class PresenceHandler(BaseHandler):
             observer_user.localpart, observed_user.to_string()
         )
 
-        yield self.start_polling_presence(
-            observer_user, target_user=observed_user
-        )
-
     @defer.inlineCallbacks
     def deny_presence(self, observed_user, observer_user):
         """Handle a m.presence_deny EDU. Removes a local or remote user from a
         local user's presence list.
-
         Args:
             observed_user(UserID): The local or remote user to remove from the
                 list.
@@ -584,7 +735,6 @@ class PresenceHandler(BaseHandler):
     def drop(self, observed_user, observer_user):
         """Remove a local or remote user from a local user's presence list and
         unsubscribe the local user from updates that user.
-
         Args:
             observed_user(UserId): The local or remote user to remove from the
                 list.
@@ -599,710 +749,353 @@ class PresenceHandler(BaseHandler):
             observer_user.localpart, observed_user.to_string()
         )
 
-        self.stop_polling_presence(
-            observer_user, target_user=observed_user
-        )
+        # TODO: Inform the remote that we've dropped the presence list.
 
     @defer.inlineCallbacks
-    def get_presence_list(self, observer_user, accepted=None):
-        """Get the presence list for a local user. The retured list includes
-        the current presence state for each user listed.
-
-        Args:
-            observer_user(UserID): The local user whose presence list to fetch.
-            accepted(bool or None): If not none then only include users who
-                have or have not accepted the presence invite request.
-        Returns:
-            A Deferred list of presence state events.
+    def is_visible(self, observed_user, observer_user):
+        """Returns whether a user can see another user's presence.
         """
-        if not self.hs.is_mine(observer_user):
-            raise SynapseError(400, "User is not hosted on this Home Server")
+        observer_rooms = yield self.store.get_rooms_for_user(observer_user.to_string())
+        observed_rooms = yield self.store.get_rooms_for_user(observed_user.to_string())
 
-        presence_list = yield self.store.get_presence_list(
-            observer_user.localpart, accepted=accepted
+        observer_room_ids = set(r.room_id for r in observer_rooms)
+        observed_room_ids = set(r.room_id for r in observed_rooms)
+
+        if observer_room_ids & observed_room_ids:
+            defer.returnValue(True)
+
+        accepted_observers = yield self.store.get_presence_list_observers_accepted(
+            observed_user.to_string()
         )
 
-        results = []
-        for row in presence_list:
-            observed_user = UserID.from_string(row["observed_user_id"])
-            result = {
-                "observed_user": observed_user, "accepted": row["accepted"]
-            }
-            result.update(
-                self._get_or_offline_usercache(observed_user).get_state()
-            )
-            if "last_active" in result:
-                result["last_active_ago"] = int(
-                    self.clock.time_msec() - result.pop("last_active")
-                )
-            results.append(result)
-
-        defer.returnValue(results)
+        defer.returnValue(observer_user.to_string() in accepted_observers)
 
     @defer.inlineCallbacks
-    @log_function
-    def start_polling_presence(self, user, target_user=None, state=None):
-        """Subscribe a local user to presence updates from a local or remote
-        user. If no target_user is supplied then subscribe to all users stored
-        in the presence list for the local user.
-
-        Additonally this pushes the current presence state of this user to all
-        target_users. That state can be provided directly or will be read from
-        the stored state for the local user.
-
-        Also this attempts to notify the local user of the current state of
-        any local target users.
-
-        Args:
-            user(UserID): The local user that whishes for presence updates.
-            target_user(UserID): The local or remote user whose updates are
-                wanted.
-            state(dict): Optional presence state for the local user.
+    def get_all_presence_updates(self, last_id, current_id):
         """
-        logger.debug("Start polling for presence from %s", user)
-
-        if target_user:
-            target_users = set([target_user])
-            room_ids = []
-        else:
-            presence = yield self.store.get_presence_list(
-                user.localpart, accepted=True
-            )
-            target_users = set([
-                UserID.from_string(x["observed_user_id"]) for x in presence
-            ])
-
-            # Also include people in all my rooms
-
-            room_ids = yield self.get_joined_rooms_for_user(user)
-
-        if state is None:
-            state = yield self.store.get_presence_state(user.localpart)
-        else:
-            # statuscache = self._get_or_make_usercache(user)
-            # self._user_cachemap_latest_serial += 1
-            # statuscache.update(state, self._user_cachemap_latest_serial)
-            pass
-
-        yield self.push_update_to_local_and_remote(
-            observed_user=user,
-            users_to_push=target_users,
-            room_ids=room_ids,
-            statuscache=self._get_or_make_usercache(user),
-        )
-
-        for target_user in target_users:
-            if self.hs.is_mine(target_user):
-                self._start_polling_local(user, target_user)
-
-                # We want to tell the person that just came online
-                # presence state of people they are interested in?
-                self.push_update_to_clients(
-                    users_to_push=[user],
-                )
-
-        deferreds = []
-        remote_users = [u for u in target_users if not self.hs.is_mine(u)]
-        remoteusers_by_domain = partition(remote_users, lambda u: u.domain)
-        # Only poll for people in our get_presence_list
-        for domain in remoteusers_by_domain:
-            remoteusers = remoteusers_by_domain[domain]
-
-            deferreds.append(self._start_polling_remote(
-                user, domain, remoteusers
-            ))
-
-        yield defer.DeferredList(deferreds, consumeErrors=True)
-
-    def _start_polling_local(self, user, target_user):
-        """Subscribe a local user to presence updates for a local user
-
-        Args:
-            user(UserId): The local user that wishes for updates.
-            target_user(UserId): The local users whose updates are wanted.
+        Gets a list of presence update rows from between the given stream ids.
+        Each row has:
+        - stream_id(str)
+        - user_id(str)
+        - state(str)
+        - last_active_ts(int)
+        - last_federation_update_ts(int)
+        - last_user_sync_ts(int)
+        - status_msg(int)
+        - currently_active(int)
         """
-        target_localpart = target_user.localpart
-
-        if target_localpart not in self._local_pushmap:
-            self._local_pushmap[target_localpart] = set()
-
-        self._local_pushmap[target_localpart].add(user)
-
-    def _start_polling_remote(self, user, domain, remoteusers):
-        """Subscribe a local user to presence updates for remote users on a
-        given remote domain.
-
-        Args:
-            user(UserID): The local user that wishes for updates.
-            domain(str): The remote server the local user wants updates from.
-            remoteusers(UserID): The remote users that local user wants to be
-                told about.
-        Returns:
-            A Deferred.
-        """
-        to_poll = set()
-
-        for u in remoteusers:
-            if u not in self._remote_recvmap:
-                self._remote_recvmap[u] = set()
-                to_poll.add(u)
-
-            self._remote_recvmap[u].add(user)
-
-        if not to_poll:
-            return defer.succeed(None)
-
-        return self.federation.send_edu(
-            destination=domain,
-            edu_type="m.presence",
-            content={"poll": [u.to_string() for u in to_poll]}
-        )
-
-    @log_function
-    def stop_polling_presence(self, user, target_user=None):
-        """Unsubscribe a local user from presence updates from a local or
-        remote user. If no target user is supplied then unsubscribe the user
-        from all presence updates that the user had subscribed to.
-
-        Args:
-            user(UserID): The local user that no longer wishes for updates.
-            target_user(UserID or None): The user whose updates are no longer
-                wanted.
-        Returns:
-            A Deferred.
-        """
-        logger.debug("Stop polling for presence from %s", user)
-
-        if not target_user or self.hs.is_mine(target_user):
-            self._stop_polling_local(user, target_user=target_user)
-
-        deferreds = []
-
-        if target_user:
-            if target_user not in self._remote_recvmap:
-                return
-            target_users = set([target_user])
-        else:
-            target_users = self._remote_recvmap.keys()
-
-        remoteusers = [u for u in target_users
-                       if user in self._remote_recvmap[u]]
-        remoteusers_by_domain = partition(remoteusers, lambda u: u.domain)
-
-        for domain in remoteusers_by_domain:
-            remoteusers = remoteusers_by_domain[domain]
-
-            deferreds.append(
-                self._stop_polling_remote(user, domain, remoteusers)
-            )
-
-        return defer.DeferredList(deferreds, consumeErrors=True)
-
-    def _stop_polling_local(self, user, target_user):
-        """Unsubscribe a local user from presence updates from a local user on
-        this server.
-
-        Args:
-            user(UserID): The local user that no longer wishes for updates.
-            target_user(UserID): The user whose updates are no longer wanted.
-        """
-        for localpart in self._local_pushmap.keys():
-            if target_user and localpart != target_user.localpart:
-                continue
-
-            if user in self._local_pushmap[localpart]:
-                self._local_pushmap[localpart].remove(user)
-
-            if not self._local_pushmap[localpart]:
-                del self._local_pushmap[localpart]
-
-    @log_function
-    def _stop_polling_remote(self, user, domain, remoteusers):
-        """Unsubscribe a local user from presence updates from remote users on
-        a given domain.
-
-        Args:
-            user(UserID): The local user that no longer wishes for updates.
-            domain(str): The remote server to unsubscribe from.
-            remoteusers([UserID]): The users on that remote server that the
-                local user no longer wishes to be updated about.
-        Returns:
-            A Deferred.
-        """
-        to_unpoll = set()
-
-        for u in remoteusers:
-            self._remote_recvmap[u].remove(user)
-
-            if not self._remote_recvmap[u]:
-                del self._remote_recvmap[u]
-                to_unpoll.add(u)
-
-        if not to_unpoll:
-            return defer.succeed(None)
-
-        return self.federation.send_edu(
-            destination=domain,
-            edu_type="m.presence",
-            content={"unpoll": [u.to_string() for u in to_unpoll]}
-        )
-
-    @defer.inlineCallbacks
-    @log_function
-    def push_presence(self, user, statuscache):
-        """
-        Notify local and remote users of a change in presence of a local user.
-        Pushes the update to local clients and remote domains that are directly
-        subscribed to the presence of the local user.
-        Also pushes that update to any local user or remote domain that shares
-        a room with the local user.
-
-        Args:
-            user(UserID): The local user whose presence was updated.
-            statuscache(UserPresenceCache): Cache of the user's presence state
-        Returns:
-            A Deferred.
-        """
-        assert(self.hs.is_mine(user))
-
-        logger.debug("Pushing presence update from %s", user)
-
-        localusers = set(self._local_pushmap.get(user.localpart, set()))
-        remotedomains = set(self._remote_sendmap.get(user.localpart, set()))
-
-        # Reflect users' status changes back to themselves, so UIs look nice
-        # and also user is informed of server-forced pushes
-        localusers.add(user)
-
-        room_ids = yield self.get_joined_rooms_for_user(user)
-
-        if not localusers and not room_ids:
-            defer.returnValue(None)
-
-        yield self.push_update_to_local_and_remote(
-            observed_user=user,
-            users_to_push=localusers,
-            remote_domains=remotedomains,
-            room_ids=room_ids,
-            statuscache=statuscache,
-        )
-        yield user_presence_changed(self.distributor, user, statuscache)
-
-    @defer.inlineCallbacks
-    def incoming_presence(self, origin, content):
-        """Handle an incoming m.presence EDU.
-        For each presence update in the "push" list update our local cache and
-        notify the appropriate local clients. Only clients that share a room
-        or are directly subscribed to the presence for a user should be
-        notified of the update.
-        For each subscription request in the "poll" list start pushing presence
-        updates to the remote server.
-        For unsubscribe request in the "unpoll" list stop pushing presence
-        updates to the remote server.
-
-        Args:
-            orgin(str): The source of this m.presence EDU.
-            content(dict): The content of this m.presence EDU.
-        Returns:
-            A Deferred.
-        """
-        deferreds = []
-
-        for push in content.get("push", []):
-            user = UserID.from_string(push["user_id"])
-
-            logger.debug("Incoming presence update from %s", user)
-
-            observers = set(self._remote_recvmap.get(user, set()))
-            if observers:
-                logger.debug(
-                    " | %d interested local observers %r", len(observers), observers
-                )
-
-            room_ids = yield self.get_joined_rooms_for_user(user)
-            if room_ids:
-                logger.debug(" | %d interested room IDs %r", len(room_ids), room_ids)
-
-            state = dict(push)
-            del state["user_id"]
-
-            if "presence" not in state:
-                logger.warning(
-                    "Received a presence 'push' EDU from %s without a"
-                    " 'presence' key", origin
-                )
-                continue
-
-            if "last_active_ago" in state:
-                state["last_active"] = int(
-                    self.clock.time_msec() - state.pop("last_active_ago")
-                )
-
-            self._user_cachemap_latest_serial += 1
-            yield self.update_presence_cache(user, state, room_ids=room_ids)
-
-            if not observers and not room_ids:
-                logger.debug(" | no interested observers or room IDs")
-                continue
-
-            self.push_update_to_clients(
-                users_to_push=observers, room_ids=room_ids
-            )
-
-            user_id = user.to_string()
-
-            if state["presence"] == PresenceState.OFFLINE:
-                self._remote_offline_serials.insert(
-                    0,
-                    (self._user_cachemap_latest_serial, set([user_id]))
-                )
-                while len(self._remote_offline_serials) > MAX_OFFLINE_SERIALS:
-                    self._remote_offline_serials.pop()  # remove the oldest
-                if user in self._user_cachemap:
-                    del self._user_cachemap[user]
-            else:
-                # Remove the user from remote_offline_serials now that they're
-                # no longer offline
-                for idx, elem in enumerate(self._remote_offline_serials):
-                    (_, user_ids) = elem
-                    user_ids.discard(user_id)
-                    if not user_ids:
-                        self._remote_offline_serials.pop(idx)
-
-        for poll in content.get("poll", []):
-            user = UserID.from_string(poll)
-
-            if not self.hs.is_mine(user):
-                continue
-
-            # TODO(paul) permissions checks
-
-            if user not in self._remote_sendmap:
-                self._remote_sendmap[user] = set()
-
-            self._remote_sendmap[user].add(origin)
-
-            deferreds.append(self._push_presence_remote(user, origin))
-
-        for unpoll in content.get("unpoll", []):
-            user = UserID.from_string(unpoll)
-
-            if not self.hs.is_mine(user):
-                continue
-
-            if user in self._remote_sendmap:
-                self._remote_sendmap[user].remove(origin)
-
-                if not self._remote_sendmap[user]:
-                    del self._remote_sendmap[user]
-
-        yield defer.DeferredList(deferreds, consumeErrors=True)
-
-    @defer.inlineCallbacks
-    def update_presence_cache(self, user, state={}, room_ids=None,
-                              add_to_cache=True):
-        """Update the presence cache for a user with a new state and bump the
-        serial to the latest value.
-
-        Args:
-            user(UserID): The user being updated
-            state(dict): The presence state being updated
-            room_ids(None or list of str): A list of room_ids to update. If
-                room_ids is None then fetch the list of room_ids the user is
-                joined to.
-            add_to_cache: Whether to add an entry to the presence cache if the
-                user isn't already in the cache.
-        Returns:
-            A Deferred UserPresenceCache for the user being updated.
-        """
-        if room_ids is None:
-            room_ids = yield self.get_joined_rooms_for_user(user)
-
-        for room_id in room_ids:
-            self._room_serials[room_id] = self._user_cachemap_latest_serial
-        if add_to_cache:
-            statuscache = self._get_or_make_usercache(user)
-        else:
-            statuscache = self._get_or_offline_usercache(user)
-        statuscache.update(state, serial=self._user_cachemap_latest_serial)
-        defer.returnValue(statuscache)
-
-    @defer.inlineCallbacks
-    def push_update_to_local_and_remote(self, observed_user, statuscache,
-                                        users_to_push=[], room_ids=[],
-                                        remote_domains=[]):
-        """Notify local clients and remote servers of a change in the presence
-        of a user.
-
-        Args:
-            observed_user(UserID): The user to push the presence state for.
-            statuscache(UserPresenceCache): The cache for the presence state to
-                push.
-            users_to_push([UserID]): A list of local and remote users to
-                notify.
-            room_ids([str]): Notify the local and remote occupants of these
-                rooms.
-            remote_domains([str]): A list of remote servers to notify in
-                addition to those implied by the users_to_push and the
-                room_ids.
-        Returns:
-            A Deferred.
-        """
-
-        localusers, remoteusers = partitionbool(
-            users_to_push,
-            lambda u: self.hs.is_mine(u)
-        )
-
-        localusers = set(localusers)
-
-        self.push_update_to_clients(
-            users_to_push=localusers, room_ids=room_ids
-        )
-
-        remote_domains = set(remote_domains)
-        remote_domains |= set([r.domain for r in remoteusers])
-        for room_id in room_ids:
-            remote_domains.update(
-                (yield self.store.get_joined_hosts_for_room(room_id))
-            )
-
-        remote_domains.discard(self.hs.hostname)
-
-        deferreds = []
-        for domain in remote_domains:
-            logger.debug(" | push to remote domain %s", domain)
-            deferreds.append(
-                self._push_presence_remote(
-                    observed_user, domain, state=statuscache.get_state()
-                )
-            )
-
-        yield defer.DeferredList(deferreds, consumeErrors=True)
-
-        defer.returnValue((localusers, remote_domains))
-
-    def push_update_to_clients(self, users_to_push=[], room_ids=[]):
-        """Notify clients of a new presence event.
-
-        Args:
-            users_to_push([UserID]): List of users to notify.
-            room_ids([str]): List of room_ids to notify.
-        """
-        with PreserveLoggingContext():
-            self.notifier.on_new_event(
-                "presence_key",
-                self._user_cachemap_latest_serial,
-                users_to_push,
-                room_ids,
-            )
-
-    @defer.inlineCallbacks
-    def _push_presence_remote(self, user, destination, state=None):
-        """Push a user's presence to a remote server. If a presence state event
-        that event is sent. Otherwise a new state event is constructed from the
-        stored presence state.
-        The last_active is replaced with last_active_ago in case the wallclock
-        time on the remote server is different to the time on this server.
-        Sends an EDU to the remote server with the current presence state.
-
-        Args:
-            user(UserID): The user to push the presence state for.
-            destination(str): The remote server to send state to.
-            state(dict): The state to push, or None to use the current stored
-                state.
-        Returns:
-            A Deferred.
-        """
-        if state is None:
-            state = yield self.store.get_presence_state(user.localpart)
-            del state["mtime"]
-            state["presence"] = state.pop("state")
-
-            if user in self._user_cachemap:
-                state["last_active"] = (
-                    self._user_cachemap[user].get_state()["last_active"]
-                )
-
-            yield collect_presencelike_data(self.distributor, user, state)
-
-        if "last_active" in state:
-            state = dict(state)
-            state["last_active_ago"] = int(
-                self.clock.time_msec() - state.pop("last_active")
-            )
-
-        user_state = {"user_id": user.to_string(), }
-        user_state.update(state)
-
-        yield self.federation.send_edu(
-            destination=destination,
-            edu_type="m.presence",
-            content={"push": [user_state, ], }
-        )
+        # TODO(markjh): replicate the unpersisted changes.
+        # This could use the in-memory stores for recent changes.
+        rows = yield self.store.get_all_presence_updates(last_id, current_id)
+        defer.returnValue(rows)
+
+
+def should_notify(old_state, new_state):
+    """Decides if a presence state change should be sent to interested parties.
+    """
+    if old_state.status_msg != new_state.status_msg:
+        return True
+
+    if old_state.state == PresenceState.ONLINE:
+        if new_state.state != PresenceState.ONLINE:
+            # Always notify for online -> anything
+            return True
+
+        if new_state.currently_active != old_state.currently_active:
+            return True
+
+    if new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
+        # Always notify for a transition where last active gets bumped.
+        return True
+
+    if old_state.state != new_state.state:
+        return True
+
+    return False
+
+
+def _format_user_presence_state(state, now):
+    """Convert UserPresenceState to a format that can be sent down to clients
+    and to other servers.
+    """
+    content = {
+        "presence": state.state,
+        "user_id": state.user_id,
+    }
+    if state.last_active_ts:
+        content["last_active_ago"] = now - state.last_active_ts
+    if state.status_msg and state.state != PresenceState.OFFLINE:
+        content["status_msg"] = state.status_msg
+    if state.state == PresenceState.ONLINE:
+        content["currently_active"] = state.currently_active
+
+    return content
 
 
 class PresenceEventSource(object):
     def __init__(self, hs):
         self.hs = hs
         self.clock = hs.get_clock()
+        self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
     @log_function
-    def get_new_events(self, user, from_key, room_ids=None, **kwargs):
-        from_key = int(from_key)
-        room_ids = room_ids or []
+    def get_new_events(self, user, from_key, room_ids=None, include_offline=True,
+                       **kwargs):
+        # The process for getting presence events are:
+        #  1. Get the rooms the user is in.
+        #  2. Get the list of user in the rooms.
+        #  3. Get the list of users that are in the user's presence list.
+        #  4. If there is a from_key set, cross reference the list of users
+        #     with the `presence_stream_cache` to see which ones we actually
+        #     need to check.
+        #  5. Load current state for the users.
+        #
+        # We don't try and limit the presence updates by the current token, as
+        # sending down the rare duplicate is not a concern.
 
-        presence = self.hs.get_handlers().presence_handler
-        cachemap = presence._user_cachemap
+        with Measure(self.clock, "presence.get_new_events"):
+            user_id = user.to_string()
+            if from_key is not None:
+                from_key = int(from_key)
+            room_ids = room_ids or []
 
-        max_serial = presence._user_cachemap_latest_serial
+            presence = self.hs.get_handlers().presence_handler
+            stream_change_cache = self.store.presence_stream_cache
 
-        clock = self.clock
-        latest_serial = 0
+            if not room_ids:
+                rooms = yield self.store.get_rooms_for_user(user_id)
+                room_ids = set(e.room_id for e in rooms)
+            else:
+                room_ids = set(room_ids)
 
-        user_ids_to_check = {user}
-        presence_list = yield presence.store.get_presence_list(
-            user.localpart, accepted=True
-        )
-        if presence_list is not None:
-            user_ids_to_check |= set(
-                UserID.from_string(p["observed_user_id"]) for p in presence_list
-            )
-        for room_id in set(room_ids) & set(presence._room_serials):
-            if presence._room_serials[room_id] > from_key:
-                joined = yield presence.get_joined_users_for_room_id(room_id)
-                user_ids_to_check |= set(joined)
+            max_token = self.store.get_current_presence_token()
 
-        updates = []
-        for observed_user in user_ids_to_check & set(cachemap):
-            cached = cachemap[observed_user]
+            plist = yield self.store.get_presence_list_accepted(user.localpart)
+            friends = set(row["observed_user_id"] for row in plist)
+            friends.add(user_id)  # So that we receive our own presence
 
-            if cached.serial <= from_key or cached.serial > max_serial:
-                continue
+            user_ids_changed = set()
+            changed = None
+            if from_key and max_token - from_key < 100:
+                # For small deltas, its quicker to get all changes and then
+                # work out if we share a room or they're in our presence list
+                changed = stream_change_cache.get_all_entities_changed(from_key)
 
-            latest_serial = max(cached.serial, latest_serial)
-            updates.append(cached.make_event(user=observed_user, clock=clock))
+            # get_all_entities_changed can return None
+            if changed is not None:
+                for other_user_id in changed:
+                    if other_user_id in friends:
+                        user_ids_changed.add(other_user_id)
+                        continue
+                    other_rooms = yield self.store.get_rooms_for_user(other_user_id)
+                    if room_ids.intersection(e.room_id for e in other_rooms):
+                        user_ids_changed.add(other_user_id)
+                        continue
+            else:
+                # Too many possible updates. Find all users we can see and check
+                # if any of them have changed.
+                user_ids_to_check = set()
+                for room_id in room_ids:
+                    users = yield self.store.get_users_in_room(room_id)
+                    user_ids_to_check.update(users)
 
-        # TODO(paul): limit
+                user_ids_to_check.update(friends)
 
-        for serial, user_ids in presence._remote_offline_serials:
-            if serial <= from_key:
-                break
+                # Always include yourself. Only really matters for when the user is
+                # not in any rooms, but still.
+                user_ids_to_check.add(user_id)
 
-            if serial > max_serial:
-                continue
+                if from_key:
+                    user_ids_changed = stream_change_cache.get_entities_changed(
+                        user_ids_to_check, from_key,
+                    )
+                else:
+                    user_ids_changed = user_ids_to_check
 
-            latest_serial = max(latest_serial, serial)
-            for u in user_ids:
-                updates.append({
-                    "type": "m.presence",
-                    "content": {"user_id": u, "presence": PresenceState.OFFLINE},
-                })
-        # TODO(paul): For the v2 API we want to tell the client their from_key
-        #   is too old if we fell off the end of the _remote_offline_serials
-        #   list, and get them to invalidate+resync. In v1 we have no such
-        #   concept so this is a best-effort result.
+            updates = yield presence.current_state_for_users(user_ids_changed)
 
-        if updates:
-            defer.returnValue((updates, latest_serial))
-        else:
-            defer.returnValue(([], presence._user_cachemap_latest_serial))
+        now = self.clock.time_msec()
+
+        defer.returnValue(([
+            {
+                "type": "m.presence",
+                "content": _format_user_presence_state(s, now),
+            }
+            for s in updates.values()
+            if include_offline or s.state != PresenceState.OFFLINE
+        ], max_token))
 
     def get_current_key(self):
-        presence = self.hs.get_handlers().presence_handler
-        return presence._user_cachemap_latest_serial
+        return self.store.get_current_presence_token()
 
-    @defer.inlineCallbacks
     def get_pagination_rows(self, user, pagination_config, key):
-        # TODO (erikj): Does this make sense? Ordering?
-
-        from_key = int(pagination_config.from_key)
-
-        if pagination_config.to_key:
-            to_key = int(pagination_config.to_key)
-        else:
-            to_key = -1
-
-        presence = self.hs.get_handlers().presence_handler
-        cachemap = presence._user_cachemap
-
-        user_ids_to_check = {user}
-        presence_list = yield presence.store.get_presence_list(
-            user.localpart, accepted=True
-        )
-        if presence_list is not None:
-            user_ids_to_check |= set(
-                UserID.from_string(p["observed_user_id"]) for p in presence_list
-            )
-        room_ids = yield presence.get_joined_rooms_for_user(user)
-        for room_id in set(room_ids) & set(presence._room_serials):
-            if presence._room_serials[room_id] >= from_key:
-                joined = yield presence.get_joined_users_for_room_id(room_id)
-                user_ids_to_check |= set(joined)
-
-        updates = []
-        for observed_user in user_ids_to_check & set(cachemap):
-            if not (to_key < cachemap[observed_user].serial <= from_key):
-                continue
-
-            updates.append((observed_user, cachemap[observed_user]))
-
-        # TODO(paul): limit
-
-        if updates:
-            clock = self.clock
-
-            earliest_serial = max([x[1].serial for x in updates])
-            data = [x[1].make_event(user=x[0], clock=clock) for x in updates]
-
-            defer.returnValue((data, earliest_serial))
-        else:
-            defer.returnValue(([], 0))
+        return self.get_new_events(user, from_key=None, include_offline=False)
 
 
-class UserPresenceCache(object):
-    """Store an observed user's state and status message.
+def handle_timeouts(user_states, is_mine_fn, user_to_num_current_syncs, now):
+    """Checks the presence of users that have timed out and updates as
+    appropriate.
 
-    Includes the update timestamp.
+    Args:
+        user_states(list): List of UserPresenceState's to check.
+        is_mine_fn (fn): Function that returns if a user_id is ours
+        user_to_num_current_syncs (dict): Mapping of user_id to number of currently
+            active syncs.
+        now (int): Current time in ms.
+
+    Returns:
+        List of UserPresenceState updates
     """
-    def __init__(self):
-        self.state = {"presence": PresenceState.OFFLINE}
-        self.serial = None
+    changes = {}  # Actual changes we need to notify people about
 
-    def __repr__(self):
-        return "UserPresenceCache(state=%r, serial=%r)" % (
-            self.state, self.serial
-        )
+    for state in user_states:
+        is_mine = is_mine_fn(state.user_id)
 
-    def update(self, state, serial):
-        assert("mtime_age" not in state)
+        new_state = handle_timeout(state, is_mine, user_to_num_current_syncs, now)
+        if new_state:
+            changes[state.user_id] = new_state
 
-        self.state.update(state)
-        # Delete keys that are now 'None'
-        for k in self.state.keys():
-            if self.state[k] is None:
-                del self.state[k]
+    return changes.values()
 
-        self.serial = serial
 
-        if "status_msg" in state:
-            self.status_msg = state["status_msg"]
-        else:
-            self.status_msg = None
+def handle_timeout(state, is_mine, user_to_num_current_syncs, now):
+    """Checks the presence of the user to see if any of the timers have elapsed
 
-    def get_state(self):
-        # clone it so caller can't break our cache
-        state = dict(self.state)
-        return state
+    Args:
+        state (UserPresenceState)
+        is_mine (bool): Whether the user is ours
+        user_to_num_current_syncs (dict): Mapping of user_id to number of currently
+            active syncs.
+        now (int): Current time in ms.
 
-    def make_event(self, user, clock):
-        content = self.get_state()
-        content["user_id"] = user.to_string()
+    Returns:
+        A UserPresenceState update or None if no update.
+    """
+    if state.state == PresenceState.OFFLINE:
+        # No timeouts are associated with offline states.
+        return None
 
-        if "last_active" in content:
-            content["last_active_ago"] = int(
-                clock.time_msec() - content.pop("last_active")
+    changed = False
+    user_id = state.user_id
+
+    if is_mine:
+        if state.state == PresenceState.ONLINE:
+            if now - state.last_active_ts > IDLE_TIMER:
+                # Currently online, but last activity ages ago so auto
+                # idle
+                state = state.copy_and_replace(
+                    state=PresenceState.UNAVAILABLE,
+                )
+                changed = True
+            elif now - state.last_active_ts > LAST_ACTIVE_GRANULARITY:
+                # So that we send down a notification that we've
+                # stopped updating.
+                changed = True
+
+        if now - state.last_federation_update_ts > FEDERATION_PING_INTERVAL:
+            # Need to send ping to other servers to ensure they don't
+            # timeout and set us to offline
+            changed = True
+
+        # If there are have been no sync for a while (and none ongoing),
+        # set presence to offline
+        if not user_to_num_current_syncs.get(user_id, 0):
+            if now - state.last_user_sync_ts > SYNC_ONLINE_TIMEOUT:
+                state = state.copy_and_replace(
+                    state=PresenceState.OFFLINE,
+                    status_msg=None,
+                )
+                changed = True
+    else:
+        # We expect to be poked occaisonally by the other side.
+        # This is to protect against forgetful/buggy servers, so that
+        # no one gets stuck online forever.
+        if now - state.last_federation_update_ts > FEDERATION_TIMEOUT:
+            # The other side seems to have disappeared.
+            state = state.copy_and_replace(
+                state=PresenceState.OFFLINE,
+                status_msg=None,
+            )
+            changed = True
+
+    return state if changed else None
+
+
+def handle_update(prev_state, new_state, is_mine, wheel_timer, now):
+    """Given a presence update:
+        1. Add any appropriate timers.
+        2. Check if we should notify anyone.
+
+    Args:
+        prev_state (UserPresenceState)
+        new_state (UserPresenceState)
+        is_mine (bool): Whether the user is ours
+        wheel_timer (WheelTimer)
+        now (int): Time now in ms
+
+    Returns:
+        3-tuple: `(new_state, persist_and_notify, federation_ping)` where:
+            - new_state: is the state to actually persist
+            - persist_and_notify (bool): whether to persist and notify people
+            - federation_ping (bool): whether we should send a ping over federation
+    """
+    user_id = new_state.user_id
+
+    persist_and_notify = False
+    federation_ping = False
+
+    # If the users are ours then we want to set up a bunch of timers
+    # to time things out.
+    if is_mine:
+        if new_state.state == PresenceState.ONLINE:
+            # Idle timer
+            wheel_timer.insert(
+                now=now,
+                obj=user_id,
+                then=new_state.last_active_ts + IDLE_TIMER
             )
 
-        return {"type": "m.presence", "content": content}
+            active = now - new_state.last_active_ts < LAST_ACTIVE_GRANULARITY
+            new_state = new_state.copy_and_replace(
+                currently_active=active,
+            )
+
+            if active:
+                wheel_timer.insert(
+                    now=now,
+                    obj=user_id,
+                    then=new_state.last_active_ts + LAST_ACTIVE_GRANULARITY
+                )
+
+        if new_state.state != PresenceState.OFFLINE:
+            # User has stopped syncing
+            wheel_timer.insert(
+                now=now,
+                obj=user_id,
+                then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT
+            )
+
+            last_federate = new_state.last_federation_update_ts
+            if now - last_federate > FEDERATION_PING_INTERVAL:
+                # Been a while since we've poked remote servers
+                new_state = new_state.copy_and_replace(
+                    last_federation_update_ts=now,
+                )
+                federation_ping = True
+
+    else:
+        wheel_timer.insert(
+            now=now,
+            obj=user_id,
+            then=new_state.last_federation_update_ts + FEDERATION_TIMEOUT
+        )
+
+    # Check whether the change was something worth notifying about
+    if should_notify(prev_state, new_state):
+        new_state = new_state.copy_and_replace(
+            last_federation_update_ts=now,
+        )
+        persist_and_notify = True
+
+    return new_state, persist_and_notify, federation_ping

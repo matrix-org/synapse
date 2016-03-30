@@ -70,13 +70,14 @@ class DirectoryStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def create_room_alias_association(self, room_alias, room_id, servers):
+    def create_room_alias_association(self, room_alias, room_id, servers, creator=None):
         """ Creates an associatin between  a room alias and room_id/servers
 
         Args:
             room_alias (RoomAlias)
             room_id (str)
             servers (list)
+            creator (str): Optional user_id of creator.
 
         Returns:
             Deferred
@@ -87,6 +88,7 @@ class DirectoryStore(SQLBaseStore):
                 {
                     "room_alias": room_alias.to_string(),
                     "room_id": room_id,
+                    "creator": creator,
                 },
                 desc="create_room_alias_association",
             )
@@ -106,6 +108,17 @@ class DirectoryStore(SQLBaseStore):
                 desc="create_room_alias_association",
             )
         self.get_aliases_for_room.invalidate((room_id,))
+
+    def get_room_alias_creator(self, room_alias):
+        return self._simple_select_one_onecol(
+            table="room_aliases",
+            keyvalues={
+                "room_alias": room_alias,
+            },
+            retcol="creator",
+            desc="get_room_alias_creator",
+            allow_none=True
+        )
 
     @defer.inlineCallbacks
     def delete_room_alias(self, room_alias):
@@ -142,7 +155,7 @@ class DirectoryStore(SQLBaseStore):
 
         return room_id
 
-    @cached()
+    @cached(max_entries=5000)
     def get_aliases_for_room(self, room_id):
         return self._simple_select_onecol(
             "room_aliases",

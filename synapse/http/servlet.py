@@ -15,14 +15,27 @@
 
 """ This module contains base REST classes for constructing REST servlets. """
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import SynapseError, Codes
 
 import logging
+import simplejson
 
 logger = logging.getLogger(__name__)
 
 
 def parse_integer(request, name, default=None, required=False):
+    """Parse an integer parameter from the request string
+
+    :param request: the twisted HTTP request.
+    :param name (str): the name of the query parameter.
+    :param default: value to use if the parameter is absent, defaults to None.
+    :param required (bool): whether to raise a 400 SynapseError if the
+        parameter is absent, defaults to False.
+    :return: An int value or the default.
+    :raises
+        SynapseError if the parameter is absent and required, or if the
+            parameter is present and not an integer.
+    """
     if name in request.args:
         try:
             return int(request.args[name][0])
@@ -32,12 +45,25 @@ def parse_integer(request, name, default=None, required=False):
     else:
         if required:
             message = "Missing integer query parameter %r" % (name,)
-            raise SynapseError(400, message)
+            raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
         else:
             return default
 
 
 def parse_boolean(request, name, default=None, required=False):
+    """Parse a boolean parameter from the request query string
+
+    :param request: the twisted HTTP request.
+    :param name (str): the name of the query parameter.
+    :param default: value to use if the parameter is absent, defaults to None.
+    :param required (bool): whether to raise a 400 SynapseError if the
+        parameter is absent, defaults to False.
+    :return: A bool value or the default.
+    :raises
+        SynapseError if the parameter is absent and required, or if the
+            parameter is present and not one of "true" or "false".
+    """
+
     if name in request.args:
         try:
             return {
@@ -53,28 +79,82 @@ def parse_boolean(request, name, default=None, required=False):
     else:
         if required:
             message = "Missing boolean query parameter %r" % (name,)
-            raise SynapseError(400, message)
+            raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
         else:
             return default
 
 
 def parse_string(request, name, default=None, required=False,
                  allowed_values=None, param_type="string"):
+    """Parse a string parameter from the request query string.
+
+    :param request: the twisted HTTP request.
+    :param name (str): the name of the query parameter.
+    :param default: value to use if the parameter is absent, defaults to None.
+    :param required (bool): whether to raise a 400 SynapseError if the
+        parameter is absent, defaults to False.
+    :param allowed_values (list): List of allowed values for the string,
+        or None if any value is allowed, defaults to None
+    :return: A string value or the default.
+    :raises
+        SynapseError if the parameter is absent and required, or if the
+            parameter is present, must be one of a list of allowed values and
+            is not one of those allowed values.
+    """
+
     if name in request.args:
         value = request.args[name][0]
         if allowed_values is not None and value not in allowed_values:
             message = "Query parameter %r must be one of [%s]" % (
                 name, ", ".join(repr(v) for v in allowed_values)
             )
-            raise SynapseError(message)
+            raise SynapseError(400, message)
         else:
             return value
     else:
         if required:
             message = "Missing %s query parameter %r" % (param_type, name)
-            raise SynapseError(400, message)
+            raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
         else:
             return default
+
+
+def parse_json_value_from_request(request):
+    """Parse a JSON value from the body of a twisted HTTP request.
+
+    :param request: the twisted HTTP request.
+    :returns: The JSON value.
+    :raises
+        SynapseError if the request body couldn't be decoded as JSON.
+    """
+    try:
+        content_bytes = request.content.read()
+    except:
+        raise SynapseError(400, "Error reading JSON content.")
+
+    try:
+        content = simplejson.loads(content_bytes)
+    except simplejson.JSONDecodeError:
+        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
+
+    return content
+
+
+def parse_json_object_from_request(request):
+    """Parse a JSON object from the body of a twisted HTTP request.
+
+    :param request: the twisted HTTP request.
+    :raises
+        SynapseError if the request body couldn't be decoded as JSON or
+            if it wasn't a JSON object.
+    """
+    content = parse_json_value_from_request(request)
+
+    if type(content) != dict:
+        message = "Content must be a JSON object."
+        raise SynapseError(400, message, errcode=Codes.BAD_JSON)
+
+    return content
 
 
 class RestServlet(object):

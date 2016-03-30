@@ -84,8 +84,9 @@ class RestTestCase(unittest.TestCase):
             "membership": membership
         }
 
-        (code, response) = yield self.mock_resource.trigger("PUT", path,
-            json.dumps(data))
+        (code, response) = yield self.mock_resource.trigger(
+            "PUT", path, json.dumps(data)
+        )
         self.assertEquals(expect_code, code, msg=str(response))
 
         self.auth_user_id = temp_id

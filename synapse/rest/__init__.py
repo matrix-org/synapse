@@ -30,6 +30,7 @@ from synapse.rest.client.v1 import (
     push_rule,
     register as v1_register,
     login as v1_login,
+    logout,
 )
 
 from synapse.rest.client.v2_alpha import (
@@ -72,6 +73,7 @@ class ClientRestResource(JsonResource):
         admin.register_servlets(hs, client_resource)
         pusher.register_servlets(hs, client_resource)
         push_rule.register_servlets(hs, client_resource)
+        logout.register_servlets(hs, client_resource)
 
         # "v2"
         sync.register_servlets(hs, client_resource)

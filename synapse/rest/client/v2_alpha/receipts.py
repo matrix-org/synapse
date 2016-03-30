@@ -37,6 +37,7 @@ class ReceiptRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.receipts_handler = hs.get_handlers().receipts_handler
+        self.presence_handler = hs.get_handlers().presence_handler
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, receipt_type, event_id):
@@ -44,6 +45,8 @@ class ReceiptRestServlet(RestServlet):
 
         if receipt_type != "m.read":
             raise SynapseError(400, "Receipt type must be 'm.read'")
+
+        yield self.presence_handler.bump_presence_active_time(requester.user)
 
         yield self.receipts_handler.received_client_receipt(
             room_id,

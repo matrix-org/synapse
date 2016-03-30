@@ -434,30 +434,45 @@ class Auth(object):
 
         if event.user_id != invite_event.user_id:
             return False
-        try:
-            public_key = invite_event.content["public_key"]
-            if signed["mxid"] != event.state_key:
-                return False
-            if signed["token"] != token:
-                return False
-            for server, signature_block in signed["signatures"].items():
-                for key_name, encoded_signature in signature_block.items():
-                    if not key_name.startswith("ed25519:"):
-                        return False
-                    verify_key = decode_verify_key_bytes(
-                        key_name,
-                        decode_base64(public_key)
-                    )
-                    verify_signed_json(signed, server, verify_key)
 
-                    # We got the public key from the invite, so we know that the
-                    # correct server signed the signed bundle.
-                    # The caller is responsible for checking that the signing
-                    # server has not revoked that public key.
-                    return True
+        if signed["mxid"] != event.state_key:
             return False
-        except (KeyError, SignatureVerifyException,):
+        if signed["token"] != token:
             return False
+
+        for public_key_object in self.get_public_keys(invite_event):
+            public_key = public_key_object["public_key"]
+            try:
+                for server, signature_block in signed["signatures"].items():
+                    for key_name, encoded_signature in signature_block.items():
+                        if not key_name.startswith("ed25519:"):
+                            continue
+                        verify_key = decode_verify_key_bytes(
+                            key_name,
+                            decode_base64(public_key)
+                        )
+                        verify_signed_json(signed, server, verify_key)
+
+                        # We got the public key from the invite, so we know that the
+                        # correct server signed the signed bundle.
+                        # The caller is responsible for checking that the signing
+                        # server has not revoked that public key.
+                        return True
+            except (KeyError, SignatureVerifyException,):
+                continue
+        return False
+
+    def get_public_keys(self, invite_event):
+        public_keys = []
+        if "public_key" in invite_event.content:
+            o = {
+                "public_key": invite_event.content["public_key"],
+            }
+            if "key_validity_url" in invite_event.content:
+                o["key_validity_url"] = invite_event.content["key_validity_url"]
+            public_keys.append(o)
+        public_keys.extend(invite_event.content.get("public_keys", []))
+        return public_keys
 
     def _get_power_level_event(self, auth_events):
         key = (EventTypes.PowerLevels, "", )
@@ -519,7 +534,7 @@ class Auth(object):
                 )
 
             access_token = request.args["access_token"][0]
-            user_info = yield self._get_user_by_access_token(access_token)
+            user_info = yield self.get_user_by_access_token(access_token)
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
@@ -580,7 +595,7 @@ class Auth(object):
         defer.returnValue(user_id)
 
     @defer.inlineCallbacks
-    def _get_user_by_access_token(self, token):
+    def get_user_by_access_token(self, token):
         """ Get a registered user's ID.
 
         Args:
@@ -799,17 +814,16 @@ class Auth(object):
 
         return auth_ids
 
-    @log_function
-    def _can_send_event(self, event, auth_events):
+    def _get_send_level(self, etype, state_key, auth_events):
         key = (EventTypes.PowerLevels, "", )
         send_level_event = auth_events.get(key)
         send_level = None
         if send_level_event:
             send_level = send_level_event.content.get("events", {}).get(
-                event.type
+                etype
             )
             if send_level is None:
-                if hasattr(event, "state_key"):
+                if state_key is not None:
                     send_level = send_level_event.content.get(
                         "state_default", 50
                     )
@@ -823,6 +837,13 @@ class Auth(object):
         else:
             send_level = 0
 
+        return send_level
+
+    @log_function
+    def _can_send_event(self, event, auth_events):
+        send_level = self._get_send_level(
+            event.type, event.get("state_key", None), auth_events
+        )
         user_level = self._get_user_power_level(event.user_id, auth_events)
 
         if user_level < send_level:
@@ -967,3 +988,43 @@ class Auth(object):
                     "You don't have permission to add ops level greater "
                     "than your own"
                 )
+
+    @defer.inlineCallbacks
+    def check_can_change_room_list(self, room_id, user):
+        """Check if the user is allowed to edit the room's entry in the
+        published room list.
+
+        Args:
+            room_id (str)
+            user (UserID)
+        """
+
+        is_admin = yield self.is_server_admin(user)
+        if is_admin:
+            defer.returnValue(True)
+
+        user_id = user.to_string()
+        yield self.check_joined_room(room_id, user_id)
+
+        # We currently require the user is a "moderator" in the room. We do this
+        # by checking if they would (theoretically) be able to change the
+        # m.room.aliases events
+        power_level_event = yield self.state.get_current_state(
+            room_id, EventTypes.PowerLevels, ""
+        )
+
+        auth_events = {}
+        if power_level_event:
+            auth_events[(EventTypes.PowerLevels, "")] = power_level_event
+
+        send_level = self._get_send_level(
+            EventTypes.Aliases, "", auth_events
+        )
+        user_level = self._get_user_power_level(user_id, auth_events)
+
+        if user_level < send_level:
+            raise AuthError(
+                403,
+                "This server requires you to be a moderator in the room to"
+                " edit its room list entry"
+            )

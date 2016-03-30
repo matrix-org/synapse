@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from base import ClientV1RestServlet, client_path_patterns
+from .base import ClientV1RestServlet, client_path_patterns
 
 
 import hmac

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 REQUIREMENTS = {
     "frozendict>=0.4": ["frozendict"],
-    "unpaddedbase64>=1.0.1": ["unpaddedbase64>=1.0.1"],
+    "unpaddedbase64>=1.1.0": ["unpaddedbase64>=1.1.0"],
     "canonicaljson>=1.0.0": ["canonicaljson>=1.0.0"],
     "signedjson>=1.0.0": ["signedjson>=1.0.0"],
     "pynacl==0.3.0": ["nacl==0.3.0", "nacl.bindings"],
@@ -34,7 +34,7 @@ REQUIREMENTS = {
     "pydenticon": ["pydenticon"],
     "ujson": ["ujson"],
     "blist": ["blist"],
-    "pysaml2": ["saml2"],
+    "pysaml2>=3.0.0,<4.0.0": ["saml2>=3.0.0,<4.0.0"],
     "pymacaroons-pynacl": ["pymacaroons"],
 }
 CONDITIONAL_REQUIREMENTS = {

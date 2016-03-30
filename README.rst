@@ -525,7 +525,6 @@ Logging In To An Existing Account
 Just enter the ``@localpart:my.domain.here`` Matrix user ID and password into
 the form and click the Login button.
 
-
 Identity Servers
 ================
 
@@ -545,6 +544,26 @@ as the primary means of identity and E2E encryption is not complete. As such,
 we are running a single identity server (https://matrix.org) at the current
 time.
 
+Password reset
+==============
+
+If a user has registered an email address to their account using an identity
+server, they can request a password-reset token via clients such as Vector.
+
+A manual password reset can be done via direct database access as follows.
+
+First calculate the hash of the new password:
+
+    $ source ~/.synapse/bin/activate
+    $ ./scripts/hash_password
+    Password: 
+    Confirm password: 
+    $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+Then update the `users` table in the database:
+
+    UPDATE users SET password_hash='$2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+        WHERE name='@test:test.com';
 
 Where's the spec?!
 ==================
@@ -565,4 +584,21 @@ sphinxcontrib-napoleon::
 Building internal API documentation::
 
     python setup.py build_sphinx
-    
+
+
+
+Halp!! Synapse eats all my RAM!
+===============================
+
+Synapse's architecture is quite RAM hungry currently - we deliberately
+cache a lot of recent room data and metadata in RAM in order to speed up
+common requests.  We'll improve this in future, but for now the easiest
+way to either reduce the RAM usage (at the risk of slowing things down)
+is to set the almost-undocumented ``SYNAPSE_CACHE_FACTOR`` environment
+variable.  Roughly speaking, a SYNAPSE_CACHE_FACTOR of 1.0 will max out
+at around 3-4GB of resident memory - this is what we currently run the
+matrix.org on.  The default setting is currently 0.1, which is probably
+around a ~700MB footprint.  You can dial it down further to 0.02 if
+desired, which targets roughly ~512MB.  Conversely you can dial it up if
+you need performance for lots of users and have a box with a lot of RAM.
+

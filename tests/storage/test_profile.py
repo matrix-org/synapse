@@ -55,7 +55,7 @@ class ProfileStoreTestCase(unittest.TestCase):
         )
 
         yield self.store.set_profile_avatar_url(
-                self.u_frank.localpart, "http://my.site/here"
+            self.u_frank.localpart, "http://my.site/here"
         )
 
         self.assertEquals(

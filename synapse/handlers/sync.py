@@ -20,6 +20,7 @@ from synapse.api.constants import Membership, EventTypes
 from synapse.util import unwrapFirstError
 from synapse.util.logcontext import LoggingContext, preserve_fn
 from synapse.util.metrics import Measure
+from synapse.push.clientformat import format_push_rules_for_user
 
 from twisted.internet import defer
 
@@ -121,7 +122,11 @@ class SyncResult(collections.namedtuple("SyncResult", [
         events.
         """
         return bool(
-            self.presence or self.joined or self.invited or self.archived
+            self.presence or
+            self.joined or
+            self.invited or
+            self.archived or
+            self.account_data
         )
 
 
@@ -205,9 +210,9 @@ class SyncHandler(BaseHandler):
             key=None
         )
 
-        membership_list = (Membership.INVITE, Membership.JOIN)
-        if sync_config.filter_collection.include_leave:
-            membership_list += (Membership.LEAVE, Membership.BAN)
+        membership_list = (
+            Membership.INVITE, Membership.JOIN, Membership.LEAVE, Membership.BAN
+        )
 
         room_list = yield self.store.get_rooms_for_user_where_membership_is(
             user_id=sync_config.user.to_string(),
@@ -218,6 +223,10 @@ class SyncHandler(BaseHandler):
             yield self.store.get_account_data_for_user(
                 sync_config.user.to_string()
             )
+        )
+
+        account_data['m.push_rules'] = yield self.push_rules_for_user(
+            sync_config.user
         )
 
         tags_by_room = yield self.store.get_tags_for_user(
@@ -253,6 +262,12 @@ class SyncHandler(BaseHandler):
                         invite=invite,
                     ))
                 elif event.membership in (Membership.LEAVE, Membership.BAN):
+                    # Always send down rooms we were banned or kicked from.
+                    if not sync_config.filter_collection.include_leave:
+                        if event.membership == Membership.LEAVE:
+                            if sync_config.user.to_string() == event.sender:
+                                continue
+
                     leave_token = now_token.copy_and_replace(
                         "room_key", "s%d" % (event.stream_ordering,)
                     )
@@ -317,6 +332,14 @@ class SyncHandler(BaseHandler):
         )
 
         defer.returnValue(room_sync)
+
+    @defer.inlineCallbacks
+    def push_rules_for_user(self, user):
+        user_id = user.to_string()
+        rawrules = yield self.store.get_push_rules_for_user(user_id)
+        enabled_map = yield self.store.get_push_rules_enabled_for_user(user_id)
+        rules = format_push_rules_for_user(user, rawrules, enabled_map)
+        defer.returnValue(rules)
 
     def account_data_for_user(self, account_data):
         account_data_events = []
@@ -477,6 +500,15 @@ class SyncHandler(BaseHandler):
             )
         )
 
+        push_rules_changed = yield self.store.have_push_rules_changed_for_user(
+            user_id, int(since_token.push_rules_key)
+        )
+
+        if push_rules_changed:
+            account_data["m.push_rules"] = yield self.push_rules_for_user(
+                sync_config.user
+            )
+
         # Get a list of membership change events that have happened.
         rooms_changed = yield self.store.get_membership_changes_for_user(
             user_id, since_token.room_key, now_token.room_key
@@ -582,6 +614,28 @@ class SyncHandler(BaseHandler):
             if room_sync:
                 joined.append(room_sync)
 
+        # For each newly joined room, we want to send down presence of
+        # existing users.
+        presence_handler = self.hs.get_handlers().presence_handler
+        extra_presence_users = set()
+        for room_id in newly_joined_rooms:
+            users = yield self.store.get_users_in_room(event.room_id)
+            extra_presence_users.update(users)
+
+        # For each new member, send down presence.
+        for joined_sync in joined:
+            it = itertools.chain(joined_sync.timeline.events, joined_sync.state.values())
+            for event in it:
+                if event.type == EventTypes.Member:
+                    if event.membership == Membership.JOIN:
+                        extra_presence_users.add(event.state_key)
+
+        states = yield presence_handler.get_states(
+            [u for u in extra_presence_users if u != user_id],
+            as_event=True,
+        )
+        presence.extend(states)
+
         account_data_for_user = sync_config.filter_collection.filter_account_data(
             self.account_data_for_user(account_data)
         )
@@ -623,7 +677,6 @@ class SyncHandler(BaseHandler):
                 recents = yield self._filter_events_for_client(
                     sync_config.user.to_string(),
                     recents,
-                    is_peeking=sync_config.is_guest,
                 )
             else:
                 recents = []
@@ -645,7 +698,6 @@ class SyncHandler(BaseHandler):
                 loaded_recents = yield self._filter_events_for_client(
                     sync_config.user.to_string(),
                     loaded_recents,
-                    is_peeking=sync_config.is_guest,
                 )
                 loaded_recents.extend(recents)
                 recents = loaded_recents
@@ -825,13 +877,19 @@ class SyncHandler(BaseHandler):
         with Measure(self.clock, "compute_state_delta"):
             if full_state:
                 if batch:
+                    current_state = yield self.store.get_state_for_event(
+                        batch.events[-1].event_id
+                    )
+
                     state = yield self.store.get_state_for_event(
                         batch.events[0].event_id
                     )
                 else:
-                    state = yield self.get_state_at(
+                    current_state = yield self.get_state_at(
                         room_id, stream_position=now_token
                     )
+
+                    state = current_state
 
                 timeline_state = {
                     (event.type, event.state_key): event
@@ -842,10 +900,15 @@ class SyncHandler(BaseHandler):
                     timeline_contains=timeline_state,
                     timeline_start=state,
                     previous={},
+                    current=current_state,
                 )
             elif batch.limited:
                 state_at_previous_sync = yield self.get_state_at(
                     room_id, stream_position=since_token
+                )
+
+                current_state = yield self.store.get_state_for_event(
+                    batch.events[-1].event_id
                 )
 
                 state_at_timeline_start = yield self.store.get_state_for_event(
@@ -861,6 +924,7 @@ class SyncHandler(BaseHandler):
                     timeline_contains=timeline_state,
                     timeline_start=state_at_timeline_start,
                     previous=state_at_previous_sync,
+                    current=current_state,
                 )
             else:
                 state = {}
@@ -920,7 +984,7 @@ def _action_has_highlight(actions):
     return False
 
 
-def _calculate_state(timeline_contains, timeline_start, previous):
+def _calculate_state(timeline_contains, timeline_start, previous, current):
     """Works out what state to include in a sync response.
 
     Args:
@@ -928,6 +992,7 @@ def _calculate_state(timeline_contains, timeline_start, previous):
         timeline_start (dict): state at the start of the timeline
         previous (dict): state at the end of the previous sync (or empty dict
             if this is an initial sync)
+        current (dict): state at the end of the timeline
 
     Returns:
         dict
@@ -938,14 +1003,16 @@ def _calculate_state(timeline_contains, timeline_start, previous):
             timeline_contains.values(),
             previous.values(),
             timeline_start.values(),
+            current.values(),
         )
     }
 
+    c_ids = set(e.event_id for e in current.values())
     tc_ids = set(e.event_id for e in timeline_contains.values())
     p_ids = set(e.event_id for e in previous.values())
     ts_ids = set(e.event_id for e in timeline_start.values())
 
-    state_ids = (ts_ids - p_ids) - tc_ids
+    state_ids = ((c_ids | ts_ids) - p_ids) - tc_ids
 
     evs = (event_id_to_state[e] for e in state_ids)
     return {

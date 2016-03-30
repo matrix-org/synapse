@@ -30,7 +30,7 @@ class TagsStore(SQLBaseStore):
         Returns:
             A deferred int.
         """
-        return self._account_data_id_gen.get_max_token(self)
+        return self._account_data_id_gen.get_max_token()
 
     @cached()
     def get_tags_for_user(self, user_id):
@@ -57,6 +57,59 @@ class TagsStore(SQLBaseStore):
             return tags_by_room
 
         return deferred
+
+    @defer.inlineCallbacks
+    def get_all_updated_tags(self, last_id, current_id, limit):
+        """Get all the client tags that have changed on the server
+        Args:
+            last_id(int): The position to fetch from.
+            current_id(int): The position to fetch up to.
+        Returns:
+            A deferred list of tuples of stream_id int, user_id string,
+            room_id string, tag string and content string.
+        """
+        def get_all_updated_tags_txn(txn):
+            sql = (
+                "SELECT stream_id, user_id, room_id"
+                " FROM room_tags_revisions as r"
+                " WHERE ? < stream_id AND stream_id <= ?"
+                " ORDER BY stream_id ASC LIMIT ?"
+            )
+            txn.execute(sql, (last_id, current_id, limit))
+            return txn.fetchall()
+
+        tag_ids = yield self.runInteraction(
+            "get_all_updated_tags", get_all_updated_tags_txn
+        )
+
+        def get_tag_content(txn, tag_ids):
+            sql = (
+                "SELECT tag, content"
+                " FROM room_tags"
+                " WHERE user_id=? AND room_id=?"
+            )
+            results = []
+            for stream_id, user_id, room_id in tag_ids:
+                txn.execute(sql, (user_id, room_id))
+                tags = []
+                for tag, content in txn.fetchall():
+                    tags.append(json.dumps(tag) + ":" + content)
+                tag_json = "{" + ",".join(tags) + "}"
+                results.append((stream_id, user_id, room_id, tag_json))
+
+            return results
+
+        batch_size = 50
+        results = []
+        for i in xrange(0, len(tag_ids), batch_size):
+            tags = yield self.runInteraction(
+                "get_all_updated_tag_content",
+                get_tag_content,
+                tag_ids[i:i + batch_size],
+            )
+            results.extend(tags)
+
+        defer.returnValue(results)
 
     @defer.inlineCallbacks
     def get_updated_tags(self, user_id, stream_id):
@@ -142,12 +195,12 @@ class TagsStore(SQLBaseStore):
             )
             self._update_revision_txn(txn, user_id, room_id, next_id)
 
-        with (yield self._account_data_id_gen.get_next(self)) as next_id:
+        with self._account_data_id_gen.get_next() as next_id:
             yield self.runInteraction("add_tag", add_tag_txn, next_id)
 
         self.get_tags_for_user.invalidate((user_id,))
 
-        result = yield self._account_data_id_gen.get_max_token(self)
+        result = self._account_data_id_gen.get_max_token()
         defer.returnValue(result)
 
     @defer.inlineCallbacks
@@ -164,12 +217,12 @@ class TagsStore(SQLBaseStore):
             txn.execute(sql, (user_id, room_id, tag))
             self._update_revision_txn(txn, user_id, room_id, next_id)
 
-        with (yield self._account_data_id_gen.get_next(self)) as next_id:
+        with self._account_data_id_gen.get_next() as next_id:
             yield self.runInteraction("remove_tag", remove_tag_txn, next_id)
 
         self.get_tags_for_user.invalidate((user_id,))
 
-        result = yield self._account_data_id_gen.get_max_token(self)
+        result = self._account_data_id_gen.get_max_token()
         defer.returnValue(result)
 
     def _update_revision_txn(self, txn, user_id, room_id, next_id):

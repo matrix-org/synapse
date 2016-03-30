@@ -18,9 +18,10 @@ from twisted.internet import defer
 
 from synapse.api.errors import AuthError, SynapseError, Codes
 from synapse.types import RoomAlias
+from synapse.http.servlet import parse_json_object_from_request
+
 from .base import ClientV1RestServlet, client_path_patterns
 
-import simplejson as json
 import logging
 
 
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 def register_servlets(hs, http_server):
     ClientDirectoryServer(hs).register(http_server)
+    ClientDirectoryListServer(hs).register(http_server)
 
 
 class ClientDirectoryServer(ClientV1RestServlet):
@@ -45,7 +47,7 @@ class ClientDirectoryServer(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_alias):
-        content = _parse_json(request)
+        content = parse_json_object_from_request(request)
         if "room_id" not in content:
             raise SynapseError(400, "Missing room_id key",
                                errcode=Codes.BAD_JSON)
@@ -75,7 +77,11 @@ class ClientDirectoryServer(ClientV1RestServlet):
                 yield dir_handler.create_association(
                     user_id, room_alias, room_id, servers
                 )
-                yield dir_handler.send_room_alias_update_event(user_id, room_id)
+                yield dir_handler.send_room_alias_update_event(
+                    requester,
+                    user_id,
+                    room_id
+                )
             except SynapseError as e:
                 raise e
             except:
@@ -118,15 +124,13 @@ class ClientDirectoryServer(ClientV1RestServlet):
 
         requester = yield self.auth.get_user_by_req(request)
         user = requester.user
-        is_admin = yield self.auth.is_server_admin(user)
-        if not is_admin:
-            raise AuthError(403, "You need to be a server admin")
 
         room_alias = RoomAlias.from_string(room_alias)
 
         yield dir_handler.delete_association(
-            user.to_string(), room_alias
+            requester, user.to_string(), room_alias
         )
+
         logger.info(
             "User %s deleted alias %s",
             user.to_string(),
@@ -136,12 +140,42 @@ class ClientDirectoryServer(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 
-def _parse_json(request):
-    try:
-        content = json.loads(request.content.read())
-        if type(content) != dict:
-            raise SynapseError(400, "Content must be a JSON object.",
-                               errcode=Codes.NOT_JSON)
-        return content
-    except ValueError:
-        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
+class ClientDirectoryListServer(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/directory/list/room/(?P<room_id>[^/]*)$")
+
+    def __init__(self, hs):
+        super(ClientDirectoryListServer, self).__init__(hs)
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id):
+        room = yield self.store.get_room(room_id)
+        if room is None:
+            raise SynapseError(400, "Unknown room")
+
+        defer.returnValue((200, {
+            "visibility": "public" if room["is_public"] else "private"
+        }))
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, room_id):
+        requester = yield self.auth.get_user_by_req(request)
+
+        content = parse_json_object_from_request(request)
+        visibility = content.get("visibility", "public")
+
+        yield self.handlers.directory_handler.edit_published_room_list(
+            requester, room_id, visibility,
+        )
+
+        defer.returnValue((200, {}))
+
+    @defer.inlineCallbacks
+    def on_DELETE(self, request, room_id):
+        requester = yield self.auth.get_user_by_req(request)
+
+        yield self.handlers.directory_handler.edit_published_room_list(
+            requester, room_id, "private",
+        )
+
+        defer.returnValue((200, {}))
