@@ -64,12 +64,12 @@ class StateStore(SQLBaseStore):
             for group, state_map in group_to_state.items()
         })
 
-    def _store_state_groups_txn(self, txn, event, context):
-        return self._store_mult_state_groups_txn(txn, [(event, context)])
-
     def _store_mult_state_groups_txn(self, txn, events_and_contexts):
         state_groups = {}
         for event, context in events_and_contexts:
+            if event.internal_metadata.is_outlier():
+                continue
+
             if context.current_state is None:
                 continue
 
@@ -82,7 +82,8 @@ class StateStore(SQLBaseStore):
             if event.is_state():
                 state_events[(event.type, event.state_key)] = event
 
-            state_group = self._state_groups_id_gen.get_next()
+            state_group = context.new_state_group_id
+
             self._simple_insert_txn(
                 txn,
                 table="state_groups",
@@ -114,11 +115,10 @@ class StateStore(SQLBaseStore):
             table="event_to_state_groups",
             values=[
                 {
-                    "state_group": state_groups[event.event_id],
-                    "event_id": event.event_id,
+                    "state_group": state_group_id,
+                    "event_id": event_id,
                 }
-                for event, context in events_and_contexts
-                if context.current_state is not None
+                for event_id, state_group_id in state_groups.items()
             ],
         )
 

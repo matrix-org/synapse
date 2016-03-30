@@ -31,7 +31,7 @@ class _EventInternalMetadata(object):
         return dict(self.__dict__)
 
     def is_outlier(self):
-        return hasattr(self, "outlier") and self.outlier
+        return getattr(self, "outlier", False)
 
 
 def _event_dict_property(key):
