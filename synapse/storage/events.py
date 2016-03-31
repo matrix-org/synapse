@@ -25,7 +25,7 @@ from synapse.api.constants import EventTypes
 
 from canonicaljson import encode_canonical_json
 from contextlib import contextmanager
-
+from collections import namedtuple
 
 import logging
 import math
@@ -1193,9 +1193,16 @@ class EventsStore(SQLBaseStore):
                 new_backfill_events = []
                 backward_ex_outliers = []
 
-            return (
+            return AllNewEventsResult(
                 new_forward_events, new_backfill_events,
                 forward_ex_outliers, backward_ex_outliers,
                 state_resets,
             )
         return self.runInteraction("get_all_new_events", get_all_new_events_txn)
+
+
+AllNewEventsResult = namedtuple("AllNewEventsResult", [
+    "new_forward_events", "new_backfill_events",
+    "forward_ex_outliers", "backward_ex_outliers",
+    "state_resets"
+])
