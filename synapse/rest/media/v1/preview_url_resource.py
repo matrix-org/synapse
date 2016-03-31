@@ -18,6 +18,7 @@ from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
 from lxml import html
+from urlparse import urlparse, urlunparse
 from synapse.util.stringutils import random_string
 from synapse.http.client import SpiderHttpClient
 from synapse.http.server import request_handler, respond_with_json, respond_with_json_bytes
@@ -125,7 +126,14 @@ class PreviewUrlResource(BaseMediaResource):
                     images = big_images if big_images else images
 
                     if images:
-                        og['og:image'] = images[0].attrib['src']
+                        base = list(urlparse(media_info['uri']))
+                        src = list(urlparse(images[0].attrib['src']))
+                        if not src[0] and not src[1]:
+                            src[0] = base[0]
+                            src[1] = base[1]
+                            if not src[2].startswith('/'):
+                                src[2] = re.sub(r'/[^/]+$', '/', base[2]) + src[2]
+                        og['og:image'] = urlunparse(src)
 
                     text_nodes = tree.xpath("//h1/text() | //h2/text() | //h3/text() | //p/text() | //div/text() | //span/text() | //a/text()")
                     # text_nodes = tree.xpath("//h1/text() | //h2/text() | //h3/text() | //p/text() | //div/text()")
@@ -140,6 +148,7 @@ class PreviewUrlResource(BaseMediaResource):
                     text = text.strip()[:1024]
                     og['og:description'] = text if text else None
 
+                # TODO: extract a favicon?
                 # TODO: turn any OG media URLs into mxc URLs to capture and thumbnail them too
                 # TODO: store our OG details in a cache (and expire them when stale)
                 # TODO: delete the content to stop diskfilling, as we only ever cared about its OG
@@ -180,7 +189,7 @@ class PreviewUrlResource(BaseMediaResource):
         try:
             with open(fname, "wb") as f:
                 logger.debug("Trying to get url '%s'" % url)
-                length, headers = yield self.client.get_file(
+                length, headers, uri = yield self.client.get_file(
                     url, output_stream=f, max_size=self.max_spider_size,
                 )
                 # FIXME: handle 404s sanely - don't spider an error page
@@ -233,6 +242,7 @@ class PreviewUrlResource(BaseMediaResource):
             "created_ts": time_now_ms,
             "filesystem_id": file_id,
             "filename": fname,
+            "uri": uri,
         })
 
     def _is_media(self, content_type):

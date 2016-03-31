@@ -282,7 +282,7 @@ class SimpleHttpClient(object):
             logger.exception("Failed to download body")
             raise
 
-        defer.returnValue((length, headers))
+        defer.returnValue((length, headers, response.request.absoluteURI))
 
 
 # XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
