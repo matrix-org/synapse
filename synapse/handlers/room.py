@@ -536,7 +536,9 @@ class RoomMemberHandler(BaseHandler):
 
             if not is_host_in_room:
                 # perhaps we've been invited
-                inviter = self.get_inviter(target_user.to_string(), context.current_state)
+                inviter = self.get_inviter(
+                    target_user.to_string(), context.current_state
+                )
                 if not inviter:
                     raise SynapseError(404, "Not a known room")
 
