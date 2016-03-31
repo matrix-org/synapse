@@ -72,7 +72,15 @@ class PreviewUrlResource(BaseMediaResource):
                 # define our OG response for this media
             elif self._is_html(media_info['media_type']):
                 # TODO: somehow stop a big HTML tree from exploding synapse's RAM
-                tree = html.parse(media_info['filename'])
+
+                # XXX: can't work out how to make lxml ignore UTF8 decoding errors
+                # so slurp as a string at this point.
+                file = open(media_info['filename'])
+                body = file.read()
+                file.close()
+                # FIXME: we shouldn't be forcing utf-8 if the page isn't actually utf-8...
+                tree = html.fromstring(body.decode('utf-8','ignore'))
+                # tree = html.parse(media_info['filename'])
 
                 # suck it up into lxml and define our OG response.
                 # if we see any URLs in the OG response, then spider them
@@ -108,14 +116,19 @@ class PreviewUrlResource(BaseMediaResource):
                     title = tree.xpath("(//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1]")
                     og['og:title'] = title[0].text if title else None
 
-                    images = tree.xpath("//img")
+                    images = [ i for i in tree.xpath("//img") if 'src' in i.attrib ]
                     big_images = [ i for i in images if (
-                        'width' in i and 'height' in i and
+                        'width' in i.attrib and 'height' in i.attrib and
                         i.attrib['width'] > 64 and i.attrib['height'] > 64
-                    )] or images
-                    og['og:image'] = images[0].attrib['src'] if images else None
+                    )]
+                    big_images = big_images.sort(key=lambda i: (-1 * int(i.attrib['width']) * int(i.attrib['height'])))
+                    images = big_images if big_images else images
+
+                    if images:
+                        og['og:image'] = images[0].attrib['src']
 
                     text_nodes = tree.xpath("//h1/text() | //h2/text() | //h3/text() | //p/text() | //div/text() | //span/text() | //a/text()")
+                    # text_nodes = tree.xpath("//h1/text() | //h2/text() | //h3/text() | //p/text() | //div/text()")
                     text = ''
                     for text_node in text_nodes:
                         if len(text) < 1024:
