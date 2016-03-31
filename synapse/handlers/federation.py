@@ -102,8 +102,7 @@ class FederationHandler(BaseHandler):
 
     @log_function
     @defer.inlineCallbacks
-    def on_receive_pdu(self, origin, pdu, state=None,
-                       auth_chain=None):
+    def on_receive_pdu(self, origin, pdu, state=None, auth_chain=None):
         """ Called by the ReplicationLayer when we have a new pdu. We need to
         do auth checks and put it through the StateHandler.
         """
@@ -174,11 +173,7 @@ class FederationHandler(BaseHandler):
                     })
                     seen_ids.add(e.event_id)
 
-                yield self._handle_new_events(
-                    origin,
-                    event_infos,
-                    outliers=True
-                )
+                yield self._handle_new_events(origin, event_infos)
 
             try:
                 context, event_stream_id, max_stream_id = yield self._handle_new_event(
@@ -761,6 +756,7 @@ class FederationHandler(BaseHandler):
         event = pdu
 
         event.internal_metadata.outlier = True
+        event.internal_metadata.invite_from_remote = True
 
         event.signatures.update(
             compute_event_signature(
@@ -1069,9 +1065,6 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     @log_function
     def _handle_new_event(self, origin, event, state=None, auth_events=None):
-
-        outlier = event.internal_metadata.is_outlier()
-
         context = yield self._prep_event(
             origin, event,
             state=state,
@@ -1087,14 +1080,12 @@ class FederationHandler(BaseHandler):
         event_stream_id, max_stream_id = yield self.store.persist_event(
             event,
             context=context,
-            is_new_state=not outlier,
         )
 
         defer.returnValue((context, event_stream_id, max_stream_id))
 
     @defer.inlineCallbacks
-    def _handle_new_events(self, origin, event_infos, backfilled=False,
-                           outliers=False):
+    def _handle_new_events(self, origin, event_infos, backfilled=False):
         contexts = yield defer.gatherResults(
             [
                 self._prep_event(
@@ -1113,7 +1104,6 @@ class FederationHandler(BaseHandler):
                 for ev_info, context in itertools.izip(event_infos, contexts)
             ],
             backfilled=backfilled,
-            is_new_state=(not outliers and not backfilled),
         )
 
     @defer.inlineCallbacks
@@ -1176,7 +1166,6 @@ class FederationHandler(BaseHandler):
                 (e, events_to_context[e.event_id])
                 for e in itertools.chain(auth_events, state)
             ],
-            is_new_state=False,
         )
 
         new_event_context = yield self.state_handler.compute_event_context(
@@ -1185,7 +1174,6 @@ class FederationHandler(BaseHandler):
 
         event_stream_id, max_stream_id = yield self.store.persist_event(
             event, new_event_context,
-            is_new_state=True,
             current_state=state,
         )
 
