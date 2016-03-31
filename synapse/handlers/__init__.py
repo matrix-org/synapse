@@ -17,8 +17,9 @@ from synapse.appservice.scheduler import AppServiceScheduler
 from synapse.appservice.api import ApplicationServiceApi
 from .register import RegistrationHandler
 from .room import (
-    RoomCreationHandler, RoomMemberHandler, RoomListHandler, RoomContextHandler,
+    RoomCreationHandler, RoomListHandler, RoomContextHandler,
 )
+from .room_member import RoomMemberHandler
 from .message import MessageHandler
 from .events import EventStreamHandler, EventHandler
 from .federation import FederationHandler
