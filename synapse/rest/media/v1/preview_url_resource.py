@@ -23,6 +23,7 @@ from synapse.http.client import SpiderHttpClient
 from synapse.http.server import request_handler, respond_with_json, respond_with_json_bytes
 
 import os
+import re
 import ujson as json
 
 import logging
@@ -70,6 +71,7 @@ class PreviewUrlResource(BaseMediaResource):
 
                 # define our OG response for this media
             elif self._is_html(media_info['media_type']):
+                # TODO: somehow stop a big HTML tree from exploding synapse's RAM
                 tree = html.parse(media_info['filename'])
 
                 # suck it up into lxml and define our OG response.
@@ -82,16 +84,57 @@ class PreviewUrlResource(BaseMediaResource):
                 # "og:image"       : "https://pbs.twimg.com/profile_images/500400952029888512/yI0qtFi7_400x400.png"
                 # "og:description" : "Synapse 0.12 is out! Lots of polishing, performance &amp;amp; bugfixes: /sync API, /r0 prefix, fulltext search, 3PID invites https://t.co/5alhXLLEGP"
                 # "og:site_name"   : "Twitter"
+                
+                # or:
+
+                # "og:type"         : "video",
+                # "og:url"          : "https://www.youtube.com/watch?v=LXDBoHyjmtw",
+                # "og:site_name"    : "YouTube",
+                # "og:video:type"   : "application/x-shockwave-flash",
+                # "og:description"  : " ",
+                # "og:title"        : "RemoteJam - Matrix team hack for Disrupt Europe Hackathon",
+                # "og:image"        : "https://i.ytimg.com/vi/LXDBoHyjmtw/maxresdefault.jpg",
+                # "og:video:url"    : "http://www.youtube.com/v/LXDBoHyjmtw?version=3&autohide=1",
+                # "og:video:width"  : "1280"
+                # "og:video:height" : "720",
+                # "og:video:secure_url": "https://www.youtube.com/v/LXDBoHyjmtw?version=3&autohide=1",
 
                 og = {}
                 for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
                     og[tag.attrib['property']] = tag.attrib['content']
 
+                if not og:
+                    # do some basic spidering of the HTML
+                    title = tree.xpath("(//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1]")
+                    og['og:title'] = title[0].text if title else None
+
+                    images = tree.xpath("//img")
+                    big_images = [ i for i in images if (
+                        'width' in i and 'height' in i and
+                        i.attrib['width'] > 64 and i.attrib['height'] > 64
+                    )] or images
+                    og['og:image'] = images[0].attrib['src'] if images else None
+
+                    text_nodes = tree.xpath("//h1/text() | //h2/text() | //h3/text() | //p/text() | //div/text() | //span/text() | //a/text()")
+                    text = ''
+                    for text_node in text_nodes:
+                        if len(text) < 1024:
+                            text += text_node + ' '
+                        else:
+                            break
+                    text = re.sub(r'[\t ]+', ' ', text)
+                    text = re.sub(r'[\t \r\n]*[\r\n]+', '\n', text)
+                    text = text.strip()[:1024]
+                    og['og:description'] = text if text else None
+
+                # TODO: turn any OG media URLs into mxc URLs to capture and thumbnail them too
                 # TODO: store our OG details in a cache (and expire them when stale)
                 # TODO: delete the content to stop diskfilling, as we only ever cared about its OG
             else:
                 logger.warn("Failed to find any OG data in %s", url)
                 og = {}
+
+            logger.warn(og)
 
             respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
         except:
@@ -111,6 +154,10 @@ class PreviewUrlResource(BaseMediaResource):
 
     @defer.inlineCallbacks
     def _download_url(self, url, user):
+        # TODO: we should probably honour robots.txt... except in practice
+        # we're most likely being explicitly triggered by a human rather than a
+        # bot, so are we really a robot?
+
         # XXX: horrible duplication with base_resource's _download_remote_file()
         file_id = random_string(24)
 
