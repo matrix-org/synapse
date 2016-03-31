@@ -244,7 +244,7 @@ class SimpleHttpClient(object):
     # The two should be factored out.
 
     @defer.inlineCallbacks
-    def get_file(self, url, output_stream, args={}, max_size=None):
+    def get_file(self, url, output_stream, max_size=None):
         """GETs a file from a given URL
         Args:
             url (str): The URL to GET
@@ -299,7 +299,11 @@ class _ReadBodyToFileProtocol(protocol.Protocol):
         self.stream.write(data)
         self.length += len(data)
         if self.max_size is not None and self.length >= self.max_size:
-            logger.warn("Requested URL is too large > %r bytes" % (self.max_size,))
+            self.deferred.errback(SynapseError(
+                502,
+                "Requested file is too large > %r bytes" % (self.max_size,),
+                Codes.TOO_LARGE,
+            ))
             self.deferred = defer.Deferred()
             self.transport.loseConnection()
 
