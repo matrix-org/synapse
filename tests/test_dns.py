@@ -69,8 +69,11 @@ class DnsTestCase(unittest.TestCase):
 
         service_name = "test_service.examle.com"
 
+        entry = Mock(spec_set=["expires"])
+        entry.expires = 999999999
+
         cache = {
-            service_name: [object()]
+            service_name: [entry]
         }
 
         servers = yield resolve_service(
