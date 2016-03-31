@@ -485,12 +485,12 @@ class EventsStore(SQLBaseStore):
             ],
         )
 
-        for event, _ in state_events_and_contexts:
-            if backfilled:
-                # Backfilled events come before the current state so shouldn't
-                # clobber it.
-                continue
+        if backfilled:
+            # Backfilled events come before the current state so we don't need
+            # to update the current state table
+            return
 
+        for event, _ in state_events_and_contexts:
             if (not event.internal_metadata.is_invite_from_remote()
                     and event.internal_metadata.is_outlier()):
                 # Outlier events generally shouldn't clobber the current state.
