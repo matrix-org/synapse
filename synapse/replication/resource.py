@@ -204,17 +204,28 @@ class ReplicationResource(Resource):
                 request_events = current_token.events
             if request_backfill is None:
                 request_backfill = current_token.backfill
-            events_rows, backfill_rows = yield self.store.get_all_new_events(
+            res = yield self.store.get_all_new_events(
                 request_backfill, request_events,
                 current_token.backfill, current_token.events,
                 limit
             )
-            writer.write_header_and_rows("events", events_rows, (
+            writer.write_header_and_rows("events", res.new_forward_events, (
                 "position", "internal", "json", "state_group"
             ))
-            writer.write_header_and_rows("backfill", backfill_rows, (
+            writer.write_header_and_rows("backfill", res.new_backfill_events, (
                 "position", "internal", "json", "state_group"
             ))
+            writer.write_header_and_rows(
+                "forward_ex_outliers", res.forward_ex_outliers,
+                ("position", "event_id", "state_group")
+            )
+            writer.write_header_and_rows(
+                "backward_ex_outliers", res.backward_ex_outliers,
+                ("position", "event_id", "state_group")
+            )
+            writer.write_header_and_rows(
+                "state_resets", res.state_resets, ("position",)
+            )
 
     @defer.inlineCallbacks
     def presence(self, writer, current_token):
