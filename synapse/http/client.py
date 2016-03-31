@@ -23,8 +23,9 @@ from canonicaljson import encode_canonical_json
 
 from twisted.internet import defer, reactor, ssl, protocol
 from twisted.web.client import (
-    RedirectAgent, Agent, readBody, FileBodyProducer, PartialDownloadError,
+    BrowserLikeRedirectAgent, Agent, readBody, FileBodyProducer, PartialDownloadError,
 )
+from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
 from twisted.web._newclient import ResponseDone
 
@@ -59,11 +60,11 @@ class SimpleHttpClient(object):
         # The default context factory in Twisted 14.0.0 (which we require) is
         # BrowserLikePolicyForHTTPS which will do regular cert validation
         # 'like a browser'
-        self.agent = RedirectAgent(Agent(
+        self.agent = Agent(
             reactor,
             connectTimeout=15,
             contextFactory=hs.get_http_client_context_factory()
-        ))
+        )
         self.user_agent = hs.version_string
         if hs.config.user_agent_suffix:
             self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix,)
@@ -253,10 +254,6 @@ class SimpleHttpClient(object):
             headers.
         """
 
-        def body_callback(method, url_bytes, headers_dict):
-            self.sign_request(destination, method, url_bytes, headers_dict)
-            return None
-
         response = yield self.request(
             "GET",
             url.encode("ascii"),
@@ -309,6 +306,10 @@ class _ReadBodyToFileProtocol(protocol.Protocol):
     def connectionLost(self, reason):
         if reason.check(ResponseDone):
             self.deferred.callback(self.length)
+        elif reason.check(PotentialDataLoss):
+            # stolen from https://github.com/twisted/treq/pull/49/files
+            # http://twistedmatrix.com/trac/ticket/4840
+            self.deferred.callback(self.length)
         else:
             self.deferred.errback(reason)
 
@@ -350,6 +351,24 @@ class CaptchaServerHttpClient(SimpleHttpClient):
             # twisted dislikes google's response, no content length.
             defer.returnValue(e.response)
 
+class SpiderHttpClient(SimpleHttpClient):
+    """
+    Separate HTTP client for spidering arbitrary URLs.
+    Special in that it follows retries and has a UA that looks
+    like a browser.
+
+    used by the preview_url endpoint in the content repo.
+    """
+    def __init__(self, hs):
+        SimpleHttpClient.__init__(self, hs)
+        # clobber the base class's agent and UA:
+        self.agent = BrowserLikeRedirectAgent(Agent(
+            reactor,
+            connectTimeout=15,
+            contextFactory=hs.get_http_client_context_factory()
+        ))
+        # Look like Chrome for now
+        #self.user_agent = ("Mozilla/5.0 (%s) (KHTML, like Gecko) Chrome Safari" % hs.version_string)
 
 def encode_urlencode_args(args):
     return {k: encode_urlencode_arg(v) for k, v in args.items()}

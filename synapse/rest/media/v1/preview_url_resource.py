@@ -19,7 +19,7 @@ from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
 from lxml import html
 from synapse.util.stringutils import random_string
-from synapse.http.client import SimpleHttpClient
+from synapse.http.client import SpiderHttpClient
 from synapse.http.server import request_handler, respond_with_json, respond_with_json_bytes
 
 import os
@@ -33,7 +33,7 @@ class PreviewUrlResource(BaseMediaResource):
 
     def __init__(self, hs, filepaths):
         BaseMediaResource.__init__(self, hs, filepaths)
-        self.client = SimpleHttpClient(hs)
+        self.client = SpiderHttpClient(hs)
 
     def render_GET(self, request):
         self._async_render_GET(request)
