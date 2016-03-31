@@ -261,8 +261,7 @@ class BaseHandler(object):
 
                 context = yield state_handler.compute_event_context(
                     builder,
-                    old_state=(prev_member_event,),
-                    outlier=True
+                    old_state=(prev_member_event,)
                 )
 
         if builder.is_state():
