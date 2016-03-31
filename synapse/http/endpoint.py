@@ -155,10 +155,10 @@ class SRVClientEndpoint(object):
 
 
 @defer.inlineCallbacks
-def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE):
+def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=time):
     cache_entry = cache.get(service_name, None)
     if cache_entry:
-        if all(s.expires > int(time.time()) for s in cache_entry):
+        if all(s.expires > int(clock.time()) for s in cache_entry):
             servers = list(cache_entry)
             defer.returnValue(servers)
 
@@ -199,7 +199,7 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE):
                         port=int(payload.port),
                         priority=int(payload.priority),
                         weight=int(payload.weight),
-                        expires=int(time.time()) + host_ttl,
+                        expires=int(clock.time()) + host_ttl,
                     ))
 
         servers.sort()
