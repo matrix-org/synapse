@@ -75,7 +75,8 @@ class StateHandler(object):
         self._state_cache.start()
 
     @defer.inlineCallbacks
-    def get_current_state(self, room_id, event_type=None, state_key=""):
+    def get_current_state(self, room_id, event_type=None, state_key="",
+                          latest_event_ids=None):
         """ Retrieves the current state for the room. This is done by
         calling `get_latest_events_in_room` to get the leading edges of the
         event graph and then resolving any of the state conflicts.
@@ -88,9 +89,10 @@ class StateHandler(object):
 
         :returns map from (type, state_key) to event
         """
-        event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
+        if not latest_event_ids:
+            latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
 
-        res = yield self.resolve_state_groups(room_id, event_ids)
+        res = yield self.resolve_state_groups(room_id, latest_event_ids)
         state = res[1]
 
         if event_type:
