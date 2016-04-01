@@ -411,7 +411,7 @@ class RoomMemberHandler(BaseHandler):
             address (str): The third party identifier (e.g. "foo@example.com").
 
         Returns:
-            (str) the matrix ID of the 3pid, or None if it is not recognized.
+            str: the matrix ID of the 3pid, or None if it is not recognized.
         """
         try:
             data = yield self.hs.get_simple_http_client().get_json(
@@ -545,29 +545,29 @@ class RoomMemberHandler(BaseHandler):
         """
         Asks an identity server for a third party invite.
 
-        :param id_server (str): hostname + optional port for the identity server.
-        :param medium (str): The literal string "email".
-        :param address (str): The third party address being invited.
-        :param room_id (str): The ID of the room to which the user is invited.
-        :param inviter_user_id (str): The user ID of the inviter.
-        :param room_alias (str): An alias for the room, for cosmetic
-            notifications.
-        :param room_avatar_url (str): The URL of the room's avatar, for cosmetic
-            notifications.
-        :param room_join_rules (str): The join rules of the email
-            (e.g. "public").
-        :param room_name (str): The m.room.name of the room.
-        :param inviter_display_name (str): The current display name of the
-            inviter.
-        :param inviter_avatar_url (str): The URL of the inviter's avatar.
+        Args:
+            id_server (str): hostname + optional port for the identity server.
+            medium (str): The literal string "email".
+            address (str): The third party address being invited.
+            room_id (str): The ID of the room to which the user is invited.
+            inviter_user_id (str): The user ID of the inviter.
+            room_alias (str): An alias for the room, for cosmetic notifications.
+            room_avatar_url (str): The URL of the room's avatar, for cosmetic
+                notifications.
+            room_join_rules (str): The join rules of the email (e.g. "public").
+            room_name (str): The m.room.name of the room.
+            inviter_display_name (str): The current display name of the
+                inviter.
+            inviter_avatar_url (str): The URL of the inviter's avatar.
 
-        :return: A deferred tuple containing:
-            token (str): The token which must be signed to prove authenticity.
-            public_keys ([{"public_key": str, "key_validity_url": str}]):
-                public_key is a base64-encoded ed25519 public key.
-            fallback_public_key: One element from public_keys.
-            display_name (str): A user-friendly name to represent the invited
-                user.
+        Returns:
+            A deferred tuple containing:
+                token (str): The token which must be signed to prove authenticity.
+                public_keys ([{"public_key": str, "key_validity_url": str}]):
+                    public_key is a base64-encoded ed25519 public key.
+                fallback_public_key: One element from public_keys.
+                display_name (str): A user-friendly name to represent the invited
+                    user.
         """
 
         is_url = "%s%s/_matrix/identity/api/v1/store-invite" % (

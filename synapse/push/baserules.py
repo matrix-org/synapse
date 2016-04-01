@@ -19,9 +19,11 @@ import copy
 def list_with_base_rules(rawrules):
     """Combine the list of rules set by the user with the default push rules
 
-    :param list rawrules: The rules the user has modified or set.
-    :returns: A new list with the rules set by the user combined with the
-        defaults.
+    Args:
+        rawrules(list): The rules the user has modified or set.
+
+    Returns:
+        A new list with the rules set by the user combined with the defaults.
     """
     ruleslist = []
 
