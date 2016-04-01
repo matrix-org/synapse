@@ -224,16 +224,19 @@ class LoginRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def do_jwt_login(self, login_submission):
-        token = login_submission['token']
+        token = login_submission.get("token", None)
         if token is None:
-            raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
+            raise LoginError(401, "Token field for JWT is missing",
+                             errcode=Codes.UNAUTHORIZED)
 
         try:
             payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
+        except jwt.ExpiredSignatureError:
+            raise LoginError(401, "JWT expired", errcode=Codes.UNAUTHORIZED)
         except InvalidTokenError:
             raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
 
-        user = payload['user']
+        user = payload.get("sub", None)
         if user is None:
             raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
 

@@ -30,6 +30,8 @@ class JWTConfig(Config):
 
     def default_config(self, **kwargs):
         return """\
+        # The JWT needs to contain a globally unique "sub" (subject) claim.
+        #
         # jwt_config:
         #    enabled: true
         #    secret: "a secret"
