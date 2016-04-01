@@ -98,6 +98,7 @@ class RoomMemberHandler(BaseHandler):
     @defer.inlineCallbacks
     def _local_membership_update(
         self, requester, target, room_id, membership,
+        prev_event_ids,
         txn_id=None,
         ratelimit=True,
     ):
@@ -120,6 +121,7 @@ class RoomMemberHandler(BaseHandler):
             },
             token_id=requester.access_token_id,
             txn_id=txn_id,
+            prev_event_ids=prev_event_ids,
         )
 
         yield self.handle_new_client_event(
@@ -268,6 +270,7 @@ class RoomMemberHandler(BaseHandler):
             membership=effective_membership_state,
             txn_id=txn_id,
             ratelimit=ratelimit,
+            prev_event_ids=latest_event_ids,
         )
 
     @defer.inlineCallbacks

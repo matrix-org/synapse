@@ -199,20 +199,25 @@ class BaseHandler(object):
             )
 
     @defer.inlineCallbacks
-    def _create_new_client_event(self, builder):
-        latest_ret = yield self.store.get_latest_event_ids_and_hashes_in_room(
-            builder.room_id,
-        )
-
-        if latest_ret:
-            depth = max([d for _, _, d in latest_ret]) + 1
+    def _create_new_client_event(self, builder, prev_event_ids=None):
+        if prev_event_ids:
+            prev_events = yield self.store.add_event_hashes(prev_event_ids)
+            prev_max_depth = yield self.store.get_max_depth_of_events(prev_event_ids)
+            depth = prev_max_depth + 1
         else:
-            depth = 1
+            latest_ret = yield self.store.get_latest_event_ids_and_hashes_in_room(
+                builder.room_id,
+            )
 
-        prev_events = [
-            (event_id, prev_hashes)
-            for event_id, prev_hashes, _ in latest_ret
-        ]
+            if latest_ret:
+                depth = max([d for _, _, d in latest_ret]) + 1
+            else:
+                depth = 1
+
+            prev_events = [
+                (event_id, prev_hashes)
+                for event_id, prev_hashes, _ in latest_ret
+            ]
 
         builder.prev_events = prev_events
         builder.depth = depth
