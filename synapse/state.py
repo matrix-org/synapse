@@ -86,7 +86,8 @@ class StateHandler(object):
         If `event_type` is specified, then the method returns only the one
         event (or None) with that `event_type` and `state_key`.
 
-        :returns map from (type, state_key) to event
+        Returns:
+            map from (type, state_key) to event
         """
         event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
 
@@ -176,10 +177,11 @@ class StateHandler(object):
         """ Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
 
-        :returns a Deferred tuple of (`state_group`, `state`, `prev_state`).
-        `state_group` is the name of a state group if one and only one is
-        involved. `state` is a map from (type, state_key) to event, and
-        `prev_state` is a list of event ids.
+        Returns:
+            a Deferred tuple of (`state_group`, `state`, `prev_state`).
+            `state_group` is the name of a state group if one and only one is
+            involved. `state` is a map from (type, state_key) to event, and
+            `prev_state` is a list of event ids.
         """
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
@@ -251,9 +253,10 @@ class StateHandler(object):
 
     def _resolve_events(self, state_sets, event_type=None, state_key=""):
         """
-        :returns a tuple (new_state, prev_states). new_state is a map
-        from (type, state_key) to event. prev_states is a list of event_ids.
-        :rtype: (dict[(str, str), synapse.events.FrozenEvent], list[str])
+        Returns
+            (dict[(str, str), synapse.events.FrozenEvent], list[str]): a tuple
+            (new_state, prev_states). new_state is a map from (type, state_key)
+            to event. prev_states is a list of event_ids.
         """
         with Measure(self.clock, "state._resolve_events"):
             state = {}

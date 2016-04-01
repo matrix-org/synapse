@@ -671,7 +671,8 @@ class SyncHandler(BaseHandler):
     def load_filtered_recents(self, room_id, sync_config, now_token,
                               since_token=None, recents=None, newly_joined_room=False):
         """
-        :returns a Deferred TimelineBatch
+        Returns:
+            a Deferred TimelineBatch
         """
         with Measure(self.clock, "load_filtered_recents"):
             filtering_factor = 2
@@ -838,8 +839,11 @@ class SyncHandler(BaseHandler):
         """
         Get the room state after the given event
 
-        :param synapse.events.EventBase event: event of interest
-        :return: A Deferred map from ((type, state_key)->Event)
+        Args:
+            event(synapse.events.EventBase): event of interest
+
+        Returns:
+            A Deferred map from ((type, state_key)->Event)
         """
         state = yield self.store.get_state_for_event(event.event_id)
         if event.is_state():
@@ -850,9 +854,13 @@ class SyncHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_state_at(self, room_id, stream_position):
         """ Get the room state at a particular stream position
-        :param str room_id: room for which to get state
-        :param StreamToken stream_position: point at which to get state
-        :returns: A Deferred map from ((type, state_key)->Event)
+
+        Args:
+            room_id(str): room for which to get state
+            stream_position(StreamToken): point at which to get state
+
+        Returns:
+            A Deferred map from ((type, state_key)->Event)
         """
         last_events, token = yield self.store.get_recent_events_for_room(
             room_id, end_token=stream_position.room_key, limit=1,
@@ -873,15 +881,18 @@ class SyncHandler(BaseHandler):
         """ Works out the differnce in state between the start of the timeline
         and the previous sync.
 
-        :param str room_id
-        :param TimelineBatch batch: The timeline batch for the room that will
-            be sent to the user.
-        :param sync_config
-        :param str since_token: Token of the end of the previous batch. May be None.
-        :param str now_token: Token of the end of the current batch.
-        :param bool full_state: Whether to force returning the full state.
+        Args:
+            room_id(str):
+            batch(synapse.handlers.sync.TimelineBatch): The timeline batch for
+                the room that will be sent to the user.
+            sync_config(synapse.handlers.sync.SyncConfig):
+            since_token(str|None): Token of the end of the previous batch. May
+                be None.
+            now_token(str): Token of the end of the current batch.
+            full_state(bool): Whether to force returning the full state.
 
-        :returns A new event dictionary
+        Returns:
+             A deferred new event dictionary
         """
         # TODO(mjark) Check if the state events were received by the server
         # after the previous sync, since we need to include those state
@@ -953,11 +964,13 @@ class SyncHandler(BaseHandler):
         Check if the user has just joined the given room (so should
         be given the full state)
 
-        :param sync_config:
-        :param dict[(str,str), synapse.events.FrozenEvent] state_delta: the
-           difference in state since the last sync
+        Args:
+            sync_config(synapse.handlers.sync.SyncConfig):
+            state_delta(dict[(str,str), synapse.events.FrozenEvent]): the
+                difference in state since the last sync
 
-        :returns A deferred Tuple (state_delta, limited)
+        Returns:
+             A deferred Tuple (state_delta, limited)
         """
         join_event = state_delta.get((
             EventTypes.Member, sync_config.user.to_string()), None)

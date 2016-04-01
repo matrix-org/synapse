@@ -41,8 +41,9 @@ class BaseHandler(object):
     """
     Common base class for the event handlers.
 
-    :type store: synapse.storage.events.StateStore
-    :type state_handler: synapse.state.StateHandler
+    Attributes:
+        store (synapse.storage.events.StateStore):
+        state_handler (synapse.state.StateHandler):
     """
 
     def __init__(self, hs):
@@ -65,11 +66,12 @@ class BaseHandler(object):
         """ Returns dict of user_id -> list of events that user is allowed to
         see.
 
-        :param (str, bool) user_tuples: (user id, is_peeking) for each
-            user to be checked. is_peeking should be true if:
-              * the user is not currently a member of the room, and:
-              * the user has not been a member of the room since the given
-                events
+        Args:
+            user_tuples (str, bool): (user id, is_peeking) for each user to be
+                checked. is_peeking should be true if:
+                * the user is not currently a member of the room, and:
+                * the user has not been a member of the room since the
+                given events
         """
         forgotten = yield defer.gatherResults([
             self.store.who_forgot_in_room(
@@ -165,13 +167,16 @@ class BaseHandler(object):
         """
         Check which events a user is allowed to see
 
-        :param str user_id: user id to be checked
-        :param [synapse.events.EventBase] events: list of events to be checked
-        :param bool is_peeking should be True if:
+        Args:
+            user_id(str): user id to be checked
+            events([synapse.events.EventBase]): list of events to be checked
+            is_peeking(bool): should be True if:
               * the user is not currently a member of the room, and:
               * the user has not been a member of the room since the given
                 events
-        :rtype [synapse.events.EventBase]
+
+        Returns:
+            [synapse.events.EventBase]
         """
         types = (
             (EventTypes.RoomHistoryVisibility, ""),
