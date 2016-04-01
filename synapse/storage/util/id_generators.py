@@ -49,17 +49,18 @@ class StreamIdGenerator(object):
     all ids less than or equal to it have completed. This handles the fact that
     persistence of events can complete out of order.
 
-    :param connection db_conn:  A database connection to use to fetch the
-        initial value of the generator from.
-    :param str table: A database table to read the initial value of the id
-        generator from.
-    :param str column: The column of the database table to read the initial
-        value from the id generator from.
-    :param list extra_tables: List of pairs of database tables and columns to
-        use to source the initial value of the generator from. The value with
-        the largest magnitude is used.
-    :param int step: which direction the stream ids grow in. +1 to grow
-        upwards, -1 to grow downwards.
+    Args:
+        db_conn(connection):  A database connection to use to fetch the
+            initial value of the generator from.
+        table(str): A database table to read the initial value of the id
+            generator from.
+        column(str): The column of the database table to read the initial
+            value from the id generator from.
+        extra_tables(list): List of pairs of database tables and columns to
+            use to source the initial value of the generator from. The value
+            with the largest magnitude is used.
+        step(int): which direction the stream ids grow in. +1 to grow
+            upwards, -1 to grow downwards.
 
     Usage:
         with stream_id_gen.get_next() as stream_id:
