@@ -74,84 +74,93 @@ class PreviewUrlResource(BaseMediaResource):
             elif self._is_html(media_info['media_type']):
                 # TODO: somehow stop a big HTML tree from exploding synapse's RAM
 
-                # XXX: can't work out how to make lxml ignore UTF8 decoding errors
-                # so slurp as a string at this point.
-                file = open(media_info['filename'])
-                body = file.read()
-                file.close()
-                # FIXME: we shouldn't be forcing utf-8 if the page isn't actually utf-8...
-                tree = html.fromstring(body.decode('utf-8','ignore'))
-                # tree = html.parse(media_info['filename'])
+                def _calc_og():
+                    # suck it up into lxml and define our OG response.
+                    # if we see any URLs in the OG response, then spider them
+                    # (although the client could choose to do this by asking for previews of those URLs to avoid DoSing the server)
 
-                # suck it up into lxml and define our OG response.
-                # if we see any URLs in the OG response, then spider them
-                # (although the client could choose to do this by asking for previews of those URLs to avoid DoSing the server)
+                    # "og:type"        : "article"
+                    # "og:url"         : "https://twitter.com/matrixdotorg/status/684074366691356672"
+                    # "og:title"       : "Matrix on Twitter"
+                    # "og:image"       : "https://pbs.twimg.com/profile_images/500400952029888512/yI0qtFi7_400x400.png"
+                    # "og:description" : "Synapse 0.12 is out! Lots of polishing, performance &amp;amp; bugfixes: /sync API, /r0 prefix, fulltext search, 3PID invites https://t.co/5alhXLLEGP"
+                    # "og:site_name"   : "Twitter"
+                    
+                    # or:
 
-                # "og:type"        : "article"
-                # "og:url"         : "https://twitter.com/matrixdotorg/status/684074366691356672"
-                # "og:title"       : "Matrix on Twitter"
-                # "og:image"       : "https://pbs.twimg.com/profile_images/500400952029888512/yI0qtFi7_400x400.png"
-                # "og:description" : "Synapse 0.12 is out! Lots of polishing, performance &amp;amp; bugfixes: /sync API, /r0 prefix, fulltext search, 3PID invites https://t.co/5alhXLLEGP"
-                # "og:site_name"   : "Twitter"
-                
-                # or:
+                    # "og:type"         : "video",
+                    # "og:url"          : "https://www.youtube.com/watch?v=LXDBoHyjmtw",
+                    # "og:site_name"    : "YouTube",
+                    # "og:video:type"   : "application/x-shockwave-flash",
+                    # "og:description"  : " ",
+                    # "og:title"        : "RemoteJam - Matrix team hack for Disrupt Europe Hackathon",
+                    # "og:image"        : "https://i.ytimg.com/vi/LXDBoHyjmtw/maxresdefault.jpg",
+                    # "og:video:url"    : "http://www.youtube.com/v/LXDBoHyjmtw?version=3&autohide=1",
+                    # "og:video:width"  : "1280"
+                    # "og:video:height" : "720",
+                    # "og:video:secure_url": "https://www.youtube.com/v/LXDBoHyjmtw?version=3&autohide=1",
 
-                # "og:type"         : "video",
-                # "og:url"          : "https://www.youtube.com/watch?v=LXDBoHyjmtw",
-                # "og:site_name"    : "YouTube",
-                # "og:video:type"   : "application/x-shockwave-flash",
-                # "og:description"  : " ",
-                # "og:title"        : "RemoteJam - Matrix team hack for Disrupt Europe Hackathon",
-                # "og:image"        : "https://i.ytimg.com/vi/LXDBoHyjmtw/maxresdefault.jpg",
-                # "og:video:url"    : "http://www.youtube.com/v/LXDBoHyjmtw?version=3&autohide=1",
-                # "og:video:width"  : "1280"
-                # "og:video:height" : "720",
-                # "og:video:secure_url": "https://www.youtube.com/v/LXDBoHyjmtw?version=3&autohide=1",
+                    og = {}
+                    for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
+                        og[tag.attrib['property']] = tag.attrib['content']
 
-                og = {}
-                for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
-                    og[tag.attrib['property']] = tag.attrib['content']
+                    if 'og:title' not in og:
+                        # do some basic spidering of the HTML
+                        title = tree.xpath("(//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1]")
+                        og['og:title'] = title[0].text if title else None
 
-                if not og:
-                    # do some basic spidering of the HTML
-                    title = tree.xpath("(//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1]")
-                    og['og:title'] = title[0].text if title else None
 
-                    images = [ i for i in tree.xpath("//img") if 'src' in i.attrib ]
-                    big_images = [ i for i in images if (
-                        'width' in i.attrib and 'height' in i.attrib and
-                        i.attrib['width'] > 64 and i.attrib['height'] > 64
-                    )]
-                    big_images = big_images.sort(key=lambda i: (-1 * int(i.attrib['width']) * int(i.attrib['height'])))
-                    images = big_images if big_images else images
-
-                    if images:
-                        base = list(urlparse(media_info['uri']))
-                        src = list(urlparse(images[0].attrib['src']))
-                        if not src[0] and not src[1]:
-                            src[0] = base[0]
-                            src[1] = base[1]
-                            if not src[2].startswith('/'):
-                                src[2] = re.sub(r'/[^/]+$', '/', base[2]) + src[2]
-                        og['og:image'] = urlunparse(src)
-
-                    text_nodes = tree.xpath("//h1/text() | //h2/text() | //h3/text() | //p/text() | //div/text() | //span/text() | //a/text()")
-                    # text_nodes = tree.xpath("//h1/text() | //h2/text() | //h3/text() | //p/text() | //div/text()")
-                    text = ''
-                    for text_node in text_nodes:
-                        if len(text) < 1024:
-                            text += text_node + ' '
+                    if 'og:image' not in og:
+                        meta_image = tree.xpath("//*/meta[@itemprop='image']/@content");
+                        if meta_image:
+                            og['og:image'] = self._rebase_url(meta_image[0], media_info['uri'])
                         else:
-                            break
-                    text = re.sub(r'[\t ]+', ' ', text)
-                    text = re.sub(r'[\t \r\n]*[\r\n]+', '\n', text)
-                    text = text.strip()[:1024]
-                    og['og:description'] = text if text else None
+                            images = [ i for i in tree.xpath("//img") if 'src' in i.attrib ]
+                            big_images = [ i for i in images if (
+                                'width' in i.attrib and 'height' in i.attrib and
+                                i.attrib['width'] > 64 and i.attrib['height'] > 64
+                            )]
+                            big_images = big_images.sort(key=lambda i: (-1 * int(i.attrib['width']) * int(i.attrib['height'])))
+                            images = big_images if big_images else images
 
-                # TODO: extract a favicon?
-                # TODO: turn any OG media URLs into mxc URLs to capture and thumbnail them too
-                # TODO: store our OG details in a cache (and expire them when stale)
-                # TODO: delete the content to stop diskfilling, as we only ever cared about its OG
+                            if images:
+                                og['og:image'] = self._rebase_url(images[0].attrib['src'], media_info['uri'])
+
+                    if 'og:description' not in og:
+                        meta_description = tree.xpath("//*/meta[@name='description']/@content");
+                        if meta_description:
+                            og['og:description'] = meta_description[0]
+                        else:
+                            text_nodes = tree.xpath("//h1/text() | //h2/text() | //h3/text() | //p/text() | //div/text() | //span/text() | //a/text()")
+                            # text_nodes = tree.xpath("//h1/text() | //h2/text() | //h3/text() | //p/text() | //div/text()")
+                            text = ''
+                            for text_node in text_nodes:
+                                if len(text) < 500:
+                                    text += text_node + ' '
+                                else:
+                                    break
+                            text = re.sub(r'[\t ]+', ' ', text)
+                            text = re.sub(r'[\t \r\n]*[\r\n]+', '\n', text)
+                            text = text.strip()[:500]
+                            og['og:description'] = text if text else None
+
+                    # TODO: extract a favicon?
+                    # TODO: turn any OG media URLs into mxc URLs to capture and thumbnail them too
+                    # TODO: store our OG details in a cache (and expire them when stale)
+                    # TODO: delete the content to stop diskfilling, as we only ever cared about its OG
+                    return og
+
+                try:
+                    tree = html.parse(media_info['filename'])
+                    og = _calc_og()
+                except UnicodeDecodeError:
+                    # XXX: evil evil bodge
+                    file = open(media_info['filename'])
+                    body = file.read()
+                    file.close()
+                    tree = html.fromstring(body.decode('utf-8','ignore'))
+                    og = _calc_og()
+
             else:
                 logger.warn("Failed to find any OG data in %s", url)
                 og = {}
@@ -173,6 +182,15 @@ class PreviewUrlResource(BaseMediaResource):
             )
             raise
 
+    def _rebase_url(self, url, base):
+        base = list(urlparse(base))
+        url = list(urlparse(url))
+        if not url[0] and not url[1]:
+            url[0] = base[0]
+            url[1] = base[1]
+            if not url[2].startswith('/'):
+                url[2] = re.sub(r'/[^/]+$', '/', base[2]) + url[2]
+        return urlunparse(url)
 
     @defer.inlineCallbacks
     def _download_url(self, url, user):
@@ -223,7 +241,7 @@ class PreviewUrlResource(BaseMediaResource):
                 download_name = None
 
             yield self.store.store_local_media(
-                media_id=fname,
+                media_id=file_id,
                 media_type=media_type,
                 time_now_ms=self.clock.time_msec(),
                 upload_name=download_name,
