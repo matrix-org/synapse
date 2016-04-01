@@ -97,7 +97,7 @@ class DataStore(RoomMemberStore, RoomStore,
             db_conn, "events", "stream_ordering"
         )
         self._backfill_id_gen = StreamIdGenerator(
-            db_conn, "events", "stream_ordering", direction=-1
+            db_conn, "events", "stream_ordering", step=-1
         )
         self._receipts_id_gen = StreamIdGenerator(
             db_conn, "receipts_linearized", "stream_id"
