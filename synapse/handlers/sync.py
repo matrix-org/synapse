@@ -252,6 +252,18 @@ class SyncHandler(BaseHandler):
         archived = []
         deferreds = []
 
+        user_id = sync_config.user.to_string()
+
+        def _should_include_room(event):
+            # Always send down rooms we were banned or kicked from.
+            if not sync_config.filter_collection.include_leave:
+                if event.membership == Membership.LEAVE:
+                    if user_id == event.sender:
+                        return False
+            return True
+
+        room_list = filter(_should_include_room, room_list)
+
         room_list_chunks = [room_list[i:i + 10] for i in xrange(0, len(room_list), 10)]
         for room_list_chunk in room_list_chunks:
             for event in room_list_chunk:
@@ -276,12 +288,6 @@ class SyncHandler(BaseHandler):
                         invite=invite,
                     ))
                 elif event.membership in (Membership.LEAVE, Membership.BAN):
-                    # Always send down rooms we were banned or kicked from.
-                    if not sync_config.filter_collection.include_leave:
-                        if event.membership == Membership.LEAVE:
-                            if sync_config.user.to_string() == event.sender:
-                                continue
-
                     leave_token = now_token.copy_and_replace(
                         "room_key", "s%d" % (event.stream_ordering,)
                     )
