@@ -121,7 +121,7 @@ def concurrently_execute(func, args, limit):
         limit (int): Maximum number of conccurent executions.
 
     Returns:
-        deferred
+        deferred: Resolved when all function invocations have finished.
     """
     it = iter(args)
 
