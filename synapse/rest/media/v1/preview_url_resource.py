@@ -63,9 +63,6 @@ class PreviewUrlResource(BaseMediaResource):
             url = request.args.get("url")[0]
             ts = request.args.get("ts")[0] if "ts" in request.args else self.clock.time_msec()
 
-            # TODO: keep track of whether there's an ongoing request for this preview
-            # and block and return their details if there is one.
-
             # first check the memory cache - good to handle all the clients on this
             # HS thundering away to preview the same URL at the same time.
             try:
