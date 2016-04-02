@@ -170,7 +170,7 @@ class PreviewUrlResource(BaseMediaResource):
 
         if 'og:image' not in og:
             # TODO: extract a favicon failing all else
-            meta_image = tree.xpath("//*/meta[@itemprop='image']/@content");
+            meta_image = tree.xpath("//*/meta[translate(@itemprop, 'IMAGE', 'image')='image']/@content");
             if meta_image:
                 og['og:image'] = self._rebase_url(meta_image[0], media_info['uri'])
             else:
@@ -198,7 +198,7 @@ class PreviewUrlResource(BaseMediaResource):
                 del og["og:image"]
 
         if 'og:description' not in og:
-            meta_description = tree.xpath("//*/meta[@name='description']/@content");
+            meta_description = tree.xpath("//*/meta[translate(@name, 'DESCRIPTION', 'description')='description']/@content");
             if meta_description:
                 og['og:description'] = meta_description[0]
             else:
