@@ -228,6 +228,8 @@ class ThumbnailResource(BaseMediaResource):
     @defer.inlineCallbacks
     def _respond_default_thumbnail(self, request, media_info, width, height,
                                    method, m_type):
+        # XXX: how is this meant to work? store.get_default_thumbnails
+        # appears to always return [] so won't this always 404?
         media_type = media_info["media_type"]
         top_level_type = media_type.split("/")[0]
         sub_type = media_type.split("/")[-1].split(";")[0]
