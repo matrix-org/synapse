@@ -23,6 +23,7 @@ from synapse.util.stringutils import random_string
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.http.client import SpiderHttpClient
 from synapse.http.server import request_handler, respond_with_json, respond_with_json_bytes
+from synapse.util.async import ObservableDeferred
 
 import os
 import re
@@ -45,6 +46,8 @@ class PreviewUrlResource(BaseMediaResource):
             expiry_ms = 60*60*1000, # don't spider URLs more often than once an hour
         )
         self.cache.start()
+
+        self.downloads = {}
 
     def render_GET(self, request):
         self._async_render_GET(request)
@@ -86,7 +89,21 @@ class PreviewUrlResource(BaseMediaResource):
                 )
                 return
 
-            media_info = yield self._download_url(url, requester.user)
+            # Ensure only one download for a given URL is active at a time
+            download = self.downloads.get(url)
+            if download is None:
+                download = self._download_url(url, requester.user)
+                download = ObservableDeferred(
+                    download,
+                    consumeErrors=True
+                )
+                self.downloads[url] = download
+
+                @download.addBoth
+                def callback(media_info):
+                    del self.downloads[key]
+                    return media_info
+            media_info = yield download.observe()
 
             # FIXME: we should probably update our cache now anyway, so that
             # even if the OG calculation raises, we don't keep hammering on the
