@@ -251,8 +251,8 @@ class SimpleHttpClient(object):
             url (str): The URL to GET
             output_stream (file): File to write the response body to.
         Returns:
-            A (int,dict) tuple of the file length and a dict of the response
-            headers.
+            A (int,dict,string,int) tuple of the file length, dict of the response
+            headers, absolute URI of the response and HTTP response code.
         """
 
         response = yield self.request(
@@ -287,7 +287,7 @@ class SimpleHttpClient(object):
             logger.exception("Failed to download body")
             raise
 
-        defer.returnValue((length, headers, response.request.absoluteURI))
+        defer.returnValue((length, headers, response.request.absoluteURI, response.code))
 
 
 # XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.

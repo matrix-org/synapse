@@ -37,6 +37,8 @@ class PreviewUrlResource(BaseMediaResource):
     def __init__(self, hs, filepaths):
         BaseMediaResource.__init__(self, hs, filepaths)
         self.client = SpiderHttpClient(hs)
+
+        # simple memory cache mapping urls to OG metadata
         self.cache = ExpiringCache(
             cache_name = "url_previews",
             clock = self.clock,
@@ -56,16 +58,40 @@ class PreviewUrlResource(BaseMediaResource):
             # XXX: if get_user_by_req fails, what should we do in an async render?
             requester = yield self.auth.get_user_by_req(request)
             url = request.args.get("url")[0]
-
-            if self.cache:
-                og = self.cache.get(url)
-                respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
-                return
+            ts = request.args.get("ts")[0] if "ts" in request.args else self.clock.time_msec()
 
             # TODO: keep track of whether there's an ongoing request for this preview
             # and block and return their details if there is one.
 
+            # first check the memory cache - good to handle all the clients on this
+            # HS thundering away to preview the same URL at the same time.
+            try:
+                og = self.cache[url]
+                respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
+                return
+            except:
+                pass
+
+            # then check the URL cache in the DB (which will also provide us with
+            # historical previews, if we have any)
+            cache_result = yield self.store.get_url_cache(url, ts)
+            if (
+                cache_result and
+                cache_result["download_ts"] + cache_result["expires"] > ts and
+                cache_result["response_code"] / 100 == 2
+            ):
+                respond_with_json_bytes(
+                    request, 200, cache_result["og"].encode('utf-8'),
+                    send_cors=True
+                )
+                return
+
             media_info = yield self._download_url(url, requester.user)
+
+            # FIXME: we should probably update our cache now anyway, so that
+            # even if the OG calculation raises, we don't keep hammering on the
+            # remote server.  For now, leave it uncached to aid debugging OG
+            # calculation problems
 
             logger.debug("got media_info of '%s'" % media_info)
 
@@ -105,10 +131,21 @@ class PreviewUrlResource(BaseMediaResource):
                 logger.warn("Failed to find any OG data in %s", url)
                 og = {}
 
-            if self.cache:
-                self.cache[url] = og
+            logger.debug("Calculated OG for %s as %s" % (url, og));
 
-            logger.warn(og);
+            # store OG in ephemeral in-memory cache
+            self.cache[url] = og
+
+            # store OG in history-aware DB cache
+            yield self.store.store_url_cache(
+                url,
+                media_info["response_code"],
+                media_info["etag"],
+                media_info["expires"],
+                json.dumps(og),
+                media_info["filesystem_id"],
+                media_info["created_ts"],
+            )
 
             respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
         except:
@@ -187,6 +224,9 @@ class PreviewUrlResource(BaseMediaResource):
                     og['og:image'] = self._rebase_url(images[0].attrib['src'], media_info['uri'])
 
         # pre-cache the image for posterity
+        # FIXME: it might be cleaner to use the same flow as the main /preview_url request itself
+        # and benefit from the same caching etc.  But for now we just rely on the caching
+        # of the master request to speed things up.
         if 'og:image' in og and og['og:image']:
             image_info = yield self._download_url(og['og:image'], requester.user)
 
@@ -226,7 +266,6 @@ class PreviewUrlResource(BaseMediaResource):
                 text = text.strip()[:500]
                 og['og:description'] = text if text else None
 
-        # TODO: persist a cache mapping { url, etag } -> { og, mxc of url (if we bother keeping it around), age }
         # TODO: delete the url downloads to stop diskfilling, as we only ever cared about its OG
         defer.returnValue(og);
 
@@ -256,7 +295,7 @@ class PreviewUrlResource(BaseMediaResource):
         try:
             with open(fname, "wb") as f:
                 logger.debug("Trying to get url '%s'" % url)
-                length, headers, uri = yield self.client.get_file(
+                length, headers, uri, code = yield self.client.get_file(
                     url, output_stream=f, max_size=self.max_spider_size,
                 )
                 # FIXME: pass through 404s and other error messages nicely
@@ -311,6 +350,11 @@ class PreviewUrlResource(BaseMediaResource):
             "filesystem_id": file_id,
             "filename": fname,
             "uri": uri,
+            "response_code": code,
+            # FIXME: we should calculate a proper expiration based on the
+            # Cache-Control and Expire headers.  But for now, assume 1 hour.
+            "expires": 60 * 60 * 1000,
+            "etag": headers["ETag"] if "ETag" in headers else None,
         })
 
     def _is_media(self, content_type):
