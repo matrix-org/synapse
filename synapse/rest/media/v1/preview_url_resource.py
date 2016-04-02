@@ -200,7 +200,7 @@ class PreviewUrlResource(BaseMediaResource):
                     og["og:image:height"] = dims['height']
                 else:
                     logger.warn("Couldn't get dims for %s" % og["og:image"])
-                    
+
                 og["og:image"] = "mxc://%s/%s" % (self.server_name, image_info['filesystem_id'])
                 og["og:image:type"] = image_info['media_type']
             else:
@@ -259,7 +259,8 @@ class PreviewUrlResource(BaseMediaResource):
                 length, headers, uri = yield self.client.get_file(
                     url, output_stream=f, max_size=self.max_spider_size,
                 )
-                # FIXME: handle 404s sanely - don't spider an error page
+                # FIXME: pass through 404s and other error messages nicely
+
             media_type = headers["Content-Type"][0]
             time_now_ms = self.clock.time_msec()
 

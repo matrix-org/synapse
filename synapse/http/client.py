@@ -23,7 +23,8 @@ from canonicaljson import encode_canonical_json
 
 from twisted.internet import defer, reactor, ssl, protocol
 from twisted.web.client import (
-    BrowserLikeRedirectAgent, Agent, readBody, FileBodyProducer, PartialDownloadError,
+    BrowserLikeRedirectAgent, ContentDecoderAgent, GzipDecoder, Agent,
+    readBody, FileBodyProducer, PartialDownloadError,
 )
 from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
@@ -269,6 +270,10 @@ class SimpleHttpClient(object):
             # XXX: do we want to explicitly drop the connection here somehow? if so, how?
             raise # what should we be raising here?
 
+        if response.code > 299:
+            logger.warn("Got %d when downloading %s" % (response.code, url))
+            raise
+
         # TODO: if our Content-Type is HTML or something, just read the first
         # N bytes into RAM rather than saving it all to disk only to read it
         # straight back in again
@@ -366,11 +371,11 @@ class SpiderHttpClient(SimpleHttpClient):
     def __init__(self, hs):
         SimpleHttpClient.__init__(self, hs)
         # clobber the base class's agent and UA:
-        self.agent = BrowserLikeRedirectAgent(Agent(
+        self.agent = ContentDecoderAgent(BrowserLikeRedirectAgent(Agent(
             reactor,
             connectTimeout=15,
             contextFactory=hs.get_http_client_context_factory()
-        ))
+        )), [('gzip', GzipDecoder)])
         # Look like Chrome for now
         #self.user_agent = ("Mozilla/5.0 (%s) (KHTML, like Gecko) Chrome Safari" % hs.version_string)
 
