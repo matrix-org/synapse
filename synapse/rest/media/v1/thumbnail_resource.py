@@ -72,6 +72,11 @@ class ThumbnailResource(BaseMediaResource):
             self._respond_404(request)
             return
 
+        if media_info["media_type"] == "image/svg+xml":
+            file_path = self.filepaths.local_media_filepath(media_id)
+            yield self._respond_with_file(request, media_info["media_type"], file_path)
+            return
+
         thumbnail_infos = yield self.store.get_local_media_thumbnails(media_id)
 
         if thumbnail_infos:
@@ -101,6 +106,11 @@ class ThumbnailResource(BaseMediaResource):
 
         if not media_info:
             self._respond_404(request)
+            return
+
+        if media_info["media_type"] == "image/svg+xml":
+            file_path = self.filepaths.local_media_filepath(media_id)
+            yield self._respond_with_file(request, media_info["media_type"], file_path)
             return
 
         thumbnail_infos = yield self.store.get_local_media_thumbnails(media_id)
@@ -137,6 +147,11 @@ class ThumbnailResource(BaseMediaResource):
                                              desired_width, desired_height,
                                              desired_method, desired_type):
         media_info = yield self._get_remote_media(server_name, media_id)
+
+        if media_info["media_type"] == "image/svg+xml":
+            file_path = self.filepaths.remote_media_filepath(server_name, media_id)
+            yield self._respond_with_file(request, media_info["media_type"], file_path)
+            return
 
         thumbnail_infos = yield self.store.get_remote_media_thumbnails(
             server_name, media_id,
@@ -180,6 +195,11 @@ class ThumbnailResource(BaseMediaResource):
         # TODO: Don't download the whole remote file
         # We should proxy the thumbnail from the remote server instead.
         media_info = yield self._get_remote_media(server_name, media_id)
+
+        if media_info["media_type"] == "image/svg+xml":
+            file_path = self.filepaths.remote_media_filepath(server_name, media_id)
+            yield self._respond_with_file(request, media_info["media_type"], file_path)
+            return
 
         thumbnail_infos = yield self.store.get_remote_media_thumbnails(
             server_name, media_id,
