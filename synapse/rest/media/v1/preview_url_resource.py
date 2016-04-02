@@ -78,9 +78,13 @@ class PreviewUrlResource(BaseMediaResource):
                     "og:description" : media_info['download_name'],
                     "og:image" : "mxc://%s/%s" % (self.server_name, media_info['filesystem_id']),
                     "og:image:type" : media_info['media_type'],
-                    "og:image:width" : dims['width'],
-                    "og:image:height" : dims['height'],
                 }
+
+                if dims:
+                    og["og:image:width"] = dims['width']
+                    og["og:image:height"] = dims['height']
+                else:
+                    logger.warn("Couldn't get dims for %s" % url)
 
                 # define our OG response for this media
             elif self._is_html(media_info['media_type']):
@@ -174,6 +178,7 @@ class PreviewUrlResource(BaseMediaResource):
             if meta_image:
                 og['og:image'] = self._rebase_url(meta_image[0], media_info['uri'])
             else:
+                # TODO: consider inlined CSS styles as well as width & height attribs
                 images = tree.xpath("//img[@src][number(@width)>10][number(@height)>10]")
                 images = sorted(images, key=lambda i: (-1 * int(i.attrib['width']) * int(i.attrib['height'])))
                 if not images:
@@ -190,10 +195,14 @@ class PreviewUrlResource(BaseMediaResource):
                 dims = yield self._generate_local_thumbnails(
                         image_info['filesystem_id'], image_info
                       )
+                if dims:
+                    og["og:image:width"] = dims['width']
+                    og["og:image:height"] = dims['height']
+                else:
+                    logger.warn("Couldn't get dims for %s" % og["og:image"])
+                    
                 og["og:image"] = "mxc://%s/%s" % (self.server_name, image_info['filesystem_id'])
                 og["og:image:type"] = image_info['media_type']
-                og["og:image:width"] = dims['width']
-                og["og:image:height"] = dims['height']
             else:
                 del og["og:image"]
 
