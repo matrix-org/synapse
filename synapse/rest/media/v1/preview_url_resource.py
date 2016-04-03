@@ -131,6 +131,7 @@ class PreviewUrlResource(BaseMediaResource):
                         self.server_name, media_info['filesystem_id']
                     ),
                     "og:image:type": media_info['media_type'],
+                    "matrix:image:size": media_info['media_length'],
                 }
 
                 if dims:
@@ -269,6 +270,7 @@ class PreviewUrlResource(BaseMediaResource):
                     self.server_name, image_info['filesystem_id']
                 )
                 og["og:image:type"] = image_info['media_type']
+                og["matrix:image:size"] = image_info['media_length']
             else:
                 del og["og:image"]
 
