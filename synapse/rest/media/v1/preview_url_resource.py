@@ -61,7 +61,7 @@ class PreviewUrlResource(BaseMediaResource):
             # XXX: if get_user_by_req fails, what should we do in an async render?
             requester = yield self.auth.get_user_by_req(request)
             url = request.args.get("url")[0]
-            ts = request.args.get("ts")[0] if "ts" in request.args else self.clock.time_msec()
+            ts = int(request.args.get("ts")[0]) if "ts" in request.args else self.clock.time_msec()
 
             # first check the memory cache - good to handle all the clients on this
             # HS thundering away to preview the same URL at the same time.
@@ -368,7 +368,7 @@ class PreviewUrlResource(BaseMediaResource):
             # FIXME: we should calculate a proper expiration based on the
             # Cache-Control and Expire headers.  But for now, assume 1 hour.
             "expires": 60 * 60 * 1000,
-            "etag": headers["ETag"] if "ETag" in headers else None,
+            "etag": headers["ETag"][0] if "ETag" in headers else None,
         })
 
     def _is_media(self, content_type):
