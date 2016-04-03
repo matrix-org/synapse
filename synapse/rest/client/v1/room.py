@@ -405,6 +405,42 @@ class RoomEventContext(ClientV1RestServlet):
         defer.returnValue((200, results))
 
 
+class RoomForgetRestServlet(ClientV1RestServlet):
+    def register(self, http_server):
+        PATTERNS = ("/rooms/(?P<room_id>[^/]*)/forget")
+        register_txn_path(self, PATTERNS, http_server)
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, room_id, txn_id=None):
+        requester = yield self.auth.get_user_by_req(
+            request,
+            allow_guest=False,
+        )
+
+        yield self.handlers.room_member_handler.forget(
+            user=requester.user,
+            room_id=room_id,
+        )
+
+        defer.returnValue((200, {}))
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, room_id, txn_id):
+        try:
+            defer.returnValue(
+                self.txns.get_client_transaction(request, txn_id)
+            )
+        except KeyError:
+            pass
+
+        response = yield self.on_POST(
+            request, room_id, txn_id
+        )
+
+        self.txns.store_client_transaction(request, txn_id, response)
+        defer.returnValue(response)
+
+
 # TODO: Needs unit testing
 class RoomMembershipRestServlet(ClientV1RestServlet):
 
@@ -624,6 +660,7 @@ def register_servlets(hs, http_server):
     RoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
+    RoomForgetRestServlet(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
     RoomSendEventRestServlet(hs).register(http_server)
     PublicRoomListRestServlet(hs).register(http_server)

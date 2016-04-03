@@ -503,13 +503,14 @@ class Notifier(object):
     def wait_for_replication(self, callback, timeout):
         """Wait for an event to happen.
 
-        :param callback:
-            Gets called whenever an event happens. If this returns a truthy
-            value then ``wait_for_replication`` returns, otherwise it waits
-            for another event.
-        :param int timeout:
-            How many milliseconds to wait for callback return a truthy value.
-        :returns:
+        Args:
+            callback: Gets called whenever an event happens. If this returns a
+                truthy value then ``wait_for_replication`` returns, otherwise
+                it waits for another event.
+            timeout: How many milliseconds to wait for callback return a truthy
+                value.
+
+        Returns:
             A deferred that resolves with the value returned by the callback.
         """
         listener = _NotificationListener(None)

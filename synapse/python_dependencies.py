@@ -37,6 +37,7 @@ REQUIREMENTS = {
     "pysaml2>=3.0.0,<4.0.0": ["saml2>=3.0.0,<4.0.0"],
     "pymacaroons-pynacl": ["pymacaroons"],
     "lxml>=3.6.0": ["lxml"],
+    "pyjwt": ["jwt"],
 }
 CONDITIONAL_REQUIREMENTS = {
     "web_client": {

@@ -38,6 +38,7 @@ STREAM_NAMES = (
     ("backfill",),
     ("push_rules",),
     ("pushers",),
+    ("state",),
 )
 
 
@@ -123,6 +124,7 @@ class ReplicationResource(Resource):
         backfill_token = yield self.store.get_current_backfill_token()
         push_rules_token, room_stream_token = self.store.get_push_rules_stream_token()
         pushers_token = self.store.get_pushers_stream_token()
+        state_token = self.store.get_state_stream_token()
 
         defer.returnValue(_ReplicationToken(
             room_stream_token,
@@ -133,6 +135,7 @@ class ReplicationResource(Resource):
             backfill_token,
             push_rules_token,
             pushers_token,
+            state_token,
         ))
 
     @request_handler
@@ -156,6 +159,7 @@ class ReplicationResource(Resource):
             yield self.receipts(writer, current_token, limit)
             yield self.push_rules(writer, current_token, limit)
             yield self.pushers(writer, current_token, limit)
+            yield self.state(writer, current_token, limit)
             self.streams(writer, current_token)
 
             logger.info("Replicated %d rows", writer.total)
@@ -200,16 +204,27 @@ class ReplicationResource(Resource):
                 request_events = current_token.events
             if request_backfill is None:
                 request_backfill = current_token.backfill
-            events_rows, backfill_rows = yield self.store.get_all_new_events(
+            res = yield self.store.get_all_new_events(
                 request_backfill, request_events,
                 current_token.backfill, current_token.events,
                 limit
             )
+            writer.write_header_and_rows("events", res.new_forward_events, (
+                "position", "internal", "json", "state_group"
+            ))
+            writer.write_header_and_rows("backfill", res.new_backfill_events, (
+                "position", "internal", "json", "state_group"
+            ))
             writer.write_header_and_rows(
-                "events", events_rows, ("position", "internal", "json")
+                "forward_ex_outliers", res.forward_ex_outliers,
+                ("position", "event_id", "state_group")
             )
             writer.write_header_and_rows(
-                "backfill", backfill_rows, ("position", "internal", "json")
+                "backward_ex_outliers", res.backward_ex_outliers,
+                ("position", "event_id", "state_group")
+            )
+            writer.write_header_and_rows(
+                "state_resets", res.state_resets, ("position",)
             )
 
     @defer.inlineCallbacks
@@ -320,6 +335,24 @@ class ReplicationResource(Resource):
                 "position", "user_id", "app_id", "pushkey"
             ))
 
+    @defer.inlineCallbacks
+    def state(self, writer, current_token, limit):
+        current_position = current_token.state
+
+        state = parse_integer(writer.request, "state")
+        if state is not None:
+            state_groups, state_group_state = (
+                yield self.store.get_all_new_state_groups(
+                    state, current_position, limit
+                )
+            )
+            writer.write_header_and_rows("state_groups", state_groups, (
+                "position", "room_id", "event_id"
+            ))
+            writer.write_header_and_rows("state_group_state", state_group_state, (
+                "position", "type", "state_key", "event_id"
+            ))
+
 
 class _Writer(object):
     """Writes the streams as a JSON object as the response to the request"""
@@ -350,7 +383,7 @@ class _Writer(object):
 
 class _ReplicationToken(collections.namedtuple("_ReplicationToken", (
     "events", "presence", "typing", "receipts", "account_data", "backfill",
-    "push_rules", "pushers"
+    "push_rules", "pushers", "state"
 ))):
     __slots__ = []
 
