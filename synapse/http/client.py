@@ -15,7 +15,9 @@
 from OpenSSL import SSL
 from OpenSSL.SSL import VERIFY_NONE
 
-from synapse.api.errors import CodeMessageException
+from synapse.api.errors import (
+    CodeMessageException, SynapseError, Codes,
+)
 from synapse.util.logcontext import preserve_context_over_fn
 import synapse.metrics
 
@@ -268,7 +270,7 @@ class SimpleHttpClient(object):
         if 'Content-Length' in headers and headers['Content-Length'] > max_size:
             logger.warn("Requested URL is too large > %r bytes" % (self.max_size,))
             # XXX: do we want to explicitly drop the connection here somehow? if so, how?
-            raise # what should we be raising here?
+            raise  # what should we be raising here?
 
         if response.code > 299:
             logger.warn("Got %d when downloading %s" % (response.code, url))
@@ -331,6 +333,7 @@ def _readBodyToFile(response, stream, max_size):
     response.deliverBody(_ReadBodyToFileProtocol(stream, d, max_size))
     return d
 
+
 class CaptchaServerHttpClient(SimpleHttpClient):
     """
     Separate HTTP client for talking to google's captcha servers
@@ -360,6 +363,7 @@ class CaptchaServerHttpClient(SimpleHttpClient):
             # twisted dislikes google's response, no content length.
             defer.returnValue(e.response)
 
+
 class SpiderHttpClient(SimpleHttpClient):
     """
     Separate HTTP client for spidering arbitrary URLs.
@@ -376,8 +380,10 @@ class SpiderHttpClient(SimpleHttpClient):
             connectTimeout=15,
             contextFactory=hs.get_http_client_context_factory()
         )), [('gzip', GzipDecoder)])
-        # Look like Chrome for now
-        #self.user_agent = ("Mozilla/5.0 (%s) (KHTML, like Gecko) Chrome Safari" % hs.version_string)
+        # We could look like Chrome:
+        # self.user_agent = ("Mozilla/5.0 (%s) (KHTML, like Gecko)
+        #                   Chrome Safari" % hs.version_string)
+
 
 def encode_urlencode_args(args):
     return {k: encode_urlencode_arg(v) for k, v in args.items()}

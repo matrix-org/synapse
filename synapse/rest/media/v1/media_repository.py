@@ -80,4 +80,3 @@ class MediaRepositoryResource(Resource):
         self.putChild("thumbnail", ThumbnailResource(hs, filepaths))
         self.putChild("identicon", IdenticonResource())
         self.putChild("preview_url", PreviewUrlResource(hs, filepaths))
-

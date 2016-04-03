@@ -87,7 +87,8 @@ class MediaRepositoryStore(SQLBaseStore):
             "get_url_cache", get_url_cache_txn
         )
 
-    def store_url_cache(self, url, response_code, etag, expires, og, media_id, download_ts):
+    def store_url_cache(self, url, response_code, etag, expires, og, media_id,
+                        download_ts):
         return self._simple_insert(
             "local_media_repository_url_cache",
             {
