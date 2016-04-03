@@ -235,14 +235,14 @@ class PreviewUrlResource(BaseMediaResource):
                 if not images:
                     images = tree.xpath("//img[@src]")
                 if images:
-                    og['og:image'] = self._rebase_url(images[0].attrib['src'], media_info['uri'])
+                    og['og:image'] = images[0].attrib['src']
 
         # pre-cache the image for posterity
         # FIXME: it might be cleaner to use the same flow as the main /preview_url request itself
         # and benefit from the same caching etc.  But for now we just rely on the caching
         # of the master request to speed things up.
         if 'og:image' in og and og['og:image']:
-            image_info = yield self._download_url(og['og:image'], requester.user)
+            image_info = yield self._download_url(self._rebase_url(og['og:image'], media_info['uri']), requester.user)
 
             if self._is_media(image_info['media_type']):
                 # TODO: make sure we don't choke on white-on-transparent images
@@ -286,9 +286,9 @@ class PreviewUrlResource(BaseMediaResource):
     def _rebase_url(self, url, base):
         base = list(urlparse(base))
         url = list(urlparse(url))
-        if not url[0]:
+        if not url[0]: # fix up schema
             url[0] = base[0] or "http"
-        if not url[1]:
+        if not url[1]: # fix up hostname
             url[1] = base[1]
             if not url[2].startswith('/'):
                 url[2] = re.sub(r'/[^/]+$', '/', base[2]) + url[2]
