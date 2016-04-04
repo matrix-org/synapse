@@ -367,7 +367,8 @@ class EventsStore(SQLBaseStore):
                 event
                 for event, _ in events_and_contexts
                 if event.type == EventTypes.Member
-            ]
+            ],
+            backfilled=backfilled,
         )
 
         def event_dict(event):
@@ -485,14 +486,8 @@ class EventsStore(SQLBaseStore):
             return
 
         for event, _ in state_events_and_contexts:
-            if (not event.internal_metadata.is_invite_from_remote()
-                    and event.internal_metadata.is_outlier()):
-                # Outlier events generally shouldn't clobber the current state.
-                # However invites from remote severs for rooms we aren't in
-                # are a bit special: they don't come with any associated
-                # state so are technically an outlier, however all the
-                # client-facing code assumes that they are in the current
-                # state table so we insert the event anyway.
+            if event.internal_metadata.is_outlier():
+                # Outlier events shouldn't clobber the current state.
                 continue
 
             if context.rejected:
