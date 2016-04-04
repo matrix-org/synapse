@@ -66,11 +66,15 @@ class RoomMemberStore(SQLBaseStore):
                 self.get_invited_rooms_for_user.invalidate, (event.state_key,)
             )
 
-            is_mine = self.hs.is_mine_id(event.state_key)
+            # We update the local_invites table only if the event is "current",
+            # i.e., its something that has just happened.
+            # The only current event that can also be an outlier is if its an
+            # invite that has come in across federation.
             is_new_state = not backfilled and (
                 not event.internal_metadata.is_outlier()
                 or event.internal_metadata.is_invite_from_remote()
             )
+            is_mine = self.hs.is_mine_id(event.state_key)
             if is_new_state and is_mine:
                 if event.membership == Membership.INVITE:
                     self._simple_insert_txn(
@@ -163,7 +167,17 @@ class RoomMemberStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def get_inviter(self, user_id, room_id):
+    def get_invite_for_user_in_room(self, user_id, room_id):
+        """Gets the invite for the given user and room
+
+        Args:
+            user_id (str)
+            room_id (str)
+
+        Returns:
+            Deferred: Resolves to either a RoomsForUser or None if no invite was
+                found.
+        """
         invites = yield self.get_invited_rooms_for_user(user_id)
         for invite in invites:
             if invite.room_id == room_id:
