@@ -204,20 +204,25 @@ class BaseHandler(object):
             )
 
     @defer.inlineCallbacks
-    def _create_new_client_event(self, builder):
-        latest_ret = yield self.store.get_latest_event_ids_and_hashes_in_room(
-            builder.room_id,
-        )
-
-        if latest_ret:
-            depth = max([d for _, _, d in latest_ret]) + 1
+    def _create_new_client_event(self, builder, prev_event_ids=None):
+        if prev_event_ids:
+            prev_events = yield self.store.add_event_hashes(prev_event_ids)
+            prev_max_depth = yield self.store.get_max_depth_of_events(prev_event_ids)
+            depth = prev_max_depth + 1
         else:
-            depth = 1
+            latest_ret = yield self.store.get_latest_event_ids_and_hashes_in_room(
+                builder.room_id,
+            )
 
-        prev_events = [
-            (event_id, prev_hashes)
-            for event_id, prev_hashes, _ in latest_ret
-        ]
+            if latest_ret:
+                depth = max([d for _, _, d in latest_ret]) + 1
+            else:
+                depth = 1
+
+            prev_events = [
+                (event_id, prev_hashes)
+                for event_id, prev_hashes, _ in latest_ret
+            ]
 
         builder.prev_events = prev_events
         builder.depth = depth
@@ -225,49 +230,6 @@ class BaseHandler(object):
         state_handler = self.state_handler
 
         context = yield state_handler.compute_event_context(builder)
-
-        # If we've received an invite over federation, there are no latest
-        # events in the room, because we don't know enough about the graph
-        # fragment we received to treat it like a graph, so the above returned
-        # no relevant events. It may have returned some events (if we have
-        # joined and left the room), but not useful ones, like the invite.
-        if (
-            not self.is_host_in_room(context.current_state) and
-            builder.type == EventTypes.Member
-        ):
-            prev_member_event = yield self.store.get_room_member(
-                builder.sender, builder.room_id
-            )
-
-            # The prev_member_event may already be in context.current_state,
-            # despite us not being present in the room; in particular, if
-            # inviting user, and all other local users, have already left.
-            #
-            # In that case, we have all the information we need, and we don't
-            # want to drop "context" - not least because we may need to handle
-            # the invite locally, which will require us to have the whole
-            # context (not just prev_member_event) to auth it.
-            #
-            context_event_ids = (
-                e.event_id for e in context.current_state.values()
-            )
-
-            if (
-                prev_member_event and
-                prev_member_event.event_id not in context_event_ids
-            ):
-                # The prev_member_event is missing from context, so it must
-                # have arrived over federation and is an outlier. We forcibly
-                # set our context to the invite we received over federation
-                builder.prev_events = (
-                    prev_member_event.event_id,
-                    prev_member_event.prev_events
-                )
-
-                context = yield state_handler.compute_event_context(
-                    builder,
-                    old_state=(prev_member_event,)
-                )
 
         if builder.is_state():
             builder.prev_state = yield self.store.add_event_hashes(
