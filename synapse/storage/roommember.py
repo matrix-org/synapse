@@ -75,7 +75,7 @@ class RoomMemberStore(SQLBaseStore):
                 if event.membership == Membership.INVITE:
                     self._simple_insert_txn(
                         txn,
-                        table="invites",
+                        table="local_invites",
                         values={
                             "event_id": event.event_id,
                             "invitee": event.state_key,
@@ -86,7 +86,7 @@ class RoomMemberStore(SQLBaseStore):
                     )
                 else:
                     sql = (
-                        "UPDATE invites SET stream_id = ?, replaced_by = ? WHERE"
+                        "UPDATE local_invites SET stream_id = ?, replaced_by = ? WHERE"
                         " room_id = ? AND invitee = ? AND locally_rejected is NULL"
                         " AND replaced_by is NULL"
                     )
@@ -239,7 +239,7 @@ class RoomMemberStore(SQLBaseStore):
         if do_invite:
             sql = (
                 "SELECT i.room_id, inviter, i.event_id, e.stream_ordering"
-                " FROM invites as i"
+                " FROM local_invites as i"
                 " INNER JOIN events as e USING (event_id)"
                 " WHERE invitee = ? AND locally_rejected is NULL"
                 " AND replaced_by is NULL"
