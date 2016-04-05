@@ -94,7 +94,8 @@ class DataStore(RoomMemberStore, RoomStore,
         )
 
         self._stream_id_gen = StreamIdGenerator(
-            db_conn, "events", "stream_ordering"
+            db_conn, "events", "stream_ordering",
+            extra_tables=[("local_invites", "stream_id")]
         )
         self._backfill_id_gen = StreamIdGenerator(
             db_conn, "events", "stream_ordering", step=-1

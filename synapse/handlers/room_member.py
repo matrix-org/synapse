@@ -258,10 +258,20 @@ class RoomMemberHandler(BaseHandler):
                 else:
                     # send the rejection to the inviter's HS.
                     remote_room_hosts = remote_room_hosts + [inviter.domain]
-                    ret = yield self.reject_remote_invite(
-                        target.to_string(), room_id, remote_room_hosts
-                    )
-                    defer.returnValue(ret)
+
+                    try:
+                        ret = yield self.reject_remote_invite(
+                            target.to_string(), room_id, remote_room_hosts
+                        )
+                        defer.returnValue(ret)
+                    except SynapseError as e:
+                        logger.warn("Failed to reject invite: %s", e)
+
+                        yield self.store.locally_reject_invite(
+                            target.to_string(), room_id
+                        )
+
+                        defer.returnValue({})
 
         yield self._local_membership_update(
             requester=requester,
