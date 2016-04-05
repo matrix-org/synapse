@@ -36,6 +36,8 @@ import xml.etree.ElementTree as ET
 import jwt
 from jwt.exceptions import InvalidTokenError
 
+import ldap
+
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +49,7 @@ class LoginRestServlet(ClientV1RestServlet):
     CAS_TYPE = "m.login.cas"
     TOKEN_TYPE = "m.login.token"
     JWT_TYPE = "m.login.jwt"
+    LDAP_TYPE = "m.login.ldap"
 
     def __init__(self, hs):
         super(LoginRestServlet, self).__init__(hs)
@@ -56,6 +59,13 @@ class LoginRestServlet(ClientV1RestServlet):
         self.jwt_enabled = hs.config.jwt_enabled
         self.jwt_secret = hs.config.jwt_secret
         self.jwt_algorithm = hs.config.jwt_algorithm
+        self.ldap_enabled = hs.config.ldap_enabled
+        self.ldap_server = hs.config.ldap_server
+        self.ldap_port = hs.config.ldap_port
+        self.ldap_search_base = hs.config.ldap_search_base
+        self.ldap_search_property = hs.config.ldap_search_property
+        self.ldap_email_property = hs.config.ldap_email_property
+        self.ldap_full_name_property = hs.config.ldap_full_name_property
         self.cas_enabled = hs.config.cas_enabled
         self.cas_server_url = hs.config.cas_server_url
         self.cas_required_attributes = hs.config.cas_required_attributes
@@ -64,6 +74,8 @@ class LoginRestServlet(ClientV1RestServlet):
 
     def on_GET(self, request):
         flows = []
+        if self.ldap_enabled:
+            flows.append({"type": LoginRestServlet.LDAP_TYPE})
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
         if self.saml2_enabled:
@@ -107,6 +119,10 @@ class LoginRestServlet(ClientV1RestServlet):
                     "uri": "%s%s" % (self.idp_redirect_url, relay_state)
                 }
                 defer.returnValue((200, result))
+            elif self.ldap_enabled and (login_submission["type"] ==
+                                       LoginRestServlet.JWT_TYPE):
+                result = yield self.do_ldap_login(login_submission)
+                defer.returnValue(result)
             elif self.jwt_enabled and (login_submission["type"] ==
                                        LoginRestServlet.JWT_TYPE):
                 result = yield self.do_jwt_login(login_submission)
@@ -159,6 +175,50 @@ class LoginRestServlet(ClientV1RestServlet):
         }
 
         defer.returnValue((200, result))
+
+    @defer.inlineCallbacks
+    def do_ldap_login(self, login_submission):
+        if 'medium' in login_submission and 'address' in login_submission:
+            user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
+                login_submission['medium'], login_submission['address']
+            )
+            if not user_id:
+                raise LoginError(403, "", errcode=Codes.FORBIDDEN)
+        else:
+            user_id = login_submission['user']
+
+        if not user_id.startswith('@'):
+            user_id = UserID.create(
+                user_id, self.hs.hostname
+            ).to_string()
+
+        # FIXME check against LDAP Server!!
+
+        auth_handler = self.handlers.auth_handler
+        user_exists = yield auth_handler.does_user_exist(user_id)
+        if user_exists:
+            user_id, access_token, refresh_token = (
+                yield auth_handler.get_login_tuple_for_user_id(user_id)
+            )
+            result = {
+                "user_id": user_id,  # may have changed
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "home_server": self.hs.hostname,
+            }
+
+        else:
+            user_id, access_token = (
+                yield self.handlers.registration_handler.register(localpart=user_id.localpart)
+            )
+            result = {
+                "user_id": user_id,  # may have changed
+                "access_token": access_token,
+                "home_server": self.hs.hostname,
+            }
+
+        defer.returnValue((200, result))
+
 
     @defer.inlineCallbacks
     def do_token_login(self, login_submission):
