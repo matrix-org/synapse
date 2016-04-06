@@ -107,10 +107,6 @@ class LoginRestServlet(ClientV1RestServlet):
                     "uri": "%s%s" % (self.idp_redirect_url, relay_state)
                 }
                 defer.returnValue((200, result))
-            elif self.ldap_enabled and (login_submission["type"] ==
-                                       LoginRestServlet.JWT_TYPE):
-                result = yield self.do_ldap_login(login_submission)
-                defer.returnValue(result)
             elif self.jwt_enabled and (login_submission["type"] ==
                                        LoginRestServlet.JWT_TYPE):
                 result = yield self.do_jwt_login(login_submission)
@@ -163,7 +159,6 @@ class LoginRestServlet(ClientV1RestServlet):
         }
 
         defer.returnValue((200, result))
-
 
     @defer.inlineCallbacks
     def do_token_login(self, login_submission):
