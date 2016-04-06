@@ -71,9 +71,6 @@ class SlavedEventStore(BaseSlavedStore):
 
     get_current_state = DataStore.get_current_state.__func__
     get_current_state_for_key = DataStore.get_current_state_for_key.__func__
-    _get_rooms_for_user_where_membership_is_txn = (
-        DataStore._get_rooms_for_user_where_membership_is_txn.__func__
-    )
     get_rooms_for_user_where_membership_is = (
         DataStore.get_rooms_for_user_where_membership_is.__func__
     )
@@ -95,6 +92,10 @@ class SlavedEventStore(BaseSlavedStore):
     _fetch_events_txn = DataStore._fetch_events_txn.__func__
     _fetch_event_rows = DataStore._fetch_event_rows.__func__
     _get_event_from_row_txn = DataStore._get_event_from_row_txn.__func__
+    _get_rooms_for_user_where_membership_is_txn = (
+        DataStore._get_rooms_for_user_where_membership_is_txn.__func__
+    )
+    _get_members_rows_txn = DataStore._get_members_rows_txn.__func__
 
     def stream_positions(self):
         result = super(SlavedEventStore, self).stream_positions()
