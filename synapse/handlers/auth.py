@@ -358,7 +358,6 @@ class AuthHandler(BaseHandler):
             logger.warn("Failed password login for user %s", user_id)
             raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
-
         logger.info("Logging in user %s", user_id)
         access_token = yield self.issue_access_token(user_id)
         refresh_token = yield self.issue_refresh_token(user_id)
@@ -466,8 +465,8 @@ class AuthHandler(BaseHandler):
             l.simple_bind_s(dn.encode('utf-8'), password.encode('utf-8'))
 
             if not (yield self.does_user_exist(user_id)):
+                handler = self.hs.get_handlers().registration_handler
                 user_id, access_token = (
-                    handler = self.hs.get_handlers().registration_handler
                     yield handler.register(localpart=local_name)
                 )
 
