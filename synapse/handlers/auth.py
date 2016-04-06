@@ -230,7 +230,9 @@ class AuthHandler(BaseHandler):
         if not user_id.startswith('@'):
             user_id = UserID.create(user_id, self.hs.hostname).to_string()
 
-        self._check_password(user_id, password)
+        if not (yield self._check_password(user_id, password)):
+            logger.warn("Failed password login for user %s", user_id)
+            raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
         defer.returnValue(user_id)
 
@@ -356,7 +358,7 @@ class AuthHandler(BaseHandler):
             LoginError if there was an authentication problem.
         """
 
-        if not self._check_password(user_id, password):
+        if not (yield self._check_password(user_id, password)):
             logger.warn("Failed password login for user %s", user_id)
             raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
