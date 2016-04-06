@@ -1134,7 +1134,7 @@ class EventsStore(SQLBaseStore):
                     upper_bound = current_forward_id
 
                 sql = (
-                    "SELECT -event_stream_ordering FROM current_state_resets"
+                    "SELECT event_stream_ordering FROM current_state_resets"
                     " WHERE ? < event_stream_ordering"
                     " AND event_stream_ordering <= ?"
                     " ORDER BY event_stream_ordering ASC"
@@ -1143,7 +1143,7 @@ class EventsStore(SQLBaseStore):
                 state_resets = txn.fetchall()
 
                 sql = (
-                    "SELECT -event_stream_ordering, event_id, state_group"
+                    "SELECT event_stream_ordering, event_id, state_group"
                     " FROM ex_outlier_stream"
                     " WHERE ? > event_stream_ordering"
                     " AND event_stream_ordering >= ?"
