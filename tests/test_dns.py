@@ -21,6 +21,8 @@ from mock import Mock
 
 from synapse.http.endpoint import resolve_service
 
+from tests.utils import MockClock
+
 
 class DnsTestCase(unittest.TestCase):
 
@@ -63,9 +65,34 @@ class DnsTestCase(unittest.TestCase):
         self.assertEquals(servers[0].host, ip_address)
 
     @defer.inlineCallbacks
-    def test_from_cache(self):
+    def test_from_cache_expired_and_dns_fail(self):
         dns_client_mock = Mock()
         dns_client_mock.lookupService.return_value = defer.fail(error.DNSServerError())
+
+        service_name = "test_service.examle.com"
+
+        entry = Mock(spec_set=["expires"])
+        entry.expires = 0
+
+        cache = {
+            service_name: [entry]
+        }
+
+        servers = yield resolve_service(
+            service_name, dns_client=dns_client_mock, cache=cache
+        )
+
+        dns_client_mock.lookupService.assert_called_once_with(service_name)
+
+        self.assertEquals(len(servers), 1)
+        self.assertEquals(servers, cache[service_name])
+
+    @defer.inlineCallbacks
+    def test_from_cache(self):
+        clock = MockClock()
+
+        dns_client_mock = Mock(spec_set=['lookupService'])
+        dns_client_mock.lookupService = Mock(spec_set=[])
 
         service_name = "test_service.examle.com"
 
@@ -77,10 +104,10 @@ class DnsTestCase(unittest.TestCase):
         }
 
         servers = yield resolve_service(
-            service_name, dns_client=dns_client_mock, cache=cache
+            service_name, dns_client=dns_client_mock, cache=cache, clock=clock,
         )
 
-        dns_client_mock.lookupService.assert_called_once_with(service_name)
+        self.assertFalse(dns_client_mock.lookupService.called)
 
         self.assertEquals(len(servers), 1)
         self.assertEquals(servers, cache[service_name])
