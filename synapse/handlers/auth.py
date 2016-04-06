@@ -62,7 +62,6 @@ class AuthHandler(BaseHandler):
             import ldap
             logger.info("Import ldap version: %s", ldap.__version__)
 
-
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
 
     @defer.inlineCallbacks
