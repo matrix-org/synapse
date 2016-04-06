@@ -14,14 +14,14 @@
 
 from ._base import BaseSlavedStoreTestCase
 
-from synapse.types import UserID
 from synapse.events import FrozenEvent
 from synapse.events.snapshot import EventContext
+from synapse.storage.roommember import RoomsForUser
 
 from twisted.internet import defer
 
 USER_ID = "@feeling:blue"
-USER = UserID.from_string(USER_ID)
+USER_ID_2 = "@bright:blue"
 OUTLIER = {"outlier": True}
 ROOM_ID = "!room:blue"
 
@@ -69,16 +69,66 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             "get_room_name_and_aliases", (ROOM_ID,), (None, [])
         )
 
+    @defer.inlineCallbacks
+    def test_room_members(self):
+        create = yield self.persist(type="m.room.create", key="", creator=USER_ID)
+        yield self.replicate()
+        yield self.check("get_rooms_for_user", (USER_ID,), [])
+        yield self.check("get_users_in_room", (ROOM_ID,), [])
+
+        # Join the room.
+        join = yield self.persist(type="m.room.member", key=USER_ID, membership="join")
+        yield self.replicate()
+        yield self.check("get_rooms_for_user", (USER_ID,), [RoomsForUser(
+            room_id=ROOM_ID,
+            sender=USER_ID,
+            membership="join",
+            event_id=join.event_id,
+            stream_ordering=join.internal_metadata.stream_ordering,
+        )])
+        yield self.check("get_users_in_room", (ROOM_ID,), [USER_ID])
+
+        # Leave the room.
+        yield self.persist(type="m.room.member", key=USER_ID, membership="leave")
+        yield self.replicate()
+        yield self.check("get_rooms_for_user", (USER_ID,), [])
+        yield self.check("get_users_in_room", (ROOM_ID,), [])
+
+        # Add some other user to the room.
+        join = yield self.persist(type="m.room.member", key=USER_ID_2, membership="join")
+        yield self.replicate()
+        yield self.check("get_rooms_for_user", (USER_ID_2,), [RoomsForUser(
+            room_id=ROOM_ID,
+            sender=USER_ID,
+            membership="join",
+            event_id=join.event_id,
+            stream_ordering=join.internal_metadata.stream_ordering,
+        )])
+        yield self.check("get_users_in_room", (ROOM_ID,), [USER_ID_2])
+
+        # Join the room clobbering the state.
+        # This should remove any evidence of the other user being in the room.
+        yield self.persist(
+            type="m.room.member", key=USER_ID, membership="join",
+            reset_state=[create]
+        )
+        yield self.replicate()
+        yield self.check("get_users_in_room", (ROOM_ID,), [USER_ID])
+        yield self.check("get_rooms_for_user", (USER_ID_2,), [])
+
     event_id = 0
 
     @defer.inlineCallbacks
     def persist(
-            self, sender=USER_ID, room_id=ROOM_ID, type={}, key=None,
-            internal={},
-            state=None, reset_state=False, backfill=False,
-            depth=None, prev_events=[], auth_events=[], prev_state=[],
-            **content
+        self, sender=USER_ID, room_id=ROOM_ID, type={}, key=None, internal={},
+        state=None, reset_state=False, backfill=False,
+        depth=None, prev_events=[], auth_events=[], prev_state=[],
+        **content
     ):
+        """
+        Returns:
+            synapse.events.FrozenEvent: The event that was persisted.
+        """
         if depth is None:
             depth = self.event_id
 
@@ -103,12 +153,17 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
         context = EventContext(current_state=state)
 
+        ordering = None
         if backfill:
             yield self.master_store.persist_events(
                 [(event, context)], backfilled=True
             )
         else:
-            yield self.master_store.persist_event(
+            ordering, _ = yield self.master_store.persist_event(
                 event, context, current_state=reset_state
             )
+
+        if ordering:
+            event.internal_metadata.stream_ordering = ordering
+
         defer.returnValue(event)
