@@ -30,6 +30,8 @@ import simplejson
 
 import synapse.util.stringutils as stringutils
 
+import ldap
+
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,15 @@ class AuthHandler(BaseHandler):
         self.bcrypt_rounds = hs.config.bcrypt_rounds
         self.sessions = {}
         self.INVALID_TOKEN_HTTP_STATUS = 401
+
+        self.ldap_enabled = hs.config.ldap_enabled
+        self.ldap_server = hs.config.ldap_server
+        self.ldap_port = hs.config.ldap_port
+        self.ldap_search_base = hs.config.ldap_search_base
+        self.ldap_search_property = hs.config.ldap_search_property
+        self.ldap_email_property = hs.config.ldap_email_property
+        self.ldap_full_name_property = hs.config.ldap_full_name_property
+
 
     @defer.inlineCallbacks
     def check_auth(self, flows, clientdict, clientip):
@@ -215,8 +226,8 @@ class AuthHandler(BaseHandler):
         if not user_id.startswith('@'):
             user_id = UserID.create(user_id, self.hs.hostname).to_string()
 
-        user_id, password_hash = yield self._find_user_id_and_pwd_hash(user_id)
-        self._check_password(user_id, password, password_hash)
+        self._check_password(user_id, password)
+
         defer.returnValue(user_id)
 
     @defer.inlineCallbacks
@@ -340,8 +351,8 @@ class AuthHandler(BaseHandler):
             StoreError if there was a problem storing the token.
             LoginError if there was an authentication problem.
         """
-        user_id, password_hash = yield self._find_user_id_and_pwd_hash(user_id)
-        self._check_password(user_id, password, password_hash)
+
+        self._check_password(user_id, password)
 
         logger.info("Logging in user %s", user_id)
         access_token = yield self.issue_access_token(user_id)
@@ -407,11 +418,42 @@ class AuthHandler(BaseHandler):
         else:
             defer.returnValue(user_infos.popitem())
 
-    def _check_password(self, user_id, password, stored_hash):
+    def _check_password(self, user_id, password):
         """Checks that user_id has passed password, raises LoginError if not."""
-        if not self.validate_hash(password, stored_hash):
+
+        if not (self._check_ldap_password(user_id, password) or self._check_local_password(user_id, password)):
             logger.warn("Failed password login for user %s", user_id)
             raise LoginError(403, "", errcode=Codes.FORBIDDEN)
+
+    def _check_local_password(self, user_id, password):
+        user_id, password_hash = yield self._find_user_id_and_pwd_hash(user_id)
+        return not self.validate_hash(password, password_hash)
+
+    def _check_ldap_password(self, user_id, password):
+        if not self.ldap_enabled:
+            return False
+
+        logger.info("Authenticating %s with LDAP" % user_id)
+        try:
+            l = ldap.initialize("%s:%s" % (ldap_server, ldap_port))
+            if self.ldap_tls:
+                logger.debug("Initiating TLS")
+                self._connection.start_tls_s()
+
+            dn = "%s=%s, %s" % (ldap_search_property, user_id.localpart, ldap_search_base)
+            logger.debug("DN for LDAP authentication: %s" % dn)
+
+            l.simple_bind_s(dn.encode('utf-8'), password.encode('utf-8'))
+
+            if not self.does_user_exist(user_id):
+                user_id, access_token = (
+                    yield self.handlers.registration_handler.register(localpart=user_id.localpart)
+                )
+
+            return True
+        except ldap.LDAPError, e:
+            logger.info(e)
+            return False
 
     @defer.inlineCallbacks
     def issue_access_token(self, user_id):
