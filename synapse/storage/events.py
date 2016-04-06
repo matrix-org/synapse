@@ -61,6 +61,17 @@ class EventsStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def persist_events(self, events_and_contexts, backfilled=False):
+        """
+        Write events to the database
+        Args:
+            events_and_contexts: list of tuples of (event, context)
+            backfilled: ?
+
+        Returns: Tuple of stream_orderings where the first is the minimum and
+            last is the maximum stream ordering assigned to the events when
+            persisting.
+
+        """
         if not events_and_contexts:
             return
 
@@ -191,6 +202,7 @@ class EventsStore(SQLBaseStore):
             txn.call_after(self._get_current_state_for_key.invalidate_all)
             txn.call_after(self.get_rooms_for_user.invalidate_all)
             txn.call_after(self.get_users_in_room.invalidate, (event.room_id,))
+            txn.call_after(self.get_users_with_pushers_in_room.invalidate, (event.room_id,))
             txn.call_after(self.get_joined_hosts_for_room.invalidate, (event.room_id,))
             txn.call_after(self.get_room_name_and_aliases.invalidate, (event.room_id,))
 

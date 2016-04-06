@@ -70,11 +70,17 @@ def _get_rules(room_id, user_ids, store):
 
 @defer.inlineCallbacks
 def evaluator_for_room_id(room_id, hs, store):
-    results = yield store.get_receipts_for_room(room_id, "m.read")
-    user_ids = [
-        row["user_id"] for row in results
-        if hs.is_mine_id(row["user_id"])
-    ]
+    users_with_pushers = yield store.get_users_with_pushers_in_room(room_id)
+    receipts = yield store.get_receipts_for_room(room_id, "m.read")
+
+    # any users with pushers must be ours: they have pushers
+    user_ids = set(users_with_pushers)
+    for r in receipts:
+        if hs.is_mine_id(r['user_id']):
+            user_ids.add(r['user_id'])
+
+    user_ids = list(user_ids)
+
     rules_by_user = yield _get_rules(room_id, user_ids, store)
 
     defer.returnValue(BulkPushRuleEvaluator(
@@ -101,10 +107,15 @@ class BulkPushRuleEvaluator:
     def action_for_event_by_user(self, event, handler, current_state):
         actions_by_user = {}
 
-        users_dict = yield self.store.are_guests(self.rules_by_user.keys())
+        # None of these users can be peeking since this list of users comes
+        # from the set of users in the room, so we know for sure they're all
+        # actually in the room.
+        user_tuples = [
+            (u, False) for u in self.rules_by_user.keys()
+        ]
 
         filtered_by_user = yield handler.filter_events_for_clients(
-            users_dict.items(), [event], {event.event_id: current_state}
+            user_tuples, [event], {event.event_id: current_state}
         )
 
         room_members = yield self.store.get_users_in_room(self.room_id)

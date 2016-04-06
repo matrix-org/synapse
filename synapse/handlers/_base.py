@@ -21,7 +21,7 @@ from synapse.api.constants import Membership, EventTypes
 from synapse.types import UserID, RoomAlias, Requester
 from synapse.push.action_generator import ActionGenerator
 
-from synapse.util.logcontext import PreserveLoggingContext
+from synapse.util.logcontext import PreserveLoggingContext, preserve_fn
 
 import logging
 
@@ -375,6 +375,12 @@ class BaseHandler(object):
 
         (event_stream_id, max_stream_id) = yield self.store.persist_event(
             event, context=context
+        )
+
+        # this intentionally does not yield: we don't care about the result
+        # and don't need to wait for it.
+        preserve_fn(self.hs.get_pusherpool().on_new_notifications)(
+            event_stream_id, max_stream_id
         )
 
         destinations = set()

@@ -319,26 +319,6 @@ class RegistrationStore(SQLBaseStore):
 
         defer.returnValue(res if res else False)
 
-    @cachedList(cache=is_guest.cache, list_name="user_ids", num_args=1,
-                inlineCallbacks=True)
-    def are_guests(self, user_ids):
-        sql = "SELECT name, is_guest FROM users WHERE name IN (%s)" % (
-            ",".join("?" for _ in user_ids),
-        )
-
-        rows = yield self._execute(
-            "are_guests", self.cursor_to_dict, sql, *user_ids
-        )
-
-        result = {user_id: False for user_id in user_ids}
-
-        result.update({
-            row["name"]: bool(row["is_guest"])
-            for row in rows
-        })
-
-        defer.returnValue(result)
-
     def _query_for_auth(self, txn, token):
         sql = (
             "SELECT users.name, users.is_guest, access_tokens.id as token_id"
