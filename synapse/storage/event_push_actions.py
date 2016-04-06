@@ -144,7 +144,7 @@ class EventPushActionsStore(SQLBaseStore):
             txn.execute("SELECT MAX(stream_ordering) FROM event_push_actions")
             return txn.fetchone()
         result = yield self.runInteraction(
-                "get_latest_push_action_stream_ordering", f
+            "get_latest_push_action_stream_ordering", f
         )
         defer.returnValue(result[0] or 0)
 
