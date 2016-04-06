@@ -26,13 +26,13 @@ SUPPORTED_MODULE = {
 }
 
 
-def create_engine(config):
-    name = config.database_config["name"]
+def create_engine(database_config):
+    name = database_config["name"]
     engine_class = SUPPORTED_MODULE.get(name, None)
 
     if engine_class:
         module = importlib.import_module(name)
-        return engine_class(module, config=config)
+        return engine_class(module)
 
     raise RuntimeError(
         "Unsupported database engine '%s'" % (name,)

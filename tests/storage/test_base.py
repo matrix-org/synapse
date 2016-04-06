@@ -53,7 +53,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             "test",
             db_pool=self.db_pool,
             config=config,
-            database_engine=create_engine(config),
+            database_engine=create_engine(config.database_config),
         )
 
         self.datastore = SQLBaseStore(hs)

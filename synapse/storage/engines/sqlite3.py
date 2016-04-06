@@ -13,9 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.prepare_database import (
-    prepare_database, prepare_sqlite3_database
-)
+from synapse.storage.prepare_database import prepare_database
 
 import struct
 
@@ -23,9 +21,8 @@ import struct
 class Sqlite3Engine(object):
     single_threaded = True
 
-    def __init__(self, database_module, config):
+    def __init__(self, database_module):
         self.module = database_module
-        self.config = config
 
     def check_database(self, txn):
         pass
@@ -34,12 +31,8 @@ class Sqlite3Engine(object):
         return sql
 
     def on_new_connection(self, db_conn):
-        self.prepare_database(db_conn)
+        prepare_database(db_conn, self, config=None)
         db_conn.create_function("rank", 1, _rank)
-
-    def prepare_database(self, db_conn):
-        prepare_sqlite3_database(db_conn)
-        prepare_database(db_conn, self, config=self.config)
 
     def is_deadlock(self, error):
         return False
