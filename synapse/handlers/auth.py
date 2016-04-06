@@ -30,8 +30,6 @@ import simplejson
 
 import synapse.util.stringutils as stringutils
 
-import ldap
-
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +57,9 @@ class AuthHandler(BaseHandler):
         self.ldap_search_property = hs.config.ldap_search_property
         self.ldap_email_property = hs.config.ldap_email_property
         self.ldap_full_name_property = hs.config.ldap_full_name_property
+
+        if self.ldap_enabled:
+            import ldap
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
 
@@ -444,6 +445,8 @@ class AuthHandler(BaseHandler):
         if not self.ldap_enabled:
             logger.info("LDAP not configured")
             defer.returnValue(False)
+
+        import ldap
 
         logger.info("Authenticating %s with LDAP" % user_id)
         try:
