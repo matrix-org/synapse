@@ -18,7 +18,7 @@ from synapse.storage.appservice import ApplicationServiceStore
 logger = logging.getLogger(__name__)
 
 
-def run_upgrade(cur, database_engine, config, *args, **kwargs):
+def run_create(cur, database_engine, *args, **kwargs):
     # NULL indicates user was not registered by an appservice.
     try:
         cur.execute("ALTER TABLE users ADD COLUMN appservice_id TEXT")
@@ -26,6 +26,8 @@ def run_upgrade(cur, database_engine, config, *args, **kwargs):
         # Maybe we already added the column? Hope so...
         pass
 
+
+def run_upgrade(cur, database_engine, config, *args, **kwargs):
     cur.execute("SELECT name FROM users")
     rows = cur.fetchall()
 
