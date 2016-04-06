@@ -60,6 +60,8 @@ class AuthHandler(BaseHandler):
 
         if self.ldap_enabled:
             import ldap
+            logger.info("Import ldap version: %s", ldap.__version__)
+
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
 
