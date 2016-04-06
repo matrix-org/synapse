@@ -54,11 +54,13 @@ class AuthHandler(BaseHandler):
         self.ldap_enabled = hs.config.ldap_enabled
         self.ldap_server = hs.config.ldap_server
         self.ldap_port = hs.config.ldap_port
+        self.ldap_tls = hs.config.ldap_tls
         self.ldap_search_base = hs.config.ldap_search_base
         self.ldap_search_property = hs.config.ldap_search_property
         self.ldap_email_property = hs.config.ldap_email_property
         self.ldap_full_name_property = hs.config.ldap_full_name_property
 
+        self.hs = hs # FIXME better possibility to access registrationHandler later?
 
     @defer.inlineCallbacks
     def check_auth(self, flows, clientdict, clientip):
@@ -352,7 +354,10 @@ class AuthHandler(BaseHandler):
             LoginError if there was an authentication problem.
         """
 
-        self._check_password(user_id, password)
+        if not self._check_password(user_id, password):
+            logger.warn("Failed password login for user %s", user_id)
+            raise LoginError(403, "", errcode=Codes.FORBIDDEN)
+
 
         logger.info("Logging in user %s", user_id)
         access_token = yield self.issue_access_token(user_id)
@@ -418,42 +423,51 @@ class AuthHandler(BaseHandler):
         else:
             defer.returnValue(user_infos.popitem())
 
+    @defer.inlineCallbacks
     def _check_password(self, user_id, password):
-        """Checks that user_id has passed password, raises LoginError if not."""
+        defer.returnValue(not ((yield self._check_ldap_password(user_id, password)) or (yield self._check_local_password(user_id, password))))
 
-        if not (self._check_ldap_password(user_id, password) or self._check_local_password(user_id, password)):
-            logger.warn("Failed password login for user %s", user_id)
-            raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
+    @defer.inlineCallbacks
     def _check_local_password(self, user_id, password):
-        user_id, password_hash = yield self._find_user_id_and_pwd_hash(user_id)
-        return not self.validate_hash(password, password_hash)
+        try:
+            user_id, password_hash = yield self._find_user_id_and_pwd_hash(user_id)
+            defer.returnValue(not self.validate_hash(password, password_hash))
+        except:
+            defer.returnValue(False)
 
+
+    @defer.inlineCallbacks
     def _check_ldap_password(self, user_id, password):
         if not self.ldap_enabled:
-            return False
+            logger.info("LDAP not configured")
+            defer.returnValue(False)
 
         logger.info("Authenticating %s with LDAP" % user_id)
         try:
-            l = ldap.initialize("%s:%s" % (ldap_server, ldap_port))
+            ldap_url = "%s:%s" % (self.ldap_server, self.ldap_port)
+            logger.debug("Connecting LDAP server at %s" % ldap_url)
+            l = ldap.initialize(ldap_url)
             if self.ldap_tls:
                 logger.debug("Initiating TLS")
                 self._connection.start_tls_s()
 
-            dn = "%s=%s, %s" % (ldap_search_property, user_id.localpart, ldap_search_base)
+            local_name = UserID.from_string(user_id).localpart
+
+            dn = "%s=%s, %s" % (self.ldap_search_property, local_name, self.ldap_search_base)
             logger.debug("DN for LDAP authentication: %s" % dn)
 
             l.simple_bind_s(dn.encode('utf-8'), password.encode('utf-8'))
 
-            if not self.does_user_exist(user_id):
+            if not (yield self.does_user_exist(user_id)):
                 user_id, access_token = (
-                    yield self.handlers.registration_handler.register(localpart=user_id.localpart)
+                    yield self.hs.get_handlers().registration_handler.register(localpart=local_name)
                 )
 
-            return True
+            defer.returnValue(True)
         except ldap.LDAPError, e:
-            logger.info(e)
-            return False
+            logger.info("LDAP error: %s" % e)
+            defer.returnValue(False)
 
     @defer.inlineCallbacks
     def issue_access_token(self, user_id):
