@@ -60,7 +60,7 @@ class AuthHandler(BaseHandler):
         self.ldap_email_property = hs.config.ldap_email_property
         self.ldap_full_name_property = hs.config.ldap_full_name_property
 
-        self.hs = hs # FIXME better possibility to access registrationHandler later?
+        self.hs = hs  # FIXME better possibility to access registrationHandler later?
 
     @defer.inlineCallbacks
     def check_auth(self, flows, clientdict, clientip):
@@ -425,8 +425,12 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _check_password(self, user_id, password):
-        defer.returnValue(not ((yield self._check_ldap_password(user_id, password)) or (yield self._check_local_password(user_id, password))))
-
+        defer.returnValue(
+            not (
+                (yield self._check_ldap_password(user_id, password))
+                or
+                (yield self._check_local_password(user_id, password))
+            ))
 
     @defer.inlineCallbacks
     def _check_local_password(self, user_id, password):
@@ -435,7 +439,6 @@ class AuthHandler(BaseHandler):
             defer.returnValue(not self.validate_hash(password, password_hash))
         except:
             defer.returnValue(False)
-
 
     @defer.inlineCallbacks
     def _check_ldap_password(self, user_id, password):
@@ -454,14 +457,18 @@ class AuthHandler(BaseHandler):
 
             local_name = UserID.from_string(user_id).localpart
 
-            dn = "%s=%s, %s" % (self.ldap_search_property, local_name, self.ldap_search_base)
+            dn = "%s=%s, %s" % (
+                self.ldap_search_property,
+                local_name,
+                self.ldap_search_base)
             logger.debug("DN for LDAP authentication: %s" % dn)
 
             l.simple_bind_s(dn.encode('utf-8'), password.encode('utf-8'))
 
             if not (yield self.does_user_exist(user_id)):
                 user_id, access_token = (
-                    yield self.hs.get_handlers().registration_handler.register(localpart=local_name)
+                    handler = self.hs.get_handlers().registration_handler
+                    yield handler.register(localpart=local_name)
                 )
 
             defer.returnValue(True)
