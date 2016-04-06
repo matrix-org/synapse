@@ -58,7 +58,7 @@ class AuthHandler(BaseHandler):
         self.ldap_email_property = hs.config.ldap_email_property
         self.ldap_full_name_property = hs.config.ldap_full_name_property
 
-        if self.ldap_enabled:
+        if self.ldap_enabled is True:
             import ldap
             logger.info("Import ldap version: %s", ldap.__version__)
 
@@ -444,8 +444,8 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _check_ldap_password(self, user_id, password):
-        if not self.ldap_enabled:
-            logger.info("LDAP not configured")
+        if self.ldap_enabled is not True:
+            logger.debug("LDAP not configured")
             defer.returnValue(False)
 
         import ldap
