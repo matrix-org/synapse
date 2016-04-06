@@ -437,7 +437,7 @@ class AuthHandler(BaseHandler):
         try:
             user_id, password_hash = yield self._find_user_id_and_pwd_hash(user_id)
             defer.returnValue(not self.validate_hash(password, password_hash))
-        except:
+        except LoginError:
             defer.returnValue(False)
 
     @defer.inlineCallbacks
@@ -473,7 +473,7 @@ class AuthHandler(BaseHandler):
 
             defer.returnValue(True)
         except ldap.LDAPError, e:
-            logger.info("LDAP error: %s" % e)
+            logger.warn("LDAP error: %s", e)
             defer.returnValue(False)
 
     @defer.inlineCallbacks
