@@ -124,9 +124,9 @@ class PusherStore(SQLBaseStore):
                    app_display_name, device_display_name,
                    pushkey, pushkey_ts, lang, data, last_stream_ordering,
                    profile_tag=""):
-        def f(txn):
-            txn.call_after(self.get_users_with_pushers_in_room.invalidate_all)
-            with self._pushers_id_gen.get_next() as stream_id:
+        with self._pushers_id_gen.get_next() as stream_id:
+            def f(txn):
+                txn.call_after(self.get_users_with_pushers_in_room.invalidate_all)
                 return self._simple_upsert_txn(
                     txn,
                     "pushers",
