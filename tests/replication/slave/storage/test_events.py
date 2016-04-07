@@ -14,11 +14,12 @@
 
 from ._base import BaseSlavedStoreTestCase
 
-from synapse.events import FrozenEvent
+from synapse.events import FrozenEvent, _EventInternalMetadata
 from synapse.events.snapshot import EventContext
 from synapse.storage.roommember import RoomsForUser
 
 from twisted.internet import defer
+
 
 USER_ID = "@feeling:blue"
 USER_ID_2 = "@bright:blue"
@@ -26,7 +27,33 @@ OUTLIER = {"outlier": True}
 ROOM_ID = "!room:blue"
 
 
+def dict_equals(self, other):
+    return self.__dict__ == other.__dict__
+
+
+def patch__eq__(cls):
+    eq = getattr(cls, "__eq__", None)
+    cls.__eq__ = dict_equals
+
+    def unpatch():
+        if eq is not None:
+            cls.__eq__ = eq
+    return unpatch
+
+
 class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
+
+    def setUp(self):
+        # Patch up the equality operator for events so that we can check
+        # whether lists of events match using assertEquals
+        self.unpatches = [
+            patch__eq__(_EventInternalMetadata),
+            patch__eq__(FrozenEvent),
+        ]
+        return super(SlavedEventStoreTestCase, self).setUp()
+
+    def tearDown(self):
+        [unpatch() for unpatch in self.unpatches]
 
     @defer.inlineCallbacks
     def test_room_name_and_aliases(self):
@@ -115,6 +142,68 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         yield self.replicate()
         yield self.check("get_users_in_room", (ROOM_ID,), [USER_ID])
         yield self.check("get_rooms_for_user", (USER_ID_2,), [])
+
+    @defer.inlineCallbacks
+    def test_get_latest_event_ids_in_room(self):
+        create = yield self.persist(type="m.room.create", key="", creator=USER_ID)
+        yield self.replicate()
+        yield self.check(
+            "get_latest_event_ids_in_room", (ROOM_ID,), [create.event_id]
+        )
+
+        join = yield self.persist(
+            type="m.room.member", key=USER_ID, membership="join",
+            prev_events=[(create.event_id, {})],
+        )
+        yield self.replicate()
+        yield self.check(
+            "get_latest_event_ids_in_room", (ROOM_ID,), [join.event_id]
+        )
+
+    @defer.inlineCallbacks
+    def test_get_current_state(self):
+        # Create the room.
+        create = yield self.persist(type="m.room.create", key="", creator=USER_ID)
+        yield self.replicate()
+        yield self.check(
+            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID), []
+        )
+
+        # Join the room.
+        join1 = yield self.persist(
+            type="m.room.member", key=USER_ID, membership="join",
+        )
+        yield self.replicate()
+        yield self.check(
+            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID),
+            [join1]
+        )
+
+        # Add some other user to the room.
+        join2 = yield self.persist(
+            type="m.room.member", key=USER_ID_2, membership="join",
+        )
+        yield self.replicate()
+        yield self.check(
+            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID_2),
+            [join2]
+        )
+
+        # Leave the room, then rejoin the room clobbering state.
+        yield self.persist(type="m.room.member", key=USER_ID, membership="leave")
+        join3 = yield self.persist(
+            type="m.room.member", key=USER_ID, membership="join",
+            reset_state=[create]
+        )
+        yield self.replicate()
+        yield self.check(
+            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID_2),
+            []
+        )
+        yield self.check(
+            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID),
+            [join3]
+        )
 
     event_id = 0
 

@@ -89,8 +89,11 @@ class SlavedEventStore(BaseSlavedStore):
     _invalidate_get_event_cache = DataStore._invalidate_get_event_cache.__func__
     _parse_events_txn = DataStore._parse_events_txn.__func__
     _get_events_txn = DataStore._get_events_txn.__func__
+    _enqueue_events = DataStore._enqueue_events.__func__
+    _do_fetch = DataStore._do_fetch.__func__
     _fetch_events_txn = DataStore._fetch_events_txn.__func__
     _fetch_event_rows = DataStore._fetch_event_rows.__func__
+    _get_event_from_row = DataStore._get_event_from_row.__func__
     _get_event_from_row_txn = DataStore._get_event_from_row_txn.__func__
     _get_rooms_for_user_where_membership_is_txn = (
         DataStore._get_rooms_for_user_where_membership_is_txn.__func__
@@ -157,6 +160,8 @@ class SlavedEventStore(BaseSlavedStore):
             self.get_room_name_and_aliases.invalidate((event.room_id,))
 
         self._invalidate_get_event_cache(event.event_id)
+
+        self.get_latest_event_ids_in_room.invalidate((event.room_id,))
 
         if not backfilled:
             self._events_stream_cache.entity_has_changed(
