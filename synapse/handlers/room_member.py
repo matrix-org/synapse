@@ -24,6 +24,7 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import AuthError, SynapseError, Codes
 from synapse.util.logcontext import preserve_context_over_fn
+from synapse.util.async import Linearizer
 
 from signedjson.sign import verify_signed_json
 from signedjson.key import decode_verify_key_bytes
@@ -59,6 +60,8 @@ class RoomMemberHandler(BaseHandler):
 
     def __init__(self, hs):
         super(RoomMemberHandler, self).__init__(hs)
+
+        self.member_linearizer = Linearizer()
 
         self.clock = hs.get_clock()
 
@@ -173,6 +176,34 @@ class RoomMemberHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def update_membership(
+            self,
+            requester,
+            target,
+            room_id,
+            action,
+            txn_id=None,
+            remote_room_hosts=None,
+            third_party_signed=None,
+            ratelimit=True,
+    ):
+        key = (target, room_id,)
+
+        with (yield self.member_linearizer.queue(key)):
+            result = yield self._update_membership(
+                requester,
+                target,
+                room_id,
+                action,
+                txn_id=txn_id,
+                remote_room_hosts=remote_room_hosts,
+                third_party_signed=third_party_signed,
+                ratelimit=ratelimit,
+            )
+
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _update_membership(
             self,
             requester,
             target,
