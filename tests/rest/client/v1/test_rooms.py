@@ -259,8 +259,8 @@ class RoomPermissionsTestCase(RestTestCase):
         # set [invite/join/left] of self, set [invite/join/left] of other,
         # expect all 404s because room doesn't exist on any server
         for usr in [self.user_id, self.rmcreator_id]:
-            yield self.join(room=room, user=usr, expect_code=404)
-            yield self.leave(room=room, user=usr, expect_code=404)
+            yield self.join(room=room, user=usr, expect_code=403)
+            yield self.leave(room=room, user=usr, expect_code=403)
 
     @defer.inlineCallbacks
     def test_membership_private_room_perms(self):

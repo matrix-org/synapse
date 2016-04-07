@@ -21,6 +21,7 @@ from synapse.streams.config import PaginationConfig
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
 from synapse.util import unwrapFirstError
+from synapse.util.async import concurrently_execute
 from synapse.util.caches.snapshot_cache import SnapshotCache
 from synapse.types import UserID, RoomStreamToken, StreamToken
 
@@ -175,7 +176,7 @@ class MessageHandler(BaseHandler):
         defer.returnValue(chunk)
 
     @defer.inlineCallbacks
-    def create_event(self, event_dict, token_id=None, txn_id=None):
+    def create_event(self, event_dict, token_id=None, txn_id=None, prev_event_ids=None):
         """
         Given a dict from a client, create a new event.
 
@@ -186,6 +187,9 @@ class MessageHandler(BaseHandler):
 
         Args:
             event_dict (dict): An entire event
+            token_id (str)
+            txn_id (str)
+            prev_event_ids (list): The prev event ids to use when creating the event
 
         Returns:
             Tuple of created event (FrozenEvent), Context
@@ -224,6 +228,7 @@ class MessageHandler(BaseHandler):
 
         event, context = yield self._create_new_client_event(
             builder=builder,
+            prev_event_ids=prev_event_ids,
         )
         defer.returnValue((event, context))
 
@@ -556,14 +561,7 @@ class MessageHandler(BaseHandler):
             except:
                 logger.exception("Failed to get snapshot")
 
-        # Only do N rooms at once
-        n = 5
-        d_list = [handle_room(e) for e in room_list]
-        for i in range(0, len(d_list), n):
-            yield defer.gatherResults(
-                d_list[i:i + n],
-                consumeErrors=True
-            ).addErrback(unwrapFirstError)
+        yield concurrently_execute(handle_room, room_list, 10)
 
         account_data_events = []
         for account_data_type, content in account_data.items():

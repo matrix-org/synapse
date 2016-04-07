@@ -37,12 +37,22 @@ VISIBILITY_PRIORITY = (
 )
 
 
+MEMBERSHIP_PRIORITY = (
+    Membership.JOIN,
+    Membership.INVITE,
+    Membership.KNOCK,
+    Membership.LEAVE,
+    Membership.BAN,
+)
+
+
 class BaseHandler(object):
     """
     Common base class for the event handlers.
 
-    :type store: synapse.storage.events.StateStore
-    :type state_handler: synapse.state.StateHandler
+    Attributes:
+        store (synapse.storage.events.StateStore):
+        state_handler (synapse.state.StateHandler):
     """
 
     def __init__(self, hs):
@@ -65,11 +75,13 @@ class BaseHandler(object):
         """ Returns dict of user_id -> list of events that user is allowed to
         see.
 
-        :param (str, bool) user_tuples: (user id, is_peeking) for each
-            user to be checked. is_peeking should be true if:
-              * the user is not currently a member of the room, and:
-              * the user has not been a member of the room since the given
-                events
+        Args:
+            user_tuples (str, bool): (user id, is_peeking) for each user to be
+                checked. is_peeking should be true if:
+                * the user is not currently a member of the room, and:
+                * the user has not been a member of the room since the
+                given events
+            events ([synapse.events.EventBase]): list of events to filter
         """
         forgotten = yield defer.gatherResults([
             self.store.who_forgot_in_room(
@@ -84,6 +96,12 @@ class BaseHandler(object):
         )
 
         def allowed(event, user_id, is_peeking):
+            """
+            Args:
+                event (synapse.events.EventBase): event to check
+                user_id (str)
+                is_peeking (bool)
+            """
             state = event_id_to_state[event.event_id]
 
             # get the room_visibility at the time of the event.
@@ -115,17 +133,30 @@ class BaseHandler(object):
                 if old_priority < new_priority:
                     visibility = prev_visibility
 
-            # get the user's membership at the time of the event. (or rather,
-            # just *after* the event. Which means that people can see their
-            # own join events, but not (currently) their own leave events.)
-            membership_event = state.get((EventTypes.Member, user_id), None)
-            if membership_event:
-                if membership_event.event_id in event_id_forgotten:
-                    membership = None
-                else:
-                    membership = membership_event.membership
-            else:
-                membership = None
+            # likewise, if the event is the user's own membership event, use
+            # the 'most joined' membership
+            membership = None
+            if event.type == EventTypes.Member and event.state_key == user_id:
+                membership = event.content.get("membership", None)
+                if membership not in MEMBERSHIP_PRIORITY:
+                    membership = "leave"
+
+                prev_content = event.unsigned.get("prev_content", {})
+                prev_membership = prev_content.get("membership", None)
+                if prev_membership not in MEMBERSHIP_PRIORITY:
+                    prev_membership = "leave"
+
+                new_priority = MEMBERSHIP_PRIORITY.index(membership)
+                old_priority = MEMBERSHIP_PRIORITY.index(prev_membership)
+                if old_priority < new_priority:
+                    membership = prev_membership
+
+            # otherwise, get the user's membership at the time of the event.
+            if membership is None:
+                membership_event = state.get((EventTypes.Member, user_id), None)
+                if membership_event:
+                    if membership_event.event_id not in event_id_forgotten:
+                        membership = membership_event.membership
 
             # if the user was a member of the room at the time of the event,
             # they can see it.
@@ -165,13 +196,16 @@ class BaseHandler(object):
         """
         Check which events a user is allowed to see
 
-        :param str user_id: user id to be checked
-        :param [synapse.events.EventBase] events: list of events to be checked
-        :param bool is_peeking should be True if:
+        Args:
+            user_id(str): user id to be checked
+            events([synapse.events.EventBase]): list of events to be checked
+            is_peeking(bool): should be True if:
               * the user is not currently a member of the room, and:
               * the user has not been a member of the room since the given
                 events
-        :rtype [synapse.events.EventBase]
+
+        Returns:
+            [synapse.events.EventBase]
         """
         types = (
             (EventTypes.RoomHistoryVisibility, ""),
@@ -199,20 +233,25 @@ class BaseHandler(object):
             )
 
     @defer.inlineCallbacks
-    def _create_new_client_event(self, builder):
-        latest_ret = yield self.store.get_latest_event_ids_and_hashes_in_room(
-            builder.room_id,
-        )
-
-        if latest_ret:
-            depth = max([d for _, _, d in latest_ret]) + 1
+    def _create_new_client_event(self, builder, prev_event_ids=None):
+        if prev_event_ids:
+            prev_events = yield self.store.add_event_hashes(prev_event_ids)
+            prev_max_depth = yield self.store.get_max_depth_of_events(prev_event_ids)
+            depth = prev_max_depth + 1
         else:
-            depth = 1
+            latest_ret = yield self.store.get_latest_event_ids_and_hashes_in_room(
+                builder.room_id,
+            )
 
-        prev_events = [
-            (event_id, prev_hashes)
-            for event_id, prev_hashes, _ in latest_ret
-        ]
+            if latest_ret:
+                depth = max([d for _, _, d in latest_ret]) + 1
+            else:
+                depth = 1
+
+            prev_events = [
+                (event_id, prev_hashes)
+                for event_id, prev_hashes, _ in latest_ret
+            ]
 
         builder.prev_events = prev_events
         builder.depth = depth
@@ -220,50 +259,6 @@ class BaseHandler(object):
         state_handler = self.state_handler
 
         context = yield state_handler.compute_event_context(builder)
-
-        # If we've received an invite over federation, there are no latest
-        # events in the room, because we don't know enough about the graph
-        # fragment we received to treat it like a graph, so the above returned
-        # no relevant events. It may have returned some events (if we have
-        # joined and left the room), but not useful ones, like the invite.
-        if (
-            not self.is_host_in_room(context.current_state) and
-            builder.type == EventTypes.Member
-        ):
-            prev_member_event = yield self.store.get_room_member(
-                builder.sender, builder.room_id
-            )
-
-            # The prev_member_event may already be in context.current_state,
-            # despite us not being present in the room; in particular, if
-            # inviting user, and all other local users, have already left.
-            #
-            # In that case, we have all the information we need, and we don't
-            # want to drop "context" - not least because we may need to handle
-            # the invite locally, which will require us to have the whole
-            # context (not just prev_member_event) to auth it.
-            #
-            context_event_ids = (
-                e.event_id for e in context.current_state.values()
-            )
-
-            if (
-                prev_member_event and
-                prev_member_event.event_id not in context_event_ids
-            ):
-                # The prev_member_event is missing from context, so it must
-                # have arrived over federation and is an outlier. We forcibly
-                # set our context to the invite we received over federation
-                builder.prev_events = (
-                    prev_member_event.event_id,
-                    prev_member_event.prev_events
-                )
-
-                context = yield state_handler.compute_event_context(
-                    builder,
-                    old_state=(prev_member_event,),
-                    outlier=True
-                )
 
         if builder.is_state():
             builder.prev_state = yield self.store.add_event_hashes(

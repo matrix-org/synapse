@@ -163,9 +163,13 @@ class AuthHandler(BaseHandler):
     def get_session_id(self, clientdict):
         """
         Gets the session ID for a client given the client dictionary
-        :param clientdict: The dictionary sent by the client in the request
-        :return: The string session ID the client sent. If the client did not
-                 send a session ID, returns None.
+
+        Args:
+            clientdict: The dictionary sent by the client in the request
+
+        Returns:
+            str|None: The string session ID the client sent. If the client did
+                not send a session ID, returns None.
         """
         sid = None
         if clientdict and 'auth' in clientdict:
@@ -179,9 +183,11 @@ class AuthHandler(BaseHandler):
         Store a key-value pair into the sessions data associated with this
         request. This data is stored server-side and cannot be modified by
         the client.
-        :param session_id: (string) The ID of this session as returned from check_auth
-        :param key: (string) The key to store the data under
-        :param value: (any) The data to store
+
+        Args:
+            session_id (string): The ID of this session as returned from check_auth
+            key (string): The key to store the data under
+            value (any): The data to store
         """
         sess = self._get_session_info(session_id)
         sess.setdefault('serverdict', {})[key] = value
@@ -190,9 +196,11 @@ class AuthHandler(BaseHandler):
     def get_session_data(self, session_id, key, default=None):
         """
         Retrieve data stored with set_session_data
-        :param session_id: (string) The ID of this session as returned from check_auth
-        :param key: (string) The key to store the data under
-        :param default: (any) Value to return if the key has not been set
+
+        Args:
+            session_id (string): The ID of this session as returned from check_auth
+            key (string): The key to store the data under
+            default (any): Value to return if the key has not been set
         """
         sess = self._get_session_info(session_id)
         return sess.setdefault('serverdict', {}).get(key, default)

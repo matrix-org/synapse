@@ -33,6 +33,9 @@ class _EventInternalMetadata(object):
     def is_outlier(self):
         return getattr(self, "outlier", False)
 
+    def is_invite_from_remote(self):
+        return getattr(self, "invite_from_remote", False)
+
 
 def _event_dict_property(key):
     def getter(self):

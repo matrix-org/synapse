@@ -102,8 +102,7 @@ class FederationHandler(BaseHandler):
 
     @log_function
     @defer.inlineCallbacks
-    def on_receive_pdu(self, origin, pdu, state=None,
-                       auth_chain=None):
+    def on_receive_pdu(self, origin, pdu, state=None, auth_chain=None):
         """ Called by the ReplicationLayer when we have a new pdu. We need to
         do auth checks and put it through the StateHandler.
         """
@@ -174,11 +173,7 @@ class FederationHandler(BaseHandler):
                     })
                     seen_ids.add(e.event_id)
 
-                yield self._handle_new_events(
-                    origin,
-                    event_infos,
-                    outliers=True
-                )
+                yield self._handle_new_events(origin, event_infos)
 
             try:
                 context, event_stream_id, max_stream_id = yield self._handle_new_event(
@@ -289,6 +284,9 @@ class FederationHandler(BaseHandler):
     def backfill(self, dest, room_id, limit, extremities=[]):
         """ Trigger a backfill request to `dest` for the given `room_id`
         """
+        if dest == self.server_name:
+            raise SynapseError(400, "Can't backfill from self.")
+
         if not extremities:
             extremities = yield self.store.get_oldest_events_in_room(room_id)
 
@@ -455,7 +453,7 @@ class FederationHandler(BaseHandler):
 
         likely_domains = [
             domain for domain, depth in curr_domains
-            if domain is not self.server_name
+            if domain != self.server_name
         ]
 
         @defer.inlineCallbacks
@@ -761,6 +759,7 @@ class FederationHandler(BaseHandler):
         event = pdu
 
         event.internal_metadata.outlier = True
+        event.internal_metadata.invite_from_remote = True
 
         event.signatures.update(
             compute_event_signature(
@@ -788,13 +787,19 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def do_remotely_reject_invite(self, target_hosts, room_id, user_id):
-        origin, event = yield self._make_and_verify_event(
-            target_hosts,
-            room_id,
-            user_id,
-            "leave"
-        )
-        signed_event = self._sign_event(event)
+        try:
+            origin, event = yield self._make_and_verify_event(
+                target_hosts,
+                room_id,
+                user_id,
+                "leave"
+            )
+            signed_event = self._sign_event(event)
+        except SynapseError:
+            raise
+        except CodeMessageException as e:
+            logger.warn("Failed to reject invite: %s", e)
+            raise SynapseError(500, "Failed to reject invite")
 
         # Try the host we successfully got a response to /make_join/
         # request first.
@@ -804,10 +809,16 @@ class FederationHandler(BaseHandler):
         except ValueError:
             pass
 
-        yield self.replication_layer.send_leave(
-            target_hosts,
-            signed_event
-        )
+        try:
+            yield self.replication_layer.send_leave(
+                target_hosts,
+                signed_event
+            )
+        except SynapseError:
+            raise
+        except CodeMessageException as e:
+            logger.warn("Failed to reject invite: %s", e)
+            raise SynapseError(500, "Failed to reject invite")
 
         context = yield self.state_handler.compute_event_context(event)
 
@@ -1069,9 +1080,6 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     @log_function
     def _handle_new_event(self, origin, event, state=None, auth_events=None):
-
-        outlier = event.internal_metadata.is_outlier()
-
         context = yield self._prep_event(
             origin, event,
             state=state,
@@ -1087,14 +1095,12 @@ class FederationHandler(BaseHandler):
         event_stream_id, max_stream_id = yield self.store.persist_event(
             event,
             context=context,
-            is_new_state=not outlier,
         )
 
         defer.returnValue((context, event_stream_id, max_stream_id))
 
     @defer.inlineCallbacks
-    def _handle_new_events(self, origin, event_infos, backfilled=False,
-                           outliers=False):
+    def _handle_new_events(self, origin, event_infos, backfilled=False):
         contexts = yield defer.gatherResults(
             [
                 self._prep_event(
@@ -1113,7 +1119,6 @@ class FederationHandler(BaseHandler):
                 for ev_info, context in itertools.izip(event_infos, contexts)
             ],
             backfilled=backfilled,
-            is_new_state=(not outliers and not backfilled),
         )
 
     @defer.inlineCallbacks
@@ -1128,11 +1133,9 @@ class FederationHandler(BaseHandler):
         """
         events_to_context = {}
         for e in itertools.chain(auth_events, state):
-            ctx = yield self.state_handler.compute_event_context(
-                e, outlier=True,
-            )
-            events_to_context[e.event_id] = ctx
             e.internal_metadata.outlier = True
+            ctx = yield self.state_handler.compute_event_context(e)
+            events_to_context[e.event_id] = ctx
 
         event_map = {
             e.event_id: e
@@ -1176,16 +1179,14 @@ class FederationHandler(BaseHandler):
                 (e, events_to_context[e.event_id])
                 for e in itertools.chain(auth_events, state)
             ],
-            is_new_state=False,
         )
 
         new_event_context = yield self.state_handler.compute_event_context(
-            event, old_state=state, outlier=False,
+            event, old_state=state
         )
 
         event_stream_id, max_stream_id = yield self.store.persist_event(
             event, new_event_context,
-            is_new_state=True,
             current_state=state,
         )
 
@@ -1193,10 +1194,9 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _prep_event(self, origin, event, state=None, auth_events=None):
-        outlier = event.internal_metadata.is_outlier()
 
         context = yield self.state_handler.compute_event_context(
-            event, old_state=state, outlier=outlier,
+            event, old_state=state,
         )
 
         if not auth_events:
@@ -1718,13 +1718,15 @@ class FederationHandler(BaseHandler):
     def _check_signature(self, event, auth_events):
         """
         Checks that the signature in the event is consistent with its invite.
-        :param event (Event): The m.room.member event to check
-        :param auth_events (dict<(event type, state_key), event>)
 
-        :raises
-            AuthError if signature didn't match any keys, or key has been
+        Args:
+            event (Event): The m.room.member event to check
+            auth_events (dict<(event type, state_key), event>):
+
+        Raises:
+            AuthError: if signature didn't match any keys, or key has been
                 revoked,
-            SynapseError if a transient error meant a key couldn't be checked
+            SynapseError: if a transient error meant a key couldn't be checked
                 for revocation.
         """
         signed = event.content["third_party_invite"]["signed"]
@@ -1766,12 +1768,13 @@ class FederationHandler(BaseHandler):
         """
         Checks whether public_key has been revoked.
 
-        :param public_key (str): base-64 encoded public key.
-        :param url (str): Key revocation URL.
+        Args:
+            public_key (str): base-64 encoded public key.
+            url (str): Key revocation URL.
 
-        :raises
-            AuthError if they key has been revoked.
-            SynapseError if a transient error meant a key couldn't be checked
+        Raises:
+            AuthError: if they key has been revoked.
+            SynapseError: if a transient error meant a key couldn't be checked
                 for revocation.
         """
         try:
