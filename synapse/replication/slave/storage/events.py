@@ -69,6 +69,7 @@ class SlavedEventStore(BaseSlavedStore):
         "_get_current_state_for_key"
     ]
 
+    get_event = DataStore.get_event.__func__
     get_current_state = DataStore.get_current_state.__func__
     get_current_state_for_key = DataStore.get_current_state_for_key.__func__
     get_rooms_for_user_where_membership_is = (
@@ -103,7 +104,7 @@ class SlavedEventStore(BaseSlavedStore):
     def stream_positions(self):
         result = super(SlavedEventStore, self).stream_positions()
         result["events"] = self._stream_id_gen.get_current_token()
-        result["backfilled"] = self._backfill_id_gen.get_current_token()
+        result["backfill"] = self._backfill_id_gen.get_current_token()
         return result
 
     def process_replication(self, result):
@@ -145,7 +146,6 @@ class SlavedEventStore(BaseSlavedStore):
         position = row[0]
         internal = json.loads(row[1])
         event_json = json.loads(row[2])
-
         event = FrozenEvent(event_json, internal_metadata_dict=internal)
         self._invalidate_caches_for_event(
             event, backfilled, reset_state=position in state_resets
