@@ -155,7 +155,7 @@ class PusherPool:
                 if u in self.pushers:
                     for p in self.pushers[u].values():
                         deferreds.append(
-                                p.on_new_receipts(min_stream_id, max_stream_id)
+                            p.on_new_receipts(min_stream_id, max_stream_id)
                         )
 
             yield defer.gatherResults(deferreds)
