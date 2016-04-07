@@ -105,7 +105,7 @@ class EventPushActionsStore(SQLBaseStore):
         def f(txn):
             sql = (
                 "SELECT DISTINCT(user_id) FROM event_push_actions WHERE"
-                " stream_ordering >= ? AND stream_ordering >= ?"
+                " stream_ordering >= ? AND stream_ordering <= ?"
             )
             txn.execute(sql, (min_stream_ordering, max_stream_ordering))
             return [r[0] for r in txn.fetchall()]
