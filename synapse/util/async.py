@@ -175,13 +175,13 @@ class Linearizer(object):
             yield preserve_context_over_deferred(current_defer)
 
         @contextmanager
-        def _ctx_manager(d):
+        def _ctx_manager():
             try:
                 yield
             finally:
-                d.callback(None)
-                d = self.key_to_defer.get(key)
-                if d is new_defer:
+                new_defer.callback(None)
+                current_d = self.key_to_defer.get(key)
+                if current_d is new_defer:
                     self.key_to_defer.pop(key, None)
 
-        defer.returnValue(_ctx_manager(new_defer))
+        defer.returnValue(_ctx_manager())
