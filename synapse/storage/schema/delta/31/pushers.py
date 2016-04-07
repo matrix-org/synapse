@@ -74,5 +74,6 @@ def run_create(cur, database_engine, *args, **kwargs):
     cur.execute("ALTER TABLE pushers2 RENAME TO pushers")
     logger.info("Moved %d pushers to new table", count)
 
+
 def run_upgrade(cur, database_engine, *args, **kwargs):
     pass
