@@ -14,11 +14,12 @@
 
 from ._base import BaseSlavedStoreTestCase
 
-from synapse.events import FrozenEvent
+from synapse.events import FrozenEvent, _EventInternalMetadata
 from synapse.events.snapshot import EventContext
 from synapse.storage.roommember import RoomsForUser
 
 from twisted.internet import defer
+
 
 USER_ID = "@feeling:blue"
 USER_ID_2 = "@bright:blue"
@@ -26,7 +27,33 @@ OUTLIER = {"outlier": True}
 ROOM_ID = "!room:blue"
 
 
+def dict_equals(self, other):
+    return self.__dict__ == other.__dict__
+
+
+def patch__eq__(cls):
+    eq = getattr(cls, "__eq__", None)
+    cls.__eq__ = dict_equals
+
+    def unpatch():
+        if eq is not None:
+            cls.__eq__ = eq
+    return unpatch
+
+
 class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
+
+    def setUp(self):
+        # Patch up the equality operator for events so that we can check
+        # whether lists of events match using assertEquals
+        self.unpatches = [
+            patch__eq__(_EventInternalMetadata),
+            patch__eq__(FrozenEvent),
+        ]
+        return super(SlavedEventStoreTestCase, self).setUp()
+
+    def tearDown(self):
+        [unpatch() for unpatch in self.unpatches]
 
     @defer.inlineCallbacks
     def test_room_name_and_aliases(self):

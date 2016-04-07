@@ -36,10 +36,6 @@ class _EventInternalMetadata(object):
     def is_invite_from_remote(self):
         return getattr(self, "invite_from_remote", False)
 
-    def __eq__(self, other):
-        "Equality check for unit tests."
-        return self.__dict__ == other.__dict__
-
 
 def _event_dict_property(key):
     def getter(self):
@@ -184,8 +180,3 @@ class FrozenEvent(EventBase):
             self.get("type", None),
             self.get("state_key", None),
         )
-
-    def __eq__(self, other):
-        """Equality check for unit tests. Compares internal_metadata as well
-        as the event fields"""
-        return self.__dict__ == other.__dict__
