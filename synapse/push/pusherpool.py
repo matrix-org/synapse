@@ -123,10 +123,17 @@ class PusherPool:
             users_affected = yield self.store.get_push_action_users_in_range(
                 min_stream_id, max_stream_id
             )
+
+            deferreds = []
+
             for u in users_affected:
                 if u in self.pushers:
                     for p in self.pushers[u].values():
-                        yield p.on_new_notifications(min_stream_id, max_stream_id)
+                        deferreds.append(
+                            p.on_new_notifications(min_stream_id, max_stream_id)
+                        )
+
+            yield defer.gatherResults(deferreds)
         except:
             logger.exception("Exception in pusher on_new_notifications")
 
@@ -141,10 +148,17 @@ class PusherPool:
             )
             # This returns a tuple, user_id is at index 3
             users_affected = set([r[3] for r in updated_receipts])
+
+            deferreds = []
+
             for u in users_affected:
                 if u in self.pushers:
                     for p in self.pushers[u].values():
-                        yield p.on_new_receipts(min_stream_id, max_stream_id)
+                        deferreds.append(
+                                p.on_new_receipts(min_stream_id, max_stream_id)
+                        )
+
+            yield defer.gatherResults(deferreds)
         except:
             logger.exception("Exception in pusher on_new_receipts")
 
