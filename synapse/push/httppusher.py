@@ -168,7 +168,7 @@ class HttpPusher(object):
         if 'notify' not in push_action['actions']:
             defer.returnValue(True)
 
-        tweaks = push_rule_evaluator.PushRuleEvaluator.tweaks_for_actions(push_action['actions'])
+        tweaks = push_rule_evaluator.tweaks_for_actions(push_action['actions'])
         badge = yield push_tools.get_badge_count(self.hs, self.user_id)
 
         event = yield self.store.get_event(push_action['event_id'], allow_none=True)
