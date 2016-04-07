@@ -130,23 +130,23 @@ class PusherStore(SQLBaseStore):
                 return self._simple_upsert_txn(
                     txn,
                     "pushers",
-                    dict(
-                        app_id=app_id,
-                        pushkey=pushkey,
-                        user_name=user_id,
-                    ),
-                    dict(
-                        access_token=access_token,
-                        kind=kind,
-                        app_display_name=app_display_name,
-                        device_display_name=device_display_name,
-                        ts=pushkey_ts,
-                        lang=lang,
-                        data=encode_canonical_json(data),
-                        last_stream_ordering=last_stream_ordering,
-                        profile_tag=profile_tag,
-                        id=stream_id,
-                    ),
+                    {
+                        "app_id": app_id,
+                        "pushkey": pushkey,
+                        "user_name": user_id,
+                    },
+                    {
+                        "access_token": access_token,
+                        "kind": kind,
+                        "app_display_name": app_display_name,
+                        "device_display_name": device_display_name,
+                        "ts": pushkey_ts,
+                        "lang": lang,
+                        "data": encode_canonical_json(data),
+                        "last_stream_ordering": last_stream_ordering,
+                        "profile_tag": profile_tag,
+                        "id": stream_id,
+                    },
                 )
         defer.returnValue((yield self.runInteraction("add_pusher", f)))
 
