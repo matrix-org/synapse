@@ -96,7 +96,9 @@ class HttpPusher(object):
         # We could check the receipts are actually m.read receipts here,
         # but currently that's the only type of receipt anyway...
         with Measure(self.clock, "push.on_new_receipts"):
-            badge = yield push_tools.get_badge_count(self.hs, self.user_id)
+            badge = yield push_tools.get_badge_count(
+                self.hs.get_datastore(), self.user_id
+            )
             yield self.send_badge(badge)
 
     @defer.inlineCallbacks
@@ -185,7 +187,7 @@ class HttpPusher(object):
             defer.returnValue(True)
 
         tweaks = push_rule_evaluator.tweaks_for_actions(push_action['actions'])
-        badge = yield push_tools.get_badge_count(self.hs, self.user_id)
+        badge = yield push_tools.get_badge_count(self.hs.get_datastore(), self.user_id)
 
         event = yield self.store.get_event(push_action['event_id'], allow_none=True)
         if event is None:
@@ -215,7 +217,7 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def _build_notification_dict(self, event, tweaks, badge):
-        ctx = yield push_tools.get_context_for_event(self.hs, event)
+        ctx = yield push_tools.get_context_for_event(self.hs.get_datastore(), event)
 
         d = {
             'notification': {

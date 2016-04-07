@@ -17,13 +17,13 @@ from twisted.internet import defer
 
 
 @defer.inlineCallbacks
-def get_badge_count(hs, user_id):
+def get_badge_count(store, user_id):
     invites, joins = yield defer.gatherResults([
-        hs.get_datastore().get_invited_rooms_for_user(user_id),
-        hs.get_datastore().get_rooms_for_user(user_id),
+        store.get_invited_rooms_for_user(user_id),
+        store.get_rooms_for_user(user_id),
     ], consumeErrors=True)
 
-    my_receipts_by_room = yield hs.get_datastore().get_receipts_for_user(
+    my_receipts_by_room = yield store.get_receipts_for_user(
         user_id, "m.read",
     )
 
@@ -34,7 +34,7 @@ def get_badge_count(hs, user_id):
             last_unread_event_id = my_receipts_by_room[r.room_id]
 
             notifs = yield (
-                hs.get_datastore().get_unread_event_push_actions_by_room_for_user(
+                store.get_unread_event_push_actions_by_room_for_user(
                     r.room_id, user_id, last_unread_event_id
                 )
             )
@@ -43,8 +43,8 @@ def get_badge_count(hs, user_id):
 
 
 @defer.inlineCallbacks
-def get_context_for_event(hs, ev):
-    name_aliases = yield hs.get_datastore().get_room_name_and_aliases(
+def get_context_for_event(store, ev):
+    name_aliases = yield store.get_room_name_and_aliases(
         ev.room_id
     )
 
@@ -52,7 +52,7 @@ def get_context_for_event(hs, ev):
     if name_aliases[0] is not None:
         ctx['name'] = name_aliases[0]
 
-    their_member_events_for_room = yield hs.get_datastore().get_current_state(
+    their_member_events_for_room = yield store.get_current_state(
         room_id=ev.room_id,
         event_type='m.room.member',
         state_key=ev.user_id
