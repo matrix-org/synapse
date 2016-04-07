@@ -16,7 +16,9 @@
 
 from twisted.internet import defer, reactor
 
-from .logcontext import PreserveLoggingContext, preserve_fn
+from .logcontext import (
+    PreserveLoggingContext, preserve_fn, preserve_context_over_deferred,
+)
 from synapse.util import unwrapFirstError
 
 from contextlib import contextmanager
@@ -141,14 +143,6 @@ def concurrently_execute(func, args, limit):
     ], consumeErrors=True).addErrback(unwrapFirstError)
 
 
-@contextmanager
-def _trigger_defer_manager(d):
-    try:
-        yield
-    finally:
-        d.callback(None)
-
-
 class Linearizer(object):
     """Linearizes access to resources based on a key. Useful to ensure only one
     thing is happening at a time on a given resource.
@@ -177,13 +171,17 @@ class Linearizer(object):
         new_defer = defer.Deferred()
         self.key_to_defer[key] = new_defer
 
-        def remove_if_current(_):
-            d = self.key_to_defer.get(key)
-            if d is new_defer:
-                self.key_to_defer.pop(key, None)
+        if current_defer:
+            yield preserve_context_over_deferred(current_defer)
 
-        new_defer.addBoth(remove_if_current)
+        @contextmanager
+        def _ctx_manager(d):
+            try:
+                yield
+            finally:
+                d.callback(None)
+                d = self.key_to_defer.get(key)
+                if d is new_defer:
+                    self.key_to_defer.pop(key, None)
 
-        yield current_defer
-
-        defer.returnValue(_trigger_defer_manager(new_defer))
+        defer.returnValue(_ctx_manager(new_defer))
