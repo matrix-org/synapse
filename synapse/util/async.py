@@ -164,6 +164,14 @@ class Linearizer(object):
 
     @defer.inlineCallbacks
     def queue(self, key):
+        # If there is already a deferred in the queue, we pull it out so that
+        # we can wait on it later.
+        # Then we replace it with a deferred that we resolve *after* the
+        # context manager has exited.
+        # We only return the context manager after the previous deferred has
+        # resolved.
+        # This all has the net effect of creating a chain of deferreds that
+        # wait for the previous deferred before starting their work.
         current_defer = self.key_to_defer.get(key)
 
         new_defer = defer.Deferred()
