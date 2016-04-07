@@ -87,6 +87,8 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def on_new_receipts(self, min_stream_id, max_stream_id):
+        # Note that the min here shouldn't be relied upon to be accurate.
+
         # We could check the receipts are actually m.read receipts here,
         # but currently that's the only type of receipt anyway...
         badge = yield push_tools.get_badge_count(self.hs, self.user_id)
