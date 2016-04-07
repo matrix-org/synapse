@@ -33,7 +33,7 @@ from synapse.python_dependencies import (
 from synapse.rest import ClientRestResource
 from synapse.storage.engines import create_engine, IncorrectDatabaseSetup
 from synapse.storage import are_all_users_on_domain
-from synapse.storage.prepare_database import UpgradeDatabaseException
+from synapse.storage.prepare_database import UpgradeDatabaseException, prepare_database
 
 from synapse.server import HomeServer
 
@@ -245,7 +245,7 @@ class SynapseHomeServer(HomeServer):
         except IncorrectDatabaseSetup as e:
             quit_with_error(e.message)
 
-    def get_db_conn(self):
+    def get_db_conn(self, run_new_connection=True):
         # Any param beginning with cp_ is a parameter for adbapi, and should
         # not be passed to the database engine.
         db_params = {
@@ -254,7 +254,8 @@ class SynapseHomeServer(HomeServer):
         }
         db_conn = self.database_engine.module.connect(**db_params)
 
-        self.database_engine.on_new_connection(db_conn)
+        if run_new_connection:
+            self.database_engine.on_new_connection(db_conn)
         return db_conn
 
 
@@ -386,7 +387,7 @@ def setup(config_options):
 
     tls_server_context_factory = context_factory.ServerContextFactory(config)
 
-    database_engine = create_engine(config)
+    database_engine = create_engine(config.database_config)
     config.database_config["args"]["cp_openfun"] = database_engine.on_new_connection
 
     hs = SynapseHomeServer(
@@ -402,8 +403,10 @@ def setup(config_options):
     logger.info("Preparing database: %s...", config.database_config['name'])
 
     try:
-        db_conn = hs.get_db_conn()
-        database_engine.prepare_database(db_conn)
+        db_conn = hs.get_db_conn(run_new_connection=False)
+        prepare_database(db_conn, database_engine, config=config)
+        database_engine.on_new_connection(db_conn)
+
         hs.run_startup_checks(db_conn, database_engine)
 
         db_conn.commit()

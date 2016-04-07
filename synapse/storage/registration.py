@@ -319,7 +319,7 @@ class RegistrationStore(SQLBaseStore):
 
         defer.returnValue(res if res else False)
 
-    @cachedList(cache=is_guest.cache, list_name="user_ids", num_args=1,
+    @cachedList(cached_method_name="is_guest", list_name="user_ids", num_args=1,
                 inlineCallbacks=True)
     def are_guests(self, user_ids):
         sql = "SELECT name, is_guest FROM users WHERE name IN (%s)" % (
