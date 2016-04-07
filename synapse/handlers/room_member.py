@@ -233,6 +233,11 @@ class RoomMemberHandler(BaseHandler):
                     remote_room_hosts.append(inviter.domain)
 
                 content = {"membership": Membership.JOIN}
+
+                profile = self.hs.get_handlers().profile_handler
+                content["displayname"] = yield profile.get_displayname(target)
+                content["avatar_url"] = yield profile.get_avatar_url(target)
+
                 if requester.is_guest:
                     content["kind"] = "guest"
 
