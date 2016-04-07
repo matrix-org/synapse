@@ -21,6 +21,8 @@ import logging
 import push_rule_evaluator
 import push_tools
 
+from synapse.util.metrics import Measure
+
 logger = logging.getLogger(__name__)
 
 
@@ -82,8 +84,9 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def on_new_notifications(self, min_stream_ordering, max_stream_ordering):
-        self.max_stream_ordering = max_stream_ordering
-        yield self._process()
+        with Measure(self.clock, "push.on_new_notifications"):
+            self.max_stream_ordering = max_stream_ordering
+            yield self._process()
 
     @defer.inlineCallbacks
     def on_new_receipts(self, min_stream_id, max_stream_id):
@@ -91,12 +94,14 @@ class HttpPusher(object):
 
         # We could check the receipts are actually m.read receipts here,
         # but currently that's the only type of receipt anyway...
-        badge = yield push_tools.get_badge_count(self.hs, self.user_id)
-        yield self.send_badge(badge)
+        with Measure(self.clock, "push.on_new_receipts"):
+            badge = yield push_tools.get_badge_count(self.hs, self.user_id)
+            yield self.send_badge(badge)
 
     @defer.inlineCallbacks
     def on_timer(self):
-        yield self._process()
+        with Measure(self.clock, "push.on_timer"):
+            yield self._process()
 
     def on_stop(self):
         if self.timed_call:
