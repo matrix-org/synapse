@@ -126,9 +126,27 @@ class PusherPool:
             for u in users_affected:
                 if u in self.pushers:
                     for p in self.pushers[u].values():
-                        p.on_new_notifications(min_stream_id, max_stream_id)
+                        yield p.on_new_notifications(min_stream_id, max_stream_id)
         except:
             logger.exception("Exception in pusher on_new_notifications")
+
+    @defer.inlineCallbacks
+    def on_new_receipts(self, min_stream_id, max_stream_id, affected_room_ids):
+        yield run_on_reactor()
+        try:
+            # Need to subtract 1 from the minimum because the lower bound here
+            # is not inclusive
+            updated_receipts = yield self.store.get_all_updated_receipts(
+                min_stream_id - 1, max_stream_id
+            )
+            # This returns a tuple, user_id is at index 3
+            users_affected = set([r[3] for r in updated_receipts])
+            for u in users_affected:
+                if u in self.pushers:
+                    for p in self.pushers[u].values():
+                        yield p.on_new_receipts(min_stream_id, max_stream_id)
+        except:
+            logger.exception("Exception in pusher on_new_receipts")
 
     @defer.inlineCallbacks
     def _refresh_pusher(self, app_id, pushkey, user_id):
