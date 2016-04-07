@@ -116,6 +116,68 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         yield self.check("get_users_in_room", (ROOM_ID,), [USER_ID])
         yield self.check("get_rooms_for_user", (USER_ID_2,), [])
 
+    @defer.inlineCallbacks
+    def test_get_latest_event_ids_in_room(self):
+        create = yield self.persist(type="m.room.create", key="", creator=USER_ID)
+        yield self.replicate()
+        yield self.check(
+            "get_latest_event_ids_in_room", (ROOM_ID,), [create.event_id]
+        )
+
+        join = yield self.persist(
+            type="m.room.member", key=USER_ID, membership="join",
+            prev_events=[(create.event_id, {})],
+        )
+        yield self.replicate()
+        yield self.check(
+            "get_latest_event_ids_in_room", (ROOM_ID,), [join.event_id]
+        )
+
+    @defer.inlineCallbacks
+    def test_get_current_state(self):
+        # Create the room.
+        create = yield self.persist(type="m.room.create", key="", creator=USER_ID)
+        yield self.replicate()
+        yield self.check(
+            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID), []
+        )
+
+        # Join the room.
+        join1 = yield self.persist(
+            type="m.room.member", key=USER_ID, membership="join",
+        )
+        yield self.replicate()
+        yield self.check(
+            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID),
+            [join1]
+        )
+
+        # Add some other user to the room.
+        join2 = yield self.persist(
+            type="m.room.member", key=USER_ID_2, membership="join",
+        )
+        yield self.replicate()
+        yield self.check(
+            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID_2),
+            [join2]
+        )
+
+        # Leave the room, then rejoin the room clobbering state.
+        yield self.persist(type="m.room.member", key=USER_ID, membership="leave")
+        join3 = yield self.persist(
+            type="m.room.member", key=USER_ID, membership="join",
+            reset_state=[create]
+        )
+        yield self.replicate()
+        yield self.check(
+            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID_2),
+            []
+        )
+        yield self.check(
+            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID),
+            [join3]
+        )
+
     event_id = 0
 
     @defer.inlineCallbacks
