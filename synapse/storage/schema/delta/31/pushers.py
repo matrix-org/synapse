@@ -27,7 +27,7 @@ def token_to_stream_ordering(token):
     return int(token[1:].split('_')[0])
 
 
-def run_upgrade(cur, database_engine, *args, **kwargs):
+def run_create(cur, database_engine, *args, **kwargs):
     logger.info("Porting pushers table, delta 31...")
     cur.execute("""
         CREATE TABLE IF NOT EXISTS pushers2 (
@@ -73,3 +73,6 @@ def run_upgrade(cur, database_engine, *args, **kwargs):
     cur.execute("DROP TABLE pushers")
     cur.execute("ALTER TABLE pushers2 RENAME TO pushers")
     logger.info("Moved %d pushers to new table", count)
+
+def run_upgrade(cur, database_engine, *args, **kwargs):
+    pass
