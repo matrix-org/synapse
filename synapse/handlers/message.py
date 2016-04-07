@@ -34,10 +34,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def collect_presencelike_data(distributor, user, content):
-    return distributor.fire("collect_presencelike_data", user, content)
-
-
 class MessageHandler(BaseHandler):
 
     def __init__(self, hs):
@@ -202,12 +198,8 @@ class MessageHandler(BaseHandler):
             membership = builder.content.get("membership", None)
             target = UserID.from_string(builder.state_key)
 
-            if membership == Membership.JOIN:
+            if membership in {Membership.JOIN, Membership.INVITE}:
                 # If event doesn't include a display name, add one.
-                yield collect_presencelike_data(
-                    self.distributor, target, builder.content
-                )
-            elif membership == Membership.INVITE:
                 profile = self.hs.get_handlers().profile_handler
                 content = builder.content
 
