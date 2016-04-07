@@ -205,13 +205,59 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             [join3]
         )
 
+    @defer.inlineCallbacks
+    def test_redactions(self):
+        yield self.persist(type="m.room.create", key="", creator=USER_ID)
+        yield self.persist(type="m.room.member", key=USER_ID, membership="join")
+
+        msg = yield self.persist(
+            type="m.room.message", msgtype="m.text", body="Hello"
+        )
+        yield self.replicate()
+        yield self.check("get_event", [msg.event_id], msg)
+
+        redaction = yield self.persist(
+            type="m.room.redaction", redacts=msg.event_id
+        )
+        yield self.replicate()
+
+        msg_dict = msg.get_dict()
+        msg_dict["content"] = {}
+        msg_dict["unsigned"]["redacted_by"] = redaction.event_id
+        msg_dict["unsigned"]["redacted_because"] = redaction
+        redacted = FrozenEvent(msg_dict, msg.internal_metadata.get_dict())
+        yield self.check("get_event", [msg.event_id], redacted)
+
+    @defer.inlineCallbacks
+    def test_backfilled_redactions(self):
+        yield self.persist(type="m.room.create", key="", creator=USER_ID)
+        yield self.persist(type="m.room.member", key=USER_ID, membership="join")
+
+        msg = yield self.persist(
+            type="m.room.message", msgtype="m.text", body="Hello"
+        )
+        yield self.replicate()
+        yield self.check("get_event", [msg.event_id], msg)
+
+        redaction = yield self.persist(
+            type="m.room.redaction", redacts=msg.event_id, backfill=True
+        )
+        yield self.replicate()
+
+        msg_dict = msg.get_dict()
+        msg_dict["content"] = {}
+        msg_dict["unsigned"]["redacted_by"] = redaction.event_id
+        msg_dict["unsigned"]["redacted_because"] = redaction
+        redacted = FrozenEvent(msg_dict, msg.internal_metadata.get_dict())
+        yield self.check("get_event", [msg.event_id], redacted)
+
     event_id = 0
 
     @defer.inlineCallbacks
     def persist(
         self, sender=USER_ID, room_id=ROOM_ID, type={}, key=None, internal={},
         state=None, reset_state=False, backfill=False,
-        depth=None, prev_events=[], auth_events=[], prev_state=[],
+        depth=None, prev_events=[], auth_events=[], prev_state=[], redacts=None,
         **content
     ):
         """
@@ -235,6 +281,9 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         if key is not None:
             event_dict["state_key"] = key
             event_dict["prev_state"] = prev_state
+
+        if redacts is not None:
+            event_dict["redacts"] = redacts
 
         event = FrozenEvent(event_dict, internal_metadata_dict=internal)
 

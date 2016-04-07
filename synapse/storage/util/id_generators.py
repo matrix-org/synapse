@@ -112,7 +112,7 @@ class StreamIdGenerator(object):
                 self._current + self._step * (n + 1),
                 self._step
             )
-            self._current += n
+            self._current += n * self._step
 
             for next_id in next_ids:
                 self._unfinished_ids.append(next_id)

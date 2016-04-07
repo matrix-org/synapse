@@ -51,7 +51,7 @@ class BaseSlavedStoreTestCase(unittest.TestCase):
     def check(self, method, args, expected_result=None):
         master_result = yield getattr(self.master_store, method)(*args)
         slaved_result = yield getattr(self.slaved_store, method)(*args)
-        self.assertEqual(master_result, slaved_result)
         if expected_result is not None:
             self.assertEqual(master_result, expected_result)
             self.assertEqual(slaved_result, expected_result)
+        self.assertEqual(master_result, slaved_result)
