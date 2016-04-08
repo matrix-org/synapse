@@ -124,12 +124,10 @@ class PreviewUrlResource(BaseMediaResource):
 
             # first check the memory cache - good to handle all the clients on this
             # HS thundering away to preview the same URL at the same time.
-            try:
-                og = self.cache[url]
+            og = self.cache.get(url)
+            if og:
                 respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
                 return
-            except:
-                pass
 
             # then check the URL cache in the DB (which will also provide us with
             # historical previews, if we have any)
@@ -197,6 +195,12 @@ class PreviewUrlResource(BaseMediaResource):
                     og = yield self._calc_og(tree, media_info, requester)
                 except UnicodeDecodeError:
                     # XXX: evil evil bodge
+                    # Empirically, sites like google.com mix Latin-1 and utf-8
+                    # encodings in the same page.  The rogue Latin-1 characters
+                    # cause lxml to choke with a UnicodeDecodeError, so if we
+                    # see this we go and do a manual decode of the HTML before
+                    # handing it to lxml as utf-8 encoding, counter-intuitively,
+                    # which seems to make it happier...
                     file = open(media_info['filename'])
                     body = file.read()
                     file.close()
