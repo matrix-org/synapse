@@ -17,34 +17,52 @@ from .base_resource import BaseMediaResource
 
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
-from lxml import html
-from urlparse import urlparse, urlunparse
+from urlparse import urlparse, urlsplit, urlunparse
 
-from synapse.api.errors import Codes
 from synapse.util.stringutils import random_string
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.http.client import SpiderHttpClient
 from synapse.http.server import (
-    request_handler, respond_with_json, respond_with_json_bytes
+    request_handler, respond_with_json_bytes
 )
 from synapse.util.async import ObservableDeferred
 from synapse.util.stringutils import is_ascii
 
 import os
 import re
+import fnmatch
 import cgi
 import ujson as json
 
 import logging
 logger = logging.getLogger(__name__)
 
+try:
+    from lxml import html
+except ImportError:
+    pass
+
 
 class PreviewUrlResource(BaseMediaResource):
     isLeaf = True
 
     def __init__(self, hs, filepaths):
+        if not html:
+            logger.warn("Disabling PreviewUrlResource as lxml not available")
+            raise
+
+        if not hasattr(hs.config, "url_preview_ip_range_blacklist"):
+            logger.warn(
+                "For security, you must specify an explicit target IP address "
+                "blacklist in url_preview_ip_range_blacklist for url previewing "
+                "to work"
+            )
+            raise
+
         BaseMediaResource.__init__(self, hs, filepaths)
         self.client = SpiderHttpClient(hs)
+        if hasattr(hs.config, "url_preview_url_blacklist"):
+            self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
 
         # simple memory cache mapping urls to OG metadata
         self.cache = ExpiringCache(
@@ -73,6 +91,36 @@ class PreviewUrlResource(BaseMediaResource):
                 ts = int(request.args.get("ts")[0])
             else:
                 ts = self.clock.time_msec()
+
+            # impose the URL pattern blacklist
+            if hasattr(self, "url_preview_url_blacklist"):
+                url_tuple = urlsplit(url)
+                for entry in self.url_preview_url_blacklist:
+                    match = True
+                    for attrib in entry:
+                        pattern = entry[attrib]
+                        value = getattr(url_tuple, attrib)
+                        logger.debug("Matching attrib '%s' with value '%s' against pattern '%s'" % (
+                            attrib, value, pattern
+                        ))
+
+                        if value is None:
+                            match = False
+                            continue
+
+                        if pattern.startswith('^'):
+                            if not re.match(pattern, getattr(url_tuple, attrib)):
+                                match = False
+                                continue
+                        else:
+                            if not fnmatch.fnmatch(getattr(url_tuple, attrib), pattern):
+                                match = False
+                                continue
+                    if match:
+                        logger.warn(
+                            "URL %s blocked by url_blacklist entry %s", url, entry
+                        )
+                        raise
 
             # first check the memory cache - good to handle all the clients on this
             # HS thundering away to preview the same URL at the same time.
@@ -177,17 +225,6 @@ class PreviewUrlResource(BaseMediaResource):
 
             respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
         except:
-            # XXX: if we don't explicitly respond here, the request never returns.
-            # isn't this what server.py's wrapper is meant to be doing for us?
-            respond_with_json(
-                request,
-                500,
-                {
-                    "error": "Internal server error",
-                    "errcode": Codes.UNKNOWN,
-                },
-                send_cors=True
-            )
             raise
 
     @defer.inlineCallbacks
@@ -282,8 +319,12 @@ class PreviewUrlResource(BaseMediaResource):
             if meta_description:
                 og['og:description'] = meta_description[0]
             else:
-                # text_nodes = tree.xpath("//h1/text() | //h2/text() | //h3/text() | "
-                #    "//p/text() | //div/text() | //span/text() | //a/text()")
+                # grab any text nodes which are inside the <body/> tag...
+                # unless they are within an HTML5 semantic markup tag...
+                # <header/>, <nav/>, <aside/>, <footer/>
+                # ...or if they are within a <script/> or <style/> tag.
+                # This is a very very very coarse approximation to a plain text
+                # render of the page.
                 text_nodes = tree.xpath("//text()[not(ancestor::header | ancestor::nav | "
                                         "ancestor::aside | ancestor::footer | "
                                         "ancestor::script | ancestor::style)]" +

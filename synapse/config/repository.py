@@ -16,6 +16,8 @@
 from ._base import Config
 from collections import namedtuple
 
+import sys
+
 ThumbnailRequirement = namedtuple(
     "ThumbnailRequirement", ["width", "height", "method", "media_type"]
 )
@@ -23,7 +25,7 @@ ThumbnailRequirement = namedtuple(
 
 def parse_thumbnail_requirements(thumbnail_sizes):
     """ Takes a list of dictionaries with "width", "height", and "method" keys
-    and creates a map from image media types to the thumbnail size, thumnailing
+    and creates a map from image media types to the thumbnail size, thumbnailing
     method, and thumbnail media type to precalculate
 
     Args:
@@ -60,6 +62,18 @@ class ContentRepositoryConfig(Config):
         self.thumbnail_requirements = parse_thumbnail_requirements(
             config["thumbnail_sizes"]
         )
+        self.url_preview_enabled = config["url_preview_enabled"]
+        if self.url_preview_enabled:
+            try:
+                from netaddr import IPSet
+                if "url_preview_ip_range_blacklist" in config:
+                    self.url_preview_ip_range_blacklist = IPSet(
+                        config["url_preview_ip_range_blacklist"]
+                    )
+                if "url_preview_url_blacklist" in config:
+                    self.url_preview_url_blacklist = config["url_preview_url_blacklist"]
+            except ImportError:
+                sys.stderr.write("\nmissing netaddr dep - disabling preview_url API\n")
 
     def default_config(self, **kwargs):
         media_store = self.default_path("media_store")
@@ -73,9 +87,6 @@ class ContentRepositoryConfig(Config):
 
         # The largest allowed upload size in bytes
         max_upload_size: "10M"
-
-        # The largest allowed URL preview spidering size in bytes
-        max_spider_size: "10M"
 
         # Maximum number of pixels that will be thumbnailed
         max_image_pixels: "32M"
@@ -104,4 +115,62 @@ class ContentRepositoryConfig(Config):
         - width: 800
           height: 600
           method: scale
+
+        # Is the preview URL API enabled?  If enabled, you *must* specify
+        # an explicit url_preview_ip_range_blacklist of IPs that the spider is
+        # denied from accessing.
+        url_preview_enabled: False
+
+        # List of IP address CIDR ranges that the URL preview spider is denied
+        # from accessing.  There are no defaults: you must explicitly
+        # specify a list for URL previewing to work.  You should specify any
+        # internal services in your network that you do not want synapse to try
+        # to connect to, otherwise anyone in any Matrix room could cause your
+        # synapse to issue arbitrary GET requests to your internal services,
+        # causing serious security issues.
+        #
+        # url_preview_ip_range_blacklist:
+        # - '127.0.0.0/8'
+        # - '10.0.0.0/8'
+        # - '172.16.0.0/12'
+        # - '192.168.0.0/16'
+
+        # Optional list of URL matches that the URL preview spider is
+        # denied from accessing.  You should use url_preview_ip_range_blacklist
+        # in preference to this, otherwise someone could define a public DNS
+        # entry that points to a private IP address and circumvent the blacklist.
+        # This is more useful if you know there is an entire shape of URL that
+        # you know that will never want synapse to try to spider.
+        #
+        # Each list entry is a dictionary of url component attributes as returned
+        # by urlparse.urlsplit as applied to the absolute form of the URL.  See
+        # https://docs.python.org/2/library/urlparse.html#urlparse.urlsplit
+        # The values of the dictionary are treated as an filename match pattern
+        # applied to that component of URLs, unless they start with a ^ in which
+        # case they are treated as a regular expression match.  If all the
+        # specified component matches for a given list item succeed, the URL is
+        # blacklisted.
+        #
+        # url_preview_url_blacklist:
+        # # blacklist any URL with a username in its URI
+        # - username: '*''
+        #
+        # # blacklist all *.google.com URLs
+        # - netloc: 'google.com'
+        # - netloc: '*.google.com'
+        #
+        # # blacklist all plain HTTP URLs
+        # - scheme: 'http'
+        #
+        # # blacklist http(s)://www.acme.com/foo
+        # - netloc: 'www.acme.com'
+        #   path: '/foo'
+        #
+        # # blacklist any URL with a literal IPv4 address
+        # - netloc: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
+
+        # The largest allowed URL preview spidering size in bytes
+        max_spider_size: "10M"
+
+
         """ % locals()

@@ -20,10 +20,12 @@ from synapse.api.errors import (
 )
 from synapse.util.logcontext import preserve_context_over_fn
 import synapse.metrics
+from synapse.http.endpoint import SpiderEndpoint
 
 from canonicaljson import encode_canonical_json
 
 from twisted.internet import defer, reactor, ssl, protocol
+from twisted.internet.endpoints import SSL4ClientEndpoint, TCP4ClientEndpoint
 from twisted.web.client import (
     BrowserLikeRedirectAgent, ContentDecoderAgent, GzipDecoder, Agent,
     readBody, FileBodyProducer, PartialDownloadError,
@@ -364,6 +366,35 @@ class CaptchaServerHttpClient(SimpleHttpClient):
             defer.returnValue(e.response)
 
 
+class SpiderEndpointFactory(object):
+    def __init__(self, hs):
+        self.blacklist = hs.config.url_preview_ip_range_blacklist
+        self.policyForHTTPS = hs.get_http_client_context_factory()
+
+    def endpointForURI(self, uri):
+        logger.info("Getting endpoint for %s", uri.toBytes())
+        if uri.scheme == "http":
+            return SpiderEndpoint(
+                reactor, uri.host, uri.port, self.blacklist,
+                endpoint=TCP4ClientEndpoint,
+                endpoint_kw_args={
+                    'timeout': 15
+                },
+            )
+        elif uri.scheme == "https":
+            tlsPolicy = self.policyForHTTPS.creatorForNetloc(uri.host, uri.port)
+            return SpiderEndpoint(
+                reactor, uri.host, uri.port, self.blacklist,
+                endpoint=SSL4ClientEndpoint,
+                endpoint_kw_args={
+                    'sslContextFactory': tlsPolicy,
+                    'timeout': 15
+                },
+            )
+        else:
+            logger.warn("Can't get endpoint for unrecognised scheme %s", uri.scheme)
+
+
 class SpiderHttpClient(SimpleHttpClient):
     """
     Separate HTTP client for spidering arbitrary URLs.
@@ -375,11 +406,14 @@ class SpiderHttpClient(SimpleHttpClient):
     def __init__(self, hs):
         SimpleHttpClient.__init__(self, hs)
         # clobber the base class's agent and UA:
-        self.agent = ContentDecoderAgent(BrowserLikeRedirectAgent(Agent(
-            reactor,
-            connectTimeout=15,
-            contextFactory=hs.get_http_client_context_factory()
-        )), [('gzip', GzipDecoder)])
+        self.agent = ContentDecoderAgent(
+            BrowserLikeRedirectAgent(
+                Agent.usingEndpointFactory(
+                    reactor,
+                    SpiderEndpointFactory(hs)
+                )
+            ), [('gzip', GzipDecoder)]
+        )
         # We could look like Chrome:
         # self.user_agent = ("Mozilla/5.0 (%s) (KHTML, like Gecko)
         #                   Chrome Safari" % hs.version_string)
