@@ -110,22 +110,10 @@ class RedactionTestCase(unittest.TestCase):
             self.room1, self.u_alice, Membership.JOIN
         )
 
-        start = yield self.store.get_room_events_max_id()
-
         msg_event = yield self.inject_message(self.room1, self.u_alice, u"t")
 
-        end = yield self.store.get_room_events_max_id()
-
-        results, _ = yield self.store.get_room_events_stream(
-            self.u_alice.to_string(),
-            start,
-            end,
-        )
-
-        self.assertEqual(1, len(results))
-
         # Check event has not been redacted:
-        event = results[0]
+        event = yield self.store.get_event(msg_event.event_id)
 
         self.assertObjectHasAttributes(
             {
@@ -144,17 +132,7 @@ class RedactionTestCase(unittest.TestCase):
             self.room1, msg_event.event_id, self.u_alice, reason
         )
 
-        results, _ = yield self.store.get_room_events_stream(
-            self.u_alice.to_string(),
-            start,
-            end,
-        )
-
-        self.assertEqual(1, len(results))
-
-        # Check redaction
-
-        event = results[0]
+        event = yield self.store.get_event(msg_event.event_id)
 
         self.assertEqual(msg_event.event_id, event.event_id)
 
@@ -184,25 +162,12 @@ class RedactionTestCase(unittest.TestCase):
             self.room1, self.u_alice, Membership.JOIN
         )
 
-        start = yield self.store.get_room_events_max_id()
-
         msg_event = yield self.inject_room_member(
             self.room1, self.u_bob, Membership.JOIN,
             extra_content={"blue": "red"},
         )
 
-        end = yield self.store.get_room_events_max_id()
-
-        results, _ = yield self.store.get_room_events_stream(
-            self.u_alice.to_string(),
-            start,
-            end,
-        )
-
-        self.assertEqual(1, len(results))
-
-        # Check event has not been redacted:
-        event = results[0]
+        event = yield self.store.get_event(msg_event.event_id)
 
         self.assertObjectHasAttributes(
             {
@@ -221,17 +186,9 @@ class RedactionTestCase(unittest.TestCase):
             self.room1, msg_event.event_id, self.u_alice, reason
         )
 
-        results, _ = yield self.store.get_room_events_stream(
-            self.u_alice.to_string(),
-            start,
-            end,
-        )
-
-        self.assertEqual(1, len(results))
-
         # Check redaction
 
-        event = results[0]
+        event = yield self.store.get_event(msg_event.event_id)
 
         self.assertTrue("redacted_because" in event.unsigned)
 

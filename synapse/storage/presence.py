@@ -176,16 +176,6 @@ class PresenceStore(SQLBaseStore):
             desc="disallow_presence_visible",
         )
 
-    def is_presence_visible(self, observed_localpart, observer_userid):
-        return self._simple_select_one(
-            table="presence_allow_inbound",
-            keyvalues={"observed_user_id": observed_localpart,
-                       "observer_user_id": observer_userid},
-            retcols=["observed_user_id"],
-            allow_none=True,
-            desc="is_presence_visible",
-        )
-
     def add_presence_list_pending(self, observer_localpart, observed_userid):
         return self._simple_insert(
             table="presence_list",
