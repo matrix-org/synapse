@@ -355,5 +355,76 @@ class RegisterRestServlet(ClientV1RestServlet):
             )
 
 
+class CreateUserRestServlet(ClientV1RestServlet):
+    """Handles user creation via a server-to-server interface
+    """
+
+    PATTERNS = client_path_patterns("/createUser$", releases=())
+
+    def __init__(self, hs):
+        super(CreateUserRestServlet, self).__init__(hs)
+        self.store = hs.get_datastore()
+        self.direct_user_creation_max_duration = hs.config.user_creation_max_duration
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        user_json = parse_json_object_from_request(request)
+
+        if "access_token" not in request.args:
+            raise SynapseError(400, "Expected application service token.")
+
+        app_service = yield self.store.get_app_service_by_token(
+            request.args["access_token"][0]
+        )
+        if not app_service:
+            raise SynapseError(403, "Invalid application service token.")
+
+        logger.debug("creating user: %s", user_json)
+
+        response = yield self._do_create(user_json)
+
+        defer.returnValue((200, response))
+
+    def on_OPTIONS(self, request):
+        return 403, {}
+
+    @defer.inlineCallbacks
+    def _do_create(self, user_json):
+        yield run_on_reactor()
+
+        if "localpart" not in user_json:
+            raise SynapseError(400, "Expected 'localpart' key.")
+
+        if "displayname" not in user_json:
+            raise SynapseError(400, "Expected 'displayname' key.")
+
+        if "duration_seconds" not in user_json:
+            raise SynapseError(400, "Expected 'duration_seconds' key.")
+
+        localpart = user_json["localpart"].encode("utf-8")
+        displayname = user_json["displayname"].encode("utf-8")
+        duration_seconds = 0
+        try:
+            duration_seconds = int(user_json["duration_seconds"])
+        except:
+            raise SynapseError(400, "Failed to parse 'duration_seconds'")
+        if duration_seconds > self.direct_user_creation_max_duration:
+            duration_seconds = self.direct_user_creation_max_duration
+
+        handler = self.handlers.registration_handler
+        user_id, token = yield handler.create_user(
+            localpart=localpart,
+            displayname=displayname,
+            duration_seconds=duration_seconds
+        )
+
+        defer.returnValue({
+            "user_id": user_id,
+            "access_token": token,
+            "home_server": self.hs.hostname,
+        })
+
+
 def register_servlets(hs, http_server):
     RegisterRestServlet(hs).register(http_server)
+    CreateUserRestServlet(hs).register(http_server)
