@@ -79,7 +79,7 @@ def make_base_append_rules(kind, modified_base_rules):
     rules = []
 
     if kind == 'override':
-        rules = BASE_APPEND_OVRRIDE_RULES
+        rules = BASE_APPEND_OVERRIDE_RULES
     elif kind == 'underride':
         rules = BASE_APPEND_UNDERRIDE_RULES
     elif kind == 'content':
@@ -148,7 +148,7 @@ BASE_PREPEND_OVERRIDE_RULES = [
 ]
 
 
-BASE_APPEND_OVRRIDE_RULES = [
+BASE_APPEND_OVERRIDE_RULES = [
     {
         'rule_id': 'global/override/.m.rule.suppress_notices',
         'conditions': [
@@ -161,6 +161,40 @@ BASE_APPEND_OVRRIDE_RULES = [
         ],
         'actions': [
             'dont_notify',
+        ]
+    },
+    # NB. .m.rule.invite_for_me must be higher prio than .m.rule.member_event
+    # otherwise invites will be matched by .m.rule.member_event
+    {
+        'rule_id': 'global/underride/.m.rule.invite_for_me',
+        'conditions': [
+            {
+                'kind': 'event_match',
+                'key': 'type',
+                'pattern': 'm.room.member',
+                '_id': '_member',
+            },
+            {
+                'kind': 'event_match',
+                'key': 'content.membership',
+                'pattern': 'invite',
+                '_id': '_invite_member',
+            },
+            {
+                'kind': 'event_match',
+                'key': 'state_key',
+                'pattern_type': 'user_id'
+            },
+        ],
+        'actions': [
+            'notify',
+            {
+                'set_tweak': 'sound',
+                'value': 'default'
+            }, {
+                'set_tweak': 'highlight',
+                'value': False
+            }
         ]
     },
     # Will we sometimes want to know about people joining and leaving?
@@ -252,38 +286,6 @@ BASE_APPEND_UNDERRIDE_RULES = [
         ]
     },
     {
-        'rule_id': 'global/underride/.m.rule.invite_for_me',
-        'conditions': [
-            {
-                'kind': 'event_match',
-                'key': 'type',
-                'pattern': 'm.room.member',
-                '_id': '_member',
-            },
-            {
-                'kind': 'event_match',
-                'key': 'content.membership',
-                'pattern': 'invite',
-                '_id': '_invite_member',
-            },
-            {
-                'kind': 'event_match',
-                'key': 'state_key',
-                'pattern_type': 'user_id'
-            },
-        ],
-        'actions': [
-            'notify',
-            {
-                'set_tweak': 'sound',
-                'value': 'default'
-            }, {
-                'set_tweak': 'highlight',
-                'value': False
-            }
-        ]
-    },
-    {
         'rule_id': 'global/underride/.m.rule.message',
         'conditions': [
             {
@@ -315,7 +317,7 @@ for r in BASE_PREPEND_OVERRIDE_RULES:
     r['default'] = True
     BASE_RULE_IDS.add(r['rule_id'])
 
-for r in BASE_APPEND_OVRRIDE_RULES:
+for r in BASE_APPEND_OVERRIDE_RULES:
     r['priority_class'] = PRIORITY_CLASS_MAP['override']
     r['default'] = True
     BASE_RULE_IDS.add(r['rule_id'])

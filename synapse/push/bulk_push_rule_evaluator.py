@@ -69,7 +69,8 @@ def _get_rules(room_id, user_ids, store):
 
 
 @defer.inlineCallbacks
-def evaluator_for_room_id(room_id, hs, store):
+def evaluator_for_event(event, hs, store):
+    room_id = event.room_id
     users_with_pushers = yield store.get_users_with_pushers_in_room(room_id)
     receipts = yield store.get_receipts_for_room(room_id, "m.read")
 
@@ -78,6 +79,15 @@ def evaluator_for_room_id(room_id, hs, store):
     for r in receipts:
         if hs.is_mine_id(r['user_id']):
             user_ids.add(r['user_id'])
+
+    # if this event is an invite event, we may need to run rules for the user
+    # who's been invited, otherwise they won't get told they've been invited
+    if event.type == 'm.room.member' and event.content['membership'] == 'invite':
+        invited_user = event.state_key
+        if invited_user and hs.is_mine_id(invited_user):
+            has_pusher = yield store.user_has_pusher(invited_user)
+            if has_pusher:
+                user_ids.add(invited_user)
 
     user_ids = list(user_ids)
 

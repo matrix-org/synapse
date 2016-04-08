@@ -50,6 +50,13 @@ class PusherStore(SQLBaseStore):
         return rows
 
     @defer.inlineCallbacks
+    def user_has_pusher(self, user_id):
+        ret = yield self._simple_select_one_onecol(
+            "pushers", {"user_name": user_id}, "id", allow_none=True
+        )
+        defer.returnValue(ret is not None)
+
+    @defer.inlineCallbacks
     def get_pushers_by_app_id_and_pushkey(self, app_id, pushkey):
         def r(txn):
             sql = (
