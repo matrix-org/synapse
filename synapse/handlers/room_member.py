@@ -23,8 +23,8 @@ from synapse.api.constants import (
     EventTypes, Membership,
 )
 from synapse.api.errors import AuthError, SynapseError, Codes
-from synapse.util.logcontext import preserve_context_over_fn
 from synapse.util.async import Linearizer
+from synapse.util.distributor import user_left_room, user_joined_room
 
 from signedjson.sign import verify_signed_json
 from signedjson.key import decode_verify_key_bytes
@@ -36,20 +36,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 id_server_scheme = "https://"
-
-
-def user_left_room(distributor, user, room_id):
-    return preserve_context_over_fn(
-        distributor.fire,
-        "user_left_room", user=user, room_id=room_id
-    )
-
-
-def user_joined_room(distributor, user, room_id):
-    return preserve_context_over_fn(
-        distributor.fire,
-        "user_joined_room", user=user, room_id=room_id
-    )
 
 
 class RoomMemberHandler(BaseHandler):

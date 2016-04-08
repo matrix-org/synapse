@@ -25,7 +25,6 @@ from synapse.api.constants import (
 from synapse.api.errors import AuthError, StoreError, SynapseError
 from synapse.util import stringutils
 from synapse.util.async import concurrently_execute
-from synapse.util.logcontext import preserve_context_over_fn
 from synapse.util.caches.response_cache import ResponseCache
 
 from collections import OrderedDict
@@ -37,20 +36,6 @@ import string
 logger = logging.getLogger(__name__)
 
 id_server_scheme = "https://"
-
-
-def user_left_room(distributor, user, room_id):
-    return preserve_context_over_fn(
-        distributor.fire,
-        "user_left_room", user=user, room_id=room_id
-    )
-
-
-def user_joined_room(distributor, user, room_id):
-    return preserve_context_over_fn(
-        distributor.fire,
-        "user_joined_room", user=user, room_id=room_id
-    )
 
 
 class RoomCreationHandler(BaseHandler):
