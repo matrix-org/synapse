@@ -112,6 +112,8 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def _process(self):
+        if self.processing:
+            return
         try:
             self.processing = True
             yield self._unsafe_process()
