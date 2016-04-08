@@ -153,7 +153,7 @@ class ContentRepositoryConfig(Config):
         #
         # url_preview_url_blacklist:
         # # blacklist any URL with a username in its URI
-        # - username: '*''
+        # - username: '*'
         #
         # # blacklist all *.google.com URLs
         # - netloc: 'google.com'
