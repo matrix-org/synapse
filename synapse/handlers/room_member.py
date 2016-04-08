@@ -406,19 +406,6 @@ class RoomMemberHandler(BaseHandler):
             and guest_access.content["guest_access"] == "can_join"
         )
 
-    def _should_do_dance(self, current_state, inviter, room_hosts=None):
-        # TODO: Shouldn't this be remote_room_host?
-        room_hosts = room_hosts or []
-
-        is_host_in_room = self.is_host_in_room(current_state)
-        if is_host_in_room:
-            return False, room_hosts
-
-        if inviter and not self.hs.is_mine(inviter):
-            room_hosts.append(inviter.domain)
-
-        return True, room_hosts
-
     @defer.inlineCallbacks
     def lookup_room_alias(self, room_alias):
         """

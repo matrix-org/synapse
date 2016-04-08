@@ -219,8 +219,5 @@ class ApplicationService(object):
     def is_exclusive_alias(self, alias):
         return self._is_exclusive(ApplicationService.NS_ALIASES, alias)
 
-    def is_exclusive_room(self, room_id):
-        return self._is_exclusive(ApplicationService.NS_ROOMS, room_id)
-
     def __str__(self):
         return "ApplicationService: %s" % (self.__dict__,)

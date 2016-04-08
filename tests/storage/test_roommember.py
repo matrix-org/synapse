@@ -71,13 +71,6 @@ class RoomMemberStoreTestCase(unittest.TestCase):
         yield self.inject_room_member(self.room, self.u_alice, Membership.JOIN)
 
         self.assertEquals(
-            Membership.JOIN,
-            (yield self.store.get_room_member(
-                user_id=self.u_alice.to_string(),
-                room_id=self.room.to_string(),
-            )).membership
-        )
-        self.assertEquals(
             [self.u_alice.to_string()],
             [m.user_id for m in (
                 yield self.store.get_room_members(self.room.to_string())

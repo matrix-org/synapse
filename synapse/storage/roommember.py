@@ -121,26 +121,6 @@ class RoomMemberStore(SQLBaseStore):
         with self._stream_id_gen.get_next() as stream_ordering:
             yield self.runInteraction("locally_reject_invite", f, stream_ordering)
 
-    def get_room_member(self, user_id, room_id):
-        """Retrieve the current state of a room member.
-
-        Args:
-            user_id (str): The member's user ID.
-            room_id (str): The room the member is in.
-        Returns:
-            Deferred: Results in a MembershipEvent or None.
-        """
-        return self.runInteraction(
-            "get_room_member",
-            self._get_members_events_txn,
-            room_id,
-            user_id=user_id,
-        ).addCallback(
-            self._get_events
-        ).addCallback(
-            lambda events: events[0] if events else None
-        )
-
     @cached(max_entries=5000)
     def get_users_in_room(self, room_id):
         def f(txn):
@@ -202,19 +182,6 @@ class RoomMemberStore(SQLBaseStore):
             if invite.room_id == room_id:
                 defer.returnValue(invite)
         defer.returnValue(None)
-
-    def get_leave_and_ban_events_for_user(self, user_id):
-        """ Get all the leave events for a user
-        Args:
-            user_id (str): The user ID.
-        Returns:
-            A deferred list of event objects.
-        """
-        return self.get_rooms_for_user_where_membership_is(
-            user_id, (Membership.LEAVE, Membership.BAN)
-        ).addCallback(lambda leaves: self._get_events([
-            leave.event_id for leave in leaves
-        ]))
 
     def get_rooms_for_user_where_membership_is(self, user_id, membership_list):
         """ Get all the rooms for this user where the membership for this user

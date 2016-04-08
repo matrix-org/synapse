@@ -810,12 +810,6 @@ class SQLBaseStore(object):
 
         return txn.execute(sql, keyvalues.values())
 
-    def get_next_stream_id(self):
-        with self._next_stream_id_lock:
-            i = self._next_stream_id
-            self._next_stream_id += 1
-            return i
-
     def _get_cache_dict(self, db_conn, table, entity_column, stream_column,
                         max_value):
         # Fetch a mapping of room_id -> max stream position for "recent" rooms.

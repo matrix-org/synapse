@@ -30,18 +30,6 @@ SCHEMA_VERSION = 31
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
 
-def read_schema(path):
-    """ Read the named database schema.
-
-    Args:
-        path: Path of the database schema.
-    Returns:
-        A string containing the database schema.
-    """
-    with open(path) as schema_file:
-        return schema_file.read()
-
-
 class PrepareDatabaseException(Exception):
     pass
 
