@@ -96,6 +96,14 @@ class ApplicationServiceTestCase(unittest.TestCase):
             "#irc_foobar:matrix.org"
         ))
 
+    def test_non_exclusive_room(self):
+        self.service.namespaces[ApplicationService.NS_ROOMS].append(
+            _regex("!irc_.*:matrix.org", exclusive=False)
+        )
+        self.assertFalse(self.service.is_exclusive_room(
+            "!irc_foobar:matrix.org"
+        ))
+
     def test_non_exclusive_user(self):
         self.service.namespaces[ApplicationService.NS_USERS].append(
             _regex("@irc_.*:matrix.org", exclusive=False)
@@ -118,6 +126,14 @@ class ApplicationServiceTestCase(unittest.TestCase):
         )
         self.assertTrue(self.service.is_exclusive_user(
             "@irc_foobar:matrix.org"
+        ))
+
+    def test_exclusive_room(self):
+        self.service.namespaces[ApplicationService.NS_ROOMS].append(
+            _regex("!irc_.*:matrix.org", exclusive=True)
+        )
+        self.assertTrue(self.service.is_exclusive_room(
+            "!irc_foobar:matrix.org"
         ))
 
     def test_regex_alias_no_match(self):
