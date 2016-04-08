@@ -86,7 +86,7 @@ class HttpPusher(object):
     @defer.inlineCallbacks
     def on_new_notifications(self, min_stream_ordering, max_stream_ordering):
         with Measure(self.clock, "push.on_new_notifications"):
-            self.max_stream_ordering = max_stream_ordering
+            self.max_stream_ordering = max(max_stream_ordering, self.max_stream_ordering)
             yield self._process()
 
     @defer.inlineCallbacks
