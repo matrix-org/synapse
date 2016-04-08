@@ -26,10 +26,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def changed_presencelike_data(distributor, user, state):
-    return distributor.fire("changed_presencelike_data", user, state)
-
-
 class ProfileHandler(BaseHandler):
 
     def __init__(self, hs):
@@ -41,9 +37,6 @@ class ProfileHandler(BaseHandler):
         )
 
         distributor = hs.get_distributor()
-        self.distributor = distributor
-
-        distributor.declare("changed_presencelike_data")
 
         distributor.observe("registered_user", self.registered_user)
 
@@ -95,10 +88,6 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, new_displayname
         )
 
-        yield changed_presencelike_data(self.distributor, target_user, {
-            "displayname": new_displayname,
-        })
-
         yield self._update_join_states(requester)
 
     @defer.inlineCallbacks
@@ -141,10 +130,6 @@ class ProfileHandler(BaseHandler):
         yield self.store.set_profile_avatar_url(
             target_user.localpart, new_avatar_url
         )
-
-        yield changed_presencelike_data(self.distributor, target_user, {
-            "avatar_url": new_avatar_url,
-        })
 
         yield self._update_join_states(requester)
 
