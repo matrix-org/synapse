@@ -271,12 +271,19 @@ class SimpleHttpClient(object):
 
         if 'Content-Length' in headers and headers['Content-Length'] > max_size:
             logger.warn("Requested URL is too large > %r bytes" % (self.max_size,))
-            # XXX: do we want to explicitly drop the connection here somehow? if so, how?
-            raise  # what should we be raising here?
+            raise SynapseError(
+                502,
+                "Requested file is too large > %r bytes" % (self.max_size,),
+                Codes.TOO_LARGE,
+            )
 
         if response.code > 299:
             logger.warn("Got %d when downloading %s" % (response.code, url))
-            raise
+            raise SynapseError(
+                502,
+                "Got error %d" % (response.code,),
+                Codes.UNKNOWN,
+            )
 
         # TODO: if our Content-Type is HTML or something, just read the first
         # N bytes into RAM rather than saving it all to disk only to read it
@@ -287,9 +294,13 @@ class SimpleHttpClient(object):
                 _readBodyToFile,
                 response, output_stream, max_size
             )
-        except:
+        except Exception as e:
             logger.exception("Failed to download body")
-            raise
+            raise SynapseError(
+                502,
+                ("Failed to download remote body: %s" % e),
+                Codes.UNKNOWN,
+            )
 
         defer.returnValue((length, headers, response.request.absoluteURI, response.code))
 

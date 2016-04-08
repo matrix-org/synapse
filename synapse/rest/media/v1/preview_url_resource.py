@@ -19,6 +19,9 @@ from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
 from urlparse import urlparse, urlsplit, urlunparse
 
+from synapse.api.errors import (
+    SynapseError, Codes,
+)
 from synapse.util.stringutils import random_string
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.http.client import SpiderHttpClient
@@ -47,9 +50,11 @@ class PreviewUrlResource(BaseMediaResource):
     isLeaf = True
 
     def __init__(self, hs, filepaths):
-        if not html:
-            logger.warn("Disabling PreviewUrlResource as lxml not available")
-            raise
+        try:
+            if html:
+                pass
+        except:
+            raise RunTimeError("Disabling PreviewUrlResource as lxml not available")
 
         if not hasattr(hs.config, "url_preview_ip_range_blacklist"):
             logger.warn(
@@ -57,7 +62,10 @@ class PreviewUrlResource(BaseMediaResource):
                 "blacklist in url_preview_ip_range_blacklist for url previewing "
                 "to work"
             )
-            raise
+            raise RunTimeError(
+                "Disabling PreviewUrlResource as "
+                "url_preview_ip_range_blacklist not specified"
+            )
 
         BaseMediaResource.__init__(self, hs, filepaths)
         self.client = SpiderHttpClient(hs)
@@ -121,7 +129,10 @@ class PreviewUrlResource(BaseMediaResource):
                         logger.warn(
                             "URL %s blocked by url_blacklist entry %s", url, entry
                         )
-                        raise
+                        raise SynapseError(
+                            403, "URL blocked by url pattern blacklist entry",
+                            Codes.UNKNOWN
+                        )
 
             # first check the memory cache - good to handle all the clients on this
             # HS thundering away to preview the same URL at the same time.
@@ -229,8 +240,9 @@ class PreviewUrlResource(BaseMediaResource):
             )
 
             respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
-        except:
-            raise
+        except Exception as e:
+            raise e
+
 
     @defer.inlineCallbacks
     def _calc_og(self, tree, media_info, requester):
@@ -418,9 +430,12 @@ class PreviewUrlResource(BaseMediaResource):
                 user_id=user,
             )
 
-        except:
+        except Exception as e:
             os.remove(fname)
-            raise
+            raise SynapseError(
+                500, ("Failed to download content: %s" % e),
+                Codes.UNKNOWN
+            )
 
         defer.returnValue({
             "media_type": media_type,
