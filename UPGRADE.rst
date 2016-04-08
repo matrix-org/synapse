@@ -34,7 +34,7 @@ Upgrading to v0.15.0
 ====================
 
 If you want to use the new URL previewing API (/_matrix/media/r0/preview_url)
-then you have to explicitly enable it in the config and install the optional
+then you have to explicitly enable it in the config and update your dependencies
 dependencies.  See README.rst for details.
 
 

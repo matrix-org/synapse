@@ -570,6 +570,9 @@ from a security perspective to stop arbitrary Matrix users spidering 'internal'
 URLs on your network.  At the very least we recommend that your loopback and
 RFC1918 IP addresses are blacklisted.
 
+This also requires the optional lxml and netaddr python dependencies to be
+installed.
+
 
 Password reset
 ==============
