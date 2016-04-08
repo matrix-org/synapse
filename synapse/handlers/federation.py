@@ -40,6 +40,7 @@ from synapse.events.utils import prune_event
 from synapse.util.retryutils import NotRetryingDestination
 
 from synapse.push.action_generator import ActionGenerator
+from synapse.util.distributor import user_joined_room
 
 from twisted.internet import defer
 
@@ -47,10 +48,6 @@ import itertools
 import logging
 
 logger = logging.getLogger(__name__)
-
-
-def user_joined_room(distributor, user, room_id):
-    return distributor.fire("user_joined_room", user, room_id)
 
 
 class FederationHandler(BaseHandler):
