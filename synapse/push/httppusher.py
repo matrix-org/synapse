@@ -120,6 +120,11 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def _unsafe_process(self):
+        """
+        Looks for unset notifications and dispatch them, in order
+        Never call this directly: use _process which will only allow this to
+        run once per pusher.
+        """
         unprocessed = yield self.store.get_unread_push_actions_for_user_in_range(
             self.user_id, self.last_stream_ordering, self.max_stream_ordering
         )
