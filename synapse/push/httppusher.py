@@ -125,6 +125,7 @@ class HttpPusher(object):
         Never call this directly: use _process which will only allow this to
         run once per pusher.
         """
+        starting_max_ordering = self.max_stream_ordering
         unprocessed = yield self.store.get_unread_push_actions_for_user_in_range(
             self.user_id, self.last_stream_ordering, self.max_stream_ordering
         )
@@ -185,6 +186,8 @@ class HttpPusher(object):
                     self.timed_call = reactor.callLater(self.backoff_delay, self.on_timer)
                     self.backoff_delay = min(self.backoff_delay * 2, self.MAX_BACKOFF_SEC)
                     break
+        if self.max_stream_ordering != starting_max_ordering:
+            self._unsafe_process()
 
     @defer.inlineCallbacks
     def _process_one(self, push_action):
