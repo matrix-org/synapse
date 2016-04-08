@@ -100,9 +100,10 @@ class PreviewUrlResource(BaseMediaResource):
                     for attrib in entry:
                         pattern = entry[attrib]
                         value = getattr(url_tuple, attrib)
-                        logger.debug("Matching attrib '%s' with value '%s' against pattern '%s'" % (
-                            attrib, value, pattern
-                        ))
+                        logger.debug((
+                            "Matching attrib '%s' with value '%s' against"
+                            " pattern '%s'"
+                        ) % (attrib, value, pattern))
 
                         if value is None:
                             match = False
