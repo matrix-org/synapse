@@ -66,7 +66,7 @@ class MediaRepositoryStore(SQLBaseStore):
             txn.execute(sql, (url, ts))
             row = txn.fetchone()
 
-            if not row[3]:
+            if not row:
                 # ...or if we've requested a timestamp older than the oldest
                 # copy in the cache, return the oldest copy (if any)
                 sql = (
@@ -78,7 +78,7 @@ class MediaRepositoryStore(SQLBaseStore):
                 txn.execute(sql, (url, ts))
                 row = txn.fetchone()
 
-            if not row[3]:
+            if not row:
                 return None
 
             return dict(zip((
