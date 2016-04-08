@@ -15,6 +15,8 @@
 
 from ._base import BaseHandler
 
+import synapse.handlers.room_member
+
 from twisted.internet import defer
 
 from synapse.util.logcontext import PreserveLoggingContext
@@ -29,12 +31,16 @@ class ReceiptsHandler(BaseHandler):
     def __init__(self, hs):
         super(ReceiptsHandler, self).__init__(hs)
 
-        self.hs = hs
         self.federation = hs.get_replication_layer()
         self.federation.register_edu_handler(
             "m.receipt", self._received_remote_receipt
         )
-        self.clock = self.hs.get_clock()
+
+        self.clock = hs.get_clock()
+
+        self.room_member_handler = hs.get(
+            synapse.handlers.room_member.RoomMemberHandler
+        )
 
     @defer.inlineCallbacks
     def received_client_receipt(self, room_id, receipt_type, user_id,
@@ -119,8 +125,7 @@ class ReceiptsHandler(BaseHandler):
 
             remotedomains = set()
 
-            rm_handler = self.hs.get_handlers().room_member_handler
-            yield rm_handler.fetch_room_distributions_into(
+            yield self.room_member_handler.fetch_room_distributions_into(
                 room_id, localusers=None, remotedomains=remotedomains
             )
 

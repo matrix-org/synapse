@@ -25,6 +25,11 @@ from synapse.util.async import concurrently_execute
 from synapse.util.caches.snapshot_cache import SnapshotCache
 from synapse.types import UserID, RoomStreamToken, StreamToken
 
+import synapse.handlers.federation
+import synapse.handlers.profile
+import synapse.handlers.presence
+import synapse.handlers.receipts
+
 from ._base import BaseHandler
 
 from canonicaljson import encode_canonical_json
@@ -38,11 +43,25 @@ class MessageHandler(BaseHandler):
 
     def __init__(self, hs):
         super(MessageHandler, self).__init__(hs)
-        self.hs = hs
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
         self.validator = EventValidator()
         self.snapshot_cache = SnapshotCache()
+        self.is_mine = hs.is_mine
+        self.event_sources = hs.get_event_sources()
+
+        self.federation_handler = hs.get(
+            synapse.handlers.federation.FederationHandler
+        )
+        self.profile_handler = hs.get(
+            synapse.handlers.profile.ProfileHandler
+        )
+        self.presence_handler = hs.get(
+            synapse.handlers.presence.PresenceHandler
+        )
+        self.receipts_handler = hs.get(
+            synapse.handlers.receipts.ReceiptsHandler
+        )
 
     @defer.inlineCallbacks
     def get_messages(self, requester, room_id=None, pagin_config=None,
@@ -59,13 +78,13 @@ class MessageHandler(BaseHandler):
             dict: Pagination API results
         """
         user_id = requester.user.to_string()
-        data_source = self.hs.get_event_sources().sources["room"]
+        data_source = self.event_sources.sources["room"]
 
         if pagin_config.from_token:
             room_token = pagin_config.from_token.room_key
         else:
             pagin_config.from_token = (
-                yield self.hs.get_event_sources().get_current_token(
+                yield self.event_sources.get_current_token(
                     direction='b'
                 )
             )
@@ -104,7 +123,7 @@ class MessageHandler(BaseHandler):
                 if leave_token.topological < max_topo:
                     source_config.from_key = str(leave_token)
 
-            yield self.hs.get_handlers().federation_handler.maybe_backfill(
+            yield self.federation_handler.maybe_backfill(
                 room_id, max_topo
             )
 
@@ -171,7 +190,7 @@ class MessageHandler(BaseHandler):
 
             if membership in {Membership.JOIN, Membership.INVITE}:
                 # If event doesn't include a display name, add one.
-                profile = self.hs.get_handlers().profile_handler
+                profile = self.profile_handler
                 content = builder.content
 
                 try:
@@ -214,7 +233,7 @@ class MessageHandler(BaseHandler):
 
         user = UserID.from_string(event.sender)
 
-        assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
+        assert self.is_mine(user), "User must be our own: %s" % (user,)
 
         if event.is_state():
             prev_state = self.deduplicate_state_event(event, context)
@@ -229,8 +248,7 @@ class MessageHandler(BaseHandler):
         )
 
         if event.type == EventTypes.Message:
-            presence = self.hs.get_handlers().presence_handler
-            yield presence.bump_presence_active_time(user)
+            yield self.presence_handler.bump_presence_active_time(user)
 
     def deduplicate_state_event(self, event, context):
         """
@@ -409,15 +427,15 @@ class MessageHandler(BaseHandler):
 
         rooms_ret = []
 
-        now_token = yield self.hs.get_event_sources().get_current_token()
+        now_token = yield self.event_sources.get_current_token()
 
-        presence_stream = self.hs.get_event_sources().sources["presence"]
+        presence_stream = self.event_sources.sources["presence"]
         pagination_config = PaginationConfig(from_token=now_token)
         presence, _ = yield presence_stream.get_pagination_rows(
             user, pagination_config.get_source_config("presence"), None
         )
 
-        receipt_stream = self.hs.get_event_sources().sources["receipt"]
+        receipt_stream = self.event_sources.sources["receipt"]
         receipt, _ = yield receipt_stream.get_pagination_rows(
             user, pagination_config.get_source_config("receipt"), None
         )
@@ -655,7 +673,7 @@ class MessageHandler(BaseHandler):
             for x in current_state.values()
         ]
 
-        now_token = yield self.hs.get_event_sources().get_current_token()
+        now_token = yield self.event_sources.get_current_token()
 
         limit = pagin_config.limit if pagin_config else None
         if limit is None:
@@ -667,11 +685,9 @@ class MessageHandler(BaseHandler):
             and m.content["membership"] == Membership.JOIN
         ]
 
-        presence_handler = self.hs.get_handlers().presence_handler
-
         @defer.inlineCallbacks
         def get_presence():
-            states = yield presence_handler.get_states(
+            states = yield self.presence_handler.get_states(
                 [m.user_id for m in room_members],
                 as_event=True,
             )
@@ -680,8 +696,7 @@ class MessageHandler(BaseHandler):
 
         @defer.inlineCallbacks
         def get_receipts():
-            receipts_handler = self.hs.get_handlers().receipts_handler
-            receipts = yield receipts_handler.get_receipts_for_room(
+            receipts = yield self.receipts_handler.get_receipts_for_room(
                 room_id,
                 now_token.receipt_key
             )

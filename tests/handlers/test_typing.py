@@ -26,6 +26,9 @@ from ..utils import (
 
 from synapse.api.errors import AuthError
 from synapse.handlers.typing import TypingNotificationHandler
+from synapse.handlers.federation import FederationHandler
+from synapse.handlers.directory import DirectoryHandler
+from synapse.handlers.room_member import RoomMemberHandler
 
 from synapse.types import UserID
 
@@ -51,6 +54,9 @@ def _make_edu_json(origin, edu_type, content):
 
 class JustTypingNotificationHandlers(object):
     def __init__(self, hs):
+        hs.registry[FederationHandler] = True
+        hs.registry[DirectoryHandler] = True
+        hs.registry[RoomMemberHandler] = self.room_member_handler = Mock(spec=[])
         self.typing_notification_handler = TypingNotificationHandler(hs)
 
 
@@ -111,7 +117,6 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.room_id = "a-room"
 
         # Mock the RoomMemberHandler
-        hs.handlers.room_member_handler = Mock(spec=[])
         self.room_member_handler = hs.handlers.room_member_handler
 
         self.room_members = []

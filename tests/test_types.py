@@ -18,8 +18,11 @@ from tests import unittest
 from synapse.api.errors import SynapseError
 from synapse.server import HomeServer
 from synapse.types import UserID, RoomAlias
+from mock import Mock
 
-mock_homeserver = HomeServer(hostname="my.domain")
+config = Mock(spec=[])
+config.server_name = "my.domain"
+mock_homeserver = HomeServer(config.server_name, config=config)
 
 
 class UserIDTestCase(unittest.TestCase):

@@ -21,6 +21,10 @@ from mock import Mock, NonCallableMock
 
 from synapse.api.errors import AuthError
 from synapse.handlers.profile import ProfileHandler
+from synapse.handlers.federation import FederationHandler
+from synapse.handlers.directory import DirectoryHandler
+from synapse.handlers.room_member import RoomMemberHandler
+
 from synapse.types import UserID
 
 from tests.utils import setup_test_homeserver, requester_for_user
@@ -28,6 +32,9 @@ from tests.utils import setup_test_homeserver, requester_for_user
 
 class ProfileHandlers(object):
     def __init__(self, hs):
+        hs.registry[FederationHandler] = True
+        hs.registry[DirectoryHandler] = True
+        hs.registry[RoomMemberHandler] = True
         self.profile_handler = ProfileHandler(hs)
 
 

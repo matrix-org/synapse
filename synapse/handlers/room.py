@@ -17,6 +17,9 @@
 from twisted.internet import defer
 
 from ._base import BaseHandler
+import synapse.handlers.directory
+import synapse.handlers.message
+import synapse.handlers.room_member
 
 from synapse.types import UserID, RoomAlias, RoomID, RoomStreamToken
 from synapse.api.constants import (
@@ -39,6 +42,20 @@ id_server_scheme = "https://"
 
 
 class RoomCreationHandler(BaseHandler):
+
+    def __init__(self, hs):
+        super(RoomCreationHandler, self).__init__(hs)
+        self.server_name = hs.config.server_name
+        self.event_sources = hs.get_event_sources()
+        self.directory_handler = hs.get(
+            synapse.handlers.directory.DirectoryHandler
+        )
+        self.message_handler = hs.get(
+            synapse.handlers.message.MessageHandler
+        )
+        self.room_member_handler = hs.get(
+            synapse.handlers.room_member.RoomMemberHandler
+        )
 
     PRESETS_DICT = {
         RoomCreationPreset.PRIVATE_CHAT: {
@@ -82,7 +99,7 @@ class RoomCreationHandler(BaseHandler):
 
             room_alias = RoomAlias.create(
                 config["room_alias_name"],
-                self.hs.hostname,
+                self.server_name,
             )
             mapping = yield self.store.get_association_from_room_alias(
                 room_alias
@@ -114,7 +131,7 @@ class RoomCreationHandler(BaseHandler):
                 random_string = stringutils.random_string(18)
                 gen_room_id = RoomID.create(
                     random_string,
-                    self.hs.hostname,
+                    self.server_name,
                 )
                 yield self.store.store_room(
                     room_id=gen_room_id.to_string(),
@@ -129,12 +146,11 @@ class RoomCreationHandler(BaseHandler):
             raise StoreError(500, "Couldn't generate a room ID.")
 
         if room_alias:
-            directory_handler = self.hs.get_handlers().directory_handler
-            yield directory_handler.create_association(
+            yield self.directory_handler.create_association(
                 user_id=user_id,
                 room_id=room_id,
                 room_alias=room_alias,
-                servers=[self.hs.hostname],
+                servers=[self.server_name],
             )
 
         preset_config = config.get(
@@ -152,14 +168,11 @@ class RoomCreationHandler(BaseHandler):
 
         creation_content = config.get("creation_content", {})
 
-        msg_handler = self.hs.get_handlers().message_handler
-        room_member_handler = self.hs.get_handlers().room_member_handler
-
         yield self._send_events_for_new_room(
             requester,
             room_id,
-            msg_handler,
-            room_member_handler,
+            self.message_handler,
+            self.room_member_handler,
             preset_config=preset_config,
             invite_list=invite_list,
             initial_state=initial_state,
@@ -169,7 +182,7 @@ class RoomCreationHandler(BaseHandler):
 
         if "name" in config:
             name = config["name"]
-            yield msg_handler.create_and_send_nonmember_event(
+            yield self.message_handler.create_and_send_nonmember_event(
                 requester,
                 {
                     "type": EventTypes.Name,
@@ -182,7 +195,7 @@ class RoomCreationHandler(BaseHandler):
 
         if "topic" in config:
             topic = config["topic"]
-            yield msg_handler.create_and_send_nonmember_event(
+            yield self.message_handler.create_and_send_nonmember_event(
                 requester,
                 {
                     "type": EventTypes.Topic,
@@ -194,7 +207,7 @@ class RoomCreationHandler(BaseHandler):
                 ratelimit=False)
 
         for invitee in invite_list:
-            yield room_member_handler.update_membership(
+            yield self.room_member_handler.update_membership(
                 requester,
                 UserID.from_string(invitee),
                 room_id,
@@ -206,7 +219,7 @@ class RoomCreationHandler(BaseHandler):
             id_server = invite_3pid["id_server"]
             address = invite_3pid["address"]
             medium = invite_3pid["medium"]
-            yield self.hs.get_handlers().room_member_handler.do_3pid_invite(
+            yield self.room_member_handler.do_3pid_invite(
                 room_id,
                 requester.user,
                 medium,
@@ -220,7 +233,7 @@ class RoomCreationHandler(BaseHandler):
 
         if room_alias:
             result["room_alias"] = room_alias.to_string()
-            yield directory_handler.send_room_alias_update_event(
+            yield self.directory_handler.send_room_alias_update_event(
                 requester, user_id, room_id
             )
 
@@ -443,7 +456,7 @@ class RoomContextHandler(BaseHandler):
         before_limit = math.floor(limit / 2.)
         after_limit = limit - before_limit
 
-        now_token = yield self.hs.get_event_sources().get_current_token()
+        now_token = yield self.event_sources.get_current_token()
 
         def filter_evts(events):
             return self._filter_events_for_client(

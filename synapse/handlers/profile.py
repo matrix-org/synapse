@@ -19,6 +19,7 @@ from synapse.api.errors import SynapseError, AuthError, CodeMessageException
 from synapse.types import UserID, Requester
 
 from ._base import BaseHandler
+import synapse.handlers.room_member
 
 import logging
 
@@ -36,6 +37,12 @@ class ProfileHandler(BaseHandler):
             "profile", self.on_profile_query
         )
 
+        self.is_mine = hs.is_mine
+
+        self.room_member_handler = hs.get(
+            synapse.handlers.room_member.RoomMemberHandler
+        )
+
         distributor = hs.get_distributor()
 
         distributor.observe("registered_user", self.registered_user)
@@ -45,7 +52,7 @@ class ProfileHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_displayname(self, target_user):
-        if self.hs.is_mine(target_user):
+        if self.is_mine(target_user):
             displayname = yield self.store.get_profile_displayname(
                 target_user.localpart
             )
@@ -75,7 +82,7 @@ class ProfileHandler(BaseHandler):
     def set_displayname(self, target_user, requester, new_displayname):
         """target_user is the user whose displayname is to be changed;
         auth_user is the user attempting to make this change."""
-        if not self.hs.is_mine(target_user):
+        if not self.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         if target_user != requester.user:
@@ -92,7 +99,7 @@ class ProfileHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_avatar_url(self, target_user):
-        if self.hs.is_mine(target_user):
+        if self.is_mine(target_user):
             avatar_url = yield self.store.get_profile_avatar_url(
                 target_user.localpart
             )
@@ -121,7 +128,7 @@ class ProfileHandler(BaseHandler):
     def set_avatar_url(self, target_user, requester, new_avatar_url):
         """target_user is the user whose avatar_url is to be changed;
         auth_user is the user attempting to make this change."""
-        if not self.hs.is_mine(target_user):
+        if not self.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         if target_user != requester.user:
@@ -136,7 +143,7 @@ class ProfileHandler(BaseHandler):
     @defer.inlineCallbacks
     def on_profile_query(self, args):
         user = UserID.from_string(args["user_id"])
-        if not self.hs.is_mine(user):
+        if not self.is_mine(user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         just_field = args.get("field", None)
@@ -158,7 +165,7 @@ class ProfileHandler(BaseHandler):
     @defer.inlineCallbacks
     def _update_join_states(self, requester):
         user = requester.user
-        if not self.hs.is_mine(user):
+        if not self.is_mine(user):
             return
 
         self.ratelimit(requester)
@@ -168,12 +175,11 @@ class ProfileHandler(BaseHandler):
         )
 
         for j in joins:
-            handler = self.hs.get_handlers().room_member_handler
             try:
                 # Assume the user isn't a guest because we don't let guests set
                 # profile or avatar data.
                 requester = Requester(user, "", False)
-                yield handler.update_membership(
+                yield self.room_member_handler.update_membership(
                     requester,
                     user,
                     j.room_id,

@@ -35,6 +35,7 @@ class SearchHandler(BaseHandler):
 
     def __init__(self, hs):
         super(SearchHandler, self).__init__(hs)
+        self.event_sources = hs.get_event_sources()
 
     @defer.inlineCallbacks
     def search(self, user, content, batch=None):
@@ -273,7 +274,7 @@ class SearchHandler(BaseHandler):
         # If client has asked for "context" for each event (i.e. some surrounding
         # events and state), fetch that
         if event_context is not None:
-            now_token = yield self.hs.get_event_sources().get_current_token()
+            now_token = yield self.event_sources.get_current_token()
 
             contexts = {}
             for event in allowed_events:

@@ -14,6 +14,8 @@
 # limitations under the License.
 
 from ._base import BaseHandler
+import synapse.handlers.presence
+import synapse.handlers.room_member
 
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import Membership, EventTypes
@@ -139,6 +141,13 @@ class SyncHandler(BaseHandler):
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
         self.response_cache = ResponseCache()
+
+        self.room_member_handler = hs.get(
+            synapse.handlers.room_member.RoomMemberHandler
+        )
+        self.presence_handler = hs.get(
+            synapse.handlers.presence.PresenceHandler
+        )
 
     def wait_for_sync_for_user(self, sync_config, since_token=None, timeout=0,
                                full_state=False):

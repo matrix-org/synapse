@@ -37,6 +37,7 @@ from synapse.crypto.keyring import Keyring
 from synapse.push.pusherpool import PusherPool
 from synapse.events.builder import EventBuilderFactory
 from synapse.api.filtering import Filtering
+from synapse.util.injection import Registry
 
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 
@@ -46,7 +47,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class HomeServer(object):
+class HomeServer(Registry):
     """A basic homeserver object without lazy component builders.
 
     This will need all of the components it requires to either be passed as
@@ -115,6 +116,8 @@ class HomeServer(object):
         for depname in kwargs:
             setattr(self, depname, kwargs[depname])
 
+        super(HomeServer, self).__init__()
+
     def setup(self):
         logger.info("Setting up.")
         self.datastore = DataStore(self.get_db_conn(), self)
@@ -125,10 +128,10 @@ class HomeServer(object):
         return request.getClientIP()
 
     def is_mine(self, domain_specific_string):
-        return domain_specific_string.domain == self.hostname
+        return domain_specific_string.domain == self.config.server_name
 
     def is_mine_id(self, string):
-        return string.split(":", 1)[1] == self.hostname
+        return string.split(":", 1)[1] == self.config.server_name
 
     def build_replication_layer(self):
         return initialize_http_replication(self)

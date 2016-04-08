@@ -19,6 +19,7 @@ from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64
 
 from ._base import BaseHandler
+import synapse.handlers.room_member
 
 from synapse.api.errors import (
     AuthError, FederationError, StoreError, CodeMessageException, SynapseError,
@@ -64,8 +65,6 @@ class FederationHandler(BaseHandler):
     def __init__(self, hs):
         super(FederationHandler, self).__init__(hs)
 
-        self.hs = hs
-
         self.distributor.observe("user_joined_room", self.user_joined_room)
 
         self.waiting_for_join_list = {}
@@ -73,10 +72,19 @@ class FederationHandler(BaseHandler):
         self.store = hs.get_datastore()
         self.replication_layer = hs.get_replication_layer()
         self.state_handler = hs.get_state_handler()
-        self.server_name = hs.hostname
+        self.server_name = hs.config.server_name
+        self.signing_key = hs.config.signing_key[0]
         self.keyring = hs.get_keyring()
+        self.auth = hs.get_auth()
+        self.simple_http_client = hs.get_simple_http_client()
 
         self.replication_layer.set_handler(self)
+
+        self.action_generator = ActionGenerator(hs)
+
+        self.room_member_handler = hs.get(
+            synapse.handlers.room_member.RoomMemberHandler
+        )
 
         # When joining a room we need to queue any events for that room up
         self.room_queues = {}
@@ -547,8 +555,8 @@ class FederationHandler(BaseHandler):
             event.signatures.update(
                 compute_event_signature(
                     event,
-                    self.hs.hostname,
-                    self.hs.config.signing_key[0]
+                    self.server_name,
+                    self.signing_key,
                 )
             )
 
@@ -761,8 +769,8 @@ class FederationHandler(BaseHandler):
         event.signatures.update(
             compute_event_signature(
                 event,
-                self.hs.hostname,
-                self.hs.config.signing_key[0]
+                self.server_name,
+                self.signing_key,
             )
         )
 
@@ -863,15 +871,15 @@ class FederationHandler(BaseHandler):
         )
 
         builder.event_id = self.event_builder_factory.create_event_id()
-        builder.origin = self.hs.hostname
+        builder.origin = self.server_name
 
         if not hasattr(event, "signatures"):
             builder.signatures = {}
 
         add_hashes_and_signatures(
             builder,
-            self.hs.hostname,
-            self.hs.config.signing_key[0],
+            self.server_name,
+            self.signing_key,
         )
 
         return builder.build()
@@ -997,8 +1005,8 @@ class FederationHandler(BaseHandler):
                 event.signatures.update(
                     compute_event_signature(
                         event,
-                        self.hs.hostname,
-                        self.hs.config.signing_key[0]
+                        self.server_name,
+                        self.signing_key,
                     )
                 )
 
@@ -1044,8 +1052,8 @@ class FederationHandler(BaseHandler):
             event.signatures.update(
                 compute_event_signature(
                     event,
-                    self.hs.hostname,
-                    self.hs.config.signing_key[0]
+                    self.server_name,
+                    self.signing_key,
                 )
             )
 
@@ -1084,8 +1092,7 @@ class FederationHandler(BaseHandler):
         )
 
         if not event.internal_metadata.is_outlier():
-            action_generator = ActionGenerator(self.hs)
-            yield action_generator.handle_push_actions_for_event(
+            yield self.action_generator.handle_push_actions_for_event(
                 event, context, self
             )
 
@@ -1253,8 +1260,8 @@ class FederationHandler(BaseHandler):
             event.signatures.update(
                 compute_event_signature(
                     event,
-                    self.hs.hostname,
-                    self.hs.config.signing_key[0]
+                    self.server_name,
+                    self.signing_key,
                 )
             )
 
@@ -1647,7 +1654,7 @@ class FederationHandler(BaseHandler):
             "state_key": target_user_id,
         }
 
-        if (yield self.auth.check_host_in_room(room_id, self.hs.hostname)):
+        if (yield self.auth.check_host_in_room(room_id, self.server_name)):
             builder = self.event_builder_factory.new(event_dict)
             EventValidator().validate_new(builder)
             event, context = yield self._create_new_client_event(builder=builder)
@@ -1658,7 +1665,7 @@ class FederationHandler(BaseHandler):
 
             self.auth.check(event, context.current_state)
             yield self._check_signature(event, auth_events=context.current_state)
-            member_handler = self.hs.get_handlers().room_member_handler
+            member_handler = self.room_member_handler
             yield member_handler.send_membership_event(None, event, context)
         else:
             destinations = set(x.split(":", 1)[-1] for x in (sender_user_id, room_id))
@@ -1687,8 +1694,7 @@ class FederationHandler(BaseHandler):
         returned_invite = yield self.send_invite(origin, event)
         # TODO: Make sure the signatures actually are correct.
         event.signatures.update(returned_invite.signatures)
-        member_handler = self.hs.get_handlers().room_member_handler
-        yield member_handler.send_membership_event(None, event, context)
+        yield self.room_member_handler.send_membership_event(None, event, context)
 
     @defer.inlineCallbacks
     def add_display_name_to_third_party_invite(self, event_dict, event, context):
@@ -1737,7 +1743,7 @@ class FederationHandler(BaseHandler):
             raise AuthError(403, "Could not find invite")
 
         last_exception = None
-        for public_key_object in self.hs.get_auth().get_public_keys(invite_event):
+        for public_key_object in self.auth.get_public_keys(invite_event):
             try:
                 for server, signature_block in signed["signatures"].items():
                     for key_name, encoded_signature in signature_block.items():
@@ -1775,7 +1781,7 @@ class FederationHandler(BaseHandler):
                 for revocation.
         """
         try:
-            response = yield self.hs.get_simple_http_client().get_json(
+            response = yield self.simple_http_client.get_json(
                 url,
                 {"public_key": public_key}
             )

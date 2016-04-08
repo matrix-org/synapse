@@ -16,26 +16,27 @@
 import pymacaroons
 
 from synapse.handlers.auth import AuthHandler
+from synapse.handlers.federation import FederationHandler
+from synapse.handlers.directory import DirectoryHandler
+from synapse.handlers.room_member import RoomMemberHandler
 from tests import unittest
 from tests.utils import setup_test_homeserver
 from twisted.internet import defer
-
-
-class AuthHandlers(object):
-    def __init__(self, hs):
-        self.auth_handler = AuthHandler(hs)
 
 
 class AuthTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         self.hs = yield setup_test_homeserver(handlers=None)
-        self.hs.handlers = AuthHandlers(self.hs)
+        self.hs.registry[FederationHandler] = True
+        self.hs.registry[DirectoryHandler] = True
+        self.hs.registry[RoomMemberHandler] = True
 
     def test_token_is_a_macaroon(self):
         self.hs.config.macaroon_secret_key = "this key is a huge secret"
+        auth_handler = AuthHandler(self.hs)
 
-        token = self.hs.handlers.auth_handler.generate_access_token("some_user")
+        token = auth_handler.generate_access_token("some_user")
         # Check that we can parse the thing with pymacaroons
         macaroon = pymacaroons.Macaroon.deserialize(token)
         # The most basic of sanity checks
@@ -45,8 +46,9 @@ class AuthTestCase(unittest.TestCase):
     def test_macaroon_caveats(self):
         self.hs.config.macaroon_secret_key = "this key is a massive secret"
         self.hs.clock.now = 5000
+        auth_handler = AuthHandler(self.hs)
 
-        token = self.hs.handlers.auth_handler.generate_access_token("a_user")
+        token = auth_handler.generate_access_token("a_user")
         macaroon = pymacaroons.Macaroon.deserialize(token)
 
         def verify_gen(caveat):

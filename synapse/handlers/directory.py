@@ -16,6 +16,8 @@
 
 from twisted.internet import defer
 from ._base import BaseHandler
+import synapse.handlers.message
+import synapse.handlers.appservice
 
 from synapse.api.errors import SynapseError, Codes, CodeMessageException, AuthError
 from synapse.api.constants import EventTypes
@@ -38,6 +40,15 @@ class DirectoryHandler(BaseHandler):
         self.federation.register_query_handler(
             "directory", self.on_directory_query
         )
+        self.is_mine = hs.is_mine
+
+        self.message_handler = hs.get(
+            synapse.handlers.message.MessageHandler
+        )
+
+        self.appservice_handler = hs.get(
+            synapse.handlers.appservice.ApplicationServicesHandler
+        )
 
     @defer.inlineCallbacks
     def _create_association(self, room_alias, room_id, servers=None, creator=None):
@@ -47,7 +58,7 @@ class DirectoryHandler(BaseHandler):
                 if wchar in room_alias.localpart:
                     raise SynapseError(400, "Invalid characters in room alias")
 
-        if not self.hs.is_mine(room_alias):
+        if not self.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
             # TODO(erikj): Change this.
 
@@ -146,7 +157,7 @@ class DirectoryHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _delete_association(self, room_alias):
-        if not self.hs.is_mine(room_alias):
+        if not self.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
 
         room_id = yield self.store.delete_room_alias(room_alias)
@@ -156,7 +167,7 @@ class DirectoryHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_association(self, room_alias):
         room_id = None
-        if self.hs.is_mine(room_alias):
+        if self.is_mine(room_alias):
             result = yield self.get_association_from_room_alias(
                 room_alias
             )
@@ -213,7 +224,7 @@ class DirectoryHandler(BaseHandler):
     @defer.inlineCallbacks
     def on_directory_query(self, args):
         room_alias = RoomAlias.from_string(args["room_alias"])
-        if not self.hs.is_mine(room_alias):
+        if not self.is_mine(room_alias):
             raise SynapseError(
                 400, "Room Alias is not hosted on this Home Server"
             )
@@ -238,12 +249,11 @@ class DirectoryHandler(BaseHandler):
     def send_room_alias_update_event(self, requester, user_id, room_id):
         aliases = yield self.store.get_aliases_for_room(room_id)
 
-        msg_handler = self.hs.get_handlers().message_handler
-        yield msg_handler.create_and_send_nonmember_event(
+        yield self.message_handler.create_and_send_nonmember_event(
             requester,
             {
                 "type": EventTypes.Aliases,
-                "state_key": self.hs.hostname,
+                "state_key": self.server_name,
                 "room_id": room_id,
                 "sender": user_id,
                 "content": {"aliases": aliases},
@@ -261,8 +271,7 @@ class DirectoryHandler(BaseHandler):
         if not alias_event or alias_event.content.get("alias", "") != alias_str:
             return
 
-        msg_handler = self.hs.get_handlers().message_handler
-        yield msg_handler.create_and_send_nonmember_event(
+        yield self.message_handler.create_and_send_nonmember_event(
             requester,
             {
                 "type": EventTypes.CanonicalAlias,
@@ -281,7 +290,7 @@ class DirectoryHandler(BaseHandler):
         )
         if not result:
             # Query AS to see if it exists
-            as_handler = self.hs.get_handlers().appservice_handler
+            as_handler = self.appservice_handler
             result = yield as_handler.query_room_alias_exists(room_alias)
         defer.returnValue(result)
 

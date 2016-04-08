@@ -16,6 +16,9 @@
 from twisted.internet import defer
 
 from ._base import BaseHandler
+import synapse.handlers.register
+import synapse.handlers.identity
+
 from synapse.api.constants import LoginType
 from synapse.types import UserID
 from synapse.api.errors import AuthError, LoginError, Codes
@@ -62,7 +65,19 @@ class AuthHandler(BaseHandler):
             import ldap
             logger.info("Import ldap version: %s", ldap.__version__)
 
-        self.hs = hs  # FIXME better possibility to access registrationHandler later?
+        self.server_name = hs.config.server_name
+        self.recaptcha_private_key = hs.config.recaptcha_private_key
+        self.recaptcha_public_key = hs.config.recaptcha_public_key
+        self.recaptcha_siteverify_api = hs.config.recaptcha_siteverify_api
+        self.macaroon_secret_key = hs.config.macaroon_secret_key
+
+        self.auth_api = hs.get_auth()
+        self.registration_handler = hs.get(
+            synapse.handlers.register.RegistrationHandler
+        )
+        self.identity_handler = hs.get(synapse.handlers.identity.IdentityHandler)
+        self.pusherpool = hs.get_pusherpool()
+        self.simple_http_client = hs.get_simple_http_client()
 
     @defer.inlineCallbacks
     def check_auth(self, flows, clientdict, clientip):
@@ -228,7 +243,7 @@ class AuthHandler(BaseHandler):
         user_id = authdict["user"]
         password = authdict["password"]
         if not user_id.startswith('@'):
-            user_id = UserID.create(user_id, self.hs.hostname).to_string()
+            user_id = UserID.create(user_id, self.server_name).to_string()
 
         if not (yield self._check_password(user_id, password)):
             logger.warn("Failed password login for user %s", user_id)
@@ -256,11 +271,11 @@ class AuthHandler(BaseHandler):
         # TODO: get this from the homeserver rather than creating a new one for
         # each request
         try:
-            client = self.hs.get_simple_http_client()
+            client = self.simple_http_client
             resp_body = yield client.post_urlencoded_get_json(
-                self.hs.config.recaptcha_siteverify_api,
+                self.recaptcha_siteverify_api,
                 args={
-                    'secret': self.hs.config.recaptcha_private_key,
+                    'secret': self.recaptcha_private_key,
                     'response': user_response,
                     'remoteip': clientip,
                 }
@@ -282,7 +297,7 @@ class AuthHandler(BaseHandler):
             raise LoginError(400, "Missing threepid_creds", Codes.MISSING_PARAM)
 
         threepid_creds = authdict['threepid_creds']
-        identity_handler = self.hs.get_handlers().identity_handler
+        identity_handler = self.identity_handler
 
         logger.info("Getting validated threepid. threepidcreds: %r" % (threepid_creds,))
         threepid = yield identity_handler.threepid_from_creds(threepid_creds)
@@ -300,7 +315,7 @@ class AuthHandler(BaseHandler):
         defer.returnValue(True)
 
     def _get_params_recaptcha(self):
-        return {"public_key": self.hs.config.recaptcha_public_key}
+        return {"public_key": self.recaptcha_public_key}
 
     def _auth_dict_for_flows(self, flows, session):
         public_flows = []
@@ -471,7 +486,7 @@ class AuthHandler(BaseHandler):
             l.simple_bind_s(dn.encode('utf-8'), password.encode('utf-8'))
 
             if not (yield self.does_user_exist(user_id)):
-                handler = self.hs.get_handlers().registration_handler
+                handler = self.registration_handler
                 user_id, access_token = (
                     yield handler.register(localpart=local_name)
                 )
@@ -497,7 +512,7 @@ class AuthHandler(BaseHandler):
         extra_caveats = extra_caveats or []
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = access")
-        now = self.hs.get_clock().time_msec()
+        now = self.clock.time_msec()
         expiry = now + (60 * 60 * 1000)
         macaroon.add_first_party_caveat("time < %d" % (expiry,))
         for caveat in extra_caveats:
@@ -517,7 +532,7 @@ class AuthHandler(BaseHandler):
     def generate_short_term_login_token(self, user_id):
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = login")
-        now = self.hs.get_clock().time_msec()
+        now = self.clock.time_msec()
         expiry = now + (2 * 60 * 1000)
         macaroon.add_first_party_caveat("time < %d" % (expiry,))
         return macaroon.serialize()
@@ -525,17 +540,17 @@ class AuthHandler(BaseHandler):
     def validate_short_term_login_token_and_get_user_id(self, login_token):
         try:
             macaroon = pymacaroons.Macaroon.deserialize(login_token)
-            auth_api = self.hs.get_auth()
-            auth_api.validate_macaroon(macaroon, "login", True)
+            self.auth_api.validate_macaroon(macaroon, "login", True)
             return self.get_user_from_macaroon(macaroon)
         except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
             raise AuthError(401, "Invalid token", errcode=Codes.UNKNOWN_TOKEN)
 
     def _generate_base_macaroon(self, user_id):
         macaroon = pymacaroons.Macaroon(
-            location=self.hs.config.server_name,
+            location=self.server_name,
             identifier="key",
-            key=self.hs.config.macaroon_secret_key)
+            key=self.macaroon_secret_key
+        )
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         return macaroon
@@ -560,7 +575,7 @@ class AuthHandler(BaseHandler):
         yield self.store.user_delete_access_tokens(
             user_id, except_access_token_ids
         )
-        yield self.hs.get_pusherpool().remove_pushers_by_user(
+        yield self.pusherpool.remove_pushers_by_user(
             user_id, except_access_token_ids
         )
 
@@ -568,13 +583,13 @@ class AuthHandler(BaseHandler):
     def add_threepid(self, user_id, medium, address, validated_at):
         yield self.store.user_add_threepid(
             user_id, medium, address, validated_at,
-            self.hs.get_clock().time_msec()
+            self.clock.time_msec()
         )
 
     def _save_session(self, session):
         # TODO: Persistent storage
         logger.debug("Saving session %s", session)
-        session["last_used"] = self.hs.get_clock().time_msec()
+        session["last_used"] = self.clock.time_msec()
         self.sessions[session["id"]] = session
         self._prune_sessions()
 
@@ -583,7 +598,7 @@ class AuthHandler(BaseHandler):
             last_used = 0
             if 'last_used' in sess:
                 last_used = sess['last_used']
-            now = self.hs.get_clock().time_msec()
+            now = self.clock.time_msec()
             if last_used < now - AuthHandler.SESSION_EXPIRE_MS:
                 del self.sessions[sid]
 

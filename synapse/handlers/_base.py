@@ -21,7 +21,9 @@ from synapse.api.constants import Membership, EventTypes
 from synapse.types import UserID, RoomAlias, Requester
 from synapse.push.action_generator import ActionGenerator
 
+from synapse.util.injection import Injected
 from synapse.util.logcontext import PreserveLoggingContext
+
 
 import logging
 
@@ -46,7 +48,7 @@ MEMBERSHIP_PRIORITY = (
 )
 
 
-class BaseHandler(object):
+class BaseHandler(Injected):
     """
     Common base class for the event handlers.
 
@@ -63,12 +65,27 @@ class BaseHandler(object):
         self.distributor = hs.get_distributor()
         self.ratelimiter = hs.get_ratelimiter()
         self.clock = hs.get_clock()
-        self.hs = hs
 
+        self.is_mine = hs.is_mine
         self.signing_key = hs.config.signing_key[0]
-        self.server_name = hs.hostname
+        self.server_name = hs.config.server_name
+        self.rc_messages_per_second = hs.config.rc_messages_per_second
+        self.rc_message_burst_count = hs.config.rc_message_burst_count
+        self.room_invite_state_types = hs.config.room_invite_state_types
 
         self.event_builder_factory = hs.get_event_builder_factory()
+        self.action_generator = ActionGenerator(hs)
+
+        from synapse.handlers.federation import FederationHandler
+        self.federation_handler = hs.get(FederationHandler)
+
+        from synapse.handlers.directory import DirectoryHandler
+        self.directory_handler = hs.get(DirectoryHandler)
+
+        from synapse.handlers.room_member import RoomMemberHandler
+        self.room_member_handler = hs.get(RoomMemberHandler)
+
+        self.hs = hs
 
     @defer.inlineCallbacks
     def filter_events_for_clients(self, user_tuples, events, event_id_to_state):
@@ -224,8 +241,8 @@ class BaseHandler(object):
         time_now = self.clock.time()
         allowed, time_allowed = self.ratelimiter.send_message(
             requester.user.to_string(), time_now,
-            msg_rate_hz=self.hs.config.rc_messages_per_second,
-            burst_count=self.hs.config.rc_message_burst_count,
+            msg_rate_hz=self.rc_messages_per_second,
+            burst_count=self.rc_message_burst_count,
         )
         if not allowed:
             raise LimitExceededError(
@@ -296,7 +313,7 @@ class BaseHandler(object):
                 return True
         for (state_key, membership) in room_members:
             if (
-                UserID.from_string(state_key).domain == self.hs.hostname
+                UserID.from_string(state_key).domain == self.server_name
                 and membership == Membership.JOIN
             ):
                 return True
@@ -325,8 +342,7 @@ class BaseHandler(object):
             room_alias_str = event.content.get("alias", None)
             if room_alias_str:
                 room_alias = RoomAlias.from_string(room_alias_str)
-                directory_handler = self.hs.get_handlers().directory_handler
-                mapping = yield directory_handler.get_association(room_alias)
+                mapping = yield self.directory_handler.get_association(room_alias)
 
                 if mapping["room_id"] != event.room_id:
                     raise SynapseError(
@@ -336,7 +352,7 @@ class BaseHandler(object):
                         )
                     )
 
-        federation_handler = self.hs.get_handlers().federation_handler
+        federation_handler = self.federation_handler
 
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.INVITE:
@@ -354,17 +370,17 @@ class BaseHandler(object):
                         "sender": e.sender,
                     }
                     for k, e in context.current_state.items()
-                    if e.type in self.hs.config.room_invite_state_types
+                    if e.type in self.room_invite_state_types
                     or is_inviter_member_event(e)
                 ]
 
                 invitee = UserID.from_string(event.state_key)
-                if not self.hs.is_mine(invitee):
+                if not self.is_mine(invitee):
                     # TODO: Can we add signature from remote server in a nicer
                     # way? If we have been invited by a remote server, we need
                     # to get them to sign the event.
 
-                    returned_invite = yield federation_handler.send_invite(
+                    returned_invite = yield self.federation_handler.send_invite(
                         invitee.domain,
                         event,
                     )
@@ -397,8 +413,7 @@ class BaseHandler(object):
                 "Changing the room create event is forbidden",
             )
 
-        action_generator = ActionGenerator(self.hs)
-        yield action_generator.handle_push_actions_for_event(
+        yield self.action_generator.handle_push_actions_for_event(
             event, context, self
         )
 
@@ -450,7 +465,7 @@ class BaseHandler(object):
                     continue
 
                 target_user = UserID.from_string(member_event.state_key)
-                if not self.hs.is_mine(target_user):
+                if not self.is_mine(target_user):
                     continue
 
                 if member_event.content["membership"] not in {
@@ -473,8 +488,7 @@ class BaseHandler(object):
                 # of that decision-making and control local to the guest-having
                 # homeserver.
                 requester = Requester(target_user, "", True)
-                handler = self.hs.get_handlers().room_member_handler
-                yield handler.update_membership(
+                yield self.room_member_handler.update_membership(
                     requester,
                     target_user,
                     member_event.room_id,

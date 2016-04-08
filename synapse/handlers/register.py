@@ -21,6 +21,9 @@ from synapse.api.errors import (
     AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError
 )
 from ._base import BaseHandler
+import synapse.handlers.identity
+import synapse.handlers.auth
+
 from synapse.util.async import run_on_reactor
 from synapse.http.client import CaptchaServerHttpClient
 from synapse.util.distributor import registered_user
@@ -41,6 +44,10 @@ class RegistrationHandler(BaseHandler):
         self.distributor.declare("registered_user")
         self.captcha_client = CaptchaServerHttpClient(hs)
 
+        self.server_name = hs.config.server_name
+        self.auth_handler = hs.get(synapse.handlers.auth.AuthHandler)
+        self.identity_handler = hs.get(synapse.handlers.identity.IdentityHandler)
+
         self._next_generated_user_id = None
 
     @defer.inlineCallbacks
@@ -55,7 +62,7 @@ class RegistrationHandler(BaseHandler):
                 Codes.INVALID_USERNAME
             )
 
-        user = UserID(localpart, self.hs.hostname)
+        user = UserID(localpart, self.server_name)
         user_id = user.to_string()
 
         if assigned_user_id:
@@ -111,7 +118,7 @@ class RegistrationHandler(BaseHandler):
         yield run_on_reactor()
         password_hash = None
         if password:
-            password_hash = self.auth_handler().hash(password)
+            password_hash = self.auth_handler.hash(password)
 
         if localpart:
             yield self.check_username(localpart, guest_access_token=guest_access_token)
@@ -128,12 +135,12 @@ class RegistrationHandler(BaseHandler):
                 except ValueError:
                     pass
 
-            user = UserID(localpart, self.hs.hostname)
+            user = UserID(localpart, self.server_name)
             user_id = user.to_string()
 
             token = None
             if generate_token:
-                token = self.auth_handler().generate_access_token(user_id)
+                token = self.auth_handler.generate_access_token(user_id)
             yield self.store.register(
                 user_id=user_id,
                 token=token,
@@ -150,11 +157,11 @@ class RegistrationHandler(BaseHandler):
             user = None
             while not user:
                 localpart = yield self._generate_user_id(attempts > 0)
-                user = UserID(localpart, self.hs.hostname)
+                user = UserID(localpart, self.server_name)
                 user_id = user.to_string()
                 yield self.check_user_id_not_appservice_exclusive(user_id)
                 if generate_token:
-                    token = self.auth_handler().generate_access_token(user_id)
+                    token = self.auth_handler.generate_access_token(user_id)
                 try:
                     yield self.store.register(
                         user_id=user_id,
@@ -178,7 +185,7 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def appservice_register(self, user_localpart, as_token):
-        user = UserID(user_localpart, self.hs.hostname)
+        user = UserID(user_localpart, self.server_name)
         user_id = user.to_string()
         service = yield self.store.get_app_service_by_token(as_token)
         if not service:
@@ -195,7 +202,7 @@ class RegistrationHandler(BaseHandler):
             user_id, allowed_appservice=service
         )
 
-        token = self.auth_handler().generate_access_token(user_id)
+        token = self.auth_handler.generate_access_token(user_id)
         yield self.store.register(
             user_id=user_id,
             token=token,
@@ -239,11 +246,11 @@ class RegistrationHandler(BaseHandler):
                 "User ID must only contain characters which do not"
                 " require URL encoding."
             )
-        user = UserID(localpart, self.hs.hostname)
+        user = UserID(localpart, self.sever_name)
         user_id = user.to_string()
 
         yield self.check_user_id_not_appservice_exclusive(user_id)
-        token = self.auth_handler().generate_access_token(user_id)
+        token = self.auth_handler.generate_access_token(user_id)
         try:
             yield self.store.register(
                 user_id=user_id,
@@ -269,8 +276,7 @@ class RegistrationHandler(BaseHandler):
             logger.info("validating theeepidcred sid %s on id server %s",
                         c['sid'], c['idServer'])
             try:
-                identity_handler = self.hs.get_handlers().identity_handler
-                threepid = yield identity_handler.threepid_from_creds(c)
+                threepid = yield self.identity_handler.threepid_from_creds(c)
             except:
                 logger.exception("Couldn't validate 3pid")
                 raise RegistrationError(400, "Couldn't validate 3pid")
@@ -289,9 +295,8 @@ class RegistrationHandler(BaseHandler):
 
         # Now we have a matrix ID, bind it to the threepids we were given
         for c in threepidCreds:
-            identity_handler = self.hs.get_handlers().identity_handler
             # XXX: This should be a deferred list, shouldn't it?
-            yield identity_handler.bind_threepid(c, user_id)
+            yield self.identity_handler.bind_threepid(c, user_id)
 
     @defer.inlineCallbacks
     def check_user_id_not_appservice_exclusive(self, user_id, allowed_appservice=None):
@@ -357,9 +362,6 @@ class RegistrationHandler(BaseHandler):
             }
         )
         defer.returnValue(data)
-
-    def auth_handler(self):
-        return self.hs.get_handlers().auth_handler
 
     @defer.inlineCallbacks
     def guest_access_token_for(self, medium, address, inviter_user_id):

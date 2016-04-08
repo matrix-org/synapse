@@ -22,6 +22,7 @@ from synapse.api.constants import Membership, EventTypes
 from synapse.events import EventBase
 
 from ._base import BaseHandler
+import synapse.handlers.presence
 
 import logging
 import random
@@ -48,6 +49,10 @@ class EventStreamHandler(BaseHandler):
 
         self.notifier = hs.get_notifier()
 
+        self.presence_handler = hs.get(
+            synapse.handlers.presence.PresenceHandler
+        )
+
     @defer.inlineCallbacks
     @log_function
     def get_stream(self, auth_user_id, pagin_config, timeout=0,
@@ -58,9 +63,8 @@ class EventStreamHandler(BaseHandler):
         If `only_keys` is not None, events from keys will be sent down.
         """
         auth_user = UserID.from_string(auth_user_id)
-        presence_handler = self.hs.get_handlers().presence_handler
 
-        context = yield presence_handler.user_syncing(
+        context = yield self.presence_handler.user_syncing(
             auth_user_id, affect_presence=affect_presence,
         )
         with context:
@@ -91,14 +95,14 @@ class EventStreamHandler(BaseHandler):
                     if event.state_key == auth_user_id:
                         # Send down presence for everyone in the room.
                         users = yield self.store.get_users_in_room(event.room_id)
-                        states = yield presence_handler.get_states(
+                        states = yield self.presence_handler.get_states(
                             users,
                             as_event=True,
                         )
                         to_add.extend(states)
                     else:
 
-                        ev = yield presence_handler.get_state(
+                        ev = yield self.presence_handler.get_state(
                             UserID.from_string(event.state_key),
                             as_event=True,
                         )

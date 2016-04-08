@@ -16,6 +16,7 @@
 from twisted.internet import defer
 
 from ._base import BaseHandler
+import synapse.handlers.room_member
 
 from synapse.api.errors import SynapseError, AuthError
 from synapse.util.logcontext import PreserveLoggingContext
@@ -39,8 +40,6 @@ class TypingNotificationHandler(BaseHandler):
     def __init__(self, hs):
         super(TypingNotificationHandler, self).__init__(hs)
 
-        self.homeserver = hs
-
         self.clock = hs.get_clock()
 
         self.federation = hs.get_replication_layer()
@@ -48,6 +47,8 @@ class TypingNotificationHandler(BaseHandler):
         self.federation.register_edu_handler("m.typing", self._recv_edu)
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
+
+        self.is_mine = hs.is_mine
 
         self._member_typing_until = {}  # clock time we expect to stop
         self._member_typing_timer = {}  # deferreds to manage theabove
@@ -58,6 +59,10 @@ class TypingNotificationHandler(BaseHandler):
         # map room IDs to sets of users currently typing
         self._room_typing = {}
 
+        self.room_member_handler = hs.get(
+            synapse.handlers.room_member.RoomMemberHandler
+        )
+
     def tearDown(self):
         """Cancels all the pending timers.
         Normally this shouldn't be needed, but it's required from unit tests
@@ -67,7 +72,7 @@ class TypingNotificationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def started_typing(self, target_user, auth_user, room_id, timeout):
-        if not self.hs.is_mine(target_user):
+        if not self.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         if target_user != auth_user:
@@ -110,7 +115,7 @@ class TypingNotificationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def stopped_typing(self, target_user, auth_user, room_id):
-        if not self.hs.is_mine(target_user):
+        if not self.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         if target_user != auth_user:
@@ -132,7 +137,7 @@ class TypingNotificationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def user_left_room(self, user, room_id):
-        if self.hs.is_mine(user):
+        if self.is_mine(user):
             member = RoomMember(room_id=room_id, user=user)
             yield self._stopped_typing(member)
 
@@ -160,8 +165,7 @@ class TypingNotificationHandler(BaseHandler):
         localusers = set()
         remotedomains = set()
 
-        rm_handler = self.homeserver.get_handlers().room_member_handler
-        yield rm_handler.fetch_room_distributions_into(
+        yield self.room_member_handler.fetch_room_distributions_into(
             room_id, localusers=localusers, remotedomains=remotedomains
         )
 
@@ -193,8 +197,7 @@ class TypingNotificationHandler(BaseHandler):
 
         localusers = set()
 
-        rm_handler = self.homeserver.get_handlers().room_member_handler
-        yield rm_handler.fetch_room_distributions_into(
+        yield self.room_member_handler.fetch_room_distributions_into(
             room_id, localusers=localusers
         )
 
@@ -236,21 +239,16 @@ class TypingNotificationHandler(BaseHandler):
 
 class TypingNotificationEventSource(object):
     def __init__(self, hs):
-        self.hs = hs
         self.clock = hs.get_clock()
         self._handler = None
-        self._room_member_handler = None
 
-    def handler(self):
-        # Avoid cyclic dependency in handler setup
-        if not self._handler:
-            self._handler = self.hs.get_handlers().typing_notification_handler
-        return self._handler
+        def handler():
+            # Avoid cyclic dependency in handler setup
+            if not self._handler:
+                self._handler = hs.get(TypingNotificationHandler)
+            return self._handler
 
-    def room_member_handler(self):
-        if not self._room_member_handler:
-            self._room_member_handler = self.hs.get_handlers().room_member_handler
-        return self._room_member_handler
+        self.handler = handler
 
     def _make_event_for(self, room_id):
         typing = self.handler()._room_typing[room_id]

@@ -20,6 +20,10 @@ from twisted.internet import defer
 from mock import Mock
 
 from synapse.handlers.directory import DirectoryHandler
+from synapse.handlers.federation import FederationHandler
+from synapse.handlers.room_member import RoomMemberHandler
+from synapse.handlers.message import MessageHandler
+from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.types import RoomAlias
 
 from tests.utils import setup_test_homeserver
@@ -27,6 +31,10 @@ from tests.utils import setup_test_homeserver
 
 class DirectoryHandlers(object):
     def __init__(self, hs):
+        hs.registry[MessageHandler] = Mock(spec=[])
+        hs.registry[FederationHandler] = Mock(spec=[])
+        hs.registry[RoomMemberHandler] = Mock(spec=[])
+        hs.registry[ApplicationServicesHandler] = Mock(spec=[])
         self.directory_handler = DirectoryHandler(hs)
 
 
