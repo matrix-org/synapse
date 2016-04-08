@@ -58,9 +58,10 @@ class MediaRepositoryStore(SQLBaseStore):
         def get_url_cache_txn(txn):
             # get the most recently cached result (relative to the given ts)
             sql = (
-                "SELECT response_code, etag, expires, og, media_id, max(download_ts)"
+                "SELECT response_code, etag, expires, og, media_id, download_ts"
                 " FROM local_media_repository_url_cache"
                 " WHERE url = ? AND download_ts <= ?"
+                " ORDER BY download_ts DESC LIMIT 1"
             )
             txn.execute(sql, (url, ts))
             row = txn.fetchone()
@@ -69,9 +70,10 @@ class MediaRepositoryStore(SQLBaseStore):
                 # ...or if we've requested a timestamp older than the oldest
                 # copy in the cache, return the oldest copy (if any)
                 sql = (
-                    "SELECT response_code, etag, expires, og, media_id, min(download_ts)"
+                    "SELECT response_code, etag, expires, og, media_id, download_ts"
                     " FROM local_media_repository_url_cache"
                     " WHERE url = ? AND download_ts > ?"
+                    " ORDER BY download_ts ASC LIMIT 1"
                 )
                 txn.execute(sql, (url, ts))
                 row = txn.fetchone()
