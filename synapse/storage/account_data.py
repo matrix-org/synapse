@@ -16,7 +16,7 @@
 from ._base import SQLBaseStore
 from twisted.internet import defer
 
-import ujson as json
+import json
 import logging
 
 logger = logging.getLogger(__name__)

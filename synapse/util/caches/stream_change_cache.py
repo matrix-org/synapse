@@ -16,7 +16,7 @@
 from synapse.util.caches import cache_counter, caches_by_name
 
 
-from blist import sorteddict
+from sortedcontainers import SortedDict as sorteddict
 import logging
 import os
 

@@ -25,7 +25,7 @@ from synapse.types import UserID
 import logging
 
 from collections import namedtuple
-import ujson as json
+import json
 
 logger = logging.getLogger(__name__)
 

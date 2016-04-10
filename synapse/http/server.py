@@ -34,7 +34,7 @@ from twisted.web.util import redirectTo
 import collections
 import logging
 import urllib
-import ujson
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -333,7 +333,7 @@ def respond_with_json(request, code, json_object, send_cors=False,
             json_bytes = encode_canonical_json(json_object)
         else:
             # ujson doesn't like frozen_dicts.
-            json_bytes = ujson.dumps(json_object, ensure_ascii=False)
+            json_bytes = json.dumps(json_object, ensure_ascii=False)
 
     return respond_with_json_bytes(
         request, code, json_bytes,

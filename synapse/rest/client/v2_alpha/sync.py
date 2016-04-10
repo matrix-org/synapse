@@ -32,7 +32,7 @@ import copy
 import itertools
 import logging
 
-import ujson as json
+import json
 
 logger = logging.getLogger(__name__)
 

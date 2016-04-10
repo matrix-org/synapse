@@ -28,7 +28,7 @@ from contextlib import contextmanager
 
 import logging
 import math
-import ujson as json
+import json
 
 logger = logging.getLogger(__name__)
 

@@ -15,7 +15,7 @@
 from synapse.api.errors import SynapseError
 from synapse.types import UserID, RoomID
 
-import ujson as json
+import json
 
 
 class Filtering(object):

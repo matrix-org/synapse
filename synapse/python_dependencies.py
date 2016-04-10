@@ -32,9 +32,9 @@ REQUIREMENTS = {
     "py-bcrypt": ["bcrypt"],
     "pillow": ["PIL"],
     "pydenticon": ["pydenticon"],
-    "ujson": ["ujson"],
-    "blist": ["blist"],
-    "pysaml2>=3.0.0,<4.0.0": ["saml2>=3.0.0,<4.0.0"],
+    # "ujson": ["ujson"], # json
+    "sortedcontainers": ["sortedcontainers"],
+    "pysaml2==4.0.3": ["saml2==4.0.3"],
     "pymacaroons-pynacl": ["pymacaroons"],
 }
 CONDITIONAL_REQUIREMENTS = {
