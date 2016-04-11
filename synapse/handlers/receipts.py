@@ -80,6 +80,9 @@ class ReceiptsHandler(BaseHandler):
     def _handle_new_receipts(self, receipts):
         """Takes a list of receipts, stores them and informs the notifier.
         """
+        min_batch_id = None
+        max_batch_id = None
+
         for receipt in receipts:
             room_id = receipt["room_id"]
             receipt_type = receipt["receipt_type"]
@@ -97,10 +100,21 @@ class ReceiptsHandler(BaseHandler):
 
             stream_id, max_persisted_id = res
 
-            with PreserveLoggingContext():
-                self.notifier.on_new_event(
-                    "receipt_key", max_persisted_id, rooms=[room_id]
-                )
+            if min_batch_id is None or stream_id < min_batch_id:
+                min_batch_id = stream_id
+            if max_batch_id is None or max_persisted_id > max_batch_id:
+                max_batch_id = max_persisted_id
+
+        affected_room_ids = list(set([r["room_id"] for r in receipts]))
+
+        with PreserveLoggingContext():
+            self.notifier.on_new_event(
+                "receipt_key", max_batch_id, rooms=affected_room_ids
+            )
+            # Note that the min here shouldn't be relied upon to be accurate.
+            self.hs.get_pusherpool().on_new_receipts(
+                min_batch_id, max_batch_id, affected_room_ids
+            )
 
             defer.returnValue(True)
 

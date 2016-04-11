@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from .bulk_push_rule_evaluator import evaluator_for_room_id
+from .bulk_push_rule_evaluator import evaluator_for_event
 
 import logging
 
@@ -35,8 +35,8 @@ class ActionGenerator:
 
     @defer.inlineCallbacks
     def handle_push_actions_for_event(self, event, context, handler):
-        bulk_evaluator = yield evaluator_for_room_id(
-            event.room_id, self.hs, self.store
+        bulk_evaluator = yield evaluator_for_event(
+            event, self.hs, self.store
         )
 
         actions_by_user = yield bulk_evaluator.action_for_event_by_user(
