@@ -76,6 +76,25 @@ class PusherStore(SQLBaseStore):
         defer.returnValue(rows)
 
     @defer.inlineCallbacks
+    def get_pushers_by_app_user_id(self, user_id):
+        def r(txn):
+            sql = (
+                "SELECT * FROM pushers"
+                " WHERE user_name = ?"
+            )
+
+            txn.execute(sql, (user_id,))
+            rows = self.cursor_to_dict(txn)
+
+            return self._decode_pushers_rows(rows)
+
+        result = yield self.runInteraction(
+            "get_pushers_by_user_id", r
+        )
+
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
     def get_all_pushers(self):
         def get_pushers(txn):
             txn.execute("SELECT * FROM pushers")

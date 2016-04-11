@@ -27,14 +27,47 @@ logger = logging.getLogger(__name__)
 
 
 class PusherRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/pushers/set$")
+    PATTERNS = client_path_patterns("/pushers(/set)?$")
 
     def __init__(self, hs):
         super(PusherRestServlet, self).__init__(hs)
         self.notifier = hs.get_notifier()
 
     @defer.inlineCallbacks
+    def on_GET(self, request):
+        if request.postpath != ["pushers"]:
+            defer.returnValue((405, {}))
+
+        requester = yield self.auth.get_user_by_req(request)
+        user = requester.user
+
+        pushers = yield self.hs.get_datastore().get_pushers_by_app_user_id(
+            user.to_string()
+        )
+
+        allowed_keys = [
+            "app_display_name",
+            "app_id",
+            "data",
+            "device_display_name",
+            "kind",
+            "lang",
+            "profile_tag",
+            "pushkey",
+        ]
+
+        for p in pushers:
+            for k, v in p.items():
+                if k not in allowed_keys:
+                    del p[k]
+
+        defer.returnValue((200, {"pushers": pushers}))
+
+    @defer.inlineCallbacks
     def on_POST(self, request):
+        if request.postpath != ["pushers", "set"]:
+            defer.returnValue((405, {}))
+
         requester = yield self.auth.get_user_by_req(request)
         user = requester.user
 
