@@ -37,7 +37,7 @@ class DomainSpecificString(
     # set by:
     #    users = set(user)
     def __iter__(self):
-        raise ValueError("Attempted to iterate a %s" % (type(self).__name__,))
+        raise ValueError("Attempted to iterate a %s" % (type(self).__name__,),)
 
     # Because this class is a namedtuple of strings and booleans, it is deeply
     # immutable.
@@ -82,6 +82,11 @@ class DomainSpecificString(
             return False
 
     __str__ = to_string
+
+    def __repr__(self):
+        return "%r(%r, %r)" % (
+            type(self).__name__, self.localpart, self.domain,
+        )
 
     @classmethod
     def create(cls, localpart, domain,):

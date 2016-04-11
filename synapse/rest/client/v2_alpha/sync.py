@@ -109,7 +109,7 @@ class SyncRestServlet(RestServlet):
         full_state = parse_boolean(request, "full_state", default=False)
 
         logger.info(
-            "/sync: user=%r, timeout=%r, since=%r,"
+            "/sync: user=%s, timeout=%r, since=%r,"
             " set_presence=%r, filter_id=%r" % (
                 user, timeout, since, set_presence, filter_id
             )
