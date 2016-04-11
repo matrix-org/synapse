@@ -54,7 +54,7 @@ class PreviewUrlResource(BaseMediaResource):
             if html:
                 pass
         except:
-            raise RunTimeError("Disabling PreviewUrlResource as lxml not available")
+            raise RuntimeError("Disabling PreviewUrlResource as lxml not available")
 
         if not hasattr(hs.config, "url_preview_ip_range_blacklist"):
             logger.warn(
@@ -62,7 +62,7 @@ class PreviewUrlResource(BaseMediaResource):
                 "blacklist in url_preview_ip_range_blacklist for url previewing "
                 "to work"
             )
-            raise RunTimeError(
+            raise RuntimeError(
                 "Disabling PreviewUrlResource as "
                 "url_preview_ip_range_blacklist not specified"
             )
@@ -91,157 +91,154 @@ class PreviewUrlResource(BaseMediaResource):
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
 
-        try:
-            # XXX: if get_user_by_req fails, what should we do in an async render?
-            requester = yield self.auth.get_user_by_req(request)
-            url = request.args.get("url")[0]
-            if "ts" in request.args:
-                ts = int(request.args.get("ts")[0])
-            else:
-                ts = self.clock.time_msec()
+        # XXX: if get_user_by_req fails, what should we do in an async render?
+        requester = yield self.auth.get_user_by_req(request)
+        url = request.args.get("url")[0]
+        if "ts" in request.args:
+            ts = int(request.args.get("ts")[0])
+        else:
+            ts = self.clock.time_msec()
 
-            # impose the URL pattern blacklist
-            if hasattr(self, "url_preview_url_blacklist"):
-                url_tuple = urlsplit(url)
-                for entry in self.url_preview_url_blacklist:
-                    match = True
-                    for attrib in entry:
-                        pattern = entry[attrib]
-                        value = getattr(url_tuple, attrib)
-                        logger.debug((
-                            "Matching attrib '%s' with value '%s' against"
-                            " pattern '%s'"
-                        ) % (attrib, value, pattern))
+        # impose the URL pattern blacklist
+        if hasattr(self, "url_preview_url_blacklist"):
+            url_tuple = urlsplit(url)
+            for entry in self.url_preview_url_blacklist:
+                match = True
+                for attrib in entry:
+                    pattern = entry[attrib]
+                    value = getattr(url_tuple, attrib)
+                    logger.debug((
+                        "Matching attrib '%s' with value '%s' against"
+                        " pattern '%s'"
+                    ) % (attrib, value, pattern))
 
-                        if value is None:
+                    if value is None:
+                        match = False
+                        continue
+
+                    if pattern.startswith('^'):
+                        if not re.match(pattern, getattr(url_tuple, attrib)):
                             match = False
                             continue
+                    else:
+                        if not fnmatch.fnmatch(getattr(url_tuple, attrib), pattern):
+                            match = False
+                            continue
+                if match:
+                    logger.warn(
+                        "URL %s blocked by url_blacklist entry %s", url, entry
+                    )
+                    raise SynapseError(
+                        403, "URL blocked by url pattern blacklist entry",
+                        Codes.UNKNOWN
+                    )
 
-                        if pattern.startswith('^'):
-                            if not re.match(pattern, getattr(url_tuple, attrib)):
-                                match = False
-                                continue
-                        else:
-                            if not fnmatch.fnmatch(getattr(url_tuple, attrib), pattern):
-                                match = False
-                                continue
-                    if match:
-                        logger.warn(
-                            "URL %s blocked by url_blacklist entry %s", url, entry
-                        )
-                        raise SynapseError(
-                            403, "URL blocked by url pattern blacklist entry",
-                            Codes.UNKNOWN
-                        )
+        # first check the memory cache - good to handle all the clients on this
+        # HS thundering away to preview the same URL at the same time.
+        og = self.cache.get(url)
+        if og:
+            respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
+            return
 
-            # first check the memory cache - good to handle all the clients on this
-            # HS thundering away to preview the same URL at the same time.
-            og = self.cache.get(url)
-            if og:
-                respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
-                return
+        # then check the URL cache in the DB (which will also provide us with
+        # historical previews, if we have any)
+        cache_result = yield self.store.get_url_cache(url, ts)
+        if (
+            cache_result and
+            cache_result["download_ts"] + cache_result["expires"] > ts and
+            cache_result["response_code"] / 100 == 2
+        ):
+            respond_with_json_bytes(
+                request, 200, cache_result["og"].encode('utf-8'),
+                send_cors=True
+            )
+            return
 
-            # then check the URL cache in the DB (which will also provide us with
-            # historical previews, if we have any)
-            cache_result = yield self.store.get_url_cache(url, ts)
-            if (
-                cache_result and
-                cache_result["download_ts"] + cache_result["expires"] > ts and
-                cache_result["response_code"] / 100 == 2
-            ):
-                respond_with_json_bytes(
-                    request, 200, cache_result["og"].encode('utf-8'),
-                    send_cors=True
-                )
-                return
+        # Ensure only one download for a given URL is active at a time
+        download = self.downloads.get(url)
+        if download is None:
+            download = self._download_url(url, requester.user)
+            download = ObservableDeferred(
+                download,
+                consumeErrors=True
+            )
+            self.downloads[url] = download
 
-            # Ensure only one download for a given URL is active at a time
-            download = self.downloads.get(url)
-            if download is None:
-                download = self._download_url(url, requester.user)
-                download = ObservableDeferred(
-                    download,
-                    consumeErrors=True
-                )
-                self.downloads[url] = download
+            @download.addBoth
+            def callback(media_info):
+                del self.downloads[url]
+                return media_info
+        media_info = yield download.observe()
 
-                @download.addBoth
-                def callback(media_info):
-                    del self.downloads[url]
-                    return media_info
-            media_info = yield download.observe()
+        # FIXME: we should probably update our cache now anyway, so that
+        # even if the OG calculation raises, we don't keep hammering on the
+        # remote server.  For now, leave it uncached to aid debugging OG
+        # calculation problems
 
-            # FIXME: we should probably update our cache now anyway, so that
-            # even if the OG calculation raises, we don't keep hammering on the
-            # remote server.  For now, leave it uncached to aid debugging OG
-            # calculation problems
+        logger.debug("got media_info of '%s'" % media_info)
 
-            logger.debug("got media_info of '%s'" % media_info)
-
-            if self._is_media(media_info['media_type']):
-                dims = yield self._generate_local_thumbnails(
-                    media_info['filesystem_id'], media_info
-                )
-
-                og = {
-                    "og:description": media_info['download_name'],
-                    "og:image": "mxc://%s/%s" % (
-                        self.server_name, media_info['filesystem_id']
-                    ),
-                    "og:image:type": media_info['media_type'],
-                    "matrix:image:size": media_info['media_length'],
-                }
-
-                if dims:
-                    og["og:image:width"] = dims['width']
-                    og["og:image:height"] = dims['height']
-                else:
-                    logger.warn("Couldn't get dims for %s" % url)
-
-                # define our OG response for this media
-            elif self._is_html(media_info['media_type']):
-                # TODO: somehow stop a big HTML tree from exploding synapse's RAM
-
-                try:
-                    tree = html.parse(media_info['filename'])
-                    og = yield self._calc_og(tree, media_info, requester)
-                except UnicodeDecodeError:
-                    # XXX: evil evil bodge
-                    # Empirically, sites like google.com mix Latin-1 and utf-8
-                    # encodings in the same page.  The rogue Latin-1 characters
-                    # cause lxml to choke with a UnicodeDecodeError, so if we
-                    # see this we go and do a manual decode of the HTML before
-                    # handing it to lxml as utf-8 encoding, counter-intuitively,
-                    # which seems to make it happier...
-                    file = open(media_info['filename'])
-                    body = file.read()
-                    file.close()
-                    tree = html.fromstring(body.decode('utf-8', 'ignore'))
-                    og = yield self._calc_og(tree, media_info, requester)
-
-            else:
-                logger.warn("Failed to find any OG data in %s", url)
-                og = {}
-
-            logger.debug("Calculated OG for %s as %s" % (url, og))
-
-            # store OG in ephemeral in-memory cache
-            self.cache[url] = og
-
-            # store OG in history-aware DB cache
-            yield self.store.store_url_cache(
-                url,
-                media_info["response_code"],
-                media_info["etag"],
-                media_info["expires"],
-                json.dumps(og),
-                media_info["filesystem_id"],
-                media_info["created_ts"],
+        if self._is_media(media_info['media_type']):
+            dims = yield self._generate_local_thumbnails(
+                media_info['filesystem_id'], media_info
             )
 
-            respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
-        except Exception as e:
-            raise e
+            og = {
+                "og:description": media_info['download_name'],
+                "og:image": "mxc://%s/%s" % (
+                    self.server_name, media_info['filesystem_id']
+                ),
+                "og:image:type": media_info['media_type'],
+                "matrix:image:size": media_info['media_length'],
+            }
+
+            if dims:
+                og["og:image:width"] = dims['width']
+                og["og:image:height"] = dims['height']
+            else:
+                logger.warn("Couldn't get dims for %s" % url)
+
+            # define our OG response for this media
+        elif self._is_html(media_info['media_type']):
+            # TODO: somehow stop a big HTML tree from exploding synapse's RAM
+
+            try:
+                tree = html.parse(media_info['filename'])
+                og = yield self._calc_og(tree, media_info, requester)
+            except UnicodeDecodeError:
+                # XXX: evil evil bodge
+                # Empirically, sites like google.com mix Latin-1 and utf-8
+                # encodings in the same page.  The rogue Latin-1 characters
+                # cause lxml to choke with a UnicodeDecodeError, so if we
+                # see this we go and do a manual decode of the HTML before
+                # handing it to lxml as utf-8 encoding, counter-intuitively,
+                # which seems to make it happier...
+                file = open(media_info['filename'])
+                body = file.read()
+                file.close()
+                tree = html.fromstring(body.decode('utf-8', 'ignore'))
+                og = yield self._calc_og(tree, media_info, requester)
+
+        else:
+            logger.warn("Failed to find any OG data in %s", url)
+            og = {}
+
+        logger.debug("Calculated OG for %s as %s" % (url, og))
+
+        # store OG in ephemeral in-memory cache
+        self.cache[url] = og
+
+        # store OG in history-aware DB cache
+        yield self.store.store_url_cache(
+            url,
+            media_info["response_code"],
+            media_info["etag"],
+            media_info["expires"],
+            json.dumps(og),
+            media_info["filesystem_id"],
+            media_info["created_ts"],
+        )
+
+        respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
 
 
     @defer.inlineCallbacks
