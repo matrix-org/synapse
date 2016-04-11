@@ -20,8 +20,6 @@ import contextlib
 import logging
 import os
 import re
-import resource
-import subprocess
 import sys
 import time
 from synapse.config._base import ConfigError
@@ -65,6 +63,9 @@ from synapse.util.logcontext import LoggingContext
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.replication.resource import ReplicationResource, REPLICATION_PREFIX
 from synapse.federation.transport.server import TransportLayerServer
+
+from synapse.util.rlimit import change_resource_limit
+from synapse.util.versionstring import get_version_string
 
 from synapse import events
 
@@ -269,86 +270,6 @@ def quit_with_error(error_string):
     sys.exit(1)
 
 
-def get_version_string():
-    try:
-        null = open(os.devnull, 'w')
-        cwd = os.path.dirname(os.path.abspath(__file__))
-        try:
-            git_branch = subprocess.check_output(
-                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
-                stderr=null,
-                cwd=cwd,
-            ).strip()
-            git_branch = "b=" + git_branch
-        except subprocess.CalledProcessError:
-            git_branch = ""
-
-        try:
-            git_tag = subprocess.check_output(
-                ['git', 'describe', '--exact-match'],
-                stderr=null,
-                cwd=cwd,
-            ).strip()
-            git_tag = "t=" + git_tag
-        except subprocess.CalledProcessError:
-            git_tag = ""
-
-        try:
-            git_commit = subprocess.check_output(
-                ['git', 'rev-parse', '--short', 'HEAD'],
-                stderr=null,
-                cwd=cwd,
-            ).strip()
-        except subprocess.CalledProcessError:
-            git_commit = ""
-
-        try:
-            dirty_string = "-this_is_a_dirty_checkout"
-            is_dirty = subprocess.check_output(
-                ['git', 'describe', '--dirty=' + dirty_string],
-                stderr=null,
-                cwd=cwd,
-            ).strip().endswith(dirty_string)
-
-            git_dirty = "dirty" if is_dirty else ""
-        except subprocess.CalledProcessError:
-            git_dirty = ""
-
-        if git_branch or git_tag or git_commit or git_dirty:
-            git_version = ",".join(
-                s for s in
-                (git_branch, git_tag, git_commit, git_dirty,)
-                if s
-            )
-
-            return (
-                "Synapse/%s (%s)" % (
-                    synapse.__version__, git_version,
-                )
-            ).encode("ascii")
-    except Exception as e:
-        logger.info("Failed to check for git repository: %s", e)
-
-    return ("Synapse/%s" % (synapse.__version__,)).encode("ascii")
-
-
-def change_resource_limit(soft_file_no):
-    try:
-        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
-
-        if not soft_file_no:
-            soft_file_no = hard
-
-        resource.setrlimit(resource.RLIMIT_NOFILE, (soft_file_no, hard))
-        logger.info("Set file limit to: %d", soft_file_no)
-
-        resource.setrlimit(
-            resource.RLIMIT_CORE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
-        )
-    except (ValueError, resource.error) as e:
-        logger.warn("Failed to set file or core limit: %s", e)
-
-
 def setup(config_options):
     """
     Args:
@@ -378,7 +299,7 @@ def setup(config_options):
     # check any extra requirements we have now we have a config
     check_requirements(config)
 
-    version_string = get_version_string()
+    version_string = get_version_string("Synapse", synapse)
 
     logger.info("Server hostname: %s", config.server_name)
     logger.info("Server version: %s", version_string)
