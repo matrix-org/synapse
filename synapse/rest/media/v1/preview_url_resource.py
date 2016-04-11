@@ -240,7 +240,6 @@ class PreviewUrlResource(BaseMediaResource):
 
         respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
 
-
     @defer.inlineCallbacks
     def _calc_og(self, tree, media_info, requester):
         # suck our tree into lxml and define our OG response.
