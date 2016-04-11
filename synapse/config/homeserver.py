@@ -29,13 +29,15 @@ from .key import KeyConfig
 from .saml2 import SAML2Config
 from .cas import CasConfig
 from .password import PasswordConfig
+from .jwt import JWTConfig
+from .ldap import LDAPConfig
 
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
                        VoipConfig, RegistrationConfig, MetricsConfig, ApiConfig,
                        AppServiceConfig, KeyConfig, SAML2Config, CasConfig,
-                       PasswordConfig,):
+                       JWTConfig, LDAPConfig, PasswordConfig,):
     pass
 
 

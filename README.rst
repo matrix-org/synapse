@@ -118,7 +118,6 @@ Installing prerequisites on CentOS 7::
                      python-virtualenv libffi-devel openssl-devel
     sudo yum groupinstall "Development Tools"
 
-
 Installing prerequisites on Mac OS X::
 
     xcode-select --install
@@ -150,12 +149,7 @@ In case of problems, please see the _Troubleshooting section below.
 Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
 above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
 
-Another alternative is to install via apt from http://matrix.org/packages/debian/.
-Note that these packages do not include  a client - choose one from
-https://matrix.org/blog/try-matrix-now/ (or build your own with 
-https://github.com/matrix-org/matrix-js-sdk/). 
-
-Finally, Martin Giess has created an auto-deployment process with vagrant/ansible, 
+Also, Martin Giess has created an auto-deployment process with vagrant/ansible, 
 tested with VirtualBox/AWS/DigitalOcean - see https://github.com/EMnify/matrix-synapse-auto-deploy 
 for details.
 
@@ -229,6 +223,19 @@ For information on how to install and use PostgreSQL, please see
 Platform Specific Instructions
 ==============================
 
+Debian
+------
+
+Matrix provides official Debian packages via apt from http://matrix.org/packages/debian/.
+Note that these packages do not include a client - choose one from
+https://matrix.org/blog/try-matrix-now/ (or build your own with one of our SDKs :)
+
+Fedora
+------
+
+Oleg Girko provides Fedora RPMs at
+https://obs.infoserver.lv/project/monitor/matrix-synapse
+
 ArchLinux
 ---------
 
@@ -270,10 +277,16 @@ During setup of Synapse you need to call python2.7 directly again::
 FreeBSD
 -------
 
-Synapse can be installed via FreeBSD Ports or Packages:
+Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
 
  - Ports: ``cd /usr/ports/net/py-matrix-synapse && make install clean``
  - Packages: ``pkg install py27-matrix-synapse``
+
+NixOS
+-----
+
+Robin Lambertz has packaged Synapse for NixOS at:
+https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-synapse.nix
 
 Windows Install
 ---------------

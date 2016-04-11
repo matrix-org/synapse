@@ -64,7 +64,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         hs = HomeServer(
             name, db_pool=db_pool, config=config,
             version_string="Synapse/tests",
-            database_engine=create_engine(config),
+            database_engine=create_engine(config.database_config),
             get_db_conn=db_pool.get_db_conn,
             **kargs
         )
@@ -73,7 +73,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         hs = HomeServer(
             name, db_pool=None, datastore=datastore, config=config,
             version_string="Synapse/tests",
-            database_engine=create_engine(config),
+            database_engine=create_engine(config.database_config),
             **kargs
         )
 
@@ -298,7 +298,7 @@ class SQLiteMemoryDbPool(ConnectionPool, object):
         return conn
 
     def create_engine(self):
-        return create_engine(self.config)
+        return create_engine(self.config.database_config)
 
 
 class MemoryDataStore(object):

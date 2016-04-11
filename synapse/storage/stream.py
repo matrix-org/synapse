@@ -303,96 +303,6 @@ class StreamStore(SQLBaseStore):
 
         defer.returnValue(ret)
 
-    def get_room_events_stream(
-        self,
-        user_id,
-        from_key,
-        to_key,
-        limit=0,
-        is_guest=False,
-        room_ids=None
-    ):
-        room_ids = room_ids or []
-        room_ids = [r for r in room_ids]
-        if is_guest:
-            current_room_membership_sql = (
-                "SELECT c.room_id FROM history_visibility AS h"
-                " INNER JOIN current_state_events AS c"
-                " ON h.event_id = c.event_id"
-                " WHERE c.room_id IN (%s)"
-                " AND h.history_visibility = 'world_readable'" % (
-                    ",".join(map(lambda _: "?", room_ids))
-                )
-            )
-            current_room_membership_args = room_ids
-        else:
-            current_room_membership_sql = (
-                "SELECT m.room_id FROM room_memberships as m "
-                " INNER JOIN current_state_events as c"
-                " ON m.event_id = c.event_id AND c.state_key = m.user_id"
-                " WHERE m.user_id = ? AND m.membership = 'join'"
-            )
-            current_room_membership_args = [user_id]
-
-        # We also want to get any membership events about that user, e.g.
-        # invites or leave notifications.
-        membership_sql = (
-            "SELECT m.event_id FROM room_memberships as m "
-            "INNER JOIN current_state_events as c ON m.event_id = c.event_id "
-            "WHERE m.user_id = ? "
-        )
-        membership_args = [user_id]
-
-        if limit:
-            limit = max(limit, MAX_STREAM_SIZE)
-        else:
-            limit = MAX_STREAM_SIZE
-
-        # From and to keys should be integers from ordering.
-        from_id = RoomStreamToken.parse_stream_token(from_key)
-        to_id = RoomStreamToken.parse_stream_token(to_key)
-
-        if from_key == to_key:
-            return defer.succeed(([], to_key))
-
-        sql = (
-            "SELECT e.event_id, e.stream_ordering FROM events AS e WHERE "
-            "(e.outlier = ? AND (room_id IN (%(current)s)) OR "
-            "(event_id IN (%(invites)s))) "
-            "AND e.stream_ordering > ? AND e.stream_ordering <= ? "
-            "ORDER BY stream_ordering ASC LIMIT %(limit)d "
-        ) % {
-            "current": current_room_membership_sql,
-            "invites": membership_sql,
-            "limit": limit
-        }
-
-        def f(txn):
-            args = ([False] + current_room_membership_args + membership_args +
-                    [from_id.stream, to_id.stream])
-            txn.execute(sql, args)
-
-            rows = self.cursor_to_dict(txn)
-
-            ret = self._get_events_txn(
-                txn,
-                [r["event_id"] for r in rows],
-                get_prev_content=True
-            )
-
-            self._set_before_and_after(ret, rows)
-
-            if rows:
-                key = "s%d" % max(r["stream_ordering"] for r in rows)
-            else:
-                # Assume we didn't get anything because there was nothing to
-                # get.
-                key = to_key
-
-            return ret, key
-
-        return self.runInteraction("get_room_events_stream", f)
-
     @defer.inlineCallbacks
     def paginate_room_events(self, room_id, from_key, to_key=None,
                              direction='b', limit=-1):
@@ -539,7 +449,7 @@ class StreamStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_room_events_max_id(self, direction='f'):
-        token = yield self._stream_id_gen.get_max_token()
+        token = yield self._stream_id_gen.get_current_token()
         if direction != 'b':
             defer.returnValue("s%d" % (token,))
         else:

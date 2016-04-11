@@ -18,7 +18,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def run_upgrade(cur, *args, **kwargs):
+def run_create(cur, *args, **kwargs):
     cur.execute("SELECT id, regex FROM application_services_regex")
     for row in cur.fetchall():
         try:
@@ -35,3 +35,7 @@ def run_upgrade(cur, *args, **kwargs):
                 "UPDATE application_services_regex SET regex=? WHERE id=?",
                 (new_regex, row[0])
             )
+
+
+def run_upgrade(*args, **kwargs):
+    pass

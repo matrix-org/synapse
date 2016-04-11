@@ -133,8 +133,9 @@ class PushRuleEvaluator:
             enabled = self.enabled_map.get(r['rule_id'], None)
             if enabled is not None and not enabled:
                 continue
-
-            if not r.get("enabled", True):
+            elif enabled is None and not r.get("enabled", True):
+                # if no override, check enabled on the rule itself
+                # (may have come from a base rule)
                 continue
 
             conditions = r['conditions']

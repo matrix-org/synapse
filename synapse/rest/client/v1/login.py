@@ -33,6 +33,9 @@ from saml2.client import Saml2Client
 
 import xml.etree.ElementTree as ET
 
+import jwt
+from jwt.exceptions import InvalidTokenError
+
 
 logger = logging.getLogger(__name__)
 
@@ -43,12 +46,16 @@ class LoginRestServlet(ClientV1RestServlet):
     SAML2_TYPE = "m.login.saml2"
     CAS_TYPE = "m.login.cas"
     TOKEN_TYPE = "m.login.token"
+    JWT_TYPE = "m.login.jwt"
 
     def __init__(self, hs):
         super(LoginRestServlet, self).__init__(hs)
         self.idp_redirect_url = hs.config.saml2_idp_redirect_url
         self.password_enabled = hs.config.password_enabled
         self.saml2_enabled = hs.config.saml2_enabled
+        self.jwt_enabled = hs.config.jwt_enabled
+        self.jwt_secret = hs.config.jwt_secret
+        self.jwt_algorithm = hs.config.jwt_algorithm
         self.cas_enabled = hs.config.cas_enabled
         self.cas_server_url = hs.config.cas_server_url
         self.cas_required_attributes = hs.config.cas_required_attributes
@@ -57,6 +64,8 @@ class LoginRestServlet(ClientV1RestServlet):
 
     def on_GET(self, request):
         flows = []
+        if self.jwt_enabled:
+            flows.append({"type": LoginRestServlet.JWT_TYPE})
         if self.saml2_enabled:
             flows.append({"type": LoginRestServlet.SAML2_TYPE})
         if self.cas_enabled:
@@ -98,6 +107,10 @@ class LoginRestServlet(ClientV1RestServlet):
                     "uri": "%s%s" % (self.idp_redirect_url, relay_state)
                 }
                 defer.returnValue((200, result))
+            elif self.jwt_enabled and (login_submission["type"] ==
+                                       LoginRestServlet.JWT_TYPE):
+                result = yield self.do_jwt_login(login_submission)
+                defer.returnValue(result)
             # TODO Delete this after all CAS clients switch to token login instead
             elif self.cas_enabled and (login_submission["type"] ==
                                        LoginRestServlet.CAS_TYPE):
@@ -197,6 +210,46 @@ class LoginRestServlet(ClientV1RestServlet):
                 "home_server": self.hs.hostname,
             }
 
+        else:
+            user_id, access_token = (
+                yield self.handlers.registration_handler.register(localpart=user)
+            )
+            result = {
+                "user_id": user_id,  # may have changed
+                "access_token": access_token,
+                "home_server": self.hs.hostname,
+            }
+
+        defer.returnValue((200, result))
+
+    @defer.inlineCallbacks
+    def do_jwt_login(self, login_submission):
+        token = login_submission['token']
+        if token is None:
+            raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
+
+        try:
+            payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
+        except InvalidTokenError:
+            raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
+
+        user = payload['user']
+        if user is None:
+            raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
+
+        user_id = UserID.create(user, self.hs.hostname).to_string()
+        auth_handler = self.handlers.auth_handler
+        user_exists = yield auth_handler.does_user_exist(user_id)
+        if user_exists:
+            user_id, access_token, refresh_token = (
+                yield auth_handler.get_login_tuple_for_user_id(user_id)
+            )
+            result = {
+                "user_id": user_id,  # may have changed
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "home_server": self.hs.hostname,
+            }
         else:
             user_id, access_token = (
                 yield self.handlers.registration_handler.register(localpart=user)

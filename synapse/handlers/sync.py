@@ -17,9 +17,10 @@ from ._base import BaseHandler
 
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import Membership, EventTypes
-from synapse.util import unwrapFirstError
-from synapse.util.logcontext import LoggingContext, preserve_fn
+from synapse.util.async import concurrently_execute
+from synapse.util.logcontext import LoggingContext
 from synapse.util.metrics import Measure
+from synapse.util.caches.response_cache import ResponseCache
 from synapse.push.clientformat import format_push_rules_for_user
 
 from twisted.internet import defer
@@ -35,6 +36,7 @@ SyncConfig = collections.namedtuple("SyncConfig", [
     "user",
     "filter_collection",
     "is_guest",
+    "request_key",
 ])
 
 
@@ -136,8 +138,8 @@ class SyncHandler(BaseHandler):
         super(SyncHandler, self).__init__(hs)
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
+        self.response_cache = ResponseCache()
 
-    @defer.inlineCallbacks
     def wait_for_sync_for_user(self, sync_config, since_token=None, timeout=0,
                                full_state=False):
         """Get the sync for a client if we have new data for it now. Otherwise
@@ -146,7 +148,19 @@ class SyncHandler(BaseHandler):
         Returns:
             A Deferred SyncResult.
         """
+        result = self.response_cache.get(sync_config.request_key)
+        if not result:
+            result = self.response_cache.set(
+                sync_config.request_key,
+                self._wait_for_sync_for_user(
+                    sync_config, since_token, timeout, full_state
+                )
+            )
+        return result
 
+    @defer.inlineCallbacks
+    def _wait_for_sync_for_user(self, sync_config, since_token, timeout,
+                                full_state):
         context = LoggingContext.current_context()
         if context:
             if since_token is None:
@@ -236,58 +250,50 @@ class SyncHandler(BaseHandler):
         joined = []
         invited = []
         archived = []
-        deferreds = []
 
-        room_list_chunks = [room_list[i:i + 10] for i in xrange(0, len(room_list), 10)]
-        for room_list_chunk in room_list_chunks:
-            for event in room_list_chunk:
-                if event.membership == Membership.JOIN:
-                    room_sync_deferred = preserve_fn(
-                        self.full_state_sync_for_joined_room
-                    )(
-                        room_id=event.room_id,
-                        sync_config=sync_config,
-                        now_token=now_token,
-                        timeline_since_token=timeline_since_token,
-                        ephemeral_by_room=ephemeral_by_room,
-                        tags_by_room=tags_by_room,
-                        account_data_by_room=account_data_by_room,
-                    )
-                    room_sync_deferred.addCallback(joined.append)
-                    deferreds.append(room_sync_deferred)
-                elif event.membership == Membership.INVITE:
-                    invite = yield self.store.get_event(event.event_id)
-                    invited.append(InvitedSyncResult(
-                        room_id=event.room_id,
-                        invite=invite,
-                    ))
-                elif event.membership in (Membership.LEAVE, Membership.BAN):
-                    # Always send down rooms we were banned or kicked from.
-                    if not sync_config.filter_collection.include_leave:
-                        if event.membership == Membership.LEAVE:
-                            if sync_config.user.to_string() == event.sender:
-                                continue
+        user_id = sync_config.user.to_string()
 
-                    leave_token = now_token.copy_and_replace(
-                        "room_key", "s%d" % (event.stream_ordering,)
-                    )
-                    room_sync_deferred = preserve_fn(
-                        self.full_state_sync_for_archived_room
-                    )(
-                        sync_config=sync_config,
-                        room_id=event.room_id,
-                        leave_event_id=event.event_id,
-                        leave_token=leave_token,
-                        timeline_since_token=timeline_since_token,
-                        tags_by_room=tags_by_room,
-                        account_data_by_room=account_data_by_room,
-                    )
-                    room_sync_deferred.addCallback(archived.append)
-                    deferreds.append(room_sync_deferred)
+        @defer.inlineCallbacks
+        def _generate_room_entry(event):
+            if event.membership == Membership.JOIN:
+                room_result = yield self.full_state_sync_for_joined_room(
+                    room_id=event.room_id,
+                    sync_config=sync_config,
+                    now_token=now_token,
+                    timeline_since_token=timeline_since_token,
+                    ephemeral_by_room=ephemeral_by_room,
+                    tags_by_room=tags_by_room,
+                    account_data_by_room=account_data_by_room,
+                )
+                joined.append(room_result)
+            elif event.membership == Membership.INVITE:
+                invite = yield self.store.get_event(event.event_id)
+                invited.append(InvitedSyncResult(
+                    room_id=event.room_id,
+                    invite=invite,
+                ))
+            elif event.membership in (Membership.LEAVE, Membership.BAN):
+                # Always send down rooms we were banned or kicked from.
+                if not sync_config.filter_collection.include_leave:
+                    if event.membership == Membership.LEAVE:
+                        if user_id == event.sender:
+                            return
 
-            yield defer.gatherResults(
-                deferreds, consumeErrors=True
-            ).addErrback(unwrapFirstError)
+                leave_token = now_token.copy_and_replace(
+                    "room_key", "s%d" % (event.stream_ordering,)
+                )
+                room_result = yield self.full_state_sync_for_archived_room(
+                    sync_config=sync_config,
+                    room_id=event.room_id,
+                    leave_event_id=event.event_id,
+                    leave_token=leave_token,
+                    timeline_since_token=timeline_since_token,
+                    tags_by_room=tags_by_room,
+                    account_data_by_room=account_data_by_room,
+                )
+                archived.append(room_result)
+
+        yield concurrently_execute(_generate_room_entry, room_list, 10)
 
         account_data_for_user = sync_config.filter_collection.filter_account_data(
             self.account_data_for_user(account_data)
@@ -657,7 +663,8 @@ class SyncHandler(BaseHandler):
     def load_filtered_recents(self, room_id, sync_config, now_token,
                               since_token=None, recents=None, newly_joined_room=False):
         """
-        :returns a Deferred TimelineBatch
+        Returns:
+            a Deferred TimelineBatch
         """
         with Measure(self.clock, "load_filtered_recents"):
             filtering_factor = 2
@@ -824,8 +831,11 @@ class SyncHandler(BaseHandler):
         """
         Get the room state after the given event
 
-        :param synapse.events.EventBase event: event of interest
-        :return: A Deferred map from ((type, state_key)->Event)
+        Args:
+            event(synapse.events.EventBase): event of interest
+
+        Returns:
+            A Deferred map from ((type, state_key)->Event)
         """
         state = yield self.store.get_state_for_event(event.event_id)
         if event.is_state():
@@ -836,9 +846,13 @@ class SyncHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_state_at(self, room_id, stream_position):
         """ Get the room state at a particular stream position
-        :param str room_id: room for which to get state
-        :param StreamToken stream_position: point at which to get state
-        :returns: A Deferred map from ((type, state_key)->Event)
+
+        Args:
+            room_id(str): room for which to get state
+            stream_position(StreamToken): point at which to get state
+
+        Returns:
+            A Deferred map from ((type, state_key)->Event)
         """
         last_events, token = yield self.store.get_recent_events_for_room(
             room_id, end_token=stream_position.room_key, limit=1,
@@ -859,15 +873,18 @@ class SyncHandler(BaseHandler):
         """ Works out the differnce in state between the start of the timeline
         and the previous sync.
 
-        :param str room_id
-        :param TimelineBatch batch: The timeline batch for the room that will
-            be sent to the user.
-        :param sync_config
-        :param str since_token: Token of the end of the previous batch. May be None.
-        :param str now_token: Token of the end of the current batch.
-        :param bool full_state: Whether to force returning the full state.
+        Args:
+            room_id(str):
+            batch(synapse.handlers.sync.TimelineBatch): The timeline batch for
+                the room that will be sent to the user.
+            sync_config(synapse.handlers.sync.SyncConfig):
+            since_token(str|None): Token of the end of the previous batch. May
+                be None.
+            now_token(str): Token of the end of the current batch.
+            full_state(bool): Whether to force returning the full state.
 
-        :returns A new event dictionary
+        Returns:
+             A deferred new event dictionary
         """
         # TODO(mjark) Check if the state events were received by the server
         # after the previous sync, since we need to include those state
@@ -939,11 +956,13 @@ class SyncHandler(BaseHandler):
         Check if the user has just joined the given room (so should
         be given the full state)
 
-        :param sync_config:
-        :param dict[(str,str), synapse.events.FrozenEvent] state_delta: the
-           difference in state since the last sync
+        Args:
+            sync_config(synapse.handlers.sync.SyncConfig):
+            state_delta(dict[(str,str), synapse.events.FrozenEvent]): the
+                difference in state since the last sync
 
-        :returns A deferred Tuple (state_delta, limited)
+        Returns:
+             A deferred Tuple (state_delta, limited)
         """
         join_event = state_delta.get((
             EventTypes.Member, sync_config.user.to_string()), None)

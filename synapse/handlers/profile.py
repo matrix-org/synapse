@@ -17,7 +17,6 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, AuthError, CodeMessageException
 from synapse.types import UserID, Requester
-from synapse.util import unwrapFirstError
 
 from ._base import BaseHandler
 
@@ -25,14 +24,6 @@ import logging
 
 
 logger = logging.getLogger(__name__)
-
-
-def changed_presencelike_data(distributor, user, state):
-    return distributor.fire("changed_presencelike_data", user, state)
-
-
-def collect_presencelike_data(distributor, user, content):
-    return distributor.fire("collect_presencelike_data", user, content)
 
 
 class ProfileHandler(BaseHandler):
@@ -46,16 +37,8 @@ class ProfileHandler(BaseHandler):
         )
 
         distributor = hs.get_distributor()
-        self.distributor = distributor
-
-        distributor.declare("collect_presencelike_data")
-        distributor.declare("changed_presencelike_data")
 
         distributor.observe("registered_user", self.registered_user)
-
-        distributor.observe(
-            "collect_presencelike_data", self.collect_presencelike_data
-        )
 
     def registered_user(self, user):
         return self.store.create_profile(user.localpart)
@@ -105,10 +88,6 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, new_displayname
         )
 
-        yield changed_presencelike_data(self.distributor, target_user, {
-            "displayname": new_displayname,
-        })
-
         yield self._update_join_states(requester)
 
     @defer.inlineCallbacks
@@ -152,29 +131,7 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, new_avatar_url
         )
 
-        yield changed_presencelike_data(self.distributor, target_user, {
-            "avatar_url": new_avatar_url,
-        })
-
         yield self._update_join_states(requester)
-
-    @defer.inlineCallbacks
-    def collect_presencelike_data(self, user, state):
-        if not self.hs.is_mine(user):
-            defer.returnValue(None)
-
-        (displayname, avatar_url) = yield defer.gatherResults(
-            [
-                self.store.get_profile_displayname(user.localpart),
-                self.store.get_profile_avatar_url(user.localpart),
-            ],
-            consumeErrors=True
-        ).addErrback(unwrapFirstError)
-
-        state["displayname"] = displayname
-        state["avatar_url"] = avatar_url
-
-        defer.returnValue(None)
 
     @defer.inlineCallbacks
     def on_profile_query(self, args):

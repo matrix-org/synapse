@@ -49,6 +49,21 @@ class AuthHandler(BaseHandler):
         self.sessions = {}
         self.INVALID_TOKEN_HTTP_STATUS = 401
 
+        self.ldap_enabled = hs.config.ldap_enabled
+        self.ldap_server = hs.config.ldap_server
+        self.ldap_port = hs.config.ldap_port
+        self.ldap_tls = hs.config.ldap_tls
+        self.ldap_search_base = hs.config.ldap_search_base
+        self.ldap_search_property = hs.config.ldap_search_property
+        self.ldap_email_property = hs.config.ldap_email_property
+        self.ldap_full_name_property = hs.config.ldap_full_name_property
+
+        if self.ldap_enabled is True:
+            import ldap
+            logger.info("Import ldap version: %s", ldap.__version__)
+
+        self.hs = hs  # FIXME better possibility to access registrationHandler later?
+
     @defer.inlineCallbacks
     def check_auth(self, flows, clientdict, clientip):
         """
@@ -163,9 +178,13 @@ class AuthHandler(BaseHandler):
     def get_session_id(self, clientdict):
         """
         Gets the session ID for a client given the client dictionary
-        :param clientdict: The dictionary sent by the client in the request
-        :return: The string session ID the client sent. If the client did not
-                 send a session ID, returns None.
+
+        Args:
+            clientdict: The dictionary sent by the client in the request
+
+        Returns:
+            str|None: The string session ID the client sent. If the client did
+                not send a session ID, returns None.
         """
         sid = None
         if clientdict and 'auth' in clientdict:
@@ -179,9 +198,11 @@ class AuthHandler(BaseHandler):
         Store a key-value pair into the sessions data associated with this
         request. This data is stored server-side and cannot be modified by
         the client.
-        :param session_id: (string) The ID of this session as returned from check_auth
-        :param key: (string) The key to store the data under
-        :param value: (any) The data to store
+
+        Args:
+            session_id (string): The ID of this session as returned from check_auth
+            key (string): The key to store the data under
+            value (any): The data to store
         """
         sess = self._get_session_info(session_id)
         sess.setdefault('serverdict', {})[key] = value
@@ -190,9 +211,11 @@ class AuthHandler(BaseHandler):
     def get_session_data(self, session_id, key, default=None):
         """
         Retrieve data stored with set_session_data
-        :param session_id: (string) The ID of this session as returned from check_auth
-        :param key: (string) The key to store the data under
-        :param default: (any) Value to return if the key has not been set
+
+        Args:
+            session_id (string): The ID of this session as returned from check_auth
+            key (string): The key to store the data under
+            default (any): Value to return if the key has not been set
         """
         sess = self._get_session_info(session_id)
         return sess.setdefault('serverdict', {}).get(key, default)
@@ -207,8 +230,10 @@ class AuthHandler(BaseHandler):
         if not user_id.startswith('@'):
             user_id = UserID.create(user_id, self.hs.hostname).to_string()
 
-        user_id, password_hash = yield self._find_user_id_and_pwd_hash(user_id)
-        self._check_password(user_id, password, password_hash)
+        if not (yield self._check_password(user_id, password)):
+            logger.warn("Failed password login for user %s", user_id)
+            raise LoginError(403, "", errcode=Codes.FORBIDDEN)
+
         defer.returnValue(user_id)
 
     @defer.inlineCallbacks
@@ -332,8 +357,10 @@ class AuthHandler(BaseHandler):
             StoreError if there was a problem storing the token.
             LoginError if there was an authentication problem.
         """
-        user_id, password_hash = yield self._find_user_id_and_pwd_hash(user_id)
-        self._check_password(user_id, password, password_hash)
+
+        if not (yield self._check_password(user_id, password)):
+            logger.warn("Failed password login for user %s", user_id)
+            raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
         logger.info("Logging in user %s", user_id)
         access_token = yield self.issue_access_token(user_id)
@@ -399,11 +426,60 @@ class AuthHandler(BaseHandler):
         else:
             defer.returnValue(user_infos.popitem())
 
-    def _check_password(self, user_id, password, stored_hash):
-        """Checks that user_id has passed password, raises LoginError if not."""
-        if not self.validate_hash(password, stored_hash):
-            logger.warn("Failed password login for user %s", user_id)
-            raise LoginError(403, "", errcode=Codes.FORBIDDEN)
+    @defer.inlineCallbacks
+    def _check_password(self, user_id, password):
+        defer.returnValue(
+            not (
+                (yield self._check_ldap_password(user_id, password))
+                or
+                (yield self._check_local_password(user_id, password))
+            ))
+
+    @defer.inlineCallbacks
+    def _check_local_password(self, user_id, password):
+        try:
+            user_id, password_hash = yield self._find_user_id_and_pwd_hash(user_id)
+            defer.returnValue(not self.validate_hash(password, password_hash))
+        except LoginError:
+            defer.returnValue(False)
+
+    @defer.inlineCallbacks
+    def _check_ldap_password(self, user_id, password):
+        if self.ldap_enabled is not True:
+            logger.debug("LDAP not configured")
+            defer.returnValue(False)
+
+        import ldap
+
+        logger.info("Authenticating %s with LDAP" % user_id)
+        try:
+            ldap_url = "%s:%s" % (self.ldap_server, self.ldap_port)
+            logger.debug("Connecting LDAP server at %s" % ldap_url)
+            l = ldap.initialize(ldap_url)
+            if self.ldap_tls:
+                logger.debug("Initiating TLS")
+                self._connection.start_tls_s()
+
+            local_name = UserID.from_string(user_id).localpart
+
+            dn = "%s=%s, %s" % (
+                self.ldap_search_property,
+                local_name,
+                self.ldap_search_base)
+            logger.debug("DN for LDAP authentication: %s" % dn)
+
+            l.simple_bind_s(dn.encode('utf-8'), password.encode('utf-8'))
+
+            if not (yield self.does_user_exist(user_id)):
+                handler = self.hs.get_handlers().registration_handler
+                user_id, access_token = (
+                    yield handler.register(localpart=local_name)
+                )
+
+            defer.returnValue(True)
+        except ldap.LDAPError, e:
+            logger.warn("LDAP error: %s", e)
+            defer.returnValue(False)
 
     @defer.inlineCallbacks
     def issue_access_token(self, user_id):

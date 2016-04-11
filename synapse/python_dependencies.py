@@ -36,6 +36,7 @@ REQUIREMENTS = {
     "sortedcontainers": ["sortedcontainers"],
     "pysaml2==4.0.3": ["saml2==4.0.3"],
     "pymacaroons-pynacl": ["pymacaroons"],
+    "pyjwt": ["jwt"],
 }
 CONDITIONAL_REQUIREMENTS = {
     "web_client": {

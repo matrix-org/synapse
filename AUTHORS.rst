@@ -57,3 +57,6 @@ Florent Violleau <floviolleau at gmail dot com>
 
 Niklas Riekenbrauck <nikriek at gmail dot.com>
  * Add JWT support for registration and login
+
+Christoph Witzany <christoph at web.crofting.com>
+ * Add LDAP support for authentication

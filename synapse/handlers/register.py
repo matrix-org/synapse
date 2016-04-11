@@ -23,15 +23,12 @@ from synapse.api.errors import (
 from ._base import BaseHandler
 from synapse.util.async import run_on_reactor
 from synapse.http.client import CaptchaServerHttpClient
+from synapse.util.distributor import registered_user
 
 import logging
 import urllib
 
 logger = logging.getLogger(__name__)
-
-
-def registered_user(distributor, user):
-    return distributor.fire("registered_user", user)
 
 
 class RegistrationHandler(BaseHandler):

@@ -163,6 +163,22 @@ class EventFederationStore(SQLBaseStore):
             room_id,
         )
 
+    @defer.inlineCallbacks
+    def get_max_depth_of_events(self, event_ids):
+        sql = (
+            "SELECT MAX(depth) FROM events WHERE event_id IN (%s)"
+        ) % (",".join(["?"] * len(event_ids)),)
+
+        rows = yield self._execute(
+            "get_max_depth_of_events", None,
+            sql, *event_ids
+        )
+
+        if rows:
+            defer.returnValue(rows[0][0])
+        else:
+            defer.returnValue(1)
+
     def _get_min_depth_interaction(self, txn, room_id):
         min_depth = self._simple_select_one_onecol_txn(
             txn,
