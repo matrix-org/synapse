@@ -166,7 +166,7 @@ BASE_APPEND_OVERRIDE_RULES = [
     # NB. .m.rule.invite_for_me must be higher prio than .m.rule.member_event
     # otherwise invites will be matched by .m.rule.member_event
     {
-        'rule_id': 'global/underride/.m.rule.invite_for_me',
+        'rule_id': 'global/override/.m.rule.invite_for_me',
         'conditions': [
             {
                 'kind': 'event_match',
