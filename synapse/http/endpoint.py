@@ -75,6 +75,37 @@ def matrix_federation_endpoint(reactor, destination, ssl_context_factory=None,
         return transport_endpoint(reactor, domain, port, **endpoint_kw_args)
 
 
+class SpiderEndpoint(object):
+    """An endpoint which refuses to connect to blacklisted IP addresses
+    Implements twisted.internet.interfaces.IStreamClientEndpoint.
+    """
+    def __init__(self, reactor, host, port, blacklist,
+                 endpoint=TCP4ClientEndpoint, endpoint_kw_args={}):
+        self.reactor = reactor
+        self.host = host
+        self.port = port
+        self.blacklist = blacklist
+        self.endpoint = endpoint
+        self.endpoint_kw_args = endpoint_kw_args
+
+    @defer.inlineCallbacks
+    def connect(self, protocolFactory):
+        address = yield self.reactor.resolve(self.host)
+
+        from netaddr import IPAddress
+        if IPAddress(address) in self.blacklist:
+            raise ConnectError(
+                "Refusing to spider blacklisted IP address %s" % address
+            )
+
+        logger.info("Connecting to %s:%s", address, self.port)
+        endpoint = self.endpoint(
+            self.reactor, address, self.port, **self.endpoint_kw_args
+        )
+        connection = yield endpoint.connect(protocolFactory)
+        defer.returnValue(connection)
+
+
 class SRVClientEndpoint(object):
     """An endpoint which looks up SRV records for a service.
     Cycles through the list of servers starting with each call to connect
@@ -120,7 +151,7 @@ class SRVClientEndpoint(object):
                 return self.default_server
             else:
                 raise ConnectError(
-                    "Not server available for %s", self.service_name
+                    "Not server available for %s" % self.service_name
                 )
 
         min_priority = self.servers[0].priority
@@ -174,7 +205,7 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
                 and answers[0].type == dns.SRV
                 and answers[0].payload
                 and answers[0].payload.target == dns.Name('.')):
-            raise ConnectError("Service %s unavailable", service_name)
+            raise ConnectError("Service %s unavailable" % service_name)
 
         for answer in answers:
             if answer.type != dns.SRV or not answer.payload:

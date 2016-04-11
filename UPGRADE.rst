@@ -30,6 +30,14 @@ running:
     python synapse/python_dependencies.py | xargs -n1 pip install
 
 
+Upgrading to v0.15.0
+====================
+
+If you want to use the new URL previewing API (/_matrix/media/r0/preview_url)
+then you have to explicitly enable it in the config and update your dependencies
+dependencies.  See README.rst for details.
+
+
 Upgrading to v0.11.0
 ====================
 

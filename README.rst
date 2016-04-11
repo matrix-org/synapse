@@ -104,7 +104,7 @@ Installing prerequisites on Ubuntu or Debian::
 
     sudo apt-get install build-essential python2.7-dev libffi-dev \
                          python-pip python-setuptools sqlite3 \
-                         libssl-dev python-virtualenv libjpeg-dev
+                         libssl-dev python-virtualenv libjpeg-dev libxslt1-dev
 
 Installing prerequisites on ArchLinux::
 
@@ -556,6 +556,23 @@ It's currently early days for identity servers as Matrix is not yet using 3PIDs
 as the primary means of identity and E2E encryption is not complete. As such,
 we are running a single identity server (https://matrix.org) at the current
 time.
+
+
+URL Previews
+============
+
+Synapse 0.15.0 introduces an experimental new API for previewing URLs at
+/_matrix/media/r0/preview_url.  This is disabled by default.  To turn it on
+you must enable the `url_preview_enabled: True` config parameter and explicitly
+specify the IP ranges that Synapse is not allowed to spider for previewing in
+the `url_preview_ip_range_blacklist` configuration parameter.  This is critical
+from a security perspective to stop arbitrary Matrix users spidering 'internal'
+URLs on your network.  At the very least we recommend that your loopback and
+RFC1918 IP addresses are blacklisted.
+
+This also requires the optional lxml and netaddr python dependencies to be
+installed.
+
 
 Password reset
 ==============
