@@ -399,6 +399,9 @@ class FederationHandler(BaseHandler):
             if event in events_to_state:
                 continue
 
+            # We store these one at a time since each event depends on the
+            # previous to work out the state.
+            # TODO: We can probably do something more clever here.
             yield self._handle_new_event(
                 dest, event
             )
@@ -480,6 +483,7 @@ class FederationHandler(BaseHandler):
                     )
                     # If this succeeded then we probably already have the
                     # appropriate stuff.
+                    # TODO: We can probably do something more intelligent here.
                     defer.returnValue(True)
                 except SynapseError as e:
                     logger.info(
@@ -1122,6 +1126,11 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _handle_new_events(self, origin, event_infos, backfilled=False):
+        """Creates the appropriate contexts and persists events. The events
+        should not depend on one another, e.g. this should be used to persist
+        a bunch of outliers, but not a chunk of individual events that depend
+        on each other for state calculations.
+        """
         contexts = yield defer.gatherResults(
             [
                 self._prep_event(
