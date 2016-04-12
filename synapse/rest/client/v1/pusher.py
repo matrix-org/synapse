@@ -26,18 +26,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class PusherRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/pushers(/set)?$")
+class PushersRestServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/pushers$")
 
     def __init__(self, hs):
-        super(PusherRestServlet, self).__init__(hs)
-        self.notifier = hs.get_notifier()
+        super(PushersRestServlet, self).__init__(hs)
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        if request.postpath != ["pushers"]:
-            defer.returnValue((405, {}))
-
         requester = yield self.auth.get_user_by_req(request)
         user = requester.user
 
@@ -63,11 +59,19 @@ class PusherRestServlet(ClientV1RestServlet):
 
         defer.returnValue((200, {"pushers": pushers}))
 
+    def on_OPTIONS(self, _):
+        return 200, {}
+
+
+class PushersSetRestServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/pushers(/set)?$")
+
+    def __init__(self, hs):
+        super(PushersSetRestServlet, self).__init__(hs)
+        self.notifier = hs.get_notifier()
+
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if request.postpath != ["pushers", "set"]:
-            defer.returnValue((405, {}))
-
         requester = yield self.auth.get_user_by_req(request)
         user = requester.user
 
@@ -133,4 +137,5 @@ class PusherRestServlet(ClientV1RestServlet):
 
 
 def register_servlets(hs, http_server):
-    PusherRestServlet(hs).register(http_server)
+    PushersRestServlet(hs).register(http_server)
+    PushersSetRestServlet(hs).register(http_server)
