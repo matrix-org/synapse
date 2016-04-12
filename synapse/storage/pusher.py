@@ -87,7 +87,6 @@ class PusherStore(SQLBaseStore):
                 "last_stream_ordering",
                 "last_success",
                 "failing_since",
-
             ], desc="get_pushers_by"
         )
         defer.returnValue(self._decode_pushers_rows(ret))
