@@ -36,7 +36,7 @@ then either responds with updates immediately if it already has updates or it
 waits until the timeout for more updates. If the timeout expires and nothing
 happened then the server returns an empty response.
 
-However until the /sync API this replication API is returning synapse specific
+However unlike the /sync API this replication API is returning synapse specific
 data rather than trying to implement a matrix specification. The replication
 results are returned as arrays of rows where the rows are mostly lifted
 directly from the database. This avoids unnecessary JSON parsing on the server
