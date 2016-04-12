@@ -280,6 +280,10 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     def backfill(self, dest, room_id, limit, extremities=[]):
         """ Trigger a backfill request to `dest` for the given `room_id`
+
+        This will attempt to get more events from the remote. This may return
+        be successfull and still return no events if the other side has no new
+        events to offer.
         """
         if dest == self.server_name:
             raise SynapseError(400, "Can't backfill from self.")
@@ -474,6 +478,8 @@ class FederationHandler(BaseHandler):
                         limit=100,
                         extremities=[e for e in extremities.keys()]
                     )
+                    # If this succeeded then we probably already have the
+                    # appropriate stuff.
                     defer.returnValue(True)
                 except SynapseError as e:
                     logger.info(
