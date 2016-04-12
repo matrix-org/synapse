@@ -64,7 +64,7 @@ class PushersRestServlet(ClientV1RestServlet):
 
 
 class PushersSetRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/pushers(/set)?$")
+    PATTERNS = client_path_patterns("/pushers/set$")
 
     def __init__(self, hs):
         super(PushersSetRestServlet, self).__init__(hs)
