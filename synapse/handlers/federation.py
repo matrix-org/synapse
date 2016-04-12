@@ -395,10 +395,6 @@ class FederationHandler(BaseHandler):
             if event in events_to_state:
                 continue
 
-            ev_infos.append({
-                "event": event,
-            })
-
             yield self._handle_new_event(
                 dest, event
             )
