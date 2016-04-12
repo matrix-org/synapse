@@ -37,7 +37,7 @@ class PushersRestServlet(ClientV1RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         user = requester.user
 
-        pushers = yield self.hs.get_datastore().get_pushers_by_app_user_id(
+        pushers = yield self.hs.get_datastore().get_pushers_by_user_id(
             user.to_string()
         )
 

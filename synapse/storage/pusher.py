@@ -76,7 +76,7 @@ class PusherStore(SQLBaseStore):
         defer.returnValue(rows)
 
     @defer.inlineCallbacks
-    def get_pushers_by_app_user_id(self, user_id):
+    def get_pushers_by_user_id(self, user_id):
         def r(txn):
             sql = (
                 "SELECT * FROM pushers"
