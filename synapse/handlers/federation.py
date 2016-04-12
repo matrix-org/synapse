@@ -294,6 +294,15 @@ class FederationHandler(BaseHandler):
             extremities=extremities,
         )
 
+        seen_events = yield self.store.have_events_in_timeline(
+            set(e.event_id for e in events)
+        )
+
+        events = [e for e in events if e.event_id not in seen_events]
+
+        if not events:
+            defer.returnValue([])
+
         event_map = {e.event_id: e for e in events}
 
         event_ids = set(e.event_id for e in events)
@@ -353,6 +362,7 @@ class FederationHandler(BaseHandler):
         for a in auth_events.values():
             if a.event_id in seen_events:
                 continue
+            a.internal_metadata.outlier = True
             ev_infos.append({
                 "event": a,
                 "auth_events": {
@@ -373,6 +383,11 @@ class FederationHandler(BaseHandler):
                 }
             })
 
+        yield self._handle_new_events(
+            dest, ev_infos,
+            backfilled=True,
+        )
+
         events.sort(key=lambda e: e.depth)
 
         for event in events:
@@ -383,10 +398,9 @@ class FederationHandler(BaseHandler):
                 "event": event,
             })
 
-        yield self._handle_new_events(
-            dest, ev_infos,
-            backfilled=True,
-        )
+            yield self._handle_new_event(
+                dest, event
+            )
 
         defer.returnValue(events)
 
@@ -458,11 +472,12 @@ class FederationHandler(BaseHandler):
             # TODO: Should we try multiple of these at a time?
             for dom in domains:
                 try:
-                    events = yield self.backfill(
+                    yield self.backfill(
                         dom, room_id,
                         limit=100,
                         extremities=[e for e in extremities.keys()]
                     )
+                    defer.returnValue(True)
                 except SynapseError as e:
                     logger.info(
                         "Failed to backfill from %s because %s",
@@ -488,8 +503,6 @@ class FederationHandler(BaseHandler):
                     )
                     continue
 
-                if events:
-                    defer.returnValue(True)
             defer.returnValue(False)
 
         success = yield try_backfill(likely_domains)

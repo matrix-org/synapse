@@ -543,6 +543,22 @@ class EventsStore(SQLBaseStore):
             (event.event_id, event.redacts)
         )
 
+    @defer.inlineCallbacks
+    def have_events_in_timeline(self, event_ids):
+        """Given a list of event ids, check if we have already processed and
+        stored them as non outliers.
+        """
+        rows = yield self._simple_select_many_batch(
+            table="events",
+            retcols=("event_id",),
+            column="event_id",
+            iterable=list(event_ids),
+            keyvalues={"outlier": False},
+            desc="have_events_in_timeline",
+        )
+
+        defer.returnValue(set(r["event_id"] for r in rows))
+
     def have_events(self, event_ids):
         """Given a list of event ids, check if we have already processed them.
 
