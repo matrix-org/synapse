@@ -26,11 +26,48 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class PusherRestServlet(ClientV1RestServlet):
+class PushersRestServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/pushers$")
+
+    def __init__(self, hs):
+        super(PushersRestServlet, self).__init__(hs)
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+        user = requester.user
+
+        pushers = yield self.hs.get_datastore().get_pushers_by_user_id(
+            user.to_string()
+        )
+
+        allowed_keys = [
+            "app_display_name",
+            "app_id",
+            "data",
+            "device_display_name",
+            "kind",
+            "lang",
+            "profile_tag",
+            "pushkey",
+        ]
+
+        for p in pushers:
+            for k, v in p.items():
+                if k not in allowed_keys:
+                    del p[k]
+
+        defer.returnValue((200, {"pushers": pushers}))
+
+    def on_OPTIONS(self, _):
+        return 200, {}
+
+
+class PushersSetRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/pushers/set$")
 
     def __init__(self, hs):
-        super(PusherRestServlet, self).__init__(hs)
+        super(PushersSetRestServlet, self).__init__(hs)
         self.notifier = hs.get_notifier()
 
     @defer.inlineCallbacks
@@ -100,4 +137,5 @@ class PusherRestServlet(ClientV1RestServlet):
 
 
 def register_servlets(hs, http_server):
-    PusherRestServlet(hs).register(http_server)
+    PushersRestServlet(hs).register(http_server)
+    PushersSetRestServlet(hs).register(http_server)

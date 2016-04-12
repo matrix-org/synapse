@@ -56,24 +56,40 @@ class PusherStore(SQLBaseStore):
         )
         defer.returnValue(ret is not None)
 
-    @defer.inlineCallbacks
     def get_pushers_by_app_id_and_pushkey(self, app_id, pushkey):
-        def r(txn):
-            sql = (
-                "SELECT * FROM pushers"
-                " WHERE app_id = ? AND pushkey = ?"
-            )
+        return self.get_pushers_by({
+            "app_id": app_id,
+            "pushkey": pushkey,
+        })
 
-            txn.execute(sql, (app_id, pushkey,))
-            rows = self.cursor_to_dict(txn)
+    def get_pushers_by_user_id(self, user_id):
+        return self.get_pushers_by({
+            "user_name": user_id,
+        })
 
-            return self._decode_pushers_rows(rows)
-
-        rows = yield self.runInteraction(
-            "get_pushers_by_app_id_and_pushkey", r
+    @defer.inlineCallbacks
+    def get_pushers_by(self, keyvalues):
+        ret = yield self._simple_select_list(
+            "pushers", keyvalues,
+            [
+                "id",
+                "user_name",
+                "access_token",
+                "profile_tag",
+                "kind",
+                "app_id",
+                "app_display_name",
+                "device_display_name",
+                "pushkey",
+                "ts",
+                "lang",
+                "data",
+                "last_stream_ordering",
+                "last_success",
+                "failing_since",
+            ], desc="get_pushers_by"
         )
-
-        defer.returnValue(rows)
+        defer.returnValue(self._decode_pushers_rows(ret))
 
     @defer.inlineCallbacks
     def get_all_pushers(self):
