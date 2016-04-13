@@ -88,7 +88,11 @@ class ContentRepositoryConfig(Config):
                     config["url_preview_ip_range_blacklist"]
                 )
             else:
-                raise ConfigError("url_preview_url_blacklist is required")
+                raise ConfigError(
+                    "For security, you must specify an explicit target IP address "
+                    "blacklist in url_preview_ip_range_blacklist for url previewing "
+                    "to work"
+                )
 
             if "url_preview_url_blacklist" in config:
                 self.url_preview_url_blacklist = config["url_preview_url_blacklist"]
