@@ -25,6 +25,7 @@ from synapse.api.errors import AuthError, Codes, SynapseError, EventSizeError
 from synapse.types import Requester, RoomID, UserID, EventID
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import preserve_context_over_fn
+from synapse.util.metrics import Measure
 from unpaddedbase64 import decode_base64
 
 import logging
@@ -44,6 +45,7 @@ class Auth(object):
 
     def __init__(self, hs):
         self.hs = hs
+        self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
@@ -66,66 +68,67 @@ class Auth(object):
         Returns:
             True if the auth checks pass.
         """
-        self.check_size_limits(event)
+        with Measure(self.clock, "auth.check"):
+            self.check_size_limits(event)
 
-        if not hasattr(event, "room_id"):
-            raise AuthError(500, "Event has no room_id: %s" % event)
-        if auth_events is None:
-            # Oh, we don't know what the state of the room was, so we
-            # are trusting that this is allowed (at least for now)
-            logger.warn("Trusting event: %s", event.event_id)
-            return True
+            if not hasattr(event, "room_id"):
+                raise AuthError(500, "Event has no room_id: %s" % event)
+            if auth_events is None:
+                # Oh, we don't know what the state of the room was, so we
+                # are trusting that this is allowed (at least for now)
+                logger.warn("Trusting event: %s", event.event_id)
+                return True
 
-        if event.type == EventTypes.Create:
-            # FIXME
-            return True
+            if event.type == EventTypes.Create:
+                # FIXME
+                return True
 
-        creation_event = auth_events.get((EventTypes.Create, ""), None)
+            creation_event = auth_events.get((EventTypes.Create, ""), None)
 
-        if not creation_event:
-            raise SynapseError(
-                403,
-                "Room %r does not exist" % (event.room_id,)
-            )
-
-        creating_domain = RoomID.from_string(event.room_id).domain
-        originating_domain = UserID.from_string(event.sender).domain
-        if creating_domain != originating_domain:
-            if not self.can_federate(event, auth_events):
-                raise AuthError(
+            if not creation_event:
+                raise SynapseError(
                     403,
-                    "This room has been marked as unfederatable."
+                    "Room %r does not exist" % (event.room_id,)
                 )
 
-        # FIXME: Temp hack
-        if event.type == EventTypes.Aliases:
-            return True
+            creating_domain = RoomID.from_string(event.room_id).domain
+            originating_domain = UserID.from_string(event.sender).domain
+            if creating_domain != originating_domain:
+                if not self.can_federate(event, auth_events):
+                    raise AuthError(
+                        403,
+                        "This room has been marked as unfederatable."
+                    )
 
-        logger.debug(
-            "Auth events: %s",
-            [a.event_id for a in auth_events.values()]
-        )
+            # FIXME: Temp hack
+            if event.type == EventTypes.Aliases:
+                return True
 
-        if event.type == EventTypes.Member:
-            allowed = self.is_membership_change_allowed(
-                event, auth_events
+            logger.debug(
+                "Auth events: %s",
+                [a.event_id for a in auth_events.values()]
             )
-            if allowed:
-                logger.debug("Allowing! %s", event)
-            else:
-                logger.debug("Denying! %s", event)
-            return allowed
 
-        self.check_event_sender_in_room(event, auth_events)
-        self._can_send_event(event, auth_events)
+            if event.type == EventTypes.Member:
+                allowed = self.is_membership_change_allowed(
+                    event, auth_events
+                )
+                if allowed:
+                    logger.debug("Allowing! %s", event)
+                else:
+                    logger.debug("Denying! %s", event)
+                return allowed
 
-        if event.type == EventTypes.PowerLevels:
-            self._check_power_levels(event, auth_events)
+            self.check_event_sender_in_room(event, auth_events)
+            self._can_send_event(event, auth_events)
 
-        if event.type == EventTypes.Redaction:
-            self.check_redaction(event, auth_events)
+            if event.type == EventTypes.PowerLevels:
+                self._check_power_levels(event, auth_events)
 
-        logger.debug("Allowing! %s", event)
+            if event.type == EventTypes.Redaction:
+                self.check_redaction(event, auth_events)
+
+            logger.debug("Allowing! %s", event)
 
     def check_size_limits(self, event):
         def too_big(field):
