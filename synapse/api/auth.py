@@ -25,6 +25,7 @@ from synapse.api.errors import AuthError, Codes, SynapseError, EventSizeError
 from synapse.types import Requester, RoomID, UserID, EventID
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import preserve_context_over_fn
+from synapse.util.metrics import Measure
 from unpaddedbase64 import decode_base64
 
 import logging
@@ -44,6 +45,7 @@ class Auth(object):
 
     def __init__(self, hs):
         self.hs = hs
+        self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
@@ -66,9 +68,9 @@ class Auth(object):
         Returns:
             True if the auth checks pass.
         """
-        self.check_size_limits(event)
+        with Measure(self.clock, "auth.check"):
+            self.check_size_limits(event)
 
-        try:
             if not hasattr(event, "room_id"):
                 raise AuthError(500, "Event has no room_id: %s" % event)
             if auth_events is None:
@@ -127,13 +129,6 @@ class Auth(object):
                 self.check_redaction(event, auth_events)
 
             logger.debug("Allowing! %s", event)
-        except AuthError as e:
-            logger.info(
-                "Event auth check failed on event %s with msg: %s",
-                event, e.msg
-            )
-            logger.info("Denying! %s", event)
-            raise
 
     def check_size_limits(self, event):
         def too_big(field):

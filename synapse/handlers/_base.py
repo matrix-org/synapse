@@ -316,7 +316,11 @@ class BaseHandler(object):
         if ratelimit:
             self.ratelimit(requester)
 
-        self.auth.check(event, auth_events=context.current_state)
+        try:
+            self.auth.check(event, auth_events=context.current_state)
+        except AuthError as err:
+            logger.warn("Denying new event %r because %s", event, err)
+            raise err
 
         yield self.maybe_kick_guest_users(event, context.current_state.values())
 
