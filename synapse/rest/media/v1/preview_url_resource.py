@@ -40,33 +40,11 @@ import ujson as json
 import logging
 logger = logging.getLogger(__name__)
 
-try:
-    from lxml import html
-except ImportError:
-    pass
-
 
 class PreviewUrlResource(BaseMediaResource):
     isLeaf = True
 
     def __init__(self, hs, filepaths):
-        try:
-            if html:
-                pass
-        except:
-            raise RuntimeError("Disabling PreviewUrlResource as lxml not available")
-
-        if not hasattr(hs.config, "url_preview_ip_range_blacklist"):
-            logger.warn(
-                "For security, you must specify an explicit target IP address "
-                "blacklist in url_preview_ip_range_blacklist for url previewing "
-                "to work"
-            )
-            raise RuntimeError(
-                "Disabling PreviewUrlResource as "
-                "url_preview_ip_range_blacklist not specified"
-            )
-
         BaseMediaResource.__init__(self, hs, filepaths)
         self.client = SpiderHttpClient(hs)
         if hasattr(hs.config, "url_preview_url_blacklist"):
@@ -200,6 +178,8 @@ class PreviewUrlResource(BaseMediaResource):
             # define our OG response for this media
         elif self._is_html(media_info['media_type']):
             # TODO: somehow stop a big HTML tree from exploding synapse's RAM
+
+            from lxml import html
 
             try:
                 tree = html.parse(media_info['filename'])
