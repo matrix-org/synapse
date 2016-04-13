@@ -176,7 +176,7 @@ class EventPushActionsStore(SQLBaseStore):
                 "event_id": row[0],
                 "stream_ordering": row[1],
                 "actions": json.loads(row[2]),
-            } for row in after_read_receipt+no_read_receipt
+            } for row in after_read_receipt + no_read_receipt
         ])
 
     @defer.inlineCallbacks
