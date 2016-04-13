@@ -68,72 +68,64 @@ class Auth(object):
         """
         self.check_size_limits(event)
 
-        try:
-            if not hasattr(event, "room_id"):
-                raise AuthError(500, "Event has no room_id: %s" % event)
-            if auth_events is None:
-                # Oh, we don't know what the state of the room was, so we
-                # are trusting that this is allowed (at least for now)
-                logger.warn("Trusting event: %s", event.event_id)
-                return True
+        if not hasattr(event, "room_id"):
+            raise AuthError(500, "Event has no room_id: %s" % event)
+        if auth_events is None:
+            # Oh, we don't know what the state of the room was, so we
+            # are trusting that this is allowed (at least for now)
+            logger.warn("Trusting event: %s", event.event_id)
+            return True
 
-            if event.type == EventTypes.Create:
-                # FIXME
-                return True
+        if event.type == EventTypes.Create:
+            # FIXME
+            return True
 
-            creation_event = auth_events.get((EventTypes.Create, ""), None)
+        creation_event = auth_events.get((EventTypes.Create, ""), None)
 
-            if not creation_event:
-                raise SynapseError(
+        if not creation_event:
+            raise SynapseError(
+                403,
+                "Room %r does not exist" % (event.room_id,)
+            )
+
+        creating_domain = RoomID.from_string(event.room_id).domain
+        originating_domain = UserID.from_string(event.sender).domain
+        if creating_domain != originating_domain:
+            if not self.can_federate(event, auth_events):
+                raise AuthError(
                     403,
-                    "Room %r does not exist" % (event.room_id,)
+                    "This room has been marked as unfederatable."
                 )
 
-            creating_domain = RoomID.from_string(event.room_id).domain
-            originating_domain = UserID.from_string(event.sender).domain
-            if creating_domain != originating_domain:
-                if not self.can_federate(event, auth_events):
-                    raise AuthError(
-                        403,
-                        "This room has been marked as unfederatable."
-                    )
+        # FIXME: Temp hack
+        if event.type == EventTypes.Aliases:
+            return True
 
-            # FIXME: Temp hack
-            if event.type == EventTypes.Aliases:
-                return True
+        logger.debug(
+            "Auth events: %s",
+            [a.event_id for a in auth_events.values()]
+        )
 
-            logger.debug(
-                "Auth events: %s",
-                [a.event_id for a in auth_events.values()]
+        if event.type == EventTypes.Member:
+            allowed = self.is_membership_change_allowed(
+                event, auth_events
             )
+            if allowed:
+                logger.debug("Allowing! %s", event)
+            else:
+                logger.debug("Denying! %s", event)
+            return allowed
 
-            if event.type == EventTypes.Member:
-                allowed = self.is_membership_change_allowed(
-                    event, auth_events
-                )
-                if allowed:
-                    logger.debug("Allowing! %s", event)
-                else:
-                    logger.debug("Denying! %s", event)
-                return allowed
+        self.check_event_sender_in_room(event, auth_events)
+        self._can_send_event(event, auth_events)
 
-            self.check_event_sender_in_room(event, auth_events)
-            self._can_send_event(event, auth_events)
+        if event.type == EventTypes.PowerLevels:
+            self._check_power_levels(event, auth_events)
 
-            if event.type == EventTypes.PowerLevels:
-                self._check_power_levels(event, auth_events)
+        if event.type == EventTypes.Redaction:
+            self.check_redaction(event, auth_events)
 
-            if event.type == EventTypes.Redaction:
-                self.check_redaction(event, auth_events)
-
-            logger.debug("Allowing! %s", event)
-        except AuthError as e:
-            logger.info(
-                "Event auth check failed on event %s with msg: %s",
-                event, e.msg
-            )
-            logger.info("Denying! %s", event)
-            raise
+        logger.debug("Allowing! %s", event)
 
     def check_size_limits(self, event):
         def too_big(field):
