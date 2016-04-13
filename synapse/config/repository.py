@@ -22,7 +22,13 @@ MISSING_NETADDR = (
 )
 
 MISSING_LXML = (
-    "Missing lxml library. This is required for URL preview API."
+    """Missing lxml library. This is required for URL preview API.
+
+    Install by running:
+        pip install lxml
+
+    Requires libxslt1-dev system package.
+    """
 )
 
 
