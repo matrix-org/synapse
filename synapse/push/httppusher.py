@@ -95,7 +95,7 @@ class HttpPusher(object):
 
         # We could check the receipts are actually m.read receipts here,
         # but currently that's the only type of receipt anyway...
-        with LoggingContext("push._process"):
+        with LoggingContext("push.on_new_receipts"):
             with Measure(self.clock, "push.on_new_receipts"):
                 badge = yield push_tools.get_badge_count(
                     self.hs.get_datastore(), self.user_id
