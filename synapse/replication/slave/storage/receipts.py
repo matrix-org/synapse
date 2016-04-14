@@ -40,6 +40,7 @@ class SlavedReceiptsStore(BaseSlavedStore):
     get_receipts_for_user = ReceiptsStore.__dict__["get_receipts_for_user"]
 
     get_max_receipt_stream_id = DataStore.get_max_receipt_stream_id.__func__
+    get_all_updated_receipts = DataStore.get_all_updated_receipts.__func__
 
     def stream_positions(self):
         result = super(SlavedReceiptsStore, self).stream_positions()

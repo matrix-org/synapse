@@ -136,6 +136,16 @@ class PusherServer(HomeServer):
                     min_stream_id, max_stream_id
                 )
 
+            stream = results.get("receipts")
+            if stream:
+                rows = stream["rows"]
+                affected_room_ids = set(row[1] for row in rows)
+                min_stream_id = rows[0][0]
+                max_stream_id = stream["position"]
+                preserve_fn(pusher_pool.on_new_receipts)(
+                    min_stream_id, max_stream_id, affected_room_ids
+                )
+
         while True:
             try:
                 args = store.stream_positions()
