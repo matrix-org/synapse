@@ -100,6 +100,11 @@ class RegisterRestServlet(RestServlet):
 
         # == Application Service Registration ==
         if appservice:
+            # Set the desired user according to the AS API (which uses the
+            # 'user' key not 'username'). Since this is a new addition, we'll
+            # fallback to 'username' if they gave one.
+            if isinstance(body.get("user"), basestring):
+                desired_username = body["user"]
             result = yield self._do_appservice_registration(
                 desired_username, request.args["access_token"][0]
             )
