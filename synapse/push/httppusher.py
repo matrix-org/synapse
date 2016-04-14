@@ -114,20 +114,22 @@ class HttpPusher(object):
     def _process(self):
         if self.processing:
             return
-        try:
-            self.processing = True
-            # if the max ordering changes while we're running _unsafe_process,
-            # call it again, and so on until we've caught up.
-            while True:
-                starting_max_ordering = self.max_stream_ordering
-                try:
-                    yield self._unsafe_process()
-                except:
-                    logger.exception("Exception processing notifs")
-                if self.max_stream_ordering == starting_max_ordering:
-                    break
-        finally:
-            self.processing = False
+
+        with Measure(self.clock, "push._process"):
+            try:
+                self.processing = True
+                # if the max ordering changes while we're running _unsafe_process,
+                # call it again, and so on until we've caught up.
+                while True:
+                    starting_max_ordering = self.max_stream_ordering
+                    try:
+                        yield self._unsafe_process()
+                    except:
+                        logger.exception("Exception processing notifs")
+                    if self.max_stream_ordering == starting_max_ordering:
+                        break
+            finally:
+                self.processing = False
 
     @defer.inlineCallbacks
     def _unsafe_process(self):
