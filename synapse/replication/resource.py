@@ -343,7 +343,7 @@ class ReplicationResource(Resource):
                 "app_id", "app_display_name", "device_display_name", "pushkey",
                 "ts", "lang", "data"
             ))
-            writer.write_header_and_rows("deleted", deleted, (
+            writer.write_header_and_rows("deleted_pushers", deleted, (
                 "position", "user_id", "app_id", "pushkey"
             ))
 

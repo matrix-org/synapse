@@ -28,6 +28,7 @@ class ServerConfig(Config):
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", True)
+        self.start_pushers = config.get("start_pushers", True)
 
         self.listeners = config.get("listeners", [])
 
