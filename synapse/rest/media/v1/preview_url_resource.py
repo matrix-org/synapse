@@ -17,7 +17,6 @@ from .base_resource import BaseMediaResource
 
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
-from urlparse import urlparse, urlsplit, urlunparse
 
 from synapse.api.errors import (
     SynapseError, Codes,
@@ -36,6 +35,7 @@ import re
 import fnmatch
 import cgi
 import ujson as json
+import urlparse
 
 import logging
 logger = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ class PreviewUrlResource(BaseMediaResource):
 
         # impose the URL pattern blacklist
         if hasattr(self, "url_preview_url_blacklist"):
-            url_tuple = urlsplit(url)
+            url_tuple = urlparse.urlsplit(url)
             for entry in self.url_preview_url_blacklist:
                 match = True
                 for attrib in entry:
@@ -338,15 +338,15 @@ class PreviewUrlResource(BaseMediaResource):
         defer.returnValue(og)
 
     def _rebase_url(self, url, base):
-        base = list(urlparse(base))
-        url = list(urlparse(url))
+        base = list(urlparse.urlparse(base))
+        url = list(urlparse.urlparse(url))
         if not url[0]:  # fix up schema
             url[0] = base[0] or "http"
         if not url[1]:  # fix up hostname
             url[1] = base[1]
             if not url[2].startswith('/'):
                 url[2] = re.sub(r'/[^/]+$', '/', base[2]) + url[2]
-        return urlunparse(url)
+        return urlparse.urlunparse(url)
 
     @defer.inlineCallbacks
     def _download_url(self, url, user):
