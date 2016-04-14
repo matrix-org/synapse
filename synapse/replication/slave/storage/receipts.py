@@ -52,12 +52,10 @@ class SlavedReceiptsStore(BaseSlavedStore):
         if stream:
             self._receipts_id_gen.advance(stream["position"])
             for row in stream["rows"]:
-                room_id = row[1]
-                user_id = row[3]
-                self.invalidate_caches_for_receipt(user_id, room_id)
-                self.get_receipts_for_user.invalidate((user_id,))
+                room_id, receipt_type, user_id = row[1:4]
+                self.invalidate_caches_for_receipt(room_id, receipt_type, user_id)
 
         return super(SlavedReceiptsStore, self).process_replication(result)
 
-    def invalidate_caches_for_receipt(self, user_id, room_id):
-        self.get_receipts_for_user.invalidate((user_id,))
+    def invalidate_caches_for_receipt(self, room_id, receipt_type, user_id):
+        self.get_receipts_for_user.invalidate((user_id, receipt_type))

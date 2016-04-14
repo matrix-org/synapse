@@ -42,10 +42,10 @@ class SlavedPushActionsStore(SlavedEventStore, SlavedReceiptsStore):
             event, backfilled, reset_state
         )
 
-    def invalidate_caches_for_receipt(self, user_id, room_id):
+    def invalidate_caches_for_receipt(self, room_id, receipt_type, user_id):
         self.get_unread_event_push_actions_by_room_for_user.invalidate_many(
             (room_id,)
         )
         super(SlavedPushActionsStore, self).invalidate_caches_for_receipt(
-            user_id, room_id
+            room_id, receipt_type, user_id
         )
