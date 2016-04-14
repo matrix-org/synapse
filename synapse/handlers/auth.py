@@ -441,7 +441,7 @@ class AuthHandler(BaseHandler):
             user_id, password_hash = yield self._find_user_id_and_pwd_hash(user_id)
             defer.returnValue(not self.validate_hash(password, password_hash))
         except LoginError:
-            defer.returnValue(False)
+            defer.returnValue(True)
 
     @defer.inlineCallbacks
     def _check_ldap_password(self, user_id, password):
