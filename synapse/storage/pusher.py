@@ -137,7 +137,11 @@ class PusherStore(SQLBaseStore):
         users = yield self.get_users_in_room(room_id)
 
         result = yield self._simple_select_many_batch(
-            'pushers', 'user_name', users, ['user_name']
+            table='pushers',
+            column='user_name',
+            iterable=users,
+            retcols=['user_name'],
+            desc='get_users_with_pushers_in_room'
         )
 
         defer.returnValue([r['user_name'] for r in result])
