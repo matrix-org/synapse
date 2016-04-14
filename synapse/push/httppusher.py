@@ -100,7 +100,7 @@ class HttpPusher(object):
                 badge = yield push_tools.get_badge_count(
                     self.hs.get_datastore(), self.user_id
                 )
-            yield self.send_badge(badge)
+            yield self._send_badge(badge)
 
     @defer.inlineCallbacks
     def on_timer(self):
@@ -294,7 +294,7 @@ class HttpPusher(object):
         defer.returnValue(rejected)
 
     @defer.inlineCallbacks
-    def send_badge(self, badge):
+    def _send_badge(self, badge):
         logger.info("Sending updated badge count %d to %r", badge, self.user_id)
         d = {
             'notification': {
