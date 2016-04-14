@@ -149,7 +149,7 @@ class HttpPusher(object):
             if processed:
                 self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
                 self.last_stream_ordering = push_action['stream_ordering']
-                self.store.update_pusher_last_stream_ordering_and_success(
+                yield self.store.update_pusher_last_stream_ordering_and_success(
                     self.app_id, self.pushkey, self.user_id,
                     self.last_stream_ordering,
                     self.clock.time_msec()
