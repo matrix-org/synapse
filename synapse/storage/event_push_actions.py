@@ -133,9 +133,10 @@ class EventPushActionsStore(SQLBaseStore):
                 "       ep.topological_ordering > rl.topological_ordering"
                 "       OR ("
                 "           ep.topological_ordering = rl.topological_ordering"
-                "           AND ep.stream_ordering > ?"
+                "           AND ep.stream_ordering > rl.stream_ordering"
                 "       )"
                 "   )"
+                "   AND ep.stream_ordering > ?"
                 "   AND ep.user_id = ?"
                 "   AND ep.user_id = rl.user_id"
             )
