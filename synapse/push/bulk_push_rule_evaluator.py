@@ -71,13 +71,25 @@ def _get_rules(room_id, user_ids, store):
 @defer.inlineCallbacks
 def evaluator_for_event(event, hs, store):
     room_id = event.room_id
+
+    # users in the room who have pushers need to get push rules run because
+    # that's how their pushers work
     users_with_pushers = yield store.get_users_with_pushers_in_room(room_id)
+
+    # We also will want to generate notifs for other people in the room so
+    # their unread countss are correct in the event stream, but to avoid
+    # generating them for bot / AS users etc, we only do so for people who've
+    # sent a read receipt into the room.
+
+    all_in_room = yield store.get_users_in_room(room_id)
+    all_in_room = set(all_in_room)
+
     receipts = yield store.get_receipts_for_room(room_id, "m.read")
 
     # any users with pushers must be ours: they have pushers
     user_ids = set(users_with_pushers)
     for r in receipts:
-        if hs.is_mine_id(r['user_id']):
+        if hs.is_mine_id(r['user_id']) and r['user_id'] in all_in_room:
             user_ids.add(r['user_id'])
 
     # if this event is an invite event, we may need to run rules for the user
