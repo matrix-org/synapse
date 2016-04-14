@@ -24,7 +24,9 @@ from synapse.config.logger import LoggingConfig
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.pushers import SlavedPusherStore
 from synapse.replication.slave.storage.event_push_actions import SlavedPushActionsStore
+from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.storage.engines import create_engine
+from synapse.storage import DataStore
 from synapse.util.async import sleep
 from synapse.util.logcontext import (LoggingContext, preserve_fn)
 
@@ -40,7 +42,7 @@ class SlaveConfig(DatabaseConfig):
     def read_config(self, config):
         self.replication_url = config["replication_url"]
         self.server_name = config["server_name"]
-        self.use_insecure_ssl_client_just_for_testing_do_not_use = False
+        self.use_insecure_ssl_client_just_for_testing_do_not_use = True
         self.user_agent_suffix = None
         self.start_pushers = True
 
@@ -58,9 +60,13 @@ class PusherSlaveConfig(SlaveConfig, LoggingConfig):
 
 
 class PusherSlaveStore(
-    SlavedEventStore, SlavedPusherStore, SlavedPushActionsStore
+    SlavedPushActionsStore,
+    SlavedEventStore, SlavedPusherStore,
+    SlavedReceiptsStore
 ):
-    pass
+    update_pusher_last_stream_ordering_and_success = (
+        DataStore.update_pusher_last_stream_ordering_and_success.__func__
+    )
 
 
 class PusherServer(HomeServer):
@@ -135,7 +141,6 @@ class PusherServer(HomeServer):
                 args = store.stream_positions()
                 args["timeout"] = 30000
                 result = yield http_client.get_json(replication_url, args=args)
-                logger.error("FNARG %r", result)
                 yield store.process_replication(result)
                 poke_pushers(result)
             except:

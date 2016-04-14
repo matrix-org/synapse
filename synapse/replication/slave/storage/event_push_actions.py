@@ -14,12 +14,17 @@
 # limitations under the License.
 
 
-from ._base import BaseSlavedStore
+from .events import SlavedEventStore
+from .receipts import SlavedReceiptsStore
 
 from synapse.storage import DataStore
+from synapse.storage.event_push_actions import EventPushActionsStore
 
 
-class SlavedPushActionsStore(BaseSlavedStore):
+class SlavedPushActionsStore(SlavedEventStore, SlavedReceiptsStore):
+    get_unread_event_push_actions_by_room_for_user = (
+        EventPushActionsStore.__dict__["get_unread_event_push_actions_by_room_for_user"]
+    )
 
     get_unread_push_actions_for_user_in_range = (
         DataStore.get_unread_push_actions_for_user_in_range.__func__
@@ -28,3 +33,19 @@ class SlavedPushActionsStore(BaseSlavedStore):
     get_push_action_users_in_range = (
         DataStore.get_push_action_users_in_range.__func__
     )
+
+    def invalidate_caches_for_event(self, event, backfilled, reset_state):
+        self.get_unread_event_push_actions_by_room_for_user.invalidate_many(
+            (event.room_id,)
+        )
+        super(SlavedPushActionsStore, self).invalidate_caches_for_event(
+            event, backfilled, reset_state
+        )
+
+    def invalidate_caches_for_receipt(self, user_id, room_id):
+        self.get_unread_event_push_actions_by_room_for_user.invalidate_many(
+            (room_id,)
+        )
+        super(SlavedPushActionsStore, self).invalidate_caches_for_receipt(
+            user_id, room_id
+        )

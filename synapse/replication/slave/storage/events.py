@@ -151,11 +151,11 @@ class SlavedEventStore(BaseSlavedStore):
         internal = json.loads(row[1])
         event_json = json.loads(row[2])
         event = FrozenEvent(event_json, internal_metadata_dict=internal)
-        self._invalidate_caches_for_event(
+        self.invalidate_caches_for_event(
             event, backfilled, reset_state=position in state_resets
         )
 
-    def _invalidate_caches_for_event(self, event, backfilled, reset_state):
+    def invalidate_caches_for_event(self, event, backfilled, reset_state):
         if reset_state:
             self._get_current_state_for_key.invalidate_all()
             self.get_rooms_for_user.invalidate_all()
