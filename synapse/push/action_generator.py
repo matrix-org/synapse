@@ -17,6 +17,8 @@ from twisted.internet import defer
 
 from .bulk_push_rule_evaluator import evaluator_for_event
 
+from synapse.util.metrics import Measure
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -25,6 +27,7 @@ logger = logging.getLogger(__name__)
 class ActionGenerator:
     def __init__(self, hs):
         self.hs = hs
+        self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         # really we want to get all user ids and all profile tags too,
         # since we want the actions for each profile tag for every user and
@@ -35,14 +38,15 @@ class ActionGenerator:
 
     @defer.inlineCallbacks
     def handle_push_actions_for_event(self, event, context, handler):
-        bulk_evaluator = yield evaluator_for_event(
-            event, self.hs, self.store
-        )
+        with Measure(self.clock, "handle_push_actions_for_event"):
+            bulk_evaluator = yield evaluator_for_event(
+                event, self.hs, self.store
+            )
 
-        actions_by_user = yield bulk_evaluator.action_for_event_by_user(
-            event, handler, context.current_state
-        )
+            actions_by_user = yield bulk_evaluator.action_for_event_by_user(
+                event, handler, context.current_state
+            )
 
-        context.push_actions = [
-            (uid, actions) for uid, actions in actions_by_user.items()
-        ]
+            context.push_actions = [
+                (uid, actions) for uid, actions in actions_by_user.items()
+            ]
