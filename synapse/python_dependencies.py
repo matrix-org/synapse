@@ -43,7 +43,6 @@ CONDITIONAL_REQUIREMENTS = {
         "matrix_angular_sdk>=0.6.8": ["syweb>=0.6.8"],
     },
     "preview_url": {
-        "lxml>=3.6.0": ["lxml"],
         "netaddr>=0.7.18": ["netaddr"],
     },
 }

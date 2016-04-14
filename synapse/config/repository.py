@@ -13,10 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from ._base import Config, ConfigError
 from collections import namedtuple
 
-import sys
+
+MISSING_NETADDR = (
+    "Missing netaddr library. This is required for URL preview API."
+)
+
+MISSING_LXML = (
+    """Missing lxml library. This is required for URL preview API.
+
+    Install by running:
+        pip install lxml
+
+    Requires libxslt1-dev system package.
+    """
+)
+
 
 ThumbnailRequirement = namedtuple(
     "ThumbnailRequirement", ["width", "height", "method", "media_type"]
@@ -62,18 +76,32 @@ class ContentRepositoryConfig(Config):
         self.thumbnail_requirements = parse_thumbnail_requirements(
             config["thumbnail_sizes"]
         )
-        self.url_preview_enabled = config["url_preview_enabled"]
+        self.url_preview_enabled = config.get("url_preview_enabled", False)
         if self.url_preview_enabled:
             try:
-                from netaddr import IPSet
-                if "url_preview_ip_range_blacklist" in config:
-                    self.url_preview_ip_range_blacklist = IPSet(
-                        config["url_preview_ip_range_blacklist"]
-                    )
-                if "url_preview_url_blacklist" in config:
-                    self.url_preview_url_blacklist = config["url_preview_url_blacklist"]
+                import lxml
+                lxml  # To stop unused lint.
             except ImportError:
-                sys.stderr.write("\nmissing netaddr dep - disabling preview_url API\n")
+                raise ConfigError(MISSING_LXML)
+
+            try:
+                from netaddr import IPSet
+            except ImportError:
+                raise ConfigError(MISSING_NETADDR)
+
+            if "url_preview_ip_range_blacklist" in config:
+                self.url_preview_ip_range_blacklist = IPSet(
+                    config["url_preview_ip_range_blacklist"]
+                )
+            else:
+                raise ConfigError(
+                    "For security, you must specify an explicit target IP address "
+                    "blacklist in url_preview_ip_range_blacklist for url previewing "
+                    "to work"
+                )
+
+            if "url_preview_url_blacklist" in config:
+                self.url_preview_url_blacklist = config["url_preview_url_blacklist"]
 
     def default_config(self, **kwargs):
         media_store = self.default_path("media_store")

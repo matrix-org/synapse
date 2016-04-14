@@ -358,8 +358,6 @@ class RoomListHandler(BaseHandler):
 
         @defer.inlineCallbacks
         def handle_room(room_id):
-            aliases = yield self.store.get_aliases_for_room(room_id)
-
             # We pull each bit of state out indvidually to avoid pulling the
             # full state into memory. Due to how the caching works this should
             # be fairly quick, even if not originally in the cache.
@@ -374,6 +372,14 @@ class RoomListHandler(BaseHandler):
                     defer.returnValue(None)
 
             result = {"room_id": room_id}
+
+            joined_users = yield self.store.get_users_in_room(room_id)
+            if len(joined_users) == 0:
+                return
+
+            result["num_joined_members"] = len(joined_users)
+
+            aliases = yield self.store.get_aliases_for_room(room_id)
             if aliases:
                 result["aliases"] = aliases
 
@@ -412,9 +418,6 @@ class RoomListHandler(BaseHandler):
                 avatar_url = avatar_event.content.get("url", None)
                 if avatar_url:
                     result["avatar_url"] = avatar_url
-
-            joined_users = yield self.store.get_users_in_room(room_id)
-            result["num_joined_members"] = len(joined_users)
 
             results.append(result)
 

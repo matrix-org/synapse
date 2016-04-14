@@ -80,8 +80,4 @@ class MediaRepositoryResource(Resource):
         self.putChild("thumbnail", ThumbnailResource(hs, filepaths))
         self.putChild("identicon", IdenticonResource())
         if hs.config.url_preview_enabled:
-            try:
-                self.putChild("preview_url", PreviewUrlResource(hs, filepaths))
-            except Exception as e:
-                logger.warn("Failed to mount preview_url")
-                logger.exception(e)
+            self.putChild("preview_url", PreviewUrlResource(hs, filepaths))

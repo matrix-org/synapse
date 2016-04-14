@@ -33,7 +33,6 @@ class PusherPool:
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
         self.pushers = {}
-        self.last_pusher_started = -1
 
     @defer.inlineCallbacks
     def start(self):
