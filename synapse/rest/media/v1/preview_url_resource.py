@@ -179,16 +179,28 @@ class PreviewUrlResource(BaseMediaResource):
         elif self._is_html(media_info['media_type']):
             # TODO: somehow stop a big HTML tree from exploding synapse's RAM
 
-            from lxml import html
+            from lxml import etree
 
-            # XXX: always manually try to decode body as utf-8 first, which
-            # seems to help with most character encoding woes.
-            # XXX: handle non-utf-8 encodings?
             file = open(media_info['filename'])
             body = file.read()
             file.close()
-            tree = html.fromstring(body.decode('utf-8', 'ignore'))
-            og = yield self._calc_og(tree, media_info, requester)
+
+            # clobber the encoding from the content-type, or default to utf-8
+            # XXX: this overrides any <meta/> or XML charset headers in the body
+            # which may pose problems, but so far seems to work okay.
+            match = re.match(r'.*; *charset=(.*?)(;|$)', media_info['media_type'], re.I)
+            encoding = match.group(1) if match else "utf-8"
+
+            try:
+                parser = etree.HTMLParser(recover=True, encoding=encoding)
+                tree = etree.fromstring(body, parser)
+                og = yield self._calc_og(tree, media_info, requester)
+            except UnicodeDecodeError:
+                # blindly try decoding the body as utf-8, which seems to fix
+                # the charset mismatches on https://google.com
+                parser = etree.HTMLParser(recover=True, encoding=encoding)
+                tree = etree.fromstring(body.decode('utf-8', 'ignore'), parser)
+                og = yield self._calc_og(tree, media_info, requester)
 
         else:
             logger.warn("Failed to find any OG data in %s", url)
