@@ -181,22 +181,14 @@ class PreviewUrlResource(BaseMediaResource):
 
             from lxml import html
 
-            try:
-                tree = html.parse(media_info['filename'])
-                og = yield self._calc_og(tree, media_info, requester)
-            except UnicodeDecodeError:
-                # XXX: evil evil bodge
-                # Empirically, sites like google.com mix Latin-1 and utf-8
-                # encodings in the same page.  The rogue Latin-1 characters
-                # cause lxml to choke with a UnicodeDecodeError, so if we
-                # see this we go and do a manual decode of the HTML before
-                # handing it to lxml as utf-8 encoding, counter-intuitively,
-                # which seems to make it happier...
-                file = open(media_info['filename'])
-                body = file.read()
-                file.close()
-                tree = html.fromstring(body.decode('utf-8', 'ignore'))
-                og = yield self._calc_og(tree, media_info, requester)
+            # XXX: always manually try to decode body as utf-8 first, which
+            # seems to help with most character encoding woes.
+            # XXX: handle non-utf-8 encodings?
+            file = open(media_info['filename'])
+            body = file.read()
+            file.close()
+            tree = html.fromstring(body.decode('utf-8', 'ignore'))
+            og = yield self._calc_og(tree, media_info, requester)
 
         else:
             logger.warn("Failed to find any OG data in %s", url)
