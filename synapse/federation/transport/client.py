@@ -179,7 +179,8 @@ class TransportLayerClient(object):
         content = yield self.client.get_json(
             destination=destination,
             path=path,
-            retry_on_dns_fail=True,
+            retry_on_dns_fail=False,
+            timeout=20000,
         )
 
         defer.returnValue(content)
