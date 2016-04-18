@@ -140,13 +140,13 @@ class StateTestCase(unittest.TestCase):
                 "add_event_hashes",
             ]
         )
-        hs = Mock(spec=[
+        hs = Mock(spec_set=[
             "get_datastore", "get_auth", "get_state_handler", "get_clock",
         ])
         hs.get_datastore.return_value = self.store
         hs.get_state_handler.return_value = None
-        hs.get_auth.return_value = Auth(hs)
         hs.get_clock.return_value = MockClock()
+        hs.get_auth.return_value = Auth(hs)
 
         self.state = StateHandler(hs)
         self.event_id = 0
