@@ -432,11 +432,15 @@ class AuthHandler(BaseHandler):
         Returns:
             True if the user_id successfully authenticated
         """
-        defer.returnValue((
-            (yield self._check_ldap_password(user_id, password))
-            or
-            (yield self._check_local_password(user_id, password))
-        ))
+        valid_ldap = yield self._check_ldap_password(user_id, password)
+        if valid_ldap:
+            defer.returnValue(True)
+
+        valid_local_password = yield self._check_local_password(user_id, password)
+        if valid_local_password:
+            defer.returnValue(True)
+
+        defer.returnValue(False)
 
     @defer.inlineCallbacks
     def _check_local_password(self, user_id, password):
