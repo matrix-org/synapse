@@ -370,7 +370,7 @@ class PreviewUrlResource(Resource):
         file_id = random_string(24)
 
         fname = self.filepaths.local_media_filepath(file_id)
-        self._makedirs(fname)
+        self.media_repo._makedirs(fname)
 
         try:
             with open(fname, "wb") as f:
