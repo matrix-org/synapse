@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from .base_resource import parse_media_id, respond_404, respond_with_file
+from ._base import parse_media_id, respond_404, respond_with_file
 from twisted.web.resource import Resource
 from synapse.http.servlet import parse_string, parse_integer
 from synapse.http.server import request_handler

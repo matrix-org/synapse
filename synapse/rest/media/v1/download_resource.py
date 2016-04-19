@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .base_resource import parse_media_id, respond_with_file, respond_404
+from ._base import parse_media_id, respond_with_file, respond_404
 from twisted.web.resource import Resource
 from synapse.http.server import request_handler
 
