@@ -13,10 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .base_resource import BaseMediaResource
-
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
+from twisted.web.resource import Resource
 
 from synapse.api.errors import (
     SynapseError, Codes,
@@ -41,11 +40,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class PreviewUrlResource(BaseMediaResource):
+class PreviewUrlResource(Resource):
     isLeaf = True
 
-    def __init__(self, hs, filepaths):
-        BaseMediaResource.__init__(self, hs, filepaths)
+    def __init__(self, hs, media_repo):
+        Resource.__init__(self)
         self.client = SpiderHttpClient(hs)
         if hasattr(hs.config, "url_preview_url_blacklist"):
             self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
@@ -60,6 +59,13 @@ class PreviewUrlResource(BaseMediaResource):
         self.cache.start()
 
         self.downloads = {}
+
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.version_string = hs.version_string
+        self.filepaths = media_repo.filepaths
+        self.max_spider_size = hs.config.max_spider_size
+        self.server_name = hs.hostname
 
     def render_GET(self, request):
         self._async_render_GET(request)
@@ -156,7 +162,7 @@ class PreviewUrlResource(BaseMediaResource):
         logger.debug("got media_info of '%s'" % media_info)
 
         if self._is_media(media_info['media_type']):
-            dims = yield self._generate_local_thumbnails(
+            dims = yield self.media_repo._generate_local_thumbnails(
                 media_info['filesystem_id'], media_info
             )
 
@@ -291,7 +297,7 @@ class PreviewUrlResource(BaseMediaResource):
 
             if self._is_media(image_info['media_type']):
                 # TODO: make sure we don't choke on white-on-transparent images
-                dims = yield self._generate_local_thumbnails(
+                dims = yield self.media_repo._generate_local_thumbnails(
                     image_info['filesystem_id'], image_info
                 )
                 if dims:
