@@ -15,6 +15,7 @@
 
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.http.server import request_handler, finish_request
+from synapse.replication.pusher_resource import PusherResource
 
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
@@ -102,8 +103,6 @@ class ReplicationResource(Resource):
     long-polling this replication API for new data on those streams.
     """
 
-    isLeaf = True
-
     def __init__(self, hs):
         Resource.__init__(self)  # Resource is old-style, so no super()
 
@@ -113,6 +112,8 @@ class ReplicationResource(Resource):
         self.presence_handler = hs.get_handlers().presence_handler
         self.typing_handler = hs.get_handlers().typing_notification_handler
         self.notifier = hs.notifier
+
+        self.putChild("remove_pushers", PusherResource(hs))
 
     def render_GET(self, request):
         self._async_render_GET(request)

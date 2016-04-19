@@ -89,6 +89,18 @@ class PusherServer(HomeServer):
         self.datastore = PusherSlaveStore(self.get_db_conn(), self)
         logger.info("Finished setting up.")
 
+    def remove_pusher(self, app_id, push_key, user_id):
+        http_client = self.get_simple_http_client()
+        replication_url = self.config.replication_url
+        url = replication_url + "/remove_pushers"
+        return http_client.post_json_get_json(url, {
+            "remove": [{
+                "app_id": app_id,
+                "push_key": push_key,
+                "user_id": user_id,
+            }]
+        })
+
     @defer.inlineCallbacks
     def replicate(self):
         http_client = self.get_simple_http_client()
