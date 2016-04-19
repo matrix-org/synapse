@@ -52,6 +52,7 @@ class PreviewUrlResource(Resource):
         self.filepaths = media_repo.filepaths
         self.max_spider_size = hs.config.max_spider_size
         self.server_name = hs.hostname
+        self.store = hs.get_datastore()
         self.client = SpiderHttpClient(hs)
 
         if hasattr(hs.config, "url_preview_url_blacklist"):
