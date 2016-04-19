@@ -68,6 +68,9 @@ class SlavedEventStore(BaseSlavedStore):
     _get_current_state_for_key = StateStore.__dict__[
         "_get_current_state_for_key"
     ]
+    get_invited_rooms_for_user = RoomMemberStore.__dict__[
+        "get_invited_rooms_for_user"
+    ]
 
     get_event = DataStore.get_event.__func__
     get_current_state = DataStore.get_current_state.__func__
@@ -82,6 +85,7 @@ class SlavedEventStore(BaseSlavedStore):
     get_room_events_stream_for_room = (
         DataStore.get_room_events_stream_for_room.__func__
     )
+
     _set_before_and_after = DataStore._set_before_and_after
 
     _get_events = DataStore._get_events.__func__
@@ -147,11 +151,11 @@ class SlavedEventStore(BaseSlavedStore):
         internal = json.loads(row[1])
         event_json = json.loads(row[2])
         event = FrozenEvent(event_json, internal_metadata_dict=internal)
-        self._invalidate_caches_for_event(
+        self.invalidate_caches_for_event(
             event, backfilled, reset_state=position in state_resets
         )
 
-    def _invalidate_caches_for_event(self, event, backfilled, reset_state):
+    def invalidate_caches_for_event(self, event, backfilled, reset_state):
         if reset_state:
             self._get_current_state_for_key.invalidate_all()
             self.get_rooms_for_user.invalidate_all()
@@ -182,6 +186,7 @@ class SlavedEventStore(BaseSlavedStore):
             # self._membership_stream_cache.entity_has_changed(
             #    event.state_key, event.internal_metadata.stream_ordering
             # )
+            self.get_invited_rooms_for_user.invalidate((event.state_key,))
 
         if not event.is_state():
             return

@@ -251,6 +251,18 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         redacted = FrozenEvent(msg_dict, msg.internal_metadata.get_dict())
         yield self.check("get_event", [msg.event_id], redacted)
 
+    @defer.inlineCallbacks
+    def test_invites(self):
+        yield self.check("get_invited_rooms_for_user", [USER_ID_2], [])
+        event = yield self.persist(
+            type="m.room.member", key=USER_ID_2, membership="invite"
+        )
+        yield self.replicate()
+        yield self.check("get_invited_rooms_for_user", [USER_ID_2], [RoomsForUser(
+            ROOM_ID, USER_ID, "invite", event.event_id,
+            event.internal_metadata.stream_ordering
+        )])
+
     event_id = 0
 
     @defer.inlineCallbacks
