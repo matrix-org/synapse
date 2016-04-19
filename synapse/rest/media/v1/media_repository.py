@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .base_resource import MediaRepository
 from .upload_resource import UploadResource
 from .download_resource import DownloadResource
 from .thumbnail_resource import ThumbnailResource
@@ -75,9 +76,12 @@ class MediaRepositoryResource(Resource):
     def __init__(self, hs):
         Resource.__init__(self)
         filepaths = MediaFilePaths(hs.config.media_store_path)
-        self.putChild("upload", UploadResource(hs, filepaths))
-        self.putChild("download", DownloadResource(hs, filepaths))
-        self.putChild("thumbnail", ThumbnailResource(hs, filepaths))
+
+        media_repo = MediaRepository(hs, filepaths)
+
+        self.putChild("upload", UploadResource(hs, media_repo))
+        self.putChild("download", DownloadResource(hs, media_repo))
+        self.putChild("thumbnail", ThumbnailResource(hs, media_repo))
         self.putChild("identicon", IdenticonResource())
         if hs.config.url_preview_enabled:
-            self.putChild("preview_url", PreviewUrlResource(hs, filepaths))
+            self.putChild("preview_url", PreviewUrlResource(hs, media_repo))

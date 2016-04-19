@@ -14,7 +14,8 @@
 # limitations under the License.
 
 
-from .base_resource import BaseMediaResource, parse_media_id
+from .base_resource import parse_media_id, respond_404, respond_with_file
+from twisted.web.resource import Resource
 from synapse.http.servlet import parse_string, parse_integer
 from synapse.http.server import request_handler
 
@@ -26,8 +27,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class ThumbnailResource(BaseMediaResource):
+class ThumbnailResource(Resource):
     isLeaf = True
+
+    def __init__(self, hs, media_repo):
+        Resource.__init__(self)
+
+        self.store = hs.get_datastore()
+        self.filepaths = media_repo.filepaths
+        self.media_repo = media_repo
+        self.dynamic_thumbnails = hs.config.dynamic_thumbnails
+        self.server_name = hs.hostname
+        self.version_string = hs.version_string
 
     def render_GET(self, request):
         self._async_render_GET(request)
@@ -69,12 +80,12 @@ class ThumbnailResource(BaseMediaResource):
         media_info = yield self.store.get_local_media(media_id)
 
         if not media_info:
-            self._respond_404(request)
+            respond_404(request)
             return
 
         # if media_info["media_type"] == "image/svg+xml":
         #     file_path = self.filepaths.local_media_filepath(media_id)
-        #     yield self._respond_with_file(request, media_info["media_type"], file_path)
+        #     yield respond_with_file(request, media_info["media_type"], file_path)
         #     return
 
         thumbnail_infos = yield self.store.get_local_media_thumbnails(media_id)
@@ -91,7 +102,7 @@ class ThumbnailResource(BaseMediaResource):
             file_path = self.filepaths.local_media_thumbnail(
                 media_id, t_width, t_height, t_type, t_method,
             )
-            yield self._respond_with_file(request, t_type, file_path)
+            yield respond_with_file(request, t_type, file_path)
 
         else:
             yield self._respond_default_thumbnail(
@@ -105,12 +116,12 @@ class ThumbnailResource(BaseMediaResource):
         media_info = yield self.store.get_local_media(media_id)
 
         if not media_info:
-            self._respond_404(request)
+            respond_404(request)
             return
 
         # if media_info["media_type"] == "image/svg+xml":
         #     file_path = self.filepaths.local_media_filepath(media_id)
-        #     yield self._respond_with_file(request, media_info["media_type"], file_path)
+        #     yield respond_with_file(request, media_info["media_type"], file_path)
         #     return
 
         thumbnail_infos = yield self.store.get_local_media_thumbnails(media_id)
@@ -124,18 +135,18 @@ class ThumbnailResource(BaseMediaResource):
                 file_path = self.filepaths.local_media_thumbnail(
                     media_id, desired_width, desired_height, desired_type, desired_method,
                 )
-                yield self._respond_with_file(request, desired_type, file_path)
+                yield respond_with_file(request, desired_type, file_path)
                 return
 
         logger.debug("We don't have a local thumbnail of that size. Generating")
 
         # Okay, so we generate one.
-        file_path = yield self._generate_local_exact_thumbnail(
+        file_path = yield self.media_repo.generate_local_exact_thumbnail(
             media_id, desired_width, desired_height, desired_method, desired_type
         )
 
         if file_path:
-            yield self._respond_with_file(request, desired_type, file_path)
+            yield respond_with_file(request, desired_type, file_path)
         else:
             yield self._respond_default_thumbnail(
                 request, media_info, desired_width, desired_height,
@@ -146,11 +157,11 @@ class ThumbnailResource(BaseMediaResource):
     def _select_or_generate_remote_thumbnail(self, request, server_name, media_id,
                                              desired_width, desired_height,
                                              desired_method, desired_type):
-        media_info = yield self._get_remote_media(server_name, media_id)
+        media_info = yield self.media_repo.get_remote_media(server_name, media_id)
 
         # if media_info["media_type"] == "image/svg+xml":
         #     file_path = self.filepaths.remote_media_filepath(server_name, media_id)
-        #     yield self._respond_with_file(request, media_info["media_type"], file_path)
+        #     yield respond_with_file(request, media_info["media_type"], file_path)
         #     return
 
         thumbnail_infos = yield self.store.get_remote_media_thumbnails(
@@ -170,19 +181,19 @@ class ThumbnailResource(BaseMediaResource):
                     server_name, file_id, desired_width, desired_height,
                     desired_type, desired_method,
                 )
-                yield self._respond_with_file(request, desired_type, file_path)
+                yield respond_with_file(request, desired_type, file_path)
                 return
 
         logger.debug("We don't have a local thumbnail of that size. Generating")
 
         # Okay, so we generate one.
-        file_path = yield self._generate_remote_exact_thumbnail(
+        file_path = yield self.media_repo.generate_remote_exact_thumbnail(
             server_name, file_id, media_id, desired_width,
             desired_height, desired_method, desired_type
         )
 
         if file_path:
-            yield self._respond_with_file(request, desired_type, file_path)
+            yield respond_with_file(request, desired_type, file_path)
         else:
             yield self._respond_default_thumbnail(
                 request, media_info, desired_width, desired_height,
@@ -194,11 +205,11 @@ class ThumbnailResource(BaseMediaResource):
                                   height, method, m_type):
         # TODO: Don't download the whole remote file
         # We should proxy the thumbnail from the remote server instead.
-        media_info = yield self._get_remote_media(server_name, media_id)
+        media_info = yield self.media_repo.get_remote_media(server_name, media_id)
 
         # if media_info["media_type"] == "image/svg+xml":
         #     file_path = self.filepaths.remote_media_filepath(server_name, media_id)
-        #     yield self._respond_with_file(request, media_info["media_type"], file_path)
+        #     yield respond_with_file(request, media_info["media_type"], file_path)
         #     return
 
         thumbnail_infos = yield self.store.get_remote_media_thumbnails(
@@ -219,7 +230,7 @@ class ThumbnailResource(BaseMediaResource):
             file_path = self.filepaths.remote_media_thumbnail(
                 server_name, file_id, t_width, t_height, t_type, t_method,
             )
-            yield self._respond_with_file(request, t_type, file_path, t_length)
+            yield respond_with_file(request, t_type, file_path, t_length)
         else:
             yield self._respond_default_thumbnail(
                 request, media_info, width, height, method, m_type,
@@ -245,7 +256,7 @@ class ThumbnailResource(BaseMediaResource):
                 "_default", "_default",
             )
         if not thumbnail_infos:
-            self._respond_404(request)
+            respond_404(request)
             return
 
         thumbnail_info = self._select_thumbnail(
@@ -261,7 +272,7 @@ class ThumbnailResource(BaseMediaResource):
         file_path = self.filepaths.default_thumbnail(
             top_level_type, sub_type, t_width, t_height, t_type, t_method,
         )
-        yield self.respond_with_file(request, t_type, file_path, t_length)
+        yield respond_with_file(request, t_type, file_path, t_length)
 
     def _select_thumbnail(self, desired_width, desired_height, desired_method,
                           desired_type, thumbnail_infos):

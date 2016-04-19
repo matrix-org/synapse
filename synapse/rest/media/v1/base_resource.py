@@ -23,7 +23,6 @@ from synapse.api.errors import (
 )
 
 from twisted.internet import defer, threads
-from twisted.web.resource import Resource
 from twisted.protocols.basic import FileSender
 
 from synapse.util.async import ObservableDeferred
@@ -60,11 +59,66 @@ def parse_media_id(request):
         )
 
 
-class BaseMediaResource(Resource):
-    isLeaf = True
+def respond_404(request):
+    respond_with_json(
+        request, 404,
+        cs_error(
+            "Not found %r" % (request.postpath,),
+            code=Codes.NOT_FOUND,
+        ),
+        send_cors=True
+    )
 
+
+@defer.inlineCallbacks
+def respond_with_file(request, media_type, file_path,
+                      file_size=None, upload_name=None):
+    logger.debug("Responding with %r", file_path)
+
+    if os.path.isfile(file_path):
+        request.setHeader(b"Content-Type", media_type.encode("UTF-8"))
+        if upload_name:
+            if is_ascii(upload_name):
+                request.setHeader(
+                    b"Content-Disposition",
+                    b"inline; filename=%s" % (
+                        urllib.quote(upload_name.encode("utf-8")),
+                    ),
+                )
+            else:
+                request.setHeader(
+                    b"Content-Disposition",
+                    b"inline; filename*=utf-8''%s" % (
+                        urllib.quote(upload_name.encode("utf-8")),
+                    ),
+                )
+
+        # cache for at least a day.
+        # XXX: we might want to turn this off for data we don't want to
+        # recommend caching as it's sensitive or private - or at least
+        # select private. don't bother setting Expires as all our
+        # clients are smart enough to be happy with Cache-Control
+        request.setHeader(
+            b"Cache-Control", b"public,max-age=86400,s-maxage=86400"
+        )
+        if file_size is None:
+            stat = os.stat(file_path)
+            file_size = stat.st_size
+
+        request.setHeader(
+            b"Content-Length", b"%d" % (file_size,)
+        )
+
+        with open(file_path, "rb") as f:
+            yield FileSender().beginFileTransfer(f, request)
+
+        finish_request(request)
+    else:
+        respond_404(request)
+
+
+class MediaRepository(object):
     def __init__(self, hs, filepaths):
-        Resource.__init__(self)
         self.auth = hs.get_auth()
         self.client = MatrixFederationHttpClient(hs)
         self.clock = hs.get_clock()
@@ -72,22 +126,10 @@ class BaseMediaResource(Resource):
         self.store = hs.get_datastore()
         self.max_upload_size = hs.config.max_upload_size
         self.max_image_pixels = hs.config.max_image_pixels
-        self.max_spider_size = hs.config.max_spider_size
         self.filepaths = filepaths
-        self.version_string = hs.version_string
         self.downloads = {}
         self.dynamic_thumbnails = hs.config.dynamic_thumbnails
         self.thumbnail_requirements = hs.config.thumbnail_requirements
-
-    def _respond_404(self, request):
-        respond_with_json(
-            request, 404,
-            cs_error(
-                "Not found %r" % (request.postpath,),
-                code=Codes.NOT_FOUND,
-            ),
-            send_cors=True
-        )
 
     @staticmethod
     def _makedirs(filepath):
@@ -95,7 +137,37 @@ class BaseMediaResource(Resource):
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
-    def _get_remote_media(self, server_name, media_id):
+    @defer.inlineCallbacks
+    def create_content(self, media_type, upload_name, content, content_length,
+                       auth_user):
+        media_id = random_string(24)
+
+        fname = self.filepaths.local_media_filepath(media_id)
+        self._makedirs(fname)
+
+        # This shouldn't block for very long because the content will have
+        # already been uploaded at this point.
+        with open(fname, "wb") as f:
+            f.write(content)
+
+        yield self.store.store_local_media(
+            media_id=media_id,
+            media_type=media_type,
+            time_now_ms=self.clock.time_msec(),
+            upload_name=upload_name,
+            media_length=content_length,
+            user_id=auth_user,
+        )
+        media_info = {
+            "media_type": media_type,
+            "media_length": content_length,
+        }
+
+        yield self._generate_local_thumbnails(media_id, media_info)
+
+        defer.returnValue("mxc://%s/%s" % (self.server_name, media_id))
+
+    def get_remote_media(self, server_name, media_id):
         key = (server_name, media_id)
         download = self.downloads.get(key)
         if download is None:
@@ -197,52 +269,6 @@ class BaseMediaResource(Resource):
 
         defer.returnValue(media_info)
 
-    @defer.inlineCallbacks
-    def _respond_with_file(self, request, media_type, file_path,
-                           file_size=None, upload_name=None):
-        logger.debug("Responding with %r", file_path)
-
-        if os.path.isfile(file_path):
-            request.setHeader(b"Content-Type", media_type.encode("UTF-8"))
-            if upload_name:
-                if is_ascii(upload_name):
-                    request.setHeader(
-                        b"Content-Disposition",
-                        b"inline; filename=%s" % (
-                            urllib.quote(upload_name.encode("utf-8")),
-                        ),
-                    )
-                else:
-                    request.setHeader(
-                        b"Content-Disposition",
-                        b"inline; filename*=utf-8''%s" % (
-                            urllib.quote(upload_name.encode("utf-8")),
-                        ),
-                    )
-
-            # cache for at least a day.
-            # XXX: we might want to turn this off for data we don't want to
-            # recommend caching as it's sensitive or private - or at least
-            # select private. don't bother setting Expires as all our
-            # clients are smart enough to be happy with Cache-Control
-            request.setHeader(
-                b"Cache-Control", b"public,max-age=86400,s-maxage=86400"
-            )
-            if file_size is None:
-                stat = os.stat(file_path)
-                file_size = stat.st_size
-
-            request.setHeader(
-                b"Content-Length", b"%d" % (file_size,)
-            )
-
-            with open(file_path, "rb") as f:
-                yield FileSender().beginFileTransfer(f, request)
-
-            finish_request(request)
-        else:
-            self._respond_404(request)
-
     def _get_thumbnail_requirements(self, media_type):
         return self.thumbnail_requirements.get(media_type, ())
 
@@ -269,8 +295,8 @@ class BaseMediaResource(Resource):
         return t_len
 
     @defer.inlineCallbacks
-    def _generate_local_exact_thumbnail(self, media_id, t_width, t_height,
-                                        t_method, t_type):
+    def generate_local_exact_thumbnail(self, media_id, t_width, t_height,
+                                       t_method, t_type):
         input_path = self.filepaths.local_media_filepath(media_id)
 
         t_path = self.filepaths.local_media_thumbnail(
@@ -292,8 +318,8 @@ class BaseMediaResource(Resource):
             defer.returnValue(t_path)
 
     @defer.inlineCallbacks
-    def _generate_remote_exact_thumbnail(self, server_name, file_id, media_id,
-                                         t_width, t_height, t_method, t_type):
+    def generate_remote_exact_thumbnail(self, server_name, file_id, media_id,
+                                        t_width, t_height, t_method, t_type):
         input_path = self.filepaths.remote_media_filepath(server_name, file_id)
 
         t_path = self.filepaths.remote_media_thumbnail(
