@@ -16,6 +16,7 @@ from ._base import BaseSlavedStoreTestCase
 
 from synapse.events import FrozenEvent, _EventInternalMetadata
 from synapse.events.snapshot import EventContext
+from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.storage.roommember import RoomsForUser
 
 from twisted.internet import defer
@@ -42,6 +43,8 @@ def patch__eq__(cls):
 
 
 class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
+
+    STORE_TYPE = SlavedEventStore
 
     def setUp(self):
         # Patch up the equality operator for events so that we can check
