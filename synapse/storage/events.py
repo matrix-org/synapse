@@ -55,6 +55,7 @@ class EventsStore(SQLBaseStore):
 
     def __init__(self, hs):
         super(EventsStore, self).__init__(hs)
+        self._clock = hs.get_clock()
         self.register_background_update_handler(
             self.EVENT_ORIGIN_SERVER_TS_NAME, self._background_reindex_origin_server_ts
         )
@@ -427,6 +428,7 @@ class EventsStore(SQLBaseStore):
                     "outlier": event.internal_metadata.is_outlier(),
                     "content": encode_json(event.content).decode("UTF-8"),
                     "origin_server_ts": int(event.origin_server_ts),
+                    "received_ts": self._clock.time_msec(),
                 }
                 for event, _ in events_and_contexts
             ],

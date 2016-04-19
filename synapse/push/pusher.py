@@ -1,7 +1,9 @@
 from httppusher import HttpPusher
+from emailpusher import EmailPusher
 
 PUSHER_TYPES = {
-    'http': HttpPusher
+    'http': HttpPusher,
+    'email': EmailPusher,
 }
 
 
