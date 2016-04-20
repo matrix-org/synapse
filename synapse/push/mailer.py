@@ -15,34 +15,38 @@
 
 from twisted.internet import defer
 
-import smtplib
+from twisted.mail.smtp import sendmail
 import email.utils
 import email.mime.multipart
 from email.mime.text import MIMEText
 
+import jinja2
+
 
 class Mailer(object):
-    def __init__(self, store, smtp_host, smtp_port, notif_from):
-        self.store = store
-        self.smtp_host = smtp_host
-        self.smtp_port = smtp_port
-        self.notif_from = notif_from
+    def __init__(self, hs):
+        self.hs = hs
+        loader = jinja2.FileSystemLoader(self.hs.config.email_template_dir)
+        env = jinja2.Environment(loader=loader)
+        self.notif_template = env.get_template(self.hs.config.email_notif_template_html)
 
     @defer.inlineCallbacks
-    def send_notification_mail(self, user_id, email_address, push_action):
-        raw_from = email.utils.parseaddr(self.notif_from)[1]
+    def send_notification_mail(self, user_id, email_address, push_actions):
+        raw_from = email.utils.parseaddr(self.hs.config.email_notif_from)[1]
         raw_to = email.utils.parseaddr(email_address)[1]
 
         if raw_to == '':
             raise RuntimeError("Invalid 'to' address")
 
-        plainText = "yo dawg, you got notifications!"
+        plainText = self.notif_template.render()
 
         text_part = MIMEText(plainText, "plain")
         text_part['Subject'] = "New Matrix Notifications"
-        text_part['From'] = self.notif_from
+        text_part['From'] = self.hs.config.email_notif_from
         text_part['To'] = email_address
 
-        smtp = smtplib.SMTP(self.smtp_host, self.smtp_port)
-        smtp.sendmail(raw_from, raw_to, text_part.as_string())
-        smtp.quit()
+        yield sendmail(
+            self.hs.config.email_smtp_host,
+            raw_from, raw_to, text_part.as_string(),
+            port=self.hs.config.email_smtp_port
+        )

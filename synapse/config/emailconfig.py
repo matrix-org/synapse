@@ -28,19 +28,32 @@ class EmailConfig(Config):
         email_config = config.get("email", None)
         if email_config:
             self.email_enable_notifs = email_config.get("enable_notifs", True)
-            if (
-                "smtp_host" not in email_config or
-                "smtp_port" not in email_config or
-                "notif_from" not in email_config
-            ):
+
+            required = [
+                "smtp_host",
+                "smtp_port",
+                "notif_from",
+                "template_dir",
+                "notif_template_html",
+
+            ]
+
+            missing = []
+            for k in required:
+                if k not in email_config:
+                    missing.append(k)
+
+            if (len(missing) > 0):
                 raise RuntimeError(
-                    "You must set smtp_host, smtp_port and notif_from "
-                    "to send email notifications"
+                    "email.enable_notifs is True but required keys are missing: %s" %
+                    (", ".join(["email."+k for k in missing]),)
                 )
 
             self.email_smtp_host = email_config["smtp_host"]
             self.email_smtp_port = email_config["smtp_port"]
             self.email_notif_from = email_config["notif_from"]
+            self.email_template_dir = email_config["template_dir"]
+            self.email_notif_template_html = email_config["notif_template_html"]
 
             # make sure it's valid
             parsed = email.utils.parseaddr(self.email_notif_from)
@@ -48,9 +61,8 @@ class EmailConfig(Config):
                 raise RuntimeError("Invalid notif_from address")
         else:
             self.email_enable_notifs = False
-            self.email_smtp_host = None
-            self.email_smtp_port = None
-            self.email_notif_from = None
+            # Not much point setting defaults for the rest: it would be an
+            # error for them to be used.
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
@@ -59,4 +71,7 @@ class EmailConfig(Config):
         #   enable_notifs: false
         #   smtp_host: "localhost"
         #   smtp_port: 25
+        #   notif_from: Your Friendly Matrix Home Server <noreply@example.com>
+        #   template_dir: res/templates
+        #   notif_template_html: notif.html
         """

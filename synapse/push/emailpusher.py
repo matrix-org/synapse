@@ -61,11 +61,7 @@ class EmailPusher(object):
         self.processing = False
 
         if self.hs.config.email_enable_notifs:
-            self.mailer = Mailer(
-                self.store,
-                self.hs.config.email_smtp_host, self.hs.config.email_smtp_port,
-                self.hs.config.email_notif_from,
-            )
+            self.mailer = Mailer(self.hs)
         else:
             self.mailer = None
 
@@ -149,7 +145,7 @@ class EmailPusher(object):
                 # *one* email updating the user on their notifications,
                 # we then consider all previously outstanding notifications
                 # to be delivered.
-                yield self.send_notification(push_action)
+                yield self.send_notification(unprocessed)
 
                 yield self.save_last_stream_ordering_and_success(max([
                     ea['stream_ordering'] for ea in unprocessed
@@ -252,8 +248,8 @@ class EmailPusher(object):
         )
 
     @defer.inlineCallbacks
-    def send_notification(self, push_action):
+    def send_notification(self, push_actions):
         logger.info("Sending notif email for user %r", self.user_id)
         yield self.mailer.send_notification_mail(
-            self.user_id, self.email, push_action
+            self.user_id, self.email, push_actions
         )
