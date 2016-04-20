@@ -230,6 +230,8 @@ class StateHandler(object):
                     (cache.state_group, state, prev_states)
                 )
 
+        logger.info("Resolving state for %s with %d groups", room_id, len(state_groups))
+
         new_state, prev_states = self._resolve_events(
             state_groups.values(), event_type, state_key
         )
@@ -246,6 +248,9 @@ class StateHandler(object):
         defer.returnValue((None, new_state, prev_states))
 
     def resolve_events(self, state_sets, event):
+        logger.info(
+            "Resolving state for %s with %d groups", event.room_id, len(state_sets)
+        )
         if event.is_state():
             return self._resolve_events(
                 state_sets, event.type, event.state_key
