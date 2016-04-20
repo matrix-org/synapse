@@ -57,6 +57,8 @@ class KeyConfig(Config):
             seed = self.signing_key[0].seed
             self.macaroon_secret_key = hashlib.sha256(seed)
 
+        self.expire_access_token = config.get("expire_access_token", False)
+
     def default_config(self, config_dir_path, server_name, is_generating_file=False,
                        **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)
@@ -68,6 +70,9 @@ class KeyConfig(Config):
 
         return """\
         macaroon_secret_key: "%(macaroon_secret_key)s"
+
+        # Used to enable access token expiration.
+        expire_access_token: False
 
         ## Signing Keys ##
 
