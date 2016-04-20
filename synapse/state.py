@@ -214,7 +214,7 @@ class StateHandler(object):
 
         if self._state_cache is not None:
             cache = self._state_cache.get(group_names, None)
-            if cache and cache.state_group:
+            if cache:
                 cache.ts = self.clock.time_msec()
 
                 event_dict = yield self.store.get_events(cache.state.values())
@@ -236,16 +236,23 @@ class StateHandler(object):
             state_groups.values(), event_type, state_key
         )
 
+        state_group = None
+        new_state_event_ids = frozenset(e.event_id for e in new_state.values())
+        for sg, events in state_groups.items():
+            if new_state_event_ids == frozenset(e.event_id for e in events):
+                state_group = sg
+                break
+
         if self._state_cache is not None:
             cache = _StateCacheEntry(
                 state={key: event.event_id for key, event in new_state.items()},
-                state_group=None,
+                state_group=state_group,
                 ts=self.clock.time_msec()
             )
 
             self._state_cache[group_names] = cache
 
-        defer.returnValue((None, new_state, prev_states))
+        defer.returnValue((state_group, new_state, prev_states))
 
     def resolve_events(self, state_sets, event):
         logger.info(
