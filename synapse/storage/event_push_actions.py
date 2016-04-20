@@ -202,7 +202,6 @@ class EventPushActionsStore(SQLBaseStore):
         result = yield self.runInteraction("get_time_of_last_push_action_before", f)
         defer.returnValue(result[0] if result is not None else None)
 
-
     @defer.inlineCallbacks
     def get_latest_push_action_stream_ordering(self):
         def f(txn):

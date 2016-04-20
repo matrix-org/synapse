@@ -18,8 +18,9 @@ from twisted.internet import defer, reactor
 import logging
 
 from synapse.util.metrics import Measure
-from synapse.util.async import run_on_reactor
 from synapse.util.logcontext import LoggingContext
+
+from mailer import Mailer
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +29,11 @@ logger = logging.getLogger(__name__)
 DELAY_BEFORE_MAIL_MS = 2 * 60 * 1000
 
 THROTTLE_START_MS = 2 * 60 * 1000
-THROTTLE_MAX_MS = (2 * 60 * 1000) * (2**11)  # ~3 days
+THROTTLE_MAX_MS = (2 * 60 * 1000) * (2 ** 11)  # ~3 days
 
 # If no event triggers a notification for this long after the previous,
 # the throttle is released.
-THROTTLE_RESET_AFTER_MS = (2 * 60 * 1000) * (2**11)  # ~3 days
+THROTTLE_RESET_AFTER_MS = (2 * 60 * 1000) * (2 ** 11)  # ~3 days
 
 
 class EmailPusher(object):
@@ -59,12 +60,22 @@ class EmailPusher(object):
 
         self.processing = False
 
+        if self.hs.config.email_enable_notifs:
+            self.mailer = Mailer(
+                self.store,
+                self.hs.config.email_smtp_host, self.hs.config.email_smtp_port,
+                self.hs.config.email_notif_from,
+            )
+        else:
+            self.mailer = None
+
     @defer.inlineCallbacks
     def on_started(self):
-        self.throttle_params = yield self.store.get_throttle_params_by_room(
-            self.pusher_id
-        )
-        yield self._process()
+        if self.mailer is not None:
+            self.throttle_params = yield self.store.get_throttle_params_by_room(
+                self.pusher_id
+            )
+            yield self._process()
 
     def on_stop(self):
         if self.timed_call:
@@ -102,6 +113,7 @@ class EmailPusher(object):
                 finally:
                     self.processing = False
 
+    @defer.inlineCallbacks
     def _unsafe_process(self):
         """
         Main logic of the push loop without the wrapper function that sets
@@ -241,5 +253,7 @@ class EmailPusher(object):
 
     @defer.inlineCallbacks
     def send_notification(self, push_action):
-        yield run_on_reactor()
-        logger.error("sending notif email for user %r", self.user_id)
+        logger.info("Sending notif email for user %r", self.user_id)
+        yield self.mailer.send_notification_mail(
+            self.user_id, self.email, push_action
+        )
