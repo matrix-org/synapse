@@ -178,8 +178,8 @@ class SearchStore(BackgroundUpdateStore):
             )
 
             sql = (
-                "UPDATE event_search AS es SET es.stream_ordering = e.stream_ordering,"
-                " es.origin_server_ts = e.origin_server_ts"
+                "UPDATE event_search AS es SET stream_ordering = e.stream_ordering,"
+                " origin_server_ts = e.origin_server_ts"
                 " FROM (%s) AS e"
                 " WHERE e.event_id = es.event_id"
                 " RETURNING es.stream_ordering"
