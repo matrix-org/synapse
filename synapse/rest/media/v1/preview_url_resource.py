@@ -13,10 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .base_resource import BaseMediaResource
-
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
+from twisted.web.resource import Resource
 
 from synapse.api.errors import (
     SynapseError, Codes,
@@ -41,12 +40,22 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class PreviewUrlResource(BaseMediaResource):
+class PreviewUrlResource(Resource):
     isLeaf = True
 
-    def __init__(self, hs, filepaths):
-        BaseMediaResource.__init__(self, hs, filepaths)
+    def __init__(self, hs, media_repo):
+        Resource.__init__(self)
+
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.version_string = hs.version_string
+        self.filepaths = media_repo.filepaths
+        self.max_spider_size = hs.config.max_spider_size
+        self.server_name = hs.hostname
+        self.store = hs.get_datastore()
         self.client = SpiderHttpClient(hs)
+        self.media_repo = media_repo
+
         if hasattr(hs.config, "url_preview_url_blacklist"):
             self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
 
@@ -156,7 +165,7 @@ class PreviewUrlResource(BaseMediaResource):
         logger.debug("got media_info of '%s'" % media_info)
 
         if self._is_media(media_info['media_type']):
-            dims = yield self._generate_local_thumbnails(
+            dims = yield self.media_repo._generate_local_thumbnails(
                 media_info['filesystem_id'], media_info
             )
 
@@ -179,23 +188,27 @@ class PreviewUrlResource(BaseMediaResource):
         elif self._is_html(media_info['media_type']):
             # TODO: somehow stop a big HTML tree from exploding synapse's RAM
 
-            from lxml import html
+            from lxml import etree
+
+            file = open(media_info['filename'])
+            body = file.read()
+            file.close()
+
+            # clobber the encoding from the content-type, or default to utf-8
+            # XXX: this overrides any <meta/> or XML charset headers in the body
+            # which may pose problems, but so far seems to work okay.
+            match = re.match(r'.*; *charset=(.*?)(;|$)', media_info['media_type'], re.I)
+            encoding = match.group(1) if match else "utf-8"
 
             try:
-                tree = html.parse(media_info['filename'])
+                parser = etree.HTMLParser(recover=True, encoding=encoding)
+                tree = etree.fromstring(body, parser)
                 og = yield self._calc_og(tree, media_info, requester)
             except UnicodeDecodeError:
-                # XXX: evil evil bodge
-                # Empirically, sites like google.com mix Latin-1 and utf-8
-                # encodings in the same page.  The rogue Latin-1 characters
-                # cause lxml to choke with a UnicodeDecodeError, so if we
-                # see this we go and do a manual decode of the HTML before
-                # handing it to lxml as utf-8 encoding, counter-intuitively,
-                # which seems to make it happier...
-                file = open(media_info['filename'])
-                body = file.read()
-                file.close()
-                tree = html.fromstring(body.decode('utf-8', 'ignore'))
+                # blindly try decoding the body as utf-8, which seems to fix
+                # the charset mismatches on https://google.com
+                parser = etree.HTMLParser(recover=True, encoding=encoding)
+                tree = etree.fromstring(body.decode('utf-8', 'ignore'), parser)
                 og = yield self._calc_og(tree, media_info, requester)
 
         else:
@@ -287,7 +300,7 @@ class PreviewUrlResource(BaseMediaResource):
 
             if self._is_media(image_info['media_type']):
                 # TODO: make sure we don't choke on white-on-transparent images
-                dims = yield self._generate_local_thumbnails(
+                dims = yield self.media_repo._generate_local_thumbnails(
                     image_info['filesystem_id'], image_info
                 )
                 if dims:
@@ -358,7 +371,7 @@ class PreviewUrlResource(BaseMediaResource):
         file_id = random_string(24)
 
         fname = self.filepaths.local_media_filepath(file_id)
-        self._makedirs(fname)
+        self.media_repo._makedirs(fname)
 
         try:
             with open(fname, "wb") as f:

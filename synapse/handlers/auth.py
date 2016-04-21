@@ -428,24 +428,31 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _check_password(self, user_id, password):
-        defer.returnValue(
-            not (
-                (yield self._check_ldap_password(user_id, password))
-                or
-                (yield self._check_local_password(user_id, password))
-            ))
+        """
+        Returns:
+            True if the user_id successfully authenticated
+        """
+        valid_ldap = yield self._check_ldap_password(user_id, password)
+        if valid_ldap:
+            defer.returnValue(True)
+
+        valid_local_password = yield self._check_local_password(user_id, password)
+        if valid_local_password:
+            defer.returnValue(True)
+
+        defer.returnValue(False)
 
     @defer.inlineCallbacks
     def _check_local_password(self, user_id, password):
         try:
             user_id, password_hash = yield self._find_user_id_and_pwd_hash(user_id)
-            defer.returnValue(not self.validate_hash(password, password_hash))
+            defer.returnValue(self.validate_hash(password, password_hash))
         except LoginError:
             defer.returnValue(False)
 
     @defer.inlineCallbacks
     def _check_ldap_password(self, user_id, password):
-        if self.ldap_enabled is not True:
+        if not self.ldap_enabled:
             logger.debug("LDAP not configured")
             defer.returnValue(False)
 

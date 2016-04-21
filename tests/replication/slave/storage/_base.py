@@ -15,8 +15,6 @@
 from twisted.internet import defer
 from tests import unittest
 
-from synapse.replication.slave.storage.events import SlavedEventStore
-
 from mock import Mock, NonCallableMock
 from tests.utils import setup_test_homeserver
 from synapse.replication.resource import ReplicationResource
@@ -38,7 +36,7 @@ class BaseSlavedStoreTestCase(unittest.TestCase):
         self.replication = ReplicationResource(self.hs)
 
         self.master_store = self.hs.get_datastore()
-        self.slaved_store = SlavedEventStore(self.hs.get_db_conn(), self.hs)
+        self.slaved_store = self.STORE_TYPE(self.hs.get_db_conn(), self.hs)
         self.event_id = 0
 
     @defer.inlineCallbacks

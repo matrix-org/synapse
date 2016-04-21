@@ -174,6 +174,12 @@ class StateStore(SQLBaseStore):
             return [r[0] for r in results]
         return self.runInteraction("get_current_state_for_key", f)
 
+    @cached(num_args=2, lru=True, max_entries=1000)
+    def _get_state_group_from_group(self, group, types):
+        raise NotImplementedError()
+
+    @cachedList(cached_method_name="_get_state_group_from_group",
+                list_name="groups", num_args=2, inlineCallbacks=True)
     def _get_state_groups_from_groups(self, groups, types):
         """Returns dictionary state_group -> (dict of (type, state_key) -> event id)
         """
@@ -201,18 +207,23 @@ class StateStore(SQLBaseStore):
             txn.execute(sql, args)
             rows = self.cursor_to_dict(txn)
 
-            results = {}
+            results = {group: {} for group in groups}
             for row in rows:
                 key = (row["type"], row["state_key"])
-                results.setdefault(row["state_group"], {})[key] = row["event_id"]
+                results[row["state_group"]][key] = row["event_id"]
             return results
+
+        results = {}
 
         chunks = [groups[i:i + 100] for i in xrange(0, len(groups), 100)]
         for chunk in chunks:
-            return self.runInteraction(
+            res = yield self.runInteraction(
                 "_get_state_groups_from_groups",
                 f, chunk
             )
+            results.update(res)
+
+        defer.returnValue(results)
 
     @defer.inlineCallbacks
     def get_state_for_events(self, event_ids, types):
@@ -359,6 +370,8 @@ class StateStore(SQLBaseStore):
         a `state_key` of None matches all state_keys. If `types` is None then
         all events are returned.
         """
+        if types:
+            types = frozenset(types)
         results = {}
         missing_groups = []
         if types is not None:
