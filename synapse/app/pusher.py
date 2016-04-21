@@ -23,7 +23,6 @@ from synapse.config.database import DatabaseConfig
 from synapse.config.logger import LoggingConfig
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.pushers import SlavedPusherStore
-from synapse.replication.slave.storage.event_push_actions import SlavedPushActionsStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.storage.engines import create_engine
 from synapse.storage import DataStore
@@ -60,9 +59,7 @@ class PusherSlaveConfig(SlaveConfig, LoggingConfig):
 
 
 class PusherSlaveStore(
-    SlavedPushActionsStore,
-    SlavedEventStore, SlavedPusherStore,
-    SlavedReceiptsStore
+    SlavedEventStore, SlavedPusherStore, SlavedReceiptsStore
 ):
     update_pusher_last_stream_ordering_and_success = (
         DataStore.update_pusher_last_stream_ordering_and_success.__func__
