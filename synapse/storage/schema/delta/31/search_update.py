@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 
 ALTER_TABLE = """
-ALTER TABLE event_search ADD COLUMN origin_server_ts BIGINT;
-ALTER TABLE event_search ADD COLUMN stream_ordering BIGINT;
+ALTER TABLE event_search ADD COLUMN origin_server_ts BIGINT DEFAULT 0;
+ALTER TABLE event_search ADD COLUMN stream_ordering BIGINT DEFAULT 0;
 """
 
 

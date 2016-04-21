@@ -169,33 +169,25 @@ class SearchStore(BackgroundUpdateStore):
                 self.EVENT_SEARCH_ORDER_UPDATE_NAME, progress,
             )
 
-        INSERT_CLUMP_SIZE = 1000
-
         def reindex_search_txn(txn):
-            sql = (
-                "SELECT e.stream_ordering, e.origin_server_ts, event_id FROM events as e"
-                " INNER JOIN event_search USING (room_id, event_id)"
-                " WHERE ? <= e.stream_ordering AND e.stream_ordering < ?"
-                " ORDER BY e.stream_ordering DESC"
+            events_sql = (
+                "SELECT stream_ordering, origin_server_ts, event_id FROM events"
+                " WHERE ? <= stream_ordering AND stream_ordering < ?"
+                " ORDER BY stream_ordering DESC"
                 " LIMIT ?"
             )
 
-            txn.execute(sql, (target_min_stream_id, max_stream_id, batch_size))
-
-            rows = txn.fetchall()
-            if not rows:
-                return 0
-
-            min_stream_id = rows[-1][0]
-
             sql = (
-                "UPDATE event_search SET stream_ordering = ?, origin_server_ts = ?"
-                " WHERE event_id = ?"
-            )
+                "UPDATE event_search AS es SET es.stream_ordering = e.stream_ordering,"
+                " es.origin_server_ts = e.origin_server_ts"
+                " FROM (%s) AS e"
+                " WHERE e.event_id = es.event_id"
+                " RETURNING es.stream_ordering"
+            ) % (events_sql,)
 
-            for index in range(0, len(rows), INSERT_CLUMP_SIZE):
-                clump = rows[index:index + INSERT_CLUMP_SIZE]
-                txn.executemany(sql, clump)
+            txn.execute(sql, (target_min_stream_id, max_stream_id, batch_size))
+            rows = txn.fetchall()
+            min_stream_id = rows[-1][0]
 
             progress = {
                 "target_min_stream_id_inclusive": target_min_stream_id,
