@@ -201,7 +201,7 @@ class SearchStore(BackgroundUpdateStore):
                 "target_min_stream_id_inclusive": target_min_stream_id,
                 "max_stream_id_exclusive": min_stream_id,
                 "rows_inserted": rows_inserted + len(rows),
-                "have_added_index": True,
+                "have_added_indexes": True,
             }
 
             self._background_update_progress_txn(
