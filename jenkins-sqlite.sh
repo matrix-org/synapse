@@ -24,6 +24,7 @@ rm .coverage* || echo "No coverage files to remove"
 
 tox --notest -e py27
 TOX_BIN=$WORKSPACE/.tox/py27/bin
+$TOX_BIN/pip install lxml
 
 : ${GIT_BRANCH:="origin/$(git rev-parse --abbrev-ref HEAD)"}
 
