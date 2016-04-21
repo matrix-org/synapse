@@ -24,11 +24,6 @@ logger = logging.getLogger(__name__)
 ALTER_TABLE = """
 ALTER TABLE event_search ADD COLUMN origin_server_ts BIGINT;
 ALTER TABLE event_search ADD COLUMN stream_ordering BIGINT;
-
-CREATE INDEX event_search_room_order ON event_search(
-    room_id, origin_server_ts, stream_ordering
-);
-CREATE INDEX event_search_order ON event_search(origin_server_ts, stream_ordering);
 """
 
 
@@ -52,6 +47,7 @@ def run_create(cur, database_engine, *args, **kwargs):
             "target_min_stream_id_inclusive": min_stream_id,
             "max_stream_id_exclusive": max_stream_id + 1,
             "rows_inserted": 0,
+            "have_added_indexes": False,
         }
         progress_json = ujson.dumps(progress)
 

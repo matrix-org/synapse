@@ -141,10 +141,21 @@ class SearchStore(BackgroundUpdateStore):
         target_min_stream_id = progress["target_min_stream_id_inclusive"]
         max_stream_id = progress["max_stream_id_exclusive"]
         rows_inserted = progress.get("rows_inserted", 0)
+        have_added_index = progress['have_added_indexes']
 
         INSERT_CLUMP_SIZE = 1000
 
         def reindex_search_txn(txn):
+            if not have_added_index:
+                txn.execute(
+                    "CREATE INDEX CONCURRENTLY event_search_room_order ON event_search("
+                    "room_id, origin_server_ts, stream_ordering)"
+                )
+                txn.execute(
+                    "CREATE INDEX CONCURRENTLY event_search_order ON event_search("
+                    "origin_server_ts, stream_ordering)"
+                )
+
             sql = (
                 "SELECT stream_ordering, origin_server_ts, event_id FROM events"
                 " INNER JOIN event_search USING (room_id, event_id)"
@@ -173,7 +184,8 @@ class SearchStore(BackgroundUpdateStore):
             progress = {
                 "target_min_stream_id_inclusive": target_min_stream_id,
                 "max_stream_id_exclusive": min_stream_id,
-                "rows_inserted": rows_inserted + len(rows)
+                "rows_inserted": rows_inserted + len(rows),
+                "have_added_index": True,
             }
 
             self._background_update_progress_txn(
