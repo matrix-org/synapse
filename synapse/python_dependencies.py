@@ -46,7 +46,7 @@ CONDITIONAL_REQUIREMENTS = {
         "netaddr>=0.7.18": ["netaddr"],
     },
     "email.enable_notifs": {
-        "Jinja2": ["Jinja2"],
+        "Jinja2>=2.8": ["Jinja2>=2.8"],
     },
 }
 

@@ -83,6 +83,13 @@ class EmailPusher(object):
         yield self._process()
 
     @defer.inlineCallbacks
+    def on_new_receipts(self, min_stream_id, max_stream_id):
+        # We could wake up and cancel the timer but there tend to be quite a
+        # lot of read receipts so it's probably less work to just let the
+        # timer fire
+        return defer.succeed(None)
+
+    @defer.inlineCallbacks
     def on_timer(self):
         self.timed_call = None
         yield self._process()
