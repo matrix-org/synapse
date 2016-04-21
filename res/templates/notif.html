@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+  <body>
+    <h1>{{ summaryText }}</h1>
+    <div class="content">
+        {% for room in rooms %}
+            {% include 'room.html' with context %}
+        {% endfor %}
+    </div>
+    <div class="footer">
+        <a href="{{ unsubscribe_link }}">Unsubscribe</a>
+    </div>
+  </body>
+</html>
