@@ -148,13 +148,16 @@ class SearchStore(BackgroundUpdateStore):
                 conn.rollback()
                 conn.set_session(autocommit=True)
                 c = conn.cursor()
+
+                # We create with NULLS FIRST so that when we search *backwards*
+                # we get the ones with non null origin_server_ts *first*
                 c.execute(
                     "CREATE INDEX CONCURRENTLY event_search_room_order ON event_search("
-                    "room_id, origin_server_ts, stream_ordering)"
+                    "room_id, origin_server_ts NULLS FIRST, stream_ordering NULLS FIRST)"
                 )
                 c.execute(
                     "CREATE INDEX CONCURRENTLY event_search_order ON event_search("
-                    "origin_server_ts, stream_ordering)"
+                    "origin_server_ts NULLS FIRST, stream_ordering NULLS FIRST)"
                 )
                 conn.set_session(autocommit=False)
 
@@ -434,7 +437,15 @@ class SearchStore(BackgroundUpdateStore):
 
         # We add an arbitrary limit here to ensure we don't try to pull the
         # entire table from the database.
-        sql += " ORDER BY origin_server_ts DESC, stream_ordering DESC LIMIT ?"
+        if isinstance(self.database_engine, PostgresEngine):
+            sql += (
+                " ORDER BY origin_server_ts DESC NULLS LAST,"
+                " stream_ordering DESC NULLS LAST LIMIT ?"
+            )
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            sql += " ORDER BY origin_server_ts DESC, stream_ordering DESC LIMIT ?"
+        else:
+            raise Exception("Unrecognized database engine")
 
         args.append(limit)
 
