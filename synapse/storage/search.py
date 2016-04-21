@@ -29,11 +29,16 @@ logger = logging.getLogger(__name__)
 class SearchStore(BackgroundUpdateStore):
 
     EVENT_SEARCH_UPDATE_NAME = "event_search"
+    EVENT_SEARCH_ORDER_UPDATE_NAME = "event_search_order"
 
     def __init__(self, hs):
         super(SearchStore, self).__init__(hs)
         self.register_background_update_handler(
             self.EVENT_SEARCH_UPDATE_NAME, self._background_reindex_search
+        )
+        self.register_background_update_handler(
+            self.EVENT_SEARCH_ORDER_UPDATE_NAME,
+            self._background_reindex_search_order
         )
 
     @defer.inlineCallbacks
@@ -128,6 +133,61 @@ class SearchStore(BackgroundUpdateStore):
 
         if not result:
             yield self._end_background_update(self.EVENT_SEARCH_UPDATE_NAME)
+
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _background_reindex_search_order(self, progress, batch_size):
+        target_min_stream_id = progress["target_min_stream_id_inclusive"]
+        max_stream_id = progress["max_stream_id_exclusive"]
+        rows_inserted = progress.get("rows_inserted", 0)
+
+        INSERT_CLUMP_SIZE = 1000
+
+        def reindex_search_txn(txn):
+            sql = (
+                "SELECT stream_ordering, origin_server_ts, event_id FROM events"
+                " INNER JOIN event_search USING (room_id, event_id)"
+                " WHERE ? <= stream_ordering AND stream_ordering < ?"
+                " ORDER BY stream_ordering DESC"
+                " LIMIT ?"
+            )
+
+            txn.execute(sql, (target_min_stream_id, max_stream_id, batch_size))
+
+            rows = txn.fetchall()
+            if not rows:
+                return 0
+
+            min_stream_id = rows[-1][0]
+
+            sql = (
+                "UPDATE event_search SET stream_ordering = ?, origin_server_ts = ?"
+                " WHERE event_id = ?"
+            )
+
+            for index in range(0, len(rows), INSERT_CLUMP_SIZE):
+                clump = rows[index:index + INSERT_CLUMP_SIZE]
+                txn.executemany(sql, clump)
+
+            progress = {
+                "target_min_stream_id_inclusive": target_min_stream_id,
+                "max_stream_id_exclusive": min_stream_id,
+                "rows_inserted": rows_inserted + len(rows)
+            }
+
+            self._background_update_progress_txn(
+                txn, self.EVENT_SEARCH_ORDER_UPDATE_NAME, progress
+            )
+
+            return len(rows)
+
+        result = yield self.runInteraction(
+            self.EVENT_SEARCH_ORDER_UPDATE_NAME, reindex_search_txn
+        )
+
+        if not result:
+            yield self._end_background_update(self.EVENT_SEARCH_ORDER_UPDATE_NAME)
 
         defer.returnValue(result)
 
@@ -310,7 +370,6 @@ class SearchStore(BackgroundUpdateStore):
                 "SELECT ts_rank_cd(vector, to_tsquery('english', ?)) as rank,"
                 " origin_server_ts, stream_ordering, room_id, event_id"
                 " FROM event_search"
-                " NATURAL JOIN events"
                 " WHERE vector @@ to_tsquery('english', ?) AND "
             )
             args = [search_query, search_query] + args
