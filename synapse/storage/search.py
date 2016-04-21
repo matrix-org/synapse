@@ -143,19 +143,26 @@ class SearchStore(BackgroundUpdateStore):
         rows_inserted = progress.get("rows_inserted", 0)
         have_added_index = progress['have_added_indexes']
 
-        INSERT_CLUMP_SIZE = 1000
-
-        def reindex_search_txn(txn):
-            if not have_added_index:
-                txn.execute(
+        if not have_added_index:
+            def create_index(conn):
+                conn.rollback()
+                conn.set_session(autocommit=True)
+                c = conn.cursor()
+                c.execute(
                     "CREATE INDEX CONCURRENTLY event_search_room_order ON event_search("
                     "room_id, origin_server_ts, stream_ordering)"
                 )
-                txn.execute(
+                c.execute(
                     "CREATE INDEX CONCURRENTLY event_search_order ON event_search("
                     "origin_server_ts, stream_ordering)"
                 )
+                conn.set_session(autocommit=False)
 
+            yield self.runWithConnection(create_index)
+
+        INSERT_CLUMP_SIZE = 1000
+
+        def reindex_search_txn(txn):
             sql = (
                 "SELECT stream_ordering, origin_server_ts, event_id FROM events"
                 " INNER JOIN event_search USING (room_id, event_id)"
