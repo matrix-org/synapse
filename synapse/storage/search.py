@@ -158,14 +158,16 @@ class SearchStore(BackgroundUpdateStore):
                 )
                 conn.set_session(autocommit=False)
 
-                pg = dict(progress)
-                pg["have_added_indexes"] = True
-
-                self._background_update_progress_txn(
-                    conn.cursor(), self.EVENT_SEARCH_ORDER_UPDATE_NAME, progress
-                )
-
             yield self.runWithConnection(create_index)
+
+            pg = dict(progress)
+            pg["have_added_indexes"] = True
+
+            yield self.runInteraction(
+                self.EVENT_SEARCH_ORDER_UPDATE_NAME,
+                self._background_update_progress_txn,
+                self.EVENT_SEARCH_ORDER_UPDATE_NAME, progress,
+            )
 
         INSERT_CLUMP_SIZE = 1000
 
