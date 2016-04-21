@@ -164,10 +164,10 @@ class SearchStore(BackgroundUpdateStore):
 
         def reindex_search_txn(txn):
             sql = (
-                "SELECT stream_ordering, origin_server_ts, event_id FROM events"
+                "SELECT e.stream_ordering, e.origin_server_ts, event_id FROM events as e"
                 " INNER JOIN event_search USING (room_id, event_id)"
-                " WHERE ? <= stream_ordering AND stream_ordering < ?"
-                " ORDER BY stream_ordering DESC"
+                " WHERE ? <= e.stream_ordering AND e.stream_ordering < ?"
+                " ORDER BY e.stream_ordering DESC"
                 " LIMIT ?"
             )
 
