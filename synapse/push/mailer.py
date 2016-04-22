@@ -77,7 +77,7 @@ class Mailer(object):
 
         plainText = self.notif_template.render(**template_vars)
 
-        text_part = MIMEText(plainText.encode('utf8'), "html")
+        text_part = MIMEText(plainText, "html", "utf8")
         text_part['Subject'] = "New Matrix Notifications"
         text_part['From'] = self.hs.config.email_notif_from
         text_part['To'] = email_address
