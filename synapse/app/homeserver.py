@@ -63,6 +63,7 @@ from synapse.federation.transport.server import TransportLayerServer
 
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
+from synapse.util.httpresourcetree import create_resource_tree
 
 from synapse.http.site import SynapseSite
 
@@ -170,7 +171,12 @@ class SynapseHomeServer(HomeServer):
                 if name == "replication":
                     resources[REPLICATION_PREFIX] = ReplicationResource(self)
 
-        root_resource = create_resource_tree(resources)
+        if WEB_CLIENT_PREFIX in resources:
+            root_resource = RootRedirect(WEB_CLIENT_PREFIX)
+        else:
+            root_resource = Resource()
+
+        root_resource = create_resource_tree(resources, root_resource)
         if tls:
             reactor.listenSSL(
                 port,
@@ -365,87 +371,6 @@ class SynapseService(service.Service):
 
     def stopService(self):
         return self._port.stopListening()
-
-
-def create_resource_tree(desired_tree, redirect_root_to_web_client=True):
-    """Create the resource tree for this Home Server.
-
-    This in unduly complicated because Twisted does not support putting
-    child resources more than 1 level deep at a time.
-
-    Args:
-        web_client (bool): True to enable the web client.
-        redirect_root_to_web_client (bool): True to redirect '/' to the
-        location of the web client. This does nothing if web_client is not
-        True.
-    """
-    if redirect_root_to_web_client and WEB_CLIENT_PREFIX in desired_tree:
-        root_resource = RootRedirect(WEB_CLIENT_PREFIX)
-    else:
-        root_resource = Resource()
-
-    # ideally we'd just use getChild and putChild but getChild doesn't work
-    # unless you give it a Request object IN ADDITION to the name :/ So
-    # instead, we'll store a copy of this mapping so we can actually add
-    # extra resources to existing nodes. See self._resource_id for the key.
-    resource_mappings = {}
-    for full_path, res in desired_tree.items():
-        logger.info("Attaching %s to path %s", res, full_path)
-        last_resource = root_resource
-        for path_seg in full_path.split('/')[1:-1]:
-            if path_seg not in last_resource.listNames():
-                # resource doesn't exist, so make a "dummy resource"
-                child_resource = Resource()
-                last_resource.putChild(path_seg, child_resource)
-                res_id = _resource_id(last_resource, path_seg)
-                resource_mappings[res_id] = child_resource
-                last_resource = child_resource
-            else:
-                # we have an existing Resource, use that instead.
-                res_id = _resource_id(last_resource, path_seg)
-                last_resource = resource_mappings[res_id]
-
-        # ===========================
-        # now attach the actual desired resource
-        last_path_seg = full_path.split('/')[-1]
-
-        # if there is already a resource here, thieve its children and
-        # replace it
-        res_id = _resource_id(last_resource, last_path_seg)
-        if res_id in resource_mappings:
-            # there is a dummy resource at this path already, which needs
-            # to be replaced with the desired resource.
-            existing_dummy_resource = resource_mappings[res_id]
-            for child_name in existing_dummy_resource.listNames():
-                child_res_id = _resource_id(
-                    existing_dummy_resource, child_name
-                )
-                child_resource = resource_mappings[child_res_id]
-                # steal the children
-                res.putChild(child_name, child_resource)
-
-        # finally, insert the desired resource in the right place
-        last_resource.putChild(last_path_seg, res)
-        res_id = _resource_id(last_resource, last_path_seg)
-        resource_mappings[res_id] = res
-
-    return root_resource
-
-
-def _resource_id(resource, path_seg):
-    """Construct an arbitrary resource ID so you can retrieve the mapping
-    later.
-
-    If you want to represent resource A putChild resource B with path C,
-    the mapping should looks like _resource_id(A,C) = B.
-
-    Args:
-        resource (Resource): The *parent* Resourceb
-        path_seg (str): The name of the child Resource to be attached.
-    Returns:
-        str: A unique string which can be a key to the child Resource.
-    """
-    return "%s-%s" % (resource, path_seg)
 
 
 def run(hs):
