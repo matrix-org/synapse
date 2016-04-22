@@ -169,28 +169,26 @@ class SearchStore(BackgroundUpdateStore):
             yield self.runInteraction(
                 self.EVENT_SEARCH_ORDER_UPDATE_NAME,
                 self._background_update_progress_txn,
-                self.EVENT_SEARCH_ORDER_UPDATE_NAME, progress,
+                self.EVENT_SEARCH_ORDER_UPDATE_NAME, pg,
             )
 
         def reindex_search_txn(txn):
-            events_sql = (
-                "SELECT stream_ordering, origin_server_ts, event_id FROM events"
-                " WHERE ? <= stream_ordering AND stream_ordering < ?"
-                " ORDER BY stream_ordering DESC"
-                " LIMIT ?"
-            )
-
             sql = (
                 "UPDATE event_search AS es SET stream_ordering = e.stream_ordering,"
                 " origin_server_ts = e.origin_server_ts"
-                " FROM (%s) AS e"
+                " FROM events AS e"
                 " WHERE e.event_id = es.event_id"
+                " AND ? <= e.stream_ordering AND e.stream_ordering < ?"
                 " RETURNING es.stream_ordering"
-            ) % (events_sql,)
+            )
 
-            txn.execute(sql, (target_min_stream_id, max_stream_id, batch_size))
+            min_stream_id = max_stream_id - batch_size
+            txn.execute(sql, (min_stream_id, max_stream_id))
             rows = txn.fetchall()
-            min_stream_id = rows[-1][0]
+
+            if min_stream_id < target_min_stream_id:
+                # We've recached the end.
+                return len(rows), False
 
             progress = {
                 "target_min_stream_id_inclusive": target_min_stream_id,
@@ -203,16 +201,16 @@ class SearchStore(BackgroundUpdateStore):
                 txn, self.EVENT_SEARCH_ORDER_UPDATE_NAME, progress
             )
 
-            return len(rows)
+            return len(rows), True
 
-        result = yield self.runInteraction(
+        num_rows, finished = yield self.runInteraction(
             self.EVENT_SEARCH_ORDER_UPDATE_NAME, reindex_search_txn
         )
 
-        if not result:
+        if not finished:
             yield self._end_background_update(self.EVENT_SEARCH_ORDER_UPDATE_NAME)
 
-        defer.returnValue(result)
+        defer.returnValue(num_rows)
 
     @defer.inlineCallbacks
     def search_msgs(self, room_ids, search_term, keys):
