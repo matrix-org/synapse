@@ -134,7 +134,6 @@ def descriptor_from_member_events(member_events):
 
 
 def name_from_member_event(member_event):
-    # XXX: Need to look in invite state for invite display names.
     if (
         member_event.content and "displayname" in member_event.content and
         member_event.content["displayname"]
