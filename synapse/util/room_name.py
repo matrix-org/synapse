@@ -71,9 +71,9 @@ def calculate_room_name(room_state, user_id):
     if "m.room.member" in room_state_bytype:
         all_members = [
             ev for ev in room_state_bytype["m.room.member"].values()
-            if ev.membership == "join" or ev.membership == "invite"
+            if ev.content['membership'] == "join" or ev.content['membership'] == "invite"
         ]
-        other_members = [m for m in all_members if m.sender != user_id]
+        other_members = [m for m in all_members if m.state_key != user_id]
     else:
         other_members = []
         all_members = []
@@ -113,30 +113,27 @@ def looks_like_an_alias(string):
 
 
 def descriptor_from_member_events(member_events):
-    #     else if (otherMembers.length === 1) {
-    #     return otherMembers[0].name;
-    # }
-    # else if (otherMembers.length === 2) {
-    #     return (
-    #         otherMembers[0].name + " and " + otherMembers[1].name
-    #     );
-    # }
-    # else {
-    #     return (
-    #         otherMembers[0].name + " and " + (otherMembers.length - 1) + " others"
-    #     );
-    # }
     if len(member_events) == 0:
         return "nobody"
     elif len(member_events) == 1:
         return name_from_member_event(member_events[0])
-    return "all the people, so many people. They all go hand in hand, hand in hand in their park life."
+    elif len(member_events) == 2:
+        return "%s and %s" % (
+            name_from_member_event(member_events[0]),
+            name_from_member_event(member_events[1]),
+        )
+    else:
+        return "%s and %d others" % (
+            name_from_member_event(member_events[0]),
+            len(member_events) - 1,
+        )
 
 
 def name_from_member_event(member_event):
+    # XXX: Need to look in invite state for invite display names.
     if (
         member_event.content and "displayname" in member_event.content and
         member_event.content["displayname"]
     ):
         return member_event.content["displayname"]
-    return member_event.sender
+    return member_event.state_key
