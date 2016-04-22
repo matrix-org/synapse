@@ -230,7 +230,7 @@ class HttpPusher(object):
                         "Pushkey %s was rejected: removing",
                         pk
                     )
-                    yield self.hs.get_pusherpool().remove_pusher(
+                    yield self.hs.remove_pusher(
                         self.app_id, pk, self.user_id
                     )
         defer.returnValue(True)

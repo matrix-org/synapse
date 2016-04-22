@@ -193,6 +193,9 @@ class HomeServer(object):
             **self.db_config.get("args", {})
         )
 
+    def remove_pusher(self, app_id, push_key, user_id):
+        return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
+
 
 def _make_dependency_method(depname):
     def _get(hs):
