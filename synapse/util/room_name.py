@@ -73,6 +73,10 @@ def calculate_room_name(room_state, user_id):
             ev for ev in room_state_bytype["m.room.member"].values()
             if ev.content['membership'] == "join" or ev.content['membership'] == "invite"
         ]
+        # Sort the member events oldest-first so the we name people in the
+        # order the joined (it should at least be deterministic rather than
+        # dictionary iteration order)
+        all_members.sort(key=lambda e: e.origin_server_ts)
         other_members = [m for m in all_members if m.state_key != user_id]
     else:
         other_members = []
