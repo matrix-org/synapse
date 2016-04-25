@@ -62,11 +62,11 @@ class SlaveConfig(DatabaseConfig):
         #replication_url: https://localhost:{replication_port}/_synapse/replication
 
         listeners: []
-        # Uncomment to enable a ssh manhole listener on the pusher.
+        # Enable a ssh manhole listener on the pusher.
         # - type: manhole
         #   port: {manhole_port}
         #   bind_address: 127.0.0.1
-        # Uncomment to enable a metric listener on the pusher.
+        # Enable a metric listener on the pusher.
         # - type: http
         #   port: {metrics_port}
         #   bind_address: 127.0.0.1
