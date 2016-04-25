@@ -57,7 +57,7 @@ from synapse.federation.transport.server import TransportLayerServer
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
 from synapse.util.httpresourcetree import create_resource_tree
-from synapse.util.manhole import listen_manhole
+from synapse.util.manhole import manhole
 
 from synapse.http.site import SynapseSite
 
@@ -203,12 +203,14 @@ class SynapseHomeServer(HomeServer):
             if listener["type"] == "http":
                 self._listener_http(config, listener)
             elif listener["type"] == "manhole":
-                listen_manhole(
-                    bind_address=listener.get("bind_address", '127.0.0.1'),
-                    bind_port=listener["port"],
-                    username="matrix",
-                    password="rabbithole",
-                    globals={"hs": self},
+                reactor.listenTCP(
+                    listener["port"],
+                    manhole(
+                        username="matrix",
+                        password="rabbithole",
+                        globals={"hs": self},
+                    ),
+                    interface=listener.get("bind_address", '127.0.0.1')
                 )
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])

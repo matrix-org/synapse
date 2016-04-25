@@ -18,21 +18,19 @@ from twisted.conch import manhole_ssh
 from twisted.cred import checkers, portal
 
 
-from twisted.internet import reactor
-
-
-def listen_manhole(bind_address, bind_port, username, password, globals):
+def manhole(username, password, globals):
     """Starts a ssh listener with password authentication using
     the given username and password. Clients connecting to the ssh
     listener will find themselves in a colored python shell with
     the supplied globals.
 
     Args:
-        bind_address(str): IP address to listen on.
-        bind_port(int): TCP port to listen on.
         username(str): The username ssh clients should auth with.
         password(str): The password ssh clients should auth with.
         globals(dict): The variables to expose in the shell.
+
+    Returns:
+        twisted.internet.protocol.Factory: A factory to pass to ``listenTCP``
     """
 
     checker = checkers.InMemoryUsernamePasswordDatabaseDontUse(
@@ -45,6 +43,4 @@ def listen_manhole(bind_address, bind_port, username, password, globals):
         dict(globals, __name__="__console__")
     )
 
-    factory = manhole_ssh.ConchFactory(portal.Portal(rlm, [checker]))
-
-    reactor.listenTCP(bind_port, factory, interface=bind_address)
+    return manhole_ssh.ConchFactory(portal.Portal(rlm, [checker]))
