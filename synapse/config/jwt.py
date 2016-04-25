@@ -13,7 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from ._base import Config, ConfigError
+
+
+MISSING_JWT = (
+    """Missing jwt library. This is required for jwt login.
+
+    Install by running:
+        pip install pyjwt
+    """
+)
 
 
 class JWTConfig(Config):
@@ -23,6 +32,12 @@ class JWTConfig(Config):
             self.jwt_enabled = jwt_config.get("enabled", False)
             self.jwt_secret = jwt_config["secret"]
             self.jwt_algorithm = jwt_config["algorithm"]
+
+            try:
+                import jwt
+                jwt  # To stop unused lint.
+            except ImportError:
+                raise ConfigError(MISSING_JWT)
         else:
             self.jwt_enabled = False
             self.jwt_secret = None

@@ -33,9 +33,6 @@ from saml2.client import Saml2Client
 
 import xml.etree.ElementTree as ET
 
-import jwt
-from jwt.exceptions import InvalidTokenError
-
 
 logger = logging.getLogger(__name__)
 
@@ -226,8 +223,13 @@ class LoginRestServlet(ClientV1RestServlet):
     def do_jwt_login(self, login_submission):
         token = login_submission.get("token", None)
         if token is None:
-            raise LoginError(401, "Token field for JWT is missing",
-                             errcode=Codes.UNAUTHORIZED)
+            raise LoginError(
+                401, "Token field for JWT is missing",
+                errcode=Codes.UNAUTHORIZED
+            )
+
+        import jwt
+        from jwt.exceptions import InvalidTokenError
 
         try:
             payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
