@@ -29,7 +29,7 @@ def calculate_room_name(room_state, user_id):
         if m_room_name.content and m_room_name.content["name"]:
             return m_room_name.content["name"]
 
-    # does it have a caononical alias?
+    # does it have a canonical alias?
     if ("m.room.canonical_alias", "") in room_state:
         canon_alias = room_state[("m.room.canonical_alias", "")]
         if (
