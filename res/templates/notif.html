@@ -1,7 +1,8 @@
 <!doctype html>
 <html lang="en">
   <body>
-    <h1>{{ summaryText }}</h1>
+    <div className="salutation">Hi {{ user_display_name }},</div>
+    <div className="summarytext">{{ summary_text }}</div>
     <div class="content">
         {% for room in rooms %}
             {% include 'room.html' with context %}

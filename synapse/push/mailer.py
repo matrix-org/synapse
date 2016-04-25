@@ -21,9 +21,17 @@ import email.mime.multipart
 from email.mime.text import MIMEText
 
 from synapse.util.async import concurrently_execute
-from synapse.util.room_name import calculate_room_name
+from synapse.util.presentable_names import calculate_room_name, name_from_member_event
+from synapse.types import UserID
+from synapse.api.errors import StoreError
 
 import jinja2
+
+
+MESSAGE_FROM_PERSON_IN_ROOM = "You have a message from %s in the %s room"
+MESSAGE_FROM_PERSON = "You have a message from %s"
+MESSAGES_IN_ROOM = "There are some messages for you in the %s room"
+MESSAGES_IN_ROOMS = "Here are some messages you may have missed"
 
 
 class Mailer(object):
@@ -55,6 +63,13 @@ class Mailer(object):
         # notifications
         state_by_room = {}
 
+        try:
+            user_display_name = yield self.store.get_profile_displayname(
+                UserID.from_string(user_id).localpart
+            )
+        except StoreError:
+            user_display_name = user_id
+
         @defer.inlineCallbacks
         def _fetch_room_state(room_id):
             room_state = yield self.state_handler.get_current_state(room_id)
@@ -70,8 +85,14 @@ class Mailer(object):
             ) for r in rooms_in_order
         ]
 
+        summary_text = yield self.make_summary_text(
+            notifs_by_room, state_by_room, user_id
+        )
+
         template_vars = {
+            "user_display_name": user_display_name,
             "unsubscribe_link": self.make_unsubscribe_link(),
+            "summary_text": summary_text,
             "rooms": rooms,
         }
 
@@ -92,6 +113,38 @@ class Mailer(object):
         room_vars = {}
         room_vars['title'] = calculate_room_name(room_state, user_id)
         return room_vars
+
+    @defer.inlineCallbacks
+    def make_summary_text(self, notifs_by_room, state_by_room, user_id):
+        if len(notifs_by_room) == 1:
+            room_id = notifs_by_room.keys()[0]
+            sender_name = None
+            if len(notifs_by_room[room_id]) == 1:
+                # If the room has some kind of name, use it, but we don't
+                # want the generated-from-names one here otherwise we'll
+                # end up with, "new message from Bob in the Bob room"
+                room_name = calculate_room_name(
+                    state_by_room[room_id], user_id, fallback_to_members=False
+                )
+                event = yield self.store.get_event(
+                    notifs_by_room[room_id][0]["event_id"]
+                )
+                if ("m.room.member", event.sender) in state_by_room[room_id]:
+                    state_event = state_by_room[room_id][("m.room.member", event.sender)]
+                    sender_name = name_from_member_event(state_event)
+                if sender_name is not None and room_name is not None:
+                    defer.returnValue(
+                        MESSAGE_FROM_PERSON_IN_ROOM % (sender_name, room_name)
+                    )
+                elif sender_name is not None:
+                    defer.returnValue(MESSAGE_FROM_PERSON % (sender_name,))
+            else:
+                room_name = calculate_room_name(state_by_room[room_id], user_id)
+                defer.returnValue(MESSAGES_IN_ROOM % (room_name,))
+        else:
+            defer.returnValue(MESSAGES_IN_ROOMS)
+
+        defer.returnValue("Some thing have occurred in some rooms")
 
     def make_unsubscribe_link(self):
         return "https://vector.im/#/settings"  # XXX: matrix.to

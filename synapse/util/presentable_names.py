@@ -22,7 +22,7 @@ ALIAS_RE = re.compile(r"^#.*:.+$")
 ALL_ALONE = "Empty Room"
 
 
-def calculate_room_name(room_state, user_id):
+def calculate_room_name(room_state, user_id, fallback_to_members=True):
     # does it have a name?
     if ("m.room.name", "") in room_state:
         m_room_name = room_state[("m.room.name", "")]
@@ -34,13 +34,13 @@ def calculate_room_name(room_state, user_id):
         canon_alias = room_state[("m.room.canonical_alias", "")]
         if (
             canon_alias.content and canon_alias.content["alias"] and
-            looks_like_an_alias(canon_alias.content["alias"])
+            _looks_like_an_alias(canon_alias.content["alias"])
         ):
             return canon_alias.content["alias"]
 
     # at this point we're going to need to search the state by all state keys
     # for an event type, so rearrange the data structure
-    room_state_bytype = state_as_two_level_dict(room_state)
+    room_state_bytype = _state_as_two_level_dict(room_state)
 
     # right then, any aliases at all?
     if "m.room.aliases" in room_state_bytype:
@@ -49,7 +49,7 @@ def calculate_room_name(room_state, user_id):
             first_alias_event = m_room_aliases.values()[0]
             if first_alias_event.content and first_alias_event.content["aliases"]:
                 the_aliases = first_alias_event.content["aliases"]
-                if len(the_aliases) > 0 and looks_like_an_alias(the_aliases[0]):
+                if len(the_aliases) > 0 and _looks_like_an_alias(the_aliases[0]):
                     return the_aliases[0]
 
     my_member_event = None
@@ -65,6 +65,9 @@ def calculate_room_name(room_state, user_id):
             return "Invite from %s" % (name_from_member_event(inviter_member_event),)
         else:
             return "Room Invite"
+
+    if not fallback_to_members:
+        return None
 
     # we're going to have to generate a name based on who's in the room,
     # so find out who is in the room that isn't the user.
@@ -105,17 +108,6 @@ def calculate_room_name(room_state, user_id):
         return descriptor_from_member_events(other_members)
 
 
-def state_as_two_level_dict(state):
-    ret = {}
-    for k, v in state.items():
-        ret.setdefault(k[0], {})[k[1]] = v
-    return ret
-
-
-def looks_like_an_alias(string):
-    return ALIAS_RE.match(string) is not None
-
-
 def descriptor_from_member_events(member_events):
     if len(member_events) == 0:
         return "nobody"
@@ -140,3 +132,14 @@ def name_from_member_event(member_event):
     ):
         return member_event.content["displayname"]
     return member_event.state_key
+
+
+def _state_as_two_level_dict(state):
+    ret = {}
+    for k, v in state.items():
+        ret.setdefault(k[0], {})[k[1]] = v
+    return ret
+
+
+def _looks_like_an_alias(string):
+    return ALIAS_RE.match(string) is not None
