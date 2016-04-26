@@ -309,5 +309,7 @@ if __name__ == '__main__':
                 verbose=True,
                 logger=logger,
             )
+
+            daemon.start()
         else:
             reactor.run()
