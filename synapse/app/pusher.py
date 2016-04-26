@@ -89,6 +89,14 @@ class PusherSlaveStore(
         DataStore.update_pusher_last_stream_ordering_and_success.__func__
     )
 
+    update_pusher_failing_since = (
+        DataStore.update_pusher_failing_since.__func__
+    )
+
+    update_pusher_last_stream_ordering = (
+        DataStore.update_pusher_last_stream_ordering.__func__
+    )
+
 
 class PusherServer(HomeServer):
 
