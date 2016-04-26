@@ -79,7 +79,7 @@ class SlaveConfig(DatabaseConfig):
         #   port: {metrics_port}
         #   bind_address: 127.0.0.1
         #   resources:
-        #    - names: ["metrics"],
+        #    - names: ["metrics"]
         #      compress: False
 
         report_stats: False
