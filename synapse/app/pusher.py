@@ -296,10 +296,15 @@ if __name__ == '__main__':
         ps = setup(sys.argv[1:])
 
         if ps.config.daemonize:
+            def run():
+                with LoggingContext("run"):
+                    change_resource_limit(ps.config.soft_file_limit)
+                    reactor.run()
+
             daemon = Daemonize(
                 app="synapse-pusher",
                 pid=ps.config.pid_file,
-                action=reactor.run,
+                action=run,
                 auto_close_fds=False,
                 verbose=True,
                 logger=logger,
