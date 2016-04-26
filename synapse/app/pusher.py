@@ -37,6 +37,8 @@ from synapse.util.versionstring import get_version_string
 from twisted.internet import reactor, defer
 from twisted.web.resource import Resource
 
+from daemonize import Daemonize
+
 import sys
 import logging
 
@@ -54,12 +56,18 @@ class SlaveConfig(DatabaseConfig):
         self.start_pushers = True
         self.listeners = config["listeners"]
         self.soft_file_limit = config.get("soft_file_limit")
+        self.daemonize = config.get("daemonize")
+        self.pid_file = self.abspath(config.get("pid_file"))
 
-    def default_config(self, **kwargs):
+    def default_config(self, server_name, **kwargs):
+        pid_file = self.abspath("pusher.pid")
         return """\
-        ## Slave ##
+        # Slave configuration
+
         # The replication listener on the synapse to talk to.
         #replication_url: https://localhost:{replication_port}/_synapse/replication
+
+        server_name: "%(server_name)s"
 
         listeners: []
         # Enable a ssh manhole listener on the pusher.
@@ -75,7 +83,12 @@ class SlaveConfig(DatabaseConfig):
         #      compress: False
 
         report_stats: False
-        """
+
+        daemonize: False
+
+        pid_file: %(pid_file)s
+
+        """ % locals()
 
 
 class PusherSlaveConfig(SlaveConfig, LoggingConfig):
@@ -248,6 +261,9 @@ def setup(config_options):
         sys.stderr.write("\n" + e.message + "\n")
         sys.exit(1)
 
+    if not config:
+        sys.exit(0)
+
     config.setup_logging()
 
     database_engine = create_engine(config.database_config)
@@ -278,4 +294,20 @@ def setup(config_options):
 if __name__ == '__main__':
     with LoggingContext("main"):
         ps = setup(sys.argv[1:])
-        reactor.run()
+
+        if ps.config.daemonize:
+            def run():
+                with LoggingContext("run"):
+                    change_resource_limit(ps.config.soft_file_limit)
+                    reactor.run()
+
+            daemon = Daemonize(
+                app="synapse-pusher",
+                pid=ps.config.pid_file,
+                action=run,
+                auto_close_fds=False,
+                verbose=True,
+                logger=logger,
+            )
+        else:
+            reactor.run()
