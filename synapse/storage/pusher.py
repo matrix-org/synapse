@@ -106,6 +106,9 @@ class PusherStore(SQLBaseStore):
         return self._pushers_id_gen.get_current_token()
 
     def get_all_updated_pushers(self, last_id, current_id, limit):
+        if last_id == current_id:
+            return defer.succeed(([], []))
+
         def get_all_updated_pushers_txn(txn):
             sql = (
                 "SELECT id, user_name, access_token, profile_tag, kind,"
