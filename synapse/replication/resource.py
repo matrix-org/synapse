@@ -382,7 +382,7 @@ class _Writer(object):
             position = rows[-1][0]
 
         self.streams[name] = {
-            "position": str(position),
+            "position": position if type(position) is int else str(position),
             "field_names": fields,
             "rows": rows,
         }
