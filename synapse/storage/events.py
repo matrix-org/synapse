@@ -1143,6 +1143,12 @@ class EventsStore(SQLBaseStore):
                            current_backfill_id, current_forward_id, limit):
         """Get all the new events that have arrived at the server either as
         new events or as backfilled events"""
+        have_backfill_events = last_backfill_id != current_backfill_id
+        have_forward_events = last_forward_id != current_forward_id
+
+        if not have_backfill_events and not have_forward_events:
+            return defer.succeed(AllNewEventsResult([], [], [], [], []))
+
         def get_all_new_events_txn(txn):
             sql = (
                 "SELECT e.stream_ordering, ej.internal_metadata, ej.json, eg.state_group"
@@ -1155,7 +1161,7 @@ class EventsStore(SQLBaseStore):
                 " ORDER BY e.stream_ordering ASC"
                 " LIMIT ?"
             )
-            if last_forward_id != current_forward_id:
+            if have_forward_events:
                 txn.execute(sql, (last_forward_id, current_forward_id, limit))
                 new_forward_events = txn.fetchall()
 
@@ -1199,7 +1205,7 @@ class EventsStore(SQLBaseStore):
                 " ORDER BY e.stream_ordering DESC"
                 " LIMIT ?"
             )
-            if last_backfill_id != current_backfill_id:
+            if have_backfill_events:
                 txn.execute(sql, (-last_backfill_id, -current_backfill_id, limit))
                 new_backfill_events = txn.fetchall()
 
