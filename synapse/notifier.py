@@ -399,7 +399,7 @@ class Notifier(object):
 
                 if name == "room":
                     room_member_handler = self.hs.get_handlers().room_member_handler
-                    new_events = yield room_member_handler._filter_events_for_client(
+                    new_events = yield room_member_handler.filter_events_for_client(
                         user.to_string(),
                         new_events,
                         is_peeking=is_peeking,

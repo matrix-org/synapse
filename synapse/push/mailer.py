@@ -155,13 +155,15 @@ class Mailer(object):
         }
 
         for n in notifs:
-            vars = yield self.get_notif_vars(n, notif_events[n['event_id']], room_state)
+            vars = yield self.get_notif_vars(
+                n, user_id, notif_events[n['event_id']], room_state
+            )
             room_vars['notifs'].append(vars)
 
         defer.returnValue(room_vars)
 
     @defer.inlineCallbacks
-    def get_notif_vars(self, notif, notif_event, room_state):
+    def get_notif_vars(self, notif, user_id, notif_event, room_state):
         results = yield self.store.get_events_around(
             notif['room_id'], notif['event_id'],
             before_limit=CONTEXT_BEFORE, after_limit=0
@@ -173,14 +175,16 @@ class Mailer(object):
             "messages": [],
         }
 
-        for event in results['events_before']:
+        handler = self.hs.get_handlers().message_handler
+        the_events = yield handler.filter_events_for_client(
+            user_id, results["events_before"]
+        )
+        the_events.append(notif_event)
+
+        for event in the_events:
             vars = self.get_message_vars(notif, event, room_state)
             if vars is not None:
                 ret['messages'].append(vars)
-
-        vars = self.get_message_vars(notif, notif_event, room_state)
-        if vars is not None:
-            ret['messages'].append(vars)
 
         defer.returnValue(ret)
 

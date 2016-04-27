@@ -123,7 +123,7 @@ class MessageHandler(BaseHandler):
                 "end": next_token.to_string(),
             })
 
-        events = yield self._filter_events_for_client(
+        events = yield self.filter_events_for_client(
             user_id,
             events,
             is_peeking=(member_event_id is None),
@@ -483,7 +483,7 @@ class MessageHandler(BaseHandler):
                     ]
                 ).addErrback(unwrapFirstError)
 
-                messages = yield self._filter_events_for_client(
+                messages = yield self.filter_events_for_client(
                     user_id, messages
                 )
 
@@ -619,7 +619,7 @@ class MessageHandler(BaseHandler):
             end_token=stream_token
         )
 
-        messages = yield self._filter_events_for_client(
+        messages = yield self.filter_events_for_client(
             user_id, messages, is_peeking=is_peeking
         )
 
@@ -700,7 +700,7 @@ class MessageHandler(BaseHandler):
             consumeErrors=True,
         ).addErrback(unwrapFirstError)
 
-        messages = yield self._filter_events_for_client(
+        messages = yield self.filter_events_for_client(
             user_id, messages, is_peeking=is_peeking,
         )
 

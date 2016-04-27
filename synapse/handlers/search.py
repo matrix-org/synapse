@@ -172,7 +172,7 @@ class SearchHandler(BaseHandler):
 
             filtered_events = search_filter.filter([r["event"] for r in results])
 
-            events = yield self._filter_events_for_client(
+            events = yield self.filter_events_for_client(
                 user.to_string(), filtered_events
             )
 
@@ -223,7 +223,7 @@ class SearchHandler(BaseHandler):
                     r["event"] for r in results
                 ])
 
-                events = yield self._filter_events_for_client(
+                events = yield self.filter_events_for_client(
                     user.to_string(), filtered_events
                 )
 
@@ -281,11 +281,11 @@ class SearchHandler(BaseHandler):
                     event.room_id, event.event_id, before_limit, after_limit
                 )
 
-                res["events_before"] = yield self._filter_events_for_client(
+                res["events_before"] = yield self.filter_events_for_client(
                     user.to_string(), res["events_before"]
                 )
 
-                res["events_after"] = yield self._filter_events_for_client(
+                res["events_after"] = yield self.filter_events_for_client(
                     user.to_string(), res["events_after"]
                 )
 
