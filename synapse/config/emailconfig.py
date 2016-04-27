@@ -25,17 +25,19 @@ class EmailConfig(Config):
     """
 
     def read_config(self, config):
+        self.email_enable_notifs = False
+
         email_config = config.get("email", None)
         if email_config:
             self.email_enable_notifs = email_config.get("enable_notifs", True)
 
+        if self.email_enable_notifs:
             required = [
                 "smtp_host",
                 "smtp_port",
                 "notif_from",
                 "template_dir",
                 "notif_template_html",
-
             ]
 
             missing = []
@@ -47,6 +49,11 @@ class EmailConfig(Config):
                 raise RuntimeError(
                     "email.enable_notifs is True but required keys are missing: %s" %
                     (", ".join(["email."+k for k in missing]),)
+                )
+
+            if config.get("public_baseurl") is None:
+                raise RuntimeError(
+                    "email.enable_notifs is True but no public_baseurl is set"
                 )
 
             self.email_smtp_host = email_config["smtp_host"]

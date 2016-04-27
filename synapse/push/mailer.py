@@ -26,12 +26,37 @@ from synapse.types import UserID
 from synapse.api.errors import StoreError
 
 import jinja2
+import bleach
+
+import time
+import urllib
 
 
 MESSAGE_FROM_PERSON_IN_ROOM = "You have a message from %s in the %s room"
 MESSAGE_FROM_PERSON = "You have a message from %s"
 MESSAGES_IN_ROOM = "There are some messages for you in the %s room"
 MESSAGES_IN_ROOMS = "Here are some messages you may have missed"
+
+CONTEXT_BEFORE = 1
+
+# From https://github.com/matrix-org/matrix-react-sdk/blob/master/src/HtmlUtils.js
+ALLOWED_TAGS = [
+    'font',  # custom to matrix for IRC-style font coloring
+    'del',  # for markdown
+    # deliberately no h1/h2 to stop people shouting.
+    'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol',
+    'nl', 'li', 'b', 'i', 'u', 'strong', 'em', 'strike', 'code', 'hr', 'br', 'div',
+    'table', 'thead', 'caption', 'tbody', 'tr', 'th', 'td', 'pre'
+]
+ALLOWED_ATTRS = {
+    # custom ones first:
+    "font": ["color"],  # custom to matrix
+    "a": ["href", "name", "target"],  # remote target: custom to matrix
+    # We don't currently allow img itself by default, but this
+    # would make sense if we did
+    "img": ["src"],
+}
+ALLOWED_SCHEMES = ["http", "https", "ftp", "mailto"]
 
 
 class Mailer(object):
@@ -41,6 +66,8 @@ class Mailer(object):
         self.state_handler = self.hs.get_state_handler()
         loader = jinja2.FileSystemLoader(self.hs.config.email_template_dir)
         env = jinja2.Environment(loader=loader)
+        env.filters["format_ts"] = format_ts_filter
+        env.filters["mxc_to_http"] = self.mxc_to_http_filter
         self.notif_template = env.get_template(self.hs.config.email_notif_template_html)
 
     @defer.inlineCallbacks
@@ -53,6 +80,10 @@ class Mailer(object):
 
         rooms_in_order = deduped_ordered_list(
             [pa['room_id'] for pa in push_actions]
+        )
+
+        notif_events = yield self.store.get_events(
+            [pa['event_id'] for pa in push_actions]
         )
 
         notifs_by_room = {}
@@ -79,14 +110,16 @@ class Mailer(object):
         # notifs are much realtime than sync so we can afford to wait a bit.
         yield concurrently_execute(_fetch_room_state, rooms_in_order, 3)
 
-        rooms = [
-            self.get_room_vars(
-                r, user_id, notifs_by_room[r], state_by_room[r]
-            ) for r in rooms_in_order
-        ]
+        rooms = []
 
-        summary_text = yield self.make_summary_text(
-            notifs_by_room, state_by_room, user_id
+        for r in rooms_in_order:
+            vars = yield self.get_room_vars(
+                r, user_id, notifs_by_room[r], notif_events, state_by_room[r]
+            )
+            rooms.append(vars)
+
+        summary_text = self.make_summary_text(
+            notifs_by_room, state_by_room, notif_events, user_id
         )
 
         template_vars = {
@@ -109,13 +142,72 @@ class Mailer(object):
             port=self.hs.config.email_smtp_port
         )
 
-    def get_room_vars(self, room_id, user_id, notifs, room_state):
-        room_vars = {}
-        room_vars['title'] = calculate_room_name(room_state, user_id)
-        return room_vars
+    @defer.inlineCallbacks
+    def get_room_vars(self, room_id, user_id, notifs, notif_events, room_state):
+        room_vars = {
+            "title": calculate_room_name(room_state, user_id),
+            "hash": string_ordinal_total(room_id),  # See sender avatar hash
+            "notifs": [],
+        }
+
+        for n in notifs:
+            vars = yield self.get_notif_vars(n, notif_events[n['event_id']], room_state)
+            room_vars['notifs'].append(vars)
+
+        defer.returnValue(room_vars)
 
     @defer.inlineCallbacks
-    def make_summary_text(self, notifs_by_room, state_by_room, user_id):
+    def get_notif_vars(self, notif, notif_event, room_state):
+        results = yield self.store.get_events_around(
+            notif['room_id'], notif['event_id'],
+            before_limit=CONTEXT_BEFORE, after_limit=0
+        )
+
+        ret = {
+            "link": self.make_notif_link(notif),
+            "ts": notif['received_ts'],
+            "messages": [],
+        }
+
+        for event in results['events_before']:
+            vars = self.get_message_vars(notif, event, room_state)
+            if vars is not None:
+                ret['messages'].append(vars)
+
+        vars = self.get_message_vars(notif, notif_event, room_state)
+        if vars is not None:
+            ret['messages'].append(vars)
+
+        defer.returnValue(ret)
+
+    def get_message_vars(self, notif, event, room_state):
+        msgtype = event.content["msgtype"]
+
+        sender_state_event = room_state[("m.room.member", event.sender)]
+        sender_name = name_from_member_event(sender_state_event)
+        sender_avatar_url = sender_state_event.content["avatar_url"]
+
+        # 'hash' for deterministically picking default images: use
+        # sender_hash % the number of default images to choose from
+        sender_hash = string_ordinal_total(event.sender)
+
+        ret = {
+            "msgtype": msgtype,
+            "is_historical": event.event_id != notif['event_id'],
+            "ts": event.origin_server_ts,
+            "sender_name": sender_name,
+            "sender_avatar_url": sender_avatar_url,
+            "sender_hash": sender_hash,
+        }
+
+        if msgtype == "m.text":
+            ret["body_text_plain"] = event.content["body"]
+        elif msgtype == "org.matrix.custom.html":
+            ret["body_text_html"] = safe_markup(event.content["formatted_body"])
+
+        return ret
+
+    def make_summary_text(self, notifs_by_room, state_by_room, notif_events, user_id):
         if len(notifs_by_room) == 1:
             room_id = notifs_by_room.keys()[0]
             sender_name = None
@@ -126,28 +218,49 @@ class Mailer(object):
                 room_name = calculate_room_name(
                     state_by_room[room_id], user_id, fallback_to_members=False
                 )
-                event = yield self.store.get_event(
-                    notifs_by_room[room_id][0]["event_id"]
-                )
+                event = notif_events[notifs_by_room[room_id][0]["event_id"]]
                 if ("m.room.member", event.sender) in state_by_room[room_id]:
                     state_event = state_by_room[room_id][("m.room.member", event.sender)]
                     sender_name = name_from_member_event(state_event)
                 if sender_name is not None and room_name is not None:
-                    defer.returnValue(
-                        MESSAGE_FROM_PERSON_IN_ROOM % (sender_name, room_name)
-                    )
+                    return MESSAGE_FROM_PERSON_IN_ROOM % (sender_name, room_name)
                 elif sender_name is not None:
-                    defer.returnValue(MESSAGE_FROM_PERSON % (sender_name,))
+                    return MESSAGE_FROM_PERSON % (sender_name,)
             else:
                 room_name = calculate_room_name(state_by_room[room_id], user_id)
-                defer.returnValue(MESSAGES_IN_ROOM % (room_name,))
+                return MESSAGES_IN_ROOM % (room_name,)
         else:
-            defer.returnValue(MESSAGES_IN_ROOMS)
+            return MESSAGES_IN_ROOMS
 
-        defer.returnValue("Some thing have occurred in some rooms")
+    def make_notif_link(self, notif):
+        return "https://matrix.to/%s/%s" % (
+            notif['room_id'], notif['event_id']
+        )
 
     def make_unsubscribe_link(self):
         return "https://vector.im/#/settings"  # XXX: matrix.to
+
+    def mxc_to_http_filter(self, value, width, height, resizeMethod="crop"):
+        if value[0:6] != "mxc://":
+            return ""
+        serverAndMediaId = value[6:]
+        params = {
+            "width": width,
+            "height": height,
+            "method": resizeMethod,
+        }
+        return "%s_matrix/media/v1/thumbnail/%s?%s" % (
+            self.hs.config.public_baseurl,
+            serverAndMediaId,
+            urllib.urlencode(params)
+        )
+
+
+def safe_markup(self, raw_html):
+    return jinja2.Markup(bleach.linkify(bleach.clean(
+        raw_html, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS,
+        protocols=ALLOWED_SCHEMES, strip=True
+    )))
 
 
 def deduped_ordered_list(l):
@@ -158,3 +271,12 @@ def deduped_ordered_list(l):
             seen.add(item)
             ret.append(item)
     return ret
+
+def string_ordinal_total(s):
+    tot = 0
+    for c in s:
+        tot += ord(c)
+    return tot
+
+def format_ts_filter(value, format):
+    return time.strftime(format, time.localtime(value / 1000))

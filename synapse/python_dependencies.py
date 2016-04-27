@@ -47,6 +47,7 @@ CONDITIONAL_REQUIREMENTS = {
     },
     "email.enable_notifs": {
         "Jinja2>=2.8": ["Jinja2>=2.8"],
+        "bleach>=1.4.2": ["bleach>=1.4.2"],
     },
 }
 

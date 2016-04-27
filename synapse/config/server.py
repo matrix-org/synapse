@@ -28,6 +28,11 @@ class ServerConfig(Config):
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", True)
+        self.public_baseurl = config.get("public_baseurl")
+
+        if self.public_baseurl is not None:
+            if self.public_baseurl[-1] != '/':
+                self.public_baseurl += '/'
 
         self.listeners = config.get("listeners", [])
 
@@ -141,6 +146,9 @@ class ServerConfig(Config):
 
         # Whether to serve a web client from the HTTP/HTTPS root resource.
         web_client: True
+
+        # The server's public-facing base URL
+        # https://example.com:8448/
 
         # Set the soft limit on the number of file descriptors synapse can use
         # Zero is used to indicate synapse should set the soft limit to the
