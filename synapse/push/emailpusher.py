@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # The amount of time we always wait before ever emailing about a notification
 # (to give the user a chance to respond to other push or notice the window)
-DELAY_BEFORE_MAIL_MS = 2 * 60 * 1000
+DELAY_BEFORE_MAIL_MS = 2000#2 * 60 * 1000
 
 THROTTLE_START_MS = 2 * 60 * 1000
 THROTTLE_MAX_MS = (2 * 60 * 1000) * (2 ** 11)  # ~3 days

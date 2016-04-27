@@ -21,7 +21,9 @@ import email.mime.multipart
 from email.mime.text import MIMEText
 
 from synapse.util.async import concurrently_execute
-from synapse.util.presentable_names import calculate_room_name, name_from_member_event
+from synapse.util.presentable_names import (
+    calculate_room_name, name_from_member_event, descriptor_from_member_events
+)
 from synapse.types import UserID
 from synapse.api.errors import StoreError
 
@@ -34,6 +36,7 @@ import urllib
 
 MESSAGE_FROM_PERSON_IN_ROOM = "You have a message from %s in the %s room"
 MESSAGE_FROM_PERSON = "You have a message from %s"
+MESSAGES_FROM_PERSON = "You have messages from %s"
 MESSAGES_IN_ROOM = "There are some messages for you in the %s room"
 MESSAGES_IN_ROOMS = "Here are some messages you may have missed"
 
@@ -209,15 +212,19 @@ class Mailer(object):
 
     def make_summary_text(self, notifs_by_room, state_by_room, notif_events, user_id):
         if len(notifs_by_room) == 1:
+            # Only one room has new stuff
             room_id = notifs_by_room.keys()[0]
+
+            # If the room has some kind of name, use it, but we don't
+            # want the generated-from-names one here otherwise we'll
+            # end up with, "new message from Bob in the Bob room"
+            room_name = calculate_room_name(
+                state_by_room[room_id], user_id, fallback_to_members=False
+            )
+
             sender_name = None
             if len(notifs_by_room[room_id]) == 1:
-                # If the room has some kind of name, use it, but we don't
-                # want the generated-from-names one here otherwise we'll
-                # end up with, "new message from Bob in the Bob room"
-                room_name = calculate_room_name(
-                    state_by_room[room_id], user_id, fallback_to_members=False
-                )
+                # There is just the one notification, so give some detail
                 event = notif_events[notifs_by_room[room_id][0]["event_id"]]
                 if ("m.room.member", event.sender) in state_by_room[room_id]:
                     state_event = state_by_room[room_id][("m.room.member", event.sender)]
@@ -227,9 +234,25 @@ class Mailer(object):
                 elif sender_name is not None:
                     return MESSAGE_FROM_PERSON % (sender_name,)
             else:
-                room_name = calculate_room_name(state_by_room[room_id], user_id)
-                return MESSAGES_IN_ROOM % (room_name,)
+                # There's more than one notification for this room, so just
+                # say there are several
+                if room_name is not None:
+                    return MESSAGES_IN_ROOM % (room_name,)
+                else:
+                    # If the room doesn't have a name, say who the messages
+                    # are from explicitly to avoid, "messages in the Bob room"
+                    sender_ids = list(set([
+                        notif_events[n['event_id']].sender
+                        for n in notifs_by_room[room_id]
+                    ]))
+
+                    return MESSAGES_FROM_PERSON % (
+                        descriptor_from_member_events([
+                            state_by_room[room_id][("m.room.member", s)] for s in sender_ids
+                        ])
+                    )
         else:
+            # Stuff's happened in multiple different rooms
             return MESSAGES_IN_ROOMS
 
     def make_notif_link(self, notif):
