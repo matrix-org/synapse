@@ -59,7 +59,8 @@ ALLOWED_ATTRS = {
     # would make sense if we did
     "img": ["src"],
 }
-ALLOWED_SCHEMES = ["http", "https", "ftp", "mailto"]
+# When bleach release a version with this option, we can specify schemes
+#ALLOWED_SCHEMES = ["http", "https", "ftp", "mailto"]
 
 
 class Mailer(object):
@@ -184,7 +185,15 @@ class Mailer(object):
         defer.returnValue(ret)
 
     def get_message_vars(self, notif, event, room_state):
-        msgtype = event.content["msgtype"]
+        if event.type != "m.room.message":
+            return None
+        if event.content["msgtype"] != "m.text":
+            return None
+
+        if "format" in event.content:
+            msgformat = event.content["format"]
+        else:
+            msgformat = None
 
         sender_state_event = room_state[("m.room.member", event.sender)]
         sender_name = name_from_member_event(sender_state_event)
@@ -195,7 +204,7 @@ class Mailer(object):
         sender_hash = string_ordinal_total(event.sender)
 
         ret = {
-            "msgtype": msgtype,
+            "format": msgformat,
             "is_historical": event.event_id != notif['event_id'],
             "ts": event.origin_server_ts,
             "sender_name": sender_name,
@@ -203,10 +212,10 @@ class Mailer(object):
             "sender_hash": sender_hash,
         }
 
-        if msgtype == "m.text":
-            ret["body_text_plain"] = event.content["body"]
-        elif msgtype == "org.matrix.custom.html":
+        if msgformat == "org.matrix.custom.html":
             ret["body_text_html"] = safe_markup(event.content["formatted_body"])
+        else:
+            ret["body_text_plain"] = event.content["body"]
 
         return ret
 
@@ -263,14 +272,14 @@ class Mailer(object):
     def make_unsubscribe_link(self):
         return "https://vector.im/#/settings"  # XXX: matrix.to
 
-    def mxc_to_http_filter(self, value, width, height, resizeMethod="crop"):
+    def mxc_to_http_filter(self, value, width, height, resize_method="crop"):
         if value[0:6] != "mxc://":
             return ""
         serverAndMediaId = value[6:]
         params = {
             "width": width,
             "height": height,
-            "method": resizeMethod,
+            "method": resize_method,
         }
         return "%s_matrix/media/v1/thumbnail/%s?%s" % (
             self.hs.config.public_baseurl,
@@ -279,10 +288,12 @@ class Mailer(object):
         )
 
 
-def safe_markup(self, raw_html):
+def safe_markup(raw_html):
     return jinja2.Markup(bleach.linkify(bleach.clean(
         raw_html, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS,
-        protocols=ALLOWED_SCHEMES, strip=True
+        # bleach master has this, but it isn't released yet
+        # protocols=ALLOWED_SCHEMES,
+        strip=True
     )))
 
 
