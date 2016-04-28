@@ -41,6 +41,7 @@ class UploadResource(Resource):
         self.auth = hs.get_auth()
         self.max_upload_size = hs.config.max_upload_size
         self.version_string = hs.version_string
+        self.clock = hs.get_clock()
 
     def render_POST(self, request):
         self._async_render_POST(request)
@@ -50,7 +51,7 @@ class UploadResource(Resource):
         respond_with_json(request, 200, {}, send_cors=True)
         return NOT_DONE_YET
 
-    @request_handler
+    @request_handler()
     @defer.inlineCallbacks
     def _async_render_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)

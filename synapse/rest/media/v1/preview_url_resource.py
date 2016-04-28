@@ -74,7 +74,7 @@ class PreviewUrlResource(Resource):
         self._async_render_GET(request)
         return NOT_DONE_YET
 
-    @request_handler
+    @request_handler()
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
 

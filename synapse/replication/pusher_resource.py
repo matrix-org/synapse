@@ -31,12 +31,13 @@ class PusherResource(Resource):
         self.version_string = hs.version_string
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()
+        self.clock = hs.get_clock()
 
     def render_POST(self, request):
         self._async_render_POST(request)
         return NOT_DONE_YET
 
-    @request_handler
+    @request_handler()
     @defer.inlineCallbacks
     def _async_render_POST(self, request):
         content = parse_json_object_from_request(request)
