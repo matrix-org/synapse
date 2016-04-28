@@ -317,7 +317,7 @@ class RequestMetrics(object):
         incoming_requests_counter.inc(request.method, servlet_classname, tag)
 
         response_timer.inc_by(
-            self.clock.time_msec() - start, request.method,
+            clock.time_msec() - self.start, request.method,
             servlet_classname, tag
         )
 
