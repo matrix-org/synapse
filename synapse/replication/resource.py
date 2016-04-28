@@ -112,6 +112,7 @@ class ReplicationResource(Resource):
         self.presence_handler = hs.get_handlers().presence_handler
         self.typing_handler = hs.get_handlers().typing_notification_handler
         self.notifier = hs.notifier
+        self.clock = hs.get_clock()
 
         self.putChild("remove_pushers", PusherResource(hs))
 
@@ -139,7 +140,7 @@ class ReplicationResource(Resource):
             state_token,
         ))
 
-    @request_handler
+    @request_handler()
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
         limit = parse_integer(request, "limit", 100)
