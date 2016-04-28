@@ -48,7 +48,7 @@ class EmailConfig(Config):
             if (len(missing) > 0):
                 raise RuntimeError(
                     "email.enable_notifs is True but required keys are missing: %s" %
-                    (", ".join(["email."+k for k in missing]),)
+                    (", ".join(["email." + k for k in missing]),)
                 )
 
             if config.get("public_baseurl") is None:

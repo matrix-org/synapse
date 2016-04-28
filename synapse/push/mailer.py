@@ -62,7 +62,7 @@ ALLOWED_ATTRS = {
     "img": ["src"],
 }
 # When bleach release a version with this option, we can specify schemes
-#ALLOWED_SCHEMES = ["http", "https", "ftp", "mailto"]
+# ALLOWED_SCHEMES = ["http", "https", "ftp", "mailto"]
 
 
 class Mailer(object):
@@ -283,7 +283,8 @@ class Mailer(object):
 
                     return MESSAGES_FROM_PERSON % (
                         descriptor_from_member_events([
-                            state_by_room[room_id][("m.room.member", s)] for s in sender_ids
+                            state_by_room[room_id][("m.room.member", s)]
+                            for s in sender_ids
                         ])
                     )
         else:
@@ -346,11 +347,13 @@ def deduped_ordered_list(l):
             ret.append(item)
     return ret
 
+
 def string_ordinal_total(s):
     tot = 0
     for c in s:
         tot += ord(c)
     return tot
+
 
 def format_ts_filter(value, format):
     return time.strftime(format, time.localtime(value / 1000))
