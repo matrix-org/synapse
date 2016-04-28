@@ -214,6 +214,10 @@ class JsonResource(HttpServer, resource.Resource):
         self._async_render(request)
         return server.NOT_DONE_YET
 
+    # Disable metric reporting because _async_render does its own metrics.
+    # It does its own metric reporting because _async_render dispatches to
+    # a callback and it's the class name of that callback we want to report
+    # against rather than the JsonResource itself.
     @request_handler(report_metrics=False)
     @defer.inlineCallbacks
     def _async_render(self, request):
