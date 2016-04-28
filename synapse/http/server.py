@@ -101,11 +101,12 @@ def wrap_request_handler(request_handler, report_metrics):
         global _next_request_id
         request_id = "%s-%s" % (request.method, _next_request_id)
         _next_request_id += 1
-        if report_metrics:
-            request_metrics = RequestMetrics()
-            request_metrics.start(self.clock)
 
         with LoggingContext(request_id) as request_context:
+            if report_metrics:
+                request_metrics = RequestMetrics()
+                request_metrics.start(self.clock)
+
             request_context.request = request_id
             with request.processing():
                 try:
@@ -307,7 +308,7 @@ class RequestMetrics(object):
         if context:
             tag = context.tag
 
-            if context != start_context:
+            if context != self.start_context:
                 logger.warn(
                     "Context have unexpectedly changed %r, %r",
                     context, self.start_context
