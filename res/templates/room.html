@@ -1,5 +1,4 @@
 <div class="room">
-    <h2>{{ room.title }}</h2>
     <div class="room_avatar">
         {% if room.avatar_url %}
             <img src="{{ room.avatar_url|mxc_to_http(48,48) }}" />
@@ -13,13 +12,14 @@
             {% endif %}
         {% endif %}
     </div>
-    {% if room.invite %}
-        <a href="{{ room.link }}">Join the conversation.</a>
-    {% else %}
-        <div>
+    <h2>{{ room.title }}</h2>
+    <div class="room_content">
+        {% if room.invite %}
+            <a href="{{ room.link }}">Join the conversation.</a>
+        {% else %}
             {% for notif in room.notifs %}
                 {% include 'notif.html' with context %}
             {% endfor %}
-        </div>
-    {% endif %}
+        {% endif %}
+    </div>
 </div>
