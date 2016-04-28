@@ -219,7 +219,7 @@ class Mailer(object):
         if msgformat == "org.matrix.custom.html":
             ret["body_text_html"] = safe_markup(event.content["formatted_body"])
         else:
-            ret["body_text_plain"] = event.content["body"]
+            ret["body_text_html"] = safe_text(event.content["body"])
 
         return ret
 
@@ -298,6 +298,17 @@ def safe_markup(raw_html):
         # bleach master has this, but it isn't released yet
         # protocols=ALLOWED_SCHEMES,
         strip=True
+    )))
+
+
+def safe_text(raw_text):
+    """
+    Process text: treat it as HTML but escape any tags (ie. just escape the
+    HTML) then linkify it.
+    """
+    return jinja2.Markup(bleach.linkify(bleach.clean(
+        raw_text, tags=[], attributes={},
+        strip=False
     )))
 
 
