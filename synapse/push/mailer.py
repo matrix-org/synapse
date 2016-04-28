@@ -200,13 +200,6 @@ class Mailer(object):
     def get_message_vars(self, notif, event, room_state):
         if event.type != "m.room.message":
             return None
-        if event.content["msgtype"] != "m.text":
-            return None
-
-        if "format" in event.content:
-            msgformat = event.content["format"]
-        else:
-            msgformat = None
 
         sender_state_event = room_state[("m.room.member", event.sender)]
         sender_name = name_from_member_event(sender_state_event)
@@ -217,7 +210,7 @@ class Mailer(object):
         sender_hash = string_ordinal_total(event.sender)
 
         ret = {
-            "format": msgformat,
+            "msgtype": event.content["msgtype"],
             "is_historical": event.event_id != notif['event_id'],
             "ts": event.origin_server_ts,
             "sender_name": sender_name,
@@ -225,12 +218,33 @@ class Mailer(object):
             "sender_hash": sender_hash,
         }
 
-        if msgformat == "org.matrix.custom.html":
-            ret["body_text_html"] = safe_markup(event.content["formatted_body"])
+        if event.content["msgtype"] == "m.text":
+            self.add_text_message_vars(ret, event)
+        elif event.content["msgtype"] == "m.image":
+            self.add_image_message_vars(ret, event)
         else:
-            ret["body_text_html"] = safe_text(event.content["body"])
+            return None
 
         return ret
+
+    def add_text_message_vars(self, vars, event):
+        if "format" in event.content:
+            msgformat = event.content["format"]
+        else:
+            msgformat = None
+        vars["format"] = msgformat
+
+        if msgformat == "org.matrix.custom.html":
+            vars["body_text_html"] = safe_markup(event.content["formatted_body"])
+        else:
+            vars["body_text_html"] = safe_text(event.content["body"])
+
+        return vars
+
+    def add_image_message_vars(self, vars, event):
+        vars["image_url"] = event.content["url"]
+
+        return vars
 
     def make_summary_text(self, notifs_by_room, state_by_room, notif_events, user_id):
         if len(notifs_by_room) == 1:

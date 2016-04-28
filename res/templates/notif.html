@@ -17,10 +17,14 @@
                 <div class="sender_name">{{ message.sender_name }}</div>
                 <div class="message_time">{{ message.ts|format_ts("%H:%M") }}</div>
                 <div class="message_body">
-                    {% if message.format == "org.matrix.custom.html" %}
-                        {{ message.body_text_html }}
-                    {% else %}
-                        {{ message.body_text_plain }}
+                    {% if message.msgtype == "m.text" %}
+                        {% if message.format == "org.matrix.custom.html" %}
+                            {{ message.body_text_html }}
+                        {% else %}
+                            {{ message.body_text_plain }}
+                        {% endif %}
+                    {% elif message.msgtype == "m.image" %}
+                        <img src="{{ message.image_url|mxc_to_http(640, 480, scale) }}" />
                     {% endif %}
                 </div>
             </div>
