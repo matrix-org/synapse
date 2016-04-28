@@ -222,8 +222,9 @@ class Mailer(object):
             self.add_text_message_vars(ret, event)
         elif event.content["msgtype"] == "m.image":
             self.add_image_message_vars(ret, event)
-        else:
-            return None
+
+        if "body" in event.content:
+            ret["body_text_plain"] = event.content["body"]
 
         return ret
 

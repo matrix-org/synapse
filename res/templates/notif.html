@@ -18,13 +18,11 @@
                 <div class="message_time">{{ message.ts|format_ts("%H:%M") }}</div>
                 <div class="message_body">
                     {% if message.msgtype == "m.text" %}
-                        {% if message.format == "org.matrix.custom.html" %}
-                            {{ message.body_text_html }}
-                        {% else %}
-                            {{ message.body_text_plain }}
-                        {% endif %}
+                        {{ message.body_text_html }}
                     {% elif message.msgtype == "m.image" %}
                         <img src="{{ message.image_url|mxc_to_http(640, 480, scale) }}" />
+                    {% elif message.msgtype == "m.file" %}
+                        <span class="filename">{{ message.body_text_plain }}</span>
                     {% endif %}
                 </div>
             </div>
