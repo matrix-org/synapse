@@ -144,9 +144,10 @@ def wrap_request_handler(request_handler, report_metrics):
                     )
                 finally:
                     try:
-                        request_metrics.stop(
-                            self.clock, request, self.__class__.__name__
-                        )
+                        if report_metrics:
+                            request_metrics.stop(
+                                self.clock, request, self.__class__.__name__
+                            )
                     except:
                         pass
     return wrapped_request_handler
