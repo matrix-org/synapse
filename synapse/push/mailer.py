@@ -157,12 +157,11 @@ class Mailer(object):
             "title": calculate_room_name(room_state, user_id),
             "hash": string_ordinal_total(room_id),  # See sender avatar hash
             "notifs": [],
-            "invite": is_invite
+            "invite": is_invite,
+            "link": self.make_room_link(room_id),
         }
 
-        if is_invite:
-            room_vars["link"] = self.make_room_link(room_id)
-        else:
+        if not is_invite:
             for n in notifs:
                 vars = yield self.get_notif_vars(
                     n, user_id, notif_events[n['event_id']], room_state
