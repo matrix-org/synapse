@@ -1,17 +1,3 @@
-body {
-    font-family: "Open Sans", Helvetica, Arial, sans-serif;
-    font-size: 12pt;
-    margin: 1em;
-}
-
-#page {
-    margin: auto;
-    width: 640px;
-    padding: 1em;
-    border: 1px solid #76cfa6;
-    border-radius: 5px;
-}
-
 .room_avatar {
     width: 48px;
     height: 48px;
