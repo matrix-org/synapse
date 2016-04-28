@@ -13,9 +13,13 @@
             {% endif %}
         {% endif %}
     </div>
-    <div>
-        {% for notif in room.notifs %}
-            {% include 'notif.html' with context %}
-        {% endfor %}
-    </div>
+    {% if room.invite %}
+        <a href="{{ room.link }}">Join the conversation.</a>
+    {% else %}
+        <div>
+            {% for notif in room.notifs %}
+                {% include 'notif.html' with context %}
+            {% endfor %}
+        </div>
+    {% endif %}
 </div>

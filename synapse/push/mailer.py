@@ -39,6 +39,8 @@ MESSAGE_FROM_PERSON = "You have a message from %s"
 MESSAGES_FROM_PERSON = "You have messages from %s"
 MESSAGES_IN_ROOM = "There are some messages for you in the %s room"
 MESSAGES_IN_ROOMS = "Here are some messages you may have missed"
+INVITE_FROM_PERSON_TO_ROOM = "%s has invited you to join the %s room"
+INVITE_FROM_PERSON = "%s has invited you to chat"
 
 CONTEXT_BEFORE = 1
 
@@ -148,17 +150,24 @@ class Mailer(object):
 
     @defer.inlineCallbacks
     def get_room_vars(self, room_id, user_id, notifs, notif_events, room_state):
+        my_member_event = room_state[("m.room.member", user_id)]
+        is_invite = my_member_event.content["membership"] == "invite"
+
         room_vars = {
             "title": calculate_room_name(room_state, user_id),
             "hash": string_ordinal_total(room_id),  # See sender avatar hash
             "notifs": [],
+            "invite": is_invite
         }
 
-        for n in notifs:
-            vars = yield self.get_notif_vars(
-                n, user_id, notif_events[n['event_id']], room_state
-            )
-            room_vars['notifs'].append(vars)
+        if is_invite:
+            room_vars["link"] = self.make_room_link(room_id)
+        else:
+            for n in notifs:
+                vars = yield self.get_notif_vars(
+                    n, user_id, notif_events[n['event_id']], room_state
+                )
+                room_vars['notifs'].append(vars)
 
         defer.returnValue(room_vars)
 
@@ -235,6 +244,18 @@ class Mailer(object):
                 state_by_room[room_id], user_id, fallback_to_members=False
             )
 
+            my_member_event = state_by_room[room_id][("m.room.member", user_id)]
+            if my_member_event.content["membership"] == "invite":
+                inviter_member_event = state_by_room[room_id][
+                    ("m.room.member", my_member_event.sender)
+                ]
+                inviter_name = name_from_member_event(inviter_member_event)
+
+                if room_name is None:
+                    return INVITE_FROM_PERSON % (inviter_name,)
+                else:
+                    return INVITE_FROM_PERSON_TO_ROOM % (inviter_name, room_name)
+
             sender_name = None
             if len(notifs_by_room[room_id]) == 1:
                 # There is just the one notification, so give some detail
@@ -242,6 +263,7 @@ class Mailer(object):
                 if ("m.room.member", event.sender) in state_by_room[room_id]:
                     state_event = state_by_room[room_id][("m.room.member", event.sender)]
                     sender_name = name_from_member_event(state_event)
+
                 if sender_name is not None and room_name is not None:
                     return MESSAGE_FROM_PERSON_IN_ROOM % (sender_name, room_name)
                 elif sender_name is not None:
@@ -267,6 +289,9 @@ class Mailer(object):
         else:
             # Stuff's happened in multiple different rooms
             return MESSAGES_IN_ROOMS
+
+    def make_room_link(self, room_id):
+        return "https://matrix.to/%s" % (room_id,)
 
     def make_notif_link(self, notif):
         return "https://matrix.to/%s/%s" % (

@@ -52,6 +52,9 @@ def calculate_room_name(room_state, user_id, fallback_to_members=True):
                 if len(the_aliases) > 0 and _looks_like_an_alias(the_aliases[0]):
                     return the_aliases[0]
 
+    if not fallback_to_members:
+        return None
+
     my_member_event = None
     if ("m.room.member", user_id) in room_state:
         my_member_event = room_state[("m.room.member", user_id)]
@@ -65,9 +68,6 @@ def calculate_room_name(room_state, user_id, fallback_to_members=True):
             return "Invite from %s" % (name_from_member_event(inviter_member_event),)
         else:
             return "Room Invite"
-
-    if not fallback_to_members:
-        return None
 
     # we're going to have to generate a name based on who's in the room,
     # so find out who is in the room that isn't the user.
