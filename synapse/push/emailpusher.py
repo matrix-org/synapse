@@ -122,10 +122,6 @@ class EmailPusher(object):
         up logging, measures and guards against multiple instances of it
         being run.
         """
-        last_notifs = yield self.store.get_time_of_latest_push_action_by_room_for_user(
-            self.user_id
-        )
-
         unprocessed = yield self.store.get_unread_push_actions_for_user_in_range(
             self.user_id, self.last_stream_ordering, self.max_stream_ordering
         )

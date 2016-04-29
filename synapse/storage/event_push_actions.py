@@ -212,28 +212,6 @@ class EventPushActionsStore(SQLBaseStore):
         )
         defer.returnValue(result[0] or 0)
 
-    @defer.inlineCallbacks
-    def get_time_of_latest_push_action_by_room_for_user(self, user_id):
-        """
-        Returns only the received_ts of the last notification in each of the
-        user's rooms, in a dict by room_id
-        """
-        def f(txn):
-            txn.execute(
-                "SELECT ep.room_id, MAX(e.received_ts)"
-                " FROM event_push_actions AS ep"
-                " JOIN events e ON ep.room_id = e.room_id AND ep.event_id = e.event_id"
-                " WHERE ep.user_id = ?"
-                " GROUP BY ep.room_id",
-                (user_id,)
-            )
-            return txn.fetchall()
-        result = yield self.runInteraction(
-            "get_time_of_latest_push_action_by_room_for_user", f
-        )
-
-        defer.returnValue({row[0]: row[1] for row in result})
-
     def _remove_push_actions_for_event_id_txn(self, txn, room_id, event_id):
         # Sad that we have to blow away the cache for the whole room here
         txn.call_after(
