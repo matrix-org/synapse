@@ -50,6 +50,7 @@ class PusherPool:
         # recreated, added and started: this means we have only one
         # code path adding pushers.
         pusher.create_pusher(self.hs, {
+            "id": None,
             "user_name": user_id,
             "kind": kind,
             "app_id": app_id,
