@@ -82,5 +82,6 @@ class EmailConfig(Config):
         #   smtp_port: 25
         #   notif_from: Your Friendly Matrix Home Server <noreply@example.com>
         #   template_dir: res/templates
-        #   notif_template_html: notif.html
+        #   notif_template_html: notif_email.html
+        #   notif_template_text: notif_email.txt
         """
