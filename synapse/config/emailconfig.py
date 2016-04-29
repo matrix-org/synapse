@@ -38,6 +38,7 @@ class EmailConfig(Config):
                 "notif_from",
                 "template_dir",
                 "notif_template_html",
+                "notif_template_text",
             ]
 
             missing = []
@@ -61,6 +62,7 @@ class EmailConfig(Config):
             self.email_notif_from = email_config["notif_from"]
             self.email_template_dir = email_config["template_dir"]
             self.email_notif_template_html = email_config["notif_template_html"]
+            self.email_notif_template_text = email_config["notif_template_text"]
 
             # make sure it's valid
             parsed = email.utils.parseaddr(self.email_notif_from)

@@ -19,6 +19,7 @@ from twisted.mail.smtp import sendmail
 import email.utils
 import email.mime.multipart
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 from synapse.util.async import concurrently_execute
 from synapse.util.presentable_names import (
@@ -74,7 +75,12 @@ class Mailer(object):
         env = jinja2.Environment(loader=loader)
         env.filters["format_ts"] = format_ts_filter
         env.filters["mxc_to_http"] = self.mxc_to_http_filter
-        self.notif_template = env.get_template(self.hs.config.email_notif_template_html)
+        self.notif_template_html = env.get_template(
+            self.hs.config.email_notif_template_html
+        )
+        self.notif_template_text = env.get_template(
+            self.hs.config.email_notif_template_text
+        )
 
     @defer.inlineCallbacks
     def send_notification_mail(self, user_id, email_address, push_actions):
@@ -135,16 +141,23 @@ class Mailer(object):
             "rooms": rooms,
         }
 
-        plainText = self.notif_template.render(**template_vars)
+        html_text = self.notif_template_html.render(**template_vars)
+        html_part = MIMEText(html_text, "html", "utf8")
 
-        text_part = MIMEText(plainText, "html", "utf8")
-        text_part['Subject'] = "New Matrix Notifications"
-        text_part['From'] = self.hs.config.email_notif_from
-        text_part['To'] = email_address
+        plain_text = self.notif_template_text.render(**template_vars)
+        text_part = MIMEText(plain_text, "plain", "utf8")
+
+        multipart_msg = MIMEMultipart('alternative')
+        multipart_msg['Subject'] = "New Matrix Notifications"
+        multipart_msg['From'] = self.hs.config.email_notif_from
+        multipart_msg['To'] = email_address
+        multipart_msg.attach(text_part)
+        multipart_msg.attach(html_part)
+
 
         yield sendmail(
             self.hs.config.email_smtp_host,
-            raw_from, raw_to, text_part.as_string(),
+            raw_from, raw_to, multipart_msg.as_string(),
             port=self.hs.config.email_smtp_port
         )
 
