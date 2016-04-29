@@ -154,7 +154,6 @@ class Mailer(object):
         multipart_msg.attach(text_part)
         multipart_msg.attach(html_part)
 
-
         yield sendmail(
             self.hs.config.email_smtp_host,
             raw_from, raw_to, multipart_msg.as_string(),
