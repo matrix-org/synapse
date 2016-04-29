@@ -159,6 +159,7 @@ class EmailPusher(object):
                 yield self.sent_notif_update_throttle(
                     push_action['room_id'], push_action
                 )
+                break
             else:
                 if soonest_due_at is None or should_notify_at < soonest_due_at:
                     soonest_due_at = should_notify_at
