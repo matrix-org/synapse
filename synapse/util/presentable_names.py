@@ -23,6 +23,20 @@ ALL_ALONE = "Empty Room"
 
 
 def calculate_room_name(room_state, user_id, fallback_to_members=True):
+    """
+    Works out a user-facing name for the given room as per Matrix
+    spec recommendations.
+    Does not yet support internationalisation.
+    Args:
+        room_state: Dictionary of the room's state
+        user_id: The ID of the user to whom the room name is being presented
+        fallback_to_members: If False, return None instead of generating a name
+                             based on the room's members if the room has no
+                             title or aliases.
+
+    Returns:
+        (string or None) A human readable name for the room.
+    """
     # does it have a name?
     if ("m.room.name", "") in room_state:
         m_room_name = room_state[("m.room.name", "")]
