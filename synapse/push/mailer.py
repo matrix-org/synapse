@@ -27,6 +27,7 @@ from synapse.util.presentable_names import (
 )
 from synapse.types import UserID
 from synapse.api.errors import StoreError
+from synapse.api.constants import EventTypes
 
 import jinja2
 import bleach
@@ -209,7 +210,7 @@ class Mailer(object):
         defer.returnValue(ret)
 
     def get_message_vars(self, notif, event, room_state):
-        if event.type != "m.room.message":
+        if event.type != EventTypes.Message:
             return None
 
         sender_state_event = room_state[("m.room.member", event.sender)]
