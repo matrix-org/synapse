@@ -139,7 +139,7 @@ class EmailPusher(object):
             notif_ready_at = received_at + DELAY_BEFORE_MAIL_MS
 
             room_ready_at = self.room_ready_to_notify_at(
-                push_action['room_id'], last_notifs.get(push_action['room_id'], 0)
+                push_action['room_id']
             )
 
             should_notify_at = max(notif_ready_at, room_ready_at)
@@ -194,7 +194,7 @@ class EmailPusher(object):
         else:
             return 0
 
-    def room_ready_to_notify_at(self, room_id, last_notif_time):
+    def room_ready_to_notify_at(self, room_id):
         """
         Determines whether throttling should prevent us from sending an email
         for the given room
