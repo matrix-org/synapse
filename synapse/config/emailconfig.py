@@ -23,9 +23,8 @@ class EmailConfig(Config):
     def read_config(self, config):
         self.email_enable_notifs = False
 
-        email_config = config.get("email", None)
-        if email_config:
-            self.email_enable_notifs = email_config.get("enable_notifs", True)
+        email_config = config.get("email", {})
+        self.email_enable_notifs = email_config.get("enable_notifs", True)
 
         if self.email_enable_notifs:
             required = [
