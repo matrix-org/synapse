@@ -30,6 +30,7 @@ DELAY_BEFORE_MAIL_MS = 2 * 60 * 1000
 
 THROTTLE_START_MS = 2 * 60 * 1000
 THROTTLE_MAX_MS = (2 * 60 * 1000) * (2 ** 11)  # ~3 days
+THROTTLE_MULTIPLIER = 2
 
 # If no event triggers a notification for this long after the previous,
 # the throttle is released.
@@ -231,7 +232,7 @@ class EmailPusher(object):
                 new_throttle_ms = THROTTLE_START_MS
             else:
                 new_throttle_ms = min(
-                    current_throttle_ms * 2,
+                    current_throttle_ms * THROTTLE_MULTIPLIER,
                     THROTTLE_MAX_MS
                 )
         self.throttle_params[room_id] = {
