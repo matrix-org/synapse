@@ -52,6 +52,7 @@ class PasswordRestServlet(RestServlet):
             defer.returnValue((401, result))
 
         user_id = None
+        requester = None
 
         if LoginType.PASSWORD in result:
             # if using password, they should also be logged in
