@@ -223,7 +223,9 @@ class EventPushActionsStore(SQLBaseStore):
                 "SELECT ep.room_id, MAX(e.received_ts)"
                 " FROM event_push_actions AS ep"
                 " JOIN events e ON ep.room_id = e.room_id AND ep.event_id = e.event_id"
-                " GROUP BY ep.room_id"
+                " WHERE ep.user_id = ?"
+                " GROUP BY ep.room_id",
+                (user_id,)
             )
             return txn.fetchall()
         result = yield self.runInteraction(
