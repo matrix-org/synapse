@@ -35,13 +35,13 @@ import time
 import urllib
 
 
-MESSAGE_FROM_PERSON_IN_ROOM = "You have a message from %s in the %s room"
-MESSAGE_FROM_PERSON = "You have a message from %s"
-MESSAGES_FROM_PERSON = "You have messages from %s"
-MESSAGES_IN_ROOM = "There are some messages for you in the %s room"
+MESSAGE_FROM_PERSON_IN_ROOM = "You have a message from %(person)s in the %s room"
+MESSAGE_FROM_PERSON = "You have a message from %(person)s"
+MESSAGES_FROM_PERSON = "You have messages from %(person)s"
+MESSAGES_IN_ROOM = "There are some messages for you in the %(room)s room"
 MESSAGES_IN_ROOMS = "Here are some messages you may have missed"
-INVITE_FROM_PERSON_TO_ROOM = "%s has invited you to join the %s room"
-INVITE_FROM_PERSON = "%s has invited you to chat"
+INVITE_FROM_PERSON_TO_ROOM = "%(person)s has invited you to join the %(room)s room"
+INVITE_FROM_PERSON = "%(person)s has invited you to chat"
 
 CONTEXT_BEFORE = 1
 
@@ -278,9 +278,11 @@ class Mailer(object):
                 inviter_name = name_from_member_event(inviter_member_event)
 
                 if room_name is None:
-                    return INVITE_FROM_PERSON % (inviter_name,)
+                    return INVITE_FROM_PERSON % {"person": inviter_name}
                 else:
-                    return INVITE_FROM_PERSON_TO_ROOM % (inviter_name, room_name)
+                    return INVITE_FROM_PERSON_TO_ROOM % {
+                        "person": inviter_name, "room": room_name
+                    }
 
             sender_name = None
             if len(notifs_by_room[room_id]) == 1:
@@ -291,14 +293,20 @@ class Mailer(object):
                     sender_name = name_from_member_event(state_event)
 
                 if sender_name is not None and room_name is not None:
-                    return MESSAGE_FROM_PERSON_IN_ROOM % (sender_name, room_name)
+                    return MESSAGE_FROM_PERSON_IN_ROOM % {
+                        "person": sender_name, "room": room_name
+                    }
                 elif sender_name is not None:
-                    return MESSAGE_FROM_PERSON % (sender_name,)
+                    return MESSAGE_FROM_PERSON % {
+                        "person": sender_name
+                    }
             else:
                 # There's more than one notification for this room, so just
                 # say there are several
                 if room_name is not None:
-                    return MESSAGES_IN_ROOM % (room_name,)
+                    return MESSAGES_IN_ROOM % {
+                        "room": room_name
+                    }
                 else:
                     # If the room doesn't have a name, say who the messages
                     # are from explicitly to avoid, "messages in the Bob room"
@@ -307,12 +315,12 @@ class Mailer(object):
                         for n in notifs_by_room[room_id]
                     ]))
 
-                    return MESSAGES_FROM_PERSON % (
-                        descriptor_from_member_events([
+                    return MESSAGES_FROM_PERSON % {
+                        "person": descriptor_from_member_events([
                             state_by_room[room_id][("m.room.member", s)]
                             for s in sender_ids
                         ])
-                    )
+                    }
         else:
             # Stuff's happened in multiple different rooms
             return MESSAGES_IN_ROOMS
