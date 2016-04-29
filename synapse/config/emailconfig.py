@@ -20,10 +20,6 @@ from ._base import Config
 
 
 class EmailConfig(Config):
-    """
-    Email Configuration
-    """
-
     def read_config(self, config):
         self.email_enable_notifs = False
 
