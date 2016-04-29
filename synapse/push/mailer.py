@@ -125,10 +125,10 @@ class Mailer(object):
         rooms = []
 
         for r in rooms_in_order:
-            vars = yield self.get_room_vars(
+            roomvars = yield self.get_room_vars(
                 r, user_id, notifs_by_room[r], notif_events, state_by_room[r]
             )
-            rooms.append(vars)
+            rooms.append(roomvars)
 
         summary_text = self.make_summary_text(
             notifs_by_room, state_by_room, notif_events, user_id
@@ -175,10 +175,10 @@ class Mailer(object):
 
         if not is_invite:
             for n in notifs:
-                vars = yield self.get_notif_vars(
+                notifvars = yield self.get_notif_vars(
                     n, user_id, notif_events[n['event_id']], room_state
                 )
-                room_vars['notifs'].append(vars)
+                room_vars['notifs'].append(notifvars)
 
         defer.returnValue(room_vars)
 
@@ -202,9 +202,9 @@ class Mailer(object):
         the_events.append(notif_event)
 
         for event in the_events:
-            vars = self.get_message_vars(notif, event, room_state)
-            if vars is not None:
-                ret['messages'].append(vars)
+            messagevars = self.get_message_vars(notif, event, room_state)
+            if messagevars is not None:
+                ret['messages'].append(messagevars)
 
         defer.returnValue(ret)
 
@@ -239,24 +239,24 @@ class Mailer(object):
 
         return ret
 
-    def add_text_message_vars(self, vars, event):
+    def add_text_message_vars(self, messagevars, event):
         if "format" in event.content:
             msgformat = event.content["format"]
         else:
             msgformat = None
-        vars["format"] = msgformat
+        messagevars["format"] = msgformat
 
         if msgformat == "org.matrix.custom.html":
-            vars["body_text_html"] = safe_markup(event.content["formatted_body"])
+            messagevars["body_text_html"] = safe_markup(event.content["formatted_body"])
         else:
-            vars["body_text_html"] = safe_text(event.content["body"])
+            messagevars["body_text_html"] = safe_text(event.content["body"])
 
-        return vars
+        return messagevars
 
-    def add_image_message_vars(self, vars, event):
-        vars["image_url"] = event.content["url"]
+    def add_image_message_vars(self, messagevars, event):
+        messagevars["image_url"] = event.content["url"]
 
-        return vars
+        return messagevars
 
     def make_summary_text(self, notifs_by_room, state_by_room, notif_events, user_id):
         if len(notifs_by_room) == 1:
