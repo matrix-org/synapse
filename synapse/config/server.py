@@ -148,8 +148,8 @@ class ServerConfig(Config):
         # Whether to serve a web client from the HTTP/HTTPS root resource.
         web_client: True
 
-        # The server's public-facing base URL
-        # https://example.com:8448/
+        # The public-facing base URL for the client API (not including _matrix/...)
+        # public_baseurl: https://example.com:8448/
 
         # Set the soft limit on the number of file descriptors synapse can use
         # Zero is used to indicate synapse should set the soft limit to the
