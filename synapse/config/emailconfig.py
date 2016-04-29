@@ -24,7 +24,7 @@ class EmailConfig(Config):
         self.email_enable_notifs = False
 
         email_config = config.get("email", {})
-        self.email_enable_notifs = email_config.get("enable_notifs", True)
+        self.email_enable_notifs = email_config.get("enable_notifs", False)
 
         if self.email_enable_notifs:
             required = [
