@@ -155,13 +155,13 @@ class EventPushActionsStore(SQLBaseStore):
 
         def get_no_receipt(txn):
             sql = (
-                "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions, "
-                "e.received_ts "
-                "FROM event_push_actions AS ep "
-                "JOIN events e ON ep.room_id = e.room_id AND ep.event_id = e.event_id "
-                "WHERE ep.room_id not in ("
+                "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,"
+                " e.received_ts"
+                " FROM event_push_actions AS ep"
+                " JOIN events e ON ep.room_id = e.room_id AND ep.event_id = e.event_id"
+                " WHERE ep.room_id not in ("
                 "   SELECT room_id FROM events NATURAL JOIN receipts_linearized"
-                "   WHERE receipt_type = 'm.read' AND user_id = ? "
+                "   WHERE receipt_type = 'm.read' AND user_id = ?"
                 "   GROUP BY room_id"
                 ") AND ep.user_id = ? AND ep.stream_ordering > ?"
             )
@@ -190,12 +190,12 @@ class EventPushActionsStore(SQLBaseStore):
     def get_time_of_last_push_action_before(self, stream_ordering):
         def f(txn):
             sql = (
-                "SELECT e.received_ts "
-                "FROM event_push_actions AS ep "
-                "JOIN events e ON ep.room_id = e.room_id AND ep.event_id = e.event_id "
-                "WHERE ep.stream_ordering > ? "
-                "ORDER BY ep.stream_ordering ASC "
-                "LIMIT 1"
+                "SELECT e.received_ts"
+                " FROM event_push_actions AS ep"
+                " JOIN events e ON ep.room_id = e.room_id AND ep.event_id = e.event_id"
+                " WHERE ep.stream_ordering > ?"
+                " ORDER BY ep.stream_ordering ASC"
+                " LIMIT 1"
             )
             txn.execute(sql, (stream_ordering,))
             return txn.fetchone()
@@ -220,10 +220,10 @@ class EventPushActionsStore(SQLBaseStore):
         """
         def f(txn):
             txn.execute(
-                "SELECT ep.room_id, MAX(e.received_ts) "
-                "FROM event_push_actions AS ep "
-                "JOIN events e ON ep.room_id = e.room_id AND ep.event_id = e.event_id "
-                "GROUP BY ep.room_id"
+                "SELECT ep.room_id, MAX(e.received_ts)"
+                " FROM event_push_actions AS ep"
+                " JOIN events e ON ep.room_id = e.room_id AND ep.event_id = e.event_id"
+                " GROUP BY ep.room_id"
             )
             return txn.fetchall()
         result = yield self.runInteraction(
