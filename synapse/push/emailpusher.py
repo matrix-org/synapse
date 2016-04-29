@@ -139,9 +139,7 @@ class EmailPusher(object):
             notif_ready_at = received_at + DELAY_BEFORE_MAIL_MS
 
             room_ready_at = self.room_ready_to_notify_at(
-                push_action['room_id'], self.get_room_last_notif_ts(
-                    last_notifs, push_action['room_id']
-                )
+                push_action['room_id'], last_notifs.get(push_action['room_id'], 0)
             )
 
             should_notify_at = max(notif_ready_at, room_ready_at)
@@ -183,12 +181,6 @@ class EmailPusher(object):
 
     def seconds_until(self, ts_msec):
         return (ts_msec - self.clock.time_msec()) / 1000
-
-    def get_room_last_notif_ts(self, last_notif_by_room, room_id):
-        if room_id in last_notif_by_room:
-            return last_notif_by_room[room_id]
-        else:
-            return 0
 
     def get_room_throttle_ms(self, room_id):
         if room_id in self.throttle_params:
