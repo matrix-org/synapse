@@ -27,6 +27,13 @@ class EmailConfig(Config):
         self.email_enable_notifs = email_config.get("enable_notifs", False)
 
         if self.email_enable_notifs:
+            # make sure we can import the required deps
+            import jinja2
+            import bleach
+            # prevent unused warnings
+            jinja2
+            bleach
+
             required = [
                 "smtp_host",
                 "smtp_port",
