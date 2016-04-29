@@ -36,12 +36,13 @@ class DownloadResource(Resource):
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.version_string = hs.version_string
+        self.clock = hs.get_clock()
 
     def render_GET(self, request):
         self._async_render_GET(request)
         return NOT_DONE_YET
 
-    @request_handler
+    @request_handler()
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
         server_name, media_id, name = parse_media_id(request)

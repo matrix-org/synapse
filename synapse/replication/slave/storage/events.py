@@ -21,6 +21,7 @@ from synapse.storage import DataStore
 from synapse.storage.room import RoomStore
 from synapse.storage.roommember import RoomMemberStore
 from synapse.storage.event_federation import EventFederationStore
+from synapse.storage.event_push_actions import EventPushActionsStore
 from synapse.storage.state import StateStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
@@ -68,7 +69,19 @@ class SlavedEventStore(BaseSlavedStore):
     _get_current_state_for_key = StateStore.__dict__[
         "_get_current_state_for_key"
     ]
+    get_invited_rooms_for_user = RoomMemberStore.__dict__[
+        "get_invited_rooms_for_user"
+    ]
+    get_unread_event_push_actions_by_room_for_user = (
+        EventPushActionsStore.__dict__["get_unread_event_push_actions_by_room_for_user"]
+    )
 
+    get_unread_push_actions_for_user_in_range = (
+        DataStore.get_unread_push_actions_for_user_in_range.__func__
+    )
+    get_push_action_users_in_range = (
+        DataStore.get_push_action_users_in_range.__func__
+    )
     get_event = DataStore.get_event.__func__
     get_current_state = DataStore.get_current_state.__func__
     get_current_state_for_key = DataStore.get_current_state_for_key.__func__
@@ -82,6 +95,7 @@ class SlavedEventStore(BaseSlavedStore):
     get_room_events_stream_for_room = (
         DataStore.get_room_events_stream_for_room.__func__
     )
+
     _set_before_and_after = DataStore._set_before_and_after
 
     _get_events = DataStore._get_events.__func__
@@ -104,7 +118,7 @@ class SlavedEventStore(BaseSlavedStore):
     def stream_positions(self):
         result = super(SlavedEventStore, self).stream_positions()
         result["events"] = self._stream_id_gen.get_current_token()
-        result["backfill"] = self._backfill_id_gen.get_current_token()
+        result["backfill"] = -self._backfill_id_gen.get_current_token()
         return result
 
     def process_replication(self, result):
@@ -122,7 +136,7 @@ class SlavedEventStore(BaseSlavedStore):
 
         stream = result.get("backfill")
         if stream:
-            self._backfill_id_gen.advance(stream["position"])
+            self._backfill_id_gen.advance(-stream["position"])
             for row in stream["rows"]:
                 self._process_replication_row(
                     row, backfilled=True, state_resets=state_resets
@@ -147,11 +161,11 @@ class SlavedEventStore(BaseSlavedStore):
         internal = json.loads(row[1])
         event_json = json.loads(row[2])
         event = FrozenEvent(event_json, internal_metadata_dict=internal)
-        self._invalidate_caches_for_event(
+        self.invalidate_caches_for_event(
             event, backfilled, reset_state=position in state_resets
         )
 
-    def _invalidate_caches_for_event(self, event, backfilled, reset_state):
+    def invalidate_caches_for_event(self, event, backfilled, reset_state):
         if reset_state:
             self._get_current_state_for_key.invalidate_all()
             self.get_rooms_for_user.invalidate_all()
@@ -162,6 +176,10 @@ class SlavedEventStore(BaseSlavedStore):
         self._invalidate_get_event_cache(event.event_id)
 
         self.get_latest_event_ids_in_room.invalidate((event.room_id,))
+
+        self.get_unread_event_push_actions_by_room_for_user.invalidate_many(
+            (event.room_id,)
+        )
 
         if not backfilled:
             self._events_stream_cache.entity_has_changed(
@@ -182,6 +200,7 @@ class SlavedEventStore(BaseSlavedStore):
             # self._membership_stream_cache.entity_has_changed(
             #    event.state_key, event.internal_metadata.stream_ordering
             # )
+            self.get_invited_rooms_for_user.invalidate((event.state_key,))
 
         if not event.is_state():
             return

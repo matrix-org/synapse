@@ -16,6 +16,7 @@ from ._base import BaseSlavedStoreTestCase
 
 from synapse.events import FrozenEvent, _EventInternalMetadata
 from synapse.events.snapshot import EventContext
+from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.storage.roommember import RoomsForUser
 
 from twisted.internet import defer
@@ -42,6 +43,8 @@ def patch__eq__(cls):
 
 
 class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
+
+    STORE_TYPE = SlavedEventStore
 
     def setUp(self):
         # Patch up the equality operator for events so that we can check
@@ -251,6 +254,59 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         redacted = FrozenEvent(msg_dict, msg.internal_metadata.get_dict())
         yield self.check("get_event", [msg.event_id], redacted)
 
+    @defer.inlineCallbacks
+    def test_invites(self):
+        yield self.check("get_invited_rooms_for_user", [USER_ID_2], [])
+        event = yield self.persist(
+            type="m.room.member", key=USER_ID_2, membership="invite"
+        )
+        yield self.replicate()
+        yield self.check("get_invited_rooms_for_user", [USER_ID_2], [RoomsForUser(
+            ROOM_ID, USER_ID, "invite", event.event_id,
+            event.internal_metadata.stream_ordering
+        )])
+
+    @defer.inlineCallbacks
+    def test_push_actions_for_user(self):
+        yield self.persist(type="m.room.create", creator=USER_ID)
+        yield self.persist(type="m.room.join", key=USER_ID, membership="join")
+        yield self.persist(
+            type="m.room.join", sender=USER_ID, key=USER_ID_2, membership="join"
+        )
+        event1 = yield self.persist(
+            type="m.room.message", msgtype="m.text", body="hello"
+        )
+        yield self.replicate()
+        yield self.check(
+            "get_unread_event_push_actions_by_room_for_user",
+            [ROOM_ID, USER_ID_2, event1.event_id],
+            {"highlight_count": 0, "notify_count": 0}
+        )
+
+        yield self.persist(
+            type="m.room.message", msgtype="m.text", body="world",
+            push_actions=[(USER_ID_2, ["notify"])],
+        )
+        yield self.replicate()
+        yield self.check(
+            "get_unread_event_push_actions_by_room_for_user",
+            [ROOM_ID, USER_ID_2, event1.event_id],
+            {"highlight_count": 0, "notify_count": 1}
+        )
+
+        yield self.persist(
+            type="m.room.message", msgtype="m.text", body="world",
+            push_actions=[(USER_ID_2, [
+                "notify", {"set_tweak": "highlight", "value": True}
+            ])],
+        )
+        yield self.replicate()
+        yield self.check(
+            "get_unread_event_push_actions_by_room_for_user",
+            [ROOM_ID, USER_ID_2, event1.event_id],
+            {"highlight_count": 1, "notify_count": 2}
+        )
+
     event_id = 0
 
     @defer.inlineCallbacks
@@ -258,6 +314,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self, sender=USER_ID, room_id=ROOM_ID, type={}, key=None, internal={},
         state=None, reset_state=False, backfill=False,
         depth=None, prev_events=[], auth_events=[], prev_state=[], redacts=None,
+        push_actions=[],
         **content
     ):
         """
@@ -290,6 +347,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.event_id += 1
 
         context = EventContext(current_state=state)
+        context.push_actions = push_actions
 
         ordering = None
         if backfill:

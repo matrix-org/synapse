@@ -74,7 +74,12 @@ response_db_txn_duration = metrics.register_distribution(
 _next_request_id = 0
 
 
-def request_handler(request_handler):
+def request_handler(report_metrics=True):
+    """Decorator for ``wrap_request_handler``"""
+    return lambda request_handler: wrap_request_handler(request_handler, report_metrics)
+
+
+def wrap_request_handler(request_handler, report_metrics):
     """Wraps a method that acts as a request handler with the necessary logging
     and exception handling.
 
@@ -96,7 +101,12 @@ def request_handler(request_handler):
         global _next_request_id
         request_id = "%s-%s" % (request.method, _next_request_id)
         _next_request_id += 1
+
         with LoggingContext(request_id) as request_context:
+            if report_metrics:
+                request_metrics = RequestMetrics()
+                request_metrics.start(self.clock)
+
             request_context.request = request_id
             with request.processing():
                 try:
@@ -133,6 +143,14 @@ def request_handler(request_handler):
                         },
                         send_cors=True
                     )
+                finally:
+                    try:
+                        if report_metrics:
+                            request_metrics.stop(
+                                self.clock, request, self.__class__.__name__
+                            )
+                    except:
+                        pass
     return wrapped_request_handler
 
 
@@ -197,19 +215,23 @@ class JsonResource(HttpServer, resource.Resource):
         self._async_render(request)
         return server.NOT_DONE_YET
 
-    @request_handler
+    # Disable metric reporting because _async_render does its own metrics.
+    # It does its own metric reporting because _async_render dispatches to
+    # a callback and it's the class name of that callback we want to report
+    # against rather than the JsonResource itself.
+    @request_handler(report_metrics=False)
     @defer.inlineCallbacks
     def _async_render(self, request):
         """ This gets called from render() every time someone sends us a request.
             This checks if anyone has registered a callback for that method and
             path.
         """
-        start = self.clock.time_msec()
         if request.method == "OPTIONS":
             self._send_response(request, 200, {})
             return
 
-        start_context = LoggingContext.current_context()
+        request_metrics = RequestMetrics()
+        request_metrics.start(self.clock)
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
@@ -241,40 +263,7 @@ class JsonResource(HttpServer, resource.Resource):
                 self._send_response(request, code, response)
 
             try:
-                context = LoggingContext.current_context()
-
-                tag = ""
-                if context:
-                    tag = context.tag
-
-                    if context != start_context:
-                        logger.warn(
-                            "Context have unexpectedly changed %r, %r",
-                            context, self.start_context
-                        )
-                        return
-
-                incoming_requests_counter.inc(request.method, servlet_classname, tag)
-
-                response_timer.inc_by(
-                    self.clock.time_msec() - start, request.method,
-                    servlet_classname, tag
-                )
-
-                ru_utime, ru_stime = context.get_resource_usage()
-
-                response_ru_utime.inc_by(
-                    ru_utime, request.method, servlet_classname, tag
-                )
-                response_ru_stime.inc_by(
-                    ru_stime, request.method, servlet_classname, tag
-                )
-                response_db_txn_count.inc_by(
-                    context.db_txn_count, request.method, servlet_classname, tag
-                )
-                response_db_txn_duration.inc_by(
-                    context.db_txn_duration, request.method, servlet_classname, tag
-                )
+                request_metrics.stop(self.clock, request, servlet_classname)
             except:
                 pass
 
@@ -304,6 +293,48 @@ class JsonResource(HttpServer, resource.Resource):
             pretty_print=_request_user_agent_is_curl(request),
             version_string=self.version_string,
             canonical_json=self.canonical_json,
+        )
+
+
+class RequestMetrics(object):
+    def start(self, clock):
+        self.start = clock.time_msec()
+        self.start_context = LoggingContext.current_context()
+
+    def stop(self, clock, request, servlet_classname):
+        context = LoggingContext.current_context()
+
+        tag = ""
+        if context:
+            tag = context.tag
+
+            if context != self.start_context:
+                logger.warn(
+                    "Context have unexpectedly changed %r, %r",
+                    context, self.start_context
+                )
+                return
+
+        incoming_requests_counter.inc(request.method, servlet_classname, tag)
+
+        response_timer.inc_by(
+            clock.time_msec() - self.start, request.method,
+            servlet_classname, tag
+        )
+
+        ru_utime, ru_stime = context.get_resource_usage()
+
+        response_ru_utime.inc_by(
+            ru_utime, request.method, servlet_classname, tag
+        )
+        response_ru_stime.inc_by(
+            ru_stime, request.method, servlet_classname, tag
+        )
+        response_db_txn_count.inc_by(
+            context.db_txn_count, request.method, servlet_classname, tag
+        )
+        response_db_txn_duration.inc_by(
+            context.db_txn_duration, request.method, servlet_classname, tag
         )
 
 

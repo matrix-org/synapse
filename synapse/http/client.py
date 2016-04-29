@@ -462,5 +462,8 @@ class InsecureInterceptableContextFactory(ssl.ContextFactory):
         self._context = SSL.Context(SSL.SSLv23_METHOD)
         self._context.set_verify(VERIFY_NONE, lambda *_: None)
 
-    def getContext(self, hostname, port):
+    def getContext(self, hostname=None, port=None):
         return self._context
+
+    def creatorForNetloc(self, hostname, port):
+        return self

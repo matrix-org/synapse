@@ -232,7 +232,7 @@ class RoomMemberHandler(BaseHandler):
         if old_membership == "ban" and action != "unban":
             raise SynapseError(
                 403,
-                "Cannot %s user who was is banned" % (action,),
+                "Cannot %s user who was banned" % (action,),
                 errcode=Codes.BAD_STATE
             )
 

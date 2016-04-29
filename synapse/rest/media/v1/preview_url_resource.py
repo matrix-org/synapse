@@ -45,7 +45,17 @@ class PreviewUrlResource(Resource):
 
     def __init__(self, hs, media_repo):
         Resource.__init__(self)
+
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.version_string = hs.version_string
+        self.filepaths = media_repo.filepaths
+        self.max_spider_size = hs.config.max_spider_size
+        self.server_name = hs.hostname
+        self.store = hs.get_datastore()
         self.client = SpiderHttpClient(hs)
+        self.media_repo = media_repo
+
         if hasattr(hs.config, "url_preview_url_blacklist"):
             self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
 
@@ -60,18 +70,11 @@ class PreviewUrlResource(Resource):
 
         self.downloads = {}
 
-        self.auth = hs.get_auth()
-        self.clock = hs.get_clock()
-        self.version_string = hs.version_string
-        self.filepaths = media_repo.filepaths
-        self.max_spider_size = hs.config.max_spider_size
-        self.server_name = hs.hostname
-
     def render_GET(self, request):
         self._async_render_GET(request)
         return NOT_DONE_YET
 
-    @request_handler
+    @request_handler()
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
 
@@ -368,7 +371,7 @@ class PreviewUrlResource(Resource):
         file_id = random_string(24)
 
         fname = self.filepaths.local_media_filepath(file_id)
-        self._makedirs(fname)
+        self.media_repo._makedirs(fname)
 
         try:
             with open(fname, "wb") as f:

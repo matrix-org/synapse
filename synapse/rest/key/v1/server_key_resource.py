@@ -49,7 +49,6 @@ class LocalKey(Resource):
     """
 
     def __init__(self, hs):
-        self.hs = hs
         self.version_string = hs.version_string
         self.response_body = encode_canonical_json(
             self.response_json_object(hs.config)

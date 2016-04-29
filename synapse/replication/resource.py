@@ -15,6 +15,7 @@
 
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.http.server import request_handler, finish_request
+from synapse.replication.pusher_resource import PusherResource
 
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
@@ -102,8 +103,6 @@ class ReplicationResource(Resource):
     long-polling this replication API for new data on those streams.
     """
 
-    isLeaf = True
-
     def __init__(self, hs):
         Resource.__init__(self)  # Resource is old-style, so no super()
 
@@ -113,6 +112,9 @@ class ReplicationResource(Resource):
         self.presence_handler = hs.get_handlers().presence_handler
         self.typing_handler = hs.get_handlers().typing_notification_handler
         self.notifier = hs.notifier
+        self.clock = hs.get_clock()
+
+        self.putChild("remove_pushers", PusherResource(hs))
 
     def render_GET(self, request):
         self._async_render_GET(request)
@@ -138,7 +140,7 @@ class ReplicationResource(Resource):
             state_token,
         ))
 
-    @request_handler
+    @request_handler()
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
         limit = parse_integer(request, "limit", 100)
@@ -343,7 +345,7 @@ class ReplicationResource(Resource):
                 "app_id", "app_display_name", "device_display_name", "pushkey",
                 "ts", "lang", "data"
             ))
-            writer.write_header_and_rows("deleted", deleted, (
+            writer.write_header_and_rows("deleted_pushers", deleted, (
                 "position", "user_id", "app_id", "pushkey"
             ))
 
@@ -381,7 +383,7 @@ class _Writer(object):
             position = rows[-1][0]
 
         self.streams[name] = {
-            "position": str(position),
+            "position": position if type(position) is int else str(position),
             "field_names": fields,
             "rows": rows,
         }

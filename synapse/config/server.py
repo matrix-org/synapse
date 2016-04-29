@@ -33,6 +33,7 @@ class ServerConfig(Config):
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
                 self.public_baseurl += '/'
+        self.start_pushers = config.get("start_pushers", True)
 
         self.listeners = config.get("listeners", [])
 
