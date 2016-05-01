@@ -100,6 +100,11 @@ class ContentRepositoryConfig(Config):
                     "to work"
                 )
 
+            if "url_preview_ip_range_whitelist" in config:
+                self.url_preview_ip_range_whitelist = IPSet(
+                    config["url_preview_ip_range_whitelist"]
+                )
+
             if "url_preview_url_blacklist" in config:
                 self.url_preview_url_blacklist = config["url_preview_url_blacklist"]
 
@@ -162,6 +167,15 @@ class ContentRepositoryConfig(Config):
         # - '10.0.0.0/8'
         # - '172.16.0.0/12'
         # - '192.168.0.0/16'
+        #
+        # List of IP address CIDR ranges that the URL preview spider is allowed
+        # to access even if they are specified in url_preview_ip_range_blacklist.
+        # This is useful for specifying exceptions to wide-ranging blacklisted
+        # target IP ranges - e.g. for enabling URL previews for a specific private
+        # website only visible in your network.
+        #
+        # url_preview_ip_range_whitelist:
+        # - '192.168.1.1'
 
         # Optional list of URL matches that the URL preview spider is
         # denied from accessing.  You should use url_preview_ip_range_blacklist
