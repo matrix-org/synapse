@@ -84,7 +84,7 @@ class BaseHandler(object):
             events ([synapse.events.EventBase]): list of events to filter
         """
         forgotten = yield defer.gatherResults([
-            self.store.who_forgot_in_room(
+            preserve_fn(self.store.who_forgot_in_room)(
                 room_id,
             )
             for room_id in frozenset(e.room_id for e in events)
@@ -95,13 +95,33 @@ class BaseHandler(object):
             row["event_id"] for rows in forgotten for row in rows
         )
 
-        def allowed(event, user_id, is_peeking):
+        # Maps user_id -> account data content
+        ignore_dict_content = yield defer.gatherResults([
+            preserve_fn(self.store.get_global_account_data_by_type_for_user)(
+                user_id, "m.ignored_user_list"
+            ).addCallback(lambda d, u: (u, d), user_id)
+            for user_id, is_peeking in user_tuples
+        ]).addCallback(dict)
+
+        # FIXME: This will explode if people upload something incorrect.
+        ignore_dict = {
+            user_id: frozenset(
+                content.get("ignored_users", {}).keys() if content else []
+            )
+            for user_id, content in ignore_dict_content.items()
+        }
+
+        def allowed(event, user_id, is_peeking, ignore_list):
             """
             Args:
                 event (synapse.events.EventBase): event to check
                 user_id (str)
                 is_peeking (bool)
+                ignore_list (list): list of users to ignore
             """
+            if not event.is_state() and event.sender in ignore_list:
+                return False
+
             state = event_id_to_state[event.event_id]
 
             # get the room_visibility at the time of the event.
@@ -186,7 +206,7 @@ class BaseHandler(object):
             user_id: [
                 event
                 for event in events
-                if allowed(event, user_id, is_peeking)
+                if allowed(event, user_id, is_peeking, ignore_dict.get(user_id, []))
             ]
             for user_id, is_peeking in user_tuples
         })

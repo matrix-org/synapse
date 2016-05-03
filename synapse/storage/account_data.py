@@ -16,6 +16,8 @@
 from ._base import SQLBaseStore
 from twisted.internet import defer
 
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
+
 import ujson as json
 import logging
 
@@ -24,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 class AccountDataStore(SQLBaseStore):
 
+    @cached()
     def get_account_data_for_user(self, user_id):
         """Get all the client account_data for a user.
 
@@ -59,6 +62,28 @@ class AccountDataStore(SQLBaseStore):
         return self.runInteraction(
             "get_account_data_for_user", get_account_data_for_user_txn
         )
+
+    @cachedInlineCallbacks(num_args=2)
+    def get_global_account_data_by_type_for_user(self, user_id, data_type):
+        """
+        Returns:
+            Deferred: A dict
+        """
+        result = yield self._simple_select_one_onecol(
+            table="account_data",
+            keyvalues={
+                "user_id": user_id,
+                "account_data_type": data_type,
+            },
+            retcol="content",
+            desc="get_global_account_data_by_type_for_user",
+            allow_none=True,
+        )
+
+        if result:
+            defer.returnValue(json.loads(result))
+        else:
+            defer.returnValue(None)
 
     def get_account_data_for_room(self, user_id, room_id):
         """Get all the client account_data for a user for a room.
@@ -193,6 +218,7 @@ class AccountDataStore(SQLBaseStore):
                 self._account_data_stream_cache.entity_has_changed,
                 user_id, next_id,
             )
+            txn.call_after(self.get_account_data_for_user.invalidate, (user_id,))
             self._update_max_stream_id(txn, next_id)
 
         with self._account_data_id_gen.get_next() as next_id:
@@ -231,6 +257,11 @@ class AccountDataStore(SQLBaseStore):
             txn.call_after(
                 self._account_data_stream_cache.entity_has_changed,
                 user_id, next_id,
+            )
+            txn.call_after(self.get_account_data_for_user.invalidate, (user_id,))
+            txn.call_after(
+                self.get_global_account_data_by_type_for_user.invalidate,
+                (user_id, account_data_type,)
             )
             self._update_max_stream_id(txn, next_id)
 
