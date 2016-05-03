@@ -201,6 +201,18 @@ class EventPushActionsStore(SQLBaseStore):
             (room_id, event_id)
         )
 
+    def _remove_push_actions_before_txn(self, txn, room_id, user_id,
+                                        topological_ordering):
+        txn.call_after(
+            self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
+            (room_id, user_id, )
+        )
+        txn.execute(
+            "DELETE FROM event_push_actions"
+            " WHERE room_id = ? AND user_id = ? AND topological_ordering < ?",
+            (room_id, user_id, topological_ordering,)
+        )
+
 
 def _action_has_highlight(actions):
     for action in actions:
