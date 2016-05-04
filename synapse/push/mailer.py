@@ -44,7 +44,7 @@ MESSAGES_IN_ROOMS = "Here are some messages you may have missed"
 INVITE_FROM_PERSON_TO_ROOM = "%(person)s has invited you to join the %(room)s room"
 INVITE_FROM_PERSON = "%(person)s has invited you to chat"
 
-CONTEXT_BEFORE = 1
+CONTEXT_BEFORE = 0
 
 # From https://github.com/matrix-org/matrix-react-sdk/blob/master/src/HtmlUtils.js
 ALLOWED_TAGS = [
