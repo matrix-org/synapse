@@ -17,7 +17,6 @@
 from twisted.internet import defer
 
 import pusher
-from synapse.push import PusherConfigException
 from synapse.util.logcontext import preserve_fn
 from synapse.util.async import run_on_reactor
 
