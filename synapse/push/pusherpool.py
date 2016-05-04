@@ -186,8 +186,8 @@ class PusherPool:
         for pusherdict in pushers:
             try:
                 p = pusher.create_pusher(self.hs, pusherdict)
-            except PusherConfigException:
-                logger.exception("Couldn't start a pusher: caught PusherConfigException")
+            except:
+                logger.exception("Couldn't start a pusher: caught Exception")
                 continue
             if p:
                 appid_pushkey = "%s:%s" % (
