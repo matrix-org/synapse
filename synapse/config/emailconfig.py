@@ -78,12 +78,12 @@ class EmailConfig(Config):
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Enable sending emails for notification events
-        #email_config:
+        #email:
         #   enable_notifs: false
         #   smtp_host: "localhost"
         #   smtp_port: 25
         #   notif_from: Your Friendly Matrix Home Server <noreply@example.com>
         #   template_dir: res/templates
-        #   notif_template_html: notif_email.html
-        #   notif_template_text: notif_email.txt
+        #   notif_template_html: notif_mail.html
+        #   notif_template_text: notif_mail.txt
         """
