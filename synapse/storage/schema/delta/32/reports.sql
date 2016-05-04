@@ -15,6 +15,8 @@
 
 
 CREATE TABLE event_reports(
+    id BIGINT NOT NULL,
+    received_ts BIGINT NOT NULL,
     room_id TEXT NOT NULL,
     event_id TEXT NOT NULL,
     user_id TEXT NOT NULL,

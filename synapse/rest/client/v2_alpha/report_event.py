@@ -33,6 +33,7 @@ class ReportEventRestServlet(RestServlet):
         super(ReportEventRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
@@ -48,6 +49,7 @@ class ReportEventRestServlet(RestServlet):
             user_id=user_id,
             reason=body.get("reason"),
             content=body,
+            received_ts=self.clock.time_msec(),
         )
 
         defer.returnValue((200, {}))
