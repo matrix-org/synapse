@@ -110,6 +110,18 @@ class PusherSlaveStore(
         DataStore.update_pusher_last_stream_ordering.__func__
     )
 
+    get_throttle_params_by_room = (
+        DataStore.get_throttle_params_by_room.__func__
+    )
+
+    set_throttle_params = (
+        DataStore.set_throttle_params.__func__
+    )
+
+    get_time_of_last_push_action_before = (
+        DataStore.get_time_of_last_push_action_before.__func__
+    )
+
 
 class PusherServer(HomeServer):
 
