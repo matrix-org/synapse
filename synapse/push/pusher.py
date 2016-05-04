@@ -18,6 +18,7 @@ from httppusher import HttpPusher
 import logging
 logger = logging.getLogger(__name__)
 
+
 def create_pusher(hs, pusherdict):
     logger.info("trying to create_pusher for %r", pusherdict)
 
