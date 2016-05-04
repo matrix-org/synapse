@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class ReportEventRestServlet(RestServlet):
     PATTERNS = client_v2_patterns(
-        "/rooms/(?P<room_id>[^/]*)/report$"
+        "/rooms/(?P<room_id>[^/]*)/report/(?P<event_id>[^/]*)$"
     )
 
     def __init__(self, hs):
@@ -36,13 +36,11 @@ class ReportEventRestServlet(RestServlet):
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def on_POST(self, request, room_id):
+    def on_POST(self, request, room_id, event_id):
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         body = parse_json_object_from_request(request)
-
-        event_id = body["event_id"]
 
         yield self.store.add_event_report(
             room_id=room_id,
