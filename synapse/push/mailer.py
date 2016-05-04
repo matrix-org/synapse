@@ -152,6 +152,8 @@ class Mailer(object):
         multipart_msg['Subject'] = "New Matrix Notifications"
         multipart_msg['From'] = self.hs.config.email_notif_from
         multipart_msg['To'] = email_address
+        multipart_msg['Date'] = email.utils.formatdate()
+        multipart_msg['Message-ID'] = email.utils.make_msgid()
         multipart_msg.attach(text_part)
         multipart_msg.attach(html_part)
 

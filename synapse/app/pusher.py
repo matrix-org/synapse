@@ -20,6 +20,7 @@ from synapse.server import HomeServer
 from synapse.config._base import ConfigError
 from synapse.config.database import DatabaseConfig
 from synapse.config.logger import LoggingConfig
+from synapse.config.emailconfig import EmailConfig
 from synapse.http.site import SynapseSite
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.replication.slave.storage.events import SlavedEventStore
@@ -91,7 +92,7 @@ class SlaveConfig(DatabaseConfig):
         """ % locals()
 
 
-class PusherSlaveConfig(SlaveConfig, LoggingConfig):
+class PusherSlaveConfig(SlaveConfig, LoggingConfig, EmailConfig):
     pass
 
 
