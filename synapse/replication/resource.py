@@ -167,8 +167,6 @@ class ReplicationResource(Resource):
                 stream_content["position"],
                 request_streams.get(stream_name),
             )
-            if stream_content["position"] == request_streams.get(stream_name):
-                logger.warn("Returning same position for stream: %s", stream_name)
 
         request.write(json.dumps(result, ensure_ascii=False))
         finish_request(request)
