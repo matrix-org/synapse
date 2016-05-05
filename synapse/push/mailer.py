@@ -35,16 +35,20 @@ import bleach
 import time
 import urllib
 
+import logging
+logger = logging.getLogger(__name__)
 
-MESSAGE_FROM_PERSON_IN_ROOM = "You have a message from %(person)s in the %s room"
-MESSAGE_FROM_PERSON = "You have a message from %(person)s"
-MESSAGES_FROM_PERSON = "You have messages from %(person)s"
-MESSAGES_IN_ROOM = "There are some messages for you in the %(room)s room"
-MESSAGES_IN_ROOMS = "Here are some messages you may have missed"
-INVITE_FROM_PERSON_TO_ROOM = "%(person)s has invited you to join the %(room)s room"
-INVITE_FROM_PERSON = "%(person)s has invited you to chat"
 
-CONTEXT_BEFORE = 0
+MESSAGE_FROM_PERSON_IN_ROOM = "You have a message on %%app%% from %(person)s in the %s room..."
+MESSAGE_FROM_PERSON = "You have a message on %%app%% from %(person)s..."
+MESSAGES_FROM_PERSON = "You have messages on %%app%% from %(person)s..."
+MESSAGES_IN_ROOM = "There are some messages on %%app%% for you in the %(room)s room..."
+MESSAGES_IN_ROOMS = "Here are some messages on %%app%% you may have missed..."
+INVITE_FROM_PERSON_TO_ROOM = "%(person)s has invited you to join the %(room)s room on %%app%%..."
+INVITE_FROM_PERSON = "%(person)s has invited you to chat on %%app%%..."
+
+CONTEXT_BEFORE = 1
+CONTEXT_AFTER = 1
 
 # From https://github.com/matrix-org/matrix-react-sdk/blob/master/src/HtmlUtils.js
 ALLOWED_TAGS = [
@@ -181,7 +185,25 @@ class Mailer(object):
                 notifvars = yield self.get_notif_vars(
                     n, user_id, notif_events[n['event_id']], room_state
                 )
-                room_vars['notifs'].append(notifvars)
+
+                # merge overlapping notifs together.
+                # relies on the notifs being in chronological order.
+                merge = False
+                if room_vars['notifs'] and 'messages' in room_vars['notifs'][-1]:
+                    prev_messages = room_vars['notifs'][-1]['messages']
+                    for message in notifvars['messages']:
+                        pm = filter(lambda pm: pm['id'] == message['id'], prev_messages)
+                        if pm:
+                            if not message["is_historical"]:
+                                pm[0]["is_historical"] = False
+                            merge = True
+                        elif merge:
+                            # we're merging, so append any remaining messages
+                            # in this notif to the previous one
+                            prev_messages.append(message)
+
+                if not merge:
+                    room_vars['notifs'].append(notifvars)
 
         defer.returnValue(room_vars)
 
@@ -189,7 +211,7 @@ class Mailer(object):
     def get_notif_vars(self, notif, user_id, notif_event, room_state):
         results = yield self.store.get_events_around(
             notif['room_id'], notif['event_id'],
-            before_limit=CONTEXT_BEFORE, after_limit=0
+            before_limit=CONTEXT_BEFORE, after_limit=CONTEXT_AFTER
         )
 
         ret = {
@@ -226,6 +248,7 @@ class Mailer(object):
         ret = {
             "msgtype": event.content["msgtype"],
             "is_historical": event.event_id != notif['event_id'],
+            "id": event.event_id,
             "ts": event.origin_server_ts,
             "sender_name": sender_name,
             "sender_avatar_url": sender_avatar_url,
@@ -329,10 +352,12 @@ class Mailer(object):
             return MESSAGES_IN_ROOMS
 
     def make_room_link(self, room_id):
-        return "https://matrix.to/%s" % (room_id,)
+        # XXX: matrix.to
+        return "https://vector.im/#/room/%s" % (room_id,)
 
     def make_notif_link(self, notif):
-        return "https://matrix.to/%s/%s" % (
+        # XXX: matrix.to
+        return "https://vector.im/#/room/%s/%s" % (
             notif['room_id'], notif['event_id']
         )
 
@@ -342,16 +367,22 @@ class Mailer(object):
     def mxc_to_http_filter(self, value, width, height, resize_method="crop"):
         if value[0:6] != "mxc://":
             return ""
+
         serverAndMediaId = value[6:]
+        if '#' in serverAndMediaId:
+            (serverAndMediaId, fragment) = serverAndMediaId.split('#', 1)
+            fragment = "#" + fragment
+
         params = {
             "width": width,
             "height": height,
             "method": resize_method,
         }
-        return "%s_matrix/media/v1/thumbnail/%s?%s" % (
+        return "%s_matrix/media/v1/thumbnail/%s?%s%s" % (
             self.hs.config.public_baseurl,
             serverAndMediaId,
-            urllib.urlencode(params)
+            urllib.urlencode(params),
+            fragment or "",
         )
 
 
