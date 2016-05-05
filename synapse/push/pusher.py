@@ -28,7 +28,7 @@ def create_pusher(hs, pusherdict):
 
     logger.info("email enable notifs: %r", hs.config.email_enable_notifs)
     if hs.config.email_enable_notifs:
-        from emailpusher import EmailPusher
+        from synapse.push.emailpusher import EmailPusher
         PUSHER_TYPES["email"] = EmailPusher
         logger.info("defined email pusher type")
 
