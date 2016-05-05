@@ -1,6 +1,6 @@
 Hi {{ user_display_name }},
 
-{{ summary_text }}
+{{ summary_text|replace("%app%", "Vector") }}
 
 {% for room in rooms %}
 {% include 'room.txt' with context %}
