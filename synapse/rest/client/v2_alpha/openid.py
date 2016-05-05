@@ -42,7 +42,7 @@ class IdTokenServlet(RestServlet):
 
     Request:
 
-    POST /user/{user_id}/openid/token?access_token=... HTTP/1.1
+    POST /user/{user_id}/openid/request_token?access_token=... HTTP/1.1
 
     {}
 
@@ -57,7 +57,7 @@ class IdTokenServlet(RestServlet):
     }
     """
     PATTERNS = client_v2_patterns(
-        "/user/(?P<user_id>[^/]*)/openid/token"
+        "/user/(?P<user_id>[^/]*)/openid/request_token"
     )
 
     EXPIRES_MS = 3600 * 1000
