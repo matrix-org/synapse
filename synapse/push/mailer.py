@@ -156,7 +156,7 @@ class Mailer(object):
         text_part = MIMEText(plain_text, "plain", "utf8")
 
         multipart_msg = MIMEMultipart('alternative')
-        multipart_msg['Subject'] = "New Matrix Notifications"
+        multipart_msg['Subject'] = "[%s] %s" % (self.app_name, summary_text)
         multipart_msg['From'] = self.hs.config.email_notif_from
         multipart_msg['To'] = email_address
         multipart_msg['Date'] = email.utils.formatdate()
