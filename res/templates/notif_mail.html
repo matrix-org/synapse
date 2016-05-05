@@ -8,7 +8,7 @@
     <body>
         <div id="page">
             <div className="salutation">Hi {{ user_display_name }},</div>
-            <div className="summarytext">{{ summary_text|replace("%app%", "Matrix") }}</div>
+            <div className="summarytext">{{ summary_text }}</div>
             <div class="content">
                 {% for room in rooms %}
                     {% include 'room.html' with context %}

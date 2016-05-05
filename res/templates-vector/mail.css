@@ -85,11 +85,14 @@ body {
 .sender_name  {
     margin-left: 75px;
     display: inline;
-    font-weight: bold;
+    font-size: 13px;
+    color: #a2a2a2;
 }
 
 .message_time  {
     float: right;
+    font-size: 11px;
+    color: #a2a2a2;
 }
 
 .message_body {

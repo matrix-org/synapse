@@ -65,6 +65,10 @@ class EmailConfig(Config):
             self.email_template_dir = email_config["template_dir"]
             self.email_notif_template_html = email_config["notif_template_html"]
             self.email_notif_template_text = email_config["notif_template_text"]
+            if "app_name" in email_config:
+                self.email_app_name = email_config["app_name"]
+            else:
+                self.email_app_name = "Matrix"
 
             # make sure it's valid
             parsed = email.utils.parseaddr(self.email_notif_from)
@@ -83,6 +87,7 @@ class EmailConfig(Config):
         #   smtp_host: "localhost"
         #   smtp_port: 25
         #   notif_from: Your Friendly Matrix Home Server <noreply@example.com>
+        #   app_name: Matrix
         #   template_dir: res/templates
         #   notif_template_html: notif_mail.html
         #   notif_template_text: notif_mail.txt

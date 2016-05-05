@@ -8,9 +8,9 @@
     <body>
         <div id="page">
             <div class="header">
-                <img class="logo" src="http://matrix.org/img/vector-logo-email.png" width="64" height="83" alt="Vector"/>
+                <img class="logo" src="http://matrix.org/img/vector-logo-email.png" width="64" height="83" alt="[Vector]"/>
                 <div class="salutation">Hi {{ user_display_name }},</div>
-                <div class="summarytext">{{ summary_text|replace("%app%", "Vector") }}</div>
+                <div class="summarytext">{{ summary_text }}</div>
             </div>
             <div class="content">
                 {% for room in rooms %}

@@ -39,15 +39,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-MESSAGE_FROM_PERSON_IN_ROOM = "You have a message on %%app%% from %(person)s " \
+MESSAGE_FROM_PERSON_IN_ROOM = "You have a message on %(app)s from %(person)s " \
                               "in the %s room..."
-MESSAGE_FROM_PERSON = "You have a message on %%app%% from %(person)s..."
-MESSAGES_FROM_PERSON = "You have messages on %%app%% from %(person)s..."
-MESSAGES_IN_ROOM = "There are some messages on %%app%% for you in the %(room)s room..."
-MESSAGES_IN_ROOMS = "Here are some messages on %%app%% you may have missed..."
+MESSAGE_FROM_PERSON = "You have a message on %(app)s from %(person)s..."
+MESSAGES_FROM_PERSON = "You have messages on %(app)s from %(person)s..."
+MESSAGES_IN_ROOM = "There are some messages on %(app)s for you in the %(room)s room..."
+MESSAGES_IN_ROOMS = "Here are some messages on %(app)s you may have missed..."
 INVITE_FROM_PERSON_TO_ROOM = "%(person)s has invited you to join the " \
-                             "%(room)s room on %%app%%..."
-INVITE_FROM_PERSON = "%(person)s has invited you to chat on %%app%%..."
+                             "%(room)s room on %(app)s..."
+INVITE_FROM_PERSON = "%(person)s has invited you to chat on %(app)s..."
 
 CONTEXT_BEFORE = 1
 CONTEXT_AFTER = 1
@@ -79,6 +79,7 @@ class Mailer(object):
         self.store = self.hs.get_datastore()
         self.state_handler = self.hs.get_state_handler()
         loader = jinja2.FileSystemLoader(self.hs.config.email_template_dir)
+        self.app_name = self.hs.config.email_app_name
         env = jinja2.Environment(loader=loader)
         env.filters["format_ts"] = format_ts_filter
         env.filters["mxc_to_http"] = self.mxc_to_http_filter
@@ -306,10 +307,15 @@ class Mailer(object):
                 inviter_name = name_from_member_event(inviter_member_event)
 
                 if room_name is None:
-                    return INVITE_FROM_PERSON % {"person": inviter_name}
+                    return INVITE_FROM_PERSON % {
+                        "person": inviter_name,
+                        "app": self.app_name
+                    }
                 else:
                     return INVITE_FROM_PERSON_TO_ROOM % {
-                        "person": inviter_name, "room": room_name
+                        "person": inviter_name,
+                        "room": room_name,
+                        "app": self.app_name,
                     }
 
             sender_name = None
@@ -322,18 +328,22 @@ class Mailer(object):
 
                 if sender_name is not None and room_name is not None:
                     return MESSAGE_FROM_PERSON_IN_ROOM % {
-                        "person": sender_name, "room": room_name
+                        "person": sender_name,
+                        "room": room_name,
+                        "app": self.app_name,
                     }
                 elif sender_name is not None:
                     return MESSAGE_FROM_PERSON % {
-                        "person": sender_name
+                        "person": sender_name,
+                        "app": self.app_name,
                     }
             else:
                 # There's more than one notification for this room, so just
                 # say there are several
                 if room_name is not None:
                     return MESSAGES_IN_ROOM % {
-                        "room": room_name
+                        "room": room_name,
+                        "app": self.app_name,
                     }
                 else:
                     # If the room doesn't have a name, say who the messages
@@ -347,19 +357,24 @@ class Mailer(object):
                         "person": descriptor_from_member_events([
                             state_by_room[room_id][("m.room.member", s)]
                             for s in sender_ids
-                        ])
+                        ]),
+                        "app": self.app_name,
                     }
         else:
             # Stuff's happened in multiple different rooms
-            return MESSAGES_IN_ROOMS
+            return MESSAGES_IN_ROOMS % {
+                "app": self.app_name,
+            }
 
     def make_room_link(self, room_id):
         # XXX: matrix.to
-        return "https://vector.im/#/room/%s" % (room_id,)
+        # need /beta for Universal Links to work on iOS
+        return "https://vector.im/beta/#/room/%s" % (room_id,)
 
     def make_notif_link(self, notif):
         # XXX: matrix.to
-        return "https://vector.im/#/room/%s/%s" % (
+        # need /beta for Universal Links to work on iOS
+        return "https://vector.im/beta/#/room/%s/%s" % (
             notif['room_id'], notif['event_id']
         )
 
