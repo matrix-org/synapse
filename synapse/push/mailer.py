@@ -39,12 +39,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-MESSAGE_FROM_PERSON_IN_ROOM = "You have a message on %%app%% from %(person)s in the %s room..."
+MESSAGE_FROM_PERSON_IN_ROOM = "You have a message on %%app%% from %(person)s " \
+                              "in the %s room..."
 MESSAGE_FROM_PERSON = "You have a message on %%app%% from %(person)s..."
 MESSAGES_FROM_PERSON = "You have messages on %%app%% from %(person)s..."
 MESSAGES_IN_ROOM = "There are some messages on %%app%% for you in the %(room)s room..."
 MESSAGES_IN_ROOMS = "Here are some messages on %%app%% you may have missed..."
-INVITE_FROM_PERSON_TO_ROOM = "%(person)s has invited you to join the %(room)s room on %%app%%..."
+INVITE_FROM_PERSON_TO_ROOM = "%(person)s has invited you to join the " \
+                             "%(room)s room on %%app%%..."
 INVITE_FROM_PERSON = "%(person)s has invited you to chat on %%app%%..."
 
 CONTEXT_BEFORE = 1
