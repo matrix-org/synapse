@@ -95,13 +95,9 @@ class BaseHandler(object):
             row["event_id"] for rows in forgotten for row in rows
         )
 
-        # Maps user_id -> account data content
-        ignore_dict_content = yield defer.gatherResults([
-            preserve_fn(self.store.get_global_account_data_by_type_for_user)(
-                user_id, "m.ignored_user_list"
-            ).addCallback(lambda d, u: (u, d), user_id)
-            for user_id, is_peeking in user_tuples
-        ]).addCallback(dict)
+        ignore_dict_content = yield self.store.get_global_account_data_by_type_for_users(
+            "m.ignored_user_list", user_ids=[user_id for user_id, _ in user_tuples]
+        )
 
         # FIXME: This will explode if people upload something incorrect.
         ignore_dict = {

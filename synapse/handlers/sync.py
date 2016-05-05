@@ -522,7 +522,7 @@ class SyncHandler(BaseHandler):
             )
 
         ignored_account_data = yield self.store.get_global_account_data_by_type_for_user(
-            user_id, "m.ignored_user_list"
+            "m.ignored_user_list", user_id=user_id,
         )
 
         if ignored_account_data:

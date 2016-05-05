@@ -16,7 +16,7 @@
 from ._base import SQLBaseStore
 from twisted.internet import defer
 
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
+from synapse.util.caches.descriptors import cached, cachedList, cachedInlineCallbacks
 
 import ujson as json
 import logging
@@ -64,7 +64,7 @@ class AccountDataStore(SQLBaseStore):
         )
 
     @cachedInlineCallbacks(num_args=2)
-    def get_global_account_data_by_type_for_user(self, user_id, data_type):
+    def get_global_account_data_by_type_for_user(self, data_type, user_id):
         """
         Returns:
             Deferred: A dict
@@ -84,6 +84,25 @@ class AccountDataStore(SQLBaseStore):
             defer.returnValue(json.loads(result))
         else:
             defer.returnValue(None)
+
+    @cachedList(cached_method_name="get_global_account_data_by_type_for_user",
+                num_args=2, list_name="user_ids", inlineCallbacks=True)
+    def get_global_account_data_by_type_for_users(self, data_type, user_ids):
+        rows = yield self._simple_select_many_batch(
+            table="account_data",
+            column="user_id",
+            iterable=user_ids,
+            keyvalues={
+                "account_data_type": data_type,
+            },
+            retcols=("user_id", "content",),
+            desc="get_global_account_data_by_type_for_users",
+        )
+
+        defer.returnValue({
+            row["user_id"]: json.loads(row["content"]) if row["content"] else None
+            for row in rows
+        })
 
     def get_account_data_for_room(self, user_id, room_id):
         """Get all the client account_data for a user for a room.
@@ -261,7 +280,7 @@ class AccountDataStore(SQLBaseStore):
             txn.call_after(self.get_account_data_for_user.invalidate, (user_id,))
             txn.call_after(
                 self.get_global_account_data_by_type_for_user.invalidate,
-                (user_id, account_data_type,)
+                (account_data_type, user_id,)
             )
             self._update_max_stream_id(txn, next_id)
 
