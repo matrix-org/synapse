@@ -617,7 +617,7 @@ Building internal API documentation::
 
 
 
-Halp!! Synapse eats all my RAM!
+Help!! Synapse eats all my RAM!
 ===============================
 
 Synapse's architecture is quite RAM hungry currently - we deliberately
