@@ -44,6 +44,7 @@ from .receipts import ReceiptsStore
 from .search import SearchStore
 from .tags import TagsStore
 from .account_data import AccountDataStore
+from .openid import OpenIdStore
 
 from .util.id_generators import IdGenerator, StreamIdGenerator, ChainedIdGenerator
 
@@ -81,7 +82,8 @@ class DataStore(RoomMemberStore, RoomStore,
                 SearchStore,
                 TagsStore,
                 AccountDataStore,
-                EventPushActionsStore
+                EventPushActionsStore,
+                OpenIdStore,
                 ):
 
     def __init__(self, db_conn, hs):
