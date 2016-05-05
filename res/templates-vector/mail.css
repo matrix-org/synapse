@@ -1,0 +1,112 @@
+body {
+    margin: 0px;
+}
+
+#page {
+    font-family: 'Open Sans', Helvetica, Arial, Sans-Serif;
+    font-size: 12pt;
+
+    margin: auto;
+    max-width: 640px;
+    padding: 20px;
+}
+
+.header {
+    height: 87px;
+    border-bottom: 4px solid #e4f7ed;
+}
+
+.logo {
+    float: right;
+    margin-left: 20px;
+}
+
+.salutation {
+    padding-top: 10px;
+    font-weight: bold;
+}
+
+.summarytext {
+}
+
+.room_header {
+    padding-top: 38px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+.room_header h2 {
+    margin-top: 0px;
+    margin-left: 75px;
+    font-size: 20px;
+}
+
+.room_avatar {
+    float: left;
+    margin-top: -8px;
+}
+
+.room_avatar img {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 24px;
+    margin-left: 7px;
+}
+
+.room_content {
+    clear: left;
+}
+
+.notif {
+    border-bottom: 1px solid #e5e5e5;
+    margin-top: 16px;
+    padding-bottom: 16px;
+}
+
+.historical {
+    opacity: 0.3;
+}
+
+.message {
+    position: relative;
+    margin-bottom: 10px;
+}
+
+.sender_avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 16px;
+    position: absolute;
+    margin-left: 14px;
+    margin-top: -2px;
+}
+
+.sender_name  {
+    margin-left: 75px;
+    display: inline;
+    font-weight: bold;
+}
+
+.message_time  {
+    float: right;
+}
+
+.message_body {
+    margin-left: 75px;
+}
+
+.notif_link {
+    margin-left: 75px;
+    font-weight: bold;
+}
+
+.notif_link a, .footer a {
+    color: #76CFA6;
+    text-decoration: none;
+}
+
+.footer {
+    margin-top: 20px;
+    text-align: center;
+}

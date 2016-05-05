@@ -1,0 +1,34 @@
+<div class="notif">
+    <div>
+        {% for message in notif.messages %}
+            <div class="message {% if message.is_historical %}historical{% endif %}">
+                {% if message.sender_avatar_url %}
+                    <img alt="" class="sender_avatar" src="{{ message.sender_avatar_url|mxc_to_http(32,32) }}"  />
+                {% else %}
+                    {% if message.sender_hash % 3 == 0 %}
+                        <img class="sender_avatar" src="https://vector.im/beta/img/76cfa6.png"  />
+                    {% elif message.sender_hash % 3 == 1 %}
+                        <img class="sender_avatar" src="https://vector.im/beta/img/50e2c2.png"  />
+                    {% else %}
+                        <img class="sender_avatar" src="https://vector.im/beta/img/f4c371.png"  />
+                    {% endif %}
+                    <img class="sender_avatar" src="{{ message.sender_avatar_url }}"  />
+                {% endif %}
+                <div class="sender_name">{{ message.sender_name }}</div>
+                <div class="message_time">{{ message.ts|format_ts("%H:%M") }}</div>
+                <div class="message_body">
+                    {% if message.msgtype == "m.text" %}
+                        {{ message.body_text_html }}
+                    {% elif message.msgtype == "m.image" %}
+                        <img src="{{ message.image_url|mxc_to_http(640, 480, scale) }}" />
+                    {% elif message.msgtype == "m.file" %}
+                        <span class="filename">{{ message.body_text_plain }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    <div class="notif_link">
+        <a href="{{ notif.link }}">View {{ room.title }}</a>
+    </div>
+</div>
