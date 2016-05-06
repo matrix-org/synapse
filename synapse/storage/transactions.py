@@ -159,10 +159,8 @@ class TransactionStore(SQLBaseStore):
 
         self.inflight_transactions.setdefault(destination, {})[transaction_id] = txn_row
 
-        # TODO: Fetch prev_txns
-
         return self.runInteraction(
-            "prep_send_transaction",
+            "_get_prevs_txn",
             self._get_prevs_txn,
             destination,
         )
@@ -350,11 +348,12 @@ class TransactionStore(SQLBaseStore):
             ]
 
             def f(txn):
-                self._simple_insert_many_txn(
-                    txn=txn,
-                    table="sent_transactions",
-                    values=full_rows
-                )
+                if full_rows:
+                    self._simple_insert_many_txn(
+                        txn=txn,
+                        table="sent_transactions",
+                        values=full_rows
+                    )
 
                 for dest, txn_map in update_delivered.items():
                     for txn_id, update_row in txn_map.items():
@@ -371,6 +370,7 @@ class TransactionStore(SQLBaseStore):
                             }
                         )
 
-            yield self.runInteraction("_persist_in_mem_txns", f)
+            if full_rows or update_delivered:
+                yield self.runInteraction("_persist_in_mem_txns", f)
         except:
             logger.exception("Failed to persist transactions!")
