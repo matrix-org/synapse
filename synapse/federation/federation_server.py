@@ -388,6 +388,11 @@ class FederationServer(FederationBase):
         })
 
     @log_function
+    def on_openid_userinfo(self, token):
+        ts_now_ms = self._clock.time_msec()
+        return self.store.get_user_id_for_open_id_token(token, ts_now_ms)
+
+    @log_function
     def _get_persisted_pdu(self, origin, event_id, do_auth=True):
         """ Get a PDU from the database with given origin and id.
 
