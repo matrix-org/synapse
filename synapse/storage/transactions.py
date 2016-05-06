@@ -58,6 +58,8 @@ class TransactionStore(SQLBaseStore):
         # Newly delivered transactions that *were* persisted while in flight
         self.update_delivered_transactions = {}
 
+        self.last_transaction = {}
+
         reactor.addSystemEventTrigger("before", "shutdown", self._persist_in_mem_txns)
         hs.get_clock().looping_call(
             self._persist_in_mem_txns,
@@ -159,11 +161,15 @@ class TransactionStore(SQLBaseStore):
 
         self.inflight_transactions.setdefault(destination, {})[transaction_id] = txn_row
 
-        return self.runInteraction(
-            "_get_prevs_txn",
-            self._get_prevs_txn,
-            destination,
-        )
+        prev_txn = self.last_transaction.get(destination)
+        if prev_txn:
+            return defer.succeed(prev_txn)
+        else:
+            return self.runInteraction(
+                "_get_prevs_txn",
+                self._get_prevs_txn,
+                destination,
+            )
 
     def _get_prevs_txn(self, txn, destination):
         # First we find out what the prev_txns should be.
@@ -195,6 +201,8 @@ class TransactionStore(SQLBaseStore):
         txn_row = self.inflight_transactions.get(
             destination, {}
         ).pop(transaction_id, None)
+
+        self.last_transaction[destination] = transaction_id
 
         if txn_row:
             d = self.new_delivered_transactions.setdefault(destination, {})
