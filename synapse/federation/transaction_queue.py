@@ -20,6 +20,7 @@ from .persistence import TransactionActions
 from .units import Transaction
 
 from synapse.api.errors import HttpResponseException
+from synapse.util.async import run_on_reactor
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import PreserveLoggingContext
 from synapse.util.retryutils import (
@@ -199,6 +200,8 @@ class TransactionQueue(object):
     @defer.inlineCallbacks
     @log_function
     def _attempt_new_transaction(self, destination):
+        yield run_on_reactor()
+
         # list of (pending_pdu, deferred, order)
         if destination in self.pending_transactions:
             # XXX: pending_transactions can get stuck on by a never-ending
