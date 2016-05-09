@@ -21,7 +21,7 @@ from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 from synapse.api.constants import Membership
-from synapse.types import UserID
+from synapse.types import get_domian_from_id
 
 import logging
 
@@ -273,10 +273,7 @@ class RoomMemberStore(SQLBaseStore):
             room_id, membership=Membership.JOIN
         )
 
-        joined_domains = set(
-            UserID.from_string(r["user_id"]).domain
-            for r in rows
-        )
+        joined_domains = set(get_domian_from_id(r["user_id"]) for r in rows)
 
         return joined_domains
 
