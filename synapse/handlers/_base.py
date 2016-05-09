@@ -18,7 +18,7 @@ from twisted.internet import defer
 from synapse.api.errors import LimitExceededError, SynapseError, AuthError
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.api.constants import Membership, EventTypes
-from synapse.types import UserID, RoomAlias, Requester, get_domian_from_id
+from synapse.types import UserID, RoomAlias, Requester, get_domain_from_id
 from synapse.push.action_generator import ActionGenerator
 
 from synapse.util.logcontext import PreserveLoggingContext, preserve_fn
@@ -421,7 +421,7 @@ class BaseHandler(object):
             try:
                 if k[0] == EventTypes.Member:
                     if s.content["membership"] == Membership.JOIN:
-                        destinations.add(get_domian_from_id(s.state_key))
+                        destinations.add(get_domain_from_id(s.state_key))
             except SynapseError:
                 logger.warn(
                     "Failed to get destination from event %s", s.event_id

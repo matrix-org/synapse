@@ -22,7 +22,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes, SynapseError, EventSizeError
-from synapse.types import Requester, UserID, get_domian_from_id
+from synapse.types import Requester, UserID, get_domain_from_id
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import preserve_context_over_fn
 from synapse.util.metrics import Measure
@@ -91,8 +91,8 @@ class Auth(object):
                     "Room %r does not exist" % (event.room_id,)
                 )
 
-            creating_domain = get_domian_from_id(event.room_id)
-            originating_domain = get_domian_from_id(event.sender)
+            creating_domain = get_domain_from_id(event.room_id)
+            originating_domain = get_domain_from_id(event.sender)
             if creating_domain != originating_domain:
                 if not self.can_federate(event, auth_events):
                     raise AuthError(
@@ -219,7 +219,7 @@ class Auth(object):
         for event in curr_state.values():
             if event.type == EventTypes.Member:
                 try:
-                    if get_domian_from_id(event.state_key) != host:
+                    if get_domain_from_id(event.state_key) != host:
                         continue
                 except:
                     logger.warn("state_key not user_id: %s", event.state_key)
@@ -266,8 +266,8 @@ class Auth(object):
 
         target_user_id = event.state_key
 
-        creating_domain = get_domian_from_id(event.room_id)
-        target_domain = get_domian_from_id(target_user_id)
+        creating_domain = get_domain_from_id(event.room_id)
+        target_domain = get_domain_from_id(target_user_id)
         if creating_domain != target_domain:
             if not self.can_federate(event, auth_events):
                 raise AuthError(
@@ -889,8 +889,8 @@ class Auth(object):
         if user_level >= redact_level:
             return False
 
-        redacter_domain = get_domian_from_id(event.event_id)
-        redactee_domain = get_domian_from_id(event.redacts)
+        redacter_domain = get_domain_from_id(event.event_id)
+        redactee_domain = get_domain_from_id(event.redacts)
         if redacter_domain == redactee_domain:
             return True
 
