@@ -21,6 +21,10 @@ from collections import namedtuple
 Requester = namedtuple("Requester", ["user", "access_token_id", "is_guest"])
 
 
+def get_domian_from_id(string):
+    return string.split(":", 1)[1]
+
+
 class DomainSpecificString(
         namedtuple("DomainSpecificString", ("localpart", "domain"))
 ):
