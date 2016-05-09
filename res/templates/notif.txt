@@ -9,4 +9,4 @@
 {% endif %}
 {% endfor %}
 
-View at {{ notif.link }}
+View {{ room.title }} at {{ notif.link }}

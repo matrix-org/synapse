@@ -146,6 +146,7 @@ class Mailer(object):
             "user_display_name": user_display_name,
             "unsubscribe_link": self.make_unsubscribe_link(),
             "summary_text": summary_text,
+            "app_name": self.app_name,
             "rooms": rooms,
         }
 
@@ -163,6 +164,9 @@ class Mailer(object):
         multipart_msg['Message-ID'] = email.utils.make_msgid()
         multipart_msg.attach(text_part)
         multipart_msg.attach(html_part)
+
+        logger.info("Sending email push notification to %s" % email_address)
+        #logger.debug(html_text)
 
         yield sendmail(
             self.hs.config.email_smtp_host,
@@ -367,19 +371,26 @@ class Mailer(object):
             }
 
     def make_room_link(self, room_id):
-        # XXX: matrix.to
         # need /beta for Universal Links to work on iOS
-        return "https://vector.im/beta/#/room/%s" % (room_id,)
+        if self.app_name == "Vector":
+            return "https://vector.im/beta/#/room/%s" % (room_id,)
+        else:
+            return "https://matrix.to/#/room/%s" % (room_id,)
 
     def make_notif_link(self, notif):
-        # XXX: matrix.to
         # need /beta for Universal Links to work on iOS
-        return "https://vector.im/beta/#/room/%s/%s" % (
-            notif['room_id'], notif['event_id']
-        )
+        if self.app_name == "Vector":
+            return "https://vector.im/beta/#/room/%s/%s" % (
+                notif['room_id'], notif['event_id']
+            )
+        else:
+            return "https://matrix.to/#/room/%s/%s" % (
+                notif['room_id'], notif['event_id']
+            )
 
     def make_unsubscribe_link(self):
-        return "https://vector.im/#/settings"  # XXX: matrix.to
+        # XXX: matrix.to
+        return "https://vector.im/#/settings"
 
     def mxc_to_http_filter(self, value, width, height, resize_method="crop"):
         if value[0:6] != "mxc://":
