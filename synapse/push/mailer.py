@@ -166,7 +166,7 @@ class Mailer(object):
         multipart_msg.attach(html_part)
 
         logger.info("Sending email push notification to %s" % email_address)
-        #logger.debug(html_text)
+        # logger.debug(html_text)
 
         yield sendmail(
             self.hs.config.email_smtp_host,
