@@ -83,6 +83,7 @@ class SlavedEventStore(BaseSlavedStore):
         DataStore.get_push_action_users_in_range.__func__
     )
     get_event = DataStore.get_event.__func__
+    get_events = DataStore.get_events.__func__
     get_current_state = DataStore.get_current_state.__func__
     get_current_state_for_key = DataStore.get_current_state_for_key.__func__
     get_rooms_for_user_where_membership_is = (
