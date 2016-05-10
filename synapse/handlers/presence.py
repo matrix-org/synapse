@@ -33,7 +33,7 @@ from synapse.util.logcontext import preserve_fn
 from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 from synapse.util.wheel_timer import WheelTimer
-from synapse.types import UserID
+from synapse.types import UserID, get_domian_from_id
 import synapse.metrics
 
 from ._base import BaseHandler
@@ -168,7 +168,7 @@ class PresenceHandler(BaseHandler):
         # The initial delay is to allow disconnected clients a chance to
         # reconnect before we treat them as offline.
         self.clock.call_later(
-            0 * 1000,
+            30 * 1000,
             self.clock.looping_call,
             self._handle_timeouts,
             5000,
@@ -440,7 +440,7 @@ class PresenceHandler(BaseHandler):
             if not local_states:
                 continue
 
-            host = UserID.from_string(user_id).domain
+            host = get_domian_from_id(user_id)
             hosts_to_states.setdefault(host, []).extend(local_states)
 
         # TODO: de-dup hosts_to_states, as a single host might have multiple

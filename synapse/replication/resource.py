@@ -159,6 +159,15 @@ class ReplicationResource(Resource):
 
         result = yield self.notifier.wait_for_replication(replicate, timeout)
 
+        for stream_name, stream_content in result.items():
+            logger.info(
+                "Replicating %d rows of %s from %s -> %s",
+                len(stream_content["rows"]),
+                stream_name,
+                stream_content["position"],
+                request_streams.get(stream_name),
+            )
+
         request.write(json.dumps(result, ensure_ascii=False))
         finish_request(request)
 

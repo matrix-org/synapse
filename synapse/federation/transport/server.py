@@ -18,7 +18,7 @@ from twisted.internet import defer
 from synapse.api.urls import FEDERATION_PREFIX as PREFIX
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import JsonResource
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.servlet import parse_json_object_from_request, parse_string
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 import functools
@@ -323,7 +323,7 @@ class FederationSendLeaveServlet(BaseFederationServlet):
 
 
 class FederationEventAuthServlet(BaseFederationServlet):
-    PATH = "/event_auth(?P<context>[^/]*)/(?P<event_id>[^/]*)"
+    PATH = "/event_auth/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
 
     def on_GET(self, origin, content, query, context, event_id):
         return self.handler.on_event_auth(origin, context, event_id)
@@ -448,6 +448,50 @@ class On3pidBindServlet(BaseFederationServlet):
         return code
 
 
+class OpenIdUserInfo(BaseFederationServlet):
+    """
+    Exchange a bearer token for information about a user.
+
+    The response format should be compatible with:
+        http://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse
+
+    GET /openid/userinfo?access_token=ABDEFGH HTTP/1.1
+
+    HTTP/1.1 200 OK
+    Content-Type: application/json
+
+    {
+        "sub": "@userpart:example.org",
+    }
+    """
+
+    PATH = "/openid/userinfo"
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        token = parse_string(request, "access_token")
+        if token is None:
+            defer.returnValue((401, {
+                "errcode": "M_MISSING_TOKEN", "error": "Access Token required"
+            }))
+            return
+
+        user_id = yield self.handler.on_openid_userinfo(token)
+
+        if user_id is None:
+            defer.returnValue((401, {
+                "errcode": "M_UNKNOWN_TOKEN",
+                "error": "Access Token unknown or expired"
+            }))
+
+        defer.returnValue((200, {"sub": user_id}))
+
+    # Avoid doing remote HS authorization checks which are done by default by
+    # BaseFederationServlet.
+    def _wrap(self, code):
+        return code
+
+
 SERVLET_CLASSES = (
     FederationSendServlet,
     FederationPullServlet,
@@ -468,6 +512,7 @@ SERVLET_CLASSES = (
     FederationClientKeysClaimServlet,
     FederationThirdPartyInviteExchangeServlet,
     On3pidBindServlet,
+    OpenIdUserInfo,
 )
 
 
