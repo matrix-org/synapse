@@ -127,6 +127,10 @@ class PusherSlaveStore(
         DataStore.get_profile_displayname.__func__
     )
 
+    get_state_groups = (
+        DataStore.get_state_groups.__func__
+    )
+
 
 class PusherServer(HomeServer):
 
