@@ -136,6 +136,10 @@ class PusherSlaveStore(
         StateStore.__dict__["_get_state_group_for_events"]
     )
 
+    _get_state_group_for_event = (
+        StateStore.__dict__["_get_state_group_for_event"]
+    )
+
 
 class PusherServer(HomeServer):
 
