@@ -43,7 +43,7 @@ class ServerContextFactory(ssl.ContextFactory):
             context.use_privatekey(config.tls_private_key)
 
         context.load_tmp_dh(config.tls_dh_params_path)
-        context.set_cipher_list("!ADH:HIGH+kEDH:!AECDH:HIGH+kEECDH:HIGH")
+        context.set_cipher_list("!ADH:HIGH+kEDH:!AECDH:HIGH+kEECDH")
 
     def getContext(self):
         return self._context
