@@ -123,6 +123,10 @@ class PusherSlaveStore(
         DataStore.get_time_of_last_push_action_before.__func__
     )
 
+    get_profile_displayname = (
+        DataStore.get_profile_displayname.__func__
+    )
+
 
 class PusherServer(HomeServer):
 
