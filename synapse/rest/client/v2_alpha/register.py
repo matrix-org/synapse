@@ -219,7 +219,10 @@ class RegisterRestServlet(RestServlet):
                     # if email notifications are enabled (so people don't start
                     # getting mail spam where they weren't before if email
                     # notifs are set up on a home server)
-                    if self.hs.config.email_enable_notifs:
+                    if (
+                        self.hs.config.email_enable_notifs and
+                        self.hs.config.email_notifs_for_new_users
+                    ):
                         # Pull the ID of the access token back out of the db
                         # It would really make more sense for this to be passed
                         # up when the access token is saved, but that's quite an
