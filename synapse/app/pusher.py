@@ -23,6 +23,7 @@ from synapse.config.logger import LoggingConfig
 from synapse.config.emailconfig import EmailConfig
 from synapse.http.site import SynapseSite
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
+from synapse.storage.events import EventsStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.pushers import SlavedPusherStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
@@ -132,7 +133,7 @@ class PusherSlaveStore(
     )
 
     _get_state_group_for_events = (
-        DataStore._get_state_group_for_events.__func__
+        EventsStore.__dict__["_get_state_group_for_events"]
     )
 
 
