@@ -131,6 +131,10 @@ class PusherSlaveStore(
         DataStore.get_state_groups.__func__
     )
 
+    _get_state_group_for_events = (
+        DataStore._get_state_group_for_events.__func__
+    )
+
 
 class PusherServer(HomeServer):
 
