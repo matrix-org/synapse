@@ -221,7 +221,7 @@ class RegisterRestServlet(RestServlet):
                     # notifs are set up on a home server)
                     if (
                         self.hs.config.email_enable_notifs and
-                        self.hs.config.email_notifs_for_new_users
+                        self.hs.config.email_notif_for_new_users
                     ):
                         # Pull the ID of the access token back out of the db
                         # It would really make more sense for this to be passed

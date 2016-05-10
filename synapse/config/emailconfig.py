@@ -65,7 +65,7 @@ class EmailConfig(Config):
             self.email_template_dir = email_config["template_dir"]
             self.email_notif_template_html = email_config["notif_template_html"]
             self.email_notif_template_text = email_config["notif_template_text"]
-            self.email_notifs_for_new_users = email_config.get(
+            self.email_notif_for_new_users = email_config.get(
                 "notif_for_new_users", True
             )
             if "app_name" in email_config:
