@@ -208,7 +208,7 @@ class BaseHandler(object):
         })
 
     @defer.inlineCallbacks
-    def _filter_events_for_client(self, user_id, events, is_peeking=False):
+    def filter_events_for_client(self, user_id, events, is_peeking=False):
         """
         Check which events a user is allowed to see
 

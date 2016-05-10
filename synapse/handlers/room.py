@@ -449,7 +449,7 @@ class RoomContextHandler(BaseHandler):
         now_token = yield self.hs.get_event_sources().get_current_token()
 
         def filter_evts(events):
-            return self._filter_events_for_client(
+            return self.filter_events_for_client(
                 user.to_string(),
                 events,
                 is_peeking=is_guest)

@@ -697,7 +697,7 @@ class SyncHandler(BaseHandler):
 
             if recents is not None:
                 recents = sync_config.filter_collection.filter_room_timeline(recents)
-                recents = yield self._filter_events_for_client(
+                recents = yield self.filter_events_for_client(
                     sync_config.user.to_string(),
                     recents,
                 )
@@ -718,7 +718,7 @@ class SyncHandler(BaseHandler):
                 loaded_recents = sync_config.filter_collection.filter_room_timeline(
                     events
                 )
-                loaded_recents = yield self._filter_events_for_client(
+                loaded_recents = yield self.filter_events_for_client(
                     sync_config.user.to_string(),
                     loaded_recents,
                 )

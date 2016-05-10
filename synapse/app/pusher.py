@@ -20,6 +20,7 @@ from synapse.server import HomeServer
 from synapse.config._base import ConfigError
 from synapse.config.database import DatabaseConfig
 from synapse.config.logger import LoggingConfig
+from synapse.config.emailconfig import EmailConfig
 from synapse.http.site import SynapseSite
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.replication.slave.storage.events import SlavedEventStore
@@ -91,7 +92,7 @@ class SlaveConfig(DatabaseConfig):
         """ % locals()
 
 
-class PusherSlaveConfig(SlaveConfig, LoggingConfig):
+class PusherSlaveConfig(SlaveConfig, LoggingConfig, EmailConfig):
     pass
 
 
@@ -108,6 +109,18 @@ class PusherSlaveStore(
 
     update_pusher_last_stream_ordering = (
         DataStore.update_pusher_last_stream_ordering.__func__
+    )
+
+    get_throttle_params_by_room = (
+        DataStore.get_throttle_params_by_room.__func__
+    )
+
+    set_throttle_params = (
+        DataStore.set_throttle_params.__func__
+    )
+
+    get_time_of_last_push_action_before = (
+        DataStore.get_time_of_last_push_action_before.__func__
     )
 
 

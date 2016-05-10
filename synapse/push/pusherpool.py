@@ -17,7 +17,6 @@
 from twisted.internet import defer
 
 import pusher
-from synapse.push import PusherConfigException
 from synapse.util.logcontext import preserve_fn
 from synapse.util.async import run_on_reactor
 
@@ -50,6 +49,7 @@ class PusherPool:
         # recreated, added and started: this means we have only one
         # code path adding pushers.
         pusher.create_pusher(self.hs, {
+            "id": None,
             "user_name": user_id,
             "kind": kind,
             "app_id": app_id,
@@ -185,8 +185,8 @@ class PusherPool:
         for pusherdict in pushers:
             try:
                 p = pusher.create_pusher(self.hs, pusherdict)
-            except PusherConfigException:
-                logger.exception("Couldn't start a pusher: caught PusherConfigException")
+            except:
+                logger.exception("Couldn't start a pusher: caught Exception")
                 continue
             if p:
                 appid_pushkey = "%s:%s" % (
