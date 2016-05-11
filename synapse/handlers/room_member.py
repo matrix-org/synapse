@@ -113,7 +113,7 @@ class RoomMemberHandler(BaseHandler):
             prev_event_ids=prev_event_ids,
         )
 
-        yield self.handle_new_client_event(
+        yield self.msg_handler.handle_new_client_event(
             requester,
             event,
             context,
@@ -357,7 +357,7 @@ class RoomMemberHandler(BaseHandler):
                 # so don't really fit into the general auth process.
                 raise AuthError(403, "Guest access not allowed")
 
-        yield self.handle_new_client_event(
+        yield message_handler.handle_new_client_event(
             requester,
             event,
             context,
