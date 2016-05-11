@@ -48,7 +48,6 @@ class MessageHandler(BaseHandler):
         self.clock = hs.get_clock()
         self.validator = EventValidator()
         self.snapshot_cache = SnapshotCache()
-        self.signing_key = hs.config.signing_key[0]
 
     @defer.inlineCallbacks
     def get_messages(self, requester, room_id=None, pagin_config=None,
@@ -766,8 +765,9 @@ class MessageHandler(BaseHandler):
 
         yield self.auth.add_auth_events(builder, context)
 
+        signing_key = self.hs.config.signing_key[0]
         add_hashes_and_signatures(
-            builder, self.server_name, self.signing_key
+            builder, self.server_name, signing_key
         )
 
         event = builder.build()
