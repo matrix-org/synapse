@@ -28,6 +28,7 @@ from synapse.util.presentable_names import (
 from synapse.types import UserID
 from synapse.api.errors import StoreError
 from synapse.api.constants import EventTypes
+from synapse.visibility import filter_events_for_client
 
 import jinja2
 import bleach
@@ -227,9 +228,8 @@ class Mailer(object):
             "messages": [],
         }
 
-        handler = self.hs.get_handlers().message_handler
-        the_events = yield handler.filter_events_for_client(
-            user_id, results["events_before"]
+        the_events = yield filter_events_for_client(
+            self.store, user_id, results["events_before"]
         )
         the_events.append(notif_event)
 
