@@ -113,7 +113,7 @@ class RoomMemberHandler(BaseHandler):
             prev_event_ids=prev_event_ids,
         )
 
-        yield self.msg_handler.handle_new_client_event(
+        yield msg_handler.handle_new_client_event(
             requester,
             event,
             context,
