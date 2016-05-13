@@ -149,7 +149,7 @@ class SlavedEventStore(BaseSlavedStore):
 
         stream = result.get("events")
         if stream:
-            self._stream_id_gen.advance(stream["position"])
+            self._stream_id_gen.advance(int(stream["position"]))
             for row in stream["rows"]:
                 self._process_replication_row(
                     row, backfilled=False, state_resets=state_resets
@@ -157,7 +157,7 @@ class SlavedEventStore(BaseSlavedStore):
 
         stream = result.get("backfill")
         if stream:
-            self._backfill_id_gen.advance(-stream["position"])
+            self._backfill_id_gen.advance(-int(stream["position"]))
             for row in stream["rows"]:
                 self._process_replication_row(
                     row, backfilled=True, state_resets=state_resets
@@ -165,14 +165,14 @@ class SlavedEventStore(BaseSlavedStore):
 
         stream = result.get("forward_ex_outliers")
         if stream:
-            self._stream_id_gen.advance(stream["position"])
+            self._stream_id_gen.advance(int(stream["position"]))
             for row in stream["rows"]:
                 event_id = row[1]
                 self._invalidate_get_event_cache(event_id)
 
         stream = result.get("backward_ex_outliers")
         if stream:
-            self._backfill_id_gen.advance(-stream["position"])
+            self._backfill_id_gen.advance(-int(stream["position"]))
             for row in stream["rows"]:
                 event_id = row[1]
                 self._invalidate_get_event_cache(event_id)

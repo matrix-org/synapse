@@ -50,7 +50,7 @@ class SlavedReceiptsStore(BaseSlavedStore):
     def process_replication(self, result):
         stream = result.get("receipts")
         if stream:
-            self._receipts_id_gen.advance(stream["position"])
+            self._receipts_id_gen.advance(int(stream["position"]))
             for row in stream["rows"]:
                 room_id, receipt_type, user_id = row[1:4]
                 self.invalidate_caches_for_receipt(room_id, receipt_type, user_id)
