@@ -146,12 +146,14 @@ class SlavedEventStore(BaseSlavedStore):
 
         stream = result.get("forward_ex_outliers")
         if stream:
+            self._stream_id_gen.advance(stream["position"])
             for row in stream["rows"]:
                 event_id = row[1]
                 self._invalidate_get_event_cache(event_id)
 
         stream = result.get("backward_ex_outliers")
         if stream:
+            self._backfill_id_gen.advance(-stream["position"])
             for row in stream["rows"]:
                 event_id = row[1]
                 self._invalidate_get_event_cache(event_id)
