@@ -24,6 +24,8 @@ from synapse.config.emailconfig import EmailConfig
 from synapse.http.site import SynapseSite
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.storage.state import StateStore
+from synapse.storage.roommember import RoomMemberStore
+from synapse.storage.account_data import AccountDataStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.pushers import SlavedPusherStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
@@ -60,6 +62,7 @@ class SlaveConfig(DatabaseConfig):
         self.soft_file_limit = config.get("soft_file_limit")
         self.daemonize = config.get("daemonize")
         self.pid_file = self.abspath(config.get("pid_file"))
+        self.public_baseurl = config["public_baseurl"]
 
     def default_config(self, server_name, **kwargs):
         pid_file = self.abspath("pusher.pid")
@@ -132,12 +135,56 @@ class PusherSlaveStore(
         DataStore.get_state_groups.__func__
     )
 
+    _get_state_for_groups = (
+        DataStore._get_state_for_groups.__func__
+    )
+
+    _get_all_state_from_cache = (
+        DataStore._get_all_state_from_cache.__func__
+    )
+
+    get_events_around = (
+        DataStore.get_events_around.__func__
+    )
+
+    _get_events_around_txn = (
+        DataStore._get_events_around_txn.__func__
+    )
+
+    get_state_for_events = (
+        DataStore.get_state_for_events.__func__
+    )
+
+    _get_some_state_from_cache = (
+        DataStore._get_some_state_from_cache.__func__
+    )
+
     _get_state_group_for_events = (
         StateStore.__dict__["_get_state_group_for_events"]
     )
 
     _get_state_group_for_event = (
         StateStore.__dict__["_get_state_group_for_event"]
+    )
+
+    _get_state_groups_from_groups = (
+        StateStore.__dict__["_get_state_groups_from_groups"]
+    )
+
+    _get_state_group_from_group = (
+        StateStore.__dict__["_get_state_group_from_group"]
+    )
+
+    get_global_account_data_by_type_for_users = (
+        AccountDataStore.__dict__["get_global_account_data_by_type_for_users"]
+    )
+
+    get_global_account_data_by_type_for_user = (
+        AccountDataStore.__dict__["get_global_account_data_by_type_for_user"]
+    )
+
+    who_forgot_in_room = (
+        RoomMemberStore.__dict__["who_forgot_in_room"]
     )
 
 
