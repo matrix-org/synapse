@@ -24,10 +24,10 @@ from synapse.config.emailconfig import EmailConfig
 from synapse.http.site import SynapseSite
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.storage.roommember import RoomMemberStore
-from synapse.storage.account_data import AccountDataStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.pushers import SlavedPusherStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
+from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.storage.engines import create_engine
 from synapse.storage import DataStore
 from synapse.util.async import sleep
@@ -100,7 +100,8 @@ class PusherSlaveConfig(SlaveConfig, LoggingConfig, EmailConfig):
 
 
 class PusherSlaveStore(
-    SlavedEventStore, SlavedPusherStore, SlavedReceiptsStore
+    SlavedEventStore, SlavedPusherStore, SlavedReceiptsStore,
+    SlavedAccountDataStore
 ):
     update_pusher_last_stream_ordering_and_success = (
         DataStore.update_pusher_last_stream_ordering_and_success.__func__
@@ -128,14 +129,6 @@ class PusherSlaveStore(
 
     get_profile_displayname = (
         DataStore.get_profile_displayname.__func__
-    )
-
-    get_global_account_data_by_type_for_users = (
-        AccountDataStore.__dict__["get_global_account_data_by_type_for_users"]
-    )
-
-    get_global_account_data_by_type_for_user = (
-        AccountDataStore.__dict__["get_global_account_data_by_type_for_user"]
     )
 
     who_forgot_in_room = (
