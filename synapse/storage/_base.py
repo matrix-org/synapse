@@ -453,7 +453,9 @@ class SQLBaseStore(object):
             keyvalues (dict): The unique key tables and their new values
             values (dict): The nonunique columns and their new values
             insertion_values (dict): key/values to use when inserting
-        Returns: A deferred
+        Returns:
+            Deferred(bool): True if a new entry was created, False if an
+                exisitng one was updated.
         """
         return self.runInteraction(
             desc,
@@ -497,6 +499,10 @@ class SQLBaseStore(object):
                 sql, keyvalues.values(),
             )
             txn.execute(sql, allvalues.values())
+
+            return True
+        else:
+            return False
 
     def _simple_select_one(self, table, keyvalues, retcols,
                            allow_none=False, desc="_simple_select_one"):
