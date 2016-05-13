@@ -455,7 +455,7 @@ class SQLBaseStore(object):
             insertion_values (dict): key/values to use when inserting
         Returns:
             Deferred(bool): True if a new entry was created, False if an
-                exisitng one was updated.
+                existing one was updated.
         """
         return self.runInteraction(
             desc,
