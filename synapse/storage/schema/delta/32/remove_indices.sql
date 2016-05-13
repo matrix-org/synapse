@@ -35,5 +35,4 @@ DROP INDEX IF EXISTS room_hosts_room_id; -- Prefix of UNIQUE CONSTRAINT
 -- The following indices were unused
 DROP INDEX IF EXISTS remote_media_cache_thumbnails_media_id;
 DROP INDEX IF EXISTS evauth_edges_auth_id;
-DROP INDEX IF EXISTS topics_room_id;
 DROP INDEX IF EXISTS presence_stream_state;
