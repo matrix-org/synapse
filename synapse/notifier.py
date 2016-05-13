@@ -21,6 +21,7 @@ from synapse.util.logutils import log_function
 from synapse.util.async import ObservableDeferred
 from synapse.util.logcontext import PreserveLoggingContext
 from synapse.types import StreamToken
+from synapse.visibility import filter_events_for_client
 import synapse.metrics
 
 from collections import namedtuple
@@ -398,8 +399,8 @@ class Notifier(object):
                 )
 
                 if name == "room":
-                    room_member_handler = self.hs.get_handlers().room_member_handler
-                    new_events = yield room_member_handler.filter_events_for_client(
+                    new_events = yield filter_events_for_client(
+                        self.store,
                         user.to_string(),
                         new_events,
                         is_peeking=is_peeking,
