@@ -397,6 +397,7 @@ class Mailer(object):
             return ""
 
         serverAndMediaId = value[6:]
+        fragment = None
         if '#' in serverAndMediaId:
             (serverAndMediaId, fragment) = serverAndMediaId.split('#', 1)
             fragment = "#" + fragment
