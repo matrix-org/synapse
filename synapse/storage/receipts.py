@@ -244,6 +244,15 @@ class ReceiptsStore(SQLBaseStore):
             (user_id, room_id, receipt_type)
         )
 
+        res = self._simple_select_one_txn(
+            txn,
+            table="events",
+            retcols=["topological_ordering", "stream_ordering"],
+            keyvalues={"event_id": event_id},
+        )
+        topological_ordering = int(res["topological_ordering"])
+        stream_ordering = int(res["stream_ordering"])
+
         # We don't want to clobber receipts for more recent events, so we
         # have to compare orderings of existing receipts
         sql = (
@@ -256,15 +265,6 @@ class ReceiptsStore(SQLBaseStore):
         results = txn.fetchall()
 
         if results:
-            res = self._simple_select_one_txn(
-                txn,
-                table="events",
-                retcols=["topological_ordering", "stream_ordering"],
-                keyvalues={"event_id": event_id},
-            )
-            topological_ordering = int(res["topological_ordering"])
-            stream_ordering = int(res["stream_ordering"])
-
             for to, so, _ in results:
                 if int(to) > topological_ordering:
                     return False
@@ -293,6 +293,14 @@ class ReceiptsStore(SQLBaseStore):
                 "data": json.dumps(data),
             }
         )
+
+        if receipt_type == "m.read":
+            self._remove_push_actions_before_txn(
+                txn,
+                room_id=room_id,
+                user_id=user_id,
+                topological_ordering=topological_ordering,
+            )
 
         return True
 
