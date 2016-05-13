@@ -612,7 +612,8 @@ class Auth(object):
     def get_user_from_macaroon(self, macaroon_str):
         try:
             macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
-            self.validate_macaroon(macaroon, "access", False)
+
+            self.validate_macaroon(macaroon, "access", self.hs.config.expire_access_token)
 
             user_prefix = "user_id = "
             user = None
