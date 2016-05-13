@@ -23,7 +23,6 @@ from synapse.config.logger import LoggingConfig
 from synapse.config.emailconfig import EmailConfig
 from synapse.http.site import SynapseSite
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
-from synapse.storage.state import StateStore
 from synapse.storage.roommember import RoomMemberStore
 from synapse.storage.account_data import AccountDataStore
 from synapse.replication.slave.storage.events import SlavedEventStore
@@ -129,50 +128,6 @@ class PusherSlaveStore(
 
     get_profile_displayname = (
         DataStore.get_profile_displayname.__func__
-    )
-
-    get_state_groups = (
-        DataStore.get_state_groups.__func__
-    )
-
-    _get_state_for_groups = (
-        DataStore._get_state_for_groups.__func__
-    )
-
-    _get_all_state_from_cache = (
-        DataStore._get_all_state_from_cache.__func__
-    )
-
-    get_events_around = (
-        DataStore.get_events_around.__func__
-    )
-
-    _get_events_around_txn = (
-        DataStore._get_events_around_txn.__func__
-    )
-
-    get_state_for_events = (
-        DataStore.get_state_for_events.__func__
-    )
-
-    _get_some_state_from_cache = (
-        DataStore._get_some_state_from_cache.__func__
-    )
-
-    _get_state_group_for_events = (
-        StateStore.__dict__["_get_state_group_for_events"]
-    )
-
-    _get_state_group_for_event = (
-        StateStore.__dict__["_get_state_group_for_event"]
-    )
-
-    _get_state_groups_from_groups = (
-        StateStore.__dict__["_get_state_groups_from_groups"]
-    )
-
-    _get_state_group_from_group = (
-        StateStore.__dict__["_get_state_group_from_group"]
     )
 
     get_global_account_data_by_type_for_users = (
