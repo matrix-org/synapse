@@ -185,6 +185,8 @@ def runUntilCurrentTimer(func):
         tick_time.inc_by(end - start)
         pending_calls_metric.inc_by(num_pending)
 
+        # Check if we need to do a manual GC (since its been disabled), and do
+        # one if necessary.
         threshold = gc.get_threshold()
         counts = gc.get_count()
 
@@ -210,6 +212,9 @@ try:
     # runUntilCurrent is called when we have pending calls. It is called once
     # per iteratation after fd polling.
     reactor.runUntilCurrent = runUntilCurrentTimer(reactor.runUntilCurrent)
+
+    # We manually run the GC each reactor tick so that we can get some metrics
+    # about time spent doing GC,
     gc.disable()
 except AttributeError:
     pass
