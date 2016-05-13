@@ -375,7 +375,7 @@ class Mailer(object):
         if self.app_name == "Vector":
             return "https://vector.im/beta/#/room/%s" % (room_id,)
         else:
-            return "https://matrix.to/#/room/%s" % (room_id,)
+            return "https://matrix.to/#/%s" % (room_id,)
 
     def make_notif_link(self, notif):
         # need /beta for Universal Links to work on iOS
@@ -384,7 +384,7 @@ class Mailer(object):
                 notif['room_id'], notif['event_id']
             )
         else:
-            return "https://matrix.to/#/room/%s/%s" % (
+            return "https://matrix.to/#/%s/%s" % (
                 notif['room_id'], notif['event_id']
             )
 
