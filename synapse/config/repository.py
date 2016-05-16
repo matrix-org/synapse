@@ -100,13 +100,13 @@ class ContentRepositoryConfig(Config):
                     "to work"
                 )
 
-            if "url_preview_ip_range_whitelist" in config:
-                self.url_preview_ip_range_whitelist = IPSet(
-                    config["url_preview_ip_range_whitelist"]
-                )
+            self.url_preview_ip_range_whitelist = IPSet(
+                config.get("url_preview_ip_range_whitelist", ())
+            )
 
-            if "url_preview_url_blacklist" in config:
-                self.url_preview_url_blacklist = config["url_preview_url_blacklist"]
+            self.url_preview_url_blacklist = config.get(
+                "url_preview_url_blacklist", ()
+            )
 
     def default_config(self, **kwargs):
         media_store = self.default_path("media_store")
