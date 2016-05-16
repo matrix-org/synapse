@@ -31,8 +31,8 @@
                     {% endfor %}
                     <div class="footer">
                         <small>
-                            Sending at {{ reason.now|format_ts("%c") }} due to activity in room {{ reason.room_name }} because:<br/>
-                            1. The most recent notifiable event was received at {{ reason.received_at|format_ts("%c") }}
+                            Sending email at {{ reason.now|format_ts("%c") }} due to activity in room '{{ reason.room_name }}' because:<br/>
+                            1. An event was received at {{ reason.received_at|format_ts("%c") }}
                             which is more than {{ "%.1f"|format(reason.delay_before_mail_ms / (60*1000)) }} (delay_before_mail_ms) mins ago.<br/>
                             {% if reason.last_sent_ts %}
                                 2. The last time we sent a mail for this room was {{ reason.last_sent_ts|format_ts("%c") }},
