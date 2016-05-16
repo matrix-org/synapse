@@ -229,18 +229,12 @@ class TypingNotificationEventSource(object):
         self.hs = hs
         self.clock = hs.get_clock()
         self._handler = None
-        self._room_member_handler = None
 
     def handler(self):
         # Avoid cyclic dependency in handler setup
         if not self._handler:
             self._handler = self.hs.get_handlers().typing_notification_handler
         return self._handler
-
-    def room_member_handler(self):
-        if not self._room_member_handler:
-            self._room_member_handler = self.hs.get_handlers().room_member_handler
-        return self._room_member_handler
 
     def _make_event_for(self, room_id):
         typing = self.handler()._room_typing[room_id]

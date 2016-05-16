@@ -485,7 +485,6 @@ class SyncHandler(BaseHandler):
             sync_config, now_token, since_token
         )
 
-        rm_handler = self.hs.get_handlers().room_member_handler
         app_service = yield self.store.get_app_service_by_user_id(
             sync_config.user.to_string()
         )
@@ -493,9 +492,10 @@ class SyncHandler(BaseHandler):
             rooms = yield self.store.get_app_service_rooms(app_service)
             joined_room_ids = set(r.room_id for r in rooms)
         else:
-            joined_room_ids = yield rm_handler.get_joined_rooms_for_user(
-                sync_config.user
+            rooms = yield self.store.get_rooms_for_user(
+                sync_config.user.to_string()
             )
+            joined_room_ids = set(r.room_id for r in rooms)
 
         user_id = sync_config.user.to_string()
 

@@ -428,8 +428,7 @@ class RoomMemberHandler(BaseHandler):
         )
 
         if invitee:
-            handler = self.hs.get_handlers().room_member_handler
-            yield handler.update_membership(
+            yield self.update_membership(
                 requester,
                 UserID.from_string(invitee),
                 room_id,
