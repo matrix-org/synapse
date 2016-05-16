@@ -28,7 +28,6 @@ from .directory import DirectoryHandler
 from .typing import TypingNotificationHandler
 from .admin import AdminHandler
 from .appservice import ApplicationServicesHandler
-from .sync import SyncHandler
 from .auth import AuthHandler
 from .identity import IdentityHandler
 from .receipts import ReceiptsHandler
@@ -65,7 +64,6 @@ class Handlers(object):
                 as_api=asapi
             )
         )
-        self.sync_handler = SyncHandler(hs)
         self.auth_handler = AuthHandler(hs)
         self.identity_handler = IdentityHandler(hs)
         self.search_handler = SearchHandler(hs)
