@@ -17,6 +17,9 @@ from synapse.api.errors import SynapseError
 
 from collections import namedtuple
 
+from unpaddedbase64 import encode_base64, decode_base64
+import ujson as json
+
 
 Requester = namedtuple("Requester", ["user", "access_token_id", "is_guest"])
 
@@ -110,6 +113,30 @@ class RoomID(DomainSpecificString):
 class EventID(DomainSpecificString):
     """Structure representing an event id. """
     SIGIL = "$"
+
+
+class SyncNextBatchToken(
+    namedtuple("SyncNextBatchToken", (
+        "stream_token",
+        "pagination_config",
+    ))
+):
+    @classmethod
+    def from_string(cls, string):
+        try:
+            d = json.loads(decode_base64(string))
+            return cls(StreamToken.from_string(d["t"]), d.get("pa", {}))
+        except:
+            raise SynapseError(400, "Invalid Token")
+
+    def to_string(self):
+        return encode_base64(json.dumps({
+            "t": self.stream_token.to_string(),
+            "pa": self.pagination_config,
+        }))
+
+    def replace(self, **kwargs):
+        return self._replace(**kwargs)
 
 
 class StreamToken(

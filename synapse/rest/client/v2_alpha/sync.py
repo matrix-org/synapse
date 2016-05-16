@@ -19,7 +19,7 @@ from synapse.http.servlet import (
     RestServlet, parse_string, parse_integer, parse_boolean
 )
 from synapse.handlers.sync import SyncConfig
-from synapse.types import StreamToken
+from synapse.types import SyncNextBatchToken
 from synapse.events.utils import (
     serialize_event, format_event_for_client_v2_without_room_id,
 )
@@ -140,9 +140,9 @@ class SyncRestServlet(RestServlet):
         )
 
         if since is not None:
-            since_token = StreamToken.from_string(since)
+            batch_token = SyncNextBatchToken.from_string(since)
         else:
-            since_token = None
+            batch_token = None
 
         affect_presence = set_presence != PresenceState.OFFLINE
 
@@ -154,7 +154,7 @@ class SyncRestServlet(RestServlet):
         )
         with context:
             sync_result = yield self.sync_handler.wait_for_sync_for_user(
-                sync_config, since_token=since_token, timeout=timeout,
+                sync_config, batch_token=batch_token, timeout=timeout,
                 full_state=full_state
             )
 
