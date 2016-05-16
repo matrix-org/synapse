@@ -56,8 +56,7 @@ class PreviewUrlResource(Resource):
         self.client = SpiderHttpClient(hs)
         self.media_repo = media_repo
 
-        if hasattr(hs.config, "url_preview_url_blacklist"):
-            self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
+        self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
 
         # simple memory cache mapping urls to OG metadata
         self.cache = ExpiringCache(
@@ -86,39 +85,37 @@ class PreviewUrlResource(Resource):
         else:
             ts = self.clock.time_msec()
 
-        # impose the URL pattern blacklist
-        if hasattr(self, "url_preview_url_blacklist"):
-            url_tuple = urlparse.urlsplit(url)
-            for entry in self.url_preview_url_blacklist:
-                match = True
-                for attrib in entry:
-                    pattern = entry[attrib]
-                    value = getattr(url_tuple, attrib)
-                    logger.debug((
-                        "Matching attrib '%s' with value '%s' against"
-                        " pattern '%s'"
-                    ) % (attrib, value, pattern))
+        url_tuple = urlparse.urlsplit(url)
+        for entry in self.url_preview_url_blacklist:
+            match = True
+            for attrib in entry:
+                pattern = entry[attrib]
+                value = getattr(url_tuple, attrib)
+                logger.debug((
+                    "Matching attrib '%s' with value '%s' against"
+                    " pattern '%s'"
+                ) % (attrib, value, pattern))
 
-                    if value is None:
+                if value is None:
+                    match = False
+                    continue
+
+                if pattern.startswith('^'):
+                    if not re.match(pattern, getattr(url_tuple, attrib)):
                         match = False
                         continue
-
-                    if pattern.startswith('^'):
-                        if not re.match(pattern, getattr(url_tuple, attrib)):
-                            match = False
-                            continue
-                    else:
-                        if not fnmatch.fnmatch(getattr(url_tuple, attrib), pattern):
-                            match = False
-                            continue
-                if match:
-                    logger.warn(
-                        "URL %s blocked by url_blacklist entry %s", url, entry
-                    )
-                    raise SynapseError(
-                        403, "URL blocked by url pattern blacklist entry",
-                        Codes.UNKNOWN
-                    )
+                else:
+                    if not fnmatch.fnmatch(getattr(url_tuple, attrib), pattern):
+                        match = False
+                        continue
+            if match:
+                logger.warn(
+                    "URL %s blocked by url_blacklist entry %s", url, entry
+                )
+                raise SynapseError(
+                    403, "URL blocked by url pattern blacklist entry",
+                    Codes.UNKNOWN
+                )
 
         # first check the memory cache - good to handle all the clients on this
         # HS thundering away to preview the same URL at the same time.
