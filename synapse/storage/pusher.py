@@ -156,8 +156,7 @@ class PusherStore(SQLBaseStore):
                    profile_tag=""):
         with self._pushers_id_gen.get_next() as stream_id:
             def f(txn):
-                txn.call_after(self.get_users_with_pushers_in_room.invalidate_all)
-                return self._simple_upsert_txn(
+                newly_inserted = self._simple_upsert_txn(
                     txn,
                     "pushers",
                     {
@@ -178,11 +177,18 @@ class PusherStore(SQLBaseStore):
                         "id": stream_id,
                     },
                 )
-        defer.returnValue((yield self.runInteraction("add_pusher", f)))
+                if newly_inserted:
+                    # get_users_with_pushers_in_room only cares if the user has
+                    # at least *one* pusher.
+                    txn.call_after(self.get_users_with_pushers_in_room.invalidate_all)
+
+            yield self.runInteraction("add_pusher", f)
 
     @defer.inlineCallbacks
     def delete_pusher_by_app_id_pushkey_user_id(self, app_id, pushkey, user_id):
         def delete_pusher_txn(txn, stream_id):
+            txn.call_after(self.get_users_with_pushers_in_room.invalidate_all)
+
             self._simple_delete_one_txn(
                 txn,
                 "pushers",
@@ -194,6 +200,7 @@ class PusherStore(SQLBaseStore):
                 {"app_id": app_id, "pushkey": pushkey, "user_id": user_id},
                 {"stream_id": stream_id},
             )
+
         with self._pushers_id_gen.get_next() as stream_id:
             yield self.runInteraction(
                 "delete_pusher", delete_pusher_txn, stream_id
@@ -232,4 +239,31 @@ class PusherStore(SQLBaseStore):
             {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_id},
             {'failing_since': failing_since},
             desc="update_pusher_failing_since",
+        )
+
+    @defer.inlineCallbacks
+    def get_throttle_params_by_room(self, pusher_id):
+        res = yield self._simple_select_list(
+            "pusher_throttle",
+            {"pusher": pusher_id},
+            ["room_id", "last_sent_ts", "throttle_ms"],
+            desc="get_throttle_params_by_room"
+        )
+
+        params_by_room = {}
+        for row in res:
+            params_by_room[row["room_id"]] = {
+                "last_sent_ts": row["last_sent_ts"],
+                "throttle_ms": row["throttle_ms"]
+            }
+
+        defer.returnValue(params_by_room)
+
+    @defer.inlineCallbacks
+    def set_throttle_params(self, pusher_id, room_id, params):
+        yield self._simple_upsert(
+            "pusher_throttle",
+            {"pusher": pusher_id, "room_id": room_id},
+            params,
+            desc="set_throttle_params"
         )

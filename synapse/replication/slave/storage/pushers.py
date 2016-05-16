@@ -43,10 +43,10 @@ class SlavedPusherStore(BaseSlavedStore):
     def process_replication(self, result):
         stream = result.get("pushers")
         if stream:
-            self._pushers_id_gen.advance(stream["position"])
+            self._pushers_id_gen.advance(int(stream["position"]))
 
         stream = result.get("deleted_pushers")
         if stream:
-            self._pushers_id_gen.advance(stream["position"])
+            self._pushers_id_gen.advance(int(stream["position"]))
 
         return super(SlavedPusherStore, self).process_replication(result)

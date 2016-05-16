@@ -358,6 +358,59 @@ class RegistrationHandler(BaseHandler):
         )
         defer.returnValue(data)
 
+    @defer.inlineCallbacks
+    def get_or_create_user(self, localpart, displayname, duration_seconds):
+        """Creates a new user or returns an access token for an existing one
+
+        Args:
+            localpart : The local part of the user ID to register. If None,
+              one will be randomly generated.
+        Returns:
+            A tuple of (user_id, access_token).
+        Raises:
+            RegistrationError if there was a problem registering.
+        """
+        yield run_on_reactor()
+
+        if localpart is None:
+            raise SynapseError(400, "Request must include user id")
+
+        need_register = True
+
+        try:
+            yield self.check_username(localpart)
+        except SynapseError as e:
+            if e.errcode == Codes.USER_IN_USE:
+                need_register = False
+            else:
+                raise
+
+        user = UserID(localpart, self.hs.hostname)
+        user_id = user.to_string()
+        auth_handler = self.hs.get_handlers().auth_handler
+        token = auth_handler.generate_short_term_login_token(user_id, duration_seconds)
+
+        if need_register:
+            yield self.store.register(
+                user_id=user_id,
+                token=token,
+                password_hash=None
+            )
+
+            yield registered_user(self.distributor, user)
+        else:
+            yield self.store.flush_user(user_id=user_id)
+            yield self.store.add_access_token_to_user(user_id=user_id, token=token)
+
+        if displayname is not None:
+            logger.info("setting user display name: %s -> %s", user_id, displayname)
+            profile_handler = self.hs.get_handlers().profile_handler
+            yield profile_handler.set_displayname(
+                user, user, displayname
+            )
+
+        defer.returnValue((user_id, token))
+
     def auth_handler(self):
         return self.hs.get_handlers().auth_handler
 

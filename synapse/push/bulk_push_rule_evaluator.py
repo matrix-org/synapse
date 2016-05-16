@@ -22,6 +22,7 @@ from .baserules import list_with_base_rules
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
 from synapse.api.constants import EventTypes
+from synapse.visibility import filter_events_for_clients
 
 
 logger = logging.getLogger(__name__)
@@ -126,7 +127,7 @@ class BulkPushRuleEvaluator:
         self.store = store
 
     @defer.inlineCallbacks
-    def action_for_event_by_user(self, event, handler, current_state):
+    def action_for_event_by_user(self, event, current_state):
         actions_by_user = {}
 
         # None of these users can be peeking since this list of users comes
@@ -136,8 +137,8 @@ class BulkPushRuleEvaluator:
             (u, False) for u in self.rules_by_user.keys()
         ]
 
-        filtered_by_user = yield handler.filter_events_for_clients(
-            user_tuples, [event], {event.event_id: current_state}
+        filtered_by_user = yield filter_events_for_clients(
+            self.store, user_tuples, [event], {event.event_id: current_state}
         )
 
         room_members = yield self.store.get_users_in_room(self.room_id)

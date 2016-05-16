@@ -75,6 +75,18 @@ class SlavedEventStore(BaseSlavedStore):
     get_unread_event_push_actions_by_room_for_user = (
         EventPushActionsStore.__dict__["get_unread_event_push_actions_by_room_for_user"]
     )
+    _get_state_group_for_events = (
+        StateStore.__dict__["_get_state_group_for_events"]
+    )
+    _get_state_group_for_event = (
+        StateStore.__dict__["_get_state_group_for_event"]
+    )
+    _get_state_groups_from_groups = (
+        StateStore.__dict__["_get_state_groups_from_groups"]
+    )
+    _get_state_group_from_group = (
+        StateStore.__dict__["_get_state_group_from_group"]
+    )
 
     get_unread_push_actions_for_user_in_range = (
         DataStore.get_unread_push_actions_for_user_in_range.__func__
@@ -83,6 +95,7 @@ class SlavedEventStore(BaseSlavedStore):
         DataStore.get_push_action_users_in_range.__func__
     )
     get_event = DataStore.get_event.__func__
+    get_events = DataStore.get_events.__func__
     get_current_state = DataStore.get_current_state.__func__
     get_current_state_for_key = DataStore.get_current_state_for_key.__func__
     get_rooms_for_user_where_membership_is = (
@@ -95,6 +108,9 @@ class SlavedEventStore(BaseSlavedStore):
     get_room_events_stream_for_room = (
         DataStore.get_room_events_stream_for_room.__func__
     )
+    get_events_around = DataStore.get_events_around.__func__
+    get_state_for_events = DataStore.get_state_for_events.__func__
+    get_state_groups = DataStore.get_state_groups.__func__
 
     _set_before_and_after = DataStore._set_before_and_after
 
@@ -104,6 +120,7 @@ class SlavedEventStore(BaseSlavedStore):
     _invalidate_get_event_cache = DataStore._invalidate_get_event_cache.__func__
     _parse_events_txn = DataStore._parse_events_txn.__func__
     _get_events_txn = DataStore._get_events_txn.__func__
+    _get_event_txn = DataStore._get_event_txn.__func__
     _enqueue_events = DataStore._enqueue_events.__func__
     _do_fetch = DataStore._do_fetch.__func__
     _fetch_events_txn = DataStore._fetch_events_txn.__func__
@@ -114,6 +131,10 @@ class SlavedEventStore(BaseSlavedStore):
         DataStore._get_rooms_for_user_where_membership_is_txn.__func__
     )
     _get_members_rows_txn = DataStore._get_members_rows_txn.__func__
+    _get_state_for_groups = DataStore._get_state_for_groups.__func__
+    _get_all_state_from_cache = DataStore._get_all_state_from_cache.__func__
+    _get_events_around_txn = DataStore._get_events_around_txn.__func__
+    _get_some_state_from_cache = DataStore._get_some_state_from_cache.__func__
 
     def stream_positions(self):
         result = super(SlavedEventStore, self).stream_positions()
@@ -128,7 +149,7 @@ class SlavedEventStore(BaseSlavedStore):
 
         stream = result.get("events")
         if stream:
-            self._stream_id_gen.advance(stream["position"])
+            self._stream_id_gen.advance(int(stream["position"]))
             for row in stream["rows"]:
                 self._process_replication_row(
                     row, backfilled=False, state_resets=state_resets
@@ -136,7 +157,7 @@ class SlavedEventStore(BaseSlavedStore):
 
         stream = result.get("backfill")
         if stream:
-            self._backfill_id_gen.advance(-stream["position"])
+            self._backfill_id_gen.advance(-int(stream["position"]))
             for row in stream["rows"]:
                 self._process_replication_row(
                     row, backfilled=True, state_resets=state_resets
@@ -144,12 +165,14 @@ class SlavedEventStore(BaseSlavedStore):
 
         stream = result.get("forward_ex_outliers")
         if stream:
+            self._stream_id_gen.advance(int(stream["position"]))
             for row in stream["rows"]:
                 event_id = row[1]
                 self._invalidate_get_event_cache(event_id)
 
         stream = result.get("backward_ex_outliers")
         if stream:
+            self._backfill_id_gen.advance(-int(stream["position"]))
             for row in stream["rows"]:
                 event_id = row[1]
                 self._invalidate_get_event_cache(event_id)

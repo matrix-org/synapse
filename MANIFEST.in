@@ -11,6 +11,7 @@ recursive-include synapse/storage/schema *.sql
 recursive-include synapse/storage/schema *.py
 
 recursive-include docs *
+recursive-include res *
 recursive-include scripts *
 recursive-include scripts-dev *
 recursive-include tests *.py

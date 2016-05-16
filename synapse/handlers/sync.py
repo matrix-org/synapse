@@ -22,6 +22,7 @@ from synapse.util.logcontext import LoggingContext
 from synapse.util.metrics import Measure
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.push.clientformat import format_push_rules_for_user
+from synapse.visibility import filter_events_for_client
 
 from twisted.internet import defer
 
@@ -247,6 +248,10 @@ class SyncHandler(BaseHandler):
             sync_config.user.to_string()
         )
 
+        ignored_users = account_data.get(
+            "m.ignored_user_list", {}
+        ).get("ignored_users", {}).keys()
+
         joined = []
         invited = []
         archived = []
@@ -267,6 +272,8 @@ class SyncHandler(BaseHandler):
                 )
                 joined.append(room_result)
             elif event.membership == Membership.INVITE:
+                if event.sender in ignored_users:
+                    return
                 invite = yield self.store.get_event(event.event_id)
                 invited.append(InvitedSyncResult(
                     room_id=event.room_id,
@@ -515,6 +522,15 @@ class SyncHandler(BaseHandler):
                 sync_config.user
             )
 
+        ignored_account_data = yield self.store.get_global_account_data_by_type_for_user(
+            "m.ignored_user_list", user_id=user_id,
+        )
+
+        if ignored_account_data:
+            ignored_users = ignored_account_data.get("ignored_users", {}).keys()
+        else:
+            ignored_users = frozenset()
+
         # Get a list of membership change events that have happened.
         rooms_changed = yield self.store.get_membership_changes_for_user(
             user_id, since_token.room_key, now_token.room_key
@@ -549,9 +565,10 @@ class SyncHandler(BaseHandler):
             # Only bother if we're still currently invited
             should_invite = non_joins[-1].membership == Membership.INVITE
             if should_invite:
-                room_sync = InvitedSyncResult(room_id, invite=non_joins[-1])
-                if room_sync:
-                    invited.append(room_sync)
+                if event.sender not in ignored_users:
+                    room_sync = InvitedSyncResult(room_id, invite=non_joins[-1])
+                    if room_sync:
+                        invited.append(room_sync)
 
             # Always include leave/ban events. Just take the last one.
             # TODO: How do we handle ban -> leave in same batch?
@@ -681,7 +698,8 @@ class SyncHandler(BaseHandler):
 
             if recents is not None:
                 recents = sync_config.filter_collection.filter_room_timeline(recents)
-                recents = yield self._filter_events_for_client(
+                recents = yield filter_events_for_client(
+                    self.store,
                     sync_config.user.to_string(),
                     recents,
                 )
@@ -702,7 +720,8 @@ class SyncHandler(BaseHandler):
                 loaded_recents = sync_config.filter_collection.filter_room_timeline(
                     events
                 )
-                loaded_recents = yield self._filter_events_for_client(
+                loaded_recents = yield filter_events_for_client(
+                    self.store,
                     sync_config.user.to_string(),
                     loaded_recents,
                 )

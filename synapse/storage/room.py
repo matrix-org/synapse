@@ -23,6 +23,7 @@ from .engines import PostgresEngine, Sqlite3Engine
 
 import collections
 import logging
+import ujson as json
 
 logger = logging.getLogger(__name__)
 
@@ -221,3 +222,20 @@ class RoomStore(SQLBaseStore):
                     aliases.extend(e.content['aliases'])
 
         defer.returnValue((name, aliases))
+
+    def add_event_report(self, room_id, event_id, user_id, reason, content,
+                         received_ts):
+        next_id = self._event_reports_id_gen.get_next()
+        return self._simple_insert(
+            table="event_reports",
+            values={
+                "id": next_id,
+                "received_ts": received_ts,
+                "room_id": room_id,
+                "event_id": event_id,
+                "user_id": user_id,
+                "reason": reason,
+                "content": json.dumps(content),
+            },
+            desc="add_event_report"
+        )
