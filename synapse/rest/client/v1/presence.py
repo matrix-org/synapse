@@ -30,20 +30,24 @@ logger = logging.getLogger(__name__)
 class PresenceStatusRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/presence/(?P<user_id>[^/]*)/status")
 
+    def __init__(self, hs):
+        super(PresenceStatusRestServlet, self).__init__(hs)
+        self.presence_handler = hs.get_presence_handler()
+
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         requester = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
         if requester.user != user:
-            allowed = yield self.handlers.presence_handler.is_visible(
+            allowed = yield self.presence_handler.is_visible(
                 observed_user=user, observer_user=requester.user,
             )
 
             if not allowed:
                 raise AuthError(403, "You are not allowed to see their presence.")
 
-        state = yield self.handlers.presence_handler.get_state(target_user=user)
+        state = yield self.presence_handler.get_state(target_user=user)
 
         defer.returnValue((200, state))
 
@@ -74,7 +78,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
         except:
             raise SynapseError(400, "Unable to parse state")
 
-        yield self.handlers.presence_handler.set_state(user, state)
+        yield self.presence_handler.set_state(user, state)
 
         defer.returnValue((200, {}))
 
@@ -84,6 +88,10 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
 
 class PresenceListRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/presence/list/(?P<user_id>[^/]*)")
+
+    def __init__(self, hs):
+        super(PresenceListRestServlet, self).__init__(hs)
+        self.presence_handler = hs.get_presence_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -96,7 +104,7 @@ class PresenceListRestServlet(ClientV1RestServlet):
         if requester.user != user:
             raise SynapseError(400, "Cannot get another user's presence list")
 
-        presence = yield self.handlers.presence_handler.get_presence_list(
+        presence = yield self.presence_handler.get_presence_list(
             observer_user=user, accepted=True
         )
 
@@ -123,7 +131,7 @@ class PresenceListRestServlet(ClientV1RestServlet):
                 if len(u) == 0:
                     continue
                 invited_user = UserID.from_string(u)
-                yield self.handlers.presence_handler.send_presence_invite(
+                yield self.presence_handler.send_presence_invite(
                     observer_user=user, observed_user=invited_user
                 )
 
@@ -134,7 +142,7 @@ class PresenceListRestServlet(ClientV1RestServlet):
                 if len(u) == 0:
                     continue
                 dropped_user = UserID.from_string(u)
-                yield self.handlers.presence_handler.drop(
+                yield self.presence_handler.drop(
                     observer_user=user, observed_user=dropped_user
                 )
 

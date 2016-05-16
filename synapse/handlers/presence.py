@@ -860,7 +860,7 @@ class PresenceEventSource(object):
                 from_key = int(from_key)
             room_ids = room_ids or []
 
-            presence = self.hs.get_handlers().presence_handler
+            presence = self.hs.get_presence_handler()
             stream_change_cache = self.store.presence_stream_cache
 
             if not room_ids:

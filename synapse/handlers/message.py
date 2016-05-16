@@ -236,7 +236,7 @@ class MessageHandler(BaseHandler):
         )
 
         if event.type == EventTypes.Message:
-            presence = self.hs.get_handlers().presence_handler
+            presence = self.hs.get_presence_handler()
             yield presence.bump_presence_active_time(user)
 
     def deduplicate_state_event(self, event, context):
@@ -674,7 +674,7 @@ class MessageHandler(BaseHandler):
             and m.content["membership"] == Membership.JOIN
         ]
 
-        presence_handler = self.hs.get_handlers().presence_handler
+        presence_handler = self.hs.get_presence_handler()
 
         @defer.inlineCallbacks
         def get_presence():
