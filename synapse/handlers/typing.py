@@ -39,7 +39,8 @@ class TypingNotificationHandler(BaseHandler):
     def __init__(self, hs):
         super(TypingNotificationHandler, self).__init__(hs)
 
-        self.homeserver = hs
+        self.store = hs.get_datastore()
+        self.server_name = hs.config.server_name
 
         self.clock = hs.get_clock()
 
@@ -157,32 +158,26 @@ class TypingNotificationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _push_update(self, room_id, user, typing):
-        localusers = set()
-        remotedomains = set()
-
-        rm_handler = self.homeserver.get_handlers().room_member_handler
-        yield rm_handler.fetch_room_distributions_into(
-            room_id, localusers=localusers, remotedomains=remotedomains
-        )
-
-        if localusers:
-            self._push_update_local(
-                room_id=room_id,
-                user=user,
-                typing=typing
-            )
+        domains = yield self.store.get_joined_hosts_for_room(room_id)
 
         deferreds = []
-        for domain in remotedomains:
-            deferreds.append(self.federation.send_edu(
-                destination=domain,
-                edu_type="m.typing",
-                content={
-                    "room_id": room_id,
-                    "user_id": user.to_string(),
-                    "typing": typing,
-                },
-            ))
+        for domain in domains:
+            if domain == self.server_name:
+                self._push_update_local(
+                    room_id=room_id,
+                    user=user,
+                    typing=typing
+                )
+            else:
+                deferreds.append(self.federation.send_edu(
+                    destination=domain,
+                    edu_type="m.typing",
+                    content={
+                        "room_id": room_id,
+                        "user_id": user.to_string(),
+                        "typing": typing,
+                    },
+                ))
 
         yield defer.DeferredList(deferreds, consumeErrors=True)
 
@@ -191,14 +186,9 @@ class TypingNotificationHandler(BaseHandler):
         room_id = content["room_id"]
         user = UserID.from_string(content["user_id"])
 
-        localusers = set()
+        domains = yield self.store.get_joined_hosts_for_room(room_id)
 
-        rm_handler = self.homeserver.get_handlers().room_member_handler
-        yield rm_handler.fetch_room_distributions_into(
-            room_id, localusers=localusers
-        )
-
-        if localusers:
+        if self.server_name in domains:
             self._push_update_local(
                 room_id=room_id,
                 user=user,

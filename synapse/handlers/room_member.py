@@ -56,35 +56,6 @@ class RoomMemberHandler(BaseHandler):
         self.distributor.declare("user_left_room")
 
     @defer.inlineCallbacks
-    def get_room_members(self, room_id):
-        users = yield self.store.get_users_in_room(room_id)
-
-        defer.returnValue([UserID.from_string(u) for u in users])
-
-    @defer.inlineCallbacks
-    def fetch_room_distributions_into(self, room_id, localusers=None,
-                                      remotedomains=None, ignore_user=None):
-        """Fetch the distribution of a room, adding elements to either
-        'localusers' or 'remotedomains', which should be a set() if supplied.
-        If ignore_user is set, ignore that user.
-
-        This function returns nothing; its result is performed by the
-        side-effect on the two passed sets. This allows easy accumulation of
-        member lists of multiple rooms at once if required.
-        """
-        members = yield self.get_room_members(room_id)
-        for member in members:
-            if ignore_user is not None and member == ignore_user:
-                continue
-
-            if self.hs.is_mine(member):
-                if localusers is not None:
-                    localusers.add(member)
-            else:
-                if remotedomains is not None:
-                    remotedomains.add(member.domain)
-
-    @defer.inlineCallbacks
     def _local_membership_update(
         self, requester, target, room_id, membership,
         prev_event_ids,

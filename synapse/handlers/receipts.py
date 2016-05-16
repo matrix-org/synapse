@@ -29,6 +29,8 @@ class ReceiptsHandler(BaseHandler):
     def __init__(self, hs):
         super(ReceiptsHandler, self).__init__(hs)
 
+        self.server_name = hs.config.server_name
+        self.store = hs.get_datastore()
         self.hs = hs
         self.federation = hs.get_replication_layer()
         self.federation.register_edu_handler(
@@ -131,12 +133,9 @@ class ReceiptsHandler(BaseHandler):
             event_ids = receipt["event_ids"]
             data = receipt["data"]
 
-            remotedomains = set()
-
-            rm_handler = self.hs.get_handlers().room_member_handler
-            yield rm_handler.fetch_room_distributions_into(
-                room_id, localusers=None, remotedomains=remotedomains
-            )
+            remotedomains = yield self.store.get_joined_hosts_for_room(room_id)
+            remotedomains = remotedomains.copy()
+            remotedomains.discard(self.server_name)
 
             logger.debug("Sending receipt to: %r", remotedomains)
 
