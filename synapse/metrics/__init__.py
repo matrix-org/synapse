@@ -156,7 +156,12 @@ get_metrics_for("process").register_callback("fds", _process_fds, labels=["type"
 reactor_metrics = get_metrics_for("reactor")
 tick_time = reactor_metrics.register_distribution("tick_time")
 pending_calls_metric = reactor_metrics.register_distribution("pending_calls")
-gc_time = reactor_metrics.register_distribution("gc_time")
+
+gc_time = (
+    reactor_metrics.register_distribution("gc_time_gen0"),
+    reactor_metrics.register_distribution("gc_time_gen2"),
+    reactor_metrics.register_distribution("gc_time_gen2"),
+)
 
 
 def runUntilCurrentTimer(func):
@@ -189,14 +194,15 @@ def runUntilCurrentTimer(func):
         # one if necessary.
         threshold = gc.get_threshold()
         counts = gc.get_count()
-
-        start = time.time() * 1000
         for i in [2, 1, 0]:
             if threshold[i] < counts[i]:
                 logger.info("Collecting gc %d", i)
+
+                start = time.time() * 1000
                 gc.collect(i)
-        end = time.time() * 1000
-        gc_time.inc_by(end - start)
+                end = time.time() * 1000
+
+                gc_time[i].inc_by(end - start)
 
         return ret
 
