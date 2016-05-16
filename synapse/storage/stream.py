@@ -529,6 +529,26 @@ class StreamStore(SQLBaseStore):
                 int(stream),
             )
 
+    def get_last_ts_for_room(self, room_id, token):
+        stream_ordering = RoomStreamToken.parse_stream_token(token).stream
+
+        sql = (
+            "SELECT origin_server_ts FROM events"
+            " WHERE room_id = ? AND stream_ordering <= ?"
+            " ORDER BY topological_ordering DESC, stream_ordering DESC"
+            " LIMIT 1"
+        )
+
+        def f(txn):
+            txn.execute(sql, (room_id, stream_ordering))
+            rows = txn.fetchall()
+            if rows:
+                return rows[0][0]
+            else:
+                return None
+
+        return self.runInteraction("get_last_ts_for_room", f)
+
     @defer.inlineCallbacks
     def get_events_around(self, room_id, event_id, before_limit, after_limit):
         """Retrieve events and pagination tokens around a given event in a

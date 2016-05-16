@@ -258,19 +258,39 @@ class SyncHandler(BaseHandler):
 
         user_id = sync_config.user.to_string()
 
+        room_to_last_ts = {}
+
+        @defer.inlineCallbacks
+        def _get_last_ts(event):
+            room_id = event.room_id
+            if event.membership == Membership.JOIN:
+                ts = yield self.store.get_last_ts_for_room(
+                    room_id, now_token.room_key
+                )
+                room_to_last_ts[room_id] = ts if ts else 0
+
+        logger.info("room_to_last_ts: %r", room_to_last_ts)
+        yield concurrently_execute(_get_last_ts, room_list, 10)
+
+        joined_rooms_list = frozenset([
+            room_id for room_id, _f in
+            sorted(room_to_last_ts.items(), key=lambda item: -item[1])
+        ][:20])
+
         @defer.inlineCallbacks
         def _generate_room_entry(event):
             if event.membership == Membership.JOIN:
-                room_result = yield self.full_state_sync_for_joined_room(
-                    room_id=event.room_id,
-                    sync_config=sync_config,
-                    now_token=now_token,
-                    timeline_since_token=timeline_since_token,
-                    ephemeral_by_room=ephemeral_by_room,
-                    tags_by_room=tags_by_room,
-                    account_data_by_room=account_data_by_room,
-                )
-                joined.append(room_result)
+                if event.room_id in joined_rooms_list:
+                    room_result = yield self.full_state_sync_for_joined_room(
+                        room_id=event.room_id,
+                        sync_config=sync_config,
+                        now_token=now_token,
+                        timeline_since_token=timeline_since_token,
+                        ephemeral_by_room=ephemeral_by_room,
+                        tags_by_room=tags_by_room,
+                        account_data_by_room=account_data_by_room,
+                    )
+                    joined.append(room_result)
             elif event.membership == Membership.INVITE:
                 if event.sender in ignored_users:
                     return
