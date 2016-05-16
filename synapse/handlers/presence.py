@@ -36,8 +36,6 @@ from synapse.util.wheel_timer import WheelTimer
 from synapse.types import UserID, get_domain_from_id
 import synapse.metrics
 
-from ._base import BaseHandler
-
 import logging
 
 
@@ -73,11 +71,11 @@ FEDERATION_PING_INTERVAL = 25 * 60 * 1000
 assert LAST_ACTIVE_GRANULARITY < IDLE_TIMER
 
 
-class PresenceHandler(BaseHandler):
+class PresenceHandler(object):
 
     def __init__(self, hs):
-        super(PresenceHandler, self).__init__(hs)
-        self.hs = hs
+        self.is_mine = hs.is_mine
+        self.is_mine_id = hs.is_mine_id
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.wheel_timer = WheelTimer()
@@ -138,7 +136,7 @@ class PresenceHandler(BaseHandler):
                 obj=state.user_id,
                 then=state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
             )
-            if self.hs.is_mine_id(state.user_id):
+            if self.is_mine_id(state.user_id):
                 self.wheel_timer.insert(
                     now=now,
                     obj=state.user_id,
@@ -228,7 +226,7 @@ class PresenceHandler(BaseHandler):
 
                 new_state, should_notify, should_ping = handle_update(
                     prev_state, new_state,
-                    is_mine=self.hs.is_mine_id(user_id),
+                    is_mine=self.is_mine_id(user_id),
                     wheel_timer=self.wheel_timer,
                     now=now
                 )
@@ -287,7 +285,7 @@ class PresenceHandler(BaseHandler):
 
             changes = handle_timeouts(
                 states,
-                is_mine_fn=self.hs.is_mine_id,
+                is_mine_fn=self.is_mine_id,
                 user_to_num_current_syncs=self.user_to_num_current_syncs,
                 now=now,
             )
@@ -427,7 +425,7 @@ class PresenceHandler(BaseHandler):
 
         hosts_to_states = {}
         for room_id, states in room_ids_to_states.items():
-            local_states = filter(lambda s: self.hs.is_mine_id(s.user_id), states)
+            local_states = filter(lambda s: self.is_mine_id(s.user_id), states)
             if not local_states:
                 continue
 
@@ -436,7 +434,7 @@ class PresenceHandler(BaseHandler):
                 hosts_to_states.setdefault(host, []).extend(local_states)
 
         for user_id, states in users_to_states.items():
-            local_states = filter(lambda s: self.hs.is_mine_id(s.user_id), states)
+            local_states = filter(lambda s: self.is_mine_id(s.user_id), states)
             if not local_states:
                 continue
 
@@ -611,14 +609,14 @@ class PresenceHandler(BaseHandler):
         # don't need to send to local clients here, as that is done as part
         # of the event stream/sync.
         # TODO: Only send to servers not already in the room.
-        if self.hs.is_mine(user):
+        if self.is_mine(user):
             state = yield self.current_state_for_user(user.to_string())
 
             hosts = yield self.store.get_joined_hosts_for_room(room_id)
             self._push_to_remotes({host: (state,) for host in hosts})
         else:
             user_ids = yield self.store.get_users_in_room(room_id)
-            user_ids = filter(self.hs.is_mine_id, user_ids)
+            user_ids = filter(self.is_mine_id, user_ids)
 
             states = yield self.current_state_for_users(user_ids)
 
@@ -628,7 +626,7 @@ class PresenceHandler(BaseHandler):
     def get_presence_list(self, observer_user, accepted=None):
         """Returns the presence for all users in their presence list.
         """
-        if not self.hs.is_mine(observer_user):
+        if not self.is_mine(observer_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         presence_list = yield self.store.get_presence_list(
@@ -659,7 +657,7 @@ class PresenceHandler(BaseHandler):
             observer_user.localpart, observed_user.to_string()
         )
 
-        if self.hs.is_mine(observed_user):
+        if self.is_mine(observed_user):
             yield self.invite_presence(observed_user, observer_user)
         else:
             yield self.federation.send_edu(
@@ -675,11 +673,11 @@ class PresenceHandler(BaseHandler):
     def invite_presence(self, observed_user, observer_user):
         """Handles new presence invites.
         """
-        if not self.hs.is_mine(observed_user):
+        if not self.is_mine(observed_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         # TODO: Don't auto accept
-        if self.hs.is_mine(observer_user):
+        if self.is_mine(observer_user):
             yield self.accept_presence(observed_user, observer_user)
         else:
             self.federation.send_edu(
@@ -742,7 +740,7 @@ class PresenceHandler(BaseHandler):
         Returns:
             A Deferred.
         """
-        if not self.hs.is_mine(observer_user):
+        if not self.is_mine(observer_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
         yield self.store.del_presence_list(
@@ -834,7 +832,11 @@ def _format_user_presence_state(state, now):
 
 class PresenceEventSource(object):
     def __init__(self, hs):
-        self.hs = hs
+        # We can't call get_presence_handler here because there's a cycle:
+        #
+        #   Presence -> Notifier -> PresenceEventSource -> Presence
+        #
+        self.get_presence_handler = hs.get_presence_handler
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
 
@@ -860,7 +862,7 @@ class PresenceEventSource(object):
                 from_key = int(from_key)
             room_ids = room_ids or []
 
-            presence = self.hs.get_handlers().presence_handler
+            presence = self.get_presence_handler()
             stream_change_cache = self.store.presence_stream_cache
 
             if not room_ids:

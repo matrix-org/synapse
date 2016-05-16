@@ -83,7 +83,7 @@ class SyncRestServlet(RestServlet):
         self.sync_handler = hs.get_handlers().sync_handler
         self.clock = hs.get_clock()
         self.filtering = hs.get_filtering()
-        self.presence_handler = hs.get_handlers().presence_handler
+        self.presence_handler = hs.get_presence_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request):

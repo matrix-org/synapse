@@ -570,7 +570,7 @@ class RoomTypingRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(RoomTypingRestServlet, self).__init__(hs)
-        self.presence_handler = hs.get_handlers().presence_handler
+        self.presence_handler = hs.get_presence_handler()
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, user_id):
