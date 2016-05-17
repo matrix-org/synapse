@@ -27,6 +27,4 @@ class SlavedRegistrationStore(BaseSlavedStore):
         "get_user_by_access_token"
     ]
 
-    insert_client_ip = DataStore.insert_client_ip.__func__
-
     _query_for_auth = DataStore._query_for_auth.__func__

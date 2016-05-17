@@ -15,7 +15,9 @@
 
 from .events import SlavedEventStore
 from ._slaved_id_tracker import SlavedIdTracker
+from synapse.storage import DataStore
 from synapse.storage.push_rule import PushRuleStore
+from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 
 class SlavedPushRuleStore(SlavedEventStore):
@@ -24,8 +26,18 @@ class SlavedPushRuleStore(SlavedEventStore):
         self._push_rules_stream_id_gen = SlavedIdTracker(
             db_conn, "push_rules_stream", "stream_id",
         )
+        self.push_rules_stream_cache = StreamChangeCache(
+            "PushRulesStreamChangeCache",
+            self._push_rules_stream_id_gen.get_current_token(),
+        )
 
     get_push_rules_for_user = PushRuleStore.__dict__["get_push_rules_for_user"]
+    get_push_rules_enabled_for_user = (
+        PushRuleStore.__dict__["get_push_rules_enabled_for_user"]
+    )
+    have_push_rules_changed_for_user = (
+        DataStore.have_push_rules_changed_for_user.__func__
+    )
 
     def get_push_rules_stream_token(self):
         return (
@@ -44,6 +56,7 @@ class SlavedPushRuleStore(SlavedEventStore):
             for row in stream["rows"]:
                 user_id = row[1]
                 self.get_push_rules_for_user.invalidate((user_id,))
+                self.get_push_rules_enabled_for_user.invalidate((user_id,))
 
             self._push_rules_stream_id_gen.advance(int(stream["position"]))
 

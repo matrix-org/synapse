@@ -23,6 +23,7 @@ from synapse.storage.roommember import RoomMemberStore
 from synapse.storage.event_federation import EventFederationStore
 from synapse.storage.event_push_actions import EventPushActionsStore
 from synapse.storage.state import StateStore
+from synapse.storage.stream import StreamStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 import ujson as json
@@ -87,6 +88,9 @@ class SlavedEventStore(BaseSlavedStore):
     _get_state_group_from_group = (
         StateStore.__dict__["_get_state_group_from_group"]
     )
+    get_recent_event_ids_for_room = (
+        StreamStore.__dict__["get_recent_event_ids_for_room"]
+    )
 
     get_unread_push_actions_for_user_in_range = (
         DataStore.get_unread_push_actions_for_user_in_range.__func__
@@ -111,8 +115,12 @@ class SlavedEventStore(BaseSlavedStore):
     get_events_around = DataStore.get_events_around.__func__
     get_state_for_events = DataStore.get_state_for_events.__func__
     get_state_groups = DataStore.get_state_groups.__func__
+    get_recent_events_for_room = DataStore.get_recent_events_for_room.__func__
+    get_room_events_stream_for_rooms = (
+        DataStore.get_room_events_stream_for_rooms.__func__
+    )
 
-    _set_before_and_after = DataStore._set_before_and_after
+    _set_before_and_after = staticmethod(DataStore._set_before_and_after)
 
     _get_events = DataStore._get_events.__func__
     _get_events_from_cache = DataStore._get_events_from_cache.__func__

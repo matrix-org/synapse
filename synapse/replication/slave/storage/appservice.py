@@ -27,3 +27,4 @@ class SlavedApplicationServiceStore(BaseSlavedStore):
         )
 
     get_app_service_by_token = DataStore.get_app_service_by_token.__func__
+    get_app_service_by_user_id = DataStore.get_app_service_by_user_id.__func__

@@ -107,6 +107,14 @@ class SynchrotronSlavedStore(
     SlavedFilteringStore,
 ):
     def get_current_presence_token(self):
+        return 0
+
+    presence_stream_cache = ()
+
+    def get_presence_list_accepted(self, user_localpart):
+        return ()
+
+    def insert_client_ip(self, user, access_token, ip, user_agent):
         pass
 
 
@@ -114,9 +122,20 @@ class SynchrotronPresence(object):
     def set_state(self, user, state):
         pass
 
+    def get_states(self, user_ids, as_event=False):
+        return {}
+
     @contextlib.contextmanager
     def user_syncing(self, user, affect_presence):
         yield
+
+    def current_state_for_users(self, user_ids):
+        return {}
+
+
+class SynchrotronTyping(object):
+    _latest_room_serial = 0
+    _room_serials = ()
 
 
 class SynchrotronServer(HomeServer):
@@ -210,6 +229,7 @@ def setup(config_options):
         version_string=get_version_string("Synapse", synapse),
         database_engine=database_engine,
         presence_handler=SynchrotronPresence(),
+        typing_handler=SynchrotronTyping(),
     )
 
     ss.setup()
