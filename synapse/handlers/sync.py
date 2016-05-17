@@ -662,28 +662,27 @@ class SyncHandler(BaseHandler):
             limit=timeline_limit + 1,
         )
 
-        p_room_token = room_pagination_config.get("t", None)
-        if p_room_token:
-            needing_full_state = yield self._get_rooms_that_need_full_state(
-                joined_room_ids,
-                since_token,
-                room_pagination_config.get("ts", 0),
-            )
-        else:
-            needing_full_state = set()
-
         joined = []
         # We loop through all room ids, even if there are no new events, in case
         # there are non room events taht we need to notify about.
         for room_id in joined_room_ids:
             room_entry = room_to_events.get(room_id, None)
 
-            need_full_state = room_id in needing_full_state
-
             if room_entry:
                 events, start_key = room_entry
 
                 prev_batch_token = now_token.copy_and_replace("room_key", start_key)
+
+                p_room_token = room_pagination_config.get("t", None)
+                if p_room_token:
+                    needing_full_state = yield self._get_rooms_that_need_full_state(
+                        [room_id],
+                        since_token,
+                        room_pagination_config.get("ts", 0),
+                    )
+                    need_full_state = room_id in needing_full_state
+                else:
+                    need_full_state = False
 
                 newly_joined_room = (room_id in newly_joined_rooms) or need_full_state
                 full_state = newly_joined_room
@@ -695,9 +694,6 @@ class SyncHandler(BaseHandler):
                     newly_joined_room=newly_joined_room,
                 )
             else:
-                if need_full_state:
-                    continue
-
                 batch = TimelineBatch(
                     events=[],
                     prev_batch=since_token,
@@ -717,6 +713,16 @@ class SyncHandler(BaseHandler):
                 full_state=full_state,
             )
             if room_sync:
+                if not room_sync.timeline:
+                    p_room_token = room_pagination_config.get("t", None)
+                    if p_room_token:
+                        needing_full_state = yield self._get_rooms_that_need_full_state(
+                            [room_id],
+                            since_token,
+                            room_pagination_config.get("ts", 0),
+                        )
+                        if room_id in needing_full_state:
+                            continue
                 joined.append(room_sync)
 
         # For each newly joined room, we want to send down presence of
