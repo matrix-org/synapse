@@ -2,6 +2,11 @@ body {
     margin: 0px;
 }
 
+pre, code {
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
 #page {
     font-family: 'Open Sans', Helvetica, Arial, Sans-Serif;
     font-color: #454545;
