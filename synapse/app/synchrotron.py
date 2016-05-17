@@ -26,6 +26,7 @@ from synapse.rest.client.v2_alpha import sync
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
+from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.util.httpresourcetree import create_resource_tree
@@ -93,6 +94,7 @@ class SynchrotronSlavedStore(
     SlavedEventStore,
     SlavedReceiptsStore,
     SlavedAccountDataStore,
+    SlavedApplicationServiceStore,
 ):
     pass
 
