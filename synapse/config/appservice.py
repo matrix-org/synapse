@@ -12,7 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from ._base import Config, ConfigError
+
+from synapse.appservice import ApplicationService
+from synapse.types import UserID
+
+import urllib
+import yaml
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AppServiceConfig(Config):
@@ -25,3 +34,99 @@ class AppServiceConfig(Config):
         # A list of application service config file to use
         app_service_config_files: []
         """
+
+
+def load_appservices(hostname, config_files):
+    """Returns a list of Application Services from the config files."""
+    if not isinstance(config_files, list):
+        logger.warning(
+            "Expected %s to be a list of AS config files.", config_files
+        )
+        return []
+
+    # Dicts of value -> filename
+    seen_as_tokens = {}
+    seen_ids = {}
+
+    appservices = []
+
+    for config_file in config_files:
+        try:
+            with open(config_file, 'r') as f:
+                appservice = _load_appservice(
+                    hostname, yaml.load(f), config_file
+                )
+                if appservice.id in seen_ids:
+                    raise ConfigError(
+                        "Cannot reuse ID across application services: "
+                        "%s (files: %s, %s)" % (
+                            appservice.id, config_file, seen_ids[appservice.id],
+                        )
+                    )
+                seen_ids[appservice.id] = config_file
+                if appservice.token in seen_as_tokens:
+                    raise ConfigError(
+                        "Cannot reuse as_token across application services: "
+                        "%s (files: %s, %s)" % (
+                            appservice.token,
+                            config_file,
+                            seen_as_tokens[appservice.token],
+                        )
+                    )
+                seen_as_tokens[appservice.token] = config_file
+                logger.info("Loaded application service: %s", appservice)
+                appservices.append(appservice)
+        except Exception as e:
+            logger.error("Failed to load appservice from '%s'", config_file)
+            logger.exception(e)
+            raise
+    return appservices
+
+
+def _load_appservice(hostname, as_info, config_filename):
+    required_string_fields = [
+        "id", "url", "as_token", "hs_token", "sender_localpart"
+    ]
+    for field in required_string_fields:
+        if not isinstance(as_info.get(field), basestring):
+            raise KeyError("Required string field: '%s' (%s)" % (
+                field, config_filename,
+            ))
+
+    localpart = as_info["sender_localpart"]
+    if urllib.quote(localpart) != localpart:
+        raise ValueError(
+            "sender_localpart needs characters which are not URL encoded."
+        )
+    user = UserID(localpart, hostname)
+    user_id = user.to_string()
+
+    # namespace checks
+    if not isinstance(as_info.get("namespaces"), dict):
+        raise KeyError("Requires 'namespaces' object.")
+    for ns in ApplicationService.NS_LIST:
+        # specific namespaces are optional
+        if ns in as_info["namespaces"]:
+            # expect a list of dicts with exclusive and regex keys
+            for regex_obj in as_info["namespaces"][ns]:
+                if not isinstance(regex_obj, dict):
+                    raise ValueError(
+                        "Expected namespace entry in %s to be an object,"
+                        " but got %s", ns, regex_obj
+                    )
+                if not isinstance(regex_obj.get("regex"), basestring):
+                    raise ValueError(
+                        "Missing/bad type 'regex' key in %s", regex_obj
+                    )
+                if not isinstance(regex_obj.get("exclusive"), bool):
+                    raise ValueError(
+                        "Missing/bad type 'exclusive' key in %s", regex_obj
+                    )
+    return ApplicationService(
+        token=as_info["as_token"],
+        url=as_info["url"],
+        namespaces=as_info["namespaces"],
+        hs_token=as_info["hs_token"],
+        sender=user_id,
+        id=as_info["id"],
+    )
