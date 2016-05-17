@@ -110,7 +110,7 @@ class ReplicationResource(Resource):
         self.store = hs.get_datastore()
         self.sources = hs.get_event_sources()
         self.presence_handler = hs.get_presence_handler()
-        self.typing_handler = hs.get_handlers().typing_notification_handler
+        self.typing_handler = hs.get_typing_handler()
         self.notifier = hs.notifier
         self.clock = hs.get_clock()
 
