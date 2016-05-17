@@ -16,7 +16,6 @@
 
 import synapse
 
-from synapse.api.urls import CLIENT_PREFIX
 from synapse.config._base import ConfigError
 from synapse.config.database import DatabaseConfig
 from synapse.config.logger import LoggingConfig
@@ -129,7 +128,11 @@ class SynchrotronServer(HomeServer):
                 elif name == "client":
                     resource = JsonResource(self, canonical_json=False)
                     sync.register_servlets(self, resource)
-                    resources[CLIENT_PREFIX] = resource
+                    resources.update({
+                        "/_matrix/client/r0": resource,
+                        "/_matrix/client/unstable": resource,
+                        "/_matrix/client/v2_alpha": resource,
+                    })
 
         root_resource = create_resource_tree(resources, Resource())
         reactor.listenTCP(
@@ -184,6 +187,7 @@ def setup(config_options):
         config=config,
         version_string=get_version_string("Synapse", synapse),
         database_engine=database_engine,
+        presence_handler=object(),
     )
 
     ss.setup()
@@ -196,7 +200,7 @@ def setup(config_options):
 
     reactor.callWhenRunning(start)
 
-    return ps
+    return ss
 
 
 if __name__ == '__main__':
