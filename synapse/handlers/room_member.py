@@ -398,21 +398,6 @@ class RoomMemberHandler(BaseHandler):
             defer.returnValue(UserID.from_string(invite.sender))
 
     @defer.inlineCallbacks
-    def get_joined_rooms_for_user(self, user):
-        """Returns a list of roomids that the user has any of the given
-        membership states in."""
-
-        rooms = yield self.store.get_rooms_for_user(
-            user.to_string(),
-        )
-
-        # For some reason the list of events contains duplicates
-        # TODO(paul): work out why because I really don't think it should
-        room_ids = set(r.room_id for r in rooms)
-
-        defer.returnValue(room_ids)
-
-    @defer.inlineCallbacks
     def do_3pid_invite(
             self,
             room_id,
