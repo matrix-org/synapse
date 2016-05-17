@@ -79,8 +79,7 @@ class SyncRestServlet(RestServlet):
     def __init__(self, hs):
         super(SyncRestServlet, self).__init__()
         self.auth = hs.get_auth()
-        self.event_stream_handler = hs.get_handlers().event_stream_handler
-        self.sync_handler = hs.get_handlers().sync_handler
+        self.sync_handler = hs.get_sync_handler()
         self.clock = hs.get_clock()
         self.filtering = hs.get_filtering()
         self.presence_handler = hs.get_presence_handler()
