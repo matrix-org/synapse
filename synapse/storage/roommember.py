@@ -137,24 +137,6 @@ class RoomMemberStore(SQLBaseStore):
             return [r["user_id"] for r in rows]
         return self.runInteraction("get_users_in_room", f)
 
-    def get_room_members(self, room_id, membership=None):
-        """Retrieve the current room member list for a room.
-
-        Args:
-            room_id (str): The room to get the list of members.
-            membership (synapse.api.constants.Membership): The filter to apply
-            to this list, or None to return all members with some state
-            associated with this room.
-        Returns:
-            list of namedtuples representing the members in this room.
-        """
-        return self.runInteraction(
-            "get_room_members",
-            self._get_members_events_txn,
-            room_id,
-            membership=membership,
-        ).addCallback(self._get_events)
-
     @cached()
     def get_invited_rooms_for_user(self, user_id):
         """ Get all the rooms the user is invited to
