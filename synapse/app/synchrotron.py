@@ -28,6 +28,9 @@ from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
+from synapse.replication.slave.storage.registration import SlavedRegistrationStore
+from synapse.replication.slave.storage.filtering import SlavedFilteringStore
+from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.util.httpresourcetree import create_resource_tree
@@ -43,6 +46,7 @@ from daemonize import Daemonize
 
 import sys
 import logging
+import contextlib
 
 logger = logging.getLogger("synapse.app.synchrotron")
 
@@ -94,12 +98,25 @@ class SynchrotronConfig(DatabaseConfig, LoggingConfig, AppServiceConfig):
 
 
 class SynchrotronSlavedStore(
+    SlavedPushRuleStore,
     SlavedEventStore,
     SlavedReceiptsStore,
     SlavedAccountDataStore,
     SlavedApplicationServiceStore,
+    SlavedRegistrationStore,
+    SlavedFilteringStore,
 ):
-    pass
+    def get_current_presence_token(self):
+        pass
+
+
+class SynchrotronPresence(object):
+    def set_state(self, user, state):
+        pass
+
+    @contextlib.contextmanager
+    def user_syncing(self, user, affect_presence):
+        yield
 
 
 class SynchrotronServer(HomeServer):
@@ -192,7 +209,7 @@ def setup(config_options):
         config=config,
         version_string=get_version_string("Synapse", synapse),
         database_engine=database_engine,
-        presence_handler=object(),
+        presence_handler=SynchrotronPresence(),
     )
 
     ss.setup()
