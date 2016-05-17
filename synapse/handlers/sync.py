@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import BaseHandler
-
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import Membership, EventTypes
 from synapse.util.async import concurrently_execute
@@ -133,10 +131,12 @@ class SyncResult(collections.namedtuple("SyncResult", [
         )
 
 
-class SyncHandler(BaseHandler):
+class SyncHandler(object):
 
     def __init__(self, hs):
-        super(SyncHandler, self).__init__(hs)
+        self.store = hs.get_datastore()
+        self.notifier = hs.get_notifier()
+        self.presence_handler = hs.get_presence_handler()
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
         self.response_cache = ResponseCache()
@@ -485,7 +485,6 @@ class SyncHandler(BaseHandler):
             sync_config, now_token, since_token
         )
 
-        rm_handler = self.hs.get_handlers().room_member_handler
         app_service = yield self.store.get_app_service_by_user_id(
             sync_config.user.to_string()
         )
@@ -493,9 +492,10 @@ class SyncHandler(BaseHandler):
             rooms = yield self.store.get_app_service_rooms(app_service)
             joined_room_ids = set(r.room_id for r in rooms)
         else:
-            joined_room_ids = yield rm_handler.get_joined_rooms_for_user(
-                sync_config.user
+            rooms = yield self.store.get_rooms_for_user(
+                sync_config.user.to_string()
             )
+            joined_room_ids = set(r.room_id for r in rooms)
 
         user_id = sync_config.user.to_string()
 
@@ -639,7 +639,7 @@ class SyncHandler(BaseHandler):
 
         # For each newly joined room, we want to send down presence of
         # existing users.
-        presence_handler = self.hs.get_handlers().presence_handler
+        presence_handler = self.presence_handler
         extra_presence_users = set()
         for room_id in newly_joined_rooms:
             users = yield self.store.get_users_in_room(event.room_id)

@@ -71,6 +71,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.auth = Mock(spec=[])
 
         hs = yield setup_test_homeserver(
+            "test",
             auth=self.auth,
             clock=self.clock,
             datastore=Mock(spec=[
@@ -110,55 +111,15 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         self.room_id = "a-room"
 
-        # Mock the RoomMemberHandler
-        hs.handlers.room_member_handler = Mock(spec=[])
-        self.room_member_handler = hs.handlers.room_member_handler
-
         self.room_members = []
-
-        def get_rooms_for_user(user):
-            if user in self.room_members:
-                return defer.succeed([self.room_id])
-            else:
-                return defer.succeed([])
-        self.room_member_handler.get_rooms_for_user = get_rooms_for_user
-
-        def get_room_members(room_id):
-            if room_id == self.room_id:
-                return defer.succeed(self.room_members)
-            else:
-                return defer.succeed([])
-        self.room_member_handler.get_room_members = get_room_members
-
-        def get_joined_rooms_for_user(user):
-            if user in self.room_members:
-                return defer.succeed([self.room_id])
-            else:
-                return defer.succeed([])
-        self.room_member_handler.get_joined_rooms_for_user = get_joined_rooms_for_user
-
-        @defer.inlineCallbacks
-        def fetch_room_distributions_into(
-            room_id, localusers=None, remotedomains=None, ignore_user=None
-        ):
-            members = yield get_room_members(room_id)
-            for member in members:
-                if ignore_user is not None and member == ignore_user:
-                    continue
-
-                if hs.is_mine(member):
-                    if localusers is not None:
-                        localusers.add(member)
-                else:
-                    if remotedomains is not None:
-                        remotedomains.add(member.domain)
-        self.room_member_handler.fetch_room_distributions_into = (
-            fetch_room_distributions_into
-        )
 
         def check_joined_room(room_id, user_id):
             if user_id not in [u.to_string() for u in self.room_members]:
                 raise AuthError(401, "User is not in the room")
+
+        def get_joined_hosts_for_room(room_id):
+            return set(member.domain for member in self.room_members)
+        self.datastore.get_joined_hosts_for_room = get_joined_hosts_for_room
 
         self.auth.check_joined_room = check_joined_room
 

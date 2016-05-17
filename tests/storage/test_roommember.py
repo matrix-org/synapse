@@ -71,30 +71,12 @@ class RoomMemberStoreTestCase(unittest.TestCase):
         yield self.inject_room_member(self.room, self.u_alice, Membership.JOIN)
 
         self.assertEquals(
-            [self.u_alice.to_string()],
-            [m.user_id for m in (
-                yield self.store.get_room_members(self.room.to_string())
-            )]
-        )
-        self.assertEquals(
             [self.room.to_string()],
             [m.room_id for m in (
                 yield self.store.get_rooms_for_user_where_membership_is(
                     self.u_alice.to_string(), [Membership.JOIN]
                 )
             )]
-        )
-
-    @defer.inlineCallbacks
-    def test_two_members(self):
-        yield self.inject_room_member(self.room, self.u_alice, Membership.JOIN)
-        yield self.inject_room_member(self.room, self.u_bob, Membership.JOIN)
-
-        self.assertEquals(
-            {self.u_alice.to_string(), self.u_bob.to_string()},
-            {m.user_id for m in (
-                yield self.store.get_room_members(self.room.to_string())
-            )}
         )
 
     @defer.inlineCallbacks
