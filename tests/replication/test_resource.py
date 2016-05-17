@@ -78,7 +78,7 @@ class ReplicationResourceCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_presence(self):
         get = self.get(presence="-1")
-        yield self.hs.get_handlers().presence_handler.set_state(
+        yield self.hs.get_presence_handler().set_state(
             self.user, {"presence": "online"}
         )
         code, body = yield get

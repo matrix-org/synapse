@@ -639,7 +639,7 @@ class SyncHandler(BaseHandler):
 
         # For each newly joined room, we want to send down presence of
         # existing users.
-        presence_handler = self.hs.get_handlers().presence_handler
+        presence_handler = self.hs.get_presence_handler()
         extra_presence_users = set()
         for room_id in newly_joined_rooms:
             users = yield self.store.get_users_in_room(event.room_id)
