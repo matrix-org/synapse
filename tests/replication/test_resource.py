@@ -93,7 +93,7 @@ class ReplicationResourceCase(unittest.TestCase):
     def test_typing(self):
         room_id = yield self.create_room()
         get = self.get(typing="-1")
-        yield self.hs.get_handlers().typing_notification_handler.started_typing(
+        yield self.hs.get_typing_handler().started_typing(
             self.user, self.user, room_id, timeout=2
         )
         code, body = yield get
