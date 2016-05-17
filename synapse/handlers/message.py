@@ -23,7 +23,7 @@ from synapse.events.validator import EventValidator
 from synapse.push.action_generator import ActionGenerator
 from synapse.streams.config import PaginationConfig
 from synapse.types import (
-    UserID, RoomAlias, RoomStreamToken, StreamToken, get_domian_from_id
+    UserID, RoomAlias, RoomStreamToken, StreamToken, get_domain_from_id
 )
 from synapse.util import unwrapFirstError
 from synapse.util.async import concurrently_execute
@@ -902,7 +902,7 @@ class MessageHandler(BaseHandler):
             try:
                 if k[0] == EventTypes.Member:
                     if s.content["membership"] == Membership.JOIN:
-                        destinations.add(get_domian_from_id(s.state_key))
+                        destinations.add(get_domain_from_id(s.state_key))
             except SynapseError:
                 logger.warn(
                     "Failed to get destination from event %s", s.event_id
