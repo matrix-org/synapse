@@ -25,8 +25,6 @@ from ..utils import (
 )
 
 from synapse.api.errors import AuthError
-from synapse.handlers.typing import TypingNotificationHandler
-
 from synapse.types import UserID
 
 
@@ -47,11 +45,6 @@ def _expect_edu(destination, edu_type, content, origin="test"):
 
 def _make_edu_json(origin, edu_type, content):
     return json.dumps(_expect_edu("test", edu_type, content, origin=origin))
-
-
-class JustTypingNotificationHandlers(object):
-    def __init__(self, hs):
-        self.typing_notification_handler = TypingNotificationHandler(hs)
 
 
 class TypingNotificationsTestCase(unittest.TestCase):
@@ -89,9 +82,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
             http_client=self.mock_http_client,
             keyring=Mock(),
         )
-        hs.handlers = JustTypingNotificationHandlers(hs)
 
-        self.handler = hs.get_handlers().typing_notification_handler
+        self.handler = hs.get_typing_handler()
 
         self.event_source = hs.get_event_sources().sources["typing"]
 

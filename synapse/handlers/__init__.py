@@ -25,7 +25,6 @@ from .events import EventStreamHandler, EventHandler
 from .federation import FederationHandler
 from .profile import ProfileHandler
 from .directory import DirectoryHandler
-from .typing import TypingNotificationHandler
 from .admin import AdminHandler
 from .appservice import ApplicationServicesHandler
 from .auth import AuthHandler
@@ -53,7 +52,6 @@ class Handlers(object):
         self.profile_handler = ProfileHandler(hs)
         self.room_list_handler = RoomListHandler(hs)
         self.directory_handler = DirectoryHandler(hs)
-        self.typing_notification_handler = TypingNotificationHandler(hs)
         self.admin_handler = AdminHandler(hs)
         self.receipts_handler = ReceiptsHandler(hs)
         asapi = ApplicationServiceApi(hs)
