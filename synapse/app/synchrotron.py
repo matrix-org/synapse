@@ -19,6 +19,7 @@ import synapse
 from synapse.config._base import ConfigError
 from synapse.config.database import DatabaseConfig
 from synapse.config.logger import LoggingConfig
+from synapse.config.appservice import AppServiceConfig
 from synapse.http.site import SynapseSite
 from synapse.http.server import JsonResource
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
@@ -46,7 +47,7 @@ import logging
 logger = logging.getLogger("synapse.app.synchrotron")
 
 
-class SynchrotronConfig(DatabaseConfig, LoggingConfig):
+class SynchrotronConfig(DatabaseConfig, LoggingConfig, AppServiceConfig):
     def read_config(self, config):
         self.replication_url = config["replication_url"]
         self.server_name = config["server_name"]
@@ -54,6 +55,8 @@ class SynchrotronConfig(DatabaseConfig, LoggingConfig):
         self.soft_file_limit = config.get("soft_file_limit")
         self.daemonize = config.get("daemonize")
         self.pid_file = self.abspath(config.get("pid_file"))
+        self.macaroon_secret_key = config["macaroon_secret_key"]
+        self.expire_access_token = config.get("expire_access_token", False)
 
     def default_config(self, server_name, **kwargs):
         pid_file = self.abspath("synchroton.pid")
