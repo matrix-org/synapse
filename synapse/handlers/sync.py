@@ -235,7 +235,7 @@ class SyncHandler(BaseHandler):
         while len(to_return) < limit and len(queued_events) > 0:
             to_fetch = queued_events[:limit - len(to_return)]
             event_to_q = {
-                e["event_id"]: (room_id, e) for room_id, e in to_fetch.items()
+                e["event_id"]: (room_id, e) for room_id, e in to_fetch
                 if "event_id" in e
             }
 
