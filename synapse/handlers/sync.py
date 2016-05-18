@@ -227,7 +227,7 @@ class SyncHandler(BaseHandler):
 
         queued_events = sorted(
             room_to_entries.items(),
-            key=lambda e: e[1]["origin_server_ts"]
+            key=lambda e: -e[1]["origin_server_ts"]
         )
 
         to_return = {}
@@ -257,7 +257,7 @@ class SyncHandler(BaseHandler):
                 queued_events.append(event_to_q[ev_id])
 
             # FIXME: Need to refetch TS
-            queued_events.sort(key=lambda e: e[1]["origin_server_ts"])
+            queued_events.sort(key=lambda e: -e[1]["origin_server_ts"])
 
         defer.returnValue(to_return)
 
@@ -325,7 +325,7 @@ class SyncHandler(BaseHandler):
 
         user_id = sync_config.user.to_string()
 
-        pagination_limit = 20
+        pagination_limit = 10
         room_pagination_config = {
             "l": pagination_limit,
             "o": 0,
