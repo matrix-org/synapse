@@ -27,6 +27,9 @@ from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFa
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
 from synapse.handlers import Handlers
+from synapse.handlers.presence import PresenceHandler
+from synapse.handlers.sync import SyncHandler
+from synapse.handlers.typing import TypingHandler
 from synapse.state import StateHandler
 from synapse.storage import DataStore
 from synapse.util import Clock
@@ -78,6 +81,9 @@ class HomeServer(object):
         'auth',
         'rest_servlet_factory',
         'state_handler',
+        'presence_handler',
+        'sync_handler',
+        'typing_handler',
         'notifier',
         'distributor',
         'client_resource',
@@ -163,6 +169,15 @@ class HomeServer(object):
 
     def build_state_handler(self):
         return StateHandler(self)
+
+    def build_presence_handler(self):
+        return PresenceHandler(self)
+
+    def build_typing_handler(self):
+        return TypingHandler(self)
+
+    def build_sync_handler(self):
+        return SyncHandler(self)
 
     def build_event_sources(self):
         return EventSources(self)

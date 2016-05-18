@@ -92,7 +92,7 @@ class Mailer(object):
         )
 
     @defer.inlineCallbacks
-    def send_notification_mail(self, user_id, email_address, push_actions):
+    def send_notification_mail(self, user_id, email_address, push_actions, reason):
         raw_from = email.utils.parseaddr(self.hs.config.email_notif_from)[1]
         raw_to = email.utils.parseaddr(email_address)[1]
 
@@ -143,12 +143,17 @@ class Mailer(object):
             notifs_by_room, state_by_room, notif_events, user_id
         )
 
+        reason['room_name'] = calculate_room_name(
+            state_by_room[reason['room_id']], user_id, fallback_to_members=False
+        )
+
         template_vars = {
             "user_display_name": user_display_name,
             "unsubscribe_link": self.make_unsubscribe_link(),
             "summary_text": summary_text,
             "app_name": self.app_name,
             "rooms": rooms,
+            "reason": reason,
         }
 
         html_text = self.notif_template_html.render(**template_vars)

@@ -18,6 +18,17 @@ from httppusher import HttpPusher
 import logging
 logger = logging.getLogger(__name__)
 
+# We try importing this if we can (it will fail if we don't
+# have the optional email dependencies installed). We don't
+# yet have the config to know if we need the email pusher,
+# but importing this after daemonizing seems to fail
+# (even though a simple test of importing from a daemonized
+# process works fine)
+try:
+    from synapse.push.emailpusher import EmailPusher
+except:
+    pass
+
 
 def create_pusher(hs, pusherdict):
     logger.info("trying to create_pusher for %r", pusherdict)
@@ -28,7 +39,6 @@ def create_pusher(hs, pusherdict):
 
     logger.info("email enable notifs: %r", hs.config.email_enable_notifs)
     if hs.config.email_enable_notifs:
-        from synapse.push.emailpusher import EmailPusher
         PUSHER_TYPES["email"] = EmailPusher
         logger.info("defined email pusher type")
 

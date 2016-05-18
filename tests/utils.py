@@ -50,7 +50,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.enable_registration = True
         config.macaroon_secret_key = "not even a little secret"
         config.expire_access_token = False
-        config.server_name = "server.under.test"
+        config.server_name = name
         config.trusted_third_party_id_servers = []
         config.room_invite_state_types = []
 

@@ -570,7 +570,8 @@ class RoomTypingRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(RoomTypingRestServlet, self).__init__(hs)
-        self.presence_handler = hs.get_handlers().presence_handler
+        self.presence_handler = hs.get_presence_handler()
+        self.typing_handler = hs.get_typing_handler()
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, user_id):
@@ -581,19 +582,17 @@ class RoomTypingRestServlet(ClientV1RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        typing_handler = self.handlers.typing_notification_handler
-
         yield self.presence_handler.bump_presence_active_time(requester.user)
 
         if content["typing"]:
-            yield typing_handler.started_typing(
+            yield self.typing_handler.started_typing(
                 target_user=target_user,
                 auth_user=requester.user,
                 room_id=room_id,
                 timeout=content.get("timeout", 30000),
             )
         else:
-            yield typing_handler.stopped_typing(
+            yield self.typing_handler.stopped_typing(
                 target_user=target_user,
                 auth_user=requester.user,
                 room_id=room_id,

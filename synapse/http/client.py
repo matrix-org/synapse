@@ -380,13 +380,14 @@ class CaptchaServerHttpClient(SimpleHttpClient):
 class SpiderEndpointFactory(object):
     def __init__(self, hs):
         self.blacklist = hs.config.url_preview_ip_range_blacklist
+        self.whitelist = hs.config.url_preview_ip_range_whitelist
         self.policyForHTTPS = hs.get_http_client_context_factory()
 
     def endpointForURI(self, uri):
         logger.info("Getting endpoint for %s", uri.toBytes())
         if uri.scheme == "http":
             return SpiderEndpoint(
-                reactor, uri.host, uri.port, self.blacklist,
+                reactor, uri.host, uri.port, self.blacklist, self.whitelist,
                 endpoint=TCP4ClientEndpoint,
                 endpoint_kw_args={
                     'timeout': 15
@@ -395,7 +396,7 @@ class SpiderEndpointFactory(object):
         elif uri.scheme == "https":
             tlsPolicy = self.policyForHTTPS.creatorForNetloc(uri.host, uri.port)
             return SpiderEndpoint(
-                reactor, uri.host, uri.port, self.blacklist,
+                reactor, uri.host, uri.port, self.blacklist, self.whitelist,
                 endpoint=SSL4ClientEndpoint,
                 endpoint_kw_args={
                     'sslContextFactory': tlsPolicy,

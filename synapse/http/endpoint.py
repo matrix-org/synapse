@@ -79,12 +79,13 @@ class SpiderEndpoint(object):
     """An endpoint which refuses to connect to blacklisted IP addresses
     Implements twisted.internet.interfaces.IStreamClientEndpoint.
     """
-    def __init__(self, reactor, host, port, blacklist,
+    def __init__(self, reactor, host, port, blacklist, whitelist,
                  endpoint=TCP4ClientEndpoint, endpoint_kw_args={}):
         self.reactor = reactor
         self.host = host
         self.port = port
         self.blacklist = blacklist
+        self.whitelist = whitelist
         self.endpoint = endpoint
         self.endpoint_kw_args = endpoint_kw_args
 
@@ -93,10 +94,13 @@ class SpiderEndpoint(object):
         address = yield self.reactor.resolve(self.host)
 
         from netaddr import IPAddress
-        if IPAddress(address) in self.blacklist:
-            raise ConnectError(
-                "Refusing to spider blacklisted IP address %s" % address
-            )
+        ip_address = IPAddress(address)
+
+        if ip_address in self.blacklist:
+            if self.whitelist is None or ip_address not in self.whitelist:
+                raise ConnectError(
+                    "Refusing to spider blacklisted IP address %s" % address
+                )
 
         logger.info("Connecting to %s:%s", address, self.port)
         endpoint = self.endpoint(

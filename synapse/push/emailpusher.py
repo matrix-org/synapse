@@ -26,11 +26,14 @@ logger = logging.getLogger(__name__)
 
 # The amount of time we always wait before ever emailing about a notification
 # (to give the user a chance to respond to other push or notice the window)
-DELAY_BEFORE_MAIL_MS = 2 * 60 * 1000
+DELAY_BEFORE_MAIL_MS = 10 * 60 * 1000
 
-THROTTLE_START_MS = 2 * 60 * 1000
-THROTTLE_MAX_MS = (2 * 60 * 1000) * (2 ** 11)  # ~3 days
-THROTTLE_MULTIPLIER = 2
+# THROTTLE is the minimum time between mail notifications sent for a given room.
+# Each room maintains its own throttle counter, but each new mail notification
+# sends the pending notifications for all rooms.
+THROTTLE_START_MS = 10 * 60 * 1000
+THROTTLE_MAX_MS = 24 * 60 * 60 * 1000  # (2 * 60 * 1000) * (2 ** 11)  # ~3 days
+THROTTLE_MULTIPLIER = 6                # 10 mins, 1 hour, 6 hours, 24 hours
 
 # If no event triggers a notification for this long after the previous,
 # the throttle is released.
@@ -146,7 +149,18 @@ class EmailPusher(object):
                 # *one* email updating the user on their notifications,
                 # we then consider all previously outstanding notifications
                 # to be delivered.
-                yield self.send_notification(unprocessed)
+
+                # debugging:
+                reason = {
+                    'room_id': push_action['room_id'],
+                    'now': self.clock.time_msec(),
+                    'received_at': received_at,
+                    'delay_before_mail_ms': DELAY_BEFORE_MAIL_MS,
+                    'last_sent_ts': self.get_room_last_sent_ts(push_action['room_id']),
+                    'throttle_ms': self.get_room_throttle_ms(push_action['room_id']),
+                }
+
+                yield self.send_notification(unprocessed, reason)
 
                 yield self.save_last_stream_ordering_and_success(max([
                     ea['stream_ordering'] for ea in unprocessed
@@ -195,7 +209,8 @@ class EmailPusher(object):
         """
         Determines whether throttling should prevent us from sending an email
         for the given room
-        Returns: True if we should send, False if we should not
+        Returns: The timestamp when we are next allowed to send an email notif
+        for this room
         """
         last_sent_ts = self.get_room_last_sent_ts(room_id)
         throttle_ms = self.get_room_throttle_ms(room_id)
@@ -244,8 +259,9 @@ class EmailPusher(object):
         )
 
     @defer.inlineCallbacks
-    def send_notification(self, push_actions):
+    def send_notification(self, push_actions, reason):
         logger.info("Sending notif email for user %r", self.user_id)
+
         yield self.mailer.send_notification_mail(
-            self.user_id, self.email, push_actions
+            self.user_id, self.email, push_actions, reason
         )

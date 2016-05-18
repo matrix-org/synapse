@@ -24,7 +24,7 @@ import ujson as json
 Requester = namedtuple("Requester", ["user", "access_token_id", "is_guest"])
 
 
-def get_domian_from_id(string):
+def get_domain_from_id(string):
     return string.split(":", 1)[1]
 
 

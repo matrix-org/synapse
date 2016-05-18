@@ -21,7 +21,7 @@ from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 from synapse.api.constants import Membership
-from synapse.types import get_domian_from_id
+from synapse.types import get_domain_from_id
 
 import logging
 
@@ -136,24 +136,6 @@ class RoomMemberStore(SQLBaseStore):
 
             return [r["user_id"] for r in rows]
         return self.runInteraction("get_users_in_room", f)
-
-    def get_room_members(self, room_id, membership=None):
-        """Retrieve the current room member list for a room.
-
-        Args:
-            room_id (str): The room to get the list of members.
-            membership (synapse.api.constants.Membership): The filter to apply
-            to this list, or None to return all members with some state
-            associated with this room.
-        Returns:
-            list of namedtuples representing the members in this room.
-        """
-        return self.runInteraction(
-            "get_room_members",
-            self._get_members_events_txn,
-            room_id,
-            membership=membership,
-        ).addCallback(self._get_events)
 
     @cached()
     def get_invited_rooms_for_user(self, user_id):
@@ -273,7 +255,7 @@ class RoomMemberStore(SQLBaseStore):
             room_id, membership=Membership.JOIN
         )
 
-        joined_domains = set(get_domian_from_id(r["user_id"]) for r in rows)
+        joined_domains = set(get_domain_from_id(r["user_id"]) for r in rows)
 
         return joined_domains
 
