@@ -533,7 +533,7 @@ class StreamStore(SQLBaseStore):
         stream_ordering = RoomStreamToken.parse_stream_token(token).stream
 
         sql = (
-            "SELECT origin_server_ts FROM events"
+            "SELECT event_id, origin_server_ts FROM events"
             " WHERE room_id = ? AND stream_ordering <= ?"
             " ORDER BY topological_ordering DESC, stream_ordering DESC"
             " LIMIT 1"
@@ -541,9 +541,9 @@ class StreamStore(SQLBaseStore):
 
         def f(txn):
             txn.execute(sql, (room_id, stream_ordering))
-            rows = txn.fetchall()
+            rows = self.cursor_to_dict(txn)
             if rows:
-                return rows[0][0]
+                return rows[0]
             else:
                 return None
 
