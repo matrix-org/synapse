@@ -232,7 +232,10 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
 
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
-            remote_room_hosts = None
+            try:
+                remote_room_hosts = request.args["server_name"]
+            except:
+                remote_room_hosts = None
         elif RoomAlias.is_valid(room_identifier):
             handler = self.handlers.room_member_handler
             room_alias = RoomAlias.from_string(room_identifier)
