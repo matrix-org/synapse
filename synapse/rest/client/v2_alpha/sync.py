@@ -16,7 +16,8 @@
 from twisted.internet import defer
 
 from synapse.http.servlet import (
-    RestServlet, parse_string, parse_integer, parse_boolean
+    RestServlet, parse_string, parse_integer, parse_boolean,
+    parse_json_object_from_request,
 )
 from synapse.handlers.sync import SyncConfig
 from synapse.types import SyncNextBatchToken
@@ -85,6 +86,82 @@ class SyncRestServlet(RestServlet):
         self.presence_handler = hs.get_presence_handler()
 
     @defer.inlineCallbacks
+    def on_POST(self, request):
+        requester = yield self.auth.get_user_by_req(
+            request, allow_guest=True
+        )
+        user = requester.user
+
+        body = parse_json_object_from_request(request)
+
+        timeout = body.get("timeout", 0)
+
+        since = body.get("since", None)
+
+        if "from" in body:
+            # /events used to use 'from', but /sync uses 'since'.
+            # Lets be helpful and whine if we see a 'from'.
+            raise SynapseError(
+                400, "'from' is not a valid parameter. Did you mean 'since'?"
+            )
+
+        set_presence = body.get("set_presence", "online")
+        if set_presence not in self.ALLOWED_PRESENCE:
+            message = "Parameter 'set_presence' must be one of [%s]" % (
+                ", ".join(repr(v) for v in self.ALLOWED_PRESENCE)
+            )
+            raise SynapseError(400, message)
+
+        full_state = body.get("full_state", False)
+
+        filter_id = body.get("filter_id", None)
+        filter_dict = body.get("filter", None)
+
+        if filter_dict is not None and filter_id is not None:
+            raise SynapseError(
+                400,
+                "Can only specify one of `filter` and `filter_id` paramters"
+            )
+
+        if filter_id:
+            filter_collection = yield self.filtering.get_user_filter(
+                user.localpart, filter_id
+            )
+            filter_key = filter_id
+        elif filter_dict:
+            self.filtering.check_valid_filter(filter_dict)
+            filter_collection = FilterCollection(filter_dict)
+            filter_key = json.dumps(filter_dict)
+        else:
+            filter_collection = DEFAULT_FILTER_COLLECTION
+            filter_key = None
+
+        request_key = (user, timeout, since, filter_key, full_state)
+
+        sync_config = SyncConfig(
+            user=user,
+            filter_collection=filter_collection,
+            is_guest=requester.is_guest,
+            request_key=request_key,
+        )
+
+        if since is not None:
+            batch_token = SyncNextBatchToken.from_string(since)
+        else:
+            batch_token = None
+
+        sync_result = yield self._handle_sync(
+            requester=requester,
+            sync_config=sync_config,
+            batch_token=batch_token,
+            set_presence=set_presence,
+            full_state=full_state,
+            timeout=timeout,
+        )
+
+        defer.returnValue(sync_result)
+
+    @defer.inlineCallbacks
     def on_GET(self, request):
         if "from" in request.args:
             # /events used to use 'from', but /sync uses 'since'.
@@ -143,7 +220,23 @@ class SyncRestServlet(RestServlet):
         else:
             batch_token = None
 
+        sync_result = yield self._handle_sync(
+            requester=requester,
+            sync_config=sync_config,
+            batch_token=batch_token,
+            set_presence=set_presence,
+            full_state=full_state,
+            timeout=timeout,
+        )
+
+        defer.returnValue(sync_result)
+
+    @defer.inlineCallbacks
+    def _handle_sync(self, requester, sync_config, batch_token, set_presence,
+                     full_state, timeout):
         affect_presence = set_presence != PresenceState.OFFLINE
+
+        user = sync_config.user
 
         if affect_presence:
             yield self.presence_handler.set_state(user, {"presence": set_presence})
