@@ -529,7 +529,7 @@ class StreamStore(SQLBaseStore):
                 int(stream),
             )
 
-    def get_last_ts_for_room(self, room_id, token):
+    def get_last_event_id_ts_for_room(self, room_id, token):
         stream_ordering = RoomStreamToken.parse_stream_token(token).stream
 
         sql = (

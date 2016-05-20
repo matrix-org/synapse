@@ -208,7 +208,7 @@ class SyncHandler(object):
 
         @defer.inlineCallbacks
         def _get_last_ts(room_id):
-            entry = yield self.store.get_last_ts_for_room(
+            entry = yield self.store.get_last_event_id_ts_for_room(
                 room_id, token.room_key
             )
 
