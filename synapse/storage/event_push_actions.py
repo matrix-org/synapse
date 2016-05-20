@@ -256,7 +256,7 @@ class EventPushActionsStore(SQLBaseStore):
         txn.execute(
             "DELETE FROM event_push_actions "
             " WHERE user_id = ? AND room_id = ? AND "
-            " topological_ordering < ? AND stream_ordering < ?"
+            " topological_ordering < ? AND stream_ordering < ?",
             (user_id, room_id, topological_ordering, self.stream_ordering_month_ago)
         )
 
