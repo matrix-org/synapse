@@ -245,8 +245,6 @@ class EventPushActionsStore(SQLBaseStore):
             (room_id, user_id, )
         )
 
-        threshold = self._clock.time_msec() - KEEP_PUSH_ACTIONS_FOR_MS
-
         # We need to join on the events table to get the received_ts for
         # event_push_actions and sqlite won't let us use a join in a delete so
         # we can't just delete where received_ts < x. Furthermore we can
