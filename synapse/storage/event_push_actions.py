@@ -293,6 +293,9 @@ class EventPushActionsStore(SQLBaseStore):
         txn.execute("SELECT MAX(stream_ordering) FROM events")
         max_stream_ordering = txn.fetchone()[0]
 
+        if max_stream_ordering is None:
+            return 0
+
         range_start = 0
         range_end = max_stream_ordering
 
