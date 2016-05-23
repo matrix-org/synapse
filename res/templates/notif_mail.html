@@ -30,7 +30,7 @@
                         {% include 'room.html' with context %}
                     {% endfor %}
                     <div class="footer">
-                        <small>
+                        <div class="debug">
                             Sending email at {{ reason.now|format_ts("%c") }} due to activity in room '{{ reason.room_name }}' because:<br/>
                             1. An event was received at {{ reason.received_at|format_ts("%c") }}
                             which is more than {{ "%.1f"|format(reason.delay_before_mail_ms / (60*1000)) }} (delay_before_mail_ms) mins ago.<br/>
@@ -40,7 +40,7 @@
                             {% else %}
                                 2. We can't remember the last time we sent a mail for this room.
                             {% endif %}
-                        </small>
+                        </div>
                         <a href="{{ unsubscribe_link }}">Unsubscribe</a>
                     </div>
                 </td>
