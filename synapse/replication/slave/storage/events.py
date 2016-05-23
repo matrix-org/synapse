@@ -58,6 +58,9 @@ class SlavedEventStore(BaseSlavedStore):
             "EventsRoomStreamChangeCache", min_event_val,
             prefilled_cache=event_cache_prefill,
         )
+        self._membership_stream_cache = StreamChangeCache(
+            "MembershipStreamChangeCache", events_max,
+        )
 
     # Cached functions can't be accessed through a class instance so we need
     # to reach inside the __dict__ to extract them.
@@ -113,6 +116,7 @@ class SlavedEventStore(BaseSlavedStore):
         DataStore.get_room_events_stream_for_room.__func__
     )
     get_events_around = DataStore.get_events_around.__func__
+    get_state_for_event = DataStore.get_state_for_event.__func__
     get_state_for_events = DataStore.get_state_for_events.__func__
     get_state_groups = DataStore.get_state_groups.__func__
     get_recent_events_for_room = DataStore.get_recent_events_for_room.__func__
@@ -228,9 +232,9 @@ class SlavedEventStore(BaseSlavedStore):
             self.get_rooms_for_user.invalidate((event.state_key,))
             # self.get_joined_hosts_for_room.invalidate((event.room_id,))
             self.get_users_in_room.invalidate((event.room_id,))
-            # self._membership_stream_cache.entity_has_changed(
-            #    event.state_key, event.internal_metadata.stream_ordering
-            # )
+            self._membership_stream_cache.entity_has_changed(
+                event.state_key, event.internal_metadata.stream_ordering
+            )
             self.get_invited_rooms_for_user.invalidate((event.state_key,))
 
         if not event.is_state():

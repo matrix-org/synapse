@@ -240,6 +240,8 @@ class SyncHandler(object):
             )
         )
 
+        account_data = dict(account_data)
+
         account_data['m.push_rules'] = yield self.push_rules_for_user(
             sync_config.user
         )

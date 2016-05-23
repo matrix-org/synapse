@@ -44,6 +44,9 @@ class SlavedReceiptsStore(BaseSlavedStore):
     _get_linearized_receipts_for_rooms = (
         ReceiptsStore.__dict__["_get_linearized_receipts_for_rooms"]
     )
+    get_last_receipt_event_id_for_user = (
+        ReceiptsStore.__dict__["get_last_receipt_event_id_for_user"]
+    )
 
     get_max_receipt_stream_id = DataStore.get_max_receipt_stream_id.__func__
     get_all_updated_receipts = DataStore.get_all_updated_receipts.__func__
@@ -69,4 +72,7 @@ class SlavedReceiptsStore(BaseSlavedStore):
 
     def invalidate_caches_for_receipt(self, room_id, receipt_type, user_id):
         self.get_receipts_for_user.invalidate((user_id, receipt_type))
-        self.get_linearized_receipts_for_room((room_id,))
+        self.get_linearized_receipts_for_room.invalidate((room_id,))
+        self.get_last_receipt_event_id_for_user.invalidate(
+            (user_id, room_id, receipt_type)
+        )
