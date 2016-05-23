@@ -44,7 +44,7 @@ MESSAGE_FROM_PERSON_IN_ROOM = "You have a message on %(app)s from %(person)s " \
                               "in the %s room..."
 MESSAGE_FROM_PERSON = "You have a message on %(app)s from %(person)s..."
 MESSAGES_FROM_PERSON = "You have messages on %(app)s from %(person)s..."
-MESSAGES_IN_ROOM = "There are some messages on %(app)s for you in the %(room)s room..."
+MESSAGES_IN_ROOM = "You have messages on %(app)s in the %(room)s room..."
 MESSAGES_IN_ROOM_AND_OTHERS = \
     "You have messages on %(app)s in the %(room)s room and others..."
 MESSAGES_FROM_PERSON_AND_OTHERS = \
