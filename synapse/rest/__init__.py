@@ -46,6 +46,7 @@ from synapse.rest.client.v2_alpha import (
     account_data,
     report_event,
     openid,
+    notifications,
 )
 
 from synapse.http.server import JsonResource
@@ -90,3 +91,4 @@ class ClientRestResource(JsonResource):
         account_data.register_servlets(hs, client_resource)
         report_event.register_servlets(hs, client_resource)
         openid.register_servlets(hs, client_resource)
+        notifications.register_servlets(hs, client_resource)

@@ -75,6 +75,31 @@ class ReceiptsStore(SQLBaseStore):
         defer.returnValue({row["room_id"]: row["event_id"] for row in rows})
 
     @defer.inlineCallbacks
+    def get_receipts_for_user_with_orderings(self, user_id, receipt_type):
+        def f(txn):
+            sql = (
+                "SELECT rl.room_id, rl.event_id,"
+                " e.topological_ordering, e.stream_ordering"
+                " FROM receipts_linearized rl,"
+                " events e"
+                " WHERE rl.room_id = e.room_id"
+                " AND rl.event_id = e.event_id"
+                " AND user_id = ?"
+            )
+            txn.execute(sql, (user_id,))
+            return txn.fetchall()
+        rows = yield self.runInteraction(
+            "get_receipts_for_user_with_orderings", f
+        )
+        defer.returnValue({
+            row[0]: {
+                "event_id": row[1],
+                "topological_ordering": row[2],
+                "stream_ordering": row[3],
+            } for row in rows
+        })
+
+    @defer.inlineCallbacks
     def get_linearized_receipts_for_rooms(self, room_ids, to_key, from_key=None):
         """Get receipts for multiple rooms for sending to clients.
 
