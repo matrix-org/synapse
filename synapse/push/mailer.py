@@ -135,8 +135,8 @@ class Mailer(object):
         yield concurrently_execute(_fetch_room_state, rooms_in_order, 3)
 
         # actually sort our so-called rooms_in_order list, most recent room first
-        rooms_in_order = rooms_in_order.sort(
-            key=lambda r: -notifs_by_room[r]['received_ts']
+        rooms_in_order.sort(
+            key=lambda r: -(notifs_by_room[r][-1]['received_ts'] or 0)
         )
 
         rooms = []
