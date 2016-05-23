@@ -17,6 +17,7 @@ from twisted.internet import defer
 from .. import unittest
 
 from synapse.handlers.register import RegistrationHandler
+from synapse.types import UserID
 
 from tests.utils import setup_test_homeserver
 
@@ -36,29 +37,44 @@ class RegistrationTestCase(unittest.TestCase):
         self.mock_distributor = Mock()
         self.mock_distributor.declare("registered_user")
         self.mock_captcha_client = Mock()
-        hs = yield setup_test_homeserver(
+        self.hs = yield setup_test_homeserver(
             handlers=None,
             http_client=None,
             expire_access_token=True)
-        hs.handlers = RegistrationHandlers(hs)
-        self.handler = hs.get_handlers().registration_handler
-        hs.get_handlers().profile_handler = Mock()
+        self.hs.handlers = RegistrationHandlers(self.hs)
+        self.handler = self.hs.get_handlers().registration_handler
+        self.hs.get_handlers().profile_handler = Mock()
         self.mock_handler = Mock(spec=[
             "generate_short_term_login_token",
         ])
 
-        hs.get_handlers().auth_handler = self.mock_handler
+        self.hs.get_handlers().auth_handler = self.mock_handler
 
     @defer.inlineCallbacks
     def test_user_is_created_and_logged_in_if_doesnt_exist(self):
-        """
-        Returns:
-            The user doess not exist in this case so it will register and log it in
-        """
         duration_ms = 200
         local_part = "someone"
         display_name = "someone"
         user_id = "@someone:test"
+        mock_token = self.mock_handler.generate_short_term_login_token
+        mock_token.return_value = 'secret'
+        result_user_id, result_token = yield self.handler.get_or_create_user(
+            local_part, display_name, duration_ms)
+        self.assertEquals(result_user_id, user_id)
+        self.assertEquals(result_token, 'secret')
+
+    @defer.inlineCallbacks
+    def test_if_user_exists(self):
+        store = self.hs.get_datastore()
+        frank = UserID.from_string("@frank:test")
+        yield store.register(
+            user_id=frank.to_string(),
+            token="jkv;g498752-43gj['eamb!-5",
+            password_hash=None)
+        duration_ms = 200
+        local_part = "frank"
+        display_name = "Frank"
+        user_id = "@frank:test"
         mock_token = self.mock_handler.generate_short_term_login_token
         mock_token.return_value = 'secret'
         result_user_id, result_token = yield self.handler.get_or_create_user(
