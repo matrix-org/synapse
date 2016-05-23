@@ -312,7 +312,6 @@ class EventPushActionsStore(SQLBaseStore):
                 range_start = middle
             else:
                 range_end = middle
-        logger.info("done: picking %d from %d and %d", range_end, range_start, range_end)
 
         return range_end
 
