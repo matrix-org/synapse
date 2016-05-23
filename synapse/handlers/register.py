@@ -16,7 +16,7 @@
 """Contains functions for registering clients."""
 from twisted.internet import defer
 
-from synapse.types import UserID
+from synapse.types import UserID, Requester
 from synapse.api.errors import (
     AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError
 )
@@ -399,14 +399,14 @@ class RegistrationHandler(BaseHandler):
 
             yield registered_user(self.distributor, user)
         else:
-            yield self.store.flush_user(user_id=user_id)
+            yield self.store.user_delete_access_tokens(user_id=user_id)
             yield self.store.add_access_token_to_user(user_id=user_id, token=token)
 
         if displayname is not None:
             logger.info("setting user display name: %s -> %s", user_id, displayname)
             profile_handler = self.hs.get_handlers().profile_handler
             yield profile_handler.set_displayname(
-                user, user, displayname
+                user, Requester(user, token, False), displayname
             )
 
         defer.returnValue((user_id, token))

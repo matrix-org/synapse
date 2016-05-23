@@ -17,6 +17,7 @@ from twisted.internet import defer
 from .. import unittest
 
 from synapse.handlers.register import RegistrationHandler
+from synapse.types import UserID
 
 from tests.utils import setup_test_homeserver
 
@@ -48,6 +49,13 @@ class RegistrationTestCase(unittest.TestCase):
         ])
 
         hs.get_handlers().auth_handler = self.mock_handler
+        self.store = hs.get_datastore()
+        self.frank = UserID.from_string("@frank:test")
+
+        yield self.store.register(
+            user_id=self.frank.to_string(),
+            token="jkv;g498752-43gj['eamb!-5",
+            password_hash=None)
 
     @defer.inlineCallbacks
     def test_user_is_created_and_logged_in_if_doesnt_exist(self):
@@ -65,3 +73,19 @@ class RegistrationTestCase(unittest.TestCase):
             local_part, display_name, duration_ms)
         self.assertEquals(result_user_id, user_id)
         self.assertEquals(result_token, 'secret')
+
+    @defer.inlineCallbacks
+    def test_if_user_exists(self):
+        """
+        Returns:
+            The user doess not exist in this case so it will register and log it in
+        """
+        duration_ms = 200
+        local_part = "frank"
+        display_name = "Frank"
+        user_id = "@frank:test"
+        mock_token = self.mock_handler.generate_short_term_login_token
+        mock_token.return_value = 'secret'
+        result_user_id, result_token = yield self.handler.get_or_create_user(
+            local_part, display_name, duration_ms)
+        self.assertEquals(result_user_id, user_id)
