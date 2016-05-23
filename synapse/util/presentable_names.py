@@ -14,6 +14,9 @@
 # limitations under the License.
 
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 # intentionally looser than what aliases we allow to be registered since
 # other HSes may allow aliases that we would not
@@ -105,13 +108,21 @@ def calculate_room_name(room_state, user_id, fallback_to_members=True):
             # or inbound invite, or outbound 3PID invite.
             if all_members[0].sender == user_id:
                 if "m.room.third_party_invite" in room_state_bytype:
-                    third_party_invites = room_state_bytype["m.room.third_party_invite"]
+                    third_party_invites = (
+                        room_state_bytype["m.room.third_party_invite"].values()
+                    )
+
                     if len(third_party_invites) > 0:
                         # technically third party invite events are not member
                         # events, but they are close enough
-                        return "Inviting %s" (
-                            descriptor_from_member_events(third_party_invites)
-                        )
+
+                        # FIXME: no they're not - they look nothing like a member;
+                        # they have a great big encrypted thing as their name to
+                        # prevent leaking the 3PID name...
+                        # return "Inviting %s" % (
+                        #     descriptor_from_member_events(third_party_invites)
+                        # )
+                        return "Inviting email address"
                     else:
                         return ALL_ALONE
             else:
