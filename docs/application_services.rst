@@ -32,5 +32,4 @@ The format of the AS configuration file is as follows:
 
 See the spec_ for further details on how application services work.
 
-.. _spec: https://github.com/matrix-org/matrix-doc/blob/master/specification/25_application_service_api.rst#application-service-api
-
+.. _spec: https://matrix.org/docs/spec/application_service/unstable.html
