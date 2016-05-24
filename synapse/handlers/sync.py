@@ -606,13 +606,16 @@ class SyncHandler(object):
         since_token = sync_result_builder.since_token
         if since_token and not sync_result_builder.full_state:
             presence_key = since_token.presence_key
+            include_offline = True
         else:
             presence_key = None
+            include_offline = False
 
         presence, presence_key = yield presence_source.get_new_events(
             user=user,
             from_key=presence_key,
             is_guest=sync_config.is_guest,
+            include_offline=include_offline,
         )
         sync_result_builder.now_token = now_token.copy_and_replace(
             "presence_key", presence_key
