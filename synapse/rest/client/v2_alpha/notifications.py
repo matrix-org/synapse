@@ -68,6 +68,7 @@ class NotificationsServlet(RestServlet):
                 "room_id": pa["room_id"],
                 "profile_tag": pa["profile_tag"],
                 "actions": pa["actions"],
+                "ts": pa["received_ts"],
                 "event": serialize_event(
                     notif_events[pa["event_id"]],
                     self.clock.time_msec(),

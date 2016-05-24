@@ -201,11 +201,13 @@ class EventPushActionsStore(SQLBaseStore):
             else:
                 args = [user_id, limit]
             sql = (
-                "SELECT event_id, room_id, stream_ordering, topological_ordering,"
-                " actions, profile_tag"
-                " FROM event_push_actions"
-                " WHERE user_id = ? %s"
-                " ORDER BY stream_ordering DESC"
+                "SELECT epa.event_id, epa.room_id,"
+                " epa.stream_ordering, epa.topological_ordering,"
+                " epa.actions, epa.profile_tag, e.received_ts"
+                " FROM event_push_actions epa, events e"
+                " WHERE epa.room_id = e.room_id AND epa.event_id = e.event_id"
+                " AND epa.user_id = ? %s"
+                " ORDER BY epa.stream_ordering DESC"
                 " LIMIT ?"
                 % (before_clause,)
             )
