@@ -273,23 +273,14 @@ class SyncHandler(object):
             a Deferred TimelineBatch
         """
         with Measure(self.clock, "load_filtered_recents"):
-            filtering_factor = 2
             timeline_limit = sync_config.filter_collection.timeline_limit()
-            load_limit = max(timeline_limit * filtering_factor, 10)
-            max_repeat = 5  # Only try a few times per room, otherwise
-            room_key = now_token.room_key
-            end_key = room_key
 
             if recents is None or newly_joined_room or timeline_limit < len(recents):
                 limited = True
             else:
                 limited = False
 
-            if since_token:
-                if not now_token.is_after(since_token):
-                    limited = False
-
-            if recents is not None:
+            if recents:
                 recents = sync_config.filter_collection.filter_room_timeline(recents)
                 recents = yield filter_events_for_client(
                     self.store,
@@ -298,6 +289,19 @@ class SyncHandler(object):
                 )
             else:
                 recents = []
+
+            if not limited:
+                defer.returnValue(TimelineBatch(
+                    events=recents,
+                    prev_batch=now_token,
+                    limited=False
+                ))
+
+            filtering_factor = 2
+            load_limit = max(timeline_limit * filtering_factor, 10)
+            max_repeat = 5  # Only try a few times per room, otherwise
+            room_key = now_token.room_key
+            end_key = room_key
 
             since_key = None
             if since_token and not newly_joined_room:
@@ -939,18 +943,24 @@ class SyncHandler(object):
             always_include(bool): Always include this room in the sync response,
                 even if empty.
         """
-        since_token = sync_result_builder.since_token
-        now_token = sync_result_builder.now_token
-        sync_config = sync_result_builder.sync_config
-
-        room_id = room_builder.room_id
-        events = room_builder.events
         newly_joined = room_builder.newly_joined
         full_state = (
             room_builder.full_state
             or newly_joined
             or sync_result_builder.full_state
         )
+        events = room_builder.events
+
+        # We want to shortcut out as early as possible.
+        if not (always_include or account_data or ephemeral or full_state):
+            if events == [] and tags is None:
+                return
+
+        since_token = sync_result_builder.since_token
+        now_token = sync_result_builder.now_token
+        sync_config = sync_result_builder.sync_config
+
+        room_id = room_builder.room_id
         since_token = room_builder.since_token
         upto_token = room_builder.upto_token
 
