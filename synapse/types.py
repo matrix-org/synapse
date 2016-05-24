@@ -125,15 +125,44 @@ class SyncNextBatchToken(
     def from_string(cls, string):
         try:
             d = json.loads(decode_base64(string))
-            return cls(StreamToken.from_string(d["t"]), d.get("pa", {}))
+            pa = d.get("pa", None)
+            if pa:
+                pa = SyncPaginationConfig.from_dict(pa)
+            return cls(
+                stream_token=StreamToken.from_string(d["t"]),
+                pagination_config=pa,
+            )
         except:
             raise SynapseError(400, "Invalid Token")
 
     def to_string(self):
         return encode_base64(json.dumps({
             "t": self.stream_token.to_string(),
-            "pa": self.pagination_config,
+            "pa": self.pagination_config.to_dict() if self.pagination_config else None,
         }))
+
+    def replace(self, **kwargs):
+        return self._replace(**kwargs)
+
+
+class SyncPaginationConfig(
+    namedtuple("SyncPaginationConfig", (
+        "order",
+        "value",
+    ))
+):
+    @classmethod
+    def from_dict(cls, d):
+        try:
+            return cls(d["o"], d["v"])
+        except:
+            raise SynapseError(400, "Invalid Token")
+
+    def to_dict(self):
+        return {
+            "o": self.order,
+            "v": self.value,
+        }
 
     def replace(self, **kwargs):
         return self._replace(**kwargs)
