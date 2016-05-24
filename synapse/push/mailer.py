@@ -259,7 +259,9 @@ class Mailer(object):
 
         sender_state_event = room_state[("m.room.member", event.sender)]
         sender_name = name_from_member_event(sender_state_event)
-        sender_avatar_url = sender_state_event.content["avatar_url"]
+        sender_avatar_url = None
+        if "avatar_url" in sender_state_event.content:
+            sender_avatar_url = sender_state_event.content["avatar_url"]
 
         # 'hash' for deterministically picking default images: use
         # sender_hash % the number of default images to choose from
