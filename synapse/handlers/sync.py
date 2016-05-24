@@ -699,12 +699,15 @@ class SyncHandler(object):
 
         # Now we want to get any newly joined users
         newly_joined_users = set()
-        for joined_sync in sync_result_builder.joined:
-            it = itertools.chain(joined_sync.timeline.events, joined_sync.state.values())
-            for event in it:
-                if event.type == EventTypes.Member:
-                    if event.membership == Membership.JOIN:
-                        newly_joined_users.add(event.state_key)
+        if sync_result_builder.since_token:
+            for joined_sync in sync_result_builder.joined:
+                it = itertools.chain(
+                    joined_sync.timeline.events, joined_sync.state.values()
+                )
+                for event in it:
+                    if event.type == EventTypes.Member:
+                        if event.membership == Membership.JOIN:
+                            newly_joined_users.add(event.state_key)
 
         defer.returnValue((newly_joined_rooms, newly_joined_users))
 
