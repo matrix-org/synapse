@@ -505,50 +505,50 @@ class SyncHandler(object):
         # Always use the `now_token` in `SyncResultBuilder`
         now_token = yield self.event_sources.get_current_token()
 
-        sync_result_builer = SyncResultBuilder(
+        sync_result_builder = SyncResultBuilder(
             sync_config, full_state,
             since_token=since_token,
             now_token=now_token,
         )
 
         account_data_by_room = yield self._generate_sync_entry_for_account_data(
-            sync_result_builer
+            sync_result_builder
         )
 
         res = yield self._generate_sync_entry_for_rooms(
-            sync_result_builer, account_data_by_room
+            sync_result_builder, account_data_by_room
         )
         newly_joined_rooms, newly_joined_users = res
 
         yield self._generate_sync_entry_for_presence(
-            sync_result_builer, newly_joined_rooms, newly_joined_users
+            sync_result_builder, newly_joined_rooms, newly_joined_users
         )
 
         defer.returnValue(SyncResult(
-            presence=sync_result_builer.presence,
-            account_data=sync_result_builer.account_data,
-            joined=sync_result_builer.joined,
-            invited=sync_result_builer.invited,
-            archived=sync_result_builer.archived,
-            next_batch=sync_result_builer.now_token,
+            presence=sync_result_builder.presence,
+            account_data=sync_result_builder.account_data,
+            joined=sync_result_builder.joined,
+            invited=sync_result_builder.invited,
+            archived=sync_result_builder.archived,
+            next_batch=sync_result_builder.now_token,
         ))
 
     @defer.inlineCallbacks
-    def _generate_sync_entry_for_account_data(self, sync_result_builer):
+    def _generate_sync_entry_for_account_data(self, sync_result_builder):
         """Generates the account data portion of the sync response. Populates
-        `sync_result_builer` with the result.
+        `sync_result_builder` with the result.
 
         Args:
-            sync_result_builer(SyncResultBuilder)
+            sync_result_builder(SyncResultBuilder)
 
         Returns:
             Deferred(dict): A dictionary containing the per room account data.
         """
-        sync_config = sync_result_builer.sync_config
-        user_id = sync_result_builer.sync_config.user.to_string()
-        since_token = sync_result_builer.since_token
+        sync_config = sync_result_builder.sync_config
+        user_id = sync_result_builder.sync_config.user.to_string()
+        since_token = sync_result_builder.since_token
 
-        if since_token and not sync_result_builer.full_state:
+        if since_token and not sync_result_builder.full_state:
             account_data, account_data_by_room = (
                 yield self.store.get_updated_account_data_for_user(
                     user_id,
@@ -580,31 +580,31 @@ class SyncHandler(object):
             for account_data_type, content in account_data.items()
         ])
 
-        sync_result_builer.account_data = account_data_for_user
+        sync_result_builder.account_data = account_data_for_user
 
         defer.returnValue(account_data_by_room)
 
     @defer.inlineCallbacks
-    def _generate_sync_entry_for_presence(self, sync_result_builer, newly_joined_rooms,
+    def _generate_sync_entry_for_presence(self, sync_result_builder, newly_joined_rooms,
                                           newly_joined_users):
         """Generates the presence portion of the sync response. Populates the
-        `sync_result_builer` with the result.
+        `sync_result_builder` with the result.
 
         Args:
-            sync_result_builer(SyncResultBuilder)
+            sync_result_builder(SyncResultBuilder)
             newly_joined_rooms(list): List of rooms that the user has joined
                 since the last sync (or empty if an initial sync)
             newly_joined_users(list): List of users that have joined rooms
                 since the last sync (or empty if an initial sync)
         """
-        now_token = sync_result_builer.now_token
-        sync_config = sync_result_builer.sync_config
-        user = sync_result_builer.sync_config.user
+        now_token = sync_result_builder.now_token
+        sync_config = sync_result_builder.sync_config
+        user = sync_result_builder.sync_config.user
 
         presence_source = self.event_sources.sources["presence"]
 
-        since_token = sync_result_builer.since_token
-        if since_token and not sync_result_builer.full_state:
+        since_token = sync_result_builder.since_token
+        if since_token and not sync_result_builder.full_state:
             presence_key = since_token.presence_key
         else:
             presence_key = None
@@ -614,7 +614,7 @@ class SyncHandler(object):
             from_key=presence_key,
             is_guest=sync_config.is_guest,
         )
-        sync_result_builer.now_token = now_token.copy_and_replace(
+        sync_result_builder.now_token = now_token.copy_and_replace(
             "presence_key", presence_key
         )
 
@@ -634,27 +634,27 @@ class SyncHandler(object):
             presence
         )
 
-        sync_result_builer.presence = presence
+        sync_result_builder.presence = presence
 
     @defer.inlineCallbacks
-    def _generate_sync_entry_for_rooms(self, sync_result_builer, account_data_by_room):
+    def _generate_sync_entry_for_rooms(self, sync_result_builder, account_data_by_room):
         """Generates the rooms portion of the sync response. Populates the
-        `sync_result_builer` with the result.
+        `sync_result_builder` with the result.
 
         Args:
-            sync_result_builer(SyncResultBuilder)
+            sync_result_builder(SyncResultBuilder)
             account_data_by_room(dict): Dictionary of per room account data
 
         Returns:
             Deferred(tuple): Returns a 2-tuple of
             `(newly_joined_rooms, newly_joined_users)`
         """
-        user_id = sync_result_builer.sync_config.user.to_string()
+        user_id = sync_result_builder.sync_config.user.to_string()
 
         now_token, ephemeral_by_room = yield self.ephemeral_by_room(
-            sync_result_builer.sync_config, sync_result_builer.now_token
+            sync_result_builder.sync_config, sync_result_builder.now_token
         )
-        sync_result_builer.now_token = now_token
+        sync_result_builder.now_token = now_token
 
         ignored_account_data = yield self.store.get_global_account_data_by_type_for_user(
             "m.ignored_user_list", user_id=user_id,
@@ -665,38 +665,38 @@ class SyncHandler(object):
         else:
             ignored_users = frozenset()
 
-        if sync_result_builer.since_token:
-            res = yield self._get_rooms_changed(sync_result_builer, ignored_users)
+        if sync_result_builder.since_token:
+            res = yield self._get_rooms_changed(sync_result_builder, ignored_users)
             room_entries, invited, newly_joined_rooms = res
 
             tags_by_room = yield self.store.get_updated_tags(
                 user_id,
-                sync_result_builer.since_token.account_data_key,
+                sync_result_builder.since_token.account_data_key,
             )
         else:
-            res = yield self._get_all_rooms(sync_result_builer, ignored_users)
+            res = yield self._get_all_rooms(sync_result_builder, ignored_users)
             room_entries, invited, newly_joined_rooms = res
 
             tags_by_room = yield self.store.get_tags_for_user(user_id)
 
         def handle_room_entries(room_entry):
             return self._generate_room_entry(
-                sync_result_builer,
+                sync_result_builder,
                 ignored_users,
                 room_entry,
                 ephemeral=ephemeral_by_room.get(room_entry.room_id, []),
                 tags=tags_by_room.get(room_entry.room_id),
                 account_data=account_data_by_room.get(room_entry.room_id, {}),
-                always_include=sync_result_builer.full_state,
+                always_include=sync_result_builder.full_state,
             )
 
         yield concurrently_execute(handle_room_entries, room_entries, 10)
 
-        sync_result_builer.invited.extend(invited)
+        sync_result_builder.invited.extend(invited)
 
         # Now we want to get any newly joined users
         newly_joined_users = set()
-        for joined_sync in sync_result_builer.joined:
+        for joined_sync in sync_result_builder.joined:
             it = itertools.chain(joined_sync.timeline.events, joined_sync.state.values())
             for event in it:
                 if event.type == EventTypes.Member:
@@ -706,21 +706,21 @@ class SyncHandler(object):
         defer.returnValue((newly_joined_rooms, newly_joined_users))
 
     @defer.inlineCallbacks
-    def _get_rooms_changed(self, sync_result_builer, ignored_users):
+    def _get_rooms_changed(self, sync_result_builder, ignored_users):
         """Gets the the changes that have happened since the last sync.
 
         Args:
-            sync_result_builer(SyncResultBuilder)
+            sync_result_builder(SyncResultBuilder)
             ignored_users(set(str)): Set of users ignored by user.
 
         Returns:
             Deferred(tuple): Returns a tuple of the form:
             `([RoomSyncResultBuilder], [InvitedSyncResult], newly_joined_rooms)`
         """
-        user_id = sync_result_builer.sync_config.user.to_string()
-        since_token = sync_result_builer.since_token
-        now_token = sync_result_builer.now_token
-        sync_config = sync_result_builer.sync_config
+        user_id = sync_result_builder.sync_config.user.to_string()
+        since_token = sync_result_builder.since_token
+        now_token = sync_result_builder.now_token
+        sync_config = sync_result_builder.sync_config
 
         assert since_token
 
@@ -843,11 +843,11 @@ class SyncHandler(object):
         defer.returnValue((room_entries, invited, newly_joined_rooms))
 
     @defer.inlineCallbacks
-    def _get_all_rooms(self, sync_result_builer, ignored_users):
+    def _get_all_rooms(self, sync_result_builder, ignored_users):
         """Returns entries for all rooms for the user.
 
         Args:
-            sync_result_builer(SyncResultBuilder)
+            sync_result_builder(SyncResultBuilder)
             ignored_users(set(str)): Set of users ignored by user.
 
         Returns:
@@ -855,10 +855,10 @@ class SyncHandler(object):
             `([RoomSyncResultBuilder], [InvitedSyncResult], [])`
         """
 
-        user_id = sync_result_builer.sync_config.user.to_string()
-        since_token = sync_result_builer.since_token
-        now_token = sync_result_builer.now_token
-        sync_config = sync_result_builer.sync_config
+        user_id = sync_result_builder.sync_config.user.to_string()
+        since_token = sync_result_builder.since_token
+        now_token = sync_result_builder.now_token
+        sync_config = sync_result_builder.sync_config
 
         membership_list = (
             Membership.INVITE, Membership.JOIN, Membership.LEAVE, Membership.BAN
@@ -914,14 +914,14 @@ class SyncHandler(object):
         defer.returnValue((room_entries, invited, []))
 
     @defer.inlineCallbacks
-    def _generate_room_entry(self, sync_result_builer, ignored_users,
+    def _generate_room_entry(self, sync_result_builder, ignored_users,
                              room_builder, ephemeral, tags, account_data,
                              always_include=False):
-        """Populates the `joined` and `archived` section of `sync_result_builer`
+        """Populates the `joined` and `archived` section of `sync_result_builder`
         based on the `room_builder`.
 
         Args:
-            sync_result_builer(SyncResultBuilder)
+            sync_result_builder(SyncResultBuilder)
             ignored_users(set(str)): Set of users ignored by user.
             room_builder(RoomSyncResultBuilder)
             ephemeral(list): List of new ephemeral events for room
@@ -931,9 +931,9 @@ class SyncHandler(object):
             always_include(bool): Always include this room in the sync response,
                 even if empty.
         """
-        since_token = sync_result_builer.since_token
-        now_token = sync_result_builer.now_token
-        sync_config = sync_result_builer.sync_config
+        since_token = sync_result_builder.since_token
+        now_token = sync_result_builder.now_token
+        sync_config = sync_result_builder.sync_config
 
         room_id = room_builder.room_id
         events = room_builder.events
@@ -941,7 +941,7 @@ class SyncHandler(object):
         full_state = (
             room_builder.full_state
             or newly_joined
-            or sync_result_builer.full_state
+            or sync_result_builder.full_state
         )
         since_token = room_builder.since_token
         upto_token = room_builder.upto_token
@@ -1001,7 +1001,7 @@ class SyncHandler(object):
                     unread_notifications["notification_count"] = notifs["notify_count"]
                     unread_notifications["highlight_count"] = notifs["highlight_count"]
 
-                sync_result_builer.joined.append(room_sync)
+                sync_result_builder.joined.append(room_sync)
         elif room_builder.rtype == "archived":
             room_sync = ArchivedSyncResult(
                 room_id=room_id,
@@ -1010,7 +1010,7 @@ class SyncHandler(object):
                 account_data=account_data,
             )
             if room_sync or always_include:
-                sync_result_builer.archived.append(room_sync)
+                sync_result_builder.archived.append(room_sync)
         else:
             raise Exception("Unrecognized rtype: %r", room_builder.rtype)
 
