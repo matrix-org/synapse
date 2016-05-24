@@ -547,7 +547,7 @@ class StreamStore(SQLBaseStore):
             else:
                 return None
 
-        return self.runInteraction("get_last_ts_for_room", f)
+        return self.runInteraction("get_last_event_id_ts_for_room", f)
 
     @defer.inlineCallbacks
     def get_events_around(self, room_id, event_id, before_limit, after_limit):

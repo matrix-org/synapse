@@ -118,7 +118,7 @@ class EventID(DomainSpecificString):
 class SyncNextBatchToken(
     namedtuple("SyncNextBatchToken", (
         "stream_token",
-        "pagination_config",
+        "pagination_state",
     ))
 ):
     @classmethod
@@ -127,10 +127,10 @@ class SyncNextBatchToken(
             d = json.loads(decode_base64(string))
             pa = d.get("pa", None)
             if pa:
-                pa = SyncPaginationConfig.from_dict(pa)
+                pa = SyncPaginationState.from_dict(pa)
             return cls(
                 stream_token=StreamToken.from_string(d["t"]),
-                pagination_config=pa,
+                pagination_state=pa,
             )
         except:
             raise SynapseError(400, "Invalid Token")
@@ -138,23 +138,24 @@ class SyncNextBatchToken(
     def to_string(self):
         return encode_base64(json.dumps({
             "t": self.stream_token.to_string(),
-            "pa": self.pagination_config.to_dict() if self.pagination_config else None,
+            "pa": self.pagination_state.to_dict() if self.pagination_state else None,
         }))
 
     def replace(self, **kwargs):
         return self._replace(**kwargs)
 
 
-class SyncPaginationConfig(
-    namedtuple("SyncPaginationConfig", (
+class SyncPaginationState(
+    namedtuple("SyncPaginationState", (
         "order",
         "value",
+        "limit",
     ))
 ):
     @classmethod
     def from_dict(cls, d):
         try:
-            return cls(d["o"], d["v"])
+            return cls(d["o"], d["v"], d["l"])
         except:
             raise SynapseError(400, "Invalid Token")
 
@@ -162,6 +163,7 @@ class SyncPaginationConfig(
         return {
             "o": self.order,
             "v": self.value,
+            "l": self.limit,
         }
 
     def replace(self, **kwargs):
