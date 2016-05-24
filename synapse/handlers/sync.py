@@ -203,17 +203,6 @@ class SyncHandler(object):
         rules = format_push_rules_for_user(user, rawrules, enabled_map)
         defer.returnValue(rules)
 
-    def account_data_for_user(self, account_data):
-        account_data_events = []
-
-        for account_data_type, content in account_data.items():
-            account_data_events.append({
-                "type": account_data_type,
-                "content": content,
-            })
-
-        return account_data_events
-
     @defer.inlineCallbacks
     def ephemeral_by_room(self, sync_config, now_token, since_token=None):
         """Get the ephemeral events for each room the user is in
@@ -277,8 +266,8 @@ class SyncHandler(object):
         defer.returnValue((now_token, ephemeral_by_room))
 
     @defer.inlineCallbacks
-    def load_filtered_recents(self, room_id, sync_config, now_token,
-                              since_token=None, recents=None, newly_joined_room=False):
+    def _load_filtered_recents(self, room_id, sync_config, now_token,
+                               since_token=None, recents=None, newly_joined_room=False):
         """
         Returns:
             a Deferred TimelineBatch
@@ -586,9 +575,10 @@ class SyncHandler(object):
                 sync_config.user
             )
 
-        account_data_for_user = sync_config.filter_collection.filter_account_data(
-            self.account_data_for_user(account_data)
-        )
+        account_data_for_user = sync_config.filter_collection.filter_account_data([
+            {"type": account_data_type, "content": content}
+            for account_data_type, content in account_data.items()
+        ])
 
         sync_result_builer.account_data = account_data_for_user
 
@@ -956,7 +946,7 @@ class SyncHandler(object):
         since_token = room_builder.since_token
         upto_token = room_builder.upto_token
 
-        batch = yield self.load_filtered_recents(
+        batch = yield self._load_filtered_recents(
             room_id, sync_config,
             now_token=upto_token,
             since_token=since_token,
