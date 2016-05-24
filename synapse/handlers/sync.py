@@ -655,7 +655,9 @@ class SyncHandler(object):
         user_id = sync_result_builder.sync_config.user.to_string()
 
         now_token, ephemeral_by_room = yield self.ephemeral_by_room(
-            sync_result_builder.sync_config, sync_result_builder.now_token
+            sync_result_builder.sync_config,
+            now_token=sync_result_builder.now_token,
+            since_token=sync_result_builder.since_token,
         )
         sync_result_builder.now_token = now_token
 
