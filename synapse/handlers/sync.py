@@ -130,6 +130,7 @@ class SyncResult(collections.namedtuple("SyncResult", [
     "joined",  # JoinedSyncResult for each joined room.
     "invited",  # InvitedSyncResult for each invited room.
     "archived",  # ArchivedSyncResult for each archived room.
+    "pagination_info",
 ])):
     __slots__ = []
 
@@ -549,7 +550,8 @@ class SyncHandler(object):
             next_batch=SyncNextBatchToken(
                 stream_token=sync_result_builder.now_token,
                 pagination_state=sync_result_builder.pagination_state,
-            )
+            ),
+            pagination_info=sync_result_builder.pagination_info,
         ))
 
     @defer.inlineCallbacks
@@ -707,13 +709,16 @@ class SyncHandler(object):
 
         if sync_config.pagination_config:
             pagination_config = sync_config.pagination_config
+            old_pagination_value = 0
         elif sync_result_builder.pagination_state:
             pagination_config = SyncPaginationConfig(
                 order=sync_result_builder.pagination_state.order,
                 limit=sync_result_builder.pagination_state.limit,
             )
+            old_pagination_value = sync_result_builder.pagination_state.value
         else:
             pagination_config = None
+            old_pagination_value = 0
 
         include_map = extras.get("peek", {}) if extras else {}
 
@@ -743,17 +748,20 @@ class SyncHandler(object):
 
             room_map = yield self._get_room_timestamps_at_token(
                 room_ids, sync_result_builder.now_token, sync_config,
-                pagination_limit + extra_limit,
+                pagination_limit + extra_limit + 1,
             )
 
+            limited = False
             if room_map:
                 sorted_list = sorted(
                     room_map.items(),
                     key=lambda item: -item[1]
-                )[:pagination_limit + extra_limit]
+                )
 
-                if sorted_list[pagination_limit:]:
-                    new_room_ids = set(r[0] for r in sorted_list[pagination_limit:])
+                cutoff_list = sorted_list[:pagination_limit + extra_limit]
+
+                if cutoff_list[pagination_limit:]:
+                    new_room_ids = set(r[0] for r in cutoff_list[pagination_limit:])
                     for r in room_entries:
                         if r.room_id in new_room_ids:
                             r.full_state = True
@@ -762,13 +770,20 @@ class SyncHandler(object):
                             r.upto_token = now_token
                             r.events = None
 
-                _, bottom_ts = sorted_list[-1]
+                _, bottom_ts = cutoff_list[-1]
                 value = bottom_ts
+
+                limited = any(
+                    old_pagination_value < r[1] < value
+                    for r in sorted_list[pagination_limit + extra_limit:]
+                )
 
                 sync_result_builder.pagination_state = SyncPaginationState(
                     order=pagination_config.order, value=value,
                     limit=pagination_limit + extra_limit,
                 )
+
+            sync_result_builder.pagination_info["limited"] = limited
 
             if len(room_map) == len(room_entries):
                 sync_result_builder.pagination_state = None
@@ -1257,6 +1272,7 @@ class SyncResultBuilder(object):
     __slots__ = (
         "sync_config", "full_state", "batch_token", "since_token", "pagination_state",
         "now_token", "presence", "account_data", "joined", "invited", "archived",
+        "pagination_info",
     )
 
     def __init__(self, sync_config, full_state, batch_token, now_token):
@@ -1279,6 +1295,8 @@ class SyncResultBuilder(object):
         self.joined = []
         self.invited = []
         self.archived = []
+
+        self.pagination_info = {}
 
 
 class RoomSyncResultBuilder(object):

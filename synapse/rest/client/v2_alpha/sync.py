@@ -286,6 +286,9 @@ class SyncRestServlet(RestServlet):
             "next_batch": sync_result.next_batch.to_string(),
         }
 
+        if sync_result.pagination_info:
+            response_content["pagination_info"] = sync_result.pagination_info
+
         defer.returnValue((200, response_content))
 
     def encode_presence(self, events, time_now):
