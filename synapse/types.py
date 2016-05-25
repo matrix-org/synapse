@@ -129,7 +129,7 @@ class SyncNextBatchToken(
             if pa:
                 pa = SyncPaginationState.from_dict(pa)
             return cls(
-                stream_token=StreamToken.from_string(d["t"]),
+                stream_token=StreamToken.from_arr(d["t"]),
                 pagination_state=pa,
             )
         except:
@@ -137,7 +137,7 @@ class SyncNextBatchToken(
 
     def to_string(self):
         return encode_base64(json.dumps({
-            "t": self.stream_token.to_string(),
+            "t": self.stream_token.to_arr(),
             "pa": self.pagination_state.to_dict() if self.pagination_state else None,
         }))
 
@@ -195,6 +195,20 @@ class StreamToken(
 
     def to_string(self):
         return self._SEPARATOR.join([str(k) for k in self])
+
+    @classmethod
+    def from_arr(cls, arr):
+        try:
+            keys = arr
+            while len(keys) < len(cls._fields):
+                # i.e. old token from before receipt_key
+                keys.append("0")
+            return cls(*keys)
+        except:
+            raise SynapseError(400, "Invalid Token")
+
+    def to_arr(self):
+        return self
 
     @property
     def room_stream_id(self):

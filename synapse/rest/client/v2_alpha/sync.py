@@ -98,6 +98,8 @@ class SyncRestServlet(RestServlet):
 
         since = body.get("since", None)
 
+        extras = body.get("extras", None)
+
         if "from" in body:
             # /events used to use 'from', but /sync uses 'since'.
             # Lets be helpful and whine if we see a 'from'.
@@ -162,6 +164,7 @@ class SyncRestServlet(RestServlet):
             set_presence=set_presence,
             full_state=full_state,
             timeout=timeout,
+            extras=extras,
         )
 
         defer.returnValue(sync_result)
@@ -239,7 +242,7 @@ class SyncRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def _handle_sync(self, requester, sync_config, batch_token, set_presence,
-                     full_state, timeout):
+                     full_state, timeout, extras=None):
         affect_presence = set_presence != PresenceState.OFFLINE
 
         user = sync_config.user
@@ -253,7 +256,7 @@ class SyncRestServlet(RestServlet):
         with context:
             sync_result = yield self.sync_handler.wait_for_sync_for_user(
                 sync_config, batch_token=batch_token, timeout=timeout,
-                full_state=full_state
+                full_state=full_state, extras=extras,
             )
 
         time_now = self.clock.time_msec()
