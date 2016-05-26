@@ -145,6 +145,11 @@ pre, code {
     text-decoration: none;
 }
 
+.debug {
+    font-size: 10px;
+    color: #888;
+}
+
 .footer {
     margin-top: 20px;
     text-align: center;

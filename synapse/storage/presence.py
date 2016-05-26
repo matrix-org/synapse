@@ -149,6 +149,7 @@ class PresenceStore(SQLBaseStore):
                 "status_msg",
                 "currently_active",
             ),
+            desc="get_presence_for_users",
         )
 
         for row in rows:

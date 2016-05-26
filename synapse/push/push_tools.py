@@ -38,7 +38,9 @@ def get_badge_count(store, user_id):
                     r.room_id, user_id, last_unread_event_id
                 )
             )
-            badge += notifs["notify_count"]
+            # return one badge count per conversation, as count per
+            # message is so noisy as to be almost useless
+            badge += 1 if notifs["notify_count"] else 0
     defer.returnValue(badge)
 
 
