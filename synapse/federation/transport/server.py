@@ -527,7 +527,7 @@ class PublicRoomList(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        data = yield self.room_list_handler.get_public_room_list()
+        data = yield self.room_list_handler.get_local_public_room_list()
         defer.returnValue((200, data))
 
     # Avoid doing remote HS authorization checks which are done by default by

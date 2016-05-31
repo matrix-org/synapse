@@ -345,7 +345,7 @@ class RoomListHandler(BaseHandler):
         super(RoomListHandler, self).__init__(hs)
         self.response_cache = ResponseCache()
 
-    def get_public_room_list(self):
+    def get_local_public_room_list(self):
         result = self.response_cache.get(())
         if not result:
             result = self.response_cache.set((), self._get_public_room_list())
@@ -426,6 +426,37 @@ class RoomListHandler(BaseHandler):
 
         # FIXME (erikj): START is no longer a valid value
         defer.returnValue({"start": "START", "end": "END", "chunk": results})
+
+    @defer.inlineCallbacks
+    def get_aggregated_public_room_list(self):
+        """
+        Get the public room list from this server and the servers
+        specified in the secondary_directory_servers config option.
+        XXX: Pagination...
+        """
+        federated_by_server = yield self.hs.get_replication_layer().get_public_rooms(
+            self.hs.config.secondary_directory_servers
+        )
+        public_rooms = yield self.get_local_public_room_list()
+
+        # keep track of which room IDs we've seen so we can de-dup
+        room_ids = set()
+
+        # tag all the ones in our list with our server name.
+        # Also add the them to the de-deping set
+        for room in public_rooms['chunk']:
+            room["server_name"] = self.hs.hostname
+            room_ids.add(room["room_id"])
+
+        # Now add the results from federation
+        for server_name, server_result in federated_by_server.items():
+            for room in server_result["chunk"]:
+                if room["room_id"] not in room_ids:
+                    room["server_name"] = server_name
+                    public_rooms["chunk"].append(room)
+                    room_ids.add(room["room_id"])
+
+        defer.returnValue(public_rooms)
 
 
 class RoomContextHandler(BaseHandler):

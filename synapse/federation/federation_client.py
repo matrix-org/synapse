@@ -24,6 +24,7 @@ from synapse.api.errors import (
     CodeMessageException, HttpResponseException, SynapseError,
 )
 from synapse.util import unwrapFirstError
+from synapse.util.async import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logutils import log_function
 from synapse.events import FrozenEvent
@@ -549,6 +550,26 @@ class FederationClient(FederationBase):
                 )
 
         raise RuntimeError("Failed to send to any server.")
+
+    @defer.inlineCallbacks
+    def get_public_rooms(self, destinations):
+        results_by_server = {}
+
+        @defer.inlineCallbacks
+        def _get_result(s):
+            if s == self.server_name:
+                defer.returnValue()
+
+            try:
+                result = yield self.transport_layer.get_public_rooms(s)
+                results_by_server[s] = result
+            except:
+                logger.exception("Error getting room list from server %r", s)
+
+
+        yield concurrently_execute(_get_result, destinations, 3)
+
+        defer.returnValue(results_by_server)
 
     @defer.inlineCallbacks
     def query_auth(self, destination, room_id, event_id, local_auth):
