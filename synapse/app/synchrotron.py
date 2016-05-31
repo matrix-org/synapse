@@ -156,6 +156,11 @@ class SynchrotronTyping(object):
     _room_serials = ()
 
 
+class SynchrotronApplicationService(object):
+    def notify_interested_services(self, event):
+        pass
+
+
 class SynchrotronServer(HomeServer):
     def get_db_conn(self, run_new_connection=True):
         # Any param beginning with cp_ is a parameter for adbapi, and should
@@ -294,6 +299,7 @@ def setup(config_options):
         database_engine=database_engine,
         presence_handler=SynchrotronPresence(),
         typing_handler=SynchrotronTyping(),
+        application_service_handler=SynchrotronApplicationService(),
     )
 
     ss.setup()
