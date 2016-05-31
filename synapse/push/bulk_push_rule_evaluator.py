@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 def decode_rule_json(rule):
+    rule = dict(rule)
     rule['conditions'] = json.loads(rule['conditions'])
     rule['actions'] = json.loads(rule['actions'])
     return rule
@@ -41,6 +42,8 @@ def _get_rules(room_id, user_ids, store):
         rules_by_user = yield store.bulk_get_push_rules(user_ids)
     with log_duration("bulk_get_push_rules_enabled"):
         rules_enabled_by_user = yield store.bulk_get_push_rules_enabled(user_ids)
+
+    rules_by_user = {k: v for k, v in rules_by_user.items() if v is not None}
 
     with log_duration("list_with_base_rules"):
         rules_by_user = {
@@ -56,14 +59,12 @@ def _get_rules(room_id, user_ids, store):
     # rules the user has disabled, so we need to do this too.
     with log_duration("apply_the_rules_enabled"):
         for uid in user_ids:
-            if uid not in rules_enabled_by_user:
+            user_enabled_map = rules_enabled_by_user.get(uid)
+            if not user_enabled_map:
                 continue
-
-            user_enabled_map = rules_enabled_by_user[uid]
 
             for i, rule in enumerate(rules_by_user[uid]):
                 rule_id = rule['rule_id']
-
                 if rule_id in user_enabled_map:
                     if rule.get('enabled', True) != bool(user_enabled_map[rule_id]):
                         # Rules are cached across users.
