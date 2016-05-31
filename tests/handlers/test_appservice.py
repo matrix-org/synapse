@@ -30,9 +30,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_scheduler = Mock()
         hs = Mock()
         hs.get_datastore = Mock(return_value=self.mock_store)
-        self.handler = ApplicationServicesHandler(
-            hs, self.mock_as_api, self.mock_scheduler
-        )
+        hs.get_application_service_api = Mock(return_value=self.mock_as_api)
+        hs.get_application_service_scheduler = Mock(return_value=self.mock_scheduler)
+        self.handler = ApplicationServicesHandler(hs)
 
     @defer.inlineCallbacks
     def test_notify_interested_services(self):
