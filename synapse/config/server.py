@@ -159,8 +159,12 @@ class ServerConfig(Config):
 
         # A list of other Home Servers to fetch the public room directory from
         # and include in the public room directory of this home server
+        # This is a temporary stopgap solution to populate new server with a
+        # list of rooms until there exists a good solution of a decentralized
+        # room directory.
         # secondary_directory_servers:
         #     - matrix.org
+        #     - vector.im
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.
