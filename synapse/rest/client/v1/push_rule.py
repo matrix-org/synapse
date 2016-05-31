@@ -132,9 +132,6 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
         enabled_map = yield self.store.get_push_rules_enabled_for_user(user_id)
 
-        rawrules = {k: v for k, v in rawrules.item() if k is not None}
-        enabled_map = {k: v for k, v in enabled_map.item() if k is not None}
-
         rules = format_push_rules_for_user(requester.user, rawrules, enabled_map)
 
         path = request.postpath[1:]
