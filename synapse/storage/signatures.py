@@ -19,17 +19,24 @@ from ._base import SQLBaseStore
 
 from unpaddedbase64 import encode_base64
 from synapse.crypto.event_signing import compute_event_reference_hash
+from synapse.util.caches.descriptors import cached, cachedList
 
 
 class SignatureStore(SQLBaseStore):
     """Persistence for event signatures and hashes"""
 
+    @cached(lru=True)
+    def get_event_reference_hash(self, event_id):
+        return self._get_event_reference_hashes_txn(event_id)
+
+    @cachedList(cached_method_name="get_event_reference_hash",
+                list_name="event_ids", num_args=1)
     def get_event_reference_hashes(self, event_ids):
         def f(txn):
-            return [
-                self._get_event_reference_hashes_txn(txn, ev)
-                for ev in event_ids
-            ]
+            return {
+                event_id: self._get_event_reference_hashes_txn(txn, event_id)
+                for event_id in event_ids
+            }
 
         return self.runInteraction(
             "get_event_reference_hashes",
@@ -41,15 +48,15 @@ class SignatureStore(SQLBaseStore):
         hashes = yield self.get_event_reference_hashes(
             event_ids
         )
-        hashes = [
-            {
+        hashes = {
+            e_id: {
                 k: encode_base64(v) for k, v in h.items()
                 if k == "sha256"
             }
-            for h in hashes
-        ]
+            for e_id, h in hashes.items()
+        }
 
-        defer.returnValue(zip(event_ids, hashes))
+        defer.returnValue(hashes.items())
 
     def _get_event_reference_hashes_txn(self, txn, event_id):
         """Get all the hashes for a given PDU.
