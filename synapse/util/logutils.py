@@ -21,8 +21,21 @@ import logging
 import inspect
 import time
 
+from contextlib import contextmanager
+
 
 _TIME_FUNC_ID = 0
+
+
+logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def log_duration(name):
+    start = time.time() * 1000
+    yield
+    end = time.time() * 1000
+    logger.info("Timings: %s tooke %dms", name, int(end - start))
 
 
 def _log_debug_as_f(f, msg, msg_args):

@@ -29,6 +29,7 @@ from synapse.util import unwrapFirstError
 from synapse.util.async import concurrently_execute
 from synapse.util.caches.snapshot_cache import SnapshotCache
 from synapse.util.logcontext import PreserveLoggingContext, preserve_fn
+from synapse.util.logutils import log_duration
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -734,43 +735,47 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _create_new_client_event(self, builder, prev_event_ids=None):
-        if prev_event_ids:
-            prev_events = yield self.store.add_event_hashes(prev_event_ids)
-            prev_max_depth = yield self.store.get_max_depth_of_events(prev_event_ids)
-            depth = prev_max_depth + 1
-        else:
-            latest_ret = yield self.store.get_latest_event_ids_and_hashes_in_room(
-                builder.room_id,
-            )
-
-            if latest_ret:
-                depth = max([d for _, _, d in latest_ret]) + 1
+        with log_duration("prev_events"):
+            if prev_event_ids:
+                prev_events = yield self.store.add_event_hashes(prev_event_ids)
+                prev_max_depth = yield self.store.get_max_depth_of_events(prev_event_ids)
+                depth = prev_max_depth + 1
             else:
-                depth = 1
+                latest_ret = yield self.store.get_latest_event_ids_and_hashes_in_room(
+                    builder.room_id,
+                )
 
-            prev_events = [
-                (event_id, prev_hashes)
-                for event_id, prev_hashes, _ in latest_ret
-            ]
+                if latest_ret:
+                    depth = max([d for _, _, d in latest_ret]) + 1
+                else:
+                    depth = 1
+
+                prev_events = [
+                    (event_id, prev_hashes)
+                    for event_id, prev_hashes, _ in latest_ret
+                ]
 
         builder.prev_events = prev_events
         builder.depth = depth
 
         state_handler = self.state_handler
 
-        context = yield state_handler.compute_event_context(builder)
+        with log_duration("context"):
+            context = yield state_handler.compute_event_context(builder)
 
         if builder.is_state():
             builder.prev_state = yield self.store.add_event_hashes(
                 context.prev_state_events
             )
 
-        yield self.auth.add_auth_events(builder, context)
+        with log_duration("add_auth"):
+            yield self.auth.add_auth_events(builder, context)
 
-        signing_key = self.hs.config.signing_key[0]
-        add_hashes_and_signatures(
-            builder, self.server_name, signing_key
-        )
+        with log_duration("signing"):
+            signing_key = self.hs.config.signing_key[0]
+            add_hashes_and_signatures(
+                builder, self.server_name, signing_key
+            )
 
         event = builder.build()
 
@@ -798,7 +803,8 @@ class MessageHandler(BaseHandler):
             self.ratelimit(requester)
 
         try:
-            self.auth.check(event, auth_events=context.current_state)
+            with log_duration("auth_check"):
+                self.auth.check(event, auth_events=context.current_state)
         except AuthError as err:
             logger.warn("Denying new event %r because %s", event, err)
             raise err
@@ -882,42 +888,48 @@ class MessageHandler(BaseHandler):
                 "Changing the room create event is forbidden",
             )
 
-        action_generator = ActionGenerator(self.hs)
-        yield action_generator.handle_push_actions_for_event(
-            event, context
-        )
+        with log_duration("action_generator"):
+            action_generator = ActionGenerator(self.hs)
+            yield action_generator.handle_push_actions_for_event(
+                event, context
+            )
 
-        (event_stream_id, max_stream_id) = yield self.store.persist_event(
-            event, context=context
-        )
+        with log_duration("persist_event"):
+            (event_stream_id, max_stream_id) = yield self.store.persist_event(
+                event, context=context
+            )
 
         # this intentionally does not yield: we don't care about the result
         # and don't need to wait for it.
-        preserve_fn(self.hs.get_pusherpool().on_new_notifications)(
-            event_stream_id, max_stream_id
-        )
+        with log_duration("pusherpool"):
+            preserve_fn(self.hs.get_pusherpool().on_new_notifications)(
+                event_stream_id, max_stream_id
+            )
 
         destinations = set()
-        for k, s in context.current_state.items():
-            try:
-                if k[0] == EventTypes.Member:
-                    if s.content["membership"] == Membership.JOIN:
-                        destinations.add(get_domain_from_id(s.state_key))
-            except SynapseError:
-                logger.warn(
-                    "Failed to get destination from event %s", s.event_id
-                )
+        with log_duration("destination"):
+            for k, s in context.current_state.items():
+                try:
+                    if k[0] == EventTypes.Member:
+                        if s.content["membership"] == Membership.JOIN:
+                            destinations.add(get_domain_from_id(s.state_key))
+                except SynapseError:
+                    logger.warn(
+                        "Failed to get destination from event %s", s.event_id
+                    )
 
-        with PreserveLoggingContext():
-            # Don't block waiting on waking up all the listeners.
-            self.notifier.on_new_room_event(
-                event, event_stream_id, max_stream_id,
-                extra_users=extra_users
-            )
+        with log_duration("on_new_room_event"):
+            with PreserveLoggingContext():
+                # Don't block waiting on waking up all the listeners.
+                self.notifier.on_new_room_event(
+                    event, event_stream_id, max_stream_id,
+                    extra_users=extra_users
+                )
 
         # If invite, remove room_state from unsigned before sending.
         event.unsigned.pop("invite_room_state", None)
 
-        federation_handler.handle_new_event(
-            event, destinations=destinations,
-        )
+        with log_duration("handle_new_event"):
+            federation_handler.handle_new_event(
+                event, destinations=destinations,
+            )
