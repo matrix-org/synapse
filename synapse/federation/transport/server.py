@@ -530,23 +530,6 @@ class PublicRoomList(BaseFederationServlet):
         data = yield self.room_list_handler.get_public_room_list()
         defer.returnValue((200, data))
 
-        token = parse_string(request, "access_token")
-        if token is None:
-            defer.returnValue((401, {
-                "errcode": "M_MISSING_TOKEN", "error": "Access Token required"
-            }))
-            return
-
-        user_id = yield self.handler.on_openid_userinfo(token)
-
-        if user_id is None:
-            defer.returnValue((401, {
-                "errcode": "M_UNKNOWN_TOKEN",
-                "error": "Access Token unknown or expired"
-            }))
-
-        defer.returnValue((200, {"sub": user_id}))
-
     # Avoid doing remote HS authorization checks which are done by default by
     # BaseFederationServlet.
     def _wrap(self, code):
