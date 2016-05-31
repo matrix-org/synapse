@@ -36,6 +36,8 @@ import string
 
 logger = logging.getLogger(__name__)
 
+REMOTE_ROOM_LIST_POLL_INTERVAL = 60 * 1000
+
 id_server_scheme = "https://"
 
 
@@ -344,6 +346,12 @@ class RoomListHandler(BaseHandler):
     def __init__(self, hs):
         super(RoomListHandler, self).__init__(hs)
         self.response_cache = ResponseCache()
+        self.remote_list_request_cache = ResponseCache()
+        self.remote_list_cache = {}
+        self.fetch_looping_call = hs.get_clock().looping_call(
+            self.fetch_all_remote_lists, REMOTE_ROOM_LIST_POLL_INTERVAL
+        )
+        self.fetch_all_remote_lists()
 
     def get_local_public_room_list(self):
         result = self.response_cache.get(())
@@ -428,15 +436,33 @@ class RoomListHandler(BaseHandler):
         defer.returnValue({"start": "START", "end": "END", "chunk": results})
 
     @defer.inlineCallbacks
+    def fetch_all_remote_lists(self):
+        deferred = self.hs.get_replication_layer().get_public_rooms(
+            self.hs.config.secondary_directory_servers
+        )
+        self.remote_list_request_cache.set((), deferred)
+        yield deferred
+
+    @defer.inlineCallbacks
     def get_aggregated_public_room_list(self):
         """
         Get the public room list from this server and the servers
         specified in the secondary_directory_servers config option.
         XXX: Pagination...
         """
-        federated_by_server = yield self.hs.get_replication_layer().get_public_rooms(
-            self.hs.config.secondary_directory_servers
-        )
+        # We return the results from out cache which is updated by a looping call,
+        # unless we're missing a cache entry, in which case wait for the result
+        # of the fetch if there's one in progress. If not, omit that server.
+        wait = False
+        for s in self.hs.config.secondary_directory_servers:
+            if s not in self.remote_list_cache:
+                logger.warn("No cached room list from %s: waiting for fetch", s)
+                wait = True
+                break
+
+        if wait and self.remote_list_request_cache.get(()):
+            yield self.remote_list_request_cache.get(())
+
         public_rooms = yield self.get_local_public_room_list()
 
         # keep track of which room IDs we've seen so we can de-dup
@@ -449,7 +475,7 @@ class RoomListHandler(BaseHandler):
             room_ids.add(room["room_id"])
 
         # Now add the results from federation
-        for server_name, server_result in federated_by_server.items():
+        for server_name, server_result in self.remote_list_cache.items():
             for room in server_result["chunk"]:
                 if room["room_id"] not in room_ids:
                     room["server_name"] = server_name
