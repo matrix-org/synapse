@@ -140,8 +140,6 @@ class Notifier(object):
     UNUSED_STREAM_EXPIRY_MS = 10 * 60 * 1000
 
     def __init__(self, hs):
-        self.hs = hs
-
         self.user_to_user_stream = {}
         self.room_to_user_streams = {}
         self.appservice_to_user_streams = {}
@@ -151,6 +149,8 @@ class Notifier(object):
         self.pending_new_room_events = []
 
         self.clock = hs.get_clock()
+        self.appservice_handler = hs.get_application_service_handler()
+        self.state_handler = hs.get_state_handler()
 
         hs.get_distributor().observe(
             "user_joined_room", self._user_joined_room
@@ -232,9 +232,7 @@ class Notifier(object):
     def _on_new_room_event(self, event, room_stream_id, extra_users=[]):
         """Notify any user streams that are interested in this room event"""
         # poke any interested application service.
-        self.hs.get_handlers().appservice_handler.notify_interested_services(
-            event
-        )
+        self.appservice_handler.notify_interested_services(event)
 
         app_streams = set()
 
@@ -449,7 +447,7 @@ class Notifier(object):
 
     @defer.inlineCallbacks
     def _is_world_readable(self, room_id):
-        state = yield self.hs.get_state_handler().get_current_state(
+        state = yield self.state_handler.get_current_state(
             room_id,
             EventTypes.RoomHistoryVisibility
         )

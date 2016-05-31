@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.appservice.scheduler import AppServiceScheduler
-from synapse.appservice.api import ApplicationServiceApi
 from .register import RegistrationHandler
 from .room import (
     RoomCreationHandler, RoomContextHandler,
@@ -26,7 +24,6 @@ from .federation import FederationHandler
 from .profile import ProfileHandler
 from .directory import DirectoryHandler
 from .admin import AdminHandler
-from .appservice import ApplicationServicesHandler
 from .auth import AuthHandler
 from .identity import IdentityHandler
 from .receipts import ReceiptsHandler
@@ -53,14 +50,6 @@ class Handlers(object):
         self.directory_handler = DirectoryHandler(hs)
         self.admin_handler = AdminHandler(hs)
         self.receipts_handler = ReceiptsHandler(hs)
-        asapi = ApplicationServiceApi(hs)
-        self.appservice_handler = ApplicationServicesHandler(
-            hs, asapi, AppServiceScheduler(
-                clock=hs.get_clock(),
-                store=hs.get_datastore(),
-                as_api=asapi
-            )
-        )
         self.auth_handler = AuthHandler(hs)
         self.identity_handler = IdentityHandler(hs)
         self.search_handler = SearchHandler(hs)
