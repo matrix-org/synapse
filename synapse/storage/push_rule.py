@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
 from twisted.internet import defer
 
 import logging
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class PushRuleStore(SQLBaseStore):
-    @cachedInlineCallbacks()
+    @cachedInlineCallbacks(lru=True)
     def get_push_rules_for_user(self, user_id):
         rows = yield self._simple_select_list(
             table="push_rules",
@@ -44,7 +44,7 @@ class PushRuleStore(SQLBaseStore):
 
         defer.returnValue(rows)
 
-    @cachedInlineCallbacks()
+    @cachedInlineCallbacks(lru=True)
     def get_push_rules_enabled_for_user(self, user_id):
         results = yield self._simple_select_list(
             table="push_rules_enable",
@@ -60,7 +60,8 @@ class PushRuleStore(SQLBaseStore):
             r['rule_id']: False if r['enabled'] == 0 else True for r in results
         })
 
-    @defer.inlineCallbacks
+    @cachedList(cached_method_name="get_push_rules_for_user",
+                list_name="user_ids", num_args=1, inlineCallbacks=True)
     def bulk_get_push_rules(self, user_ids):
         if not user_ids:
             defer.returnValue({})
@@ -75,13 +76,16 @@ class PushRuleStore(SQLBaseStore):
             desc="bulk_get_push_rules",
         )
 
-        rows.sort(key=lambda e: (-e["priority_class"], -e["priority"]))
+        rows.sort(
+            key=lambda row: (-int(row["priority_class"]), -int(row["priority"]))
+        )
 
         for row in rows:
             results.setdefault(row['user_name'], []).append(row)
         defer.returnValue(results)
 
-    @defer.inlineCallbacks
+    @cachedList(cached_method_name="get_push_rules_enabled_for_user",
+                list_name="user_ids", num_args=1, inlineCallbacks=True)
     def bulk_get_push_rules_enabled(self, user_ids):
         if not user_ids:
             defer.returnValue({})
