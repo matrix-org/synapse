@@ -30,6 +30,7 @@ from synapse.handlers import Handlers
 from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import TypingHandler
+from synapse.handlers.room import RoomListHandler
 from synapse.state import StateHandler
 from synapse.storage import DataStore
 from synapse.util import Clock
@@ -84,6 +85,7 @@ class HomeServer(object):
         'presence_handler',
         'sync_handler',
         'typing_handler',
+        'room_list_handler',
         'notifier',
         'distributor',
         'client_resource',
@@ -178,6 +180,9 @@ class HomeServer(object):
 
     def build_sync_handler(self):
         return SyncHandler(self)
+
+    def build_room_list_handler(self):
+        return RoomListHandler(self)
 
     def build_event_sources(self):
         return EventSources(self)

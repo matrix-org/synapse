@@ -279,7 +279,7 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        handler = self.handlers.room_list_handler
+        handler = self.hs.get_room_list_handler()
         data = yield handler.get_public_room_list()
         defer.returnValue((200, data))
 
