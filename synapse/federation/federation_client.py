@@ -566,7 +566,6 @@ class FederationClient(FederationBase):
             except:
                 logger.exception("Error getting room list from server %r", s)
 
-
         yield concurrently_execute(_get_result, destinations, 3)
 
         defer.returnValue(results_by_server)
