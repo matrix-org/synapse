@@ -66,7 +66,10 @@ class PushRuleStore(SQLBaseStore):
         if not user_ids:
             defer.returnValue({})
 
-        results = {}
+        results = {
+            user_id: []
+            for user_id in user_ids
+        }
 
         rows = yield self._simple_select_many_batch(
             table="push_rules",
@@ -90,7 +93,10 @@ class PushRuleStore(SQLBaseStore):
         if not user_ids:
             defer.returnValue({})
 
-        results = {}
+        results = {
+            user_id: []
+            for user_id in user_ids
+        }
 
         rows = yield self._simple_select_many_batch(
             table="push_rules_enable",
