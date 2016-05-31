@@ -94,7 +94,7 @@ class PushRuleStore(SQLBaseStore):
             defer.returnValue({})
 
         results = {
-            user_id: []
+            user_id: {}
             for user_id in user_ids
         }
 
