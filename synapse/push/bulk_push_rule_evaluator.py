@@ -55,11 +55,11 @@ def evaluator_for_event(event, hs, store, current_state):
     # sent a read receipt into the room.
 
     with log_duration("get_users_in_room"):
-        all_in_room = set(
+        local_users_in_room = set(
             e.state_key for e in current_state.values()
             if e.type == EventTypes.Member and e.membership == Membership.JOIN
+            and hs.is_mine_id(e.state_key)
         )
-        local_users_in_room = set(uid for uid in all_in_room if hs.is_mine_id(uid))
 
     # users in the room who have pushers need to get push rules run because
     # that's how their pushers work
@@ -67,7 +67,7 @@ def evaluator_for_event(event, hs, store, current_state):
         if_users_with_pushers = yield store.get_if_users_have_pushers(
             local_users_in_room
         )
-        users_with_pushers = set(
+        user_ids = set(
             uid for uid, have_pusher in if_users_with_pushers.items() if have_pusher
         )
 
@@ -76,22 +76,18 @@ def evaluator_for_event(event, hs, store, current_state):
 
     # any users with pushers must be ours: they have pushers
     with log_duration("get_mine_pushers"):
-        user_ids = set(users_with_pushers)
         for uid in users_with_receipts:
             if uid in local_users_in_room:
                 user_ids.add(uid)
 
     # if this event is an invite event, we may need to run rules for the user
     # who's been invited, otherwise they won't get told they've been invited
-    with log_duration("add_invite"):
-        if event.type == 'm.room.member' and event.content['membership'] == 'invite':
-            invited_user = event.state_key
-            if invited_user and hs.is_mine_id(invited_user):
-                has_pusher = yield store.user_has_pusher(invited_user)
-                if has_pusher:
-                    user_ids.add(invited_user)
-
-    user_ids = list(user_ids)
+    if event.type == 'm.room.member' and event.content['membership'] == 'invite':
+        invited_user = event.state_key
+        if invited_user and hs.is_mine_id(invited_user):
+            has_pusher = yield store.user_has_pusher(invited_user)
+            if has_pusher:
+                user_ids.add(invited_user)
 
     with log_duration("_get_rules"):
         rules_by_user = yield _get_rules(room_id, user_ids, store)
