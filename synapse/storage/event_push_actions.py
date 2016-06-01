@@ -119,7 +119,8 @@ class EventPushActionsStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_unread_push_actions_for_user_in_range(self, user_id,
                                                   min_stream_ordering,
-                                                  max_stream_ordering=None):
+                                                  max_stream_ordering=None,
+                                                  limit=20):
         def get_after_receipt(txn):
             sql = (
                 "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions, "
@@ -151,7 +152,8 @@ class EventPushActionsStore(SQLBaseStore):
             if max_stream_ordering is not None:
                 sql += " AND ep.stream_ordering <= ?"
                 args.append(max_stream_ordering)
-            sql += " ORDER BY ep.stream_ordering ASC"
+            sql += " ORDER BY ep.stream_ordering ASC LIMIT ?"
+            args.append(limit)
             txn.execute(sql, args)
             return txn.fetchall()
         after_read_receipt = yield self.runInteraction(
