@@ -134,7 +134,8 @@ class Authenticator(object):
 
 
 class BaseFederationServlet(object):
-    def __init__(self, handler, authenticator, ratelimiter, server_name, room_list_handler):
+    def __init__(self, handler, authenticator, ratelimiter, server_name,
+                 room_list_handler):
         self.handler = handler
         self.authenticator = authenticator
         self.ratelimiter = ratelimiter
@@ -491,6 +492,7 @@ class OpenIdUserInfo(BaseFederationServlet):
     # BaseFederationServlet.
     def _wrap(self, code):
         return code
+
 
 class PublicRoomList(BaseFederationServlet):
     """
