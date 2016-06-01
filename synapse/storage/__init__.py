@@ -17,7 +17,7 @@ from twisted.internet import defer
 from .appservice import (
     ApplicationServiceStore, ApplicationServiceTransactionStore
 )
-from ._base import Cache
+from ._base import Cache, LoggingTransaction
 from .directory import DirectoryStore
 from .events import EventsStore
 from .presence import PresenceStore, UserPresenceState
@@ -88,6 +88,7 @@ class DataStore(RoomMemberStore, RoomStore,
 
     def __init__(self, db_conn, hs):
         self.hs = hs
+        self._clock = hs.get_clock()
         self.database_engine = hs.database_engine
 
         self.client_ip_last_seen = Cache(
@@ -171,6 +172,19 @@ class DataStore(RoomMemberStore, RoomStore,
         self.push_rules_stream_cache = StreamChangeCache(
             "PushRulesStreamChangeCache", push_rules_id,
             prefilled_cache=push_rules_prefill,
+        )
+
+        cur = LoggingTransaction(
+            db_conn.cursor(),
+            name="_find_stream_orderings_for_times_txn",
+            database_engine=self.database_engine,
+            after_callbacks=[]
+        )
+        self._find_stream_orderings_for_times_txn(cur)
+        cur.close()
+
+        self.find_stream_orderings_looping_call = self._clock.looping_call(
+            self._find_stream_orderings_for_times, 60 * 60 * 1000
         )
 
         super(DataStore, self).__init__(hs)

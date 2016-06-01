@@ -321,7 +321,7 @@ class ReceiptsStore(SQLBaseStore):
         )
 
         if receipt_type == "m.read" and topological_ordering:
-            self._remove_push_actions_before_txn(
+            self._remove_old_push_actions_before_txn(
                 txn,
                 room_id=room_id,
                 user_id=user_id,
