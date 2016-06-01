@@ -18,7 +18,6 @@ import ujson as json
 
 from twisted.internet import defer
 
-from .baserules import list_with_base_rules
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
 from synapse.api.constants import EventTypes, Membership
@@ -40,37 +39,8 @@ def decode_rule_json(rule):
 def _get_rules(room_id, user_ids, store):
     with log_duration("bulk_get_push_rules"):
         rules_by_user = yield store.bulk_get_push_rules(user_ids)
-    with log_duration("bulk_get_push_rules_enabled"):
-        rules_enabled_by_user = yield store.bulk_get_push_rules_enabled(user_ids)
 
     rules_by_user = {k: v for k, v in rules_by_user.items() if v is not None}
-
-    with log_duration("list_with_base_rules"):
-        rules_by_user = {
-            uid: list_with_base_rules([
-                decode_rule_json(rule_list)
-                for rule_list in rules_by_user.get(uid, [])
-            ])
-            for uid in user_ids
-        }
-
-    # We apply the rules-enabled map here: bulk_get_push_rules doesn't
-    # fetch disabled rules, but this won't account for any server default
-    # rules the user has disabled, so we need to do this too.
-    with log_duration("apply_the_rules_enabled"):
-        for uid in user_ids:
-            user_enabled_map = rules_enabled_by_user.get(uid)
-            if not user_enabled_map:
-                continue
-
-            for i, rule in enumerate(rules_by_user[uid]):
-                rule_id = rule['rule_id']
-                if rule_id in user_enabled_map:
-                    if rule.get('enabled', True) != bool(user_enabled_map[rule_id]):
-                        # Rules are cached across users.
-                        rule = dict(rule)
-                        rule['enabled'] = bool(user_enabled_map[rule_id])
-                        rules_by_user[uid][i] = rule
 
     defer.returnValue(rules_by_user)
 
