@@ -71,14 +71,12 @@ def evaluator_for_event(event, hs, store, current_state):
             uid for uid, have_pusher in if_users_with_pushers.items() if have_pusher
         )
 
-    with log_duration("get_receipts_for_room"):
-        users_with_receipts = yield store.get_users_with_read_receipts_in_room(room_id)
+    users_with_receipts = yield store.get_users_with_read_receipts_in_room(room_id)
 
     # any users with pushers must be ours: they have pushers
-    with log_duration("get_mine_pushers"):
-        for uid in users_with_receipts:
-            if uid in local_users_in_room:
-                user_ids.add(uid)
+    for uid in users_with_receipts:
+        if uid in local_users_in_room:
+            user_ids.add(uid)
 
     # if this event is an invite event, we may need to run rules for the user
     # who's been invited, otherwise they won't get told they've been invited
@@ -89,8 +87,7 @@ def evaluator_for_event(event, hs, store, current_state):
             if has_pusher:
                 user_ids.add(invited_user)
 
-    with log_duration("_get_rules"):
-        rules_by_user = yield _get_rules(room_id, user_ids, store)
+    rules_by_user = yield _get_rules(room_id, user_ids, store)
 
     defer.returnValue(BulkPushRuleEvaluator(
         room_id, rules_by_user, user_ids, store

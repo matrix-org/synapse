@@ -768,14 +768,12 @@ class MessageHandler(BaseHandler):
                 context.prev_state_events
             )
 
-        with log_duration("add_auth"):
-            yield self.auth.add_auth_events(builder, context)
+        yield self.auth.add_auth_events(builder, context)
 
-        with log_duration("signing"):
-            signing_key = self.hs.config.signing_key[0]
-            add_hashes_and_signatures(
-                builder, self.server_name, signing_key
-            )
+        signing_key = self.hs.config.signing_key[0]
+        add_hashes_and_signatures(
+            builder, self.server_name, signing_key
+        )
 
         event = builder.build()
 
@@ -803,8 +801,7 @@ class MessageHandler(BaseHandler):
             self.ratelimit(requester)
 
         try:
-            with log_duration("auth_check"):
-                self.auth.check(event, auth_events=context.current_state)
+            self.auth.check(event, auth_events=context.current_state)
         except AuthError as err:
             logger.warn("Denying new event %r because %s", event, err)
             raise err
@@ -901,22 +898,20 @@ class MessageHandler(BaseHandler):
 
         # this intentionally does not yield: we don't care about the result
         # and don't need to wait for it.
-        with log_duration("pusherpool"):
-            preserve_fn(self.hs.get_pusherpool().on_new_notifications)(
-                event_stream_id, max_stream_id
-            )
+        preserve_fn(self.hs.get_pusherpool().on_new_notifications)(
+            event_stream_id, max_stream_id
+        )
 
         destinations = set()
-        with log_duration("destination"):
-            for k, s in context.current_state.items():
-                try:
-                    if k[0] == EventTypes.Member:
-                        if s.content["membership"] == Membership.JOIN:
-                            destinations.add(get_domain_from_id(s.state_key))
-                except SynapseError:
-                    logger.warn(
-                        "Failed to get destination from event %s", s.event_id
-                    )
+        for k, s in context.current_state.items():
+            try:
+                if k[0] == EventTypes.Member:
+                    if s.content["membership"] == Membership.JOIN:
+                        destinations.add(get_domain_from_id(s.state_key))
+            except SynapseError:
+                logger.warn(
+                    "Failed to get destination from event %s", s.event_id
+                )
 
         with log_duration("on_new_room_event"):
             with PreserveLoggingContext():
@@ -929,7 +924,6 @@ class MessageHandler(BaseHandler):
         # If invite, remove room_state from unsigned before sending.
         event.unsigned.pop("invite_room_state", None)
 
-        with log_duration("handle_new_event"):
-            federation_handler.handle_new_event(
-                event, destinations=destinations,
-            )
+        federation_handler.handle_new_event(
+            event, destinations=destinations,
+        )
