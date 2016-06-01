@@ -87,13 +87,13 @@ def evaluator_for_event(event, hs, store):
     all_in_room = yield store.get_users_in_room(room_id)
     all_in_room = set(all_in_room)
 
-    receipts = yield store.get_receipts_for_room(room_id, "m.read")
+    users_with_receipts = yield store.get_users_with_read_receipts_in_room(room_id)
 
     # any users with pushers must be ours: they have pushers
     user_ids = set(users_with_pushers)
-    for r in receipts:
-        if hs.is_mine_id(r['user_id']) and r['user_id'] in all_in_room:
-            user_ids.add(r['user_id'])
+    for uid in users_with_receipts:
+        if hs.is_mine_id(uid) and uid in all_in_room:
+            user_ids.add(uid)
 
     # if this event is an invite event, we may need to run rules for the user
     # who's been invited, otherwise they won't get told they've been invited
