@@ -15,12 +15,36 @@
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
+from synapse.push.baserules import list_with_base_rules
 from twisted.internet import defer
 
 import logging
 import simplejson as json
 
 logger = logging.getLogger(__name__)
+
+
+def _load_rules(rawrules, enabled_map):
+    ruleslist = []
+    for rawrule in rawrules:
+        rule = dict(rawrule)
+        rule["conditions"] = json.loads(rawrule["conditions"])
+        rule["actions"] = json.loads(rawrule["actions"])
+        ruleslist.append(rule)
+
+    # We're going to be mutating this a lot, so do a deep copy
+    rules = list(list_with_base_rules(ruleslist))
+
+    for i, rule in enumerate(rules):
+        rule_id = rule['rule_id']
+        if rule_id in enabled_map:
+            if rule.get('enabled', True) != bool(enabled_map[rule_id]):
+                # Rules are cached across users.
+                rule = dict(rule)
+                rule['enabled'] = bool(enabled_map[rule_id])
+                rules[i] = rule
+
+    return rules
 
 
 class PushRuleStore(SQLBaseStore):
@@ -42,7 +66,11 @@ class PushRuleStore(SQLBaseStore):
             key=lambda row: (-int(row["priority_class"]), -int(row["priority"]))
         )
 
-        defer.returnValue(rows)
+        enabled_map = yield self.get_push_rules_enabled_for_user(user_id)
+
+        rules = _load_rules(rows, enabled_map)
+
+        defer.returnValue(rules)
 
     @cachedInlineCallbacks(lru=True)
     def get_push_rules_enabled_for_user(self, user_id):
@@ -85,6 +113,14 @@ class PushRuleStore(SQLBaseStore):
 
         for row in rows:
             results.setdefault(row['user_name'], []).append(row)
+
+        enabled_map_by_user = yield self.bulk_get_push_rules_enabled(user_ids)
+
+        for user_id, rules in results.items():
+            results[user_id] = _load_rules(
+                rules, enabled_map_by_user.get(user_id, {})
+            )
+
         defer.returnValue(results)
 
     @cachedList(cached_method_name="get_push_rules_enabled_for_user",
