@@ -44,7 +44,7 @@ class ReceiptsStore(SQLBaseStore):
         if receipt_type != "m.read":
             return
 
-        # XXX: ObservableDeferred?!
+        # Returns an ObservableDeferred
         res = self.get_users_with_read_receipts_in_room.cache.get((room_id,), None)
 
         if res and res.called and user_id in res.result:
