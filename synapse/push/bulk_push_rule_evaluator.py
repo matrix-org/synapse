@@ -21,7 +21,7 @@ from twisted.internet import defer
 from .baserules import list_with_base_rules
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, Membership
 from synapse.visibility import filter_events_for_clients
 
 
@@ -72,20 +72,24 @@ def _get_rules(room_id, user_ids, store):
 
 
 @defer.inlineCallbacks
-def evaluator_for_event(event, hs, store):
+def evaluator_for_event(event, hs, store, current_state):
     room_id = event.room_id
-
-    # users in the room who have pushers need to get push rules run because
-    # that's how their pushers work
-    users_with_pushers = yield store.get_users_with_pushers_in_room(room_id)
-
     # We also will want to generate notifs for other people in the room so
     # their unread countss are correct in the event stream, but to avoid
     # generating them for bot / AS users etc, we only do so for people who've
     # sent a read receipt into the room.
 
-    all_in_room = yield store.get_users_in_room(room_id)
-    all_in_room = set(all_in_room)
+    all_in_room = set(
+        e.state_key for e in current_state.values()
+        if e.type == EventTypes.Member and e.membership == Membership.JOIN
+    )
+
+    # users in the room who have pushers need to get push rules run because
+    # that's how their pushers work
+    if_users_with_pushers = yield store.get_if_users_have_pushers(all_in_room)
+    users_with_pushers = set(
+        uid for uid, have_pusher in if_users_with_pushers.items() if have_pusher
+    )
 
     users_with_receipts = yield store.get_users_with_read_receipts_in_room(room_id)
 
@@ -143,7 +147,10 @@ class BulkPushRuleEvaluator:
             self.store, user_tuples, [event], {event.event_id: current_state}
         )
 
-        room_members = yield self.store.get_users_in_room(self.room_id)
+        room_members = set(
+            e.state_key for e in current_state.values()
+            if e.type == EventTypes.Member and e.membership == Membership.JOIN
+        )
 
         evaluator = PushRuleEvaluatorForEvent(event, len(room_members))
 
