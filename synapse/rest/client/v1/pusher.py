@@ -17,7 +17,11 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, Codes
 from synapse.push import PusherConfigException
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.servlet import (
+    parse_json_object_from_request, parse_string, RestServlet
+)
+from synapse.http.server import finish_request
+from synapse.api.errors import StoreError
 
 from .base import ClientV1RestServlet, client_path_patterns
 
@@ -136,6 +140,55 @@ class PushersSetRestServlet(ClientV1RestServlet):
         return 200, {}
 
 
+class PushersRemoveRestServlet(RestServlet):
+    """
+    To allow pusher to be delete by clicking a link (ie. GET request)
+    """
+    PATTERNS = client_path_patterns("/pushers/remove$")
+    SUCCESS_HTML = "<html><body>You have been unsubscribed</body><html>"
+
+    def __init__(self, hs):
+        super(RestServlet, self).__init__()
+        self.notifier = hs.get_notifier()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        requester = yield self.auth.get_user_by_req(request, "delete_pusher")
+        user = requester.user
+
+        app_id = parse_string(request, "app_id", required=True)
+        pushkey = parse_string(request, "pushkey", required=True)
+
+        pusher_pool = self.hs.get_pusherpool()
+
+        try:
+            yield pusher_pool.remove_pusher(
+                app_id=app_id,
+                pushkey=pushkey,
+                user_id=user.to_string(),
+            )
+        except StoreError as se:
+            if se.code != 404:
+                # This is fine: they're already unsubscribed
+                raise
+
+        self.notifier.on_new_replication_data()
+
+        request.setResponseCode(200)
+        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+        request.setHeader(b"Server", self.hs.version_string)
+        request.setHeader(b"Content-Length", b"%d" % (
+            len(PushersRemoveRestServlet.SUCCESS_HTML),
+        ))
+        request.write(PushersRemoveRestServlet.SUCCESS_HTML)
+        finish_request(request)
+        defer.returnValue(None)
+
+    def on_OPTIONS(self, _):
+        return 200, {}
+
+
 def register_servlets(hs, http_server):
     PushersRestServlet(hs).register(http_server)
     PushersSetRestServlet(hs).register(http_server)
+    PushersRemoveRestServlet(hs).register(http_server)
