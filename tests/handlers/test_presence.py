@@ -264,7 +264,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         )
 
         new_state = handle_timeout(
-            state, is_mine=True, user_to_num_current_syncs={}, now=now
+            state, is_mine=True, syncing_user_ids=set(), now=now
         )
 
         self.assertIsNotNone(new_state)
@@ -282,7 +282,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         )
 
         new_state = handle_timeout(
-            state, is_mine=True, user_to_num_current_syncs={}, now=now
+            state, is_mine=True, syncing_user_ids=set(), now=now
         )
 
         self.assertIsNotNone(new_state)
@@ -300,9 +300,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         )
 
         new_state = handle_timeout(
-            state, is_mine=True, user_to_num_current_syncs={
-                user_id: 1,
-            }, now=now
+            state, is_mine=True, syncing_user_ids=set([user_id]), now=now
         )
 
         self.assertIsNotNone(new_state)
@@ -321,7 +319,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         )
 
         new_state = handle_timeout(
-            state, is_mine=True, user_to_num_current_syncs={}, now=now
+            state, is_mine=True, syncing_user_ids=set(), now=now
         )
 
         self.assertIsNotNone(new_state)
@@ -340,7 +338,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         )
 
         new_state = handle_timeout(
-            state, is_mine=True, user_to_num_current_syncs={}, now=now
+            state, is_mine=True, syncing_user_ids=set(), now=now
         )
 
         self.assertIsNone(new_state)
@@ -358,7 +356,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         )
 
         new_state = handle_timeout(
-            state, is_mine=False, user_to_num_current_syncs={}, now=now
+            state, is_mine=False, syncing_user_ids=set(), now=now
         )
 
         self.assertIsNotNone(new_state)
@@ -377,7 +375,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         )
 
         new_state = handle_timeout(
-            state, is_mine=True, user_to_num_current_syncs={}, now=now
+            state, is_mine=True, syncing_user_ids=set(), now=now
         )
 
         self.assertIsNotNone(new_state)
