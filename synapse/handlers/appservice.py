@@ -17,7 +17,6 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.appservice import ApplicationService
-from synapse.types import UserID
 
 import logging
 
@@ -35,16 +34,13 @@ def log_failure(failure):
     )
 
 
-# NB: Purposefully not inheriting BaseHandler since that contains way too much
-# setup code which this handler does not need or use. This makes testing a lot
-# easier.
 class ApplicationServicesHandler(object):
 
-    def __init__(self, hs, appservice_api, appservice_scheduler):
+    def __init__(self, hs):
         self.store = hs.get_datastore()
-        self.hs = hs
-        self.appservice_api = appservice_api
-        self.scheduler = appservice_scheduler
+        self.is_mine_id = hs.is_mine_id
+        self.appservice_api = hs.get_application_service_api()
+        self.scheduler = hs.get_application_service_scheduler()
         self.started_scheduler = False
 
     @defer.inlineCallbacks
@@ -169,8 +165,7 @@ class ApplicationServicesHandler(object):
 
     @defer.inlineCallbacks
     def _is_unknown_user(self, user_id):
-        user = UserID.from_string(user_id)
-        if not self.hs.is_mine(user):
+        if not self.is_mine_id(user_id):
             # we don't know if they are unknown or not since it isn't one of our
             # users. We can't poke ASes.
             defer.returnValue(False)

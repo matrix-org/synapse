@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from synapse.storage.appservice import ApplicationServiceStore
+from synapse.config.appservice import load_appservices
 
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ def run_upgrade(cur, database_engine, config, *args, **kwargs):
         logger.warning("Could not get app_service_config_files from config")
         pass
 
-    appservices = ApplicationServiceStore.load_appservices(
+    appservices = load_appservices(
         config.server_name, config_files
     )
 

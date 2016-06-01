@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 def decode_rule_json(rule):
+    rule = dict(rule)
     rule['conditions'] = json.loads(rule['conditions'])
     rule['actions'] = json.loads(rule['actions'])
     return rule
@@ -38,6 +39,8 @@ def decode_rule_json(rule):
 def _get_rules(room_id, user_ids, store):
     rules_by_user = yield store.bulk_get_push_rules(user_ids)
     rules_enabled_by_user = yield store.bulk_get_push_rules_enabled(user_ids)
+
+    rules_by_user = {k: v for k, v in rules_by_user.items() if v is not None}
 
     rules_by_user = {
         uid: list_with_base_rules([
@@ -51,10 +54,9 @@ def _get_rules(room_id, user_ids, store):
     # fetch disabled rules, but this won't account for any server default
     # rules the user has disabled, so we need to do this too.
     for uid in user_ids:
-        if uid not in rules_enabled_by_user:
+        user_enabled_map = rules_enabled_by_user.get(uid)
+        if not user_enabled_map:
             continue
-
-        user_enabled_map = rules_enabled_by_user[uid]
 
         for i, rule in enumerate(rules_by_user[uid]):
             rule_id = rule['rule_id']
