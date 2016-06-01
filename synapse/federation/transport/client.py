@@ -226,6 +226,18 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
+    def get_public_rooms(self, remote_server):
+        path = PREFIX + "/publicRooms"
+
+        response = yield self.client.get_json(
+            destination=remote_server,
+            path=path,
+        )
+
+        defer.returnValue(response)
+
+    @defer.inlineCallbacks
+    @log_function
     def exchange_third_party_invite(self, destination, room_id, event_dict):
         path = PREFIX + "/exchange_third_party_invite/%s" % (room_id,)
 

@@ -134,10 +134,12 @@ class Authenticator(object):
 
 
 class BaseFederationServlet(object):
-    def __init__(self, handler, authenticator, ratelimiter, server_name):
+    def __init__(self, handler, authenticator, ratelimiter, server_name,
+                 room_list_handler):
         self.handler = handler
         self.authenticator = authenticator
         self.ratelimiter = ratelimiter
+        self.room_list_handler = room_list_handler
 
     def _wrap(self, code):
         authenticator = self.authenticator
@@ -492,6 +494,50 @@ class OpenIdUserInfo(BaseFederationServlet):
         return code
 
 
+class PublicRoomList(BaseFederationServlet):
+    """
+    Fetch the public room list for this server.
+
+    This API returns information in the same format as /publicRooms on the
+    client API, but will only ever include local public rooms and hence is
+    intended for consumption by other home servers.
+
+    GET /publicRooms HTTP/1.1
+
+    HTTP/1.1 200 OK
+    Content-Type: application/json
+
+    {
+        "chunk": [
+            {
+                "aliases": [
+                    "#test:localhost"
+                ],
+                "guest_can_join": false,
+                "name": "test room",
+                "num_joined_members": 3,
+                "room_id": "!whkydVegtvatLfXmPN:localhost",
+                "world_readable": false
+            }
+        ],
+        "end": "END",
+        "start": "START"
+    }
+    """
+
+    PATH = "/publicRooms"
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        data = yield self.room_list_handler.get_local_public_room_list()
+        defer.returnValue((200, data))
+
+    # Avoid doing remote HS authorization checks which are done by default by
+    # BaseFederationServlet.
+    def _wrap(self, code):
+        return code
+
+
 SERVLET_CLASSES = (
     FederationSendServlet,
     FederationPullServlet,
@@ -513,6 +559,7 @@ SERVLET_CLASSES = (
     FederationThirdPartyInviteExchangeServlet,
     On3pidBindServlet,
     OpenIdUserInfo,
+    PublicRoomList,
 )
 
 
@@ -523,4 +570,5 @@ def register_servlets(hs, resource, authenticator, ratelimiter):
             authenticator=authenticator,
             ratelimiter=ratelimiter,
             server_name=hs.hostname,
+            room_list_handler=hs.get_room_list_handler(),
         ).register(resource)
