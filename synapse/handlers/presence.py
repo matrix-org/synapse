@@ -68,6 +68,10 @@ FEDERATION_TIMEOUT = 30 * 60 * 1000
 # How often to resend presence to remote servers
 FEDERATION_PING_INTERVAL = 25 * 60 * 1000
 
+# How long we will wait before assuming that the syncs from an external process
+# are dead.
+EXTERNAL_PROCESS_EXPIRY = 5 * 60 * 1000
+
 assert LAST_ACTIVE_GRANULARITY < IDLE_TIMER
 
 
@@ -283,13 +287,26 @@ class PresenceHandler(object):
             # Fetch the list of users that *may* have timed out. Things may have
             # changed since the timeout was set, so we won't necessarily have to
             # take any action.
-            users_to_check = self.wheel_timer.fetch(now)
+            users_to_check = set(self.wheel_timer.fetch(now))
+
+            # Check whether the lists of syncing processes from an external
+            # process have expired.
+            expired_process_ids = [
+                process_id for process_id, last_update
+                in self.external_process_last_update.items()
+                if now - last_update > EXTERNAL_PROCESS_EXPIRY
+            ]
+            for process_id in expired_process_ids:
+                users_to_check.update(
+                    self.external_process_to_current_syncs.pop(process_id, ())
+                )
+                self.external_process_last_update.pop(process_id)
 
             states = [
                 self.user_to_current_state.get(
                     user_id, UserPresenceState.default(user_id)
                 )
-                for user_id in set(users_to_check)
+                for user_id in users_to_check
             ]
 
             timers_fired_counter.inc_by(len(states))
