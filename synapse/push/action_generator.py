@@ -42,7 +42,7 @@ class ActionGenerator:
         with Measure(self.clock, "handle_push_actions_for_event"):
             with log_duration("evaluator_for_event"):
                 bulk_evaluator = yield evaluator_for_event(
-                    event, self.hs, self.store
+                    event, self.hs, self.store, context.current_state
                 )
 
             with log_duration("action_for_event_by_user"):

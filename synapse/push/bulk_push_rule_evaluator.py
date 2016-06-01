@@ -79,11 +79,6 @@ def _get_rules(room_id, user_ids, store):
 def evaluator_for_event(event, hs, store, current_state):
     room_id = event.room_id
 
-    # users in the room who have pushers need to get push rules run because
-    # that's how their pushers work
-    with log_duration("get_users_with_pushers_in_room"):
-        users_with_pushers = yield store.get_users_with_pushers_in_room(room_id)
-
     # We also will want to generate notifs for other people in the room so
     # their unread countss are correct in the event stream, but to avoid
     # generating them for bot / AS users etc, we only do so for people who've
@@ -93,6 +88,14 @@ def evaluator_for_event(event, hs, store, current_state):
         all_in_room = set(
             e.state_key for e in current_state.values()
             if e.type == EventTypes.Member and e.membership == Membership.JOIN
+        )
+
+    # users in the room who have pushers need to get push rules run because
+    # that's how their pushers work
+    with log_duration("get_users_with_pushers_in_room"):
+        if_users_with_pushers = yield store.get_if_users_have_pushers(all_in_room)
+        users_with_pushers = set(
+            uid for uid, have_pusher in if_users_with_pushers.items() if have_pusher
         )
 
     with log_duration("get_receipts_for_room"):
