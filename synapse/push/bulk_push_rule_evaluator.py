@@ -89,11 +89,14 @@ def evaluator_for_event(event, hs, store, current_state):
             e.state_key for e in current_state.values()
             if e.type == EventTypes.Member and e.membership == Membership.JOIN
         )
+        local_users_in_room = set(uid for uid in all_in_room if hs.is_mine_id(uid))
 
     # users in the room who have pushers need to get push rules run because
     # that's how their pushers work
     with log_duration("get_users_with_pushers_in_room"):
-        if_users_with_pushers = yield store.get_if_users_have_pushers(all_in_room)
+        if_users_with_pushers = yield store.get_if_users_have_pushers(
+            local_users_in_room
+        )
         users_with_pushers = set(
             uid for uid, have_pusher in if_users_with_pushers.items() if have_pusher
         )
@@ -105,7 +108,7 @@ def evaluator_for_event(event, hs, store, current_state):
     with log_duration("get_mine_pushers"):
         user_ids = set(users_with_pushers)
         for uid in users_with_receipts:
-            if hs.is_mine_id(uid) and uid in all_in_room:
+            if uid in local_users_in_room:
                 user_ids.add(uid)
 
     # if this event is an invite event, we may need to run rules for the user
