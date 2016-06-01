@@ -84,6 +84,9 @@ class Cache(object):
         else:
             return default
 
+    def has(self, key):
+        return key in self.cache
+
     def update(self, sequence, key, value):
         self.check_thread()
         if self.sequence == sequence:
@@ -123,6 +126,12 @@ class Cache(object):
         self.check_thread()
         self.sequence += 1
         self.cache.clear()
+
+    def __contains__(self, key):
+        return self.has(key)
+
+    def __getitem__(self, key):
+        return self.get(key)
 
 
 class CacheDescriptor(object):
