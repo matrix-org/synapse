@@ -26,9 +26,9 @@ from synapse.types import (
     UserID, RoomAlias, RoomStreamToken, StreamToken, get_domain_from_id
 )
 from synapse.util import unwrapFirstError
-from synapse.util.async import concurrently_execute
+from synapse.util.async import concurrently_execute, run_on_reactor
 from synapse.util.caches.snapshot_cache import SnapshotCache
-from synapse.util.logcontext import PreserveLoggingContext, preserve_fn
+from synapse.util.logcontext import preserve_fn
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -908,12 +908,15 @@ class MessageHandler(BaseHandler):
                     "Failed to get destination from event %s", s.event_id
                 )
 
-        with PreserveLoggingContext():
-            # Don't block waiting on waking up all the listeners.
+        @defer.inlineCallbacks
+        def _notify():
+            yield run_on_reactor()
             self.notifier.on_new_room_event(
                 event, event_stream_id, max_stream_id,
                 extra_users=extra_users
             )
+
+        preserve_fn(_notify)()
 
         # If invite, remove room_state from unsigned before sending.
         event.unsigned.pop("invite_room_state", None)
