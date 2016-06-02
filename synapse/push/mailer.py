@@ -81,6 +81,7 @@ class Mailer(object):
     def __init__(self, hs):
         self.hs = hs
         self.store = self.hs.get_datastore()
+        self.handlers = self.hs.get_handlers()
         self.state_handler = self.hs.get_state_handler()
         loader = jinja2.FileSystemLoader(self.hs.config.email_template_dir)
         self.app_name = self.hs.config.email_app_name
@@ -95,7 +96,8 @@ class Mailer(object):
         )
 
     @defer.inlineCallbacks
-    def send_notification_mail(self, user_id, email_address, push_actions, reason):
+    def send_notification_mail(self, app_id, user_id, email_address,
+                               push_actions, reason):
         raw_from = email.utils.parseaddr(self.hs.config.email_notif_from)[1]
         raw_to = email.utils.parseaddr(email_address)[1]
 
@@ -157,7 +159,7 @@ class Mailer(object):
 
         template_vars = {
             "user_display_name": user_display_name,
-            "unsubscribe_link": self.make_unsubscribe_link(),
+            "unsubscribe_link": self.make_unsubscribe_link(app_id, email_address),
             "summary_text": summary_text,
             "app_name": self.app_name,
             "rooms": rooms,
@@ -423,9 +425,18 @@ class Mailer(object):
                 notif['room_id'], notif['event_id']
             )
 
-    def make_unsubscribe_link(self):
-        # XXX: matrix.to
-        return "https://vector.im/#/settings"
+    def make_unsubscribe_link(self, app_id, email_address):
+        params = {
+            "access_token": self.handlers.auth.generate_delete_pusher_token(),
+            "app_id": app_id,
+            "pushkey": email_address,
+        }
+
+        # XXX: make r0 once API is stable
+        return "%s_matrix/client/unstable/pushers/remove?%s" % (
+            self.hs.config.public_baseurl,
+            urllib.urlencode(params),
+        )
 
     def mxc_to_http_filter(self, value, width, height, resize_method="crop"):
         if value[0:6] != "mxc://":

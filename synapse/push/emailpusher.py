@@ -273,5 +273,5 @@ class EmailPusher(object):
         logger.info("Sending notif email for user %r", self.user_id)
 
         yield self.mailer.send_notification_mail(
-            self.user_id, self.email, push_actions, reason
+            self.app_id, self.user_id, self.email, push_actions, reason
         )
