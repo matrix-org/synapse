@@ -15,7 +15,6 @@
 
 
 from itertools import chain
-from collections import Counter
 
 
 # TODO(paul): I can't believe Python doesn't have one of these
@@ -56,29 +55,30 @@ class CounterMetric(BaseMetric):
     """The simplest kind of metric; one that stores a monotonically-increasing
     integer that counts events."""
 
-    __slots__ = ("counts")
-
     def __init__(self, *args, **kwargs):
         super(CounterMetric, self).__init__(*args, **kwargs)
 
-        self.counts = Counter()
+        self.counts = {}
 
         # Scalar metrics are never empty
         if self.is_scalar():
             self.counts[()] = 0
 
     def inc_by(self, incr, *values):
-        # if len(values) != self.dimension():
-        #     raise ValueError(
-        #         "Expected as many values to inc() as labels (%d)" % (self.dimension())
-        #     )
+        if len(values) != self.dimension():
+            raise ValueError(
+                "Expected as many values to inc() as labels (%d)" % (self.dimension())
+            )
 
         # TODO: should assert that the tag values are all strings
 
-        self.counts[values] += incr
+        if values not in self.counts:
+            self.counts[values] = incr
+        else:
+            self.counts[values] += incr
 
     def inc(self, *values):
-        self.counts[values] += 1
+        self.inc_by(1, *values)
 
     def render_item(self, k):
         return ["%s%s %d" % (self.name, self._render_key(k), self.counts[k])]
@@ -131,8 +131,6 @@ class CacheMetric(object):
 
     This metric generates standard metric name pairs, so that monitoring rules
     can easily be applied to measure hit ratio."""
-
-    __slots__ = ("name", "hits", "total", "size")
 
     def __init__(self, name, size_callback, labels=[]):
         self.name = name
