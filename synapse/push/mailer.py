@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 MESSAGE_FROM_PERSON_IN_ROOM = "You have a message on %(app)s from %(person)s " \
-                              "in the %s room..."
+                              "in the %(room)s room..."
 MESSAGE_FROM_PERSON = "You have a message on %(app)s from %(person)s..."
 MESSAGES_FROM_PERSON = "You have messages on %(app)s from %(person)s..."
 MESSAGES_IN_ROOM = "You have messages on %(app)s in the %(room)s room..."
