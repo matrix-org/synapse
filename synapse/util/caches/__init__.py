@@ -24,11 +24,21 @@ DEBUG_CACHES = False
 metrics = synapse.metrics.get_metrics_for("synapse.util.caches")
 
 caches_by_name = {}
-cache_counter = metrics.register_cache(
-    "cache",
-    lambda: {(name,): len(caches_by_name[name]) for name in caches_by_name.keys()},
-    labels=["name"],
-)
+# cache_counter = metrics.register_cache(
+#     "cache",
+#     lambda: {(name,): len(caches_by_name[name]) for name in caches_by_name.keys()},
+#     labels=["name"],
+# )
+
+
+def register_cache(name, cache):
+    caches_by_name[name] = cache
+    return metrics.register_cache(
+        "cache",
+        lambda: len(cache),
+        name,
+    )
+
 
 _string_cache = LruCache(int(5000 * CACHE_SIZE_FACTOR))
 caches_by_name["string_cache"] = _string_cache
