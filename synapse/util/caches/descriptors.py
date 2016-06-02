@@ -321,12 +321,12 @@ class CacheListDescriptor(object):
 
                 try:
                     res = cache.get(tuple(key))
-                    if not res.called:
+                    if not res.has_succeeded():
                         res = res.observe()
                         res.addCallback(lambda r, arg: (arg, r), arg)
                         cached_defers[arg] = res
                     else:
-                        results[arg] = res.result
+                        results[arg] = res.get_result()
                 except KeyError:
                     missing.append(arg)
 
