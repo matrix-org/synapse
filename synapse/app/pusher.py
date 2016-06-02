@@ -21,6 +21,7 @@ from synapse.config._base import ConfigError
 from synapse.config.database import DatabaseConfig
 from synapse.config.logger import LoggingConfig
 from synapse.config.emailconfig import EmailConfig
+from synapse.config.key import KeyConfig
 from synapse.http.site import SynapseSite
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.storage.roommember import RoomMemberStore
@@ -63,6 +64,26 @@ class SlaveConfig(DatabaseConfig):
         self.pid_file = self.abspath(config.get("pid_file"))
         self.public_baseurl = config["public_baseurl"]
 
+        # some things used by the auth handler but not actually used in the
+        # pusher codebase
+        self.bcrypt_rounds = None
+        self.ldap_enabled = None
+        self.ldap_server = None
+        self.ldap_port = None
+        self.ldap_tls = None
+        self.ldap_search_base = None
+        self.ldap_search_property = None
+        self.ldap_email_property = None
+        self.ldap_full_name_property = None
+
+        # We would otherwise try to use the registration shared secret as the
+        # macaroon shared secret if there was no macaroon_shared_secret, but
+        # that means pulling in RegistrationConfig too. We don't need to be
+        # backwards compaitible in the pusher codebase so just make people set
+        # macaroon_shared_secret. We set this to None to prevent it referencing
+        # an undefined key.
+        self.registration_shared_secret = None
+
     def default_config(self, server_name, **kwargs):
         pid_file = self.abspath("pusher.pid")
         return """\
@@ -95,7 +116,7 @@ class SlaveConfig(DatabaseConfig):
         """ % locals()
 
 
-class PusherSlaveConfig(SlaveConfig, LoggingConfig, EmailConfig):
+class PusherSlaveConfig(SlaveConfig, LoggingConfig, EmailConfig, KeyConfig):
     pass
 
 
