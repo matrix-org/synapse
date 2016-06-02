@@ -126,6 +126,24 @@ class Auth(object):
                 return allowed
 
             self.check_event_sender_in_room(event, auth_events)
+
+            # Special case to allow m.room.third_party_invite events wherever
+            # a user is allowed to issue invites.  Fixes
+            # https://github.com/vector-im/vector-web/issues/1208 hopefully
+            if event.type == EventTypes.ThirdPartyInvite:
+                user_level = self._get_user_power_level(event.user_id, auth_events)
+                invite_level = self._get_named_level(auth_events, "invite", 0)
+
+                if user_level < invite_level:
+                    raise AuthError(
+                        403, (
+                            "You cannot issue a third party invite for %s." %
+                            (event.content.display_name,)
+                        )
+                    )
+                else:
+                    return True
+
             self._can_send_event(event, auth_events)
 
             if event.type == EventTypes.PowerLevels:

@@ -16,6 +16,7 @@
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.http.server import request_handler, finish_request
 from synapse.replication.pusher_resource import PusherResource
+from synapse.replication.presence_resource import PresenceResource
 
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
@@ -115,6 +116,7 @@ class ReplicationResource(Resource):
         self.clock = hs.get_clock()
 
         self.putChild("remove_pushers", PusherResource(hs))
+        self.putChild("syncing_users", PresenceResource(hs))
 
     def render_GET(self, request):
         self._async_render_GET(request)
