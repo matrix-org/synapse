@@ -72,7 +72,12 @@ class EmailPusher(object):
         self.processing = False
 
         if self.hs.config.email_enable_notifs:
-            self.mailer = Mailer(self.hs)
+            if 'data' in pusherdict and 'brand' in pusherdict['data']:
+                app_name = pusherdict['data']['brand']
+            else:
+                app_name = self.hs.config.email_app_name
+
+            self.mailer = Mailer(self.hs, app_name)
         else:
             self.mailer = None
 

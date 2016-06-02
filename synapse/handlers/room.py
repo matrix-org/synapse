@@ -441,7 +441,7 @@ class RoomListHandler(BaseHandler):
             self.hs.config.secondary_directory_servers
         )
         self.remote_list_request_cache.set((), deferred)
-        yield deferred
+        self.remote_list_cache = yield deferred
 
     @defer.inlineCallbacks
     def get_aggregated_public_room_list(self):
