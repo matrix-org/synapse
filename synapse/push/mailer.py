@@ -161,7 +161,9 @@ class Mailer(object):
 
         template_vars = {
             "user_display_name": user_display_name,
-            "unsubscribe_link": self.make_unsubscribe_link(user_id, app_id, email_address),
+            "unsubscribe_link": self.make_unsubscribe_link(
+                user_id, app_id, email_address
+            ),
             "summary_text": summary_text,
             "app_name": self.app_name,
             "rooms": rooms,
