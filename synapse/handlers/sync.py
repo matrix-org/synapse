@@ -637,6 +637,9 @@ class SyncHandler(object):
         )
         presence.extend(states)
 
+        # Deduplicate the presence entries so that there's at most one per user
+        presence = {p["content"]["user_id"]: p for p in presence}.values()
+
         presence = sync_config.filter_collection.filter_presence(
             presence
         )
