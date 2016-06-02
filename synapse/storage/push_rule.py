@@ -106,7 +106,8 @@ class PushRuleStore(SQLBaseStore):
             desc="bulk_get_push_rules_enabled",
         )
         for row in rows:
-            results.setdefault(row['user_name'], {})[row['rule_id']] = row['enabled']
+            enabled = bool(row['enabled'])
+            results.setdefault(row['user_name'], {})[row['rule_id']] = enabled
         defer.returnValue(results)
 
     @defer.inlineCallbacks

@@ -33,6 +33,7 @@ from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import TypingHandler
 from synapse.handlers.room import RoomListHandler
+from synapse.handlers.auth import AuthHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.state import StateHandler
 from synapse.storage import DataStore
@@ -89,6 +90,7 @@ class HomeServer(object):
         'sync_handler',
         'typing_handler',
         'room_list_handler',
+        'auth_handler',
         'application_service_api',
         'application_service_scheduler',
         'application_service_handler',
@@ -189,6 +191,9 @@ class HomeServer(object):
 
     def build_room_list_handler(self):
         return RoomListHandler(self)
+
+    def build_auth_handler(self):
+        return AuthHandler(self)
 
     def build_application_service_api(self):
         return ApplicationServiceApi(self)

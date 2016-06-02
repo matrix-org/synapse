@@ -124,6 +124,8 @@ class Mailer(object):
             user_display_name = yield self.store.get_profile_displayname(
                 UserID.from_string(user_id).localpart
             )
+            if user_display_name is None:
+                user_display_name = user_id
         except StoreError:
             user_display_name = user_id
 

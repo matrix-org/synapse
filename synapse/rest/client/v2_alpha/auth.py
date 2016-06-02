@@ -104,7 +104,7 @@ class AuthRestServlet(RestServlet):
         super(AuthRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.auth_handler = hs.get_handlers().auth_handler
+        self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_handlers().registration_handler
 
     @defer.inlineCallbacks
