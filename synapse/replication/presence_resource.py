@@ -37,6 +37,7 @@ class PresenceResource(Resource):
         Resource.__init__(self)  # Resource is old-style, so no super()
 
         self.version_string = hs.version_string
+        self.clock = hs.get_clock()
         self.presence_handler = hs.get_presence_handler()
 
     def render_POST(self, request):

@@ -175,7 +175,7 @@ class PresenceHandler(object):
         # Stored as a dict from process_id to set of user_id, and a dict of
         # process_id to millisecond timestamp last updated.
         self.external_process_to_current_syncs = {}
-        self.external_process_last_updated_ms = []
+        self.external_process_last_updated_ms = {}
 
         # Start a LoopingCall in 30s that fires every 5s.
         # The initial delay is to allow disconnected clients a chance to
@@ -422,7 +422,7 @@ class PresenceHandler(object):
         # Grab the current presence state for both the users that are syncing
         # now and the users that were syncing before this update.
         prev_states = yield self.current_state_for_users(
-            syncing_user_ids + prev_syncing_user_ids
+            syncing_user_ids | prev_syncing_user_ids
         )
         updates = []
         time_now_ms = self.clock.time_msec()
