@@ -84,6 +84,7 @@ class Mailer(object):
         self.state_handler = self.hs.get_state_handler()
         loader = jinja2.FileSystemLoader(self.hs.config.email_template_dir)
         self.app_name = app_name
+        logger.info("Created Mailer for app_name %s" % app_name)
         env = jinja2.Environment(loader=loader)
         env.filters["format_ts"] = format_ts_filter
         env.filters["mxc_to_http"] = self.mxc_to_http_filter
