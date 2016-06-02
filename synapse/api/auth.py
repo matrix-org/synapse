@@ -660,6 +660,13 @@ class Auth(object):
                     "is_guest": True,
                     "token_id": None,
                 }
+            elif rights == "delete_pusher":
+                # We don't store these tokens in the database
+                ret = {
+                    "user": user,
+                    "is_guest": False,
+                    "token_id": None,
+                }
             else:
                 # This codepath exists so that we can actually return a
                 # token ID, because we use token IDs in place of device

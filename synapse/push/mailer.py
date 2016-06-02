@@ -81,7 +81,7 @@ class Mailer(object):
     def __init__(self, hs, app_name):
         self.hs = hs
         self.store = self.hs.get_datastore()
-        self.handlers = self.hs.get_handlers()
+        self.auth_handler = self.hs.get_auth_handler()
         self.state_handler = self.hs.get_state_handler()
         loader = jinja2.FileSystemLoader(self.hs.config.email_template_dir)
         self.app_name = app_name
@@ -161,7 +161,7 @@ class Mailer(object):
 
         template_vars = {
             "user_display_name": user_display_name,
-            "unsubscribe_link": self.make_unsubscribe_link(app_id, email_address),
+            "unsubscribe_link": self.make_unsubscribe_link(user_id, app_id, email_address),
             "summary_text": summary_text,
             "app_name": self.app_name,
             "rooms": rooms,
@@ -427,9 +427,9 @@ class Mailer(object):
                 notif['room_id'], notif['event_id']
             )
 
-    def make_unsubscribe_link(self, app_id, email_address):
+    def make_unsubscribe_link(self, user_id, app_id, email_address):
         params = {
-            "access_token": self.handlers.auth.generate_delete_pusher_token(),
+            "access_token": self.auth_handler.generate_delete_pusher_token(user_id),
             "app_id": app_id,
             "pushkey": email_address,
         }

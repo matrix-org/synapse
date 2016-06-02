@@ -149,11 +149,13 @@ class PushersRemoveRestServlet(RestServlet):
 
     def __init__(self, hs):
         super(RestServlet, self).__init__()
+        self.hs = hs
         self.notifier = hs.get_notifier()
+        self.auth = hs.get_v1auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request, "delete_pusher")
+        requester = yield self.auth.get_user_by_req(request, rights="delete_pusher")
         user = requester.user
 
         app_id = parse_string(request, "app_id", required=True)
