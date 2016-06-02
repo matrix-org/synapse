@@ -97,7 +97,14 @@ class Mailer(object):
 
     @defer.inlineCallbacks
     def send_notification_mail(self, user_id, email_address, push_actions, reason):
-        raw_from = email.utils.parseaddr(self.hs.config.email_notif_from)[1]
+        try:
+            from_string = self.hs.config.email_notif_from % {
+                "app": self.app_name
+            }
+        except TypeError:
+            from_string = self.hs.config.email_notif_from
+
+        raw_from = email.utils.parseaddr(from_string)[1]
         raw_to = email.utils.parseaddr(email_address)[1]
 
         if raw_to == '':
