@@ -44,7 +44,8 @@ THROTTLE_RESET_AFTER_MS = (12 * 60 * 60 * 1000)
 
 # does each email include all unread notifs, or just the ones which have happened
 # since the last mail?
-INCLUDE_ALL_UNREAD_NOTIFS = True
+# XXX: this is currently broken as it includes ones from parted rooms(!)
+INCLUDE_ALL_UNREAD_NOTIFS = False
 
 
 class EmailPusher(object):
