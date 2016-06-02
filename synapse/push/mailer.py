@@ -78,12 +78,12 @@ ALLOWED_ATTRS = {
 
 
 class Mailer(object):
-    def __init__(self, hs):
+    def __init__(self, hs, app_name):
         self.hs = hs
         self.store = self.hs.get_datastore()
         self.state_handler = self.hs.get_state_handler()
         loader = jinja2.FileSystemLoader(self.hs.config.email_template_dir)
-        self.app_name = self.hs.config.email_app_name
+        self.app_name = app_name
         env = jinja2.Environment(loader=loader)
         env.filters["format_ts"] = format_ts_filter
         env.filters["mxc_to_http"] = self.mxc_to_http_filter
