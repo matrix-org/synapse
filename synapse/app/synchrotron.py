@@ -22,6 +22,7 @@ from synapse.config.database import DatabaseConfig
 from synapse.config.logger import LoggingConfig
 from synapse.config.appservice import AppServiceConfig
 from synapse.events import FrozenEvent
+from synapse.handlers.presence import PresenceHandler
 from synapse.http.site import SynapseSite
 from synapse.http.server import JsonResource
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
@@ -33,8 +34,10 @@ from synapse.replication.slave.storage.appservice import SlavedApplicationServic
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
+from synapse.replication.slave.storage.presence import SlavedPresenceStore
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
+from synapse.storage.presence import UserPresenceState
 from synapse.storage.roommember import RoomMemberStore
 from synapse.util.async import sleep
 from synapse.util.httpresourcetree import create_resource_tree
@@ -115,12 +118,8 @@ class SynchrotronSlavedStore(
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
     SlavedFilteringStore,
+    SlavedPresenceStore,
 ):
-    def get_current_presence_token(self):
-        return 0
-
-    presence_stream_cache = ()
-
     def get_presence_list_accepted(self, user_localpart):
         return ()
 
@@ -140,19 +139,26 @@ class SynchrotronSlavedStore(
 class SynchrotronPresence(object):
     def __init__(self, hs):
         self.http_client = hs.get_simple_http_client()
+        self.store = hs.get_datastore()
         self.user_to_num_current_syncs = {}
-        self.process_id = random_string(16)
         self.syncing_users_url = hs.config.replication_url + "/syncing_users"
+        self.clock = hs.get_clock()
+
+        active_presence = self.store.take_presence_startup_info()
+        self.user_to_current_state = {
+            state.user_id: state
+            for state in active_presence
+        }
+
+        self.process_id = random_string(16)
         logger.info("Presence process_id is %r", self.process_id)
 
     def set_state(self, user, state):
+        # TODO Hows this supposed to work?
         pass
 
-    def get_states(self, user_ids, as_event=False):
-        return {}
-
-    def current_state_for_users(self, user_ids):
-        return {}
+    get_states = PresenceHandler.get_states.__func__
+    current_state_for_users = PresenceHandler.current_state_for_users.__func__
 
     @defer.inlineCallbacks
     def user_syncing(self, user_id, affect_presence):
@@ -187,6 +193,20 @@ class SynchrotronPresence(object):
                 if count > 0
             ],
         })
+
+    def process_replication(self, result):
+        stream = result.get("presence", {"rows": []})
+        for row in stream["rows"]:
+            (
+                position, user_id, state, last_active_ts,
+                last_federation_update_ts, last_user_sync_ts, status_msg,
+                currently_active
+            ) = row
+            self.user_to_current_state[user_id] = UserPresenceState(
+                user_id, state, last_active_ts,
+                last_federation_update_ts, last_user_sync_ts, status_msg,
+                currently_active
+            )
 
 
 class SynchrotronTyping(object):
@@ -273,6 +293,7 @@ class SynchrotronServer(HomeServer):
         replication_url = self.config.replication_url
         clock = self.get_clock()
         notifier = self.get_notifier()
+        presence_handler = self.get_presence_handler()
 
         def expire_broken_caches():
             store.who_forgot_in_room.invalidate_all()
@@ -307,6 +328,7 @@ class SynchrotronServer(HomeServer):
                         now_ms + store.BROKEN_CACHE_EXPIRY_MS
                     )
                 yield store.process_replication(result)
+                presence_handler.process_replication(result)
                 notify(result)
             except:
                 logger.exception("Error replicating from %r", replication_url)

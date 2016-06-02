@@ -96,3 +96,5 @@ class SlavedAccountDataStore(BaseSlavedStore):
                 self._account_data_stream_cache.entity_has_changed(
                     user_id, position
                 )
+
+        return super(SlavedAccountDataStore, self).process_replication(result)
