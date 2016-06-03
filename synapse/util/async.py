@@ -102,6 +102,15 @@ class ObservableDeferred(object):
     def observers(self):
         return self._observers
 
+    def has_called(self):
+        return self._result is not None
+
+    def has_succeeded(self):
+        return self._result is not None and self._result[0] is True
+
+    def get_result(self):
+        return self._result[1]
+
     def __getattr__(self, name):
         return getattr(self._deferred, name)
 

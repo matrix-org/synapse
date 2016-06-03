@@ -47,9 +47,6 @@ class BaseMetric(object):
                       for k, v in zip(self.labels, values)])
         )
 
-    def render(self):
-        return map_concat(self.render_item, sorted(self.counts.keys()))
-
 
 class CounterMetric(BaseMetric):
     """The simplest kind of metric; one that stores a monotonically-increasing
@@ -82,6 +79,9 @@ class CounterMetric(BaseMetric):
 
     def render_item(self, k):
         return ["%s%s %d" % (self.name, self._render_key(k), self.counts[k])]
+
+    def render(self):
+        return map_concat(self.render_item, sorted(self.counts.keys()))
 
 
 class CallbackMetric(BaseMetric):
@@ -126,30 +126,30 @@ class DistributionMetric(object):
 
 
 class CacheMetric(object):
-    """A combination of two CounterMetrics, one to count cache hits and one to
-    count a total, and a callback metric to yield the current size.
+    __slots__ = ("name", "cache_name", "hits", "misses", "size_callback")
 
-    This metric generates standard metric name pairs, so that monitoring rules
-    can easily be applied to measure hit ratio."""
-
-    def __init__(self, name, size_callback, labels=[]):
+    def __init__(self, name, size_callback, cache_name):
         self.name = name
+        self.cache_name = cache_name
 
-        self.hits = CounterMetric(name + ":hits", labels=labels)
-        self.total = CounterMetric(name + ":total", labels=labels)
+        self.hits = 0
+        self.misses = 0
 
-        self.size = CallbackMetric(
-            name + ":size",
-            callback=size_callback,
-            labels=labels,
-        )
+        self.size_callback = size_callback
 
-    def inc_hits(self, *values):
-        self.hits.inc(*values)
-        self.total.inc(*values)
+    def inc_hits(self):
+        self.hits += 1
 
-    def inc_misses(self, *values):
-        self.total.inc(*values)
+    def inc_misses(self):
+        self.misses += 1
 
     def render(self):
-        return self.hits.render() + self.total.render() + self.size.render()
+        size = self.size_callback()
+        hits = self.hits
+        total = self.misses + self.hits
+
+        return [
+            """%s:hits{name="%s"} %d""" % (self.name, self.cache_name, hits),
+            """%s:total{name="%s"} %d""" % (self.name, self.cache_name, total),
+            """%s:size{name="%s"} %d""" % (self.name, self.cache_name, size),
+        ]

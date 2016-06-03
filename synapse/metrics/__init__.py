@@ -33,11 +33,7 @@ from .metric import (
 logger = logging.getLogger(__name__)
 
 
-# We'll keep all the available metrics in a single toplevel dict, one shared
-# for the entire process. We don't currently support per-HomeServer instances
-# of metrics, because in practice any one python VM will host only one
-# HomeServer anyway. This makes a lot of implementation neater
-all_metrics = {}
+all_metrics = []
 
 
 class Metrics(object):
@@ -53,7 +49,7 @@ class Metrics(object):
 
         metric = metric_class(full_name, *args, **kwargs)
 
-        all_metrics[full_name] = metric
+        all_metrics.append(metric)
         return metric
 
     def register_counter(self, *args, **kwargs):
@@ -84,12 +80,12 @@ def render_all():
     # TODO(paul): Internal hack
     update_resource_metrics()
 
-    for name in sorted(all_metrics.keys()):
+    for metric in all_metrics:
         try:
-            strs += all_metrics[name].render()
+            strs += metric.render()
         except Exception:
-            strs += ["# FAILED to render %s" % name]
-            logger.exception("Failed to render %s metric", name)
+            strs += ["# FAILED to render"]
+            logger.exception("Failed to render metric")
 
     strs.append("")  # to generate a final CRLF
 
