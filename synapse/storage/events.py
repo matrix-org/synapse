@@ -139,6 +139,9 @@ class _EventPeristenceQueue(object):
             pass
 
 
+_EventCacheEntry = namedtuple("_EventCacheEntry", ("event", "redacted_event"))
+
+
 class EventsStore(SQLBaseStore):
     EVENT_ORIGIN_SERVER_TS_NAME = "event_origin_server_ts"
 
@@ -741,7 +744,6 @@ class EventsStore(SQLBaseStore):
         event_map = self._get_events_from_cache(
             event_ids,
             check_redacted=check_redacted,
-            get_prev_content=get_prev_content,
             allow_rejected=allow_rejected,
         )
 
@@ -751,40 +753,49 @@ class EventsStore(SQLBaseStore):
             missing_events = yield self._enqueue_events(
                 missing_events_ids,
                 check_redacted=check_redacted,
-                get_prev_content=get_prev_content,
                 allow_rejected=allow_rejected,
             )
 
             event_map.update(missing_events)
 
-        defer.returnValue([
+        events = [
             event_map[e_id] for e_id in event_id_list
             if e_id in event_map and event_map[e_id]
-        ])
+        ]
+
+        if get_prev_content:
+            for event in events:
+                if "replaces_state" in event.unsigned:
+                    prev = yield self.get_event(
+                        event.unsigned["replaces_state"],
+                        get_prev_content=False,
+                        allow_none=True,
+                    )
+                    if prev:
+                        event.unsigned = dict(event.unsigned)
+                        event.unsigned["prev_content"] = prev.content
+                        event.unsigned["prev_sender"] = prev.sender
+
+        defer.returnValue(events)
 
     def _invalidate_get_event_cache(self, event_id):
-        for check_redacted in (False, True):
-            for get_prev_content in (False, True):
-                self._get_event_cache.invalidate(
-                    (event_id, check_redacted, get_prev_content)
-                )
+            self._get_event_cache.invalidate((event_id,))
 
-    def _get_events_from_cache(self, events, check_redacted, get_prev_content,
-                               allow_rejected):
+    def _get_events_from_cache(self, events, check_redacted, allow_rejected):
         event_map = {}
 
         for event_id in events:
-            try:
-                ret = self._get_event_cache.get(
-                    (event_id, check_redacted, get_prev_content,)
-                )
+            ret = self._get_event_cache.get((event_id,), None)
+            if not ret:
+                continue
 
-                if allow_rejected or not ret.rejected_reason:
-                    event_map[event_id] = ret
+            if allow_rejected or not ret.event.rejected_reason:
+                if check_redacted and ret.redacted_event:
+                    event_map[event_id] = ret.redacted_event
                 else:
-                    event_map[event_id] = None
-            except KeyError:
-                pass
+                    event_map[event_id] = ret.event
+            else:
+                event_map[event_id] = None
 
         return event_map
 
@@ -855,8 +866,7 @@ class EventsStore(SQLBaseStore):
                         reactor.callFromThread(fire, event_list)
 
     @defer.inlineCallbacks
-    def _enqueue_events(self, events, check_redacted=True,
-                        get_prev_content=False, allow_rejected=False):
+    def _enqueue_events(self, events, check_redacted=True, allow_rejected=False):
         """Fetches events from the database using the _event_fetch_list. This
         allows batch and bulk fetching of events - it allows us to fetch events
         without having to create a new transaction for each request for events.
@@ -895,7 +905,6 @@ class EventsStore(SQLBaseStore):
                 preserve_fn(self._get_event_from_row)(
                     row["internal_metadata"], row["json"], row["redacts"],
                     check_redacted=check_redacted,
-                    get_prev_content=get_prev_content,
                     rejected_reason=row["rejects"],
                 )
                 for row in rows
@@ -936,8 +945,7 @@ class EventsStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def _get_event_from_row(self, internal_metadata, js, redacted,
-                            check_redacted=True, get_prev_content=False,
-                            rejected_reason=None):
+                            check_redacted=True, rejected_reason=None):
         d = json.loads(js)
         internal_metadata = json.loads(internal_metadata)
 
@@ -949,14 +957,17 @@ class EventsStore(SQLBaseStore):
                 desc="_get_event_from_row",
             )
 
-        ev = FrozenEvent(
+        original_ev = FrozenEvent(
             d,
             internal_metadata_dict=internal_metadata,
             rejected_reason=rejected_reason,
         )
 
+        ev = original_ev
+        redacted_event = None
         if check_redacted and redacted:
             ev = prune_event(ev)
+            redacted_event = ev
 
             redaction_id = yield self._simple_select_one_onecol(
                 table="redactions",
@@ -979,19 +990,10 @@ class EventsStore(SQLBaseStore):
                 # will serialise this field correctly
                 ev.unsigned["redacted_because"] = because
 
-        if get_prev_content and "replaces_state" in ev.unsigned:
-            prev = yield self.get_event(
-                ev.unsigned["replaces_state"],
-                get_prev_content=False,
-                allow_none=True,
-            )
-            if prev:
-                ev.unsigned["prev_content"] = prev.content
-                ev.unsigned["prev_sender"] = prev.sender
-
-        self._get_event_cache.prefill(
-            (ev.event_id, check_redacted, get_prev_content), ev
-        )
+        self._get_event_cache.prefill((ev.event_id,), _EventCacheEntry(
+            event=original_ev,
+            redacted_event=redacted_event,
+        ))
 
         defer.returnValue(ev)
 
