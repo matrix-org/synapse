@@ -122,7 +122,7 @@ class SynchrotronSlavedStore(
     SlavedFilteringStore,
     SlavedPresenceStore,
     BaseSlavedStore,
-    ClientIpStore,  # After BaseSlavedStre because the constructor is different
+    ClientIpStore,  # After BaseSlavedStore because the constructor is different
 ):
     # XXX: This is a bit broken because we don't persist forgotten rooms
     # in a way that they can be streamed. This means that we don't have a
