@@ -186,7 +186,9 @@ class Mailer(object):
 
         multipart_msg = MIMEMultipart('alternative')
         multipart_msg['Subject'] = "[%s] %s" % (self.app_name, summary_text)
-        multipart_msg['From'] = self.hs.config.email_notif_from % (self.app_name, )
+        multipart_msg['From'] = self.hs.config.email_notif_from % {
+            "app": self.app_name
+        }
         multipart_msg['To'] = email_address
         multipart_msg['Date'] = email.utils.formatdate()
         multipart_msg['Message-ID'] = email.utils.make_msgid()
