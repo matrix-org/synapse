@@ -140,7 +140,7 @@ class TypingHandler(object):
     def user_left_room(self, user, room_id):
         user_id = user.to_string()
         if self.is_mine_id(user_id):
-            member = RoomMember(room_id=room_id, user=user_id)
+            member = RoomMember(room_id=room_id, user_id=user_id)
             yield self._stopped_typing(member)
 
     @defer.inlineCallbacks
