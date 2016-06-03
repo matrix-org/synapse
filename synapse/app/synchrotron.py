@@ -163,6 +163,8 @@ class SynchrotronPresence(object):
             UPDATE_SYNCING_USERS_MS,
         )
 
+        reactor.addSystemEventTrigger("before", "shutdown", self._on_shutdown)
+
     def set_state(self, user, state):
         # TODO Hows this supposed to work?
         pass
@@ -192,6 +194,13 @@ class SynchrotronPresence(object):
                 _end()
 
         defer.returnValue(_user_syncing())
+
+    @defer.inlineCallbacks
+    def _on_shutdown(self):
+        # When the synchrotron is shutdown tell the master to clear the in
+        # progress syncs for this process
+        self.user_to_num_current_syncs.clear()
+        yield self._send_syncing_users_now()
 
     def _send_syncing_users_regularly(self):
         # Only send an update if we aren't in the middle of sending one.
