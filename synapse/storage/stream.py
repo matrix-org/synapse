@@ -132,29 +132,25 @@ class StreamStore(SQLBaseStore):
                         return True
                 return False
 
-            ret = self._get_events_txn(
-                txn,
-                # apply the filter on the room id list
-                [
-                    r["event_id"] for r in rows
-                    if app_service_interested(r)
-                ],
-                get_prev_content=True
-            )
+            return [r for r in rows if app_service_interested(r)]
 
-            self._set_before_and_after(ret, rows)
+        rows = yield self.runInteraction("get_appservice_room_stream", f)
 
-            if rows:
-                key = "s%d" % max(r["stream_ordering"] for r in rows)
-            else:
-                # Assume we didn't get anything because there was nothing to
-                # get.
-                key = to_key
+        ret = yield self._get_events(
+            [r["event_id"] for r in rows],
+            get_prev_content=True
+        )
 
-            return ret, key
+        self._set_before_and_after(ret, rows, topo_order=from_id is None)
 
-        results = yield self.runInteraction("get_appservice_room_stream", f)
-        defer.returnValue(results)
+        if rows:
+            key = "s%d" % max(r["stream_ordering"] for r in rows)
+        else:
+            # Assume we didn't get anything because there was nothing to
+            # get.
+            key = to_key
+
+        defer.returnValue((ret, key))
 
     @defer.inlineCallbacks
     def get_room_events_stream_for_rooms(self, room_ids, from_key, to_key, limit=0,

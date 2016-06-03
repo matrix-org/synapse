@@ -762,59 +762,12 @@ class EventsStore(SQLBaseStore):
             if e_id in event_map and event_map[e_id]
         ])
 
-    def _get_events_txn(self, txn, event_ids, check_redacted=True,
-                        get_prev_content=False, allow_rejected=False):
-        if not event_ids:
-            return []
-
-        event_map = self._get_events_from_cache(
-            event_ids,
-            check_redacted=check_redacted,
-            get_prev_content=get_prev_content,
-            allow_rejected=allow_rejected,
-        )
-
-        missing_events_ids = [e for e in event_ids if e not in event_map]
-
-        if not missing_events_ids:
-            return [
-                event_map[e_id] for e_id in event_ids
-                if e_id in event_map and event_map[e_id]
-            ]
-
-        missing_events = self._fetch_events_txn(
-            txn,
-            missing_events_ids,
-            check_redacted=check_redacted,
-            get_prev_content=get_prev_content,
-            allow_rejected=allow_rejected,
-        )
-
-        event_map.update(missing_events)
-
-        return [
-            event_map[e_id] for e_id in event_ids
-            if e_id in event_map and event_map[e_id]
-        ]
-
     def _invalidate_get_event_cache(self, event_id):
         for check_redacted in (False, True):
             for get_prev_content in (False, True):
                 self._get_event_cache.invalidate(
                     (event_id, check_redacted, get_prev_content)
                 )
-
-    def _get_event_txn(self, txn, event_id, check_redacted=True,
-                       get_prev_content=False, allow_rejected=False):
-
-        events = self._get_events_txn(
-            txn, [event_id],
-            check_redacted=check_redacted,
-            get_prev_content=get_prev_content,
-            allow_rejected=allow_rejected,
-        )
-
-        return events[0] if events else None
 
     def _get_events_from_cache(self, events, check_redacted, get_prev_content,
                                allow_rejected):
@@ -981,34 +934,6 @@ class EventsStore(SQLBaseStore):
 
         return rows
 
-    def _fetch_events_txn(self, txn, events, check_redacted=True,
-                          get_prev_content=False, allow_rejected=False):
-        if not events:
-            return {}
-
-        rows = self._fetch_event_rows(
-            txn, events,
-        )
-
-        if not allow_rejected:
-            rows[:] = [r for r in rows if not r["rejects"]]
-
-        res = [
-            self._get_event_from_row_txn(
-                txn,
-                row["internal_metadata"], row["json"], row["redacts"],
-                check_redacted=check_redacted,
-                get_prev_content=get_prev_content,
-                rejected_reason=row["rejects"],
-            )
-            for row in rows
-        ]
-
-        return {
-            r.event_id: r
-            for r in res
-        }
-
     @defer.inlineCallbacks
     def _get_event_from_row(self, internal_metadata, js, redacted,
                             check_redacted=True, get_prev_content=False,
@@ -1069,69 +994,6 @@ class EventsStore(SQLBaseStore):
         )
 
         defer.returnValue(ev)
-
-    def _get_event_from_row_txn(self, txn, internal_metadata, js, redacted,
-                                check_redacted=True, get_prev_content=False,
-                                rejected_reason=None):
-        d = json.loads(js)
-        internal_metadata = json.loads(internal_metadata)
-
-        if rejected_reason:
-            rejected_reason = self._simple_select_one_onecol_txn(
-                txn,
-                table="rejections",
-                keyvalues={"event_id": rejected_reason},
-                retcol="reason",
-            )
-
-        ev = FrozenEvent(
-            d,
-            internal_metadata_dict=internal_metadata,
-            rejected_reason=rejected_reason,
-        )
-
-        if check_redacted and redacted:
-            ev = prune_event(ev)
-
-            redaction_id = self._simple_select_one_onecol_txn(
-                txn,
-                table="redactions",
-                keyvalues={"redacts": ev.event_id},
-                retcol="event_id",
-            )
-
-            ev.unsigned["redacted_by"] = redaction_id
-            # Get the redaction event.
-
-            because = self._get_event_txn(
-                txn,
-                redaction_id,
-                check_redacted=False
-            )
-
-            if because:
-                ev.unsigned["redacted_because"] = because
-
-        if get_prev_content and "replaces_state" in ev.unsigned:
-            prev = self._get_event_txn(
-                txn,
-                ev.unsigned["replaces_state"],
-                get_prev_content=False,
-            )
-            if prev:
-                ev.unsigned["prev_content"] = prev.content
-                ev.unsigned["prev_sender"] = prev.sender
-
-        self._get_event_cache.prefill(
-            (ev.event_id, check_redacted, get_prev_content), ev
-        )
-
-        return ev
-
-    def _parse_events_txn(self, txn, rows):
-        event_ids = [r["event_id"] for r in rows]
-
-        return self._get_events_txn(txn, event_ids)
 
     @defer.inlineCallbacks
     def count_daily_messages(self):
