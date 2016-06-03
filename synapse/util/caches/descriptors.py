@@ -32,7 +32,7 @@ import os
 import functools
 import inspect
 import threading
-import itertools
+
 
 logger = logging.getLogger(__name__)
 
@@ -357,17 +357,16 @@ class CacheListDescriptor(object):
                     cached_defers[arg] = res
 
             if cached_defers:
+                def update_results_dict(res):
+                    results.update(res)
+                    return results
+
                 return preserve_context_over_deferred(defer.gatherResults(
                     cached_defers.values(),
                     consumeErrors=True,
-                ).addCallback(
-                    lambda res: {
-                        k: v
-                        for k, v in itertools.chain(results.items(), res)
-                    }
-                )).addErrback(
+                ).addCallback(update_results_dict).addErrback(
                     unwrapFirstError
-                )
+                ))
             else:
                 return results
 
