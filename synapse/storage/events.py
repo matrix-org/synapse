@@ -741,13 +741,12 @@ class EventsStore(SQLBaseStore):
         event_id_list = event_ids
         event_ids = set(event_ids)
 
-        event_map = self._get_events_from_cache(
+        event_entry_map = self._get_events_from_cache(
             event_ids,
-            check_redacted=check_redacted,
             allow_rejected=allow_rejected,
         )
 
-        missing_events_ids = [e for e in event_ids if e not in event_map]
+        missing_events_ids = [e for e in event_ids if e not in event_entry_map]
 
         if missing_events_ids:
             missing_events = yield self._enqueue_events(
@@ -756,32 +755,40 @@ class EventsStore(SQLBaseStore):
                 allow_rejected=allow_rejected,
             )
 
-            event_map.update(missing_events)
+            event_entry_map.update(missing_events)
 
-        events = [
-            event_map[e_id] for e_id in event_id_list
-            if e_id in event_map and event_map[e_id]
-        ]
+        events = []
+        for event_id in event_id_list:
+            entry = event_entry_map.get(event_id, None)
+            if not entry:
+                continue
 
-        if get_prev_content:
-            for event in events:
-                if "replaces_state" in event.unsigned:
-                    prev = yield self.get_event(
-                        event.unsigned["replaces_state"],
-                        get_prev_content=False,
-                        allow_none=True,
-                    )
-                    if prev:
-                        event.unsigned = dict(event.unsigned)
-                        event.unsigned["prev_content"] = prev.content
-                        event.unsigned["prev_sender"] = prev.sender
+            if allow_rejected or not entry.event.rejected_reason:
+                if check_redacted and entry.redacted_event:
+                    event = entry.redacted_event
+                else:
+                    event = entry.event
+
+                events.append(event)
+
+                if get_prev_content:
+                    if "replaces_state" in event.unsigned:
+                        prev = yield self.get_event(
+                            event.unsigned["replaces_state"],
+                            get_prev_content=False,
+                            allow_none=True,
+                        )
+                        if prev:
+                            event.unsigned = dict(event.unsigned)
+                            event.unsigned["prev_content"] = prev.content
+                            event.unsigned["prev_sender"] = prev.sender
 
         defer.returnValue(events)
 
     def _invalidate_get_event_cache(self, event_id):
             self._get_event_cache.invalidate((event_id,))
 
-    def _get_events_from_cache(self, events, check_redacted, allow_rejected):
+    def _get_events_from_cache(self, events, allow_rejected):
         event_map = {}
 
         for event_id in events:
@@ -790,10 +797,7 @@ class EventsStore(SQLBaseStore):
                 continue
 
             if allow_rejected or not ret.event.rejected_reason:
-                if check_redacted and ret.redacted_event:
-                    event_map[event_id] = ret.redacted_event
-                else:
-                    event_map[event_id] = ret.event
+                event_map[event_id] = ret
             else:
                 event_map[event_id] = None
 
@@ -904,7 +908,6 @@ class EventsStore(SQLBaseStore):
             [
                 preserve_fn(self._get_event_from_row)(
                     row["internal_metadata"], row["json"], row["redacts"],
-                    check_redacted=check_redacted,
                     rejected_reason=row["rejects"],
                 )
                 for row in rows
@@ -913,7 +916,7 @@ class EventsStore(SQLBaseStore):
         )
 
         defer.returnValue({
-            e.event_id: e
+            e.event.event_id: e
             for e in res if e
         })
 
@@ -945,7 +948,7 @@ class EventsStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def _get_event_from_row(self, internal_metadata, js, redacted,
-                            check_redacted=True, rejected_reason=None):
+                            rejected_reason=None):
         d = json.loads(js)
         internal_metadata = json.loads(internal_metadata)
 
@@ -954,7 +957,7 @@ class EventsStore(SQLBaseStore):
                 table="rejections",
                 keyvalues={"event_id": rejected_reason},
                 retcol="reason",
-                desc="_get_event_from_row",
+                desc="_get_event_from_row_rejected_reason",
             )
 
         original_ev = FrozenEvent(
@@ -963,20 +966,18 @@ class EventsStore(SQLBaseStore):
             rejected_reason=rejected_reason,
         )
 
-        ev = original_ev
         redacted_event = None
-        if check_redacted and redacted:
-            ev = prune_event(ev)
-            redacted_event = ev
+        if redacted:
+            redacted_event = prune_event(original_ev)
 
             redaction_id = yield self._simple_select_one_onecol(
                 table="redactions",
-                keyvalues={"redacts": ev.event_id},
+                keyvalues={"redacts": redacted_event.event_id},
                 retcol="event_id",
-                desc="_get_event_from_row",
+                desc="_get_event_from_row_redactions",
             )
 
-            ev.unsigned["redacted_by"] = redaction_id
+            redacted_event.unsigned["redacted_by"] = redaction_id
             # Get the redaction event.
 
             because = yield self.get_event(
@@ -988,14 +989,16 @@ class EventsStore(SQLBaseStore):
             if because:
                 # It's fine to do add the event directly, since get_pdu_json
                 # will serialise this field correctly
-                ev.unsigned["redacted_because"] = because
+                redacted_event.unsigned["redacted_because"] = because
 
-        self._get_event_cache.prefill((ev.event_id,), _EventCacheEntry(
+        cache_entry = _EventCacheEntry(
             event=original_ev,
             redacted_event=redacted_event,
-        ))
+        )
 
-        defer.returnValue(ev)
+        self._get_event_cache.prefill((original_ev.event_id,), cache_entry)
+
+        defer.returnValue(cache_entry)
 
     @defer.inlineCallbacks
     def count_daily_messages(self):
