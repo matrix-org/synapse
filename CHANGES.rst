@@ -1,6 +1,8 @@
 Changes in synapse v0.16.0-rc1 (2016-06-03)
 ===========================================
 
+Version 0.15 was not released. See v0.15.0-rc1 below for additional changes.
+
 Features:
 
 * Add email notifications for missed messages (PR #759, #786, #799, #810, #815,
