@@ -59,9 +59,6 @@ class RoomMemberStore(SQLBaseStore):
             txn.call_after(self.get_joined_hosts_for_room.invalidate, (event.room_id,))
             txn.call_after(self.get_users_in_room.invalidate, (event.room_id,))
             txn.call_after(
-                self.get_users_with_pushers_in_room.invalidate, (event.room_id,)
-            )
-            txn.call_after(
                 self._membership_stream_cache.entity_has_changed,
                 event.state_key, event.internal_metadata.stream_ordering
             )
@@ -241,23 +238,10 @@ class RoomMemberStore(SQLBaseStore):
 
         return results
 
-    @cached(max_entries=5000)
+    @cachedInlineCallbacks(max_entries=5000)
     def get_joined_hosts_for_room(self, room_id):
-        return self.runInteraction(
-            "get_joined_hosts_for_room",
-            self._get_joined_hosts_for_room_txn,
-            room_id,
-        )
-
-    def _get_joined_hosts_for_room_txn(self, txn, room_id):
-        rows = self._get_members_rows_txn(
-            txn,
-            room_id, membership=Membership.JOIN
-        )
-
-        joined_domains = set(get_domain_from_id(r["user_id"]) for r in rows)
-
-        return joined_domains
+        user_ids = yield self.get_users_in_room(room_id)
+        defer.returnValue(set(get_domain_from_id(uid) for uid in user_ids))
 
     def _get_members_events_txn(self, txn, room_id, membership=None, user_id=None):
         rows = self._get_members_rows_txn(

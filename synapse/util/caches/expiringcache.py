@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.caches import cache_counter, caches_by_name
+from synapse.util.caches import register_cache
 
 import logging
 
@@ -49,7 +49,7 @@ class ExpiringCache(object):
 
         self._cache = {}
 
-        caches_by_name[cache_name] = self._cache
+        self.metrics = register_cache(cache_name, self._cache)
 
     def start(self):
         if not self._expiry_ms:
@@ -78,9 +78,9 @@ class ExpiringCache(object):
     def __getitem__(self, key):
         try:
             entry = self._cache[key]
-            cache_counter.inc_hits(self._cache_name)
+            self.metrics.inc_hits()
         except KeyError:
-            cache_counter.inc_misses(self._cache_name)
+            self.metrics.inc_misses()
             raise
 
         if self._reset_expiry_on_get:
