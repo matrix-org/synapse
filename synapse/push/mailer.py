@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 MESSAGE_FROM_PERSON_IN_ROOM = "You have a message on %(app)s from %(person)s " \
-                              "in the %s room..."
+                              "in the %(room)s room..."
 MESSAGE_FROM_PERSON = "You have a message on %(app)s from %(person)s..."
 MESSAGES_FROM_PERSON = "You have messages on %(app)s from %(person)s..."
 MESSAGES_IN_ROOM = "You have messages on %(app)s in the %(room)s room..."
@@ -81,9 +81,11 @@ class Mailer(object):
     def __init__(self, hs, app_name):
         self.hs = hs
         self.store = self.hs.get_datastore()
+        self.auth_handler = self.hs.get_auth_handler()
         self.state_handler = self.hs.get_state_handler()
         loader = jinja2.FileSystemLoader(self.hs.config.email_template_dir)
         self.app_name = app_name
+        logger.info("Created Mailer for app_name %s" % app_name)
         env = jinja2.Environment(loader=loader)
         env.filters["format_ts"] = format_ts_filter
         env.filters["mxc_to_http"] = self.mxc_to_http_filter
@@ -95,7 +97,8 @@ class Mailer(object):
         )
 
     @defer.inlineCallbacks
-    def send_notification_mail(self, user_id, email_address, push_actions, reason):
+    def send_notification_mail(self, app_id, user_id, email_address,
+                               push_actions, reason):
         raw_from = email.utils.parseaddr(self.hs.config.email_notif_from)[1]
         raw_to = email.utils.parseaddr(email_address)[1]
 
@@ -159,7 +162,9 @@ class Mailer(object):
 
         template_vars = {
             "user_display_name": user_display_name,
-            "unsubscribe_link": self.make_unsubscribe_link(),
+            "unsubscribe_link": self.make_unsubscribe_link(
+                user_id, app_id, email_address
+            ),
             "summary_text": summary_text,
             "app_name": self.app_name,
             "rooms": rooms,
@@ -425,9 +430,18 @@ class Mailer(object):
                 notif['room_id'], notif['event_id']
             )
 
-    def make_unsubscribe_link(self):
-        # XXX: matrix.to
-        return "https://vector.im/#/settings"
+    def make_unsubscribe_link(self, user_id, app_id, email_address):
+        params = {
+            "access_token": self.auth_handler.generate_delete_pusher_token(user_id),
+            "app_id": app_id,
+            "pushkey": email_address,
+        }
+
+        # XXX: make r0 once API is stable
+        return "%s_matrix/client/unstable/pushers/remove?%s" % (
+            self.hs.config.public_baseurl,
+            urllib.urlencode(params),
+        )
 
     def mxc_to_http_filter(self, value, width, height, resize_method="crop"):
         if value[0:6] != "mxc://":
