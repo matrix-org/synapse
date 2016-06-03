@@ -27,6 +27,7 @@ from synapse.http.site import SynapseSite
 from synapse.http.server import JsonResource
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.rest.client.v2_alpha import sync
+from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
@@ -36,6 +37,7 @@ from synapse.replication.slave.storage.filtering import SlavedFilteringStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.presence import SlavedPresenceStore
 from synapse.server import HomeServer
+from synapse.storage.client_ips import ClientIpStore
 from synapse.storage.engines import create_engine
 from synapse.storage.presence import UserPresenceState
 from synapse.storage.roommember import RoomMemberStore
@@ -119,12 +121,11 @@ class SynchrotronSlavedStore(
     SlavedRegistrationStore,
     SlavedFilteringStore,
     SlavedPresenceStore,
+    BaseSlavedStore,
+    ClientIpStore, # After BaseSlavedStre because the constructor is different
 ):
     def get_presence_list_accepted(self, user_localpart):
         return ()
-
-    def insert_client_ip(self, user, access_token, ip, user_agent):
-        pass
 
     # XXX: This is a bit broken because we don't persist forgotten rooms
     # in a way that they can be streamed. This means that we don't have a
