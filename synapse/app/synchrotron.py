@@ -315,6 +315,32 @@ class SynchrotronServer(HomeServer):
         def expire_broken_caches():
             store.who_forgot_in_room.invalidate_all()
 
+        def notify_from_stream(
+            result, stream_name, stream_key, room=None, user=None
+        ):
+            stream = result.get(stream_name)
+            if stream:
+                position_index = stream["field_names"].index("position")
+                if room:
+                    room_index = stream["field_names"].index(room)
+                if user:
+                    user_index = stream["field_names"].index(user)
+
+                users = ()
+                rooms = ()
+                for row in stream["rows"]:
+                    position = row[position_index]
+
+                    if user:
+                        users = (row[user_index],)
+
+                    if room:
+                        rooms = (row[room_index],)
+
+                    notifier.on_new_event(
+                        stream_key, position, users=users, rooms=rooms
+                    )
+
         def notify(result):
             stream = result.get("events")
             if stream:
@@ -330,6 +356,25 @@ class SynchrotronServer(HomeServer):
                     notifier.on_new_room_event(
                         event, position, max_position, extra_users
                     )
+
+            notify_from_stream(
+                result, "push_rules", "push_rules_key", user="user_id"
+            )
+            notify_from_stream(
+                result, "user_account_data", "account_data_key", user="user_id"
+            )
+            notify_from_stream(
+                result, "room_account_data", "account_data_key", user="user_id"
+            )
+            notify_from_stream(
+                result, "tag_account_data", "account_data_key", user="user_id"
+            )
+            notify_from_stream(
+                result, "receipts", "receipt_key", room="room_id"
+            )
+            notify_from_stream(
+                result, "typing", "typing_key", room="room_id"
+            )
 
         next_expire_broken_caches_ms = 0
         while True:

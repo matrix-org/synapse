@@ -22,9 +22,9 @@ class SlavedRegistrationStore(BaseSlavedStore):
     def __init__(self, db_conn, hs):
         super(SlavedRegistrationStore, self).__init__(db_conn, hs)
 
-    # TODO: Remove deleted tokens from the cache
+    # TODO: use the cached version and invalidate deleted tokens
     get_user_by_access_token = RegistrationStore.__dict__[
         "get_user_by_access_token"
-    ]
+    ].orig
 
     _query_for_auth = DataStore._query_for_auth.__func__

@@ -18,6 +18,7 @@ from ._slaved_id_tracker import SlavedIdTracker
 
 from synapse.storage import DataStore
 from synapse.storage.receipts import ReceiptsStore
+from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 # So, um, we want to borrow a load of functions intended for reading from
 # a DataStore, but we don't want to take functions that either write to the
@@ -35,6 +36,10 @@ class SlavedReceiptsStore(BaseSlavedStore):
 
         self._receipts_id_gen = SlavedIdTracker(
             db_conn, "receipts_linearized", "stream_id"
+        )
+
+        self._receipts_stream_cache = StreamChangeCache(
+            "ReceiptsRoomChangeCache", self._receipts_id_gen.get_current_token()
         )
 
     get_receipts_for_user = ReceiptsStore.__dict__["get_receipts_for_user"]
@@ -65,14 +70,15 @@ class SlavedReceiptsStore(BaseSlavedStore):
         if stream:
             self._receipts_id_gen.advance(int(stream["position"]))
             for row in stream["rows"]:
-                room_id, receipt_type, user_id = row[1:4]
+                position, room_id, receipt_type, user_id = row[:4]
                 self.invalidate_caches_for_receipt(room_id, receipt_type, user_id)
+                self._receipts_stream_cache.entity_has_changed(room_id, position)
 
         return super(SlavedReceiptsStore, self).process_replication(result)
 
     def invalidate_caches_for_receipt(self, room_id, receipt_type, user_id):
         self.get_receipts_for_user.invalidate((user_id, receipt_type))
-        self.get_linearized_receipts_for_room.invalidate((room_id,))
+        self.get_linearized_receipts_for_room.invalidate_many((room_id,))
         self.get_last_receipt_event_id_for_user.invalidate(
             (user_id, room_id, receipt_type)
         )

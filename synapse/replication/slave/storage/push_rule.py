@@ -54,9 +54,13 @@ class SlavedPushRuleStore(SlavedEventStore):
         stream = result.get("push_rules")
         if stream:
             for row in stream["rows"]:
-                user_id = row[1]
+                position = row[0]
+                user_id = row[2]
                 self.get_push_rules_for_user.invalidate((user_id,))
                 self.get_push_rules_enabled_for_user.invalidate((user_id,))
+                self.push_rules_stream_cache.entity_has_changed(
+                    user_id, position
+                )
 
             self._push_rules_stream_id_gen.advance(int(stream["position"]))
 
