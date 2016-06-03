@@ -413,7 +413,7 @@ class RegistrationHandler(BaseHandler):
         defer.returnValue((user_id, token))
 
     def auth_handler(self):
-        return self.hs.get_handlers().auth_handler
+        return self.hs.get_auth_handler()
 
     @defer.inlineCallbacks
     def guest_access_token_for(self, medium, address, inviter_user_id):

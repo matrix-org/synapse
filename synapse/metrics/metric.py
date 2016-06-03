@@ -126,12 +126,6 @@ class DistributionMetric(object):
 
 
 class CacheMetric(object):
-    """A combination of two CounterMetrics, one to count cache hits and one to
-    count a total, and a callback metric to yield the current size.
-
-    This metric generates standard metric name pairs, so that monitoring rules
-    can easily be applied to measure hit ratio."""
-
     __slots__ = ("name", "cache_name", "hits", "misses", "size_callback")
 
     def __init__(self, name, size_callback, cache_name):

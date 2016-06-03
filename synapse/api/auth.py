@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""This module contains classes for authenticating the user."""
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json, SignatureVerifyException
@@ -42,13 +41,20 @@ AuthEventTypes = (
 
 
 class Auth(object):
-
+    """
+    FIXME: This class contains a mix of functions for authenticating users
+    of our client-server API and authenticating events added to room graphs.
+    """
     def __init__(self, hs):
         self.hs = hs
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
+        # Docs for these currently lives at
+        # https://github.com/matrix-org/matrix-doc/blob/master/drafts/macaroons_caveats.rst
+        # In addition, we have type == delete_pusher which grants access only to
+        # delete pushers.
         self._KNOWN_CAVEAT_PREFIXES = set([
             "gen = ",
             "guest = ",
@@ -525,7 +531,7 @@ class Auth(object):
             return default
 
     @defer.inlineCallbacks
-    def get_user_by_req(self, request, allow_guest=False):
+    def get_user_by_req(self, request, allow_guest=False, rights="access"):
         """ Get a registered user's ID.
 
         Args:
@@ -547,7 +553,7 @@ class Auth(object):
                 )
 
             access_token = request.args["access_token"][0]
-            user_info = yield self.get_user_by_access_token(access_token)
+            user_info = yield self.get_user_by_access_token(access_token, rights)
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
@@ -608,7 +614,7 @@ class Auth(object):
         defer.returnValue(user_id)
 
     @defer.inlineCallbacks
-    def get_user_by_access_token(self, token):
+    def get_user_by_access_token(self, token, rights="access"):
         """ Get a registered user's ID.
 
         Args:
@@ -619,7 +625,7 @@ class Auth(object):
             AuthError if no user by that token exists or the token is invalid.
         """
         try:
-            ret = yield self.get_user_from_macaroon(token)
+            ret = yield self.get_user_from_macaroon(token, rights)
         except AuthError:
             # TODO(daniel): Remove this fallback when all existing access tokens
             # have been re-issued as macaroons.
@@ -627,11 +633,11 @@ class Auth(object):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def get_user_from_macaroon(self, macaroon_str):
+    def get_user_from_macaroon(self, macaroon_str, rights="access"):
         try:
             macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
 
-            self.validate_macaroon(macaroon, "access", self.hs.config.expire_access_token)
+            self.validate_macaroon(macaroon, rights, self.hs.config.expire_access_token)
 
             user_prefix = "user_id = "
             user = None
@@ -652,6 +658,13 @@ class Auth(object):
                 ret = {
                     "user": user,
                     "is_guest": True,
+                    "token_id": None,
+                }
+            elif rights == "delete_pusher":
+                # We don't store these tokens in the database
+                ret = {
+                    "user": user,
+                    "is_guest": False,
                     "token_id": None,
                 }
             else:
@@ -685,7 +698,8 @@ class Auth(object):
 
         Args:
             macaroon(pymacaroons.Macaroon): The macaroon to validate
-            type_string(str): The kind of token this is (e.g. "access", "refresh")
+            type_string(str): The kind of token required (e.g. "access", "refresh",
+                              "delete_pusher")
             verify_expiry(bool): Whether to verify whether the macaroon has expired.
                 This should really always be True, but no clients currently implement
                 token refresh, so we can't enforce expiry yet.
