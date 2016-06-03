@@ -122,7 +122,7 @@ class SynchrotronSlavedStore(
     SlavedFilteringStore,
     SlavedPresenceStore,
     BaseSlavedStore,
-    ClientIpStore, # After BaseSlavedStre because the constructor is different
+    ClientIpStore,  # After BaseSlavedStre because the constructor is different
 ):
     def get_presence_list_accepted(self, user_localpart):
         return ()
