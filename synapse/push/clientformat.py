@@ -23,10 +23,7 @@ import copy
 import simplejson as json
 
 
-def format_push_rules_for_user(user, rawrules, enabled_map):
-    """Converts a list of rawrules and a enabled map into nested dictionaries
-    to match the Matrix client-server format for push rules"""
-
+def load_rules_for_user(user, rawrules, enabled_map):
     ruleslist = []
     for rawrule in rawrules:
         rule = dict(rawrule)
@@ -35,7 +32,26 @@ def format_push_rules_for_user(user, rawrules, enabled_map):
         ruleslist.append(rule)
 
     # We're going to be mutating this a lot, so do a deep copy
-    ruleslist = copy.deepcopy(list_with_base_rules(ruleslist))
+    rules = list(list_with_base_rules(ruleslist))
+
+    for i, rule in enumerate(rules):
+        rule_id = rule['rule_id']
+        if rule_id in enabled_map:
+            if rule.get('enabled', True) != bool(enabled_map[rule_id]):
+                # Rules are cached across users.
+                rule = dict(rule)
+                rule['enabled'] = bool(enabled_map[rule_id])
+                rules[i] = rule
+
+    return rules
+
+
+def format_push_rules_for_user(user, ruleslist):
+    """Converts a list of rawrules and a enabled map into nested dictionaries
+    to match the Matrix client-server format for push rules"""
+
+    # We're going to be mutating this a lot, so do a deep copy
+    ruleslist = copy.deepcopy(ruleslist)
 
     rules = {'global': {}, 'device': {}}
 
@@ -60,9 +76,7 @@ def format_push_rules_for_user(user, rawrules, enabled_map):
 
         template_rule = _rule_to_template(r)
         if template_rule:
-            if r['rule_id'] in enabled_map:
-                template_rule['enabled'] = enabled_map[r['rule_id']]
-            elif 'enabled' in r:
+            if 'enabled' in r:
                 template_rule['enabled'] = r['enabled']
             else:
                 template_rule['enabled'] = True
