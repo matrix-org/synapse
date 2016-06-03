@@ -39,7 +39,7 @@ from synapse.replication.slave.storage.presence import SlavedPresenceStore
 from synapse.server import HomeServer
 from synapse.storage.client_ips import ClientIpStore
 from synapse.storage.engines import create_engine
-from synapse.storage.presence import UserPresenceState
+from synapse.storage.presence import PresenceStore, UserPresenceState
 from synapse.storage.roommember import RoomMemberStore
 from synapse.util.async import sleep
 from synapse.util.httpresourcetree import create_resource_tree
@@ -124,9 +124,6 @@ class SynchrotronSlavedStore(
     BaseSlavedStore,
     ClientIpStore,  # After BaseSlavedStre because the constructor is different
 ):
-    def get_presence_list_accepted(self, user_localpart):
-        return ()
-
     # XXX: This is a bit broken because we don't persist forgotten rooms
     # in a way that they can be streamed. This means that we don't have a
     # way to invalidate the forgotten rooms cache correctly.
@@ -135,6 +132,13 @@ class SynchrotronSlavedStore(
     who_forgot_in_room = (
         RoomMemberStore.__dict__["who_forgot_in_room"]
     )
+
+    # XXX: This is a bit broken because we don't persist the accepted list in a
+    # way that can be replicated. This means that we don't have a way to
+    # invalidate the cache correctly.
+    get_presence_list_accepted = PresenceStore.__dict__[
+        "get_presence_list_accepted"
+    ]
 
 UPDATE_SYNCING_USERS_MS = 10 * 1000
 
@@ -357,6 +361,7 @@ class SynchrotronServer(HomeServer):
 
         def expire_broken_caches():
             store.who_forgot_in_room.invalidate_all()
+            store.get_presence_list_accepted.invalidate_all()
 
         def notify_from_stream(
             result, stream_name, stream_key, room=None, user=None
