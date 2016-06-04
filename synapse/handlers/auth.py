@@ -465,7 +465,7 @@ class AuthHandler(BaseHandler):
             l = ldap.initialize(ldap_url)
             if self.ldap_tls:
                 logger.debug("Initiating TLS")
-                self._connection.start_tls_s()
+                l.start_tls_s()
 
             local_name = UserID.from_string(user_id).localpart
 
