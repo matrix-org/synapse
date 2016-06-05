@@ -52,7 +52,6 @@ class AuthHandler(BaseHandler):
         self.ldap_enabled = hs.config.ldap_enabled
         self.ldap_server = hs.config.ldap_server
         self.ldap_port = hs.config.ldap_port
-        self.ldap_tls = hs.config.ldap_tls
         self.ldap_search_base = hs.config.ldap_search_base
         self.ldap_search_property = hs.config.ldap_search_property
         self.ldap_email_property = hs.config.ldap_email_property
@@ -463,12 +462,8 @@ class AuthHandler(BaseHandler):
             ldap_url = "%s:%s" % (self.ldap_server, self.ldap_port)
             logger.debug("Connecting LDAP server at %s" % ldap_url)
             l = ldap.initialize(ldap_url)
-            if self.ldap_tls:
-                logger.debug("Initiating TLS")
-                self._connection.start_tls_s()
 
             local_name = UserID.from_string(user_id).localpart
-
             dn = "%s=%s, %s" % (
                 self.ldap_search_property,
                 local_name,
@@ -484,7 +479,7 @@ class AuthHandler(BaseHandler):
                 )
 
             defer.returnValue(True)
-        except ldap.LDAPError, e:
+        except ldap.LDAPError as e:
             logger.warn("LDAP error: %s", e)
             defer.returnValue(False)
 
