@@ -406,7 +406,8 @@ class PresenceHandler(object):
             user_id for user_id, count in self.user_to_num_current_syncs.items()
             if count
         }
-        syncing_user_ids.update(self.external_process_to_current_syncs.values())
+        for user_ids in self.external_process_to_current_syncs.values():
+            syncing_user_ids.update(user_ids)
         return syncing_user_ids
 
     @defer.inlineCallbacks
