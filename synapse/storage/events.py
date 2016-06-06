@@ -27,12 +27,19 @@ from synapse.api.constants import EventTypes
 from canonicaljson import encode_canonical_json
 from collections import deque, namedtuple
 
+import synapse
+import synapse.metrics
+
 
 import logging
 import math
 import ujson as json
 
 logger = logging.getLogger(__name__)
+
+
+metrics = synapse.metrics.get_metrics_for(__name__)
+persist_event_counter = metrics.register_counter("persisted_events")
 
 
 def encode_json(json_object):
@@ -261,6 +268,7 @@ class EventsStore(SQLBaseStore):
                         events_and_contexts=chunk,
                         backfilled=backfilled,
                     )
+                    persist_event_counter.inc_by(len(chunk))
 
     @defer.inlineCallbacks
     @log_function
@@ -278,6 +286,7 @@ class EventsStore(SQLBaseStore):
                         current_state=current_state,
                         backfilled=backfilled,
                     )
+                    persist_event_counter.inc()
         except _RollbackButIsFineException:
             pass
 
