@@ -23,7 +23,6 @@ class LDAPConfig(Config):
             self.ldap_enabled = ldap_config.get("enabled", False)
             self.ldap_server = ldap_config["server"]
             self.ldap_port = ldap_config["port"]
-            self.ldap_tls = ldap_config.get("tls", False)
             self.ldap_search_base = ldap_config["search_base"]
             self.ldap_search_property = ldap_config["search_property"]
             self.ldap_email_property = ldap_config["email_property"]
@@ -32,7 +31,6 @@ class LDAPConfig(Config):
             self.ldap_enabled = False
             self.ldap_server = None
             self.ldap_port = None
-            self.ldap_tls = False
             self.ldap_search_base = None
             self.ldap_search_property = None
             self.ldap_email_property = None
@@ -42,9 +40,8 @@ class LDAPConfig(Config):
         return """\
         # ldap_config:
         #   enabled: true
-        #   server: "ldap://localhost"
-        #   port: 389
-        #   tls: false
+        #   server: "ldaps://ldap.example.com"
+        #   port: 636
         #   search_base: "ou=Users,dc=example,dc=com"
         #   search_property: "cn"
         #   email_property: "email"
