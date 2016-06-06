@@ -13,40 +13,88 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from ._base import Config, ConfigError
+
+
+MISSING_LDAP3 = (
+    "Missing ldap3 library. This is required for LDAP Authentication."
+)
+
+
+class LDAPMode(object):
+    SIMPLE = "simple",
+    SEARCH = "search",
+
+    LIST = (SIMPLE, SEARCH)
 
 
 class LDAPConfig(Config):
     def read_config(self, config):
-        ldap_config = config.get("ldap_config", None)
-        if ldap_config:
-            self.ldap_enabled = ldap_config.get("enabled", False)
-            self.ldap_server = ldap_config["server"]
-            self.ldap_port = ldap_config["port"]
-            self.ldap_tls = ldap_config.get("tls", False)
-            self.ldap_search_base = ldap_config["search_base"]
-            self.ldap_search_property = ldap_config["search_property"]
-            self.ldap_email_property = ldap_config["email_property"]
-            self.ldap_full_name_property = ldap_config["full_name_property"]
-        else:
-            self.ldap_enabled = False
-            self.ldap_server = None
-            self.ldap_port = None
-            self.ldap_tls = False
-            self.ldap_search_base = None
-            self.ldap_search_property = None
-            self.ldap_email_property = None
-            self.ldap_full_name_property = None
+        ldap_config = config.get("ldap_config", {})
+
+        self.ldap_enabled = ldap_config.get("enabled", False)
+
+        if self.ldap_enabled:
+            # verify dependencies are available
+            try:
+                import ldap3
+                ldap3  # to stop unused lint
+            except ImportError:
+                raise ConfigError(MISSING_LDAP3)
+
+            self.ldap_mode = LDAPMode.SIMPLE
+
+            # verify config sanity
+            self.require_keys(ldap_config, [
+                "uri",
+                "base",
+                "attributes",
+            ])
+
+            self.ldap_uri = ldap_config["uri"]
+            self.ldap_start_tls = ldap_config.get("start_tls", False)
+            self.ldap_base = ldap_config["base"]
+            self.ldap_attributes = ldap_config["attributes"]
+
+            if "bind_dn" in ldap_config:
+                self.ldap_mode = LDAPMode.SEARCH
+                self.require_keys(ldap_config, [
+                    "bind_dn",
+                    "bind_password",
+                ])
+
+                self.ldap_bind_dn = ldap_config["bind_dn"]
+                self.ldap_bind_password = ldap_config["bind_password"]
+                self.ldap_filter = ldap_config.get("filter", None)
+
+            # verify attribute lookup
+            self.require_keys(ldap_config['attributes'], [
+                "uid",
+                "name",
+                "mail",
+            ])
+
+    def require_keys(self, config, required):
+        missing = [key for key in required if key not in config]
+        if missing:
+            raise ConfigError(
+                "LDAP enabled but missing required config values: {}".format(
+                    ", ".join(missing)
+                )
+            )
 
     def default_config(self, **kwargs):
         return """\
         # ldap_config:
         #   enabled: true
-        #   server: "ldap://localhost"
-        #   port: 389
-        #   tls: false
-        #   search_base: "ou=Users,dc=example,dc=com"
-        #   search_property: "cn"
-        #   email_property: "email"
-        #   full_name_property: "givenName"
+        #   uri: "ldap://ldap.example.com:389"
+        #   start_tls: true
+        #   base: "ou=users,dc=example,dc=com"
+        #   attributes:
+        #      uid: "cn"
+        #      mail: "email"
+        #      name: "givenName"
+        #   #bind_dn:
+        #   #bind_password:
+        #   #filter: "(objectClass=posixAccount)"
         """
