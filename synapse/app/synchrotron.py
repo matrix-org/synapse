@@ -187,7 +187,10 @@ class SynchrotronPresence(object):
                 yield self._send_syncing_users_now()
 
         def _end():
-            if affect_presence:
+            # We check that the user_id is in user_to_num_current_syncs because
+            # user_to_num_current_syncs may have been cleared if we are
+            # shutting down.
+            if affect_presence and user_id in self.user_to_num_current_syncs:
                 self.user_to_num_current_syncs[user_id] -= 1
 
         @contextlib.contextmanager
