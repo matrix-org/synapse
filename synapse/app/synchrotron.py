@@ -443,7 +443,7 @@ class SynchrotronServer(HomeServer):
                 notify(result)
             except:
                 logger.exception("Error replicating from %r", replication_url)
-                sleep(5)
+                yield sleep(5)
 
     def build_presence_handler(self):
         return SynchrotronPresence(self)
