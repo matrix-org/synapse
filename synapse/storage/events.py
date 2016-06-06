@@ -635,6 +635,8 @@ class EventsStore(SQLBaseStore):
             ],
         )
 
+        self._add_to_cache(txn, events_and_contexts)
+
         if backfilled:
             # Backfilled events come before the current state so we don't need
             # to update the current state table
@@ -675,6 +677,45 @@ class EventsStore(SQLBaseStore):
             )
 
         return
+
+    def _add_to_cache(self, txn, events_and_contexts):
+        to_prefill = []
+
+        rows = []
+        N = 200
+        for i in range(0, len(events_and_contexts), N):
+            ev_map = {
+                e[0].event_id: e[0]
+                for e in events_and_contexts[i:i + N]
+            }
+            if not ev_map:
+                break
+
+            sql = (
+                "SELECT "
+                " e.event_id as event_id, "
+                " r.redacts as redacts,"
+                " rej.event_id as rejects "
+                " FROM events as e"
+                " LEFT JOIN rejections as rej USING (event_id)"
+                " LEFT JOIN redactions as r ON e.event_id = r.redacts"
+                " WHERE e.event_id IN (%s)"
+            ) % (",".join(["?"] * len(ev_map)),)
+
+            txn.execute(sql, ev_map.keys())
+            rows = self.cursor_to_dict(txn)
+            for row in rows:
+                event = ev_map[row["event_id"]]
+                if not row["rejects"] and not row["redacts"]:
+                    to_prefill.append(_EventCacheEntry(
+                        event=event,
+                        redacted_event=None,
+                    ))
+
+        def prefill():
+            for cache_entry in to_prefill:
+                self._get_event_cache.prefill((cache_entry[0].event_id,), cache_entry)
+        txn.call_after(prefill)
 
     def _store_redaction(self, txn, event):
         # invalidate the cache for the redacted event
