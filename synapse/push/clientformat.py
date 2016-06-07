@@ -13,37 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.push.baserules import list_with_base_rules
-
 from synapse.push.rulekinds import (
     PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
 )
 
 import copy
-import simplejson as json
-
-
-def load_rules_for_user(user, rawrules, enabled_map):
-    ruleslist = []
-    for rawrule in rawrules:
-        rule = dict(rawrule)
-        rule["conditions"] = json.loads(rawrule["conditions"])
-        rule["actions"] = json.loads(rawrule["actions"])
-        ruleslist.append(rule)
-
-    # We're going to be mutating this a lot, so do a deep copy
-    rules = list(list_with_base_rules(ruleslist))
-
-    for i, rule in enumerate(rules):
-        rule_id = rule['rule_id']
-        if rule_id in enabled_map:
-            if rule.get('enabled', True) != bool(enabled_map[rule_id]):
-                # Rules are cached across users.
-                rule = dict(rule)
-                rule['enabled'] = bool(enabled_map[rule_id])
-                rules[i] = rule
-
-    return rules
 
 
 def format_push_rules_for_user(user, ruleslist):

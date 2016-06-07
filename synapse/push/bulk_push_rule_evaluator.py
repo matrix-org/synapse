@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import logging
-import ujson as json
 
 from twisted.internet import defer
 
@@ -25,13 +24,6 @@ from synapse.visibility import filter_events_for_clients
 
 
 logger = logging.getLogger(__name__)
-
-
-def decode_rule_json(rule):
-    rule = dict(rule)
-    rule['conditions'] = json.loads(rule['conditions'])
-    rule['actions'] = json.loads(rule['actions'])
-    return rule
 
 
 @defer.inlineCallbacks
