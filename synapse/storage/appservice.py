@@ -320,10 +320,10 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
 
         event_ids = json.loads(entry["event_ids"])
 
-        events = yield self.get_events(event_ids)
+        event_map = yield self.get_events(event_ids)
 
         defer.returnValue(AppServiceTransaction(
-            service=service, id=entry["txn_id"], events=events
+            service=service, id=entry["txn_id"], events=event_map.values()
         ))
 
     def _get_oldest_unsent_txn(self, txn, service):
