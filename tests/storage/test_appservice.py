@@ -353,21 +353,21 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_get_oldest_unsent_txn(self):
         service = Mock(id=self.as_list[0]["id"])
-        events = {"e1": Mock(event_id="e1"), "e2": Mock(event_id="e2")}
+        events = [Mock(event_id="e1"), Mock(event_id="e2")]
         other_events = [Mock(event_id="e5"), Mock(event_id="e6")]
 
         # we aren't testing store._base stuff here, so mock this out
-        self.store.get_events = Mock(return_value=events)
+        self.store._get_events = Mock(return_value=events)
 
         yield self._insert_txn(self.as_list[1]["id"], 9, other_events)
-        yield self._insert_txn(service.id, 10, events.values())
+        yield self._insert_txn(service.id, 10, events)
         yield self._insert_txn(service.id, 11, other_events)
         yield self._insert_txn(service.id, 12, other_events)
 
         txn = yield self.store.get_oldest_unsent_txn(service)
         self.assertEquals(service, txn.service)
         self.assertEquals(10, txn.id)
-        self.assertEquals(events.values(), txn.events)
+        self.assertEquals(events, txn.events)
 
     @defer.inlineCallbacks
     def test_get_appservices_by_state_single(self):
