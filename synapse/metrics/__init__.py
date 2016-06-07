@@ -156,7 +156,6 @@ pending_calls_metric = reactor_metrics.register_distribution("pending_calls")
 gc_time = reactor_metrics.register_distribution("gc_time", labels=["gen"])
 gc_unreachable = reactor_metrics.register_counter("gc_unreachable", labels=["gen"])
 
-reactor_metrics.register_callback("gc_total_objects", lambda: len(gc.get_objects()))
 reactor_metrics.register_callback(
     "gc_counts", lambda: {(i,): v for i, v in enumerate(gc.get_count())}, labels=["gen"]
 )
