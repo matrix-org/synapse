@@ -43,6 +43,7 @@ from twisted.web.resource import Resource
 
 from daemonize import Daemonize
 
+import gc
 import sys
 import logging
 
@@ -342,6 +343,8 @@ def setup(config_options):
     ps.start_listening()
 
     change_resource_limit(ps.config.soft_file_limit)
+    if ps.config.gc_thresholds:
+        gc.set_threshold(*ps.config.gc_thresholds)
 
     def start():
         ps.replicate()
@@ -361,6 +364,8 @@ if __name__ == '__main__':
             def run():
                 with LoggingContext("run"):
                     change_resource_limit(ps.config.soft_file_limit)
+                    if ps.config.gc_thresholds:
+                        gc.set_threshold(*ps.config.gc_thresholds)
                     reactor.run()
 
             daemon = Daemonize(

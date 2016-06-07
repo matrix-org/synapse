@@ -57,6 +57,7 @@ from daemonize import Daemonize
 import sys
 import logging
 import contextlib
+import gc
 import ujson as json
 
 logger = logging.getLogger("synapse.app.synchrotron")
@@ -484,6 +485,8 @@ def setup(config_options):
     ss.start_listening()
 
     change_resource_limit(ss.config.soft_file_limit)
+    if ss.config.gc_thresholds:
+        ss.set_threshold(*ss.config.gc_thresholds)
 
     def start():
         ss.get_datastore().start_profiling()
@@ -496,17 +499,19 @@ def setup(config_options):
 
 if __name__ == '__main__':
     with LoggingContext("main"):
-        ps = setup(sys.argv[1:])
+        ss = setup(sys.argv[1:])
 
-        if ps.config.daemonize:
+        if ss.config.daemonize:
             def run():
                 with LoggingContext("run"):
-                    change_resource_limit(ps.config.soft_file_limit)
+                    change_resource_limit(ss.config.soft_file_limit)
+                    if ss.config.gc_thresholds:
+                        gc.set_threshold(*ss.config.gc_thresholds)
                     reactor.run()
 
             daemon = Daemonize(
-                app="synapse-pusher",
-                pid=ps.config.pid_file,
+                app="synapse-synchrotron",
+                pid=ss.config.pid_file,
                 action=run,
                 auto_close_fds=False,
                 verbose=True,
