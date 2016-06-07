@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from twisted.internet import defer
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError
 
 from synapse.util.logutils import log_function
@@ -152,10 +152,6 @@ class Notifier(object):
         self.appservice_handler = hs.get_application_service_handler()
         self.state_handler = hs.get_state_handler()
 
-        hs.get_distributor().observe(
-            "user_joined_room", self._user_joined_room
-        )
-
         self.clock.looping_call(
             self.remove_expired_streams, self.UNUSED_STREAM_EXPIRY_MS
         )
@@ -247,6 +243,9 @@ class Notifier(object):
                     appservice, set()
                 )
                 app_streams |= app_user_streams
+
+        if event.type == EventTypes.Member and event.membership == Membership.JOIN:
+            self._user_joined_room(event.state_key, event.room_id)
 
         self.on_new_event(
             "room_key", room_stream_id,
@@ -483,9 +482,8 @@ class Notifier(object):
                 user_stream.appservice, set()
             ).add(user_stream)
 
-    def _user_joined_room(self, user, room_id):
-        user = str(user)
-        new_user_stream = self.user_to_user_stream.get(user)
+    def _user_joined_room(self, user_id, room_id):
+        new_user_stream = self.user_to_user_stream.get(user_id)
         if new_user_stream is not None:
             room_streams = self.room_to_user_streams.setdefault(room_id, set())
             room_streams.add(new_user_stream)
