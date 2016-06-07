@@ -16,6 +16,7 @@
 
 import synapse
 
+import gc
 import logging
 import os
 import sys
@@ -351,6 +352,8 @@ class SynapseService(service.Service):
     def startService(self):
         hs = setup(self.config)
         change_resource_limit(hs.config.soft_file_limit)
+        if hs.config.gc_thresholds:
+            gc.set_threshold(*hs.config.gc_thresholds)
 
     def stopService(self):
         return self._port.stopListening()
@@ -422,6 +425,8 @@ def run(hs):
         # sys.settrace(logcontext_tracer)
         with LoggingContext("run"):
             change_resource_limit(hs.config.soft_file_limit)
+            if hs.config.gc_thresholds:
+                gc.set_threshold(*hs.config.gc_thresholds)
             reactor.run()
 
     if hs.config.daemonize:
