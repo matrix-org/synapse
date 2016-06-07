@@ -153,11 +153,8 @@ reactor_metrics = get_metrics_for("reactor")
 tick_time = reactor_metrics.register_distribution("tick_time")
 pending_calls_metric = reactor_metrics.register_distribution("pending_calls")
 
-gc_time = (
-    reactor_metrics.register_distribution("gc_time_gen0"),
-    reactor_metrics.register_distribution("gc_time_gen2"),
-    reactor_metrics.register_distribution("gc_time_gen2"),
-)
+gc_time = reactor_metrics.register_distribution("gc_time", labels=["gen"])
+gc_unreachable = reactor_metrics.register_counter("gc_unreachable", labels=["gen"])
 
 
 def runUntilCurrentTimer(func):
@@ -190,15 +187,16 @@ def runUntilCurrentTimer(func):
         # one if necessary.
         threshold = gc.get_threshold()
         counts = gc.get_count()
-        for i in [2, 1, 0]:
+        for i in (2, 1, 0):
             if threshold[i] < counts[i]:
                 logger.info("Collecting gc %d", i)
 
                 start = time.time() * 1000
-                gc.collect(i)
+                unreachable = gc.collect(i)
                 end = time.time() * 1000
 
-                gc_time[i].inc_by(end - start)
+                gc_time.inc_by(end - start, i)
+                gc_unreachable.inc_by(unreachable, i)
 
         return ret
 
