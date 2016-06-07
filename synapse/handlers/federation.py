@@ -66,10 +66,6 @@ class FederationHandler(BaseHandler):
 
         self.hs = hs
 
-        self.distributor.observe("user_joined_room", self.user_joined_room)
-
-        self.waiting_for_join_list = {}
-
         self.store = hs.get_datastore()
         self.replication_layer = hs.get_replication_layer()
         self.state_handler = hs.get_state_handler()
@@ -1090,15 +1086,6 @@ class FederationHandler(BaseHandler):
     @log_function
     def get_min_depth_for_context(self, context):
         return self.store.get_min_depth(context)
-
-    @log_function
-    def user_joined_room(self, user, room_id):
-        waiters = self.waiting_for_join_list.get(
-            (user.to_string(), room_id),
-            []
-        )
-        while waiters:
-            waiters.pop().callback(None)
 
     @defer.inlineCallbacks
     @log_function
