@@ -22,6 +22,7 @@ import functools
 import os
 import stat
 import time
+import gc
 
 from twisted.internet import reactor
 
@@ -152,6 +153,12 @@ reactor_metrics = get_metrics_for("reactor")
 tick_time = reactor_metrics.register_distribution("tick_time")
 pending_calls_metric = reactor_metrics.register_distribution("pending_calls")
 
+gc_time = (
+    reactor_metrics.register_distribution("gc_time_gen0"),
+    reactor_metrics.register_distribution("gc_time_gen2"),
+    reactor_metrics.register_distribution("gc_time_gen2"),
+)
+
 
 def runUntilCurrentTimer(func):
 
@@ -178,6 +185,21 @@ def runUntilCurrentTimer(func):
         end = time.time() * 1000
         tick_time.inc_by(end - start)
         pending_calls_metric.inc_by(num_pending)
+
+        # Check if we need to do a manual GC (since its been disabled), and do
+        # one if necessary.
+        threshold = gc.get_threshold()
+        counts = gc.get_count()
+        for i in [2, 1, 0]:
+            if threshold[i] < counts[i]:
+                logger.info("Collecting gc %d", i)
+
+                start = time.time() * 1000
+                gc.collect(i)
+                end = time.time() * 1000
+
+                gc_time[i].inc_by(end - start)
+
         return ret
 
     return f
@@ -192,5 +214,9 @@ try:
     # runUntilCurrent is called when we have pending calls. It is called once
     # per iteratation after fd polling.
     reactor.runUntilCurrent = runUntilCurrentTimer(reactor.runUntilCurrent)
+
+    # We manually run the GC each reactor tick so that we can get some metrics
+    # about time spent doing GC,
+    gc.disable()
 except AttributeError:
     pass
