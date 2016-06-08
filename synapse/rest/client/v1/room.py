@@ -72,8 +72,6 @@ class RoomCreateRestServlet(ClientV1RestServlet):
 
     def get_room_config(self, request):
         user_supplied_config = parse_json_object_from_request(request)
-        # default visibility
-        user_supplied_config.setdefault("visibility", "public")
         return user_supplied_config
 
     def on_OPTIONS(self, request):
