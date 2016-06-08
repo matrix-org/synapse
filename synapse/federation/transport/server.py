@@ -528,7 +528,7 @@ class PublicRoomList(BaseFederationServlet):
     PATH = "/publicRooms"
 
     @defer.inlineCallbacks
-    def on_GET(self, request):
+    def on_GET(self, origin, content, query):
         data = yield self.room_list_handler.get_local_public_room_list()
         defer.returnValue((200, data))
 
