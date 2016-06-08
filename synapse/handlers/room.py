@@ -20,7 +20,7 @@ from ._base import BaseHandler
 
 from synapse.types import UserID, RoomAlias, RoomID, RoomStreamToken
 from synapse.api.constants import (
-    EventTypes, JoinRules, RoomCreationPreset,
+    EventTypes, JoinRules, RoomCreationPreset, Membership,
 )
 from synapse.api.errors import AuthError, StoreError, SynapseError
 from synapse.util import stringutils
@@ -367,14 +367,10 @@ class RoomListHandler(BaseHandler):
 
         @defer.inlineCallbacks
         def handle_room(room_id):
-            # We pull each bit of state out indvidually to avoid pulling the
-            # full state into memory. Due to how the caching works this should
-            # be fairly quick, even if not originally in the cache.
-            def get_state(etype, state_key):
-                return self.state_handler.get_current_state(room_id, etype, state_key)
+            current_state = yield self.state_handler.get_current_state(room_id)
 
             # Double check that this is actually a public room.
-            join_rules_event = yield get_state(EventTypes.JoinRules, "")
+            join_rules_event = current_state.get((EventTypes.JoinRules, ""))
             if join_rules_event:
                 join_rule = join_rules_event.content.get("join_rule", None)
                 if join_rule and join_rule != JoinRules.PUBLIC:
@@ -382,47 +378,51 @@ class RoomListHandler(BaseHandler):
 
             result = {"room_id": room_id}
 
-            joined_users = yield self.store.get_users_in_room(room_id)
-            if len(joined_users) == 0:
+            num_joined_users = len([
+                1 for _, event in current_state.items()
+                if event.type == EventTypes.Member
+                and event.membership == Membership.JOIN
+            ])
+            if num_joined_users == 0:
                 return
 
-            result["num_joined_members"] = len(joined_users)
+            result["num_joined_members"] = num_joined_users
 
             aliases = yield self.store.get_aliases_for_room(room_id)
             if aliases:
                 result["aliases"] = aliases
 
-            name_event = yield get_state(EventTypes.Name, "")
+            name_event = yield current_state.get((EventTypes.Name, ""))
             if name_event:
                 name = name_event.content.get("name", None)
                 if name:
                     result["name"] = name
 
-            topic_event = yield get_state(EventTypes.Topic, "")
+            topic_event = current_state.get((EventTypes.Topic, ""))
             if topic_event:
                 topic = topic_event.content.get("topic", None)
                 if topic:
                     result["topic"] = topic
 
-            canonical_event = yield get_state(EventTypes.CanonicalAlias, "")
+            canonical_event = current_state.get((EventTypes.CanonicalAlias, ""))
             if canonical_event:
                 canonical_alias = canonical_event.content.get("alias", None)
                 if canonical_alias:
                     result["canonical_alias"] = canonical_alias
 
-            visibility_event = yield get_state(EventTypes.RoomHistoryVisibility, "")
+            visibility_event = current_state.get((EventTypes.RoomHistoryVisibility, ""))
             visibility = None
             if visibility_event:
                 visibility = visibility_event.content.get("history_visibility", None)
             result["world_readable"] = visibility == "world_readable"
 
-            guest_event = yield get_state(EventTypes.GuestAccess, "")
+            guest_event = current_state.get((EventTypes.GuestAccess, ""))
             guest = None
             if guest_event:
                 guest = guest_event.content.get("guest_access", None)
             result["guest_can_join"] = guest == "can_join"
 
-            avatar_event = yield get_state("m.room.avatar", "")
+            avatar_event = current_state.get(("m.room.avatar", ""))
             if avatar_event:
                 avatar_url = avatar_event.content.get("url", None)
                 if avatar_url:
