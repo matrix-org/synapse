@@ -77,7 +77,6 @@ echo >&2 "Running sytest with PostgreSQL";
 ./jenkins/install_and_run.sh --python $TOX_BIN/python \
                              --synapse-directory $WORKSPACE \
                              --dendron $WORKSPACE/dendron/bin/dendron \
-                             --synchrotron \
                              --pusher \
                              --port-base $PORT_BASE
 
