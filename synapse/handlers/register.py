@@ -388,8 +388,8 @@ class RegistrationHandler(BaseHandler):
 
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
-        auth_handler = self.hs.get_handlers().auth_handler
-        token = auth_handler.generate_short_term_login_token(user_id, duration_seconds)
+        token = self.auth_handler().generate_short_term_login_token(
+            user_id, duration_seconds)
 
         if need_register:
             yield self.store.register(
