@@ -65,6 +65,20 @@ class SlaveConfig(DatabaseConfig):
         self.pid_file = self.abspath(config.get("pid_file"))
         self.public_baseurl = config["public_baseurl"]
 
+        thresholds = config.get("gc_thresholds", None)
+        if thresholds is not None:
+            try:
+                assert len(thresholds) == 3
+                self.gc_thresholds = (
+                    int(thresholds[0]), int(thresholds[1]), int(thresholds[2]),
+                )
+            except:
+                raise ConfigError(
+                    "Value of `gc_threshold` must be a list of three integers if set"
+                )
+        else:
+            self.gc_thresholds = None
+
         # some things used by the auth handler but not actually used in the
         # pusher codebase
         self.bcrypt_rounds = None

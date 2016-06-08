@@ -78,6 +78,20 @@ class SynchrotronConfig(DatabaseConfig, LoggingConfig, AppServiceConfig):
         self.macaroon_secret_key = config["macaroon_secret_key"]
         self.expire_access_token = config.get("expire_access_token", False)
 
+        thresholds = config.get("gc_thresholds", None)
+        if thresholds is not None:
+            try:
+                assert len(thresholds) == 3
+                self.gc_thresholds = (
+                    int(thresholds[0]), int(thresholds[1]), int(thresholds[2]),
+                )
+            except:
+                raise ConfigError(
+                    "Value of `gc_threshold` must be a list of three integers if set"
+                )
+        else:
+            self.gc_thresholds = None
+
     def default_config(self, server_name, **kwargs):
         pid_file = self.abspath("synchroton.pid")
         return """\
