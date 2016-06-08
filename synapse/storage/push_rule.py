@@ -421,6 +421,9 @@ class PushRuleStore(SQLBaseStore):
 
     def get_all_push_rule_updates(self, last_id, current_id, limit):
         """Get all the push rules changes that have happend on the server"""
+        if last_id == current_id:
+            return defer.succeed([])
+
         def get_all_push_rule_updates_txn(txn):
             sql = (
                 "SELECT stream_id, event_stream_ordering, user_id, rule_id,"

@@ -118,6 +118,9 @@ class PresenceStore(SQLBaseStore):
             )
 
     def get_all_presence_updates(self, last_id, current_id):
+        if last_id == current_id:
+            return defer.succeed([])
+
         def get_all_presence_updates_txn(txn):
             sql = (
                 "SELECT stream_id, user_id, state, last_active_ts,"
