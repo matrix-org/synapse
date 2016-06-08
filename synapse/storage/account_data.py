@@ -138,6 +138,9 @@ class AccountDataStore(SQLBaseStore):
             A deferred pair of lists of tuples of stream_id int, user_id string,
             room_id string, type string, and content string.
         """
+        if last_room_id == current_id and last_global_id == current_id:
+            return defer.succeed(([], []))
+
         def get_updated_account_data_txn(txn):
             sql = (
                 "SELECT stream_id, user_id, account_data_type, content"

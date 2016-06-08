@@ -68,6 +68,9 @@ class TagsStore(SQLBaseStore):
             A deferred list of tuples of stream_id int, user_id string,
             room_id string, tag string and content string.
         """
+        if last_id == current_id:
+            defer.returnValue([])
+
         def get_all_updated_tags_txn(txn):
             sql = (
                 "SELECT stream_id, user_id, room_id"
