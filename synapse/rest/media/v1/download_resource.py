@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .base_resource import BaseMediaResource, parse_media_id
+from ._base import parse_media_id, respond_with_file, respond_404
+from twisted.web.resource import Resource
 from synapse.http.server import request_handler
 
 from twisted.web.server import NOT_DONE_YET
@@ -24,12 +25,24 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class DownloadResource(BaseMediaResource):
+class DownloadResource(Resource):
+    isLeaf = True
+
+    def __init__(self, hs, media_repo):
+        Resource.__init__(self)
+
+        self.filepaths = media_repo.filepaths
+        self.media_repo = media_repo
+        self.server_name = hs.hostname
+        self.store = hs.get_datastore()
+        self.version_string = hs.version_string
+        self.clock = hs.get_clock()
+
     def render_GET(self, request):
         self._async_render_GET(request)
         return NOT_DONE_YET
 
-    @request_handler
+    @request_handler()
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
         server_name, media_id, name = parse_media_id(request)
@@ -44,7 +57,7 @@ class DownloadResource(BaseMediaResource):
     def _respond_local_file(self, request, media_id, name):
         media_info = yield self.store.get_local_media(media_id)
         if not media_info:
-            self._respond_404(request)
+            respond_404(request)
             return
 
         media_type = media_info["media_type"]
@@ -52,14 +65,14 @@ class DownloadResource(BaseMediaResource):
         upload_name = name if name else media_info["upload_name"]
         file_path = self.filepaths.local_media_filepath(media_id)
 
-        yield self._respond_with_file(
+        yield respond_with_file(
             request, media_type, file_path, media_length,
             upload_name=upload_name,
         )
 
     @defer.inlineCallbacks
     def _respond_remote_file(self, request, server_name, media_id, name):
-        media_info = yield self._get_remote_media(server_name, media_id)
+        media_info = yield self.media_repo.get_remote_media(server_name, media_id)
 
         media_type = media_info["media_type"]
         media_length = media_info["media_length"]
@@ -70,7 +83,7 @@ class DownloadResource(BaseMediaResource):
             server_name, filesystem_id
         )
 
-        yield self._respond_with_file(
+        yield respond_with_file(
             request, media_type, file_path, media_length,
             upload_name=upload_name,
         )

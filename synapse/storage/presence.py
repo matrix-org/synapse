@@ -68,7 +68,9 @@ class PresenceStore(SQLBaseStore):
                 self._update_presence_txn, stream_orderings, presence_states,
             )
 
-        defer.returnValue((stream_orderings[-1], self._presence_id_gen.get_max_token()))
+        defer.returnValue((
+            stream_orderings[-1], self._presence_id_gen.get_current_token()
+        ))
 
     def _update_presence_txn(self, txn, stream_orderings, presence_states):
         for stream_id, state in zip(stream_orderings, presence_states):
@@ -116,6 +118,9 @@ class PresenceStore(SQLBaseStore):
             )
 
     def get_all_presence_updates(self, last_id, current_id):
+        if last_id == current_id:
+            return defer.succeed([])
+
         def get_all_presence_updates_txn(txn):
             sql = (
                 "SELECT stream_id, user_id, state, last_active_ts,"
@@ -147,6 +152,7 @@ class PresenceStore(SQLBaseStore):
                 "status_msg",
                 "currently_active",
             ),
+            desc="get_presence_for_users",
         )
 
         for row in rows:
@@ -155,7 +161,7 @@ class PresenceStore(SQLBaseStore):
         defer.returnValue([UserPresenceState(**row) for row in rows])
 
     def get_current_presence_token(self):
-        return self._presence_id_gen.get_max_token()
+        return self._presence_id_gen.get_current_token()
 
     def allow_presence_visible(self, observed_localpart, observer_userid):
         return self._simple_insert(
@@ -172,16 +178,6 @@ class PresenceStore(SQLBaseStore):
             keyvalues={"observed_user_id": observed_localpart,
                        "observer_user_id": observer_userid},
             desc="disallow_presence_visible",
-        )
-
-    def is_presence_visible(self, observed_localpart, observer_userid):
-        return self._simple_select_one(
-            table="presence_allow_inbound",
-            keyvalues={"observed_user_id": observed_localpart,
-                       "observer_user_id": observer_userid},
-            retcols=["observed_user_id"],
-            allow_none=True,
-            desc="is_presence_visible",
         )
 
     def add_presence_list_pending(self, observer_localpart, observed_userid):

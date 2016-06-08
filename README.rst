@@ -105,7 +105,7 @@ Installing prerequisites on Ubuntu or Debian::
 
     sudo apt-get install build-essential python2.7-dev libffi-dev \
                          python-pip python-setuptools sqlite3 \
-                         libssl-dev python-virtualenv libjpeg-dev
+                         libssl-dev python-virtualenv libjpeg-dev libxslt1-dev
 
 Installing prerequisites on ArchLinux::
 
@@ -118,7 +118,6 @@ Installing prerequisites on CentOS 7::
                      lcms2-devel libwebp-devel tcl-devel tk-devel \
                      python-virtualenv libffi-devel openssl-devel
     sudo yum groupinstall "Development Tools"
-
 
 Installing prerequisites on Mac OS X::
 
@@ -151,12 +150,7 @@ In case of problems, please see the _Troubleshooting section below.
 Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
 above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
 
-Another alternative is to install via apt from http://matrix.org/packages/debian/.
-Note that these packages do not include  a client - choose one from
-https://matrix.org/blog/try-matrix-now/ (or build your own with 
-https://github.com/matrix-org/matrix-js-sdk/). 
-
-Finally, Martin Giess has created an auto-deployment process with vagrant/ansible, 
+Also, Martin Giess has created an auto-deployment process with vagrant/ansible, 
 tested with VirtualBox/AWS/DigitalOcean - see https://github.com/EMnify/matrix-synapse-auto-deploy 
 for details.
 
@@ -230,6 +224,19 @@ For information on how to install and use PostgreSQL, please see
 Platform Specific Instructions
 ==============================
 
+Debian
+------
+
+Matrix provides official Debian packages via apt from http://matrix.org/packages/debian/.
+Note that these packages do not include a client - choose one from
+https://matrix.org/blog/try-matrix-now/ (or build your own with one of our SDKs :)
+
+Fedora
+------
+
+Oleg Girko provides Fedora RPMs at
+https://obs.infoserver.lv/project/monitor/matrix-synapse
+
 ArchLinux
 ---------
 
@@ -271,10 +278,16 @@ During setup of Synapse you need to call python2.7 directly again::
 FreeBSD
 -------
 
-Synapse can be installed via FreeBSD Ports or Packages:
+Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
 
  - Ports: ``cd /usr/ports/net/py-matrix-synapse && make install clean``
  - Packages: ``pkg install py27-matrix-synapse``
+
+NixOS
+-----
+
+Robin Lambertz has packaged Synapse for NixOS at:
+https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-synapse.nix
 
 Windows Install
 ---------------
@@ -544,6 +557,23 @@ It's currently early days for identity servers as Matrix is not yet using 3PIDs
 as the primary means of identity and E2E encryption is not complete. As such,
 we are running a single identity server (https://matrix.org) at the current
 time.
+
+
+URL Previews
+============
+
+Synapse 0.15.0 introduces an experimental new API for previewing URLs at
+/_matrix/media/r0/preview_url.  This is disabled by default.  To turn it on
+you must enable the `url_preview_enabled: True` config parameter and explicitly
+specify the IP ranges that Synapse is not allowed to spider for previewing in
+the `url_preview_ip_range_blacklist` configuration parameter.  This is critical
+from a security perspective to stop arbitrary Matrix users spidering 'internal'
+URLs on your network.  At the very least we recommend that your loopback and
+RFC1918 IP addresses are blacklisted.
+
+This also requires the optional lxml and netaddr python dependencies to be
+installed.
+
 
 Password reset
 ==============

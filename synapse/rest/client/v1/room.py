@@ -72,8 +72,6 @@ class RoomCreateRestServlet(ClientV1RestServlet):
 
     def get_room_config(self, request):
         user_supplied_config = parse_json_object_from_request(request)
-        # default visibility
-        user_supplied_config.setdefault("visibility", "public")
         return user_supplied_config
 
     def on_OPTIONS(self, request):
@@ -232,7 +230,10 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
 
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
-            remote_room_hosts = None
+            try:
+                remote_room_hosts = request.args["server_name"]
+            except:
+                remote_room_hosts = None
         elif RoomAlias.is_valid(room_identifier):
             handler = self.handlers.room_member_handler
             room_alias = RoomAlias.from_string(room_identifier)
@@ -276,8 +277,16 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        handler = self.handlers.room_list_handler
-        data = yield handler.get_public_room_list()
+        try:
+            yield self.auth.get_user_by_req(request)
+        except AuthError:
+            # This endpoint isn't authed, but its useful to know who's hitting
+            # it if they *do* supply an access token
+            pass
+
+        handler = self.hs.get_room_list_handler()
+        data = yield handler.get_aggregated_public_room_list()
+
         defer.returnValue((200, data))
 
 
@@ -403,6 +412,42 @@ class RoomEventContext(ClientV1RestServlet):
         ]
 
         defer.returnValue((200, results))
+
+
+class RoomForgetRestServlet(ClientV1RestServlet):
+    def register(self, http_server):
+        PATTERNS = ("/rooms/(?P<room_id>[^/]*)/forget")
+        register_txn_path(self, PATTERNS, http_server)
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, room_id, txn_id=None):
+        requester = yield self.auth.get_user_by_req(
+            request,
+            allow_guest=False,
+        )
+
+        yield self.handlers.room_member_handler.forget(
+            user=requester.user,
+            room_id=room_id,
+        )
+
+        defer.returnValue((200, {}))
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, room_id, txn_id):
+        try:
+            defer.returnValue(
+                self.txns.get_client_transaction(request, txn_id)
+            )
+        except KeyError:
+            pass
+
+        response = yield self.on_POST(
+            request, room_id, txn_id
+        )
+
+        self.txns.store_client_transaction(request, txn_id, response)
+        defer.returnValue(response)
 
 
 # TODO: Needs unit testing
@@ -534,7 +579,8 @@ class RoomTypingRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(RoomTypingRestServlet, self).__init__(hs)
-        self.presence_handler = hs.get_handlers().presence_handler
+        self.presence_handler = hs.get_presence_handler()
+        self.typing_handler = hs.get_typing_handler()
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, user_id):
@@ -545,19 +591,17 @@ class RoomTypingRestServlet(ClientV1RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        typing_handler = self.handlers.typing_notification_handler
-
         yield self.presence_handler.bump_presence_active_time(requester.user)
 
         if content["typing"]:
-            yield typing_handler.started_typing(
+            yield self.typing_handler.started_typing(
                 target_user=target_user,
                 auth_user=requester.user,
                 room_id=room_id,
                 timeout=content.get("timeout", 30000),
             )
         else:
-            yield typing_handler.stopped_typing(
+            yield self.typing_handler.stopped_typing(
                 target_user=target_user,
                 auth_user=requester.user,
                 room_id=room_id,
@@ -624,6 +668,7 @@ def register_servlets(hs, http_server):
     RoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
+    RoomForgetRestServlet(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
     RoomSendEventRestServlet(hs).register(http_server)
     PublicRoomListRestServlet(hs).register(http_server)

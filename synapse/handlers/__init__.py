@@ -13,23 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.appservice.scheduler import AppServiceScheduler
-from synapse.appservice.api import ApplicationServiceApi
 from .register import RegistrationHandler
 from .room import (
-    RoomCreationHandler, RoomMemberHandler, RoomListHandler, RoomContextHandler,
+    RoomCreationHandler, RoomContextHandler,
 )
+from .room_member import RoomMemberHandler
 from .message import MessageHandler
 from .events import EventStreamHandler, EventHandler
 from .federation import FederationHandler
 from .profile import ProfileHandler
-from .presence import PresenceHandler
 from .directory import DirectoryHandler
-from .typing import TypingNotificationHandler
 from .admin import AdminHandler
-from .appservice import ApplicationServicesHandler
-from .sync import SyncHandler
-from .auth import AuthHandler
 from .identity import IdentityHandler
 from .receipts import ReceiptsHandler
 from .search import SearchHandler
@@ -52,22 +46,9 @@ class Handlers(object):
         self.event_handler = EventHandler(hs)
         self.federation_handler = FederationHandler(hs)
         self.profile_handler = ProfileHandler(hs)
-        self.presence_handler = PresenceHandler(hs)
-        self.room_list_handler = RoomListHandler(hs)
         self.directory_handler = DirectoryHandler(hs)
-        self.typing_notification_handler = TypingNotificationHandler(hs)
         self.admin_handler = AdminHandler(hs)
         self.receipts_handler = ReceiptsHandler(hs)
-        asapi = ApplicationServiceApi(hs)
-        self.appservice_handler = ApplicationServicesHandler(
-            hs, asapi, AppServiceScheduler(
-                clock=hs.get_clock(),
-                store=hs.get_datastore(),
-                as_api=asapi
-            )
-        )
-        self.sync_handler = SyncHandler(hs)
-        self.auth_handler = AuthHandler(hs)
         self.identity_handler = IdentityHandler(hs)
         self.search_handler = SearchHandler(hs)
         self.room_context_handler = RoomContextHandler(hs)

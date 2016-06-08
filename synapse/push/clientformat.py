@@ -13,29 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.push.baserules import list_with_base_rules
-
 from synapse.push.rulekinds import (
     PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
 )
 
 import copy
-import simplejson as json
 
 
-def format_push_rules_for_user(user, rawrules, enabled_map):
+def format_push_rules_for_user(user, ruleslist):
     """Converts a list of rawrules and a enabled map into nested dictionaries
     to match the Matrix client-server format for push rules"""
 
-    ruleslist = []
-    for rawrule in rawrules:
-        rule = dict(rawrule)
-        rule["conditions"] = json.loads(rawrule["conditions"])
-        rule["actions"] = json.loads(rawrule["actions"])
-        ruleslist.append(rule)
-
     # We're going to be mutating this a lot, so do a deep copy
-    ruleslist = copy.deepcopy(list_with_base_rules(ruleslist))
+    ruleslist = copy.deepcopy(ruleslist)
 
     rules = {'global': {}, 'device': {}}
 
@@ -60,9 +50,7 @@ def format_push_rules_for_user(user, rawrules, enabled_map):
 
         template_rule = _rule_to_template(r)
         if template_rule:
-            if r['rule_id'] in enabled_map:
-                template_rule['enabled'] = enabled_map[r['rule_id']]
-            elif 'enabled' in r:
+            if 'enabled' in r:
                 template_rule['enabled'] = r['enabled']
             else:
                 template_rule['enabled'] = True

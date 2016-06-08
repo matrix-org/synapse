@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from ._base import Config, ConfigError
 
 
 class ServerConfig(Config):
@@ -28,8 +28,29 @@ class ServerConfig(Config):
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", True)
+        self.public_baseurl = config.get("public_baseurl")
+        self.secondary_directory_servers = config.get("secondary_directory_servers", [])
+
+        if self.public_baseurl is not None:
+            if self.public_baseurl[-1] != '/':
+                self.public_baseurl += '/'
+        self.start_pushers = config.get("start_pushers", True)
 
         self.listeners = config.get("listeners", [])
+
+        thresholds = config.get("gc_thresholds", None)
+        if thresholds is not None:
+            try:
+                assert len(thresholds) == 3
+                self.gc_thresholds = (
+                    int(thresholds[0]), int(thresholds[1]), int(thresholds[2]),
+                )
+            except:
+                raise ConfigError(
+                    "Value of `gc_threshold` must be a list of three integers if set"
+                )
+        else:
+            self.gc_thresholds = None
 
         bind_port = config.get("bind_port")
         if bind_port:
@@ -142,10 +163,25 @@ class ServerConfig(Config):
         # Whether to serve a web client from the HTTP/HTTPS root resource.
         web_client: True
 
+        # The public-facing base URL for the client API (not including _matrix/...)
+        # public_baseurl: https://example.com:8448/
+
         # Set the soft limit on the number of file descriptors synapse can use
         # Zero is used to indicate synapse should set the soft limit to the
         # hard limit.
         soft_file_limit: 0
+
+        # The GC threshold parameters to pass to `gc.set_threshold`, if defined
+        # gc_thresholds: [700, 10, 10]
+
+        # A list of other Home Servers to fetch the public room directory from
+        # and include in the public room directory of this home server
+        # This is a temporary stopgap solution to populate new server with a
+        # list of rooms until there exists a good solution of a decentralized
+        # room directory.
+        # secondary_directory_servers:
+        #     - matrix.org
+        #     - vector.im
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.

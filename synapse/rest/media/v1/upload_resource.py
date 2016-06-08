@@ -15,20 +15,34 @@
 
 from synapse.http.server import respond_with_json, request_handler
 
-from synapse.util.stringutils import random_string
 from synapse.api.errors import SynapseError
 
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
 
-from .base_resource import BaseMediaResource
+from twisted.web.resource import Resource
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class UploadResource(BaseMediaResource):
+class UploadResource(Resource):
+    isLeaf = True
+
+    def __init__(self, hs, media_repo):
+        Resource.__init__(self)
+
+        self.media_repo = media_repo
+        self.filepaths = media_repo.filepaths
+        self.store = hs.get_datastore()
+        self.clock = hs.get_clock()
+        self.server_name = hs.hostname
+        self.auth = hs.get_auth()
+        self.max_upload_size = hs.config.max_upload_size
+        self.version_string = hs.version_string
+        self.clock = hs.get_clock()
+
     def render_POST(self, request):
         self._async_render_POST(request)
         return NOT_DONE_YET
@@ -37,37 +51,7 @@ class UploadResource(BaseMediaResource):
         respond_with_json(request, 200, {}, send_cors=True)
         return NOT_DONE_YET
 
-    @defer.inlineCallbacks
-    def create_content(self, media_type, upload_name, content, content_length,
-                       auth_user):
-        media_id = random_string(24)
-
-        fname = self.filepaths.local_media_filepath(media_id)
-        self._makedirs(fname)
-
-        # This shouldn't block for very long because the content will have
-        # already been uploaded at this point.
-        with open(fname, "wb") as f:
-            f.write(content)
-
-        yield self.store.store_local_media(
-            media_id=media_id,
-            media_type=media_type,
-            time_now_ms=self.clock.time_msec(),
-            upload_name=upload_name,
-            media_length=content_length,
-            user_id=auth_user,
-        )
-        media_info = {
-            "media_type": media_type,
-            "media_length": content_length,
-        }
-
-        yield self._generate_local_thumbnails(media_id, media_info)
-
-        defer.returnValue("mxc://%s/%s" % (self.server_name, media_id))
-
-    @request_handler
+    @request_handler()
     @defer.inlineCallbacks
     def _async_render_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
@@ -108,7 +92,7 @@ class UploadResource(BaseMediaResource):
         #     disposition = headers.getRawHeaders("Content-Disposition")[0]
         # TODO(markjh): parse content-dispostion
 
-        content_uri = yield self.create_content(
+        content_uri = yield self.media_repo.create_content(
             media_type, upload_name, request.content.read(),
             content_length, requester.user
         )

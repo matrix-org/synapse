@@ -14,7 +14,8 @@
 # limitations under the License.
 
 from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
+from synapse.push.baserules import list_with_base_rules
 from twisted.internet import defer
 
 import logging
@@ -23,8 +24,31 @@ import simplejson as json
 logger = logging.getLogger(__name__)
 
 
+def _load_rules(rawrules, enabled_map):
+    ruleslist = []
+    for rawrule in rawrules:
+        rule = dict(rawrule)
+        rule["conditions"] = json.loads(rawrule["conditions"])
+        rule["actions"] = json.loads(rawrule["actions"])
+        ruleslist.append(rule)
+
+    # We're going to be mutating this a lot, so do a deep copy
+    rules = list(list_with_base_rules(ruleslist))
+
+    for i, rule in enumerate(rules):
+        rule_id = rule['rule_id']
+        if rule_id in enabled_map:
+            if rule.get('enabled', True) != bool(enabled_map[rule_id]):
+                # Rules are cached across users.
+                rule = dict(rule)
+                rule['enabled'] = bool(enabled_map[rule_id])
+                rules[i] = rule
+
+    return rules
+
+
 class PushRuleStore(SQLBaseStore):
-    @cachedInlineCallbacks()
+    @cachedInlineCallbacks(lru=True)
     def get_push_rules_for_user(self, user_id):
         rows = yield self._simple_select_list(
             table="push_rules",
@@ -42,9 +66,13 @@ class PushRuleStore(SQLBaseStore):
             key=lambda row: (-int(row["priority_class"]), -int(row["priority"]))
         )
 
-        defer.returnValue(rows)
+        enabled_map = yield self.get_push_rules_enabled_for_user(user_id)
 
-    @cachedInlineCallbacks()
+        rules = _load_rules(rows, enabled_map)
+
+        defer.returnValue(rules)
+
+    @cachedInlineCallbacks(lru=True)
     def get_push_rules_enabled_for_user(self, user_id):
         results = yield self._simple_select_list(
             table="push_rules_enable",
@@ -60,12 +88,16 @@ class PushRuleStore(SQLBaseStore):
             r['rule_id']: False if r['enabled'] == 0 else True for r in results
         })
 
-    @defer.inlineCallbacks
+    @cachedList(cached_method_name="get_push_rules_for_user",
+                list_name="user_ids", num_args=1, inlineCallbacks=True)
     def bulk_get_push_rules(self, user_ids):
         if not user_ids:
             defer.returnValue({})
 
-        results = {}
+        results = {
+            user_id: []
+            for user_id in user_ids
+        }
 
         rows = yield self._simple_select_many_batch(
             table="push_rules",
@@ -75,18 +107,32 @@ class PushRuleStore(SQLBaseStore):
             desc="bulk_get_push_rules",
         )
 
-        rows.sort(key=lambda e: (-e["priority_class"], -e["priority"]))
+        rows.sort(
+            key=lambda row: (-int(row["priority_class"]), -int(row["priority"]))
+        )
 
         for row in rows:
             results.setdefault(row['user_name'], []).append(row)
+
+        enabled_map_by_user = yield self.bulk_get_push_rules_enabled(user_ids)
+
+        for user_id, rules in results.items():
+            results[user_id] = _load_rules(
+                rules, enabled_map_by_user.get(user_id, {})
+            )
+
         defer.returnValue(results)
 
-    @defer.inlineCallbacks
+    @cachedList(cached_method_name="get_push_rules_enabled_for_user",
+                list_name="user_ids", num_args=1, inlineCallbacks=True)
     def bulk_get_push_rules_enabled(self, user_ids):
         if not user_ids:
             defer.returnValue({})
 
-        results = {}
+        results = {
+            user_id: {}
+            for user_id in user_ids
+        }
 
         rows = yield self._simple_select_many_batch(
             table="push_rules_enable",
@@ -96,7 +142,8 @@ class PushRuleStore(SQLBaseStore):
             desc="bulk_get_push_rules_enabled",
         )
         for row in rows:
-            results.setdefault(row['user_name'], {})[row['rule_id']] = row['enabled']
+            enabled = bool(row['enabled'])
+            results.setdefault(row['user_name'], {})[row['rule_id']] = enabled
         defer.returnValue(results)
 
     @defer.inlineCallbacks
@@ -374,6 +421,9 @@ class PushRuleStore(SQLBaseStore):
 
     def get_all_push_rule_updates(self, last_id, current_id, limit):
         """Get all the push rules changes that have happend on the server"""
+        if last_id == current_id:
+            return defer.succeed([])
+
         def get_all_push_rule_updates_txn(txn):
             sql = (
                 "SELECT stream_id, event_stream_ordering, user_id, rule_id,"
@@ -392,7 +442,7 @@ class PushRuleStore(SQLBaseStore):
         """Get the position of the push rules stream.
         Returns a pair of a stream id for the push_rules stream and the
         room stream ordering it corresponds to."""
-        return self._push_rules_stream_id_gen.get_max_token()
+        return self._push_rules_stream_id_gen.get_current_token()
 
     def have_push_rules_changed_for_user(self, user_id, last_id):
         if not self.push_rules_stream_cache.has_entity_changed(user_id, last_id):

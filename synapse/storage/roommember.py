@@ -21,7 +21,7 @@ from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 from synapse.api.constants import Membership
-from synapse.types import UserID
+from synapse.types import get_domain_from_id
 
 import logging
 
@@ -36,7 +36,7 @@ RoomsForUser = namedtuple(
 
 class RoomMemberStore(SQLBaseStore):
 
-    def _store_room_members_txn(self, txn, events):
+    def _store_room_members_txn(self, txn, events, backfilled):
         """Store a room member in the database.
         """
         self._simple_insert_many_txn(
@@ -62,26 +62,64 @@ class RoomMemberStore(SQLBaseStore):
                 self._membership_stream_cache.entity_has_changed,
                 event.state_key, event.internal_metadata.stream_ordering
             )
+            txn.call_after(
+                self.get_invited_rooms_for_user.invalidate, (event.state_key,)
+            )
 
-    def get_room_member(self, user_id, room_id):
-        """Retrieve the current state of a room member.
+            # We update the local_invites table only if the event is "current",
+            # i.e., its something that has just happened.
+            # The only current event that can also be an outlier is if its an
+            # invite that has come in across federation.
+            is_new_state = not backfilled and (
+                not event.internal_metadata.is_outlier()
+                or event.internal_metadata.is_invite_from_remote()
+            )
+            is_mine = self.hs.is_mine_id(event.state_key)
+            if is_new_state and is_mine:
+                if event.membership == Membership.INVITE:
+                    self._simple_insert_txn(
+                        txn,
+                        table="local_invites",
+                        values={
+                            "event_id": event.event_id,
+                            "invitee": event.state_key,
+                            "inviter": event.sender,
+                            "room_id": event.room_id,
+                            "stream_id": event.internal_metadata.stream_ordering,
+                        }
+                    )
+                else:
+                    sql = (
+                        "UPDATE local_invites SET stream_id = ?, replaced_by = ? WHERE"
+                        " room_id = ? AND invitee = ? AND locally_rejected is NULL"
+                        " AND replaced_by is NULL"
+                    )
 
-        Args:
-            user_id (str): The member's user ID.
-            room_id (str): The room the member is in.
-        Returns:
-            Deferred: Results in a MembershipEvent or None.
-        """
-        return self.runInteraction(
-            "get_room_member",
-            self._get_members_events_txn,
-            room_id,
-            user_id=user_id,
-        ).addCallback(
-            self._get_events
-        ).addCallback(
-            lambda events: events[0] if events else None
+                    txn.execute(sql, (
+                        event.internal_metadata.stream_ordering,
+                        event.event_id,
+                        event.room_id,
+                        event.state_key,
+                    ))
+
+    @defer.inlineCallbacks
+    def locally_reject_invite(self, user_id, room_id):
+        sql = (
+            "UPDATE local_invites SET stream_id = ?, locally_rejected = ? WHERE"
+            " room_id = ? AND invitee = ? AND locally_rejected is NULL"
+            " AND replaced_by is NULL"
         )
+
+        def f(txn, stream_ordering):
+            txn.execute(sql, (
+                stream_ordering,
+                True,
+                room_id,
+                user_id,
+            ))
+
+        with self._stream_id_gen.get_next() as stream_ordering:
+            yield self.runInteraction("locally_reject_invite", f, stream_ordering)
 
     @cached(max_entries=5000)
     def get_users_in_room(self, room_id):
@@ -96,24 +134,6 @@ class RoomMemberStore(SQLBaseStore):
             return [r["user_id"] for r in rows]
         return self.runInteraction("get_users_in_room", f)
 
-    def get_room_members(self, room_id, membership=None):
-        """Retrieve the current room member list for a room.
-
-        Args:
-            room_id (str): The room to get the list of members.
-            membership (synapse.api.constants.Membership): The filter to apply
-            to this list, or None to return all members with some state
-            associated with this room.
-        Returns:
-            list of namedtuples representing the members in this room.
-        """
-        return self.runInteraction(
-            "get_room_members",
-            self._get_members_events_txn,
-            room_id,
-            membership=membership,
-        ).addCallback(self._get_events)
-
     @cached()
     def get_invited_rooms_for_user(self, user_id):
         """ Get all the rooms the user is invited to
@@ -127,18 +147,23 @@ class RoomMemberStore(SQLBaseStore):
             user_id, [Membership.INVITE]
         )
 
-    def get_leave_and_ban_events_for_user(self, user_id):
-        """ Get all the leave events for a user
+    @defer.inlineCallbacks
+    def get_invite_for_user_in_room(self, user_id, room_id):
+        """Gets the invite for the given user and room
+
         Args:
-            user_id (str): The user ID.
+            user_id (str)
+            room_id (str)
+
         Returns:
-            A deferred list of event objects.
+            Deferred: Resolves to either a RoomsForUser or None if no invite was
+                found.
         """
-        return self.get_rooms_for_user_where_membership_is(
-            user_id, (Membership.LEAVE, Membership.BAN)
-        ).addCallback(lambda leaves: self._get_events([
-            leave.event_id for leave in leaves
-        ]))
+        invites = yield self.get_invited_rooms_for_user(user_id)
+        for invite in invites:
+            if invite.room_id == room_id:
+                defer.returnValue(invite)
+        defer.returnValue(None)
 
     def get_rooms_for_user_where_membership_is(self, user_id, membership_list):
         """ Get all the rooms for this user where the membership for this user
@@ -163,57 +188,60 @@ class RoomMemberStore(SQLBaseStore):
 
     def _get_rooms_for_user_where_membership_is_txn(self, txn, user_id,
                                                     membership_list):
-        where_clause = "user_id = ? AND (%s) AND forgotten = 0" % (
-            " OR ".join(["membership = ?" for _ in membership_list]),
-        )
 
-        args = [user_id]
-        args.extend(membership_list)
+        do_invite = Membership.INVITE in membership_list
+        membership_list = [m for m in membership_list if m != Membership.INVITE]
 
-        sql = (
-            "SELECT m.room_id, m.sender, m.membership, m.event_id, e.stream_ordering"
-            " FROM current_state_events as c"
-            " INNER JOIN room_memberships as m"
-            " ON m.event_id = c.event_id"
-            " INNER JOIN events as e"
-            " ON e.event_id = c.event_id"
-            " AND m.room_id = c.room_id"
-            " AND m.user_id = c.state_key"
-            " WHERE %s"
-        ) % (where_clause,)
+        results = []
+        if membership_list:
+            where_clause = "user_id = ? AND (%s) AND forgotten = 0" % (
+                " OR ".join(["membership = ?" for _ in membership_list]),
+            )
 
-        txn.execute(sql, args)
-        return [
-            RoomsForUser(**r) for r in self.cursor_to_dict(txn)
-        ]
+            args = [user_id]
+            args.extend(membership_list)
 
-    @cached(max_entries=5000)
+            sql = (
+                "SELECT m.room_id, m.sender, m.membership, m.event_id, e.stream_ordering"
+                " FROM current_state_events as c"
+                " INNER JOIN room_memberships as m"
+                " ON m.event_id = c.event_id"
+                " INNER JOIN events as e"
+                " ON e.event_id = c.event_id"
+                " AND m.room_id = c.room_id"
+                " AND m.user_id = c.state_key"
+                " WHERE %s"
+            ) % (where_clause,)
+
+            txn.execute(sql, args)
+            results = [
+                RoomsForUser(**r) for r in self.cursor_to_dict(txn)
+            ]
+
+        if do_invite:
+            sql = (
+                "SELECT i.room_id, inviter, i.event_id, e.stream_ordering"
+                " FROM local_invites as i"
+                " INNER JOIN events as e USING (event_id)"
+                " WHERE invitee = ? AND locally_rejected is NULL"
+                " AND replaced_by is NULL"
+            )
+
+            txn.execute(sql, (user_id,))
+            results.extend(RoomsForUser(
+                room_id=r["room_id"],
+                sender=r["inviter"],
+                event_id=r["event_id"],
+                stream_ordering=r["stream_ordering"],
+                membership=Membership.INVITE,
+            ) for r in self.cursor_to_dict(txn))
+
+        return results
+
+    @cachedInlineCallbacks(max_entries=5000)
     def get_joined_hosts_for_room(self, room_id):
-        return self.runInteraction(
-            "get_joined_hosts_for_room",
-            self._get_joined_hosts_for_room_txn,
-            room_id,
-        )
-
-    def _get_joined_hosts_for_room_txn(self, txn, room_id):
-        rows = self._get_members_rows_txn(
-            txn,
-            room_id, membership=Membership.JOIN
-        )
-
-        joined_domains = set(
-            UserID.from_string(r["user_id"]).domain
-            for r in rows
-        )
-
-        return joined_domains
-
-    def _get_members_events_txn(self, txn, room_id, membership=None, user_id=None):
-        rows = self._get_members_rows_txn(
-            txn,
-            room_id, membership, user_id,
-        )
-        return [r["event_id"] for r in rows]
+        user_ids = yield self.get_users_in_room(room_id)
+        defer.returnValue(set(get_domain_from_id(uid) for uid in user_ids))
 
     def _get_members_rows_txn(self, txn, room_id, membership=None, user_id=None):
         where_clause = "c.room_id = ?"

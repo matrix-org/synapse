@@ -100,20 +100,6 @@ class _PerHostRatelimiter(object):
         self.current_processing = set()
         self.request_times = []
 
-    def is_empty(self):
-        time_now = self.clock.time_msec()
-        self.request_times[:] = [
-            r for r in self.request_times
-            if time_now - r < self.window_size
-        ]
-
-        return not (
-            self.ready_request_queue
-            or self.sleeping_requests
-            or self.current_processing
-            or self.request_times
-        )
-
     @contextlib.contextmanager
     def ratelimit(self):
         # `contextlib.contextmanager` takes a generator and turns it into a

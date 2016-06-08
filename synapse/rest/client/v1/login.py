@@ -43,20 +43,27 @@ class LoginRestServlet(ClientV1RestServlet):
     SAML2_TYPE = "m.login.saml2"
     CAS_TYPE = "m.login.cas"
     TOKEN_TYPE = "m.login.token"
+    JWT_TYPE = "m.login.jwt"
 
     def __init__(self, hs):
         super(LoginRestServlet, self).__init__(hs)
         self.idp_redirect_url = hs.config.saml2_idp_redirect_url
         self.password_enabled = hs.config.password_enabled
         self.saml2_enabled = hs.config.saml2_enabled
+        self.jwt_enabled = hs.config.jwt_enabled
+        self.jwt_secret = hs.config.jwt_secret
+        self.jwt_algorithm = hs.config.jwt_algorithm
         self.cas_enabled = hs.config.cas_enabled
         self.cas_server_url = hs.config.cas_server_url
         self.cas_required_attributes = hs.config.cas_required_attributes
         self.servername = hs.config.server_name
         self.http_client = hs.get_simple_http_client()
+        self.auth_handler = self.hs.get_auth_handler()
 
     def on_GET(self, request):
         flows = []
+        if self.jwt_enabled:
+            flows.append({"type": LoginRestServlet.JWT_TYPE})
         if self.saml2_enabled:
             flows.append({"type": LoginRestServlet.SAML2_TYPE})
         if self.cas_enabled:
@@ -98,6 +105,10 @@ class LoginRestServlet(ClientV1RestServlet):
                     "uri": "%s%s" % (self.idp_redirect_url, relay_state)
                 }
                 defer.returnValue((200, result))
+            elif self.jwt_enabled and (login_submission["type"] ==
+                                       LoginRestServlet.JWT_TYPE):
+                result = yield self.do_jwt_login(login_submission)
+                defer.returnValue(result)
             # TODO Delete this after all CAS clients switch to token login instead
             elif self.cas_enabled and (login_submission["type"] ==
                                        LoginRestServlet.CAS_TYPE):
@@ -133,7 +144,7 @@ class LoginRestServlet(ClientV1RestServlet):
                 user_id, self.hs.hostname
             ).to_string()
 
-        auth_handler = self.handlers.auth_handler
+        auth_handler = self.auth_handler
         user_id, access_token, refresh_token = yield auth_handler.login_with_password(
             user_id=user_id,
             password=login_submission["password"])
@@ -150,7 +161,7 @@ class LoginRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def do_token_login(self, login_submission):
         token = login_submission['token']
-        auth_handler = self.handlers.auth_handler
+        auth_handler = self.auth_handler
         user_id = (
             yield auth_handler.validate_short_term_login_token_and_get_user_id(token)
         )
@@ -184,7 +195,7 @@ class LoginRestServlet(ClientV1RestServlet):
                     raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
 
         user_id = UserID.create(user, self.hs.hostname).to_string()
-        auth_handler = self.handlers.auth_handler
+        auth_handler = self.auth_handler
         user_exists = yield auth_handler.does_user_exist(user_id)
         if user_exists:
             user_id, access_token, refresh_token = (
@@ -197,6 +208,54 @@ class LoginRestServlet(ClientV1RestServlet):
                 "home_server": self.hs.hostname,
             }
 
+        else:
+            user_id, access_token = (
+                yield self.handlers.registration_handler.register(localpart=user)
+            )
+            result = {
+                "user_id": user_id,  # may have changed
+                "access_token": access_token,
+                "home_server": self.hs.hostname,
+            }
+
+        defer.returnValue((200, result))
+
+    @defer.inlineCallbacks
+    def do_jwt_login(self, login_submission):
+        token = login_submission.get("token", None)
+        if token is None:
+            raise LoginError(
+                401, "Token field for JWT is missing",
+                errcode=Codes.UNAUTHORIZED
+            )
+
+        import jwt
+        from jwt.exceptions import InvalidTokenError
+
+        try:
+            payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
+        except jwt.ExpiredSignatureError:
+            raise LoginError(401, "JWT expired", errcode=Codes.UNAUTHORIZED)
+        except InvalidTokenError:
+            raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
+
+        user = payload.get("sub", None)
+        if user is None:
+            raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
+
+        user_id = UserID.create(user, self.hs.hostname).to_string()
+        auth_handler = self.auth_handler
+        user_exists = yield auth_handler.does_user_exist(user_id)
+        if user_exists:
+            user_id, access_token, refresh_token = (
+                yield auth_handler.get_login_tuple_for_user_id(user_id)
+            )
+            result = {
+                "user_id": user_id,  # may have changed
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "home_server": self.hs.hostname,
+            }
         else:
             user_id, access_token = (
                 yield self.handlers.registration_handler.register(localpart=user)
@@ -354,7 +413,7 @@ class CasTicketServlet(ClientV1RestServlet):
                     raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
 
         user_id = UserID.create(user, self.hs.hostname).to_string()
-        auth_handler = self.handlers.auth_handler
+        auth_handler = self.auth_handler
         user_exists = yield auth_handler.does_user_exist(user_id)
         if not user_exists:
             user_id, _ = (

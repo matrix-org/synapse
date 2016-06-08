@@ -100,11 +100,6 @@ class ApplicationServiceApi(SimpleHttpClient):
             logger.warning("push_bulk to %s threw exception %s", uri, ex)
         defer.returnValue(False)
 
-    @defer.inlineCallbacks
-    def push(self, service, event, txn_id=None):
-        response = yield self.push_bulk(service, [event], txn_id)
-        defer.returnValue(response)
-
     def _serialize(self, events):
         time_now = self.clock.time_msec()
         return [

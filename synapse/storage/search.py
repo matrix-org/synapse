@@ -21,6 +21,7 @@ from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 import logging
 import re
+import ujson as json
 
 
 logger = logging.getLogger(__name__)
@@ -29,11 +30,16 @@ logger = logging.getLogger(__name__)
 class SearchStore(BackgroundUpdateStore):
 
     EVENT_SEARCH_UPDATE_NAME = "event_search"
+    EVENT_SEARCH_ORDER_UPDATE_NAME = "event_search_order"
 
     def __init__(self, hs):
         super(SearchStore, self).__init__(hs)
         self.register_background_update_handler(
             self.EVENT_SEARCH_UPDATE_NAME, self._background_reindex_search
+        )
+        self.register_background_update_handler(
+            self.EVENT_SEARCH_ORDER_UPDATE_NAME,
+            self._background_reindex_search_order
         )
 
     @defer.inlineCallbacks
@@ -47,7 +53,7 @@ class SearchStore(BackgroundUpdateStore):
 
         def reindex_search_txn(txn):
             sql = (
-                "SELECT stream_ordering, event_id FROM events"
+                "SELECT stream_ordering, event_id, room_id, type, content FROM events"
                 " WHERE ? <= stream_ordering AND stream_ordering < ?"
                 " AND (%s)"
                 " ORDER BY stream_ordering DESC"
@@ -56,28 +62,30 @@ class SearchStore(BackgroundUpdateStore):
 
             txn.execute(sql, (target_min_stream_id, max_stream_id, batch_size))
 
-            rows = txn.fetchall()
+            rows = self.cursor_to_dict(txn)
             if not rows:
                 return 0
 
-            min_stream_id = rows[-1][0]
-            event_ids = [row[1] for row in rows]
-
-            events = self._get_events_txn(txn, event_ids)
+            min_stream_id = rows[-1]["stream_ordering"]
 
             event_search_rows = []
-            for event in events:
+            for row in rows:
                 try:
-                    event_id = event.event_id
-                    room_id = event.room_id
-                    content = event.content
-                    if event.type == "m.room.message":
+                    event_id = row["event_id"]
+                    room_id = row["room_id"]
+                    etype = row["type"]
+                    try:
+                        content = json.loads(row["content"])
+                    except:
+                        continue
+
+                    if etype == "m.room.message":
                         key = "content.body"
                         value = content["body"]
-                    elif event.type == "m.room.topic":
+                    elif etype == "m.room.topic":
                         key = "content.topic"
                         value = content["topic"]
-                    elif event.type == "m.room.name":
+                    elif etype == "m.room.name":
                         key = "content.name"
                         value = content["name"]
                 except (KeyError, AttributeError):
@@ -130,6 +138,82 @@ class SearchStore(BackgroundUpdateStore):
             yield self._end_background_update(self.EVENT_SEARCH_UPDATE_NAME)
 
         defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _background_reindex_search_order(self, progress, batch_size):
+        target_min_stream_id = progress["target_min_stream_id_inclusive"]
+        max_stream_id = progress["max_stream_id_exclusive"]
+        rows_inserted = progress.get("rows_inserted", 0)
+        have_added_index = progress['have_added_indexes']
+
+        if not have_added_index:
+            def create_index(conn):
+                conn.rollback()
+                conn.set_session(autocommit=True)
+                c = conn.cursor()
+
+                # We create with NULLS FIRST so that when we search *backwards*
+                # we get the ones with non null origin_server_ts *first*
+                c.execute(
+                    "CREATE INDEX CONCURRENTLY event_search_room_order ON event_search("
+                    "room_id, origin_server_ts NULLS FIRST, stream_ordering NULLS FIRST)"
+                )
+                c.execute(
+                    "CREATE INDEX CONCURRENTLY event_search_order ON event_search("
+                    "origin_server_ts NULLS FIRST, stream_ordering NULLS FIRST)"
+                )
+                conn.set_session(autocommit=False)
+
+            yield self.runWithConnection(create_index)
+
+            pg = dict(progress)
+            pg["have_added_indexes"] = True
+
+            yield self.runInteraction(
+                self.EVENT_SEARCH_ORDER_UPDATE_NAME,
+                self._background_update_progress_txn,
+                self.EVENT_SEARCH_ORDER_UPDATE_NAME, pg,
+            )
+
+        def reindex_search_txn(txn):
+            sql = (
+                "UPDATE event_search AS es SET stream_ordering = e.stream_ordering,"
+                " origin_server_ts = e.origin_server_ts"
+                " FROM events AS e"
+                " WHERE e.event_id = es.event_id"
+                " AND ? <= e.stream_ordering AND e.stream_ordering < ?"
+                " RETURNING es.stream_ordering"
+            )
+
+            min_stream_id = max_stream_id - batch_size
+            txn.execute(sql, (min_stream_id, max_stream_id))
+            rows = txn.fetchall()
+
+            if min_stream_id < target_min_stream_id:
+                # We've recached the end.
+                return len(rows), False
+
+            progress = {
+                "target_min_stream_id_inclusive": target_min_stream_id,
+                "max_stream_id_exclusive": min_stream_id,
+                "rows_inserted": rows_inserted + len(rows),
+                "have_added_indexes": True,
+            }
+
+            self._background_update_progress_txn(
+                txn, self.EVENT_SEARCH_ORDER_UPDATE_NAME, progress
+            )
+
+            return len(rows), True
+
+        num_rows, finished = yield self.runInteraction(
+            self.EVENT_SEARCH_ORDER_UPDATE_NAME, reindex_search_txn
+        )
+
+        if not finished:
+            yield self._end_background_update(self.EVENT_SEARCH_ORDER_UPDATE_NAME)
+
+        defer.returnValue(num_rows)
 
     @defer.inlineCallbacks
     def search_msgs(self, room_ids, search_term, keys):
@@ -310,7 +394,6 @@ class SearchStore(BackgroundUpdateStore):
                 "SELECT ts_rank_cd(vector, to_tsquery('english', ?)) as rank,"
                 " origin_server_ts, stream_ordering, room_id, event_id"
                 " FROM event_search"
-                " NATURAL JOIN events"
                 " WHERE vector @@ to_tsquery('english', ?) AND "
             )
             args = [search_query, search_query] + args
@@ -355,7 +438,15 @@ class SearchStore(BackgroundUpdateStore):
 
         # We add an arbitrary limit here to ensure we don't try to pull the
         # entire table from the database.
-        sql += " ORDER BY origin_server_ts DESC, stream_ordering DESC LIMIT ?"
+        if isinstance(self.database_engine, PostgresEngine):
+            sql += (
+                " ORDER BY origin_server_ts DESC NULLS LAST,"
+                " stream_ordering DESC NULLS LAST LIMIT ?"
+            )
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            sql += " ORDER BY origin_server_ts DESC, stream_ordering DESC LIMIT ?"
+        else:
+            raise Exception("Unrecognized database engine")
 
         args.append(limit)
 

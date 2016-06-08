@@ -75,7 +75,8 @@ class StateHandler(object):
         self._state_cache.start()
 
     @defer.inlineCallbacks
-    def get_current_state(self, room_id, event_type=None, state_key=""):
+    def get_current_state(self, room_id, event_type=None, state_key="",
+                          latest_event_ids=None):
         """ Retrieves the current state for the room. This is done by
         calling `get_latest_events_in_room` to get the leading edges of the
         event graph and then resolving any of the state conflicts.
@@ -86,11 +87,13 @@ class StateHandler(object):
         If `event_type` is specified, then the method returns only the one
         event (or None) with that `event_type` and `state_key`.
 
-        :returns map from (type, state_key) to event
+        Returns:
+            map from (type, state_key) to event
         """
-        event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
+        if not latest_event_ids:
+            latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
 
-        res = yield self.resolve_state_groups(room_id, event_ids)
+        res = yield self.resolve_state_groups(room_id, latest_event_ids)
         state = res[1]
 
         if event_type:
@@ -100,7 +103,7 @@ class StateHandler(object):
         defer.returnValue(state)
 
     @defer.inlineCallbacks
-    def compute_event_context(self, event, old_state=None, outlier=False):
+    def compute_event_context(self, event, old_state=None):
         """ Fills out the context with the `current state` of the graph. The
         `current state` here is defined to be the state of the event graph
         just before the event - i.e. it never includes `event`
@@ -115,7 +118,7 @@ class StateHandler(object):
         """
         context = EventContext()
 
-        if outlier:
+        if event.internal_metadata.is_outlier():
             # If this is an outlier, then we know it shouldn't have any current
             # state. Certainly store.get_current_state won't return any, and
             # persisting the event won't store the state group.
@@ -176,10 +179,11 @@ class StateHandler(object):
         """ Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
 
-        :returns a Deferred tuple of (`state_group`, `state`, `prev_state`).
-        `state_group` is the name of a state group if one and only one is
-        involved. `state` is a map from (type, state_key) to event, and
-        `prev_state` is a list of event ids.
+        Returns:
+            a Deferred tuple of (`state_group`, `state`, `prev_state`).
+            `state_group` is the name of a state group if one and only one is
+            involved. `state` is a map from (type, state_key) to event, and
+            `prev_state` is a list of event ids.
         """
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
@@ -210,7 +214,7 @@ class StateHandler(object):
 
         if self._state_cache is not None:
             cache = self._state_cache.get(group_names, None)
-            if cache and cache.state_group:
+            if cache:
                 cache.ts = self.clock.time_msec()
 
                 event_dict = yield self.store.get_events(cache.state.values())
@@ -226,22 +230,34 @@ class StateHandler(object):
                     (cache.state_group, state, prev_states)
                 )
 
+        logger.info("Resolving state for %s with %d groups", room_id, len(state_groups))
+
         new_state, prev_states = self._resolve_events(
             state_groups.values(), event_type, state_key
         )
 
+        state_group = None
+        new_state_event_ids = frozenset(e.event_id for e in new_state.values())
+        for sg, events in state_groups.items():
+            if new_state_event_ids == frozenset(e.event_id for e in events):
+                state_group = sg
+                break
+
         if self._state_cache is not None:
             cache = _StateCacheEntry(
                 state={key: event.event_id for key, event in new_state.items()},
-                state_group=None,
+                state_group=state_group,
                 ts=self.clock.time_msec()
             )
 
             self._state_cache[group_names] = cache
 
-        defer.returnValue((None, new_state, prev_states))
+        defer.returnValue((state_group, new_state, prev_states))
 
     def resolve_events(self, state_sets, event):
+        logger.info(
+            "Resolving state for %s with %d groups", event.room_id, len(state_sets)
+        )
         if event.is_state():
             return self._resolve_events(
                 state_sets, event.type, event.state_key
@@ -251,9 +267,10 @@ class StateHandler(object):
 
     def _resolve_events(self, state_sets, event_type=None, state_key=""):
         """
-        :returns a tuple (new_state, prev_states). new_state is a map
-        from (type, state_key) to event. prev_states is a list of event_ids.
-        :rtype: (dict[(str, str), synapse.events.FrozenEvent], list[str])
+        Returns
+            (dict[(str, str), synapse.events.FrozenEvent], list[str]): a tuple
+            (new_state, prev_states). new_state is a map from (type, state_key)
+            to event. prev_states is a list of event_ids.
         """
         with Measure(self.clock, "state._resolve_events"):
             state = {}

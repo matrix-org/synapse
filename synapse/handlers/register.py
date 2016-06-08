@@ -16,22 +16,19 @@
 """Contains functions for registering clients."""
 from twisted.internet import defer
 
-from synapse.types import UserID
+from synapse.types import UserID, Requester
 from synapse.api.errors import (
     AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError
 )
 from ._base import BaseHandler
 from synapse.util.async import run_on_reactor
 from synapse.http.client import CaptchaServerHttpClient
+from synapse.util.distributor import registered_user
 
 import logging
 import urllib
 
 logger = logging.getLogger(__name__)
-
-
-def registered_user(distributor, user):
-    return distributor.fire("registered_user", user)
 
 
 class RegistrationHandler(BaseHandler):
@@ -361,8 +358,62 @@ class RegistrationHandler(BaseHandler):
         )
         defer.returnValue(data)
 
+    @defer.inlineCallbacks
+    def get_or_create_user(self, localpart, displayname, duration_seconds):
+        """Creates a new user if the user does not exist,
+        else revokes all previous access tokens and generates a new one.
+
+        Args:
+            localpart : The local part of the user ID to register. If None,
+              one will be randomly generated.
+        Returns:
+            A tuple of (user_id, access_token).
+        Raises:
+            RegistrationError if there was a problem registering.
+        """
+        yield run_on_reactor()
+
+        if localpart is None:
+            raise SynapseError(400, "Request must include user id")
+
+        need_register = True
+
+        try:
+            yield self.check_username(localpart)
+        except SynapseError as e:
+            if e.errcode == Codes.USER_IN_USE:
+                need_register = False
+            else:
+                raise
+
+        user = UserID(localpart, self.hs.hostname)
+        user_id = user.to_string()
+        auth_handler = self.hs.get_handlers().auth_handler
+        token = auth_handler.generate_short_term_login_token(user_id, duration_seconds)
+
+        if need_register:
+            yield self.store.register(
+                user_id=user_id,
+                token=token,
+                password_hash=None
+            )
+
+            yield registered_user(self.distributor, user)
+        else:
+            yield self.store.user_delete_access_tokens(user_id=user_id)
+            yield self.store.add_access_token_to_user(user_id=user_id, token=token)
+
+        if displayname is not None:
+            logger.info("setting user display name: %s -> %s", user_id, displayname)
+            profile_handler = self.hs.get_handlers().profile_handler
+            yield profile_handler.set_displayname(
+                user, Requester(user, token, False), displayname
+            )
+
+        defer.returnValue((user_id, token))
+
     def auth_handler(self):
-        return self.hs.get_handlers().auth_handler
+        return self.hs.get_auth_handler()
 
     @defer.inlineCallbacks
     def guest_access_token_for(self, medium, address, inviter_user_id):

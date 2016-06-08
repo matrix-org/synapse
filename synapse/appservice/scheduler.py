@@ -56,22 +56,22 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class AppServiceScheduler(object):
+class ApplicationServiceScheduler(object):
     """ Public facing API for this module. Does the required DI to tie the
     components together. This also serves as the "event_pool", which in this
     case is a simple array.
     """
 
-    def __init__(self, clock, store, as_api):
-        self.clock = clock
-        self.store = store
-        self.as_api = as_api
+    def __init__(self, hs):
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastore()
+        self.as_api = hs.get_application_service_api()
 
         def create_recoverer(service, callback):
-            return _Recoverer(clock, store, as_api, service, callback)
+            return _Recoverer(self.clock, self.store, self.as_api, service, callback)
 
         self.txn_ctrl = _TransactionController(
-            clock, store, as_api, create_recoverer
+            self.clock, self.store, self.as_api, create_recoverer
         )
         self.queuer = _ServiceQueuer(self.txn_ctrl)
 

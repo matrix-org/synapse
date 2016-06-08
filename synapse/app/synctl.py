@@ -66,6 +66,10 @@ def main():
 
     config = yaml.load(open(configfile))
     pidfile = config["pid_file"]
+    cache_factor = config.get("synctl_cache_factor", None)
+
+    if cache_factor:
+        os.environ["SYNAPSE_CACHE_FACTOR"] = str(cache_factor)
 
     action = sys.argv[1] if sys.argv[1:] else "usage"
     if action == "start":

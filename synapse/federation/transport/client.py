@@ -179,7 +179,8 @@ class TransportLayerClient(object):
         content = yield self.client.get_json(
             destination=destination,
             path=path,
-            retry_on_dns_fail=True,
+            retry_on_dns_fail=False,
+            timeout=20000,
         )
 
         defer.returnValue(content)
@@ -219,6 +220,18 @@ class TransportLayerClient(object):
             destination=destination,
             path=path,
             data=content,
+        )
+
+        defer.returnValue(response)
+
+    @defer.inlineCallbacks
+    @log_function
+    def get_public_rooms(self, remote_server):
+        path = PREFIX + "/publicRooms"
+
+        response = yield self.client.get_json(
+            destination=remote_server,
+            path=path,
         )
 
         defer.returnValue(response)
