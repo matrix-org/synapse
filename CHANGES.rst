@@ -16,7 +16,7 @@ Bug fixes:
 * Fix presence where timeouts were not being fired for the first 8h after
   restarts (PR #842)
 * Fix bug where synapse sent malformed transactions to AS's when retrying
-  transactions (Commits 310197b, 843790)
+  transactions (Commits 310197b, 8437906)
 
 Performance Improvements:
 
