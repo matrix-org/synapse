@@ -1,3 +1,30 @@
+Changes in synapse v0.16.0-rc2 (2016-06-08)
+===========================================
+
+Features:
+
+* Add configuration option for tuning GC via ``gc.set_threshold`` (PR #849)
+
+Changes:
+
+* Record metrics about GC (PR #771, #847, #852)
+* Add metric counter for number of persisted events (PR #841)
+
+Bug fixes:
+
+* Fix 'From' header in email notifications (PR #843)
+* Fix presence where timeouts were not being fired for the first 8h after
+  restarts (PR #842)
+* Fix bug where synapse sent malformed transactions to AS's when retrying
+  transactions (Commits 310197b, 843790)
+
+Performance Improvements:
+
+* Remove event fetching from DB threads (PR #835)
+* Change the way we cache events (PR #836)
+* Add events to cache when we persist them (PR #840)
+
+
 Changes in synapse v0.16.0-rc1 (2016-06-03)
 ===========================================
 
