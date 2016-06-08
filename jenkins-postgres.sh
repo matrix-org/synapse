@@ -41,6 +41,8 @@ rm -rf sytest
 git clone .sytest-base sytest --shared
 cd sytest
 
+mkdir -p var
+
 git checkout "${GIT_BRANCH}" || (echo >&2 "No ref ${GIT_BRANCH} found, falling back to develop" ; git checkout develop)
 
 : ${PORT_BASE:=8000}
