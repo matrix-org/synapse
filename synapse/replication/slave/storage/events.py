@@ -131,15 +131,10 @@ class SlavedEventStore(BaseSlavedStore):
     _get_events_from_cache = DataStore._get_events_from_cache.__func__
 
     _invalidate_get_event_cache = DataStore._invalidate_get_event_cache.__func__
-    _parse_events_txn = DataStore._parse_events_txn.__func__
-    _get_events_txn = DataStore._get_events_txn.__func__
-    _get_event_txn = DataStore._get_event_txn.__func__
     _enqueue_events = DataStore._enqueue_events.__func__
     _do_fetch = DataStore._do_fetch.__func__
-    _fetch_events_txn = DataStore._fetch_events_txn.__func__
     _fetch_event_rows = DataStore._fetch_event_rows.__func__
     _get_event_from_row = DataStore._get_event_from_row.__func__
-    _get_event_from_row_txn = DataStore._get_event_from_row_txn.__func__
     _get_rooms_for_user_where_membership_is_txn = (
         DataStore._get_rooms_for_user_where_membership_is_txn.__func__
     )

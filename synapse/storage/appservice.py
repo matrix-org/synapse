@@ -298,6 +298,7 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             dict(txn_id=txn_id, as_id=service.id)
         )
 
+    @defer.inlineCallbacks
     def get_oldest_unsent_txn(self, service):
         """Get the oldest transaction which has not been sent for this
         service.
@@ -308,11 +309,22 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             A Deferred which resolves to an AppServiceTransaction or
             None.
         """
-        return self.runInteraction(
+        entry = yield self.runInteraction(
             "get_oldest_unsent_appservice_txn",
             self._get_oldest_unsent_txn,
             service
         )
+
+        if not entry:
+            defer.returnValue(None)
+
+        event_ids = json.loads(entry["event_ids"])
+
+        events = yield self._get_events(event_ids)
+
+        defer.returnValue(AppServiceTransaction(
+            service=service, id=entry["txn_id"], events=events
+        ))
 
     def _get_oldest_unsent_txn(self, txn, service):
         # Monotonically increasing txn ids, so just select the smallest
@@ -328,12 +340,7 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
 
         entry = rows[0]
 
-        event_ids = json.loads(entry["event_ids"])
-        events = self._get_events_txn(txn, event_ids)
-
-        return AppServiceTransaction(
-            service=service, id=entry["txn_id"], events=events
-        )
+        return entry
 
     def _get_last_txn(self, txn, service_id):
         txn.execute(

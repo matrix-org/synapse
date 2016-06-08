@@ -43,6 +43,7 @@ from twisted.web.resource import Resource
 
 from daemonize import Daemonize
 
+import gc
 import sys
 import logging
 
@@ -63,6 +64,20 @@ class SlaveConfig(DatabaseConfig):
         self.daemonize = config.get("daemonize")
         self.pid_file = self.abspath(config.get("pid_file"))
         self.public_baseurl = config["public_baseurl"]
+
+        thresholds = config.get("gc_thresholds", None)
+        if thresholds is not None:
+            try:
+                assert len(thresholds) == 3
+                self.gc_thresholds = (
+                    int(thresholds[0]), int(thresholds[1]), int(thresholds[2]),
+                )
+            except:
+                raise ConfigError(
+                    "Value of `gc_threshold` must be a list of three integers if set"
+                )
+        else:
+            self.gc_thresholds = None
 
         # some things used by the auth handler but not actually used in the
         # pusher codebase
@@ -311,7 +326,7 @@ class PusherServer(HomeServer):
                 poke_pushers(result)
             except:
                 logger.exception("Error replicating from %r", replication_url)
-                sleep(30)
+                yield sleep(30)
 
 
 def setup(config_options):
@@ -342,6 +357,8 @@ def setup(config_options):
     ps.start_listening()
 
     change_resource_limit(ps.config.soft_file_limit)
+    if ps.config.gc_thresholds:
+        gc.set_threshold(*ps.config.gc_thresholds)
 
     def start():
         ps.replicate()
@@ -361,6 +378,8 @@ if __name__ == '__main__':
             def run():
                 with LoggingContext("run"):
                     change_resource_limit(ps.config.soft_file_limit)
+                    if ps.config.gc_thresholds:
+                        gc.set_threshold(*ps.config.gc_thresholds)
                     reactor.run()
 
             daemon = Daemonize(

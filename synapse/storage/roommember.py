@@ -243,13 +243,6 @@ class RoomMemberStore(SQLBaseStore):
         user_ids = yield self.get_users_in_room(room_id)
         defer.returnValue(set(get_domain_from_id(uid) for uid in user_ids))
 
-    def _get_members_events_txn(self, txn, room_id, membership=None, user_id=None):
-        rows = self._get_members_rows_txn(
-            txn,
-            room_id, membership, user_id,
-        )
-        return [r["event_id"] for r in rows]
-
     def _get_members_rows_txn(self, txn, room_id, membership=None, user_id=None):
         where_clause = "c.room_id = ?"
         where_values = [room_id]

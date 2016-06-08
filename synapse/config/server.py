@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from ._base import Config, ConfigError
 
 
 class ServerConfig(Config):
@@ -37,6 +37,20 @@ class ServerConfig(Config):
         self.start_pushers = config.get("start_pushers", True)
 
         self.listeners = config.get("listeners", [])
+
+        thresholds = config.get("gc_thresholds", None)
+        if thresholds is not None:
+            try:
+                assert len(thresholds) == 3
+                self.gc_thresholds = (
+                    int(thresholds[0]), int(thresholds[1]), int(thresholds[2]),
+                )
+            except:
+                raise ConfigError(
+                    "Value of `gc_threshold` must be a list of three integers if set"
+                )
+        else:
+            self.gc_thresholds = None
 
         bind_port = config.get("bind_port")
         if bind_port:
@@ -156,6 +170,9 @@ class ServerConfig(Config):
         # Zero is used to indicate synapse should set the soft limit to the
         # hard limit.
         soft_file_limit: 0
+
+        # The GC threshold parameters to pass to `gc.set_threshold`, if defined
+        # gc_thresholds: [700, 10, 10]
 
         # A list of other Home Servers to fetch the public room directory from
         # and include in the public room directory of this home server
