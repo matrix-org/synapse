@@ -532,11 +532,6 @@ class PublicRoomList(BaseFederationServlet):
         data = yield self.room_list_handler.get_local_public_room_list()
         defer.returnValue((200, data))
 
-    # Avoid doing remote HS authorization checks which are done by default by
-    # BaseFederationServlet.
-    def _wrap(self, code):
-        return code
-
 
 SERVLET_CLASSES = (
     FederationSendServlet,
