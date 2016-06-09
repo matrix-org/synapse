@@ -41,14 +41,15 @@ class RegistrationTestCase(unittest.TestCase):
             handlers=None,
             http_client=None,
             expire_access_token=True)
+        self.auth_handler = Mock(
+            generate_short_term_login_token=Mock(return_value='secret'))
         self.hs.handlers = RegistrationHandlers(self.hs)
         self.handler = self.hs.get_handlers().registration_handler
         self.hs.get_handlers().profile_handler = Mock()
         self.mock_handler = Mock(spec=[
             "generate_short_term_login_token",
         ])
-
-        self.hs.get_handlers().auth_handler = self.mock_handler
+        self.hs.get_auth_handler = Mock(return_value=self.auth_handler)
 
     @defer.inlineCallbacks
     def test_user_is_created_and_logged_in_if_doesnt_exist(self):
@@ -56,8 +57,6 @@ class RegistrationTestCase(unittest.TestCase):
         local_part = "someone"
         display_name = "someone"
         user_id = "@someone:test"
-        mock_token = self.mock_handler.generate_short_term_login_token
-        mock_token.return_value = 'secret'
         result_user_id, result_token = yield self.handler.get_or_create_user(
             local_part, display_name, duration_ms)
         self.assertEquals(result_user_id, user_id)
@@ -75,8 +74,6 @@ class RegistrationTestCase(unittest.TestCase):
         local_part = "frank"
         display_name = "Frank"
         user_id = "@frank:test"
-        mock_token = self.mock_handler.generate_short_term_login_token
-        mock_token.return_value = 'secret'
         result_user_id, result_token = yield self.handler.get_or_create_user(
             local_part, display_name, duration_ms)
         self.assertEquals(result_user_id, user_id)
