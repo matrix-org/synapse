@@ -45,30 +45,27 @@ class EventStreamRestServlet(ClientV1RestServlet):
                 raise SynapseError(400, "Guest users must specify room_id param")
         if "room_id" in request.args:
             room_id = request.args["room_id"][0]
-        try:
-            handler = self.handlers.event_stream_handler
-            pagin_config = PaginationConfig.from_request(request)
-            timeout = EventStreamRestServlet.DEFAULT_LONGPOLL_TIME_MS
-            if "timeout" in request.args:
-                try:
-                    timeout = int(request.args["timeout"][0])
-                except ValueError:
-                    raise SynapseError(400, "timeout must be in milliseconds.")
 
-            as_client_event = "raw" not in request.args
+        handler = self.handlers.event_stream_handler
+        pagin_config = PaginationConfig.from_request(request)
+        timeout = EventStreamRestServlet.DEFAULT_LONGPOLL_TIME_MS
+        if "timeout" in request.args:
+            try:
+                timeout = int(request.args["timeout"][0])
+            except ValueError:
+                raise SynapseError(400, "timeout must be in milliseconds.")
 
-            chunk = yield handler.get_stream(
-                requester.user.to_string(),
-                pagin_config,
-                timeout=timeout,
-                as_client_event=as_client_event,
-                affect_presence=(not is_guest),
-                room_id=room_id,
-                is_guest=is_guest,
-            )
-        except:
-            logger.exception("Event stream failed")
-            raise
+        as_client_event = "raw" not in request.args
+
+        chunk = yield handler.get_stream(
+            requester.user.to_string(),
+            pagin_config,
+            timeout=timeout,
+            as_client_event=as_client_event,
+            affect_presence=(not is_guest),
+            room_id=room_id,
+            is_guest=is_guest,
+        )
 
         defer.returnValue((200, chunk))
 
