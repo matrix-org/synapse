@@ -1,7 +1,7 @@
 Changes in synapse v0.16.0 (2016-06-09)
 =======================================
 
-NB: As of v0.14 all AS config files must have an ID specified.
+NB: As of v0.14 all AS config files must have an ID field.
 
 
 Bug fixes:
