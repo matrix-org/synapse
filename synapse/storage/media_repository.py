@@ -25,7 +25,7 @@ class MediaRepositoryStore(SQLBaseStore):
     def get_local_media(self, media_id):
         """Get the metadata for a local piece of media
         Returns:
-            None if the meia_id doesn't exist.
+            None if the media_id doesn't exist.
         """
         return self._simple_select_one(
             "local_media_repository",
@@ -48,6 +48,61 @@ class MediaRepositoryStore(SQLBaseStore):
                 "user_id": user_id.to_string(),
             },
             desc="store_local_media",
+        )
+
+    def get_url_cache(self, url, ts):
+        """Get the media_id and ts for a cached URL as of the given timestamp
+        Returns:
+            None if the URL isn't cached.
+        """
+        def get_url_cache_txn(txn):
+            # get the most recently cached result (relative to the given ts)
+            sql = (
+                "SELECT response_code, etag, expires, og, media_id, download_ts"
+                " FROM local_media_repository_url_cache"
+                " WHERE url = ? AND download_ts <= ?"
+                " ORDER BY download_ts DESC LIMIT 1"
+            )
+            txn.execute(sql, (url, ts))
+            row = txn.fetchone()
+
+            if not row:
+                # ...or if we've requested a timestamp older than the oldest
+                # copy in the cache, return the oldest copy (if any)
+                sql = (
+                    "SELECT response_code, etag, expires, og, media_id, download_ts"
+                    " FROM local_media_repository_url_cache"
+                    " WHERE url = ? AND download_ts > ?"
+                    " ORDER BY download_ts ASC LIMIT 1"
+                )
+                txn.execute(sql, (url, ts))
+                row = txn.fetchone()
+
+            if not row:
+                return None
+
+            return dict(zip((
+                'response_code', 'etag', 'expires', 'og', 'media_id', 'download_ts'
+            ), row))
+
+        return self.runInteraction(
+            "get_url_cache", get_url_cache_txn
+        )
+
+    def store_url_cache(self, url, response_code, etag, expires, og, media_id,
+                        download_ts):
+        return self._simple_insert(
+            "local_media_repository_url_cache",
+            {
+                "url": url,
+                "response_code": response_code,
+                "etag": etag,
+                "expires": expires,
+                "og": og,
+                "media_id": media_id,
+                "download_ts": download_ts,
+            },
+            desc="store_url_cache",
         )
 
     def get_local_media_thumbnails(self, media_id):

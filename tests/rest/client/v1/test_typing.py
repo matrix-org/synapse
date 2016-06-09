@@ -106,7 +106,7 @@ class RoomTypingTestCase(RestTestCase):
         yield self.join(self.room_id, user="@jim:red")
 
     def tearDown(self):
-        self.hs.get_handlers().typing_notification_handler.tearDown()
+        self.hs.get_typing_handler().tearDown()
 
     @defer.inlineCallbacks
     def test_set_typing(self):

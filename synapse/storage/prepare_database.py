@@ -25,21 +25,9 @@ logger = logging.getLogger(__name__)
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 30
+SCHEMA_VERSION = 32
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
-
-
-def read_schema(path):
-    """ Read the named database schema.
-
-    Args:
-        path: Path of the database schema.
-    Returns:
-        A string containing the database schema.
-    """
-    with open(path) as schema_file:
-        return schema_file.read()
 
 
 class PrepareDatabaseException(Exception):
@@ -53,6 +41,9 @@ class UpgradeDatabaseException(PrepareDatabaseException):
 def prepare_database(db_conn, database_engine, config):
     """Prepares a database for usage. Will either create all necessary tables
     or upgrade from an older schema version.
+
+    If `config` is None then prepare_database will assert that no upgrade is
+    necessary, *or* will create a fresh database if the database is empty.
     """
     try:
         cur = db_conn.cursor()
@@ -60,13 +51,18 @@ def prepare_database(db_conn, database_engine, config):
 
         if version_info:
             user_version, delta_files, upgraded = version_info
-            _upgrade_existing_database(
-                cur, user_version, delta_files, upgraded, database_engine, config
-            )
-        else:
-            _setup_new_database(cur, database_engine, config)
 
-        # cur.execute("PRAGMA user_version = %d" % (SCHEMA_VERSION,))
+            if config is None:
+                if user_version != SCHEMA_VERSION:
+                    # If we don't pass in a config file then we are expecting to
+                    # have already upgraded the DB.
+                    raise UpgradeDatabaseException("Database needs to be upgraded")
+            else:
+                _upgrade_existing_database(
+                    cur, user_version, delta_files, upgraded, database_engine, config
+                )
+        else:
+            _setup_new_database(cur, database_engine)
 
         cur.close()
         db_conn.commit()
@@ -75,7 +71,7 @@ def prepare_database(db_conn, database_engine, config):
         raise
 
 
-def _setup_new_database(cur, database_engine, config):
+def _setup_new_database(cur, database_engine):
     """Sets up the database by finding a base set of "full schemas" and then
     applying any necessary deltas.
 
@@ -148,12 +144,13 @@ def _setup_new_database(cur, database_engine, config):
         applied_delta_files=[],
         upgraded=False,
         database_engine=database_engine,
-        config=config,
+        config=None,
+        is_empty=True,
     )
 
 
 def _upgrade_existing_database(cur, current_version, applied_delta_files,
-                               upgraded, database_engine, config):
+                               upgraded, database_engine, config, is_empty=False):
     """Upgrades an existing database.
 
     Delta files can either be SQL stored in *.sql files, or python modules
@@ -246,7 +243,9 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
                         module_name, absolute_path, python_file
                     )
                 logger.debug("Running script %s", relative_path)
-                module.run_upgrade(cur, database_engine, config=config)
+                module.run_create(cur, database_engine)
+                if not is_empty:
+                    module.run_upgrade(cur, database_engine, config=config)
             elif ext == ".pyc":
                 # Sometimes .pyc files turn up anyway even though we've
                 # disabled their generation; e.g. from distribution package
@@ -361,36 +360,3 @@ def _get_or_create_schema_state(txn, database_engine):
         return current_version, applied_deltas, upgraded
 
     return None
-
-
-def prepare_sqlite3_database(db_conn):
-    """This function should be called before `prepare_database` on sqlite3
-    databases.
-
-    Since we changed the way we store the current schema version and handle
-    updates to schemas, we need a way to upgrade from the old method to the
-    new. This only affects sqlite databases since they were the only ones
-    supported at the time.
-    """
-    with db_conn:
-        schema_path = os.path.join(
-            dir_path, "schema", "schema_version.sql",
-        )
-        create_schema = read_schema(schema_path)
-        db_conn.executescript(create_schema)
-
-        c = db_conn.execute("SELECT * FROM schema_version")
-        rows = c.fetchall()
-        c.close()
-
-        if not rows:
-            c = db_conn.execute("PRAGMA user_version")
-            row = c.fetchone()
-            c.close()
-
-            if row and row[0]:
-                db_conn.execute(
-                    "REPLACE INTO schema_version (version, upgraded)"
-                    " VALUES (?,?)",
-                    (row[0], False)
-                )

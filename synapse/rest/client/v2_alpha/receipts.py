@@ -37,7 +37,7 @@ class ReceiptRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.receipts_handler = hs.get_handlers().receipts_handler
-        self.presence_handler = hs.get_handlers().presence_handler
+        self.presence_handler = hs.get_presence_handler()
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, receipt_type, event_id):

@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""This module contains classes for authenticating the user."""
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json, SignatureVerifyException
@@ -22,9 +21,10 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes, SynapseError, EventSizeError
-from synapse.types import Requester, RoomID, UserID, EventID
+from synapse.types import Requester, UserID, get_domain_from_id
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import preserve_context_over_fn
+from synapse.util.metrics import Measure
 from unpaddedbase64 import decode_base64
 
 import logging
@@ -41,12 +41,20 @@ AuthEventTypes = (
 
 
 class Auth(object):
-
+    """
+    FIXME: This class contains a mix of functions for authenticating users
+    of our client-server API and authenticating events added to room graphs.
+    """
     def __init__(self, hs):
         self.hs = hs
+        self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
+        # Docs for these currently lives at
+        # https://github.com/matrix-org/matrix-doc/blob/master/drafts/macaroons_caveats.rst
+        # In addition, we have type == delete_pusher which grants access only to
+        # delete pushers.
         self._KNOWN_CAVEAT_PREFIXES = set([
             "gen = ",
             "guest = ",
@@ -66,9 +74,9 @@ class Auth(object):
         Returns:
             True if the auth checks pass.
         """
-        self.check_size_limits(event)
+        with Measure(self.clock, "auth.check"):
+            self.check_size_limits(event)
 
-        try:
             if not hasattr(event, "room_id"):
                 raise AuthError(500, "Event has no room_id: %s" % event)
             if auth_events is None:
@@ -89,8 +97,8 @@ class Auth(object):
                     "Room %r does not exist" % (event.room_id,)
                 )
 
-            creating_domain = RoomID.from_string(event.room_id).domain
-            originating_domain = UserID.from_string(event.sender).domain
+            creating_domain = get_domain_from_id(event.room_id)
+            originating_domain = get_domain_from_id(event.sender)
             if creating_domain != originating_domain:
                 if not self.can_federate(event, auth_events):
                     raise AuthError(
@@ -118,6 +126,24 @@ class Auth(object):
                 return allowed
 
             self.check_event_sender_in_room(event, auth_events)
+
+            # Special case to allow m.room.third_party_invite events wherever
+            # a user is allowed to issue invites.  Fixes
+            # https://github.com/vector-im/vector-web/issues/1208 hopefully
+            if event.type == EventTypes.ThirdPartyInvite:
+                user_level = self._get_user_power_level(event.user_id, auth_events)
+                invite_level = self._get_named_level(auth_events, "invite", 0)
+
+                if user_level < invite_level:
+                    raise AuthError(
+                        403, (
+                            "You cannot issue a third party invite for %s." %
+                            (event.content.display_name,)
+                        )
+                    )
+                else:
+                    return True
+
             self._can_send_event(event, auth_events)
 
             if event.type == EventTypes.PowerLevels:
@@ -127,13 +153,6 @@ class Auth(object):
                 self.check_redaction(event, auth_events)
 
             logger.debug("Allowing! %s", event)
-        except AuthError as e:
-            logger.info(
-                "Event auth check failed on event %s with msg: %s",
-                event, e.msg
-            )
-            logger.info("Denying! %s", event)
-            raise
 
     def check_size_limits(self, event):
         def too_big(field):
@@ -224,7 +243,7 @@ class Auth(object):
         for event in curr_state.values():
             if event.type == EventTypes.Member:
                 try:
-                    if UserID.from_string(event.state_key).domain != host:
+                    if get_domain_from_id(event.state_key) != host:
                         continue
                 except:
                     logger.warn("state_key not user_id: %s", event.state_key)
@@ -271,8 +290,8 @@ class Auth(object):
 
         target_user_id = event.state_key
 
-        creating_domain = RoomID.from_string(event.room_id).domain
-        target_domain = UserID.from_string(target_user_id).domain
+        creating_domain = get_domain_from_id(event.room_id)
+        target_domain = get_domain_from_id(target_user_id)
         if creating_domain != target_domain:
             if not self.can_federate(event, auth_events):
                 raise AuthError(
@@ -512,7 +531,7 @@ class Auth(object):
             return default
 
     @defer.inlineCallbacks
-    def get_user_by_req(self, request, allow_guest=False):
+    def get_user_by_req(self, request, allow_guest=False, rights="access"):
         """ Get a registered user's ID.
 
         Args:
@@ -534,7 +553,7 @@ class Auth(object):
                 )
 
             access_token = request.args["access_token"][0]
-            user_info = yield self.get_user_by_access_token(access_token)
+            user_info = yield self.get_user_by_access_token(access_token, rights)
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
@@ -595,7 +614,7 @@ class Auth(object):
         defer.returnValue(user_id)
 
     @defer.inlineCallbacks
-    def get_user_by_access_token(self, token):
+    def get_user_by_access_token(self, token, rights="access"):
         """ Get a registered user's ID.
 
         Args:
@@ -606,7 +625,7 @@ class Auth(object):
             AuthError if no user by that token exists or the token is invalid.
         """
         try:
-            ret = yield self.get_user_from_macaroon(token)
+            ret = yield self.get_user_from_macaroon(token, rights)
         except AuthError:
             # TODO(daniel): Remove this fallback when all existing access tokens
             # have been re-issued as macaroons.
@@ -614,10 +633,11 @@ class Auth(object):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def get_user_from_macaroon(self, macaroon_str):
+    def get_user_from_macaroon(self, macaroon_str, rights="access"):
         try:
             macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
-            self.validate_macaroon(macaroon, "access", False)
+
+            self.validate_macaroon(macaroon, rights, self.hs.config.expire_access_token)
 
             user_prefix = "user_id = "
             user = None
@@ -638,6 +658,13 @@ class Auth(object):
                 ret = {
                     "user": user,
                     "is_guest": True,
+                    "token_id": None,
+                }
+            elif rights == "delete_pusher":
+                # We don't store these tokens in the database
+                ret = {
+                    "user": user,
+                    "is_guest": False,
                     "token_id": None,
                 }
             else:
@@ -671,7 +698,8 @@ class Auth(object):
 
         Args:
             macaroon(pymacaroons.Macaroon): The macaroon to validate
-            type_string(str): The kind of token this is (e.g. "access", "refresh")
+            type_string(str): The kind of token required (e.g. "access", "refresh",
+                              "delete_pusher")
             verify_expiry(bool): Whether to verify whether the macaroon has expired.
                 This should really always be True, but no clients currently implement
                 token refresh, so we can't enforce expiry yet.
@@ -894,8 +922,8 @@ class Auth(object):
         if user_level >= redact_level:
             return False
 
-        redacter_domain = EventID.from_string(event.event_id).domain
-        redactee_domain = EventID.from_string(event.redacts).domain
+        redacter_domain = get_domain_from_id(event.event_id)
+        redactee_domain = get_domain_from_id(event.redacts)
         if redacter_domain == redactee_domain:
             return True
 

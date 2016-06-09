@@ -79,11 +79,10 @@ class SyncRestServlet(RestServlet):
     def __init__(self, hs):
         super(SyncRestServlet, self).__init__()
         self.auth = hs.get_auth()
-        self.event_stream_handler = hs.get_handlers().event_stream_handler
-        self.sync_handler = hs.get_handlers().sync_handler
+        self.sync_handler = hs.get_sync_handler()
         self.clock = hs.get_clock()
         self.filtering = hs.get_filtering()
-        self.presence_handler = hs.get_handlers().presence_handler
+        self.presence_handler = hs.get_presence_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -115,6 +114,8 @@ class SyncRestServlet(RestServlet):
             )
         )
 
+        request_key = (user, timeout, since, filter_id, full_state)
+
         if filter_id:
             if filter_id.startswith('{'):
                 try:
@@ -134,6 +135,7 @@ class SyncRestServlet(RestServlet):
             user=user,
             filter_collection=filter,
             is_guest=requester.is_guest,
+            request_key=request_key,
         )
 
         if since is not None:
@@ -196,15 +198,17 @@ class SyncRestServlet(RestServlet):
         """
         Encode the joined rooms in a sync result
 
-        :param list[synapse.handlers.sync.JoinedSyncResult] rooms: list of sync
-            results for rooms this user is joined to
-        :param int time_now: current time - used as a baseline for age
-            calculations
-        :param int token_id: ID of the user's auth token - used for namespacing
-            of transaction IDs
+        Args:
+            rooms(list[synapse.handlers.sync.JoinedSyncResult]): list of sync
+                results for rooms this user is joined to
+            time_now(int): current time - used as a baseline for age
+                calculations
+            token_id(int): ID of the user's auth token - used for namespacing
+                of transaction IDs
 
-        :return: the joined rooms list, in our response format
-        :rtype: dict[str, dict[str, object]]
+        Returns:
+            dict[str, dict[str, object]]: the joined rooms list, in our
+                response format
         """
         joined = {}
         for room in rooms:
@@ -218,15 +222,17 @@ class SyncRestServlet(RestServlet):
         """
         Encode the invited rooms in a sync result
 
-        :param list[synapse.handlers.sync.InvitedSyncResult] rooms: list of
-             sync results for rooms this user is joined to
-        :param int time_now: current time - used as a baseline for age
-            calculations
-        :param int token_id: ID of the user's auth token - used for namespacing
+        Args:
+            rooms(list[synapse.handlers.sync.InvitedSyncResult]): list of
+                sync results for rooms this user is joined to
+            time_now(int): current time - used as a baseline for age
+                calculations
+            token_id(int): ID of the user's auth token - used for namespacing
             of transaction IDs
 
-        :return: the invited rooms list, in our response format
-        :rtype: dict[str, dict[str, object]]
+        Returns:
+            dict[str, dict[str, object]]: the invited rooms list, in our
+                response format
         """
         invited = {}
         for room in rooms:
@@ -248,15 +254,17 @@ class SyncRestServlet(RestServlet):
         """
         Encode the archived rooms in a sync result
 
-        :param list[synapse.handlers.sync.ArchivedSyncResult] rooms: list of
-             sync results for rooms this user is joined to
-        :param int time_now: current time - used as a baseline for age
-            calculations
-        :param int token_id: ID of the user's auth token - used for namespacing
-            of transaction IDs
+        Args:
+            rooms (list[synapse.handlers.sync.ArchivedSyncResult]): list of
+                sync results for rooms this user is joined to
+            time_now(int): current time - used as a baseline for age
+                calculations
+            token_id(int): ID of the user's auth token - used for namespacing
+                of transaction IDs
 
-        :return: the invited rooms list, in our response format
-        :rtype: dict[str, dict[str, object]]
+        Returns:
+            dict[str, dict[str, object]]: The invited rooms list, in our
+                response format
         """
         joined = {}
         for room in rooms:
@@ -269,17 +277,18 @@ class SyncRestServlet(RestServlet):
     @staticmethod
     def encode_room(room, time_now, token_id, joined=True):
         """
-        :param JoinedSyncResult|ArchivedSyncResult room: sync result for a
-            single room
-        :param int time_now: current time - used as a baseline for age
-            calculations
-        :param int token_id: ID of the user's auth token - used for namespacing
-            of transaction IDs
-        :param joined: True if the user is joined to this room - will mean
-            we handle ephemeral events
+        Args:
+            room (JoinedSyncResult|ArchivedSyncResult): sync result for a
+                single room
+            time_now (int): current time - used as a baseline for age
+                calculations
+            token_id (int): ID of the user's auth token - used for namespacing
+                of transaction IDs
+            joined (bool): True if the user is joined to this room - will mean
+                we handle ephemeral events
 
-        :return: the room, encoded in our response format
-        :rtype: dict[str, object]
+        Returns:
+            dict[str, object]: the room, encoded in our response format
         """
         def serialize(event):
             # TODO(mjark): Respect formatting requirements in the filter.

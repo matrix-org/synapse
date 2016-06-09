@@ -19,9 +19,11 @@ import copy
 def list_with_base_rules(rawrules):
     """Combine the list of rules set by the user with the default push rules
 
-    :param list rawrules: The rules the user has modified or set.
-    :returns: A new list with the rules set by the user combined with the
-        defaults.
+    Args:
+        rawrules(list): The rules the user has modified or set.
+
+    Returns:
+        A new list with the rules set by the user combined with the defaults.
     """
     ruleslist = []
 
@@ -77,7 +79,7 @@ def make_base_append_rules(kind, modified_base_rules):
     rules = []
 
     if kind == 'override':
-        rules = BASE_APPEND_OVRRIDE_RULES
+        rules = BASE_APPEND_OVERRIDE_RULES
     elif kind == 'underride':
         rules = BASE_APPEND_UNDERRIDE_RULES
     elif kind == 'content':
@@ -146,7 +148,7 @@ BASE_PREPEND_OVERRIDE_RULES = [
 ]
 
 
-BASE_APPEND_OVRRIDE_RULES = [
+BASE_APPEND_OVERRIDE_RULES = [
     {
         'rule_id': 'global/override/.m.rule.suppress_notices',
         'conditions': [
@@ -160,7 +162,61 @@ BASE_APPEND_OVRRIDE_RULES = [
         'actions': [
             'dont_notify',
         ]
-    }
+    },
+    # NB. .m.rule.invite_for_me must be higher prio than .m.rule.member_event
+    # otherwise invites will be matched by .m.rule.member_event
+    {
+        'rule_id': 'global/override/.m.rule.invite_for_me',
+        'conditions': [
+            {
+                'kind': 'event_match',
+                'key': 'type',
+                'pattern': 'm.room.member',
+                '_id': '_member',
+            },
+            {
+                'kind': 'event_match',
+                'key': 'content.membership',
+                'pattern': 'invite',
+                '_id': '_invite_member',
+            },
+            {
+                'kind': 'event_match',
+                'key': 'state_key',
+                'pattern_type': 'user_id'
+            },
+        ],
+        'actions': [
+            'notify',
+            {
+                'set_tweak': 'sound',
+                'value': 'default'
+            }, {
+                'set_tweak': 'highlight',
+                'value': False
+            }
+        ]
+    },
+    # Will we sometimes want to know about people joining and leaving?
+    # Perhaps: if so, this could be expanded upon. Seems the most usual case
+    # is that we don't though. We add this override rule so that even if
+    # the room rule is set to notify, we don't get notifications about
+    # join/leave/avatar/displayname events.
+    # See also: https://matrix.org/jira/browse/SYN-607
+    {
+        'rule_id': 'global/override/.m.rule.member_event',
+        'conditions': [
+            {
+                'kind': 'event_match',
+                'key': 'type',
+                'pattern': 'm.room.member',
+                '_id': '_member',
+            }
+        ],
+        'actions': [
+            'dont_notify'
+        ]
+    },
 ]
 
 
@@ -230,57 +286,6 @@ BASE_APPEND_UNDERRIDE_RULES = [
         ]
     },
     {
-        'rule_id': 'global/underride/.m.rule.invite_for_me',
-        'conditions': [
-            {
-                'kind': 'event_match',
-                'key': 'type',
-                'pattern': 'm.room.member',
-                '_id': '_member',
-            },
-            {
-                'kind': 'event_match',
-                'key': 'content.membership',
-                'pattern': 'invite',
-                '_id': '_invite_member',
-            },
-            {
-                'kind': 'event_match',
-                'key': 'state_key',
-                'pattern_type': 'user_id'
-            },
-        ],
-        'actions': [
-            'notify',
-            {
-                'set_tweak': 'sound',
-                'value': 'default'
-            }, {
-                'set_tweak': 'highlight',
-                'value': False
-            }
-        ]
-    },
-    # This is too simple: https://matrix.org/jira/browse/SYN-607
-    # Removing for now
-    # {
-    #     'rule_id': 'global/underride/.m.rule.member_event',
-    #     'conditions': [
-    #         {
-    #             'kind': 'event_match',
-    #             'key': 'type',
-    #             'pattern': 'm.room.member',
-    #             '_id': '_member',
-    #         }
-    #     ],
-    #     'actions': [
-    #         'notify', {
-    #             'set_tweak': 'highlight',
-    #             'value': False
-    #         }
-    #     ]
-    # },
-    {
         'rule_id': 'global/underride/.m.rule.message',
         'conditions': [
             {
@@ -312,7 +317,7 @@ for r in BASE_PREPEND_OVERRIDE_RULES:
     r['default'] = True
     BASE_RULE_IDS.add(r['rule_id'])
 
-for r in BASE_APPEND_OVRRIDE_RULES:
+for r in BASE_APPEND_OVERRIDE_RULES:
     r['priority_class'] = PRIORITY_CLASS_MAP['override']
     r['default'] = True
     BASE_RULE_IDS.add(r['rule_id'])

@@ -35,33 +35,6 @@ class PresenceStoreTestCase(unittest.TestCase):
         self.u_banana = UserID.from_string("@banana:test")
 
     @defer.inlineCallbacks
-    def test_visibility(self):
-        self.assertFalse((yield self.store.is_presence_visible(
-            observed_localpart=self.u_apple.localpart,
-            observer_userid=self.u_banana.to_string(),
-        )))
-
-        yield self.store.allow_presence_visible(
-            observed_localpart=self.u_apple.localpart,
-            observer_userid=self.u_banana.to_string(),
-        )
-
-        self.assertTrue((yield self.store.is_presence_visible(
-            observed_localpart=self.u_apple.localpart,
-            observer_userid=self.u_banana.to_string(),
-        )))
-
-        yield self.store.disallow_presence_visible(
-            observed_localpart=self.u_apple.localpart,
-            observer_userid=self.u_banana.to_string(),
-        )
-
-        self.assertFalse((yield self.store.is_presence_visible(
-            observed_localpart=self.u_apple.localpart,
-            observer_userid=self.u_banana.to_string(),
-        )))
-
-    @defer.inlineCallbacks
     def test_presence_list(self):
         self.assertEquals(
             [],

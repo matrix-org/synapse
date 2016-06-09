@@ -97,7 +97,7 @@ class RemoteKey(Resource):
         self.async_render_GET(request)
         return NOT_DONE_YET
 
-    @request_handler
+    @request_handler()
     @defer.inlineCallbacks
     def async_render_GET(self, request):
         if len(request.postpath) == 1:
@@ -122,7 +122,7 @@ class RemoteKey(Resource):
         self.async_render_POST(request)
         return NOT_DONE_YET
 
-    @request_handler
+    @request_handler()
     @defer.inlineCallbacks
     def async_render_POST(self, request):
         content = parse_json_object_from_request(request)

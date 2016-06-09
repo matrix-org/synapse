@@ -35,7 +35,7 @@ class PasswordRestServlet(RestServlet):
         super(PasswordRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.auth_handler = hs.get_handlers().auth_handler
+        self.auth_handler = hs.get_auth_handler()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -52,6 +52,7 @@ class PasswordRestServlet(RestServlet):
             defer.returnValue((401, result))
 
         user_id = None
+        requester = None
 
         if LoginType.PASSWORD in result:
             # if using password, they should also be logged in
@@ -96,7 +97,7 @@ class ThreepidRestServlet(RestServlet):
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
-        self.auth_handler = hs.get_handlers().auth_handler
+        self.auth_handler = hs.get_auth_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request):

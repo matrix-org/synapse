@@ -48,7 +48,8 @@ class RegisterRestServlet(RestServlet):
         super(RegisterRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.auth_handler = hs.get_handlers().auth_handler
+        self.store = hs.get_datastore()
+        self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_handlers().registration_handler
         self.identity_handler = hs.get_handlers().identity_handler
 
@@ -100,6 +101,11 @@ class RegisterRestServlet(RestServlet):
 
         # == Application Service Registration ==
         if appservice:
+            # Set the desired user according to the AS API (which uses the
+            # 'user' key not 'username'). Since this is a new addition, we'll
+            # fallback to 'username' if they gave one.
+            if isinstance(body.get("user"), basestring):
+                desired_username = body["user"]
             result = yield self._do_appservice_registration(
                 desired_username, request.args["access_token"][0]
             )
@@ -208,6 +214,34 @@ class RegisterRestServlet(RestServlet):
                         threepid['address'],
                         threepid['validated_at'],
                     )
+
+                    # And we add an email pusher for them by default, but only
+                    # if email notifications are enabled (so people don't start
+                    # getting mail spam where they weren't before if email
+                    # notifs are set up on a home server)
+                    if (
+                        self.hs.config.email_enable_notifs and
+                        self.hs.config.email_notif_for_new_users
+                    ):
+                        # Pull the ID of the access token back out of the db
+                        # It would really make more sense for this to be passed
+                        # up when the access token is saved, but that's quite an
+                        # invasive change I'd rather do separately.
+                        user_tuple = yield self.store.get_user_by_access_token(
+                            token
+                        )
+
+                        yield self.hs.get_pusherpool().add_pusher(
+                            user_id=user_id,
+                            access_token=user_tuple["token_id"],
+                            kind="email",
+                            app_id="m.email",
+                            app_display_name="Email Notifications",
+                            device_display_name=threepid["address"],
+                            pushkey=threepid["address"],
+                            lang=None,  # We don't know a user's language here
+                            data={},
+                        )
 
             if 'bind_email' in params and params['bind_email']:
                 logger.info("bind_email specified: binding")

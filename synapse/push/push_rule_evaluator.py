@@ -13,12 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from .baserules import list_with_base_rules
-
 import logging
-import simplejson as json
 import re
 
 from synapse.types import UserID
@@ -30,22 +25,6 @@ logger = logging.getLogger(__name__)
 GLOB_REGEX = re.compile(r'\\\[(\\\!|)(.*)\\\]')
 IS_GLOB = re.compile(r'[\?\*\[\]]')
 INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
-
-
-@defer.inlineCallbacks
-def evaluator_for_user_id(user_id, room_id, store):
-    rawrules = yield store.get_push_rules_for_user(user_id)
-    enabled_map = yield store.get_push_rules_enabled_for_user(user_id)
-    our_member_event = yield store.get_current_state(
-        room_id=room_id,
-        event_type='m.room.member',
-        state_key=user_id,
-    )
-
-    defer.returnValue(PushRuleEvaluator(
-        user_id, rawrules, enabled_map,
-        room_id, our_member_event, store
-    ))
 
 
 def _room_member_count(ev, condition, room_member_count):
@@ -74,110 +53,14 @@ def _room_member_count(ev, condition, room_member_count):
         return False
 
 
-class PushRuleEvaluator:
-    DEFAULT_ACTIONS = []
-
-    def __init__(self, user_id, raw_rules, enabled_map, room_id,
-                 our_member_event, store):
-        self.user_id = user_id
-        self.room_id = room_id
-        self.our_member_event = our_member_event
-        self.store = store
-
-        rules = []
-        for raw_rule in raw_rules:
-            rule = dict(raw_rule)
-            rule['conditions'] = json.loads(raw_rule['conditions'])
-            rule['actions'] = json.loads(raw_rule['actions'])
-            rules.append(rule)
-
-        self.rules = list_with_base_rules(rules)
-
-        self.enabled_map = enabled_map
-
-    @staticmethod
-    def tweaks_for_actions(actions):
-        tweaks = {}
-        for a in actions:
-            if not isinstance(a, dict):
-                continue
-            if 'set_tweak' in a and 'value' in a:
-                tweaks[a['set_tweak']] = a['value']
-        return tweaks
-
-    @defer.inlineCallbacks
-    def actions_for_event(self, ev):
-        """
-        This should take into account notification settings that the user
-        has configured both globally and per-room when we have the ability
-        to do such things.
-        """
-        if ev['user_id'] == self.user_id:
-            # let's assume you probably know about messages you sent yourself
-            defer.returnValue([])
-
-        room_id = ev['room_id']
-
-        # get *our* member event for display name matching
-        my_display_name = None
-
-        if self.our_member_event:
-            my_display_name = self.our_member_event[0].content.get("displayname")
-
-        room_members = yield self.store.get_users_in_room(room_id)
-        room_member_count = len(room_members)
-
-        evaluator = PushRuleEvaluatorForEvent(ev, room_member_count)
-
-        for r in self.rules:
-            enabled = self.enabled_map.get(r['rule_id'], None)
-            if enabled is not None and not enabled:
-                continue
-
-            if not r.get("enabled", True):
-                continue
-
-            conditions = r['conditions']
-            actions = r['actions']
-
-            # ignore rules with no actions (we have an explict 'dont_notify')
-            if len(actions) == 0:
-                logger.warn(
-                    "Ignoring rule id %s with no actions for user %s",
-                    r['rule_id'], self.user_id
-                )
-                continue
-
-            matches = True
-            for c in conditions:
-                matches = evaluator.matches(
-                    c, self.user_id, my_display_name
-                )
-                if not matches:
-                    break
-
-            logger.debug(
-                "Rule %s %s",
-                r['rule_id'], "matches" if matches else "doesn't match"
-            )
-
-            if matches:
-                logger.debug(
-                    "%s matches for user %s, event %s",
-                    r['rule_id'], self.user_id, ev['event_id']
-                )
-
-                # filter out dont_notify as we treat an empty actions list
-                # as dont_notify, and this doesn't take up a row in our database
-                actions = [x for x in actions if x != 'dont_notify']
-
-                defer.returnValue(actions)
-
-        logger.debug(
-            "No rules match for user %s, event %s",
-            self.user_id, ev['event_id']
-        )
-        defer.returnValue(PushRuleEvaluator.DEFAULT_ACTIONS)
+def tweaks_for_actions(actions):
+    tweaks = {}
+    for a in actions:
+        if not isinstance(a, dict):
+            continue
+        if 'set_tweak' in a and 'value' in a:
+            tweaks[a['set_tweak']] = a['value']
+    return tweaks
 
 
 class PushRuleEvaluatorForEvent(object):

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.api.errors import SynapseError
 from synapse.util.logcontext import PreserveLoggingContext
 
 from twisted.internet import defer, reactor, task
@@ -49,9 +50,6 @@ class Clock(object):
         l.start(msec / 1000.0, now=False)
         return l
 
-    def stop_looping_call(self, loop):
-        loop.stop()
-
     def call_later(self, delay, callback, *args, **kwargs):
         """Call something later
 
@@ -83,7 +81,7 @@ class Clock(object):
 
         def timed_out_fn():
             try:
-                ret_deferred.errback(RuntimeError("Timed out"))
+                ret_deferred.errback(SynapseError(504, "Timed out"))
             except:
                 pass
 

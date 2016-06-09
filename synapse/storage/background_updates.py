@@ -173,11 +173,12 @@ class BackgroundUpdateStore(SQLBaseStore):
 
         logger.info(
             "Updating %r. Updated %r items in %rms."
-            " (total_rate=%r/ms, current_rate=%r/ms, total_updated=%r)",
+            " (total_rate=%r/ms, current_rate=%r/ms, total_updated=%r, batch_size=%r)",
             update_name, items_updated, duration_ms,
             performance.total_items_per_ms(),
             performance.average_items_per_ms(),
             performance.total_item_count,
+            batch_size,
         )
 
         performance.update(items_updated, duration_ms)

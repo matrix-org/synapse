@@ -26,14 +26,19 @@ logger = logging.getLogger(__name__)
 def parse_integer(request, name, default=None, required=False):
     """Parse an integer parameter from the request string
 
-    :param request: the twisted HTTP request.
-    :param name (str): the name of the query parameter.
-    :param default: value to use if the parameter is absent, defaults to None.
-    :param required (bool): whether to raise a 400 SynapseError if the
-        parameter is absent, defaults to False.
-    :return: An int value or the default.
-    :raises
-        SynapseError if the parameter is absent and required, or if the
+    Args:
+        request: the twisted HTTP request.
+        name (str): the name of the query parameter.
+        default (int|None): value to use if the parameter is absent, defaults
+            to None.
+        required (bool): whether to raise a 400 SynapseError if the
+            parameter is absent, defaults to False.
+
+    Returns:
+        int|None: An int value or the default.
+
+    Raises:
+        SynapseError: if the parameter is absent and required, or if the
             parameter is present and not an integer.
     """
     if name in request.args:
@@ -53,14 +58,19 @@ def parse_integer(request, name, default=None, required=False):
 def parse_boolean(request, name, default=None, required=False):
     """Parse a boolean parameter from the request query string
 
-    :param request: the twisted HTTP request.
-    :param name (str): the name of the query parameter.
-    :param default: value to use if the parameter is absent, defaults to None.
-    :param required (bool): whether to raise a 400 SynapseError if the
-        parameter is absent, defaults to False.
-    :return: A bool value or the default.
-    :raises
-        SynapseError if the parameter is absent and required, or if the
+    Args:
+        request: the twisted HTTP request.
+        name (str): the name of the query parameter.
+        default (bool|None): value to use if the parameter is absent, defaults
+            to None.
+        required (bool): whether to raise a 400 SynapseError if the
+            parameter is absent, defaults to False.
+
+    Returns:
+        bool|None: A bool value or the default.
+
+    Raises:
+        SynapseError: if the parameter is absent and required, or if the
             parameter is present and not one of "true" or "false".
     """
 
@@ -88,15 +98,20 @@ def parse_string(request, name, default=None, required=False,
                  allowed_values=None, param_type="string"):
     """Parse a string parameter from the request query string.
 
-    :param request: the twisted HTTP request.
-    :param name (str): the name of the query parameter.
-    :param default: value to use if the parameter is absent, defaults to None.
-    :param required (bool): whether to raise a 400 SynapseError if the
-        parameter is absent, defaults to False.
-    :param allowed_values (list): List of allowed values for the string,
-        or None if any value is allowed, defaults to None
-    :return: A string value or the default.
-    :raises
+    Args:
+        request: the twisted HTTP request.
+        name (str): the name of the query parameter.
+        default (str|None): value to use if the parameter is absent, defaults
+            to None.
+        required (bool): whether to raise a 400 SynapseError if the
+            parameter is absent, defaults to False.
+        allowed_values (list[str]): List of allowed values for the string,
+            or None if any value is allowed, defaults to None
+
+    Returns:
+        str|None: A string value or the default.
+
+    Raises:
         SynapseError if the parameter is absent and required, or if the
             parameter is present, must be one of a list of allowed values and
             is not one of those allowed values.
@@ -122,9 +137,13 @@ def parse_string(request, name, default=None, required=False,
 def parse_json_value_from_request(request):
     """Parse a JSON value from the body of a twisted HTTP request.
 
-    :param request: the twisted HTTP request.
-    :returns: The JSON value.
-    :raises
+    Args:
+        request: the twisted HTTP request.
+
+    Returns:
+        The JSON value.
+
+    Raises:
         SynapseError if the request body couldn't be decoded as JSON.
     """
     try:
@@ -143,8 +162,10 @@ def parse_json_value_from_request(request):
 def parse_json_object_from_request(request):
     """Parse a JSON object from the body of a twisted HTTP request.
 
-    :param request: the twisted HTTP request.
-    :raises
+    Args:
+        request: the twisted HTTP request.
+
+    Raises:
         SynapseError if the request body couldn't be decoded as JSON or
             if it wasn't a JSON object.
     """

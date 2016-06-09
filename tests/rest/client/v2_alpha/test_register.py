@@ -33,7 +33,6 @@ class RegisterRestServletTestCase(unittest.TestCase):
 
         # do the dance to hook it up to the hs global
         self.handlers = Mock(
-            auth_handler=self.auth_handler,
             registration_handler=self.registration_handler,
             identity_handler=self.identity_handler,
             login_handler=self.login_handler
@@ -42,6 +41,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.hs.hostname = "superbig~testing~thing.com"
         self.hs.get_auth = Mock(return_value=self.auth)
         self.hs.get_handlers = Mock(return_value=self.handlers)
+        self.hs.get_auth_handler = Mock(return_value=self.auth_handler)
         self.hs.config.enable_registration = True
 
         # init the thing we're testing

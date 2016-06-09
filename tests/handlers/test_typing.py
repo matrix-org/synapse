@@ -25,8 +25,6 @@ from ..utils import (
 )
 
 from synapse.api.errors import AuthError
-from synapse.handlers.typing import TypingNotificationHandler
-
 from synapse.types import UserID
 
 
@@ -49,11 +47,6 @@ def _make_edu_json(origin, edu_type, content):
     return json.dumps(_expect_edu("test", edu_type, content, origin=origin))
 
 
-class JustTypingNotificationHandlers(object):
-    def __init__(self, hs):
-        self.typing_notification_handler = TypingNotificationHandler(hs)
-
-
 class TypingNotificationsTestCase(unittest.TestCase):
     """Tests typing notifications to rooms."""
     @defer.inlineCallbacks
@@ -71,6 +64,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.auth = Mock(spec=[])
 
         hs = yield setup_test_homeserver(
+            "test",
             auth=self.auth,
             clock=self.clock,
             datastore=Mock(spec=[
@@ -88,9 +82,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
             http_client=self.mock_http_client,
             keyring=Mock(),
         )
-        hs.handlers = JustTypingNotificationHandlers(hs)
 
-        self.handler = hs.get_handlers().typing_notification_handler
+        self.handler = hs.get_typing_handler()
 
         self.event_source = hs.get_event_sources().sources["typing"]
 
@@ -110,55 +103,15 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         self.room_id = "a-room"
 
-        # Mock the RoomMemberHandler
-        hs.handlers.room_member_handler = Mock(spec=[])
-        self.room_member_handler = hs.handlers.room_member_handler
-
         self.room_members = []
-
-        def get_rooms_for_user(user):
-            if user in self.room_members:
-                return defer.succeed([self.room_id])
-            else:
-                return defer.succeed([])
-        self.room_member_handler.get_rooms_for_user = get_rooms_for_user
-
-        def get_room_members(room_id):
-            if room_id == self.room_id:
-                return defer.succeed(self.room_members)
-            else:
-                return defer.succeed([])
-        self.room_member_handler.get_room_members = get_room_members
-
-        def get_joined_rooms_for_user(user):
-            if user in self.room_members:
-                return defer.succeed([self.room_id])
-            else:
-                return defer.succeed([])
-        self.room_member_handler.get_joined_rooms_for_user = get_joined_rooms_for_user
-
-        @defer.inlineCallbacks
-        def fetch_room_distributions_into(
-            room_id, localusers=None, remotedomains=None, ignore_user=None
-        ):
-            members = yield get_room_members(room_id)
-            for member in members:
-                if ignore_user is not None and member == ignore_user:
-                    continue
-
-                if hs.is_mine(member):
-                    if localusers is not None:
-                        localusers.add(member)
-                else:
-                    if remotedomains is not None:
-                        remotedomains.add(member.domain)
-        self.room_member_handler.fetch_room_distributions_into = (
-            fetch_room_distributions_into
-        )
 
         def check_joined_room(room_id, user_id):
             if user_id not in [u.to_string() for u in self.room_members]:
                 raise AuthError(401, "User is not in the room")
+
+        def get_joined_hosts_for_room(room_id):
+            return set(member.domain for member in self.room_members)
+        self.datastore.get_joined_hosts_for_room = get_joined_hosts_for_room
 
         self.auth.check_joined_room = check_joined_room
 
@@ -298,12 +251,12 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         # Gut-wrenching
         from synapse.handlers.typing import RoomMember
-        member = RoomMember(self.room_id, self.u_apple)
+        member = RoomMember(self.room_id, self.u_apple.to_string())
         self.handler._member_typing_until[member] = 1002000
         self.handler._member_typing_timer[member] = (
             self.clock.call_later(1002, lambda: 0)
         )
-        self.handler._room_typing[self.room_id] = set((self.u_apple,))
+        self.handler._room_typing[self.room_id] = set((self.u_apple.to_string(),))
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 
