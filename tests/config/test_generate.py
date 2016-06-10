@@ -30,7 +30,7 @@ class ConfigGenerationTestCase(unittest.TestCase):
         shutil.rmtree(self.dir)
 
     def test_generate_config_generates_files(self):
-        HomeServerConfig.load_config("", [
+        HomeServerConfig.load_or_generate_config("", [
             "--generate-config",
             "-c", self.file,
             "--report-stats=yes",
