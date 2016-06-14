@@ -32,12 +32,20 @@ DELAY_BEFORE_MAIL_MS = 10 * 60 * 1000
 # Each room maintains its own throttle counter, but each new mail notification
 # sends the pending notifications for all rooms.
 THROTTLE_START_MS = 10 * 60 * 1000
-THROTTLE_MAX_MS = 24 * 60 * 60 * 1000  # (2 * 60 * 1000) * (2 ** 11)  # ~3 days
-THROTTLE_MULTIPLIER = 6                # 10 mins, 1 hour, 6 hours, 24 hours
+THROTTLE_MAX_MS = 24 * 60 * 60 * 1000  # 24h
+# THROTTLE_MULTIPLIER = 6              # 10 mins, 1 hour, 6 hours, 24 hours
+THROTTLE_MULTIPLIER = 144              # 10 mins, 24 hours - i.e. jump straight to 1 day
 
 # If no event triggers a notification for this long after the previous,
 # the throttle is released.
-THROTTLE_RESET_AFTER_MS = (2 * 60 * 1000) * (2 ** 11)  # ~3 days
+# 12 hours - a gap of 12 hours in conversation is surely enough to merit a new
+# notification when things get going again...
+THROTTLE_RESET_AFTER_MS = (12 * 60 * 60 * 1000)
+
+# does each email include all unread notifs, or just the ones which have happened
+# since the last mail?
+# XXX: this is currently broken as it includes ones from parted rooms(!)
+INCLUDE_ALL_UNREAD_NOTIFS = False
 
 
 class EmailPusher(object):
@@ -65,7 +73,12 @@ class EmailPusher(object):
         self.processing = False
 
         if self.hs.config.email_enable_notifs:
-            self.mailer = Mailer(self.hs)
+            if 'data' in pusherdict and 'brand' in pusherdict['data']:
+                app_name = pusherdict['data']['brand']
+            else:
+                app_name = self.hs.config.email_app_name
+
+            self.mailer = Mailer(self.hs, app_name)
         else:
             self.mailer = None
 
@@ -126,8 +139,9 @@ class EmailPusher(object):
         up logging, measures and guards against multiple instances of it
         being run.
         """
+        start = 0 if INCLUDE_ALL_UNREAD_NOTIFS else self.last_stream_ordering
         unprocessed = yield self.store.get_unread_push_actions_for_user_in_range(
-            self.user_id, self.last_stream_ordering, self.max_stream_ordering
+            self.user_id, start, self.max_stream_ordering
         )
 
         soonest_due_at = None
@@ -150,7 +164,6 @@ class EmailPusher(object):
                 # we then consider all previously outstanding notifications
                 # to be delivered.
 
-                # debugging:
                 reason = {
                     'room_id': push_action['room_id'],
                     'now': self.clock.time_msec(),
@@ -165,9 +178,12 @@ class EmailPusher(object):
                 yield self.save_last_stream_ordering_and_success(max([
                     ea['stream_ordering'] for ea in unprocessed
                 ]))
-                yield self.sent_notif_update_throttle(
-                    push_action['room_id'], push_action
-                )
+
+                # we update the throttle on all the possible unprocessed push actions
+                for ea in unprocessed:
+                    yield self.sent_notif_update_throttle(
+                        ea['room_id'], ea
+                    )
                 break
             else:
                 if soonest_due_at is None or should_notify_at < soonest_due_at:
@@ -263,5 +279,5 @@ class EmailPusher(object):
         logger.info("Sending notif email for user %r", self.user_id)
 
         yield self.mailer.send_notification_mail(
-            self.user_id, self.email, push_actions, reason
+            self.app_id, self.user_id, self.email, push_actions, reason
         )

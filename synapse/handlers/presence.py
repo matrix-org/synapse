@@ -50,6 +50,8 @@ timers_fired_counter = metrics.register_counter("timers_fired")
 federation_presence_counter = metrics.register_counter("federation_presence")
 bump_active_time_counter = metrics.register_counter("bump_active_time")
 
+get_updates_counter = metrics.register_counter("get_updates", labels=["type"])
+
 
 # If a user was last active in the last LAST_ACTIVE_GRANULARITY, consider them
 # "currently_active"
@@ -67,6 +69,10 @@ FEDERATION_TIMEOUT = 30 * 60 * 1000
 
 # How often to resend presence to remote servers
 FEDERATION_PING_INTERVAL = 25 * 60 * 1000
+
+# How long we will wait before assuming that the syncs from an external process
+# are dead.
+EXTERNAL_PROCESS_EXPIRY = 5 * 60 * 1000
 
 assert LAST_ACTIVE_GRANULARITY < IDLE_TIMER
 
@@ -158,15 +164,26 @@ class PresenceHandler(object):
         self.serial_to_user = {}
         self._next_serial = 1
 
-        # Keeps track of the number of *ongoing* syncs. While this is non zero
-        # a user will never go offline.
+        # Keeps track of the number of *ongoing* syncs on this process. While
+        # this is non zero a user will never go offline.
         self.user_to_num_current_syncs = {}
+
+        # Keeps track of the number of *ongoing* syncs on other processes.
+        # While any sync is ongoing on another process the user will never
+        # go offline.
+        # Each process has a unique identifier and an update frequency. If
+        # no update is received from that process within the update period then
+        # we assume that all the sync requests on that process have stopped.
+        # Stored as a dict from process_id to set of user_id, and a dict of
+        # process_id to millisecond timestamp last updated.
+        self.external_process_to_current_syncs = {}
+        self.external_process_last_updated_ms = {}
 
         # Start a LoopingCall in 30s that fires every 5s.
         # The initial delay is to allow disconnected clients a chance to
         # reconnect before we treat them as offline.
         self.clock.call_later(
-            30 * 1000,
+            30,
             self.clock.looping_call,
             self._handle_timeouts,
             5000,
@@ -266,31 +283,48 @@ class PresenceHandler(object):
         """Checks the presence of users that have timed out and updates as
         appropriate.
         """
+        logger.info("Handling presence timeouts")
         now = self.clock.time_msec()
 
-        with Measure(self.clock, "presence_handle_timeouts"):
-            # Fetch the list of users that *may* have timed out. Things may have
-            # changed since the timeout was set, so we won't necessarily have to
-            # take any action.
-            users_to_check = self.wheel_timer.fetch(now)
+        try:
+            with Measure(self.clock, "presence_handle_timeouts"):
+                # Fetch the list of users that *may* have timed out. Things may have
+                # changed since the timeout was set, so we won't necessarily have to
+                # take any action.
+                users_to_check = set(self.wheel_timer.fetch(now))
 
-            states = [
-                self.user_to_current_state.get(
-                    user_id, UserPresenceState.default(user_id)
+                # Check whether the lists of syncing processes from an external
+                # process have expired.
+                expired_process_ids = [
+                    process_id for process_id, last_update
+                    in self.external_process_last_updated_ms.items()
+                    if now - last_update > EXTERNAL_PROCESS_EXPIRY
+                ]
+                for process_id in expired_process_ids:
+                    users_to_check.update(
+                        self.external_process_last_updated_ms.pop(process_id, ())
+                    )
+                    self.external_process_last_update.pop(process_id)
+
+                states = [
+                    self.user_to_current_state.get(
+                        user_id, UserPresenceState.default(user_id)
+                    )
+                    for user_id in users_to_check
+                ]
+
+                timers_fired_counter.inc_by(len(states))
+
+                changes = handle_timeouts(
+                    states,
+                    is_mine_fn=self.is_mine_id,
+                    syncing_user_ids=self.get_currently_syncing_users(),
+                    now=now,
                 )
-                for user_id in set(users_to_check)
-            ]
 
-            timers_fired_counter.inc_by(len(states))
-
-            changes = handle_timeouts(
-                states,
-                is_mine_fn=self.is_mine_id,
-                user_to_num_current_syncs=self.user_to_num_current_syncs,
-                now=now,
-            )
-
-        preserve_fn(self._update_states)(changes)
+            preserve_fn(self._update_states)(changes)
+        except:
+            logger.exception("Exception in _handle_timeouts loop")
 
     @defer.inlineCallbacks
     def bump_presence_active_time(self, user):
@@ -362,6 +396,74 @@ class PresenceHandler(object):
                 preserve_fn(_end)()
 
         defer.returnValue(_user_syncing())
+
+    def get_currently_syncing_users(self):
+        """Get the set of user ids that are currently syncing on this HS.
+        Returns:
+            set(str): A set of user_id strings.
+        """
+        syncing_user_ids = {
+            user_id for user_id, count in self.user_to_num_current_syncs.items()
+            if count
+        }
+        for user_ids in self.external_process_to_current_syncs.values():
+            syncing_user_ids.update(user_ids)
+        return syncing_user_ids
+
+    @defer.inlineCallbacks
+    def update_external_syncs(self, process_id, syncing_user_ids):
+        """Update the syncing users for an external process
+
+        Args:
+            process_id(str): An identifier for the process the users are
+                syncing against. This allows synapse to process updates
+                as user start and stop syncing against a given process.
+            syncing_user_ids(set(str)): The set of user_ids that are
+                currently syncing on that server.
+        """
+
+        # Grab the previous list of user_ids that were syncing on that process
+        prev_syncing_user_ids = (
+            self.external_process_to_current_syncs.get(process_id, set())
+        )
+        # Grab the current presence state for both the users that are syncing
+        # now and the users that were syncing before this update.
+        prev_states = yield self.current_state_for_users(
+            syncing_user_ids | prev_syncing_user_ids
+        )
+        updates = []
+        time_now_ms = self.clock.time_msec()
+
+        # For each new user that is syncing check if we need to mark them as
+        # being online.
+        for new_user_id in syncing_user_ids - prev_syncing_user_ids:
+            prev_state = prev_states[new_user_id]
+            if prev_state.state == PresenceState.OFFLINE:
+                updates.append(prev_state.copy_and_replace(
+                    state=PresenceState.ONLINE,
+                    last_active_ts=time_now_ms,
+                    last_user_sync_ts=time_now_ms,
+                ))
+            else:
+                updates.append(prev_state.copy_and_replace(
+                    last_user_sync_ts=time_now_ms,
+                ))
+
+        # For each user that is still syncing or stopped syncing update the
+        # last sync time so that we will correctly apply the grace period when
+        # they stop syncing.
+        for old_user_id in prev_syncing_user_ids:
+            prev_state = prev_states[old_user_id]
+            updates.append(prev_state.copy_and_replace(
+                last_user_sync_ts=time_now_ms,
+            ))
+
+        yield self._update_states(updates)
+
+        # Update the last updated time for the process. We expire the entries
+        # if we don't receive an update in the given timeframe.
+        self.external_process_last_updated_ms[process_id] = self.clock.time_msec()
+        self.external_process_to_current_syncs[process_id] = syncing_user_ids
 
     @defer.inlineCallbacks
     def current_state_for_user(self, user_id):
@@ -879,13 +981,13 @@ class PresenceEventSource(object):
 
             user_ids_changed = set()
             changed = None
-            if from_key and max_token - from_key < 100:
-                # For small deltas, its quicker to get all changes and then
-                # work out if we share a room or they're in our presence list
+            if from_key:
                 changed = stream_change_cache.get_all_entities_changed(from_key)
 
-            # get_all_entities_changed can return None
-            if changed is not None:
+            if changed is not None and len(changed) < 500:
+                # For small deltas, its quicker to get all changes and then
+                # work out if we share a room or they're in our presence list
+                get_updates_counter.inc("stream")
                 for other_user_id in changed:
                     if other_user_id in friends:
                         user_ids_changed.add(other_user_id)
@@ -897,6 +999,8 @@ class PresenceEventSource(object):
             else:
                 # Too many possible updates. Find all users we can see and check
                 # if any of them have changed.
+                get_updates_counter.inc("full")
+
                 user_ids_to_check = set()
                 for room_id in room_ids:
                     users = yield self.store.get_users_in_room(room_id)
@@ -935,15 +1039,14 @@ class PresenceEventSource(object):
         return self.get_new_events(user, from_key=None, include_offline=False)
 
 
-def handle_timeouts(user_states, is_mine_fn, user_to_num_current_syncs, now):
+def handle_timeouts(user_states, is_mine_fn, syncing_user_ids, now):
     """Checks the presence of users that have timed out and updates as
     appropriate.
 
     Args:
         user_states(list): List of UserPresenceState's to check.
         is_mine_fn (fn): Function that returns if a user_id is ours
-        user_to_num_current_syncs (dict): Mapping of user_id to number of currently
-            active syncs.
+        syncing_user_ids (set): Set of user_ids with active syncs.
         now (int): Current time in ms.
 
     Returns:
@@ -954,21 +1057,20 @@ def handle_timeouts(user_states, is_mine_fn, user_to_num_current_syncs, now):
     for state in user_states:
         is_mine = is_mine_fn(state.user_id)
 
-        new_state = handle_timeout(state, is_mine, user_to_num_current_syncs, now)
+        new_state = handle_timeout(state, is_mine, syncing_user_ids, now)
         if new_state:
             changes[state.user_id] = new_state
 
     return changes.values()
 
 
-def handle_timeout(state, is_mine, user_to_num_current_syncs, now):
+def handle_timeout(state, is_mine, syncing_user_ids, now):
     """Checks the presence of the user to see if any of the timers have elapsed
 
     Args:
         state (UserPresenceState)
         is_mine (bool): Whether the user is ours
-        user_to_num_current_syncs (dict): Mapping of user_id to number of currently
-            active syncs.
+        syncing_user_ids (set): Set of user_ids with active syncs.
         now (int): Current time in ms.
 
     Returns:
@@ -1002,7 +1104,7 @@ def handle_timeout(state, is_mine, user_to_num_current_syncs, now):
 
         # If there are have been no sync for a while (and none ongoing),
         # set presence to offline
-        if not user_to_num_current_syncs.get(user_id, 0):
+        if user_id not in syncing_user_ids:
             if now - state.last_user_sync_ts > SYNC_ONLINE_TIMEOUT:
                 state = state.copy_and_replace(
                     state=PresenceState.OFFLINE,

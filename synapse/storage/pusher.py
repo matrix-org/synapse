@@ -18,7 +18,7 @@ from twisted.internet import defer
 
 from canonicaljson import encode_canonical_json
 
-from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
 
 import logging
 import simplejson as json
@@ -135,19 +135,35 @@ class PusherStore(SQLBaseStore):
             "get_all_updated_pushers", get_all_updated_pushers_txn
         )
 
-    @cachedInlineCallbacks(num_args=1)
-    def get_users_with_pushers_in_room(self, room_id):
-        users = yield self.get_users_in_room(room_id)
-
+    @cachedInlineCallbacks(lru=True, num_args=1, max_entries=15000)
+    def get_if_user_has_pusher(self, user_id):
         result = yield self._simple_select_many_batch(
             table='pushers',
-            column='user_name',
-            iterable=users,
-            retcols=['user_name'],
-            desc='get_users_with_pushers_in_room'
+            keyvalues={
+                'user_name': 'user_id',
+            },
+            retcol='user_name',
+            desc='get_if_user_has_pusher',
+            allow_none=True,
         )
 
-        defer.returnValue([r['user_name'] for r in result])
+        defer.returnValue(bool(result))
+
+    @cachedList(cached_method_name="get_if_user_has_pusher",
+                list_name="user_ids", num_args=1, inlineCallbacks=True)
+    def get_if_users_have_pushers(self, user_ids):
+        rows = yield self._simple_select_many_batch(
+            table='pushers',
+            column='user_name',
+            iterable=user_ids,
+            retcols=['user_name'],
+            desc='get_if_users_have_pushers'
+        )
+
+        result = {user_id: False for user_id in user_ids}
+        result.update({r['user_name']: True for r in rows})
+
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def add_pusher(self, user_id, access_token, kind, app_id,
@@ -178,16 +194,16 @@ class PusherStore(SQLBaseStore):
                     },
                 )
                 if newly_inserted:
-                    # get_users_with_pushers_in_room only cares if the user has
+                    # get_if_user_has_pusher only cares if the user has
                     # at least *one* pusher.
-                    txn.call_after(self.get_users_with_pushers_in_room.invalidate_all)
+                    txn.call_after(self.get_if_user_has_pusher.invalidate, (user_id,))
 
             yield self.runInteraction("add_pusher", f)
 
     @defer.inlineCallbacks
     def delete_pusher_by_app_id_pushkey_user_id(self, app_id, pushkey, user_id):
         def delete_pusher_txn(txn, stream_id):
-            txn.call_after(self.get_users_with_pushers_in_room.invalidate_all)
+            txn.call_after(self.get_if_user_has_pusher.invalidate, (user_id,))
 
             self._simple_delete_one_txn(
                 txn,

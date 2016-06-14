@@ -26,6 +26,7 @@ from .thumbnailer import Thumbnailer
 
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.util.stringutils import random_string
+from synapse.api.errors import SynapseError
 
 from twisted.internet import defer, threads
 
@@ -134,10 +135,15 @@ class MediaRepository(object):
                 request_path = "/".join((
                     "/_matrix/media/v1/download", server_name, media_id,
                 ))
-                length, headers = yield self.client.get_file(
-                    server_name, request_path, output_stream=f,
-                    max_size=self.max_upload_size,
-                )
+                try:
+                    length, headers = yield self.client.get_file(
+                        server_name, request_path, output_stream=f,
+                        max_size=self.max_upload_size,
+                    )
+                except Exception as e:
+                    logger.warn("Failed to fetch remoted media %r", e)
+                    raise SynapseError(502, "Failed to fetch remoted media")
+
             media_type = headers["Content-Type"][0]
             time_now_ms = self.clock.time_msec()
 

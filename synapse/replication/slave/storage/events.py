@@ -23,6 +23,7 @@ from synapse.storage.roommember import RoomMemberStore
 from synapse.storage.event_federation import EventFederationStore
 from synapse.storage.event_push_actions import EventPushActionsStore
 from synapse.storage.state import StateStore
+from synapse.storage.stream import StreamStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 import ujson as json
@@ -57,6 +58,9 @@ class SlavedEventStore(BaseSlavedStore):
             "EventsRoomStreamChangeCache", min_event_val,
             prefilled_cache=event_cache_prefill,
         )
+        self._membership_stream_cache = StreamChangeCache(
+            "MembershipStreamChangeCache", events_max,
+        )
 
     # Cached functions can't be accessed through a class instance so we need
     # to reach inside the __dict__ to extract them.
@@ -87,6 +91,9 @@ class SlavedEventStore(BaseSlavedStore):
     _get_state_group_from_group = (
         StateStore.__dict__["_get_state_group_from_group"]
     )
+    get_recent_event_ids_for_room = (
+        StreamStore.__dict__["get_recent_event_ids_for_room"]
+    )
 
     get_unread_push_actions_for_user_in_range = (
         DataStore.get_unread_push_actions_for_user_in_range.__func__
@@ -109,24 +116,25 @@ class SlavedEventStore(BaseSlavedStore):
         DataStore.get_room_events_stream_for_room.__func__
     )
     get_events_around = DataStore.get_events_around.__func__
+    get_state_for_event = DataStore.get_state_for_event.__func__
     get_state_for_events = DataStore.get_state_for_events.__func__
     get_state_groups = DataStore.get_state_groups.__func__
+    get_recent_events_for_room = DataStore.get_recent_events_for_room.__func__
+    get_room_events_stream_for_rooms = (
+        DataStore.get_room_events_stream_for_rooms.__func__
+    )
+    get_stream_token_for_event = DataStore.get_stream_token_for_event.__func__
 
-    _set_before_and_after = DataStore._set_before_and_after
+    _set_before_and_after = staticmethod(DataStore._set_before_and_after)
 
     _get_events = DataStore._get_events.__func__
     _get_events_from_cache = DataStore._get_events_from_cache.__func__
 
     _invalidate_get_event_cache = DataStore._invalidate_get_event_cache.__func__
-    _parse_events_txn = DataStore._parse_events_txn.__func__
-    _get_events_txn = DataStore._get_events_txn.__func__
-    _get_event_txn = DataStore._get_event_txn.__func__
     _enqueue_events = DataStore._enqueue_events.__func__
     _do_fetch = DataStore._do_fetch.__func__
-    _fetch_events_txn = DataStore._fetch_events_txn.__func__
     _fetch_event_rows = DataStore._fetch_event_rows.__func__
     _get_event_from_row = DataStore._get_event_from_row.__func__
-    _get_event_from_row_txn = DataStore._get_event_from_row_txn.__func__
     _get_rooms_for_user_where_membership_is_txn = (
         DataStore._get_rooms_for_user_where_membership_is_txn.__func__
     )
@@ -220,9 +228,9 @@ class SlavedEventStore(BaseSlavedStore):
             self.get_rooms_for_user.invalidate((event.state_key,))
             # self.get_joined_hosts_for_room.invalidate((event.room_id,))
             self.get_users_in_room.invalidate((event.room_id,))
-            # self._membership_stream_cache.entity_has_changed(
-            #    event.state_key, event.internal_metadata.stream_ordering
-            # )
+            self._membership_stream_cache.entity_has_changed(
+                event.state_key, event.internal_metadata.stream_ordering
+            )
             self.get_invited_rooms_for_user.invalidate((event.state_key,))
 
         if not event.is_state():

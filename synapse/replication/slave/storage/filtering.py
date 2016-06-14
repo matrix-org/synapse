@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" This is a reference implementation of a Matrix home server.
-"""
+from ._base import BaseSlavedStore
+from synapse.storage.filtering import FilteringStore
 
-__version__ = "0.16.0"
+
+class SlavedFilteringStore(BaseSlavedStore):
+    def __init__(self, db_conn, hs):
+        super(SlavedFilteringStore, self).__init__(db_conn, hs)
+
+    # Filters are immutable so this cache doesn't need to be expired
+    get_user_filter = FilteringStore.__dict__["get_user_filter"]

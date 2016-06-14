@@ -61,9 +61,6 @@ class CounterMetricTestCase(unittest.TestCase):
             'vector{method="PUT"} 1',
         ])
 
-        # Check that passing too few values errors
-        self.assertRaises(ValueError, counter.inc)
-
 
 class CallbackMetricTestCase(unittest.TestCase):
 
@@ -138,27 +135,27 @@ class CacheMetricTestCase(unittest.TestCase):
     def test_cache(self):
         d = dict()
 
-        metric = CacheMetric("cache", lambda: len(d))
+        metric = CacheMetric("cache", lambda: len(d), "cache_name")
 
         self.assertEquals(metric.render(), [
-            'cache:hits 0',
-            'cache:total 0',
-            'cache:size 0',
+            'cache:hits{name="cache_name"} 0',
+            'cache:total{name="cache_name"} 0',
+            'cache:size{name="cache_name"} 0',
         ])
 
         metric.inc_misses()
         d["key"] = "value"
 
         self.assertEquals(metric.render(), [
-            'cache:hits 0',
-            'cache:total 1',
-            'cache:size 1',
+            'cache:hits{name="cache_name"} 0',
+            'cache:total{name="cache_name"} 1',
+            'cache:size{name="cache_name"} 1',
         ])
 
         metric.inc_hits()
 
         self.assertEquals(metric.render(), [
-            'cache:hits 1',
-            'cache:total 2',
-            'cache:size 1',
+            'cache:hits{name="cache_name"} 1',
+            'cache:total{name="cache_name"} 2',
+            'cache:size{name="cache_name"} 1',
         ])

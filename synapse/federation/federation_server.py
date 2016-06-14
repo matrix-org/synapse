@@ -377,9 +377,19 @@ class FederationServer(FederationBase):
     @log_function
     def on_get_missing_events(self, origin, room_id, earliest_events,
                               latest_events, limit, min_depth):
+        logger.info(
+            "on_get_missing_events: earliest_events: %r, latest_events: %r,"
+            " limit: %d, min_depth: %d",
+            earliest_events, latest_events, limit, min_depth
+        )
         missing_events = yield self.handler.on_get_missing_events(
             origin, room_id, earliest_events, latest_events, limit, min_depth
         )
+
+        if len(missing_events) < 5:
+            logger.info("Returning %d events: %r", len(missing_events), missing_events)
+        else:
+            logger.info("Returning %d events", len(missing_events))
 
         time_now = self._clock.time_msec()
 
@@ -490,6 +500,11 @@ class FederationServer(FederationBase):
                     latest = set(latest)
                     latest |= seen
 
+                    logger.info(
+                        "Missing %d events for room %r: %r...",
+                        len(prevs - seen), pdu.room_id, list(prevs - seen)[:5]
+                    )
+
                     missing_events = yield self.get_missing_events(
                         origin,
                         pdu.room_id,
@@ -517,6 +532,10 @@ class FederationServer(FederationBase):
             prevs = {e_id for e_id, _ in pdu.prev_events}
             seen = set(have_seen.keys())
             if prevs - seen:
+                logger.info(
+                    "Still missing %d events for room %r: %r...",
+                    len(prevs - seen), pdu.room_id, list(prevs - seen)[:5]
+                )
                 fetch_state = True
 
         if fetch_state:

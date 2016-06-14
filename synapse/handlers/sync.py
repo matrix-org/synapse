@@ -210,9 +210,8 @@ class SyncHandler(object):
     @defer.inlineCallbacks
     def push_rules_for_user(self, user):
         user_id = user.to_string()
-        rawrules = yield self.store.get_push_rules_for_user(user_id)
-        enabled_map = yield self.store.get_push_rules_enabled_for_user(user_id)
-        rules = format_push_rules_for_user(user, rawrules, enabled_map)
+        rules = yield self.store.get_push_rules_for_user(user_id)
+        rules = format_push_rules_for_user(user, rules)
         defer.returnValue(rules)
 
     @defer.inlineCallbacks
@@ -653,6 +652,9 @@ class SyncHandler(object):
             as_event=True,
         )
         presence.extend(states)
+
+        # Deduplicate the presence entries so that there's at most one per user
+        presence = {p["content"]["user_id"]: p for p in presence}.values()
 
         presence = sync_config.filter_collection.filter_presence(
             presence

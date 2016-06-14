@@ -16,6 +16,7 @@
 
 import synapse
 
+import gc
 import logging
 import os
 import sys
@@ -265,10 +266,9 @@ def setup(config_options):
         HomeServer
     """
     try:
-        config = HomeServerConfig.load_config(
+        config = HomeServerConfig.load_or_generate_config(
             "Synapse Homeserver",
             config_options,
-            generate_section="Homeserver"
         )
     except ConfigError as e:
         sys.stderr.write("\n" + e.message + "\n")
@@ -351,6 +351,8 @@ class SynapseService(service.Service):
     def startService(self):
         hs = setup(self.config)
         change_resource_limit(hs.config.soft_file_limit)
+        if hs.config.gc_thresholds:
+            gc.set_threshold(*hs.config.gc_thresholds)
 
     def stopService(self):
         return self._port.stopListening()
@@ -422,6 +424,8 @@ def run(hs):
         # sys.settrace(logcontext_tracer)
         with LoggingContext("run"):
             change_resource_limit(hs.config.soft_file_limit)
+            if hs.config.gc_thresholds:
+                gc.set_threshold(*hs.config.gc_thresholds)
             reactor.run()
 
     if hs.config.daemonize:

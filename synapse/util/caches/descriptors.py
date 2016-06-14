@@ -22,7 +22,7 @@ from synapse.util.logcontext import (
     PreserveLoggingContext, preserve_context_over_deferred, preserve_context_over_fn
 )
 
-from . import caches_by_name, DEBUG_CACHES, cache_counter
+from . import DEBUG_CACHES, register_cache
 
 from twisted.internet import defer
 
@@ -32,6 +32,7 @@ import os
 import functools
 import inspect
 import threading
+
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,15 @@ CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.1))
 
 
 class Cache(object):
+    __slots__ = (
+        "cache",
+        "max_entries",
+        "name",
+        "keylen",
+        "sequence",
+        "thread",
+        "metrics",
+    )
 
     def __init__(self, name, max_entries=1000, keylen=1, lru=True, tree=False):
         if lru:
@@ -59,7 +69,7 @@ class Cache(object):
         self.keylen = keylen
         self.sequence = 0
         self.thread = None
-        caches_by_name[name] = self.cache
+        self.metrics = register_cache(name, self.cache)
 
     def check_thread(self):
         expected_thread = self.thread
@@ -74,10 +84,10 @@ class Cache(object):
     def get(self, key, default=_CacheSentinel):
         val = self.cache.get(key, _CacheSentinel)
         if val is not _CacheSentinel:
-            cache_counter.inc_hits(self.name)
+            self.metrics.inc_hits()
             return val
 
-        cache_counter.inc_misses(self.name)
+        self.metrics.inc_misses()
 
         if default is _CacheSentinel:
             raise KeyError()
@@ -293,16 +303,21 @@ class CacheListDescriptor(object):
 
             # cached is a dict arg -> deferred, where deferred results in a
             # 2-tuple (`arg`, `result`)
-            cached = {}
+            results = {}
+            cached_defers = {}
             missing = []
             for arg in list_args:
                 key = list(keyargs)
                 key[self.list_pos] = arg
 
                 try:
-                    res = cache.get(tuple(key)).observe()
-                    res.addCallback(lambda r, arg: (arg, r), arg)
-                    cached[arg] = res
+                    res = cache.get(tuple(key))
+                    if not res.has_succeeded():
+                        res = res.observe()
+                        res.addCallback(lambda r, arg: (arg, r), arg)
+                        cached_defers[arg] = res
+                    else:
+                        results[arg] = res.get_result()
                 except KeyError:
                     missing.append(arg)
 
@@ -340,12 +355,21 @@ class CacheListDescriptor(object):
                     res = observer.observe()
                     res.addCallback(lambda r, arg: (arg, r), arg)
 
-                    cached[arg] = res
+                    cached_defers[arg] = res
 
-            return preserve_context_over_deferred(defer.gatherResults(
-                cached.values(),
-                consumeErrors=True,
-            ).addErrback(unwrapFirstError).addCallback(lambda res: dict(res)))
+            if cached_defers:
+                def update_results_dict(res):
+                    results.update(res)
+                    return results
+
+                return preserve_context_over_deferred(defer.gatherResults(
+                    cached_defers.values(),
+                    consumeErrors=True,
+                ).addCallback(update_results_dict).addErrback(
+                    unwrapFirstError
+                ))
+            else:
+                return results
 
         obj.__dict__[self.orig.__name__] = wrapped
 

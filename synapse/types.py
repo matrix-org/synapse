@@ -25,7 +25,10 @@ Requester = namedtuple("Requester", ["user", "access_token_id", "is_guest"])
 
 
 def get_domain_from_id(string):
-    return string.split(":", 1)[1]
+    try:
+        return string.split(":", 1)[1]
+    except IndexError:
+        raise SynapseError(400, "Invalid ID: %r", string)
 
 
 class DomainSpecificString(

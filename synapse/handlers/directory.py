@@ -33,6 +33,7 @@ class DirectoryHandler(BaseHandler):
         super(DirectoryHandler, self).__init__(hs)
 
         self.state = hs.get_state_handler()
+        self.appservice_handler = hs.get_application_service_handler()
 
         self.federation = hs.get_replication_layer()
         self.federation.register_query_handler(
@@ -281,7 +282,7 @@ class DirectoryHandler(BaseHandler):
         )
         if not result:
             # Query AS to see if it exists
-            as_handler = self.hs.get_handlers().appservice_handler
+            as_handler = self.appservice_handler
             result = yield as_handler.query_room_alias_exists(room_alias)
         defer.returnValue(result)
 

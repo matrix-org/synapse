@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.caches import cache_counter, caches_by_name
+from synapse.util.caches import register_cache
 
 
 from blist import sorteddict
@@ -42,7 +42,7 @@ class StreamChangeCache(object):
         self._cache = sorteddict()
         self._earliest_known_stream_pos = current_stream_pos
         self.name = name
-        caches_by_name[self.name] = self._cache
+        self.metrics = register_cache(self.name, self._cache)
 
         for entity, stream_pos in prefilled_cache.items():
             self.entity_has_changed(entity, stream_pos)
@@ -53,19 +53,19 @@ class StreamChangeCache(object):
         assert type(stream_pos) is int
 
         if stream_pos < self._earliest_known_stream_pos:
-            cache_counter.inc_misses(self.name)
+            self.metrics.inc_misses()
             return True
 
         latest_entity_change_pos = self._entity_to_key.get(entity, None)
         if latest_entity_change_pos is None:
-            cache_counter.inc_hits(self.name)
+            self.metrics.inc_hits()
             return False
 
         if stream_pos < latest_entity_change_pos:
-            cache_counter.inc_misses(self.name)
+            self.metrics.inc_misses()
             return True
 
-        cache_counter.inc_hits(self.name)
+        self.metrics.inc_hits()
         return False
 
     def get_entities_changed(self, entities, stream_pos):
@@ -82,10 +82,10 @@ class StreamChangeCache(object):
                 self._cache[k] for k in keys[i:]
             ).intersection(entities)
 
-            cache_counter.inc_hits(self.name)
+            self.metrics.inc_hits()
         else:
             result = entities
-            cache_counter.inc_misses(self.name)
+            self.metrics.inc_misses()
 
         return result
 

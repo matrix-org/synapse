@@ -21,6 +21,7 @@ from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 import logging
 import re
+import ujson as json
 
 
 logger = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ class SearchStore(BackgroundUpdateStore):
 
         def reindex_search_txn(txn):
             sql = (
-                "SELECT stream_ordering, event_id FROM events"
+                "SELECT stream_ordering, event_id, room_id, type, content FROM events"
                 " WHERE ? <= stream_ordering AND stream_ordering < ?"
                 " AND (%s)"
                 " ORDER BY stream_ordering DESC"
@@ -61,28 +62,30 @@ class SearchStore(BackgroundUpdateStore):
 
             txn.execute(sql, (target_min_stream_id, max_stream_id, batch_size))
 
-            rows = txn.fetchall()
+            rows = self.cursor_to_dict(txn)
             if not rows:
                 return 0
 
-            min_stream_id = rows[-1][0]
-            event_ids = [row[1] for row in rows]
-
-            events = self._get_events_txn(txn, event_ids)
+            min_stream_id = rows[-1]["stream_ordering"]
 
             event_search_rows = []
-            for event in events:
+            for row in rows:
                 try:
-                    event_id = event.event_id
-                    room_id = event.room_id
-                    content = event.content
-                    if event.type == "m.room.message":
+                    event_id = row["event_id"]
+                    room_id = row["room_id"]
+                    etype = row["type"]
+                    try:
+                        content = json.loads(row["content"])
+                    except:
+                        continue
+
+                    if etype == "m.room.message":
                         key = "content.body"
                         value = content["body"]
-                    elif event.type == "m.room.topic":
+                    elif etype == "m.room.topic":
                         key = "content.topic"
                         value = content["topic"]
-                    elif event.type == "m.room.name":
+                    elif etype == "m.room.name":
                         key = "content.name"
                         value = content["name"]
                 except (KeyError, AttributeError):

@@ -17,7 +17,7 @@ from twisted.internet import defer
 from .appservice import (
     ApplicationServiceStore, ApplicationServiceTransactionStore
 )
-from ._base import Cache
+from ._base import LoggingTransaction
 from .directory import DirectoryStore
 from .events import EventsStore
 from .presence import PresenceStore, UserPresenceState
@@ -45,6 +45,7 @@ from .search import SearchStore
 from .tags import TagsStore
 from .account_data import AccountDataStore
 from .openid import OpenIdStore
+from .client_ips import ClientIpStore
 
 from .util.id_generators import IdGenerator, StreamIdGenerator, ChainedIdGenerator
 
@@ -56,12 +57,6 @@ import logging
 
 
 logger = logging.getLogger(__name__)
-
-
-# Number of msec of granularity to store the user IP 'last seen' time. Smaller
-# times give more inserts into the database even for readonly API hits
-# 120 seconds == 2 minutes
-LAST_SEEN_GRANULARITY = 120 * 1000
 
 
 class DataStore(RoomMemberStore, RoomStore,
@@ -84,16 +79,13 @@ class DataStore(RoomMemberStore, RoomStore,
                 AccountDataStore,
                 EventPushActionsStore,
                 OpenIdStore,
+                ClientIpStore,
                 ):
 
     def __init__(self, db_conn, hs):
         self.hs = hs
+        self._clock = hs.get_clock()
         self.database_engine = hs.database_engine
-
-        self.client_ip_last_seen = Cache(
-            name="client_ip_last_seen",
-            keylen=4,
-        )
 
         self._stream_id_gen = StreamIdGenerator(
             db_conn, "events", "stream_ordering",
@@ -148,7 +140,7 @@ class DataStore(RoomMemberStore, RoomStore,
             "AccountDataAndTagsChangeCache", account_max,
         )
 
-        self.__presence_on_startup = self._get_active_presence(db_conn)
+        self._presence_on_startup = self._get_active_presence(db_conn)
 
         presence_cache_prefill, min_presence_val = self._get_cache_dict(
             db_conn, "presence_stream",
@@ -173,11 +165,24 @@ class DataStore(RoomMemberStore, RoomStore,
             prefilled_cache=push_rules_prefill,
         )
 
+        cur = LoggingTransaction(
+            db_conn.cursor(),
+            name="_find_stream_orderings_for_times_txn",
+            database_engine=self.database_engine,
+            after_callbacks=[]
+        )
+        self._find_stream_orderings_for_times_txn(cur)
+        cur.close()
+
+        self.find_stream_orderings_looping_call = self._clock.looping_call(
+            self._find_stream_orderings_for_times, 60 * 60 * 1000
+        )
+
         super(DataStore, self).__init__(hs)
 
     def take_presence_startup_info(self):
-        active_on_startup = self.__presence_on_startup
-        self.__presence_on_startup = None
+        active_on_startup = self._presence_on_startup
+        self._presence_on_startup = None
         return active_on_startup
 
     def _get_active_presence(self, db_conn):
@@ -201,39 +206,6 @@ class DataStore(RoomMemberStore, RoomStore,
             row["currently_active"] = bool(row["currently_active"])
 
         return [UserPresenceState(**row) for row in rows]
-
-    @defer.inlineCallbacks
-    def insert_client_ip(self, user, access_token, ip, user_agent):
-        now = int(self._clock.time_msec())
-        key = (user.to_string(), access_token, ip)
-
-        try:
-            last_seen = self.client_ip_last_seen.get(key)
-        except KeyError:
-            last_seen = None
-
-        # Rate-limited inserts
-        if last_seen is not None and (now - last_seen) < LAST_SEEN_GRANULARITY:
-            defer.returnValue(None)
-
-        self.client_ip_last_seen.prefill(key, now)
-
-        # It's safe not to lock here: a) no unique constraint,
-        # b) LAST_SEEN_GRANULARITY makes concurrent updates incredibly unlikely
-        yield self._simple_upsert(
-            "user_ips",
-            keyvalues={
-                "user_id": user.to_string(),
-                "access_token": access_token,
-                "ip": ip,
-                "user_agent": user_agent,
-            },
-            values={
-                "last_seen": now,
-            },
-            desc="insert_client_ip",
-            lock=False,
-        )
 
     @defer.inlineCallbacks
     def count_daily_users(self):

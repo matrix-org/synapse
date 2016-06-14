@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" This is a reference implementation of a Matrix home server.
-"""
+from ._base import BaseSlavedStore
+from synapse.storage import DataStore
+from synapse.storage.registration import RegistrationStore
 
-__version__ = "0.16.0"
+
+class SlavedRegistrationStore(BaseSlavedStore):
+    def __init__(self, db_conn, hs):
+        super(SlavedRegistrationStore, self).__init__(db_conn, hs)
+
+    # TODO: use the cached version and invalidate deleted tokens
+    get_user_by_access_token = RegistrationStore.__dict__[
+        "get_user_by_access_token"
+    ].orig
+
+    _query_for_auth = DataStore._query_for_auth.__func__

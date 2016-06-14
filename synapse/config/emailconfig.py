@@ -89,7 +89,7 @@ class EmailConfig(Config):
         #   enable_notifs: false
         #   smtp_host: "localhost"
         #   smtp_port: 25
-        #   notif_from: Your Friendly Matrix Home Server <noreply@example.com>
+        #   notif_from: "Your Friendly %(app)s Home Server <noreply@example.com>"
         #   app_name: Matrix
         #   template_dir: res/templates
         #   notif_template_html: notif_mail.html

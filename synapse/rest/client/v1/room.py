@@ -72,8 +72,6 @@ class RoomCreateRestServlet(ClientV1RestServlet):
 
     def get_room_config(self, request):
         user_supplied_config = parse_json_object_from_request(request)
-        # default visibility
-        user_supplied_config.setdefault("visibility", "public")
         return user_supplied_config
 
     def on_OPTIONS(self, request):
@@ -279,8 +277,16 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        handler = self.handlers.room_list_handler
-        data = yield handler.get_public_room_list()
+        try:
+            yield self.auth.get_user_by_req(request)
+        except AuthError:
+            # This endpoint isn't authed, but its useful to know who's hitting
+            # it if they *do* supply an access token
+            pass
+
+        handler = self.hs.get_room_list_handler()
+        data = yield handler.get_aggregated_public_room_list()
+
         defer.returnValue((200, data))
 
 

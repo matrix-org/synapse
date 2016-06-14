@@ -194,32 +194,44 @@ class RoomStore(SQLBaseStore):
 
     @cachedInlineCallbacks()
     def get_room_name_and_aliases(self, room_id):
-        def f(txn):
+        def get_room_name(txn):
             sql = (
-                "SELECT event_id FROM current_state_events "
-                "WHERE room_id = ? "
+                "SELECT name FROM room_names"
+                " INNER JOIN current_state_events USING (room_id, event_id)"
+                " WHERE room_id = ?"
+                " LIMIT 1"
             )
 
-            sql += " AND ((type = 'm.room.name' AND state_key = '')"
-            sql += " OR type = 'm.room.aliases')"
-
             txn.execute(sql, (room_id,))
-            results = self.cursor_to_dict(txn)
+            rows = txn.fetchall()
+            if rows:
+                return rows[0][0]
+            else:
+                return None
 
-            return self._parse_events_txn(txn, results)
+            return [row[0] for row in txn.fetchall()]
 
-        events = yield self.runInteraction("get_room_name_and_aliases", f)
+        def get_room_aliases(txn):
+            sql = (
+                "SELECT content FROM current_state_events"
+                " INNER JOIN events USING (room_id, event_id)"
+                " WHERE room_id = ?"
+            )
+            txn.execute(sql, (room_id,))
+            return [row[0] for row in txn.fetchall()]
 
-        name = None
+        name = yield self.runInteraction("get_room_name", get_room_name)
+        alias_contents = yield self.runInteraction("get_room_aliases", get_room_aliases)
+
         aliases = []
 
-        for e in events:
-            if e.type == 'm.room.name':
-                if 'name' in e.content:
-                    name = e.content['name']
-            elif e.type == 'm.room.aliases':
-                if 'aliases' in e.content:
-                    aliases.extend(e.content['aliases'])
+        for c in alias_contents:
+            try:
+                content = json.loads(c)
+            except:
+                continue
+
+            aliases.extend(content.get('aliases', []))
 
         defer.returnValue((name, aliases))
 
