@@ -280,7 +280,7 @@ class PreviewUrlResource(Resource):
                 # TODO: consider inlined CSS styles as well as width & height attribs
                 images = tree.xpath("//img[@src][number(@width)>10][number(@height)>10]")
                 images = sorted(images, key=lambda i: (
-                    -1 * int(i.attrib['width']) * int(i.attrib['height'])
+                    -1 * float(i.attrib['width']) * float(i.attrib['height'])
                 ))
                 if not images:
                     images = tree.xpath("//img[@src]")
