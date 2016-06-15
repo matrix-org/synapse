@@ -15,7 +15,8 @@ Bugs fixes:
 * Fix bug where rooms where marked as published by default (PR #857)
 * Fix bug where joining room with an event with invalid sender (PR #868)
 * Fix bug where backfilled events were sent down sync streams (PR #869)
-* Fix bug where outgoing connections could wedge indefinitely (PR #870)
+* Fix bug where outgoing connections could wedge indefinitely, causing push
+  notifications to be unreliable (PR #870)
 
 
 Performance improvements:
