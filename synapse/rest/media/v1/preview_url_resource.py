@@ -252,7 +252,8 @@ class PreviewUrlResource(Resource):
 
         og = {}
         for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
-            og[tag.attrib['property']] = tag.attrib['content']
+            if 'content' in tag.attrib:
+                og[tag.attrib['property']] = tag.attrib['content']
 
         # TODO: grab article: meta tags too, e.g.:
 
