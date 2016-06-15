@@ -288,9 +288,9 @@ class PreviewUrlResource(Resource):
                     og['og:image'] = images[0].attrib['src']
 
         # pre-cache the image for posterity
-        # FIXME: it might be cleaner to use the same flow as the main /preview_url request
-        # itself and benefit from the same caching etc.  But for now we just rely on the
-        # caching on the master request to speed things up.
+        # FIXME: it might be cleaner to use the same flow as the main /preview_url
+        # request itself and benefit from the same caching etc.  But for now we
+        # just rely on the caching on the master request to speed things up.
         if 'og:image' in og and og['og:image']:
             image_info = yield self._download_url(
                 self._rebase_url(og['og:image'], media_info['uri']), requester.user
