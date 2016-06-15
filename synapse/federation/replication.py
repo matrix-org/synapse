@@ -72,5 +72,7 @@ class ReplicationLayer(FederationClient, FederationServer):
 
         self.hs = hs
 
+        super(ReplicationLayer, self).__init__(hs)
+
     def __str__(self):
         return "<ReplicationLayer(%s)>" % self.server_name
