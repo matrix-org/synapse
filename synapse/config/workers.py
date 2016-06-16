@@ -46,10 +46,6 @@ def clobber_with_worker_config(config, worker_config):
     # worker config directly.
     config.event_cache_size = worker_config.event_cache_size
 
-    # TODO: The replication_url should only be accessed within worker specific
-    # code so it really shouldn't need to be clobbered in the main config.
-    config.replication_url = worker_config.replication_url
-
 
 def read_worker_config(config):
     return Worker(

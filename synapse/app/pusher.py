@@ -112,7 +112,7 @@ class PusherServer(HomeServer):
 
     def remove_pusher(self, app_id, push_key, user_id):
         http_client = self.get_simple_http_client()
-        replication_url = self.config.replication_url
+        replication_url = self.worker_config.replication_url
         url = replication_url + "/remove_pushers"
         return http_client.post_json_get_json(url, {
             "remove": [{
@@ -166,7 +166,7 @@ class PusherServer(HomeServer):
     def replicate(self):
         http_client = self.get_simple_http_client()
         store = self.get_datastore()
-        replication_url = self.config.replication_url
+        replication_url = self.worker_config.replication_url
         pusher_pool = self.get_pusherpool()
         clock = self.get_clock()
 
@@ -275,6 +275,7 @@ def setup(worker_name, config_options):
         config.server_name,
         db_config=config.database_config,
         config=config,
+        worker_config=worker_config,
         version_string=get_version_string("Synapse", synapse),
         database_engine=database_engine,
     )

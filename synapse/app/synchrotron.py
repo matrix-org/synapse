@@ -98,7 +98,7 @@ class SynchrotronPresence(object):
         self.http_client = hs.get_simple_http_client()
         self.store = hs.get_datastore()
         self.user_to_num_current_syncs = {}
-        self.syncing_users_url = hs.config.replication_url + "/syncing_users"
+        self.syncing_users_url = hs.worker_config.replication_url + "/syncing_users"
         self.clock = hs.get_clock()
 
         active_presence = self.store.take_presence_startup_info()
@@ -306,7 +306,7 @@ class SynchrotronServer(HomeServer):
     def replicate(self):
         http_client = self.get_simple_http_client()
         store = self.get_datastore()
-        replication_url = self.config.replication_url
+        replication_url = self.worker_config.replication_url
         clock = self.get_clock()
         notifier = self.get_notifier()
         presence_handler = self.get_presence_handler()
@@ -426,6 +426,7 @@ def start(worker_name, config_options):
         config.server_name,
         db_config=config.database_config,
         config=config,
+        worker_config=worker_config,
         version_string=get_version_string("Synapse", synapse),
         database_engine=database_engine,
         application_service_handler=SynchrotronApplicationService(),
