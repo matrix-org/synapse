@@ -35,8 +35,19 @@ Worker = collections.namedtuple("Worker", [
 
 def clobber_with_worker_config(config, worker_config):
     """Overrides some of the keys of the main config with worker-specific
-    values."""
+    values. We only need to override the keys that are accessed deep
+    withing synapse code. Most of the keys that we want to override in
+    the workers are accessed in setup code that is rewritten specifically
+    for the workers. In that new code we can access the worker config directly,
+    so we don't need to override the values in the main config."""
+
+    # TODO: The event_cache_size is accessed in the db setup. It should be
+    # possible to rejigg that code so that the cache size is pulled from the
+    # worker config directly.
     config.event_cache_size = worker_config.event_cache_size
+
+    # TODO: The replication_url should only be accessed within worker specific
+    # code so it really shouldn't need to be clobbered in the main config.
     config.replication_url = worker_config.replication_url
 
 
