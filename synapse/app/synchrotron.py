@@ -97,7 +97,7 @@ class SynchrotronPresence(object):
         self.http_client = hs.get_simple_http_client()
         self.store = hs.get_datastore()
         self.user_to_num_current_syncs = {}
-        self.syncing_users_url = hs.worker_config.replication_url + "/syncing_users"
+        self.syncing_users_url = hs.config.worker_replication_url + "/syncing_users"
         self.clock = hs.get_clock()
 
         active_presence = self.store.take_presence_startup_info()
@@ -305,7 +305,7 @@ class SynchrotronServer(HomeServer):
     def replicate(self):
         http_client = self.get_simple_http_client()
         store = self.get_datastore()
-        replication_url = self.worker_config.replication_url
+        replication_url = self.config.worker_replication_url
         clock = self.get_clock()
         notifier = self.get_notifier()
         presence_handler = self.get_presence_handler()
@@ -403,11 +403,8 @@ class SynchrotronServer(HomeServer):
     def build_typing_handler(self):
         return SynchrotronTyping(self)
 
-    def get_event_cache_size(self):
-        return self.worker_config.event_cache_size
 
-
-def start(worker_name, config_options):
+def start(config_options):
     try:
         config = HomeServerConfig.load_config(
             "Synapse synchrotron", config_options
@@ -416,9 +413,9 @@ def start(worker_name, config_options):
         sys.stderr.write("\n" + e.message + "\n")
         sys.exit(1)
 
-    worker_config = config.workers[worker_name]
+    assert config.worker_app == "synapse.app.synchrotron"
 
-    setup_logging(worker_config.log_config, worker_config.log_file)
+    setup_logging(config.worker_log_config, config.worker_log_file)
 
     database_engine = create_engine(config.database_config)
 
@@ -426,21 +423,20 @@ def start(worker_name, config_options):
         config.server_name,
         db_config=config.database_config,
         config=config,
-        worker_config=worker_config,
         version_string=get_version_string("Synapse", synapse),
         database_engine=database_engine,
         application_service_handler=SynchrotronApplicationService(),
     )
 
     ss.setup()
-    ss.start_listening(worker_config.listeners)
+    ss.start_listening(config.worker_listeners)
 
     def run():
         with LoggingContext("run"):
             logger.info("Running")
-            change_resource_limit(worker_config.soft_file_limit)
-            if worker_config.gc_thresholds:
-                ss.set_threshold(worker_config.gc_thresholds)
+            change_resource_limit(config.soft_file_limit)
+            if config.gc_thresholds:
+                ss.set_threshold(config.gc_thresholds)
             reactor.run()
 
     def start():
@@ -449,10 +445,10 @@ def start(worker_name, config_options):
 
     reactor.callWhenRunning(start)
 
-    if worker_config.daemonize:
+    if config.worker_daemonize:
         daemon = Daemonize(
             app="synapse-synchrotron",
-            pid=worker_config.pid_file,
+            pid=config.worker_pid_file,
             action=run,
             auto_close_fds=False,
             verbose=True,
@@ -465,5 +461,4 @@ def start(worker_name, config_options):
 
 if __name__ == '__main__':
     with LoggingContext("main"):
-        worker_name = sys.argv[1]
-        start(worker_name, sys.argv[2:])
+        start(sys.argv[1:])

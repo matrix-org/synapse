@@ -13,52 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
-
 from ._base import Config
-from .server import read_gc_thresholds
-
-
-Worker = collections.namedtuple("Worker", [
-    "app",
-    "listeners",
-    "pid_file",
-    "daemonize",
-    "log_file",
-    "log_config",
-    "event_cache_size",
-    "soft_file_limit",
-    "gc_thresholds",
-    "replication_url",
-])
-
-
-def read_worker_config(config):
-    return Worker(
-        app=config["app"],
-        listeners=config.get("listeners", []),
-        pid_file=config.get("pid_file"),
-        daemonize=config["daemonize"],
-        log_file=config.get("log_file"),
-        log_config=config.get("log_config"),
-        event_cache_size=Config.parse_size(config.get("event_cache_size", "10K")),
-        soft_file_limit=config.get("soft_file_limit"),
-        gc_thresholds=read_gc_thresholds(config.get("gc_thresholds")),
-        replication_url=config.get("replication_url"),
-    )
 
 
 class WorkerConfig(Config):
     """The workers are processes run separately to the main synapse process.
-    Each worker has a name that identifies it within the config file.
     They have their own pid_file and listener configuration. They use the
-    replication_url to talk to the main synapse process. They have their
-    own cache size tuning, gc threshold tuning and open file limits."""
+    replication_url to talk to the main synapse process."""
 
     def read_config(self, config):
-        workers = config.get("workers", {})
-
-        self.workers = {
-            worker_name: read_worker_config(worker_config)
-            for worker_name, worker_config in workers.items()
-        }
+        self.worker_app = config.get("worker_app")
+        self.worker_listeners = config.get("worker_listeners")
+        self.worker_daemonize = config.get("worker_daemonize")
+        self.worker_pid_file = config.get("worker_pid_file")
+        self.worker_log_file = config.get("worker_log_file")
+        self.worker_log_config = config.get("worker_log_config")
+        self.worker_replication_url = config.get("worker_replication_url")
