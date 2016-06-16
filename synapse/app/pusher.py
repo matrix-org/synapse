@@ -18,7 +18,6 @@ import synapse
 
 from synapse.server import HomeServer
 from synapse.config._base import ConfigError
-from synapse.config.workers import clobber_with_worker_config
 from synapse.config.logger import setup_logging
 from synapse.config.homeserver import HomeServerConfig
 from synapse.http.site import SynapseSite
@@ -241,6 +240,9 @@ class PusherServer(HomeServer):
                 logger.exception("Error replicating from %r", replication_url)
                 yield sleep(30)
 
+    def get_event_cache_size(self):
+        return self.worker_config.event_cache_size
+
 
 def setup(worker_name, config_options):
     try:
@@ -254,8 +256,6 @@ def setup(worker_name, config_options):
     worker_config = config.workers[worker_name]
 
     setup_logging(worker_config.log_config, worker_config.log_file)
-
-    clobber_with_worker_config(config, worker_config)
 
     if config.start_pushers:
         sys.stderr.write(

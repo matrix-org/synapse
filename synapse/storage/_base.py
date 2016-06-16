@@ -166,7 +166,7 @@ class SQLBaseStore(object):
         self._get_event_counters = PerformanceCounters()
 
         self._get_event_cache = Cache("*getEvent*", keylen=3, lru=True,
-                                      max_entries=hs.config.event_cache_size)
+                                      max_entries=hs.get_event_cache_size())
 
         self._state_group_cache = DictionaryCache(
             "*stateGroupCache*", 2000 * CACHE_SIZE_FACTOR

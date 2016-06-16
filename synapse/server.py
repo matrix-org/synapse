@@ -236,6 +236,9 @@ class HomeServer(object):
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
 
+    def get_event_cache_size(self):
+        return self.config.event_cache_size
+
 
 def _make_dependency_method(depname):
     def _get(hs):

@@ -20,7 +20,6 @@ from synapse.api.constants import EventTypes, PresenceState
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
-from synapse.config.workers import clobber_with_worker_config
 from synapse.events import FrozenEvent
 from synapse.handlers.presence import PresenceHandler
 from synapse.http.site import SynapseSite
@@ -404,6 +403,9 @@ class SynchrotronServer(HomeServer):
     def build_typing_handler(self):
         return SynchrotronTyping(self)
 
+    def get_event_cache_size(self):
+        return self.worker_config.event_cache_size
+
 
 def start(worker_name, config_options):
     try:
@@ -417,8 +419,6 @@ def start(worker_name, config_options):
     worker_config = config.workers[worker_name]
 
     setup_logging(worker_config.log_config, worker_config.log_file)
-
-    clobber_with_worker_config(config, worker_config)
 
     database_engine = create_engine(config.database_config)
 
