@@ -31,6 +31,9 @@ logger = logging.getLogger(__name__)
 
 
 class FederationBase(object):
+    def __init__(self, hs):
+        pass
+
     @defer.inlineCallbacks
     def _check_sigs_and_hash_and_fetch(self, origin, pdus, outlier=False,
                                        include_none=False):

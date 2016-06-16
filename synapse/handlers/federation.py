@@ -345,19 +345,21 @@ class FederationHandler(BaseHandler):
         )
 
         missing_auth = required_auth - set(auth_events)
-        results = yield defer.gatherResults(
-            [
-                self.replication_layer.get_pdu(
-                    [dest],
-                    event_id,
-                    outlier=True,
-                    timeout=10000,
-                )
-                for event_id in missing_auth
-            ],
-            consumeErrors=True
-        ).addErrback(unwrapFirstError)
-        auth_events.update({a.event_id: a for a in results})
+        if missing_auth:
+            logger.info("Missing auth for backfill: %r", missing_auth)
+            results = yield defer.gatherResults(
+                [
+                    self.replication_layer.get_pdu(
+                        [dest],
+                        event_id,
+                        outlier=True,
+                        timeout=10000,
+                    )
+                    for event_id in missing_auth
+                ],
+                consumeErrors=True
+            ).addErrback(unwrapFirstError)
+            auth_events.update({a.event_id: a for a in results})
 
         ev_infos = []
         for a in auth_events.values():
@@ -399,7 +401,7 @@ class FederationHandler(BaseHandler):
             # previous to work out the state.
             # TODO: We can probably do something more clever here.
             yield self._handle_new_event(
-                dest, event
+                dest, event, backfilled=True,
             )
 
         defer.returnValue(events)
