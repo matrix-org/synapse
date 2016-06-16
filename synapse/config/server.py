@@ -38,19 +38,7 @@ class ServerConfig(Config):
 
         self.listeners = config.get("listeners", [])
 
-        thresholds = config.get("gc_thresholds", None)
-        if thresholds is not None:
-            try:
-                assert len(thresholds) == 3
-                self.gc_thresholds = (
-                    int(thresholds[0]), int(thresholds[1]), int(thresholds[2]),
-                )
-            except:
-                raise ConfigError(
-                    "Value of `gc_threshold` must be a list of three integers if set"
-                )
-        else:
-            self.gc_thresholds = None
+        self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
 
         bind_port = config.get("bind_port")
         if bind_port:
@@ -264,3 +252,20 @@ class ServerConfig(Config):
                                   type=int,
                                   help="Turn on the twisted telnet manhole"
                                   " service on the given port.")
+
+
+def read_gc_thresholds(thresholds):
+    """Reads the three integer thresholds for garbage collection. Ensures that
+    the thresholds are integers if thresholds are supplied.
+    """
+    if thresholds is None:
+        return None
+    try:
+        assert len(thresholds) == 3
+        return (
+            int(thresholds[0]), int(thresholds[1]), int(thresholds[2]),
+        )
+    except:
+        raise ConfigError(
+            "Value of `gc_threshold` must be a list of three integers if set"
+        )
