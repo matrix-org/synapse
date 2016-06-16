@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from synapse.api.errors import SynapseError
-from synapse.types import StreamToken
+from synapse.types import StreamToken, SyncNextBatchToken
 
 import logging
 
@@ -72,14 +72,18 @@ class PaginationConfig(object):
         if direction not in ['f', 'b']:
             raise SynapseError(400, "'dir' parameter is invalid.")
 
-        from_tok = get_param("from")
+        raw_from_tok = get_param("from")
         to_tok = get_param("to")
 
         try:
-            if from_tok == "END":
+            from_tok = None
+            if raw_from_tok == "END":
                 from_tok = None  # For backwards compat.
-            elif from_tok:
-                from_tok = StreamToken.from_string(from_tok)
+            elif raw_from_tok:
+                try:
+                    from_tok = SyncNextBatchToken.from_string(raw_from_tok).stream_token
+                except:
+                    from_tok = StreamToken.from_string(raw_from_tok)
         except:
             raise SynapseError(400, "'from' paramater is invalid")
 

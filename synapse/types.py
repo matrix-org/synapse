@@ -174,7 +174,7 @@ class SyncPaginationState(
 
 
 class StreamToken(
-    namedtuple("Token", (
+    namedtuple("StreamToken", (
         "room_key",
         "presence_key",
         "typing_key",
