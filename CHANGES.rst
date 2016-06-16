@@ -1,3 +1,29 @@
+Changes in synapse v0.16.1-rc1 (2016-06-15)
+===========================================
+
+Features: None
+
+Changes:
+
+* Log requester for ``/publicRoom`` endpoints when possible (PR #856)
+* 502 on ``/thumbnail`` when can't connect to remote server (PR #862)
+* Linearize fetching of gaps on incoming events (PR #871)
+
+
+Bugs fixes:
+
+* Fix bug where rooms where marked as published by default (PR #857)
+* Fix bug where joining room with an event with invalid sender (PR #868)
+* Fix bug where backfilled events were sent down sync streams (PR #869)
+* Fix bug where outgoing connections could wedge indefinitely, causing push
+  notifications to be unreliable (PR #870)
+
+
+Performance improvements:
+
+* Improve ``/publicRooms`` performance(PR #859)
+
+
 Changes in synapse v0.16.0 (2016-06-09)
 =======================================
 
@@ -28,7 +54,7 @@ Bug fixes:
 * Fix bug where synapse sent malformed transactions to AS's when retrying
   transactions (Commits 310197b, 8437906)
 
-Performance Improvements:
+Performance improvements:
 
 * Remove event fetching from DB threads (PR #835)
 * Change the way we cache events (PR #836)

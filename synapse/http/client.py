@@ -24,12 +24,13 @@ from synapse.http.endpoint import SpiderEndpoint
 
 from canonicaljson import encode_canonical_json
 
-from twisted.internet import defer, reactor, ssl, protocol
+from twisted.internet import defer, reactor, ssl, protocol, task
 from twisted.internet.endpoints import SSL4ClientEndpoint, TCP4ClientEndpoint
 from twisted.web.client import (
     BrowserLikeRedirectAgent, ContentDecoderAgent, GzipDecoder, Agent,
-    readBody, FileBodyProducer, PartialDownloadError,
+    readBody, PartialDownloadError,
 )
+from twisted.web.client import FileBodyProducer as TwistedFileBodyProducer
 from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
 from twisted.web._newclient import ResponseDone
@@ -468,3 +469,26 @@ class InsecureInterceptableContextFactory(ssl.ContextFactory):
 
     def creatorForNetloc(self, hostname, port):
         return self
+
+
+class FileBodyProducer(TwistedFileBodyProducer):
+    """Workaround for https://twistedmatrix.com/trac/ticket/8473
+
+    We override the pauseProducing and resumeProducing methods in twisted's
+    FileBodyProducer so that they do not raise exceptions if the task has
+    already completed.
+    """
+
+    def pauseProducing(self):
+        try:
+            super(FileBodyProducer, self).pauseProducing()
+        except task.TaskDone:
+            # task has already completed
+            pass
+
+    def resumeProducing(self):
+        try:
+            super(FileBodyProducer, self).resumeProducing()
+        except task.NotPaused:
+            # task was not paused (probably because it had already completed)
+            pass
