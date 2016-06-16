@@ -252,7 +252,8 @@ class PreviewUrlResource(Resource):
 
         og = {}
         for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
-            og[tag.attrib['property']] = tag.attrib['content']
+            if 'content' in tag.attrib:
+                og[tag.attrib['property']] = tag.attrib['content']
 
         # TODO: grab article: meta tags too, e.g.:
 
@@ -279,7 +280,7 @@ class PreviewUrlResource(Resource):
                 # TODO: consider inlined CSS styles as well as width & height attribs
                 images = tree.xpath("//img[@src][number(@width)>10][number(@height)>10]")
                 images = sorted(images, key=lambda i: (
-                    -1 * int(i.attrib['width']) * int(i.attrib['height'])
+                    -1 * float(i.attrib['width']) * float(i.attrib['height'])
                 ))
                 if not images:
                     images = tree.xpath("//img[@src]")
@@ -287,9 +288,9 @@ class PreviewUrlResource(Resource):
                     og['og:image'] = images[0].attrib['src']
 
         # pre-cache the image for posterity
-        # FIXME: it might be cleaner to use the same flow as the main /preview_url request
-        # itself and benefit from the same caching etc.  But for now we just rely on the
-        # caching on the master request to speed things up.
+        # FIXME: it might be cleaner to use the same flow as the main /preview_url
+        # request itself and benefit from the same caching etc.  But for now we
+        # just rely on the caching on the master request to speed things up.
         if 'og:image' in og and og['og:image']:
             image_info = yield self._download_url(
                 self._rebase_url(og['og:image'], media_info['uri']), requester.user
