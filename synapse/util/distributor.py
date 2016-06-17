@@ -27,10 +27,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def registered_user(distributor, user):
-    return distributor.fire("registered_user", user)
-
-
 def user_left_room(distributor, user, room_id):
     return preserve_context_over_fn(
         distributor.fire,

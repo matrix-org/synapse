@@ -36,13 +36,6 @@ class ProfileHandler(BaseHandler):
             "profile", self.on_profile_query
         )
 
-        distributor = hs.get_distributor()
-
-        distributor.observe("registered_user", self.registered_user)
-
-    def registered_user(self, user):
-        return self.store.create_profile(user.localpart)
-
     @defer.inlineCallbacks
     def get_displayname(self, target_user):
         if self.hs.is_mine(target_user):

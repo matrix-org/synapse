@@ -23,7 +23,6 @@ from synapse.api.errors import (
 from ._base import BaseHandler
 from synapse.util.async import run_on_reactor
 from synapse.http.client import CaptchaServerHttpClient
-from synapse.util.distributor import registered_user
 
 import logging
 import urllib
@@ -37,8 +36,6 @@ class RegistrationHandler(BaseHandler):
         super(RegistrationHandler, self).__init__(hs)
 
         self.auth = hs.get_auth()
-        self.distributor = hs.get_distributor()
-        self.distributor.declare("registered_user")
         self.captcha_client = CaptchaServerHttpClient(hs)
 
         self._next_generated_user_id = None
@@ -140,9 +137,10 @@ class RegistrationHandler(BaseHandler):
                 password_hash=password_hash,
                 was_guest=was_guest,
                 make_guest=make_guest,
+                create_profile_with_localpart=(
+                    None if was_guest else user.localpart
+                ),
             )
-
-            yield registered_user(self.distributor, user)
         else:
             # autogen a sequential user ID
             attempts = 0
@@ -160,7 +158,8 @@ class RegistrationHandler(BaseHandler):
                         user_id=user_id,
                         token=token,
                         password_hash=password_hash,
-                        make_guest=make_guest
+                        make_guest=make_guest,
+                        create_profile_with_localpart=user.localpart,
                     )
                 except SynapseError:
                     # if user id is taken, just generate another
@@ -168,7 +167,6 @@ class RegistrationHandler(BaseHandler):
                     user_id = None
                     token = None
                     attempts += 1
-            yield registered_user(self.distributor, user)
 
         # We used to generate default identicons here, but nowadays
         # we want clients to generate their own as part of their branding
@@ -201,8 +199,8 @@ class RegistrationHandler(BaseHandler):
             token=token,
             password_hash="",
             appservice_id=service_id,
+            create_profile_with_localpart=user.localpart,
         )
-        yield registered_user(self.distributor, user)
         defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
@@ -248,9 +246,9 @@ class RegistrationHandler(BaseHandler):
             yield self.store.register(
                 user_id=user_id,
                 token=token,
-                password_hash=None
+                password_hash=None,
+                create_profile_with_localpart=user.localpart,
             )
-            yield registered_user(self.distributor, user)
         except Exception as e:
             yield self.store.add_access_token_to_user(user_id, token)
             # Ignore Registration errors
@@ -395,10 +393,9 @@ class RegistrationHandler(BaseHandler):
             yield self.store.register(
                 user_id=user_id,
                 token=token,
-                password_hash=None
+                password_hash=None,
+                create_profile_with_localpart=user.localpart,
             )
-
-            yield registered_user(self.distributor, user)
         else:
             yield self.store.user_delete_access_tokens(user_id=user_id)
             yield self.store.add_access_token_to_user(user_id=user_id, token=token)
