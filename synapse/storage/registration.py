@@ -76,7 +76,8 @@ class RegistrationStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def register(self, user_id, token, password_hash,
-                 was_guest=False, make_guest=False, appservice_id=None):
+                 was_guest=False, make_guest=False, appservice_id=None,
+                 create_profile_with_localpart=None):
         """Attempts to register an account.
 
         Args:
@@ -88,6 +89,8 @@ class RegistrationStore(SQLBaseStore):
             make_guest (boolean): True if the the new user should be guest,
                 false to add a regular user account.
             appservice_id (str): The ID of the appservice registering the user.
+            create_profile_with_localpart (str): Optionally create a profile for
+                the given localpart.
         Raises:
             StoreError if the user_id could not be registered.
         """
@@ -99,7 +102,8 @@ class RegistrationStore(SQLBaseStore):
             password_hash,
             was_guest,
             make_guest,
-            appservice_id
+            appservice_id,
+            create_profile_with_localpart,
         )
         self.get_user_by_id.invalidate((user_id,))
         self.is_guest.invalidate((user_id,))
@@ -112,7 +116,8 @@ class RegistrationStore(SQLBaseStore):
         password_hash,
         was_guest,
         make_guest,
-        appservice_id
+        appservice_id,
+        create_profile_with_localpart,
     ):
         now = int(self.clock.time())
 
@@ -155,6 +160,12 @@ class RegistrationStore(SQLBaseStore):
                 "INSERT INTO access_tokens(id, user_id, token)"
                 " VALUES (?,?,?)",
                 (next_id, user_id, token,)
+            )
+
+        if create_profile_with_localpart:
+            txn.execute(
+                "INSERT INTO profiles(user_id) VALUES (?)",
+                (create_profile_with_localpart,)
             )
 
     @cached()
