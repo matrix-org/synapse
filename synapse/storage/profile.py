@@ -17,6 +17,12 @@ from ._base import SQLBaseStore
 
 
 class ProfileStore(SQLBaseStore):
+    def create_profile(self, user_localpart):
+        return self._simple_insert(
+            table="profiles",
+            values={"user_id": user_localpart},
+            desc="create_profile",
+        )
 
     def get_profile_displayname(self, user_localpart):
         return self._simple_select_one_onecol(
