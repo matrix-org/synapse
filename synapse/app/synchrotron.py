@@ -18,9 +18,8 @@ import synapse
 
 from synapse.api.constants import EventTypes, PresenceState
 from synapse.config._base import ConfigError
-from synapse.config.database import DatabaseConfig
-from synapse.config.logger import LoggingConfig
-from synapse.config.appservice import AppServiceConfig
+from synapse.config.homeserver import HomeServerConfig
+from synapse.config.logger import setup_logging
 from synapse.events import FrozenEvent
 from synapse.handlers.presence import PresenceHandler
 from synapse.http.site import SynapseSite
@@ -57,74 +56,9 @@ from daemonize import Daemonize
 import sys
 import logging
 import contextlib
-import gc
 import ujson as json
 
 logger = logging.getLogger("synapse.app.synchrotron")
-
-
-class SynchrotronConfig(DatabaseConfig, LoggingConfig, AppServiceConfig):
-    def read_config(self, config):
-        self.replication_url = config["replication_url"]
-        self.server_name = config["server_name"]
-        self.use_insecure_ssl_client_just_for_testing_do_not_use = config.get(
-            "use_insecure_ssl_client_just_for_testing_do_not_use", False
-        )
-        self.user_agent_suffix = None
-        self.listeners = config["listeners"]
-        self.soft_file_limit = config.get("soft_file_limit")
-        self.daemonize = config.get("daemonize")
-        self.pid_file = self.abspath(config.get("pid_file"))
-        self.macaroon_secret_key = config["macaroon_secret_key"]
-        self.expire_access_token = config.get("expire_access_token", False)
-
-        thresholds = config.get("gc_thresholds", None)
-        if thresholds is not None:
-            try:
-                assert len(thresholds) == 3
-                self.gc_thresholds = (
-                    int(thresholds[0]), int(thresholds[1]), int(thresholds[2]),
-                )
-            except:
-                raise ConfigError(
-                    "Value of `gc_threshold` must be a list of three integers if set"
-                )
-        else:
-            self.gc_thresholds = None
-
-    def default_config(self, server_name, **kwargs):
-        pid_file = self.abspath("synchroton.pid")
-        return """\
-        # Slave configuration
-
-        # The replication listener on the synapse to talk to.
-        #replication_url: https://localhost:{replication_port}/_synapse/replication
-
-        server_name: "%(server_name)s"
-
-        listeners:
-        # Enable a /sync listener on the synchrontron
-        #- type: http
-        #    port: {http_port}
-        #    bind_address: ""
-        # Enable a ssh manhole listener on the synchrotron
-        # - type: manhole
-        #   port: {manhole_port}
-        #   bind_address: 127.0.0.1
-        # Enable a metric listener on the synchrotron
-        # - type: http
-        #   port: {metrics_port}
-        #   bind_address: 127.0.0.1
-        #   resources:
-        #    - names: ["metrics"]
-        #      compress: False
-
-        report_stats: False
-
-        daemonize: False
-
-        pid_file: %(pid_file)s
-        """ % locals()
 
 
 class SynchrotronSlavedStore(
@@ -163,7 +97,7 @@ class SynchrotronPresence(object):
         self.http_client = hs.get_simple_http_client()
         self.store = hs.get_datastore()
         self.user_to_num_current_syncs = {}
-        self.syncing_users_url = hs.config.replication_url + "/syncing_users"
+        self.syncing_users_url = hs.config.worker_replication_url + "/syncing_users"
         self.clock = hs.get_clock()
 
         active_presence = self.store.take_presence_startup_info()
@@ -350,8 +284,8 @@ class SynchrotronServer(HomeServer):
         )
         logger.info("Synapse synchrotron now listening on port %d", port)
 
-    def start_listening(self):
-        for listener in self.config.listeners:
+    def start_listening(self, listeners):
+        for listener in listeners:
             if listener["type"] == "http":
                 self._listen_http(listener)
             elif listener["type"] == "manhole":
@@ -371,7 +305,7 @@ class SynchrotronServer(HomeServer):
     def replicate(self):
         http_client = self.get_simple_http_client()
         store = self.get_datastore()
-        replication_url = self.config.replication_url
+        replication_url = self.config.worker_replication_url
         clock = self.get_clock()
         notifier = self.get_notifier()
         presence_handler = self.get_presence_handler()
@@ -470,19 +404,18 @@ class SynchrotronServer(HomeServer):
         return SynchrotronTyping(self)
 
 
-def setup(config_options):
+def start(config_options):
     try:
-        config = SynchrotronConfig.load_config(
+        config = HomeServerConfig.load_config(
             "Synapse synchrotron", config_options
         )
     except ConfigError as e:
         sys.stderr.write("\n" + e.message + "\n")
         sys.exit(1)
 
-    if not config:
-        sys.exit(0)
+    assert config.worker_app == "synapse.app.synchrotron"
 
-    config.setup_logging()
+    setup_logging(config.worker_log_config, config.worker_log_file)
 
     database_engine = create_engine(config.database_config)
 
@@ -496,11 +429,15 @@ def setup(config_options):
     )
 
     ss.setup()
-    ss.start_listening()
+    ss.start_listening(config.worker_listeners)
 
-    change_resource_limit(ss.config.soft_file_limit)
-    if ss.config.gc_thresholds:
-        ss.set_threshold(*ss.config.gc_thresholds)
+    def run():
+        with LoggingContext("run"):
+            logger.info("Running")
+            change_resource_limit(config.soft_file_limit)
+            if config.gc_thresholds:
+                ss.set_threshold(config.gc_thresholds)
+            reactor.run()
 
     def start():
         ss.get_datastore().start_profiling()
@@ -508,30 +445,20 @@ def setup(config_options):
 
     reactor.callWhenRunning(start)
 
-    return ss
+    if config.worker_daemonize:
+        daemon = Daemonize(
+            app="synapse-synchrotron",
+            pid=config.worker_pid_file,
+            action=run,
+            auto_close_fds=False,
+            verbose=True,
+            logger=logger,
+        )
+        daemon.start()
+    else:
+        run()
 
 
 if __name__ == '__main__':
     with LoggingContext("main"):
-        ss = setup(sys.argv[1:])
-
-        if ss.config.daemonize:
-            def run():
-                with LoggingContext("run"):
-                    change_resource_limit(ss.config.soft_file_limit)
-                    if ss.config.gc_thresholds:
-                        gc.set_threshold(*ss.config.gc_thresholds)
-                    reactor.run()
-
-            daemon = Daemonize(
-                app="synapse-synchrotron",
-                pid=ss.config.pid_file,
-                action=run,
-                auto_close_fds=False,
-                verbose=True,
-                logger=logger,
-            )
-
-            daemon.start()
-        else:
-            reactor.run()
+        start(sys.argv[1:])
