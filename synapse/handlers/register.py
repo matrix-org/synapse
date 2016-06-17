@@ -138,6 +138,7 @@ class RegistrationHandler(BaseHandler):
                 was_guest=was_guest,
                 make_guest=make_guest,
                 create_profile_with_localpart=(
+                    # If the user was a guest then they already have a profile
                     None if was_guest else user.localpart
                 ),
             )
