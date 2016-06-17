@@ -54,6 +54,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.trusted_third_party_id_servers = []
         config.room_invite_state_types = []
 
+    config.use_frozen_dicts = True
     config.database_config = {"name": "sqlite3"}
 
     if "clock" not in kargs:

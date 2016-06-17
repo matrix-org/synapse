@@ -27,7 +27,7 @@ class ServerConfig(Config):
         self.daemonize = config.get("daemonize")
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
-        self.use_frozen_dicts = config.get("use_frozen_dicts", True)
+        self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.public_baseurl = config.get("public_baseurl")
         self.secondary_directory_servers = config.get("secondary_directory_servers", [])
 
