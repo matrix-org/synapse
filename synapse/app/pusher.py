@@ -43,6 +43,7 @@ from daemonize import Daemonize
 
 import sys
 import logging
+import gc
 
 logger = logging.getLogger("synapse.app.pusher")
 
@@ -284,7 +285,7 @@ def start(config_options):
             logger.info("Running")
             change_resource_limit(config.soft_file_limit)
             if config.gc_thresholds:
-                ps.set_threshold(config.gc_thresholds)
+                gc.set_threshold(*config.gc_thresholds)
             reactor.run()
 
     def start():

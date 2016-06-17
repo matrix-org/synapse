@@ -56,6 +56,7 @@ from daemonize import Daemonize
 import sys
 import logging
 import contextlib
+import gc
 import ujson as json
 
 logger = logging.getLogger("synapse.app.synchrotron")
@@ -436,7 +437,7 @@ def start(config_options):
             logger.info("Running")
             change_resource_limit(config.soft_file_limit)
             if config.gc_thresholds:
-                ss.set_threshold(config.gc_thresholds)
+                gc.set_threshold(*config.gc_thresholds)
             reactor.run()
 
     def start():
