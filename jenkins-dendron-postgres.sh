@@ -80,6 +80,7 @@ echo >&2 "Running sytest with PostgreSQL";
                              --synapse-directory $WORKSPACE \
                              --dendron $WORKSPACE/dendron/bin/dendron \
                              --pusher \
+                             --synchrotron \
                              --port-base $PORT_BASE
 
 cd ..
