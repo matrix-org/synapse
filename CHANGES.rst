@@ -1,3 +1,18 @@
+Changes in synapse v0.16.1 (2016-06-20)
+=======================================
+
+Bug fixes:
+
+* Fix assorted bugs in ``/preview_url`` (PR #872)
+* Fix TypeError when setting unicode passwords (PR #873)
+
+
+Performance improvements:
+
+* Turn ``use_frozen_events`` off by default (PR #877)
+* Disable responding with canonical json for federation (PR #878)
+
+
 Changes in synapse v0.16.1-rc1 (2016-06-15)
 ===========================================
 
