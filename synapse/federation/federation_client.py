@@ -52,6 +52,8 @@ sent_queries_counter = metrics.register_counter("sent_queries", labels=["type"])
 
 
 class FederationClient(FederationBase):
+    def __init__(self, hs):
+        super(FederationClient, self).__init__(hs)
 
     def start_get_pdu_cache(self):
         self._get_pdu_cache = ExpiringCache(

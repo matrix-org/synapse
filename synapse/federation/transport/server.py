@@ -37,7 +37,7 @@ class TransportLayerServer(JsonResource):
         self.hs = hs
         self.clock = hs.get_clock()
 
-        super(TransportLayerServer, self).__init__(hs)
+        super(TransportLayerServer, self).__init__(hs, canonical_json=False)
 
         self.authenticator = Authenticator(hs)
         self.ratelimiter = FederationRateLimiter(
@@ -528,14 +528,9 @@ class PublicRoomList(BaseFederationServlet):
     PATH = "/publicRooms"
 
     @defer.inlineCallbacks
-    def on_GET(self, request):
+    def on_GET(self, origin, content, query):
         data = yield self.room_list_handler.get_local_public_room_list()
         defer.returnValue((200, data))
-
-    # Avoid doing remote HS authorization checks which are done by default by
-    # BaseFederationServlet.
-    def _wrap(self, code):
-        return code
 
 
 SERVLET_CLASSES = (

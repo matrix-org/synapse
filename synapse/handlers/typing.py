@@ -221,6 +221,9 @@ class TypingHandler(object):
 
     def get_all_typing_updates(self, last_id, current_id):
         # TODO: Work out a way to do this without scanning the entire state.
+        if last_id == current_id:
+            return []
+
         rows = []
         for room_id, serial in self._room_serials.items():
             if last_id < serial and serial <= current_id:

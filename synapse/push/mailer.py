@@ -273,16 +273,16 @@ class Mailer(object):
 
         sender_state_event = room_state[("m.room.member", event.sender)]
         sender_name = name_from_member_event(sender_state_event)
-        sender_avatar_url = None
-        if "avatar_url" in sender_state_event.content:
-            sender_avatar_url = sender_state_event.content["avatar_url"]
+        sender_avatar_url = sender_state_event.content.get("avatar_url")
 
         # 'hash' for deterministically picking default images: use
         # sender_hash % the number of default images to choose from
         sender_hash = string_ordinal_total(event.sender)
 
+        msgtype = event.content.get("msgtype")
+
         ret = {
-            "msgtype": event.content["msgtype"],
+            "msgtype": msgtype,
             "is_historical": event.event_id != notif['event_id'],
             "id": event.event_id,
             "ts": event.origin_server_ts,
@@ -291,9 +291,9 @@ class Mailer(object):
             "sender_hash": sender_hash,
         }
 
-        if event.content["msgtype"] == "m.text":
+        if msgtype == "m.text":
             self.add_text_message_vars(ret, event)
-        elif event.content["msgtype"] == "m.image":
+        elif msgtype == "m.image":
             self.add_image_message_vars(ret, event)
 
         if "body" in event.content:
@@ -302,16 +302,17 @@ class Mailer(object):
         return ret
 
     def add_text_message_vars(self, messagevars, event):
-        if "format" in event.content:
-            msgformat = event.content["format"]
-        else:
-            msgformat = None
+        msgformat = event.content.get("format")
+
         messagevars["format"] = msgformat
 
-        if msgformat == "org.matrix.custom.html":
-            messagevars["body_text_html"] = safe_markup(event.content["formatted_body"])
-        else:
-            messagevars["body_text_html"] = safe_text(event.content["body"])
+        formatted_body = event.content.get("formatted_body")
+        body = event.content.get("body")
+
+        if msgformat == "org.matrix.custom.html" and formatted_body:
+            messagevars["body_text_html"] = safe_markup(formatted_body)
+        elif body:
+            messagevars["body_text_html"] = safe_text(body)
 
         return messagevars
 

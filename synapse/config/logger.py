@@ -126,54 +126,58 @@ class LoggingConfig(Config):
                 )
 
     def setup_logging(self):
-        log_format = (
-            "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
-            " - %(message)s"
-        )
-        if self.log_config is None:
+        setup_logging(self.log_config, self.log_file, self.verbosity)
 
-            level = logging.INFO
-            level_for_storage = logging.INFO
-            if self.verbosity:
-                level = logging.DEBUG
-                if self.verbosity > 1:
-                    level_for_storage = logging.DEBUG
 
-            # FIXME: we need a logging.WARN for a -q quiet option
-            logger = logging.getLogger('')
-            logger.setLevel(level)
+def setup_logging(log_config=None, log_file=None, verbosity=None):
+    log_format = (
+        "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
+        " - %(message)s"
+    )
+    if log_config is None:
 
-            logging.getLogger('synapse.storage').setLevel(level_for_storage)
+        level = logging.INFO
+        level_for_storage = logging.INFO
+        if verbosity:
+            level = logging.DEBUG
+            if verbosity > 1:
+                level_for_storage = logging.DEBUG
 
-            formatter = logging.Formatter(log_format)
-            if self.log_file:
-                # TODO: Customisable file size / backup count
-                handler = logging.handlers.RotatingFileHandler(
-                    self.log_file, maxBytes=(1000 * 1000 * 100), backupCount=3
-                )
+        # FIXME: we need a logging.WARN for a -q quiet option
+        logger = logging.getLogger('')
+        logger.setLevel(level)
 
-                def sighup(signum, stack):
-                    logger.info("Closing log file due to SIGHUP")
-                    handler.doRollover()
-                    logger.info("Opened new log file due to SIGHUP")
+        logging.getLogger('synapse.storage').setLevel(level_for_storage)
 
-                # TODO(paul): obviously this is a terrible mechanism for
-                #   stealing SIGHUP, because it means no other part of synapse
-                #   can use it instead. If we want to catch SIGHUP anywhere
-                #   else as well, I'd suggest we find a nicer way to broadcast
-                #   it around.
-                if getattr(signal, "SIGHUP"):
-                    signal.signal(signal.SIGHUP, sighup)
-            else:
-                handler = logging.StreamHandler()
-            handler.setFormatter(formatter)
+        formatter = logging.Formatter(log_format)
+        if log_file:
+            # TODO: Customisable file size / backup count
+            handler = logging.handlers.RotatingFileHandler(
+                log_file, maxBytes=(1000 * 1000 * 100), backupCount=3
+            )
 
-            handler.addFilter(LoggingContextFilter(request=""))
+            def sighup(signum, stack):
+                logger.info("Closing log file due to SIGHUP")
+                handler.doRollover()
+                logger.info("Opened new log file due to SIGHUP")
 
-            logger.addHandler(handler)
+            # TODO(paul): obviously this is a terrible mechanism for
+            #   stealing SIGHUP, because it means no other part of synapse
+            #   can use it instead. If we want to catch SIGHUP anywhere
+            #   else as well, I'd suggest we find a nicer way to broadcast
+            #   it around.
+            if getattr(signal, "SIGHUP"):
+                signal.signal(signal.SIGHUP, sighup)
         else:
-            with open(self.log_config, 'r') as f:
-                logging.config.dictConfig(yaml.load(f))
+            handler = logging.StreamHandler()
+        handler.setFormatter(formatter)
 
-        observer = PythonLoggingObserver()
-        observer.start()
+        handler.addFilter(LoggingContextFilter(request=""))
+
+        logger.addHandler(handler)
+    else:
+        with open(log_config, 'r') as f:
+            logging.config.dictConfig(yaml.load(f))
+
+    observer = PythonLoggingObserver()
+    observer.start()
