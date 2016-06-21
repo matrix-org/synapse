@@ -15,14 +15,12 @@
 
 from synapse.http.server import respond_with_json_bytes, finish_request
 
-from synapse.util.stringutils import random_string
 from synapse.api.errors import (
-    cs_exception, SynapseError, CodeMessageException, Codes, cs_error
+    Codes, cs_error
 )
 
 from twisted.protocols.basic import FileSender
 from twisted.web import server, resource
-from twisted.internet import defer
 
 import base64
 import simplejson as json
@@ -50,64 +48,10 @@ class ContentRepoResource(resource.Resource):
     """
     isLeaf = True
 
-    def __init__(self, hs, directory, auth, external_addr):
+    def __init__(self, hs, directory):
         resource.Resource.__init__(self)
         self.hs = hs
         self.directory = directory
-        self.auth = auth
-        self.external_addr = external_addr.rstrip('/')
-        self.max_upload_size = hs.config.max_upload_size
-
-        if not os.path.isdir(self.directory):
-            os.mkdir(self.directory)
-            logger.info("ContentRepoResource : Created %s directory.",
-                        self.directory)
-
-    @defer.inlineCallbacks
-    def map_request_to_name(self, request):
-        # auth the user
-        requester = yield self.auth.get_user_by_req(request)
-
-        # namespace all file uploads on the user
-        prefix = base64.urlsafe_b64encode(
-            requester.user.to_string()
-        ).replace('=', '')
-
-        # use a random string for the main portion
-        main_part = random_string(24)
-
-        # suffix with a file extension if we can make one. This is nice to
-        # provide a hint to clients on the file information. We will also reuse
-        # this info to spit back the content type to the client.
-        suffix = ""
-        if request.requestHeaders.hasHeader("Content-Type"):
-            content_type = request.requestHeaders.getRawHeaders(
-                "Content-Type")[0]
-            suffix = "." + base64.urlsafe_b64encode(content_type)
-            if (content_type.split("/")[0].lower() in
-                    ["image", "video", "audio"]):
-                file_ext = content_type.split("/")[-1]
-                # be a little paranoid and only allow a-z
-                file_ext = re.sub("[^a-z]", "", file_ext)
-                suffix += "." + file_ext
-
-        file_name = prefix + main_part + suffix
-        file_path = os.path.join(self.directory, file_name)
-        logger.info("User %s is uploading a file to path %s",
-                    request.user.user_id.to_string(),
-                    file_path)
-
-        # keep trying to make a non-clashing file, with a sensible max attempts
-        attempts = 0
-        while os.path.exists(file_path):
-            main_part = random_string(24)
-            file_name = prefix + main_part + suffix
-            file_path = os.path.join(self.directory, file_name)
-            attempts += 1
-            if attempts > 25:  # really? Really?
-                raise SynapseError(500, "Unable to create file.")
-
-        defer.returnValue(file_path)
 
     def render_GET(self, request):
         # no auth here on purpose, to allow anyone to view, even across home
@@ -155,58 +99,6 @@ class ContentRepoResource(resource.Resource):
 
         return server.NOT_DONE_YET
 
-    def render_POST(self, request):
-        self._async_render(request)
-        return server.NOT_DONE_YET
-
     def render_OPTIONS(self, request):
         respond_with_json_bytes(request, 200, {}, send_cors=True)
         return server.NOT_DONE_YET
-
-    @defer.inlineCallbacks
-    def _async_render(self, request):
-        try:
-            # TODO: The checks here are a bit late. The content will have
-            # already been uploaded to a tmp file at this point
-            content_length = request.getHeader("Content-Length")
-            if content_length is None:
-                raise SynapseError(
-                    msg="Request must specify a Content-Length", code=400
-                )
-            if int(content_length) > self.max_upload_size:
-                raise SynapseError(
-                    msg="Upload request body is too large",
-                    code=413,
-                )
-
-            fname = yield self.map_request_to_name(request)
-
-            # TODO I have a suspicious feeling this is just going to block
-            with open(fname, "wb") as f:
-                f.write(request.content.read())
-
-            # FIXME (erikj): These should use constants.
-            file_name = os.path.basename(fname)
-            # FIXME: we can't assume what the repo's public mounted path is
-            # ...plus self-signed SSL won't work to remote clients anyway
-            # ...and we can't assume that it's SSL anyway, as we might want to
-            # serve it via the non-SSL listener...
-            url = "%s/_matrix/content/%s" % (
-                self.external_addr, file_name
-            )
-
-            respond_with_json_bytes(request, 200,
-                                    json.dumps({"content_token": url}),
-                                    send_cors=True)
-
-        except CodeMessageException as e:
-            logger.exception(e)
-            respond_with_json_bytes(request, e.code,
-                                    json.dumps(cs_exception(e)))
-        except Exception as e:
-            logger.error("Failed to store file: %s" % e)
-            respond_with_json_bytes(
-                request,
-                500,
-                json.dumps({"error": "Internal server error"}),
-                send_cors=True)
