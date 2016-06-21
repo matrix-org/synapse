@@ -19,7 +19,7 @@ from collections import namedtuple
 
 from unpaddedbase64 import encode_base64, decode_base64
 import ujson as json
-
+import msgpack
 
 Requester = namedtuple("Requester", ["user", "access_token_id", "is_guest"])
 
@@ -127,7 +127,7 @@ class SyncNextBatchToken(
     @classmethod
     def from_string(cls, string):
         try:
-            d = json.loads(decode_base64(string))
+            d = msgpack.loads(decode_base64(string))
             pa = d.get("pa", None)
             if pa:
                 pa = SyncPaginationState.from_dict(pa)
@@ -139,7 +139,7 @@ class SyncNextBatchToken(
             raise SynapseError(400, "Invalid Token")
 
     def to_string(self):
-        return encode_base64(json.dumps({
+        return encode_base64(msgpack.dumps({
             "t": self.stream_token.to_arr(),
             "pa": self.pagination_state.to_dict() if self.pagination_state else None,
         }))
