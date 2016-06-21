@@ -147,7 +147,7 @@ class SynapseHomeServer(HomeServer):
                         MEDIA_PREFIX: media_repo,
                         LEGACY_MEDIA_PREFIX: media_repo,
                         CONTENT_REPO_PREFIX: ContentRepoResource(
-                            self, self.config.uploads_path, self.auth, self.content_addr
+                            self, self.config.uploads_path
                         ),
                     })
 
@@ -301,7 +301,6 @@ def setup(config_options):
         db_config=config.database_config,
         tls_server_context_factory=tls_server_context_factory,
         config=config,
-        content_addr=config.content_addr,
         version_string=version_string,
         database_engine=database_engine,
     )
