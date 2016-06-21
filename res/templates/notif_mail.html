@@ -36,7 +36,7 @@
                         <div class="debug">
                             Sending email at {{ reason.now|format_ts("%c") }} due to activity in room {{ reason.room_name }} because
                             an event was received at {{ reason.received_at|format_ts("%c") }}
-                            which is more than {{ "%.1f"|format(reason.delay_before_mail_ms / (60*1000)) }} (delay_before_mail_ms) mins ago,
+                            which is more than {{ "%.1f"|format(reason.delay_before_mail_ms / (60*1000)) }} ({{ reason.delay_before_mail_ms }}) mins ago,
                             {% if reason.last_sent_ts %}
                                 and the last time we sent a mail for this room was {{ reason.last_sent_ts|format_ts("%c") }},
                                 which is more than {{ "%.1f"|format(reason.throttle_ms / (60*1000)) }} (current throttle_ms) mins ago.
