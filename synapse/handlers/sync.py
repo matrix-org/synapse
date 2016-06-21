@@ -21,6 +21,7 @@ from synapse.util.caches.response_cache import ResponseCache
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.visibility import filter_events_for_client
 from synapse.types import SyncNextBatchToken, SyncPaginationState
+from synapse.api.errors import Codes
 
 from twisted.internet import defer
 
@@ -123,6 +124,18 @@ class InvitedSyncResult(collections.namedtuple("InvitedSyncResult", [
         return True
 
 
+class ErrorSyncResult(collections.namedtuple("ErrorSyncResult", [
+    "room_id",   # str
+    "errcode",   # str
+    "error",     # str
+])):
+    __slots__ = []
+
+    def __nonzero__(self):
+        """Errors should always be reported to the client"""
+        return True
+
+
 class SyncResult(collections.namedtuple("SyncResult", [
     "next_batch",  # Token for the next sync
     "presence",  # List of presence events for the user.
@@ -130,6 +143,7 @@ class SyncResult(collections.namedtuple("SyncResult", [
     "joined",  # JoinedSyncResult for each joined room.
     "invited",  # InvitedSyncResult for each invited room.
     "archived",  # ArchivedSyncResult for each archived room.
+    "errors",  # ErrorSyncResult
     "pagination_info",
 ])):
     __slots__ = []
@@ -546,6 +560,7 @@ class SyncHandler(object):
             joined=sync_result_builder.joined,
             invited=sync_result_builder.invited,
             archived=sync_result_builder.archived,
+            errors=sync_result_builder.errors,
             next_batch=SyncNextBatchToken(
                 stream_token=sync_result_builder.now_token,
                 pagination_state=sync_result_builder.pagination_state,
@@ -741,6 +756,13 @@ class SyncHandler(object):
                             r.events = None
                             r.since_token = None
                             r.upto_token = now_token
+
+        for room_id in set(include_map.keys()) - {r.room_id for r in room_entries}:
+            sync_result_builder.errors.append(ErrorSyncResult(
+                room_id=room_id,
+                errcode=Codes.CANNOT_PEEK,
+                error="Cannot peek into requested room",
+            ))
 
         if pagination_config:
             room_ids = [r.room_id for r in room_entries]
@@ -1274,7 +1296,7 @@ class SyncResultBuilder(object):
     __slots__ = (
         "sync_config", "full_state", "batch_token", "since_token", "pagination_state",
         "now_token", "presence", "account_data", "joined", "invited", "archived",
-        "pagination_info",
+        "pagination_info", "errors",
     )
 
     def __init__(self, sync_config, full_state, batch_token, now_token):
@@ -1297,6 +1319,7 @@ class SyncResultBuilder(object):
         self.joined = []
         self.invited = []
         self.archived = []
+        self.errors = []
 
         self.pagination_info = {}
 

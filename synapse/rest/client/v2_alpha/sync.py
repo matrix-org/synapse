@@ -286,6 +286,9 @@ class SyncRestServlet(RestServlet):
             "next_batch": sync_result.next_batch.to_string(),
         }
 
+        if sync_result.errors:
+            response_content["rooms"]["errors"] = self.encode_errors(sync_result.errors)
+
         if sync_result.pagination_info:
             response_content["pagination_info"] = sync_result.pagination_info
 
@@ -298,6 +301,15 @@ class SyncRestServlet(RestServlet):
             event['sender'] = event['content'].pop('user_id')
             formatted.append(event)
         return {"events": formatted}
+
+    def encode_errors(self, errors):
+        return {
+            e.room_id: {
+                "errcode": e.errcode,
+                "error": e.error
+            }
+            for e in errors
+        }
 
     def encode_joined(self, rooms, time_now, token_id):
         """
