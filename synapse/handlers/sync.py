@@ -747,15 +747,27 @@ class SyncHandler(object):
                 pagination_state=sync_result_builder.pagination_state,
             )
 
+            all_tags = yield self.store.get_tags_for_user(user_id)
+
             if missing_state:
                 for r in room_entries:
                     if r.room_id in missing_state:
+                        if r.room_id in all_tags:
+                            r.always_include = True
+                            continue
                         r.full_state = True
                         if r.room_id in include_map:
                             r.always_include = True
                             r.events = None
                             r.since_token = None
                             r.upto_token = now_token
+        elif pagination_config:
+            all_tags = yield self.store.get_tags_for_user(user_id)
+
+            logger.info("all_tags: %r", all_tags)
+            for r in room_entries:
+                if r.room_id in all_tags:
+                    r.always_include = True
 
         for room_id in set(include_map.keys()) - {r.room_id for r in room_entries}:
             sync_result_builder.errors.append(ErrorSyncResult(
