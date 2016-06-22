@@ -335,6 +335,7 @@ class SyncRestServlet(RestServlet):
             joined[room.room_id] = self.encode_room(
                 room, time_now, token_id
             )
+            joined[room.room_id]["synced"] = room.synced
 
         return joined
 

@@ -97,6 +97,7 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
     "ephemeral",
     "account_data",
     "unread_notifications",
+    "synced",  # bool
 ])):
     __slots__ = []
 
@@ -781,13 +782,16 @@ class SyncHandler(object):
                             continue
                         if r.room_id in include_map:
                             since = include_map[r.room_id].get("since", None)
-                            r.since_token = since
-                            if not since:
+                            if since:
+                                tok = SyncNextBatchToken.from_string(since)
+                                r.since_token = tok.stream_token
+                            else:
+                                r.since_token = None
                                 r.always_include = True
                                 r.full_state = True
                                 r.would_require_resync = True
-                            r.events = None
-                            r.upto_token = now_token
+                                r.events = None
+                                r.synced = False
                         else:
                             r.full_state = True
                             r.would_require_resync = True
@@ -1201,6 +1205,7 @@ class SyncHandler(object):
                 ephemeral=ephemeral,
                 account_data=account_data_events,
                 unread_notifications=unread_notifications,
+                synced=room_builder.synced,
             )
 
             if room_sync or always_include:
@@ -1391,7 +1396,7 @@ class RoomSyncResultBuilder(object):
 
     __slots__ = (
         "room_id", "rtype", "events", "newly_joined", "full_state", "since_token",
-        "upto_token", "always_include", "would_require_resync",
+        "upto_token", "always_include", "would_require_resync", "synced",
     )
 
     def __init__(self, room_id, rtype, events, newly_joined, full_state,
@@ -1416,3 +1421,4 @@ class RoomSyncResultBuilder(object):
         self.upto_token = upto_token
         self.always_include = False
         self.would_require_resync = False
+        self.synced = True
