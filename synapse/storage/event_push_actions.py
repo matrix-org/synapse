@@ -152,7 +152,7 @@ class EventPushActionsStore(SQLBaseStore):
             if max_stream_ordering is not None:
                 sql += " AND ep.stream_ordering <= ?"
                 args.append(max_stream_ordering)
-            sql += " ORDER BY ep.stream_ordering ASC LIMIT ?"
+            sql += " ORDER BY ep.stream_ordering DESC LIMIT ?"
             args.append(limit)
             txn.execute(sql, args)
             return txn.fetchall()
@@ -176,7 +176,8 @@ class EventPushActionsStore(SQLBaseStore):
             if max_stream_ordering is not None:
                 sql += " AND ep.stream_ordering <= ?"
                 args.append(max_stream_ordering)
-            sql += " ORDER BY ep.stream_ordering ASC"
+            sql += " ORDER BY ep.stream_ordering DESC LIMIT ?"
+            args.append(limit)
             txn.execute(sql, args)
             return txn.fetchall()
         no_read_receipt = yield self.runInteraction(
@@ -191,7 +192,7 @@ class EventPushActionsStore(SQLBaseStore):
                 "actions": json.loads(row[3]),
                 "received_ts": row[4],
             } for row in after_read_receipt + no_read_receipt
-        ])
+        ][0:limit])
 
     @defer.inlineCallbacks
     def get_time_of_last_push_action_before(self, stream_ordering):
