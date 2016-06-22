@@ -779,13 +779,19 @@ class SyncHandler(object):
                         if include_all_tags and r.room_id in all_tags:
                             r.always_include = True
                             continue
-                        r.full_state = True
-                        r.would_require_resync = True
                         if r.room_id in include_map:
-                            r.always_include = True
+                            since = include_map[r.room_id].get("since", None)
+                            r.since_token = since
+                            if not since:
+                                r.always_include = True
+                                r.full_state = True
+                                r.would_require_resync = True
                             r.events = None
-                            r.since_token = None
                             r.upto_token = now_token
+                        else:
+                            r.full_state = True
+                            r.would_require_resync = True
+
         elif pagination_config and include_all_tags:
             all_tags = yield self.store.get_tags_for_user(user_id)
 
