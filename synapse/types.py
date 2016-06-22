@@ -18,8 +18,8 @@ from synapse.api.errors import SynapseError
 from collections import namedtuple
 
 from unpaddedbase64 import encode_base64, decode_base64
-import ujson as json
 import msgpack
+
 
 Requester = namedtuple("Requester", ["user", "access_token_id", "is_guest"])
 
@@ -153,12 +153,13 @@ class SyncPaginationState(
         "order",
         "value",
         "limit",
+        "tags",
     ))
 ):
     @classmethod
     def from_dict(cls, d):
         try:
-            return cls(d["o"], d["v"], d["l"])
+            return cls(d["o"], d["v"], d["l"], d["t"])
         except:
             raise SynapseError(400, "Invalid Token")
 
@@ -167,6 +168,7 @@ class SyncPaginationState(
             "o": self.order,
             "v": self.value,
             "l": self.limit,
+            "t": self.tags,
         }
 
     def replace(self, **kwargs):

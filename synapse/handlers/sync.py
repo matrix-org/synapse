@@ -21,7 +21,7 @@ from synapse.util.caches.response_cache import ResponseCache
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.visibility import filter_events_for_client
 from synapse.types import SyncNextBatchToken, SyncPaginationState
-from synapse.api.errors import Codes
+from synapse.api.errors import Codes, SynapseError
 
 from twisted.internet import defer
 
@@ -41,10 +41,30 @@ SyncConfig = collections.namedtuple("SyncConfig", [
 ])
 
 
-SyncPaginationConfig = collections.namedtuple("SyncPaginationConfig", [
+class SyncPaginationConfig(collections.namedtuple("SyncPaginationConfig", [
     "order",
     "limit",
-])
+    "tags",
+])):
+    def __init__(self, order, limit, tags):
+        if order not in SYNC_PAGINATION_VALID_ORDERS:
+            raise SynapseError(400, "Invalid 'order'")
+        if tags not in SYNC_PAGINATION_VALID_TAGS_OPTIONS:
+            raise SynapseError(400, "Invalid 'tags'")
+
+        try:
+            limit = int(limit)
+        except:
+            raise SynapseError(400, "Invalid 'limit'")
+
+        super(SyncPaginationConfig, self).__init__(order, limit, tags)
+
+
+SYNC_PAGINATION_TAGS_INCLUDE_ALL = "include_all"
+SYNC_PAGINATION_TAGS_IGNORE = "ignore"
+SYNC_PAGINATION_VALID_TAGS_OPTIONS = (
+    SYNC_PAGINATION_TAGS_INCLUDE_ALL, SYNC_PAGINATION_TAGS_IGNORE,
+)
 
 SYNC_PAGINATION_ORDER_TS = "o"
 SYNC_PAGINATION_VALID_ORDERS = (SYNC_PAGINATION_ORDER_TS,)
@@ -727,15 +747,19 @@ class SyncHandler(object):
         if sync_config.pagination_config:
             pagination_config = sync_config.pagination_config
             old_pagination_value = 0
+            include_all_tags = pagination_config.tags == SYNC_PAGINATION_TAGS_INCLUDE_ALL
         elif sync_result_builder.pagination_state:
             pagination_config = SyncPaginationConfig(
                 order=sync_result_builder.pagination_state.order,
                 limit=sync_result_builder.pagination_state.limit,
+                tags=sync_result_builder.pagination_state.tags,
             )
             old_pagination_value = sync_result_builder.pagination_state.value
+            include_all_tags = pagination_config.tags == SYNC_PAGINATION_TAGS_INCLUDE_ALL
         else:
             pagination_config = None
             old_pagination_value = 0
+            include_all_tags = False
 
         include_map = extras.get("peek", {}) if extras else {}
 
@@ -752,19 +776,19 @@ class SyncHandler(object):
             if missing_state:
                 for r in room_entries:
                     if r.room_id in missing_state:
-                        if r.room_id in all_tags:
+                        if include_all_tags and r.room_id in all_tags:
                             r.always_include = True
                             continue
                         r.full_state = True
+                        r.would_require_resync = True
                         if r.room_id in include_map:
                             r.always_include = True
                             r.events = None
                             r.since_token = None
                             r.upto_token = now_token
-        elif pagination_config:
+        elif pagination_config and include_all_tags:
             all_tags = yield self.store.get_tags_for_user(user_id)
 
-            logger.info("all_tags: %r", all_tags)
             for r in room_entries:
                 if r.room_id in all_tags:
                     r.always_include = True
@@ -817,7 +841,14 @@ class SyncHandler(object):
                 sync_result_builder.pagination_state = SyncPaginationState(
                     order=pagination_config.order, value=value,
                     limit=pagination_limit + extra_limit,
+                    tags=pagination_config.tags,
                 )
+
+                to_sync_map = {
+                    key: value for key, value in cutoff_list
+                }
+            else:
+                to_sync_map = {}
 
             sync_result_builder.pagination_info["limited"] = limited
 
@@ -826,7 +857,7 @@ class SyncHandler(object):
 
             room_entries = [
                 r for r in room_entries
-                if r.room_id in room_map or r.always_include
+                if r.room_id in to_sync_map or r.always_include
             ]
 
         sync_result_builder.full_state |= sync_result_builder.since_token is None
@@ -1094,6 +1125,7 @@ class SyncHandler(object):
             room_builder.full_state
             or newly_joined
             or sync_result_builder.full_state
+            or room_builder.would_require_resync
         )
         events = room_builder.events
 
@@ -1138,6 +1170,16 @@ class SyncHandler(object):
 
         if not (always_include or batch or account_data or ephemeral):
             return
+
+        if room_builder.would_require_resync:
+            since_token = None
+            batch = yield self._load_filtered_recents(
+                room_id, sync_config,
+                now_token=upto_token,
+                since_token=since_token,
+                recents=None,
+                newly_joined_room=newly_joined,
+            )
 
         state = yield self.compute_state_delta(
             room_id, batch, sync_config, since_token, now_token,
@@ -1343,7 +1385,7 @@ class RoomSyncResultBuilder(object):
 
     __slots__ = (
         "room_id", "rtype", "events", "newly_joined", "full_state", "since_token",
-        "upto_token", "always_include",
+        "upto_token", "always_include", "would_require_resync",
     )
 
     def __init__(self, room_id, rtype, events, newly_joined, full_state,
@@ -1367,3 +1409,4 @@ class RoomSyncResultBuilder(object):
         self.since_token = since_token
         self.upto_token = upto_token
         self.always_include = False
+        self.would_require_resync = False

@@ -19,7 +19,9 @@ from synapse.http.servlet import (
     RestServlet, parse_string, parse_integer, parse_boolean,
     parse_json_object_from_request,
 )
-from synapse.handlers.sync import SyncConfig, SyncPaginationConfig
+from synapse.handlers.sync import (
+    SyncConfig, SyncPaginationConfig, SYNC_PAGINATION_TAGS_INCLUDE_ALL,
+)
 from synapse.types import SyncNextBatchToken
 from synapse.events.utils import (
     serialize_event, format_event_for_client_v2_without_room_id,
@@ -149,6 +151,7 @@ class SyncRestServlet(RestServlet):
             pagination_config=SyncPaginationConfig(
                 order=pagination_config["order"],
                 limit=pagination_config["limit"],
+                tags=pagination_config.get("tags", SYNC_PAGINATION_TAGS_INCLUDE_ALL),
             ) if pagination_config else None,
         )
 
