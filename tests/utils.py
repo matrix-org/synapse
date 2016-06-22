@@ -56,6 +56,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
 
     config.use_frozen_dicts = True
     config.database_config = {"name": "sqlite3"}
+    config.ldap_enabled = False
 
     if "clock" not in kargs:
         kargs["clock"] = MockClock()
