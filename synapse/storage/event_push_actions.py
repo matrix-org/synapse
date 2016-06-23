@@ -152,7 +152,7 @@ class EventPushActionsStore(SQLBaseStore):
             if max_stream_ordering is not None:
                 sql += " AND ep.stream_ordering <= ?"
                 args.append(max_stream_ordering)
-            sql += " ORDER BY ep.stream_ordering ASC LIMIT ?"
+            sql += " ORDER BY ep.stream_ordering DESC LIMIT ?"
             args.append(limit)
             txn.execute(sql, args)
             return txn.fetchall()
@@ -176,14 +176,16 @@ class EventPushActionsStore(SQLBaseStore):
             if max_stream_ordering is not None:
                 sql += " AND ep.stream_ordering <= ?"
                 args.append(max_stream_ordering)
-            sql += " ORDER BY ep.stream_ordering ASC"
+            sql += " ORDER BY ep.stream_ordering DESC LIMIT ?"
+            args.append(limit)
             txn.execute(sql, args)
             return txn.fetchall()
         no_read_receipt = yield self.runInteraction(
             "get_unread_push_actions_for_user_in_range", get_no_receipt
         )
 
-        defer.returnValue([
+        # Make a list of dicts from the two sets of results.
+        notifs = [
             {
                 "event_id": row[0],
                 "room_id": row[1],
@@ -191,7 +193,16 @@ class EventPushActionsStore(SQLBaseStore):
                 "actions": json.loads(row[3]),
                 "received_ts": row[4],
             } for row in after_read_receipt + no_read_receipt
-        ])
+        ]
+
+        # Now sort it so it's ordered correctly, since currently it will
+        # contain results from the first query, correctly ordered, followed
+        # by results from the second query, but we want them all ordered
+        # by received_ts
+        notifs.sort(key=lambda r: -(r['received_ts'] or 0))
+
+        # Now return the first `limit`
+        defer.returnValue(notifs[:limit])
 
     @defer.inlineCallbacks
     def get_time_of_last_push_action_before(self, stream_ordering):
