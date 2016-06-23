@@ -22,6 +22,7 @@ from synapse.push.clientformat import format_push_rules_for_user
 from synapse.visibility import filter_events_for_client
 from synapse.types import SyncNextBatchToken, SyncPaginationState
 from synapse.api.errors import Codes, SynapseError
+from synapse.storage.tags import (TAG_CHANGE_NEWLY_TAGGED, TAG_CHANGE_ALL_REMOVED)
 
 from twisted.internet import defer
 
@@ -774,12 +775,33 @@ class SyncHandler(object):
 
             all_tags = yield self.store.get_tags_for_user(user_id)
 
+            if sync_result_builder.since_token:
+                stream_id = sync_result_builder.since_token.account_data_key
+                tag_changes = yield self.store.get_room_tags_changed(user_id, stream_id)
+            else:
+                tag_changes = {}
+
             if missing_state:
                 for r in room_entries:
                     if r.room_id in missing_state:
-                        if include_all_tags and r.room_id in all_tags:
-                            r.always_include = True
-                            continue
+                        if include_all_tags:
+                            change = tag_changes.get(r.room_id)
+                            if change == TAG_CHANGE_NEWLY_TAGGED:
+                                r.since_token = None
+                                r.always_include = True
+                                r.full_state = True
+                                r.would_require_resync = True
+                                r.events = None
+                                r.synced = True
+                                continue
+                            elif change == TAG_CHANGE_ALL_REMOVED:
+                                r.always_include = True
+                                r.synced = False
+                                continue
+                            elif r.room_id in all_tags:
+                                r.always_include = True
+                                continue
+
                         if r.room_id in include_map:
                             since = include_map[r.room_id].get("since", None)
                             if since:
