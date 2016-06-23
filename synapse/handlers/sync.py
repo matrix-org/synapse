@@ -714,7 +714,6 @@ class SyncHandler(object):
             `(newly_joined_rooms, newly_joined_users)`
         """
         user_id = sync_result_builder.sync_config.user.to_string()
-        sync_config = sync_result_builder.sync_config
 
         now_token, ephemeral_by_room = yield self.ephemeral_by_room(
             sync_result_builder.sync_config,
@@ -745,6 +744,56 @@ class SyncHandler(object):
             room_entries, invited, newly_joined_rooms = res
 
             tags_by_room = yield self.store.get_tags_for_user(user_id)
+
+        yield self._update_room_entries_for_paginated_sync(
+            sync_result_builder, room_entries, extras
+        )
+
+        sync_result_builder.full_state |= sync_result_builder.since_token is None
+
+        def handle_room_entries(room_entry):
+            return self._generate_room_entry(
+                sync_result_builder,
+                ignored_users,
+                room_entry,
+                ephemeral=ephemeral_by_room.get(room_entry.room_id, []),
+                tags=tags_by_room.get(room_entry.room_id),
+                account_data=account_data_by_room.get(room_entry.room_id, {}),
+            )
+
+        yield concurrently_execute(handle_room_entries, room_entries, 10)
+
+        sync_result_builder.invited.extend(invited)
+
+        # Now we want to get any newly joined users
+        newly_joined_users = set()
+        if sync_result_builder.since_token:
+            for joined_sync in sync_result_builder.joined:
+                it = itertools.chain(
+                    joined_sync.timeline.events, joined_sync.state.values()
+                )
+                for event in it:
+                    if event.type == EventTypes.Member:
+                        if event.membership == Membership.JOIN:
+                            newly_joined_users.add(event.state_key)
+
+        defer.returnValue((newly_joined_rooms, newly_joined_users))
+
+    @defer.inlineCallbacks
+    def _update_room_entries_for_paginated_sync(self, sync_result_builder,
+                                                room_entries, extras):
+        """Works out which room_entries should be synced to the client, which
+        would need to be resynced if they were sent down, etc.
+
+        Mutates room_entries.
+
+        Args:
+            sync_result_builder (SyncResultBuilder)
+            room_entries (list(RoomSyncResultBuilder))
+            extras (dict)
+        """
+        user_id = sync_result_builder.sync_config.user.to_string()
+        sync_config = sync_result_builder.sync_config
 
         if sync_config.pagination_config:
             pagination_config = sync_config.pagination_config
@@ -877,40 +926,10 @@ class SyncHandler(object):
             if len(room_map) == len(room_entries):
                 sync_result_builder.pagination_state = None
 
-            room_entries = [
+            room_entries[:] = [
                 r for r in room_entries
                 if r.room_id in to_sync_map or r.always_include
             ]
-
-        sync_result_builder.full_state |= sync_result_builder.since_token is None
-
-        def handle_room_entries(room_entry):
-            return self._generate_room_entry(
-                sync_result_builder,
-                ignored_users,
-                room_entry,
-                ephemeral=ephemeral_by_room.get(room_entry.room_id, []),
-                tags=tags_by_room.get(room_entry.room_id),
-                account_data=account_data_by_room.get(room_entry.room_id, {}),
-            )
-
-        yield concurrently_execute(handle_room_entries, room_entries, 10)
-
-        sync_result_builder.invited.extend(invited)
-
-        # Now we want to get any newly joined users
-        newly_joined_users = set()
-        if sync_result_builder.since_token:
-            for joined_sync in sync_result_builder.joined:
-                it = itertools.chain(
-                    joined_sync.timeline.events, joined_sync.state.values()
-                )
-                for event in it:
-                    if event.type == EventTypes.Member:
-                        if event.membership == Membership.JOIN:
-                            newly_joined_users.add(event.state_key)
-
-        defer.returnValue((newly_joined_rooms, newly_joined_users))
 
     @defer.inlineCallbacks
     def _get_rooms_changed(self, sync_result_builder, ignored_users):
