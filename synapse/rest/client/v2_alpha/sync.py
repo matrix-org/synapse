@@ -20,7 +20,8 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
 )
 from synapse.handlers.sync import (
-    SyncConfig, SyncPaginationConfig, SYNC_PAGINATION_TAGS_IGNORE,
+    SyncConfig, SyncPaginationConfig, SYNC_PAGINATION_TAGS_IGNORE, SyncExtras,
+    DEFAULT_SYNC_EXTRAS,
 )
 from synapse.types import SyncNextBatchToken
 from synapse.events.utils import (
@@ -100,7 +101,11 @@ class SyncRestServlet(RestServlet):
 
         since = body.get("since", None)
 
-        extras = body.get("extras", None)
+        extras = body.get("extras", {})
+        extras = SyncExtras(
+            paginate=extras.get("paginate", {}),
+            peek=extras.get("peek", {}),
+        )
 
         if "from" in body:
             # /events used to use 'from', but /sync uses 'since'.
@@ -245,7 +250,7 @@ class SyncRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def _handle_sync(self, requester, sync_config, batch_token, set_presence,
-                     full_state, timeout, extras=None):
+                     full_state, timeout, extras=DEFAULT_SYNC_EXTRAS):
         affect_presence = set_presence != PresenceState.OFFLINE
 
         user = sync_config.user

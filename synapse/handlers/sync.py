@@ -72,9 +72,11 @@ SYNC_PAGINATION_VALID_ORDERS = (SYNC_PAGINATION_ORDER_TS,)
 
 
 SyncExtras = collections.namedtuple("SyncExtras", [
-    "paginate",
-    "rooms",
+    "paginate",  # dict with "limit" key
+    "peek",  # dict of room_id -> dict
 ])
+
+DEFAULT_SYNC_EXTRAS = SyncExtras(paginate={}, peek={})
 
 
 class TimelineBatch(collections.namedtuple("TimelineBatch", [
@@ -195,7 +197,7 @@ class SyncHandler(object):
         self.response_cache = ResponseCache()
 
     def wait_for_sync_for_user(self, sync_config, batch_token=None, timeout=0,
-                               full_state=False, extras=None):
+                               full_state=False, extras=DEFAULT_SYNC_EXTRAS):
         """Get the sync for a client if we have new data for it now. Otherwise
         wait for new data to arrive on the server. If the timeout expires, then
         return an empty sync result.
@@ -214,7 +216,7 @@ class SyncHandler(object):
 
     @defer.inlineCallbacks
     def _wait_for_sync_for_user(self, sync_config, batch_token, timeout,
-                                full_state, extras=None):
+                                full_state, extras=DEFAULT_SYNC_EXTRAS):
         context = LoggingContext.current_context()
         if context:
             if batch_token is None:
@@ -539,13 +541,14 @@ class SyncHandler(object):
 
     @defer.inlineCallbacks
     def generate_sync_result(self, sync_config, batch_token=None, full_state=False,
-                             extras=None):
+                             extras=DEFAULT_SYNC_EXTRAS):
         """Generates a sync result.
 
         Args:
             sync_config (SyncConfig)
             since_token (StreamToken)
             full_state (bool)
+            extras (SyncExtras)
 
         Returns:
             Deferred(SyncResult)
@@ -790,7 +793,7 @@ class SyncHandler(object):
         Args:
             sync_result_builder (SyncResultBuilder)
             room_entries (list(RoomSyncResultBuilder))
-            extras (dict)
+            extras (SyncExtras)
         """
         user_id = sync_result_builder.sync_config.user.to_string()
         sync_config = sync_result_builder.sync_config
@@ -811,8 +814,6 @@ class SyncHandler(object):
             pagination_config = None
             old_pagination_value = 0
             include_all_tags = False
-
-        include_map = extras.get("peek", {}) if extras else {}
 
         if sync_result_builder.pagination_state:
             missing_state = yield self._get_rooms_that_need_full_state(
@@ -848,8 +849,8 @@ class SyncHandler(object):
                                 r.always_include = True
                                 continue
 
-                        if r.room_id in include_map:
-                            since = include_map[r.room_id].get("since", None)
+                        if r.room_id in extras.peek:
+                            since = extras.peek[r.room_id].get("since", None)
                             if since:
                                 tok = SyncNextBatchToken.from_string(since)
                                 r.since_token = tok.stream_token
@@ -867,7 +868,7 @@ class SyncHandler(object):
                 if r.room_id in all_tags:
                     r.always_include = True
 
-        for room_id in set(include_map.keys()) - {r.room_id for r in room_entries}:
+        for room_id in set(extras.peek.keys()) - {r.room_id for r in room_entries}:
             sync_result_builder.errors.append(ErrorSyncResult(
                 room_id=room_id,
                 errcode=Codes.CANNOT_PEEK,
@@ -878,7 +879,7 @@ class SyncHandler(object):
             room_ids = [r.room_id for r in room_entries]
             pagination_limit = pagination_config.limit
 
-            extra_limit = extras.get("paginate", {}).get("limit", 0) if extras else 0
+            extra_limit = extras.paginate.get("limit", 0)
 
             room_map = yield self._get_room_timestamps_at_token(
                 room_ids, sync_result_builder.now_token, sync_config,
