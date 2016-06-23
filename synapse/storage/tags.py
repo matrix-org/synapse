@@ -176,7 +176,13 @@ class TagsStore(SQLBaseStore):
             row["tag"]: json.loads(row["content"]) for row in rows
         })
 
-    def get_room_tags_changed(self, user_id, stream_id):
+    def get_room_tags_changed(self, user_id, stream_id, now_id):
+        """Returns the rooms that have been newly tagged or had all their tags
+        removed since `stream_id`.
+
+        Collapses multiple changes into one. For example, if a room has gone
+        from untagged to tagged back to untagged, the room_id won't be returned.
+        """
         changed = self._account_data_stream_cache.has_entity_changed(
             user_id, int(stream_id)
         )
@@ -187,8 +193,8 @@ class TagsStore(SQLBaseStore):
         def _get_room_tags_changed(txn):
             txn.execute(
                 "SELECT room_id, change FROM room_tags_change_revisions"
-                " WHERE user_id = ? AND stream_id > ?",
-                (user_id, stream_id)
+                " WHERE user_id = ? AND stream_id > ? AND stream_id <= ?",
+                (user_id, stream_id, now_id)
             )
 
             results = Counter()

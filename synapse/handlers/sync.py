@@ -827,7 +827,10 @@ class SyncHandler(object):
 
             if sync_result_builder.since_token:
                 stream_id = sync_result_builder.since_token.account_data_key
-                tag_changes = yield self.store.get_room_tags_changed(user_id, stream_id)
+                now_stream_id = sync_result_builder.now_token.account_data_key
+                tag_changes = yield self.store.get_room_tags_changed(
+                    user_id, stream_id, now_stream_id
+                )
             else:
                 tag_changes = {}
 
@@ -1207,6 +1210,8 @@ class SyncHandler(object):
         if not (always_include or batch or account_data or ephemeral):
             return
 
+        # At this point we're guarenteed (?) to send down the room, so if we
+        # need to resync the entire room do so now.
         if room_builder.would_require_resync:
             batch = yield self._load_filtered_recents(
                 room_id, sync_config,
@@ -1257,6 +1262,11 @@ class SyncHandler(object):
 
     @defer.inlineCallbacks
     def _get_room_timestamps_at_token(self, room_ids, token, sync_config, limit):
+        """For each room, get the last origin_server_ts timestamp the client
+        would see (after filtering) at a particular token.
+
+        Only attempts finds the latest `limit` room timestamps.
+        """
         room_to_entries = {}
 
         @defer.inlineCallbacks
@@ -1317,6 +1327,9 @@ class SyncHandler(object):
     @defer.inlineCallbacks
     def _get_rooms_that_need_full_state(self, room_ids, sync_config, since_token,
                                         pagination_state):
+        """Work out which rooms we haven't sent to the client yet, so would
+        require us to send down the full state
+        """
         start_ts = yield self._get_room_timestamps_at_token(
             room_ids, since_token,
             sync_config=sync_config,
