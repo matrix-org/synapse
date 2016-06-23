@@ -787,11 +787,8 @@ class SyncHandler(object):
                         if include_all_tags:
                             change = tag_changes.get(r.room_id)
                             if change == TAG_CHANGE_NEWLY_TAGGED:
-                                r.since_token = None
                                 r.always_include = True
-                                r.full_state = True
                                 r.would_require_resync = True
-                                r.events = None
                                 r.synced = True
                                 continue
                             elif change == TAG_CHANGE_ALL_REMOVED:
@@ -808,14 +805,10 @@ class SyncHandler(object):
                                 tok = SyncNextBatchToken.from_string(since)
                                 r.since_token = tok.stream_token
                             else:
-                                r.since_token = None
                                 r.always_include = True
-                                r.full_state = True
                                 r.would_require_resync = True
-                                r.events = None
                                 r.synced = False
                         else:
-                            r.full_state = True
                             r.would_require_resync = True
 
         elif pagination_config and include_all_tags:
@@ -856,11 +849,8 @@ class SyncHandler(object):
                     new_room_ids = set(r[0] for r in cutoff_list[pagination_limit:])
                     for r in room_entries:
                         if r.room_id in new_room_ids:
-                            r.full_state = True
                             r.always_include = True
-                            r.since_token = None
-                            r.upto_token = now_token
-                            r.events = None
+                            r.would_require_resync = True
 
                 _, bottom_ts = cutoff_list[-1]
                 value = bottom_ts
@@ -1012,7 +1002,6 @@ class SyncHandler(object):
                     rtype="archived",
                     events=None,
                     newly_joined=room_id in newly_joined_rooms,
-                    full_state=False,
                     since_token=since_token,
                     upto_token=leave_token,
                 ))
@@ -1042,7 +1031,6 @@ class SyncHandler(object):
                     rtype="joined",
                     events=events,
                     newly_joined=room_id in newly_joined_rooms,
-                    full_state=False,
                     since_token=None if room_id in newly_joined_rooms else since_token,
                     upto_token=prev_batch_token,
                 ))
@@ -1052,7 +1040,6 @@ class SyncHandler(object):
                     rtype="joined",
                     events=[],
                     newly_joined=room_id in newly_joined_rooms,
-                    full_state=False,
                     since_token=since_token,
                     upto_token=since_token,
                 ))
@@ -1096,7 +1083,6 @@ class SyncHandler(object):
                     rtype="joined",
                     events=None,
                     newly_joined=False,
-                    full_state=True,
                     since_token=since_token,
                     upto_token=now_token,
                 ))
@@ -1123,7 +1109,6 @@ class SyncHandler(object):
                     rtype="archived",
                     events=None,
                     newly_joined=False,
-                    full_state=True,
                     since_token=since_token,
                     upto_token=leave_token,
                 ))
@@ -1154,8 +1139,7 @@ class SyncHandler(object):
             or room_builder.always_include
         )
         full_state = (
-            room_builder.full_state
-            or newly_joined
+            newly_joined
             or sync_result_builder.full_state
             or room_builder.would_require_resync
         )
@@ -1204,11 +1188,10 @@ class SyncHandler(object):
             return
 
         if room_builder.would_require_resync:
-            since_token = None
             batch = yield self._load_filtered_recents(
                 room_id, sync_config,
                 now_token=upto_token,
-                since_token=since_token,
+                since_token=None,
                 recents=None,
                 newly_joined_room=newly_joined,
             )
@@ -1417,11 +1400,11 @@ class RoomSyncResultBuilder(object):
     """
 
     __slots__ = (
-        "room_id", "rtype", "events", "newly_joined", "full_state", "since_token",
+        "room_id", "rtype", "events", "newly_joined", "since_token",
         "upto_token", "always_include", "would_require_resync", "synced",
     )
 
-    def __init__(self, room_id, rtype, events, newly_joined, full_state,
+    def __init__(self, room_id, rtype, events, newly_joined,
                  since_token, upto_token):
         """
         Args:
@@ -1430,7 +1413,6 @@ class RoomSyncResultBuilder(object):
             events(list): List of events to include in the room, (more events
                 may be added when generating result).
             newly_joined(bool): If the user has newly joined the room
-            full_state(bool): Whether the full state should be sent in result
             since_token(StreamToken): Earliest point to return events from, or None
             upto_token(StreamToken): Latest point to return events from.
         """
@@ -1438,9 +1420,9 @@ class RoomSyncResultBuilder(object):
         self.rtype = rtype
         self.events = events
         self.newly_joined = newly_joined
-        self.full_state = full_state
         self.since_token = since_token
         self.upto_token = upto_token
+
         self.always_include = False
         self.would_require_resync = False
         self.synced = True
