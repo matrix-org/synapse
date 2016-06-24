@@ -41,11 +41,12 @@ cd sytest
 
 git checkout "${GIT_BRANCH}" || (echo >&2 "No ref ${GIT_BRANCH} found, falling back to develop" ; git checkout develop)
 
-: ${PORT_BASE:=8500}
+: ${PORT_COUNT=20}
+: ${PORT_BASE:=8000}
 ./jenkins/install_and_run.sh --coverage \
                              --python $TOX_BIN/python \
                              --synapse-directory $WORKSPACE \
-                             --port-base $PORT_BASE
+                             --port-range ${PORT_BASE}:$((PORT_BASE+PORT_COUNT-1)) \
 
 cd ..
 cp sytest/.coverage.* .
