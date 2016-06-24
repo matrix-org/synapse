@@ -25,7 +25,8 @@ ALIAS_RE = re.compile(r"^#.*:.+$")
 ALL_ALONE = "Empty Room"
 
 
-def calculate_room_name(room_state, user_id, fallback_to_members=True):
+def calculate_room_name(room_state, user_id, fallback_to_members=True,
+                        fallback_to_single_member=True):
     """
     Works out a user-facing name for the given room as per Matrix
     spec recommendations.
@@ -129,6 +130,8 @@ def calculate_room_name(room_state, user_id, fallback_to_members=True):
                 return name_from_member_event(all_members[0])
         else:
             return ALL_ALONE
+    elif len(other_members) == 1 and not fallback_to_single_member:
+        return None
     else:
         return descriptor_from_member_events(other_members)
 

@@ -64,7 +64,6 @@ class SlavedEventStore(BaseSlavedStore):
 
     # Cached functions can't be accessed through a class instance so we need
     # to reach inside the __dict__ to extract them.
-    get_room_name_and_aliases = RoomStore.__dict__["get_room_name_and_aliases"]
     get_rooms_for_user = RoomMemberStore.__dict__["get_rooms_for_user"]
     get_users_in_room = RoomMemberStore.__dict__["get_users_in_room"]
     get_latest_event_ids_in_room = EventFederationStore.__dict__[
@@ -202,7 +201,6 @@ class SlavedEventStore(BaseSlavedStore):
             self.get_rooms_for_user.invalidate_all()
             self.get_users_in_room.invalidate((event.room_id,))
             # self.get_joined_hosts_for_room.invalidate((event.room_id,))
-            self.get_room_name_and_aliases.invalidate((event.room_id,))
 
         self._invalidate_get_event_cache(event.event_id)
 
@@ -246,9 +244,3 @@ class SlavedEventStore(BaseSlavedStore):
         self._get_current_state_for_key.invalidate((
             event.room_id, event.type, event.state_key
         ))
-
-        if event.type in [EventTypes.Name, EventTypes.Aliases]:
-            self.get_room_name_and_aliases.invalidate(
-                (event.room_id,)
-            )
-            pass

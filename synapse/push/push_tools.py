@@ -14,7 +14,9 @@
 # limitations under the License.
 
 from twisted.internet import defer
-
+from synapse.util.presentable_names import (
+    calculate_room_name, name_from_member_event
+)
 
 @defer.inlineCallbacks
 def get_badge_count(store, user_id):
@@ -45,24 +47,21 @@ def get_badge_count(store, user_id):
 
 
 @defer.inlineCallbacks
-def get_context_for_event(store, ev):
-    name_aliases = yield store.get_room_name_and_aliases(
-        ev.room_id
-    )
+def get_context_for_event(state_handler, ev, user_id):
+    ctx = {}
 
-    ctx = {'aliases': name_aliases[1]}
-    if name_aliases[0] is not None:
-        ctx['name'] = name_aliases[0]
+    room_state = yield state_handler.get_current_state(ev.room_id)
 
-    their_member_events_for_room = yield store.get_current_state(
-        room_id=ev.room_id,
-        event_type='m.room.member',
-        state_key=ev.user_id
+    # we no longer bother setting room_alias, and make room_name the
+    # human-readable name instead, be that m.room.namer, an alias or
+    # a list of people in the room
+    name = calculate_room_name(
+        room_state, user_id, fallback_to_single_member=False
     )
-    for mev in their_member_events_for_room:
-        if mev.content['membership'] == 'join' and 'displayname' in mev.content:
-            dn = mev.content['displayname']
-            if dn is not None:
-                ctx['sender_display_name'] = dn
+    if name:
+        ctx['name'] = name
+
+    sender_state_event = room_state[("m.room.member", ev.sender)]
+    ctx['sender_display_name'] = name_from_member_event(sender_state_event)
 
     defer.returnValue(ctx)

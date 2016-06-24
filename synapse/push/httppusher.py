@@ -38,6 +38,7 @@ class HttpPusher(object):
         self.hs = hs
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
+        self.state_handler = self.hs.get_state_handler()
         self.user_id = pusherdict['user_name']
         self.app_id = pusherdict['app_id']
         self.app_display_name = pusherdict['app_display_name']
@@ -237,7 +238,9 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def _build_notification_dict(self, event, tweaks, badge):
-        ctx = yield push_tools.get_context_for_event(self.hs.get_datastore(), event)
+        ctx = yield push_tools.get_context_for_event(
+            self.state_handler, event, self.user_id
+        )
 
         d = {
             'notification': {
@@ -269,8 +272,8 @@ class HttpPusher(object):
         if 'content' in event:
             d['notification']['content'] = event.content
 
-        if len(ctx['aliases']):
-            d['notification']['room_alias'] = ctx['aliases'][0]
+        # We no longer send aliases separately, instead, we send the human
+        # readable name of the room, which may be an alias.
         if 'sender_display_name' in ctx and len(ctx['sender_display_name']) > 0:
             d['notification']['sender_display_name'] = ctx['sender_display_name']
         if 'name' in ctx and len(ctx['name']) > 0:
