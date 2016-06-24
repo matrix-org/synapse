@@ -1456,6 +1456,9 @@ class RoomSyncResultBuilder(object):
         self.since_token = since_token
         self.upto_token = upto_token
 
+        # Should this room always be included in the sync?
         self.always_include = False
+        # If we send down this room, should we send down the full state?
         self.would_require_resync = False
+        # Should the client consider this room "synced"?
         self.synced = True
