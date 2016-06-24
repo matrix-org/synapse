@@ -388,7 +388,7 @@ class FederationQueryAuthServlet(BaseFederationServlet):
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, context, event_id):
         new_content = yield self.handler.on_query_auth_request(
-            origin, content, event_id
+            origin, content, context, event_id
         )
 
         defer.returnValue((200, new_content))
