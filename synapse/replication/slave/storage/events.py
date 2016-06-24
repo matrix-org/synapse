@@ -18,7 +18,6 @@ from ._slaved_id_tracker import SlavedIdTracker
 from synapse.api.constants import EventTypes
 from synapse.events import FrozenEvent
 from synapse.storage import DataStore
-from synapse.storage.room import RoomStore
 from synapse.storage.roommember import RoomMemberStore
 from synapse.storage.event_federation import EventFederationStore
 from synapse.storage.event_push_actions import EventPushActionsStore
