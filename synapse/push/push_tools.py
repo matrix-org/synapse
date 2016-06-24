@@ -18,6 +18,7 @@ from synapse.util.presentable_names import (
     calculate_room_name, name_from_member_event
 )
 
+
 @defer.inlineCallbacks
 def get_badge_count(store, user_id):
     invites, joins = yield defer.gatherResults([
