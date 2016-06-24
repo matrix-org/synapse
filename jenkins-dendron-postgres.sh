@@ -70,6 +70,7 @@ cd sytest
 git checkout "${GIT_BRANCH}" || (echo >&2 "No ref ${GIT_BRANCH} found, falling back to develop" ; git checkout develop)
 
 : ${PORT_BASE:=8000}
+: ${PORT_COUNT=20}
 
 ./jenkins/prep_sytest_for_postgres.sh
 
@@ -81,6 +82,6 @@ echo >&2 "Running sytest with PostgreSQL";
                              --dendron $WORKSPACE/dendron/bin/dendron \
                              --pusher \
                              --synchrotron \
-                             --port-base $PORT_BASE
+                             --port-range ${PORT_BASE}:$((PORT_BASE+PORT_COUNT-1))
 
 cd ..
