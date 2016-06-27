@@ -149,7 +149,6 @@ class ServerConfig(Config):
         # room directory.
         # secondary_directory_servers:
         #     - matrix.org
-        #     - vector.im
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.
