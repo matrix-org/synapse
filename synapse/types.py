@@ -18,7 +18,7 @@ from synapse.api.errors import SynapseError
 from collections import namedtuple
 
 from unpaddedbase64 import encode_base64, decode_base64
-import msgpack
+import ujson as msgpack
 
 
 Requester = namedtuple("Requester", ["user", "access_token_id", "is_guest"])

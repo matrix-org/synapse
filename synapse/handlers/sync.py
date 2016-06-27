@@ -924,9 +924,7 @@ class SyncHandler(object):
                     tags=pagination_config.tags,
                 )
 
-                to_sync_map = {
-                    key: value for key, value in cutoff_list
-                }
+                to_sync_map = {key: value for key, value in cutoff_list}
             else:
                 to_sync_map = {}
 
