@@ -906,15 +906,20 @@ class SyncHandler(object):
                             r.would_require_resync = True
 
                 _, bottom_ts = cutoff_list[-1]
-                value = bottom_ts
+                new_pagination_value = bottom_ts
 
+                logger.info("old pagination value: %r", old_pagination_value)
+                logger.info("New pagination value: %r", new_pagination_value)
+
+                # Are there any rooms that fall into the range between the
+                # old and new value?
                 limited = any(
-                    old_pagination_value < r[1] < value
+                    old_pagination_value < r[1] < new_pagination_value
                     for r in sorted_list[pagination_limit + extra_limit:]
                 )
 
                 sync_result_builder.pagination_state = SyncPaginationState(
-                    order=pagination_config.order, value=value,
+                    order=pagination_config.order, value=new_pagination_value,
                     limit=pagination_limit + extra_limit,
                     tags=pagination_config.tags,
                 )

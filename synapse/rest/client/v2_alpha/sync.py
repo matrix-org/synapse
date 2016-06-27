@@ -200,13 +200,6 @@ class SyncRestServlet(RestServlet):
         filter_id = parse_string(request, "filter", default=None)
         full_state = parse_boolean(request, "full_state", default=False)
 
-        logger.info(
-            "/sync: user=%r, timeout=%r, since=%r,"
-            " set_presence=%r, filter_id=%r" % (
-                user, timeout, since, set_presence, filter_id
-            )
-        )
-
         request_key = (user, timeout, since, filter_id, full_state)
 
         if filter_id:
@@ -254,6 +247,13 @@ class SyncRestServlet(RestServlet):
         affect_presence = set_presence != PresenceState.OFFLINE
 
         user = sync_config.user
+
+        logger.info(
+            "/sync: user=%r, timeout=%r, since=%r,"
+            " set_presence=%r" % (
+                user, timeout, batch_token, set_presence
+            )
+        )
 
         if affect_presence:
             yield self.presence_handler.set_state(user, {"presence": set_presence})
