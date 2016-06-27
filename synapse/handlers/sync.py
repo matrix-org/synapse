@@ -62,13 +62,13 @@ class SyncPaginationConfig(collections.namedtuple("SyncPaginationConfig", [
         super(SyncPaginationConfig, self).__init__(order, limit, tags)
 
 
-SYNC_PAGINATION_TAGS_INCLUDE_ALL = "include_all"
-SYNC_PAGINATION_TAGS_IGNORE = "ignore"
+SYNC_PAGINATION_TAGS_INCLUDE_ALL = "m.include_all"
+SYNC_PAGINATION_TAGS_IGNORE = "m.ignore"
 SYNC_PAGINATION_VALID_TAGS_OPTIONS = (
     SYNC_PAGINATION_TAGS_INCLUDE_ALL, SYNC_PAGINATION_TAGS_IGNORE,
 )
 
-SYNC_PAGINATION_ORDER_TS = "o"
+SYNC_PAGINATION_ORDER_TS = "m.origin_server_ts"
 SYNC_PAGINATION_VALID_ORDERS = (SYNC_PAGINATION_ORDER_TS,)
 
 

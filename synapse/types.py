@@ -148,6 +148,12 @@ class SyncNextBatchToken(
         return self._replace(**kwargs)
 
 
+_ORDER_ENCODE = {"m.origin_server_ts": "o"}
+_ORDER_DECODE = {v: k for k, v in _ORDER_ENCODE.items()}
+_TAG_ENCODE = {"m.include_all": "i", "m.ignore": "x"}
+_TAG_DECODE = {v: k for k, v in _TAG_ENCODE.items()}
+
+
 class SyncPaginationState(
     namedtuple("SyncPaginationState", (
         "order",
@@ -159,16 +165,16 @@ class SyncPaginationState(
     @classmethod
     def from_dict(cls, d):
         try:
-            return cls(d["o"], d["v"], d["l"], d["t"])
+            return cls(_ORDER_DECODE[d["o"]], d["v"], d["l"], _TAG_DECODE[d["t"]])
         except:
             raise SynapseError(400, "Invalid Token")
 
     def to_dict(self):
         return {
-            "o": self.order,
+            "o": _ORDER_ENCODE[self.order],
             "v": self.value,
             "l": self.limit,
-            "t": self.tags,
+            "t": _TAG_ENCODE[self.tags],
         }
 
     def replace(self, **kwargs):
