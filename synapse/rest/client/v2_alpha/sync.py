@@ -98,10 +98,7 @@ class SyncRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         timeout = body.get("timeout", 0)
-
         since = body.get("since", None)
-
-        logger.info("Since: %r", since)
 
         extras = body.get("extras", {})
         extras = SyncExtras(
@@ -176,8 +173,6 @@ class SyncRestServlet(RestServlet):
             timeout=timeout,
             extras=extras,
         )
-
-        logger.info("next_batch: %r", sync_result[1]["next_batch"])
 
         defer.returnValue(sync_result)
 

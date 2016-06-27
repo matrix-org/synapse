@@ -526,6 +526,16 @@ class StreamStore(SQLBaseStore):
             )
 
     def get_last_event_id_ts_for_room(self, room_id, token):
+        """Get the latest event_id and origin_server_ts for a room_id before a
+        given token.
+
+        Args:
+            room_id (str)
+            token (str)
+
+        Returns:
+            Dictionary with ``event_id`` and ``origin_server_ts`` keys.
+        """
         stream_ordering = RoomStreamToken.parse_stream_token(token).stream
 
         sql = (

@@ -47,6 +47,7 @@ class SyncPaginationConfig(collections.namedtuple("SyncPaginationConfig", [
     "limit",
     "tags",
 ])):
+    "Initial pagination configuration from initial sync."
     def __init__(self, order, limit, tags):
         if order not in SYNC_PAGINATION_VALID_ORDERS:
             raise SynapseError(400, "Invalid 'order'")
@@ -838,6 +839,8 @@ class SyncHandler(object):
                 for r in room_entries:
                     if r.room_id in missing_state:
                         if include_all_tags:
+                            # If we're always including tagged rooms, then only
+                            # resync rooms which are newly tagged.
                             change = tag_changes.get(r.room_id)
                             if change == TAG_CHANGE_NEWLY_TAGGED:
                                 r.always_include = True
@@ -908,13 +911,11 @@ class SyncHandler(object):
                 _, bottom_ts = cutoff_list[-1]
                 new_pagination_value = bottom_ts
 
-                logger.info("old pagination value: %r", old_pagination_value)
-                logger.info("New pagination value: %r", new_pagination_value)
-
-                # Are there any rooms that fall into the range between the
-                # old and new value?
+                # We're limited if there are any rooms that are after cutoff
+                # in the list, but still have an origin server ts from after
+                # the pagination value from the since token.
                 limited = any(
-                    old_pagination_value < r[1] < new_pagination_value
+                    old_pagination_value < r[1]
                     for r in sorted_list[pagination_limit + extra_limit:]
                 )
 
@@ -924,7 +925,7 @@ class SyncHandler(object):
                     tags=pagination_config.tags,
                 )
 
-                to_sync_map = {key: value for key, value in cutoff_list}
+                to_sync_map = dict(cutoff_list)
             else:
                 to_sync_map = {}
 
