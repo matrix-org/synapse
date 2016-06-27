@@ -101,6 +101,8 @@ class SyncRestServlet(RestServlet):
 
         since = body.get("since", None)
 
+        logger.info("Since: %r", since)
+
         extras = body.get("extras", {})
         extras = SyncExtras(
             paginate=extras.get("paginate", {}),
@@ -174,6 +176,8 @@ class SyncRestServlet(RestServlet):
             timeout=timeout,
             extras=extras,
         )
+
+        logger.info("next_batch: %r", sync_result[1]["next_batch"])
 
         defer.returnValue(sync_result)
 
