@@ -19,7 +19,7 @@ coturn Setup
 You may be able to setup coturn via your package manager,  or set it up manually using the usual ``configure, make, make install`` process.  
 
  1. Check out coturn::
-      svn checkout https://github.com/coturn/coturn.git coturn
+      git clone https://github.com/coturn/coturn.git coturn
       cd coturn
 
  2. Configure it::
