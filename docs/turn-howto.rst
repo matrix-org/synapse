@@ -19,11 +19,11 @@ coturn Setup
 You may be able to setup coturn via your package manager,  or set it up manually using the usual ``configure, make, make install`` process.  
 
  1. Check out coturn::
-      svn checkout https://github.com/coturn/coturn.git coturn  
-      cd coturn  
+      svn checkout https://github.com/coturn/coturn.git coturn
+      cd coturn
 
  2. Configure it::
-      ./configure  
+      ./configure
 
     You may need to install libevent2: if so, you should do so
     in the way recommended by your operating system.
@@ -31,21 +31,21 @@ You may be able to setup coturn via your package manager,  or set it up manually
     database is unnecessary for this purpose.
 
  3. Build and install it::
-      make  
-      make install  
+      make
+      make install
 
  4. Create or edit the config file in ``/etc/turnserver.conf``. The relevant
     lines, with example values, are::
 
-      lt-cred-mech  
-      use-auth-secret  
-      static-auth-secret=[your secret key here]  
-      realm=turn.myserver.org  
+      lt-cred-mech
+      use-auth-secret
+      static-auth-secret=[your secret key here]
+      realm=turn.myserver.org
 
     See turnserver.conf for explanations of the options.
     One way to generate the static-auth-secret is with pwgen::
 
-       pwgen -s 64 1  
+       pwgen -s 64 1
 
  5. Ensure youe firewall allows traffic into the TURN server on
     the ports you've configured it to listen on (remember to allow
@@ -55,7 +55,7 @@ You may be able to setup coturn via your package manager,  or set it up manually
     import your private key and certificate.
 
  7. Start the turn server::
-       bin/turnserver -o  
+       bin/turnserver -o
 
 
 synapse Setup
@@ -92,4 +92,3 @@ Now, restart synapse::
     ./synctl restart
 
 ...and your Home Server now supports VoIP relaying!
-
