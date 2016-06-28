@@ -170,6 +170,7 @@ class SyncResult(collections.namedtuple("SyncResult", [
     "archived",  # ArchivedSyncResult for each archived room.
     "errors",  # ErrorSyncResult
     "pagination_info",
+    "unread_notifications",
 ])):
     __slots__ = []
 
@@ -561,10 +562,16 @@ class SyncHandler(object):
         # Always use the `now_token` in `SyncResultBuilder`
         now_token = yield self.event_sources.get_current_token()
 
+        all_joined_rooms = yield self.store.get_rooms_for_user(
+            sync_config.user.to_string()
+        )
+        all_joined_rooms = [room.room_id for room in all_joined_rooms]
+
         sync_result_builder = SyncResultBuilder(
             sync_config, full_state,
             batch_token=batch_token,
             now_token=now_token,
+            all_joined_rooms=all_joined_rooms,
         )
 
         account_data_by_room = yield self._generate_sync_entry_for_account_data(
@@ -580,6 +587,8 @@ class SyncHandler(object):
             sync_result_builder, newly_joined_rooms, newly_joined_users
         )
 
+        yield self._generate_notification_counts(sync_result_builder)
+
         defer.returnValue(SyncResult(
             presence=sync_result_builder.presence,
             account_data=sync_result_builder.account_data,
@@ -592,7 +601,40 @@ class SyncHandler(object):
                 pagination_state=sync_result_builder.pagination_state,
             ),
             pagination_info=sync_result_builder.pagination_info,
+            unread_notifications=sync_result_builder.unread_notifications,
         ))
+
+    @defer.inlineCallbacks
+    def _generate_notification_counts(self, sync_result_builder):
+        rooms = sync_result_builder.all_joined_rooms
+
+        total_notif_count = [0]
+        rooms_with_notifs = set()
+        total_highlight_count = [0]
+        rooms_with_highlights = set()
+
+        @defer.inlineCallbacks
+        def notif_for_room(room_id):
+            notifs = yield self.unread_notifs_for_room_id(
+                room_id, sync_result_builder.sync_config
+            )
+            if notifs is not None:
+                total_notif_count[0] += notifs["notify_count"]
+                total_highlight_count[0] += notifs["highlight_count"]
+
+                if notifs["notify_count"]:
+                    rooms_with_notifs.add(room_id)
+                if notifs["highlight_count"]:
+                    rooms_with_highlights.add(room_id)
+
+        yield concurrently_execute(notif_for_room, rooms, 10)
+
+        sync_result_builder.unread_notifications = {
+            "total_notification_count": total_notif_count[0],
+            "rooms_notification_count": len(rooms_with_notifs),
+            "total_highlight_count": total_highlight_count[0],
+            "rooms_highlight_count": len(rooms_with_highlights),
+        }
 
     @defer.inlineCallbacks
     def _generate_sync_entry_for_account_data(self, sync_result_builder):
@@ -1403,16 +1445,18 @@ class SyncResultBuilder(object):
     __slots__ = (
         "sync_config", "full_state", "batch_token", "since_token", "pagination_state",
         "now_token", "presence", "account_data", "joined", "invited", "archived",
-        "pagination_info", "errors",
+        "pagination_info", "errors", "all_joined_rooms", "unread_notifications",
     )
 
-    def __init__(self, sync_config, full_state, batch_token, now_token):
+    def __init__(self, sync_config, full_state, batch_token, now_token,
+                 all_joined_rooms):
         """
         Args:
             sync_config(SyncConfig)
             full_state(bool): The full_state flag as specified by user
             batch_token(SyncNextBatchToken): The token supplied by user, or None.
             now_token(StreamToken): The token to sync up to.
+            all_joined_rooms(list(str)): List of all joined room ids.
         """
         self.sync_config = sync_config
         self.full_state = full_state
@@ -1420,6 +1464,7 @@ class SyncResultBuilder(object):
         self.since_token = batch_token.stream_token if batch_token else None
         self.pagination_state = batch_token.pagination_state if batch_token else None
         self.now_token = now_token
+        self.all_joined_rooms = all_joined_rooms
 
         self.presence = []
         self.account_data = []
@@ -1429,6 +1474,7 @@ class SyncResultBuilder(object):
         self.errors = []
 
         self.pagination_info = {}
+        self.unread_notifications = {}
 
 
 class RoomSyncResultBuilder(object):

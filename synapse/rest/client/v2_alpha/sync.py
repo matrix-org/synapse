@@ -291,6 +291,7 @@ class SyncRestServlet(RestServlet):
                 "leave": archived,
             },
             "next_batch": sync_result.next_batch.to_string(),
+            "unread_notifications": sync_result.unread_notifications,
         }
 
         if sync_result.errors:
