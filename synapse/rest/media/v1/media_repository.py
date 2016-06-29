@@ -449,7 +449,6 @@ class MediaRepository(object):
 
             with (yield self.remote_media_linearizer.queue(key)):
                 full_path = self.filepaths.remote_media_filepath(origin, file_id)
-                full_dir = os.path.dirname(full_path)
                 try:
                     os.remove(full_path)
                 except OSError as e:
@@ -459,22 +458,12 @@ class MediaRepository(object):
                     else:
                         continue
 
-                try:
-                    os.removedirs(full_dir)
-                except OSError:
-                    pass
-
                 thumbnail_dir = self.filepaths.remote_media_thumbnail_dir(
                     origin, file_id
                 )
                 shutil.rmtree(thumbnail_dir, ignore_errors=True)
 
                 yield self.store.delete_remote_media(origin, media_id)
-                try:
-                    os.removedirs(thumbnail_dir)
-                except OSError:
-                    pass
-
                 deleted += 1
 
         defer.returnValue({"deleted": deleted})
