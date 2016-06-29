@@ -43,6 +43,9 @@ import urlparse
 logger = logging.getLogger(__name__)
 
 
+UPDATE_RECENTLY_ACCESSED_REMOTES_TS = 60 * 1000
+
+
 class MediaRepository(object):
     def __init__(self, hs, filepaths):
         self.auth = hs.get_auth()
@@ -56,6 +59,22 @@ class MediaRepository(object):
         self.downloads = {}
         self.dynamic_thumbnails = hs.config.dynamic_thumbnails
         self.thumbnail_requirements = hs.config.thumbnail_requirements
+
+        self.recently_accessed_remotes = set()
+
+        self.clock.looping_call(
+            self._update_recently_accessed_remotes,
+            UPDATE_RECENTLY_ACCESSED_REMOTES_TS
+        )
+
+    @defer.inlineCallbacks
+    def _update_recently_accessed_remotes(self):
+        media = self.recently_accessed_remotes
+        self.recently_accessed_remotes = set()
+
+        yield self.store.update_cached_last_access_time(
+            media, self.clock.time_msec()
+        )
 
     @staticmethod
     def _makedirs(filepath):
@@ -118,6 +137,11 @@ class MediaRepository(object):
         if not media_info:
             media_info = yield self._download_remote_file(
                 server_name, media_id
+            )
+        else:
+            self.recently_accessed_remotes.add((server_name, media_id))
+            yield self.store.update_cached_last_access_time(
+                [(server_name, media_id)], self.clock.time_msec()
             )
         defer.returnValue(media_info)
 
