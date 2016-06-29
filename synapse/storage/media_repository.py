@@ -205,3 +205,32 @@ class MediaRepositoryStore(SQLBaseStore):
             },
             desc="store_remote_media_thumbnail",
         )
+
+    def get_remote_media_before(self, before_ts):
+        sql = (
+            "SELECT media_origin, media_id, filesystem_id"
+            " FROM remote_media_cache"
+            " WHERE last_access_ts < ?"
+        )
+
+        return self._execute(
+            "get_remote_media_before", self.cursor_to_dict, sql, before_ts
+        )
+
+    def delete_remote_media(self, media_origin, media_id):
+        def delete_remote_media_txn(txn):
+            self._simple_delete_txn(
+                txn,
+                "remote_media_cache",
+                keyvalues={
+                    "media_origin": media_origin, "media_id": media_id
+                },
+            )
+            self._simple_delete_txn(
+                txn,
+                "remote_media_cache_thumbnails",
+                keyvalues={
+                    "media_origin": media_origin, "media_id": media_id
+                },
+            )
+        return self.runInteraction("delete_remote_media", delete_remote_media_txn)

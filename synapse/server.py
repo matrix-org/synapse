@@ -45,6 +45,7 @@ from synapse.crypto.keyring import Keyring
 from synapse.push.pusherpool import PusherPool
 from synapse.events.builder import EventBuilderFactory
 from synapse.api.filtering import Filtering
+from synapse.rest.media.v1.media_repository import MediaRepository
 
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 
@@ -113,6 +114,7 @@ class HomeServer(object):
         'filtering',
         'http_client_context_factory',
         'simple_http_client',
+        'media_repository',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -232,6 +234,9 @@ class HomeServer(object):
             name,
             **self.db_config.get("args", {})
         )
+
+    def build_media_repository(self):
+        return MediaRepository(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

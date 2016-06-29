@@ -46,5 +46,37 @@ class WhoisRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
+class PurgeMediaCacheRestServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/admin/purge_media_cache")
+
+    def __init__(self, hs):
+        self.media_repository = hs.get_media_repository()
+        super(PurgeMediaCacheRestServlet, self).__init__(hs)
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+
+        before_ts = request.args.get("before_ts", None)
+        if not before_ts:
+            raise SynapseError(400, "Missing 'before_ts' arg")
+
+        logger.info("before_ts: %r", before_ts[0])
+
+        try:
+            before_ts = int(before_ts[0])
+        except Exception:
+            raise SynapseError(400, "Invalid 'before_ts' arg")
+
+        ret = yield self.media_repository.delete_old_remote_media(before_ts)
+
+        defer.returnValue((200, ret))
+
+
 def register_servlets(hs, http_server):
     WhoisRestServlet(hs).register(http_server)
+    PurgeMediaCacheRestServlet(hs).register(http_server)
