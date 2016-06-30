@@ -807,6 +807,11 @@ class SQLBaseStore(object):
         if txn.rowcount > 1:
             raise StoreError(500, "more than one row matched")
 
+    def _simple_delete(self, table, keyvalues, desc):
+        return self.runInteraction(
+            desc, self._simple_delete_txn, table, keyvalues
+        )
+
     @staticmethod
     def _simple_delete_txn(txn, table, keyvalues):
         sql = "DELETE FROM %s WHERE %s" % (

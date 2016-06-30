@@ -384,6 +384,15 @@ class RegistrationStore(SQLBaseStore):
             defer.returnValue(ret['user_id'])
         defer.returnValue(None)
 
+    def user_delete_threepids(self, user_id):
+        return self._simple_delete(
+            "user_threepids",
+            keyvalues={
+                "user_id": user_id,
+            },
+            desc="user_delete_threepids",
+        )
+
     @defer.inlineCallbacks
     def count_all_users(self):
         """Counts all users registered on the homeserver."""
