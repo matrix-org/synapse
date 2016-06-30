@@ -77,6 +77,32 @@ class PurgeMediaCacheRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
+class DeactivateAccountRestServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/admin/deactivate/(?P<target_user_id>[^/]*)")
+
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+        super(DeactivateAccountRestServlet, self).__init__(hs)
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, target_user_id):
+        UserID.from_string(target_user_id)
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+
+        # FIXME: Theoretically there is a race here wherein user resets password
+        # using threepid.
+        yield self.store.user_delete_access_tokens(target_user_id)
+        yield self.store.user_delete_threepids(target_user_id)
+        yield self.store.user_set_password_hash(target_user_id, None)
+
+        defer.returnValue((200, {}))
+
+
 def register_servlets(hs, http_server):
     WhoisRestServlet(hs).register(http_server)
     PurgeMediaCacheRestServlet(hs).register(http_server)
+    DeactivateAccountRestServlet(hs).register(http_server)
