@@ -43,7 +43,8 @@ Basically, PEP8
   together, or want to deliberately extend or preserve vertical/horizontal
   space)
 
-Comments should follow the google code style. This is so that we can generate
-documentation with sphinx (http://sphinxcontrib-napoleon.readthedocs.org/en/latest/) 
+Comments should follow the `google code style <http://google.github.io/styleguide/pyguide.html>`_.
+This is so that we can generate documentation with 
+`sphinx <http://sphinxcontrib-napoleon.readthedocs.org/en/latest/>`_.
 
 Code should pass pep8 --max-line-length=100 without any warnings.
