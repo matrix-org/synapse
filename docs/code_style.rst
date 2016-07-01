@@ -43,7 +43,7 @@ Basically, PEP8
   together, or want to deliberately extend or preserve vertical/horizontal
   space)
 
-Comments should follow the `google code style <http://google.github.io/styleguide/pyguide.html>`_.
+Comments should follow the `google code style <http://google.github.io/styleguide/pyguide.html?showone=Comments#Comments>`_.
 This is so that we can generate documentation with 
 `sphinx <http://sphinxcontrib-napoleon.readthedocs.org/en/latest/>`_.
 
