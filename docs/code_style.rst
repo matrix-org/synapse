@@ -45,6 +45,8 @@ Basically, PEP8
 
 Comments should follow the `google code style <http://google.github.io/styleguide/pyguide.html?showone=Comments#Comments>`_.
 This is so that we can generate documentation with 
-`sphinx <http://sphinxcontrib-napoleon.readthedocs.org/en/latest/>`_.
+`sphinx <http://sphinxcontrib-napoleon.readthedocs.org/en/latest/>`_. See the
+`examples <http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html>`_
+in the sphinx documentation.
 
 Code should pass pep8 --max-line-length=100 without any warnings.
