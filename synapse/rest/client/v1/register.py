@@ -410,12 +410,14 @@ class CreateUserRestServlet(ClientV1RestServlet):
             raise SynapseError(400, "Failed to parse 'duration_seconds'")
         if duration_seconds > self.direct_user_creation_max_duration:
             duration_seconds = self.direct_user_creation_max_duration
+        password_hash = user_json["password_hash"].encode("utf-8") if user_json["password_hash"] else None
 
         handler = self.handlers.registration_handler
         user_id, token = yield handler.get_or_create_user(
             localpart=localpart,
             displayname=displayname,
-            duration_seconds=duration_seconds
+            duration_seconds=duration_seconds,
+            password_hash=password_hash
         )
 
         defer.returnValue({

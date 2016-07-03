@@ -358,7 +358,7 @@ class RegistrationHandler(BaseHandler):
         defer.returnValue(data)
 
     @defer.inlineCallbacks
-    def get_or_create_user(self, localpart, displayname, duration_seconds):
+    def get_or_create_user(self, localpart, displayname, duration_seconds, password_hash=None):
         """Creates a new user if the user does not exist,
         else revokes all previous access tokens and generates a new one.
 
@@ -394,7 +394,7 @@ class RegistrationHandler(BaseHandler):
             yield self.store.register(
                 user_id=user_id,
                 token=token,
-                password_hash=None,
+                password_hash=password_hash,
                 create_profile_with_localpart=user.localpart,
             )
         else:
