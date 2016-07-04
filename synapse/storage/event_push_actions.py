@@ -16,6 +16,8 @@
 from ._base import SQLBaseStore
 from twisted.internet import defer
 from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.types import RoomStreamToken
+from .stream import lower_bound
 
 import logging
 import ujson as json
@@ -73,6 +75,9 @@ class EventPushActionsStore(SQLBaseStore):
 
             stream_ordering = results[0][0]
             topological_ordering = results[0][1]
+            token = RoomStreamToken(
+                topological_ordering, stream_ordering
+            )
 
             sql = (
                 "SELECT sum(notif), sum(highlight)"
@@ -80,15 +85,10 @@ class EventPushActionsStore(SQLBaseStore):
                 " WHERE"
                 " user_id = ?"
                 " AND room_id = ?"
-                " AND ("
-                "       topological_ordering > ?"
-                "       OR (topological_ordering = ? AND stream_ordering > ?)"
-                ")"
-            )
-            txn.execute(sql, (
-                user_id, room_id,
-                topological_ordering, topological_ordering, stream_ordering
-            ))
+                " AND %s"
+            ) % (lower_bound(token, self.database_engine, inclusive=""),)
+
+            txn.execute(sql, (user_id, room_id))
             row = txn.fetchone()
             if row:
                 return {
