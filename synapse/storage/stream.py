@@ -591,25 +591,28 @@ class StreamStore(SQLBaseStore):
 
         query_before = (
             "SELECT topological_ordering, stream_ordering, event_id FROM events"
-            " WHERE room_id = ? AND (topological_ordering < ?"
-            " OR (topological_ordering = ? AND stream_ordering < ?))"
-            " ORDER BY topological_ordering DESC, stream_ordering DESC"
-            " LIMIT ?"
+            " WHERE room_id = ? AND topological_ordering < ?"
+            " UNION ALL "
+            " SELECT topological_ordering, stream_ordering, event_id FROM events"
+            " WHERE room_id = ? AND topological_ordering = ? AND stream_ordering < ?"
+            " ORDER BY topological_ordering DESC, stream_ordering DESC LIMIT ?"
         )
 
         query_after = (
             "SELECT topological_ordering, stream_ordering, event_id FROM events"
-            " WHERE room_id = ? AND (topological_ordering > ?"
-            " OR (topological_ordering = ? AND stream_ordering > ?))"
-            " ORDER BY topological_ordering ASC, stream_ordering ASC"
-            " LIMIT ?"
+            " WHERE room_id = ? AND topological_ordering > ?"
+            " UNION ALL"
+            " SELECT topological_ordering, stream_ordering, event_id FROM events"
+            " WHERE room_id = ? AND topological_ordering = ? AND stream_ordering > ?"
+            " ORDER BY topological_ordering ASC, stream_ordering ASC LIMIT ?"
         )
 
         txn.execute(
             query_before,
             (
-                room_id, topological_ordering, topological_ordering,
-                stream_ordering, before_limit,
+                room_id, topological_ordering,
+                room_id, topological_ordering, stream_ordering,
+                before_limit,
             )
         )
 
@@ -630,8 +633,9 @@ class StreamStore(SQLBaseStore):
         txn.execute(
             query_after,
             (
-                room_id, topological_ordering, topological_ordering,
-                stream_ordering, after_limit,
+                room_id, topological_ordering,
+                room_id, topological_ordering, stream_ordering,
+                after_limit,
             )
         )
 
