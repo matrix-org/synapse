@@ -127,15 +127,6 @@ class RegistrationStore(SQLBaseStore):
 
         try:
             if was_guest:
-                txn.execute(
-                    "UPDATE users SET"
-                    " password_hash = ?,"
-                    " upgrade_ts = ?,"
-                    " is_guest = ?,"
-                    " admin = ?"
-                    " WHERE name = ?",
-                    (password_hash, now, 1 if make_guest else 0, admin, user_id,)
-                )
                 self._simple_update_one_txn(
                     txn,
                     "users",
