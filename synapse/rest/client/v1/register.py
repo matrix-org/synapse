@@ -345,6 +345,7 @@ class RegisterRestServlet(ClientV1RestServlet):
             user_id, token = yield handler.register(
                 localpart=user,
                 password=password,
+                admin=bool(admin),
             )
             self._remove_session(session)
             defer.returnValue({
