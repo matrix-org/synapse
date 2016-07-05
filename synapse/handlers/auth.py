@@ -750,7 +750,8 @@ class AuthHandler(BaseHandler):
         Returns:
             Hashed password (str).
         """
-        return bcrypt.hashpw(password + self.hs.config.password_config.pepper, bcrypt.gensalt(self.bcrypt_rounds))
+        return bcrypt.hashpw(password + self.hs.config.password_config.pepper,
+                             bcrypt.gensalt(self.bcrypt_rounds))
 
     def validate_hash(self, password, stored_hash):
         """Validates that self.hash(password) == stored_hash.
