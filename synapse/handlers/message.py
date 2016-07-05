@@ -51,6 +51,19 @@ class MessageHandler(BaseHandler):
         self.snapshot_cache = SnapshotCache()
 
     @defer.inlineCallbacks
+    def purge_history(self, room_id, event_id):
+        event = yield self.store.get_event(event_id)
+
+        if event.room_id != room_id:
+            raise SynapseError(400, "Event is for wrong room.")
+
+        depth = event.depth
+
+        # TODO: Lock.
+
+        yield self.store.delete_old_state(room_id, depth)
+
+    @defer.inlineCallbacks
     def get_messages(self, requester, room_id=None, pagin_config=None,
                      as_client_event=True):
         """Get messages in a room.

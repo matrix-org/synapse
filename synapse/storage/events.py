@@ -1281,6 +1281,12 @@ class EventsStore(SQLBaseStore):
             )
         return self.runInteraction("get_all_new_events", get_all_new_events_txn)
 
+    def delete_old_state(self, room_id, topological_ordering):
+        return self.runInteraction(
+            "delete_old_state",
+            self._delete_old_state_txn, room_id, topological_ordering
+        )
+
     def _delete_old_state_txn(self, txn, room_id, topological_ordering):
         """Deletes old room state
         """
