@@ -652,7 +652,7 @@ class StreamStore(SQLBaseStore):
                 " ORDER BY topological_ordering DESC, stream_ordering DESC LIMIT ?"
             ) % (upper_bound(token, self.database_engine, inclusive=False),)
 
-            before_args = (room_id, before_limit),
+            before_args = (room_id, before_limit)
 
             query_after = (
                 "SELECT topological_ordering, stream_ordering, event_id FROM events"
