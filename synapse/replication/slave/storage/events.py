@@ -142,6 +142,8 @@ class SlavedEventStore(BaseSlavedStore):
     _get_events_around_txn = DataStore._get_events_around_txn.__func__
     _get_some_state_from_cache = DataStore._get_some_state_from_cache.__func__
 
+    get_last_event_id_ts_for_room = DataStore.get_last_event_id_ts_for_room.__func__
+
     def stream_positions(self):
         result = super(SlavedEventStore, self).stream_positions()
         result["events"] = self._stream_id_gen.get_current_token()

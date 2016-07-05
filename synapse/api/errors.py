@@ -44,6 +44,7 @@ class Codes(object):
     THREEPID_AUTH_FAILED = "M_THREEPID_AUTH_FAILED"
     THREEPID_IN_USE = "THREEPID_IN_USE"
     INVALID_USERNAME = "M_INVALID_USERNAME"
+    CANNOT_PEEK = "M_CANNOT_PEEK"
 
 
 class CodeMessageException(RuntimeError):

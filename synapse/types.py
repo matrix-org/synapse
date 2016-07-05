@@ -17,6 +17,9 @@ from synapse.api.errors import SynapseError
 
 from collections import namedtuple
 
+from unpaddedbase64 import encode_base64, decode_base64
+import cbor2 as serializer
+
 
 Requester = namedtuple("Requester", ["user", "access_token_id", "is_guest"])
 
@@ -115,8 +118,71 @@ class EventID(DomainSpecificString):
     SIGIL = "$"
 
 
+class SyncNextBatchToken(
+    namedtuple("SyncNextBatchToken", (
+        "stream_token",
+        "pagination_state",
+    ))
+):
+    @classmethod
+    def from_string(cls, string):
+        try:
+            d = serializer.loads(decode_base64(string))
+            pa = d.get("pa", None)
+            if pa:
+                pa = SyncPaginationState.from_dict(pa)
+            return cls(
+                stream_token=StreamToken.from_arr(d["t"]),
+                pagination_state=pa,
+            )
+        except:
+            raise SynapseError(400, "Invalid Token")
+
+    def to_string(self):
+        return encode_base64(serializer.dumps({
+            "t": self.stream_token.to_arr(),
+            "pa": self.pagination_state.to_dict() if self.pagination_state else None,
+        }))
+
+    def replace(self, **kwargs):
+        return self._replace(**kwargs)
+
+
+_ORDER_ENCODE = {"m.origin_server_ts": "o"}
+_ORDER_DECODE = {v: k for k, v in _ORDER_ENCODE.items()}
+_TAG_ENCODE = {"m.include_all": "i", "m.ignore": "x"}
+_TAG_DECODE = {v: k for k, v in _TAG_ENCODE.items()}
+
+
+class SyncPaginationState(
+    namedtuple("SyncPaginationState", (
+        "order",
+        "value",
+        "limit",
+        "tags",
+    ))
+):
+    @classmethod
+    def from_dict(cls, d):
+        try:
+            return cls(_ORDER_DECODE[d["o"]], d["v"], d["l"], _TAG_DECODE[d["t"]])
+        except:
+            raise SynapseError(400, "Invalid Token")
+
+    def to_dict(self):
+        return {
+            "o": _ORDER_ENCODE[self.order],
+            "v": self.value,
+            "l": self.limit,
+            "t": _TAG_ENCODE[self.tags],
+        }
+
+    def replace(self, **kwargs):
+        return self._replace(**kwargs)
+
+
 class StreamToken(
-    namedtuple("Token", (
+    namedtuple("StreamToken", (
         "room_key",
         "presence_key",
         "typing_key",
@@ -140,6 +206,20 @@ class StreamToken(
 
     def to_string(self):
         return self._SEPARATOR.join([str(k) for k in self])
+
+    @classmethod
+    def from_arr(cls, arr):
+        try:
+            keys = arr
+            while len(keys) < len(cls._fields):
+                # i.e. old token from before receipt_key
+                keys.append("0")
+            return cls(*keys)
+        except:
+            raise SynapseError(400, "Invalid Token")
+
+    def to_arr(self):
+        return self
 
     @property
     def room_stream_id(self):

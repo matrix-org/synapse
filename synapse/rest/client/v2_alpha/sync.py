@@ -16,10 +16,14 @@
 from twisted.internet import defer
 
 from synapse.http.servlet import (
-    RestServlet, parse_string, parse_integer, parse_boolean
+    RestServlet, parse_string, parse_integer, parse_boolean,
+    parse_json_object_from_request,
 )
-from synapse.handlers.sync import SyncConfig
-from synapse.types import StreamToken
+from synapse.handlers.sync import (
+    SyncConfig, SyncPaginationConfig, SYNC_PAGINATION_TAGS_IGNORE, SyncExtras,
+    DEFAULT_SYNC_EXTRAS,
+)
+from synapse.types import SyncNextBatchToken
 from synapse.events.utils import (
     serialize_event, format_event_for_client_v2_without_room_id,
 )
@@ -85,6 +89,94 @@ class SyncRestServlet(RestServlet):
         self.presence_handler = hs.get_presence_handler()
 
     @defer.inlineCallbacks
+    def on_POST(self, request):
+        requester = yield self.auth.get_user_by_req(
+            request, allow_guest=True
+        )
+        user = requester.user
+
+        body = parse_json_object_from_request(request)
+
+        timeout = body.get("timeout", 0)
+        since = body.get("since", None)
+
+        extras = body.get("extras", {})
+        extras = SyncExtras(
+            paginate=extras.get("paginate", {}),
+            peek=extras.get("peek", {}),
+        )
+
+        if "from" in body:
+            # /events used to use 'from', but /sync uses 'since'.
+            # Lets be helpful and whine if we see a 'from'.
+            raise SynapseError(
+                400, "'from' is not a valid parameter. Did you mean 'since'?"
+            )
+
+        set_presence = body.get("set_presence", "online")
+        if set_presence not in self.ALLOWED_PRESENCE:
+            message = "Parameter 'set_presence' must be one of [%s]" % (
+                ", ".join(repr(v) for v in self.ALLOWED_PRESENCE)
+            )
+            raise SynapseError(400, message)
+
+        full_state = body.get("full_state", False)
+
+        filter_id = body.get("filter_id", None)
+        filter_dict = body.get("filter", None)
+        pagination_config = body.get("pagination_config", None)
+
+        if filter_dict is not None and filter_id is not None:
+            raise SynapseError(
+                400,
+                "Can only specify one of `filter` and `filter_id` paramters"
+            )
+
+        if filter_id:
+            filter_collection = yield self.filtering.get_user_filter(
+                user.localpart, filter_id
+            )
+            filter_key = filter_id
+        elif filter_dict:
+            self.filtering.check_valid_filter(filter_dict)
+            filter_collection = FilterCollection(filter_dict)
+            filter_key = json.dumps(filter_dict)
+        else:
+            filter_collection = DEFAULT_FILTER_COLLECTION
+            filter_key = None
+
+        request_key = (user, timeout, since, filter_key, full_state)
+
+        sync_config = SyncConfig(
+            user=user,
+            filter_collection=filter_collection,
+            is_guest=requester.is_guest,
+            request_key=request_key,
+            pagination_config=SyncPaginationConfig(
+                order=pagination_config["order"],
+                limit=pagination_config["limit"],
+                tags=pagination_config.get("tags", SYNC_PAGINATION_TAGS_IGNORE),
+            ) if pagination_config else None,
+        )
+
+        if since is not None:
+            batch_token = SyncNextBatchToken.from_string(since)
+        else:
+            batch_token = None
+
+        sync_result = yield self._handle_sync(
+            requester=requester,
+            sync_config=sync_config,
+            batch_token=batch_token,
+            set_presence=set_presence,
+            full_state=full_state,
+            timeout=timeout,
+            extras=extras,
+        )
+
+        defer.returnValue(sync_result)
+
+    @defer.inlineCallbacks
     def on_GET(self, request):
         if "from" in request.args:
             # /events used to use 'from', but /sync uses 'since'.
@@ -106,13 +198,6 @@ class SyncRestServlet(RestServlet):
         )
         filter_id = parse_string(request, "filter", default=None)
         full_state = parse_boolean(request, "full_state", default=False)
-
-        logger.info(
-            "/sync: user=%r, timeout=%r, since=%r,"
-            " set_presence=%r, filter_id=%r" % (
-                user, timeout, since, set_presence, filter_id
-            )
-        )
 
         request_key = (user, timeout, since, filter_id, full_state)
 
@@ -136,14 +221,38 @@ class SyncRestServlet(RestServlet):
             filter_collection=filter,
             is_guest=requester.is_guest,
             request_key=request_key,
+            pagination_config=None,
         )
 
         if since is not None:
-            since_token = StreamToken.from_string(since)
+            batch_token = SyncNextBatchToken.from_string(since)
         else:
-            since_token = None
+            batch_token = None
 
+        sync_result = yield self._handle_sync(
+            requester=requester,
+            sync_config=sync_config,
+            batch_token=batch_token,
+            set_presence=set_presence,
+            full_state=full_state,
+            timeout=timeout,
+        )
+
+        defer.returnValue(sync_result)
+
+    @defer.inlineCallbacks
+    def _handle_sync(self, requester, sync_config, batch_token, set_presence,
+                     full_state, timeout, extras=DEFAULT_SYNC_EXTRAS):
         affect_presence = set_presence != PresenceState.OFFLINE
+
+        user = sync_config.user
+
+        logger.info(
+            "/sync: user=%r, timeout=%r, since=%r,"
+            " set_presence=%r" % (
+                user, timeout, batch_token, set_presence
+            )
+        )
 
         if affect_presence:
             yield self.presence_handler.set_state(user, {"presence": set_presence})
@@ -153,8 +262,8 @@ class SyncRestServlet(RestServlet):
         )
         with context:
             sync_result = yield self.sync_handler.wait_for_sync_for_user(
-                sync_config, since_token=since_token, timeout=timeout,
-                full_state=full_state
+                sync_config, batch_token=batch_token, timeout=timeout,
+                full_state=full_state, extras=extras,
             )
 
         time_now = self.clock.time_msec()
@@ -182,7 +291,14 @@ class SyncRestServlet(RestServlet):
                 "leave": archived,
             },
             "next_batch": sync_result.next_batch.to_string(),
+            "unread_notifications": sync_result.unread_notifications,
         }
+
+        if sync_result.errors:
+            response_content["rooms"]["errors"] = self.encode_errors(sync_result.errors)
+
+        if sync_result.pagination_info:
+            response_content["pagination_info"] = sync_result.pagination_info
 
         defer.returnValue((200, response_content))
 
@@ -193,6 +309,15 @@ class SyncRestServlet(RestServlet):
             event['sender'] = event['content'].pop('user_id')
             formatted.append(event)
         return {"events": formatted}
+
+    def encode_errors(self, errors):
+        return {
+            e.room_id: {
+                "errcode": e.errcode,
+                "error": e.error
+            }
+            for e in errors
+        }
 
     def encode_joined(self, rooms, time_now, token_id):
         """
@@ -215,6 +340,7 @@ class SyncRestServlet(RestServlet):
             joined[room.room_id] = self.encode_room(
                 room, time_now, token_id
             )
+            joined[room.room_id]["synced"] = room.synced
 
         return joined
 

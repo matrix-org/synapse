@@ -20,6 +20,9 @@ from synapse.util.metrics import Measure
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.visibility import filter_events_for_client
+from synapse.types import SyncNextBatchToken, SyncPaginationState
+from synapse.api.errors import Codes, SynapseError
+from synapse.storage.tags import (TAG_CHANGE_NEWLY_TAGGED, TAG_CHANGE_ALL_REMOVED)
 
 from twisted.internet import defer
 
@@ -35,7 +38,46 @@ SyncConfig = collections.namedtuple("SyncConfig", [
     "filter_collection",
     "is_guest",
     "request_key",
+    "pagination_config",
 ])
+
+
+class SyncPaginationConfig(collections.namedtuple("SyncPaginationConfig", [
+    "order",
+    "limit",
+    "tags",
+])):
+    "Initial pagination configuration from initial sync."
+    def __init__(self, order, limit, tags):
+        if order not in SYNC_PAGINATION_VALID_ORDERS:
+            raise SynapseError(400, "Invalid 'order'")
+        if tags not in SYNC_PAGINATION_VALID_TAGS_OPTIONS:
+            raise SynapseError(400, "Invalid 'tags'")
+
+        try:
+            limit = int(limit)
+        except:
+            raise SynapseError(400, "Invalid 'limit'")
+
+        super(SyncPaginationConfig, self).__init__(order, limit, tags)
+
+
+SYNC_PAGINATION_TAGS_INCLUDE_ALL = "m.include_all"
+SYNC_PAGINATION_TAGS_IGNORE = "m.ignore"
+SYNC_PAGINATION_VALID_TAGS_OPTIONS = (
+    SYNC_PAGINATION_TAGS_INCLUDE_ALL, SYNC_PAGINATION_TAGS_IGNORE,
+)
+
+SYNC_PAGINATION_ORDER_TS = "m.origin_server_ts"
+SYNC_PAGINATION_VALID_ORDERS = (SYNC_PAGINATION_ORDER_TS,)
+
+
+SyncExtras = collections.namedtuple("SyncExtras", [
+    "paginate",  # dict with "limit" key
+    "peek",  # dict of room_id -> dict
+])
+
+DEFAULT_SYNC_EXTRAS = SyncExtras(paginate={}, peek={})
 
 
 class TimelineBatch(collections.namedtuple("TimelineBatch", [
@@ -59,6 +101,7 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
     "ephemeral",
     "account_data",
     "unread_notifications",
+    "synced",  # bool
 ])):
     __slots__ = []
 
@@ -106,6 +149,18 @@ class InvitedSyncResult(collections.namedtuple("InvitedSyncResult", [
         return True
 
 
+class ErrorSyncResult(collections.namedtuple("ErrorSyncResult", [
+    "room_id",   # str
+    "errcode",   # str
+    "error",     # str
+])):
+    __slots__ = []
+
+    def __nonzero__(self):
+        """Errors should always be reported to the client"""
+        return True
+
+
 class SyncResult(collections.namedtuple("SyncResult", [
     "next_batch",  # Token for the next sync
     "presence",  # List of presence events for the user.
@@ -113,6 +168,9 @@ class SyncResult(collections.namedtuple("SyncResult", [
     "joined",  # JoinedSyncResult for each joined room.
     "invited",  # InvitedSyncResult for each invited room.
     "archived",  # ArchivedSyncResult for each archived room.
+    "errors",  # ErrorSyncResult
+    "pagination_info",
+    "unread_notifications",
 ])):
     __slots__ = []
 
@@ -140,8 +198,8 @@ class SyncHandler(object):
         self.clock = hs.get_clock()
         self.response_cache = ResponseCache()
 
-    def wait_for_sync_for_user(self, sync_config, since_token=None, timeout=0,
-                               full_state=False):
+    def wait_for_sync_for_user(self, sync_config, batch_token=None, timeout=0,
+                               full_state=False, extras=DEFAULT_SYNC_EXTRAS):
         """Get the sync for a client if we have new data for it now. Otherwise
         wait for new data to arrive on the server. If the timeout expires, then
         return an empty sync result.
@@ -153,47 +211,41 @@ class SyncHandler(object):
             result = self.response_cache.set(
                 sync_config.request_key,
                 self._wait_for_sync_for_user(
-                    sync_config, since_token, timeout, full_state
+                    sync_config, batch_token, timeout, full_state, extras,
                 )
             )
         return result
 
     @defer.inlineCallbacks
-    def _wait_for_sync_for_user(self, sync_config, since_token, timeout,
-                                full_state):
+    def _wait_for_sync_for_user(self, sync_config, batch_token, timeout,
+                                full_state, extras=DEFAULT_SYNC_EXTRAS):
         context = LoggingContext.current_context()
         if context:
-            if since_token is None:
+            if batch_token is None:
                 context.tag = "initial_sync"
             elif full_state:
                 context.tag = "full_state_sync"
             else:
                 context.tag = "incremental_sync"
 
-        if timeout == 0 or since_token is None or full_state:
+        if timeout == 0 or batch_token is None or full_state:
             # we are going to return immediately, so don't bother calling
             # notifier.wait_for_events.
-            result = yield self.current_sync_for_user(
-                sync_config, since_token, full_state=full_state,
+            result = yield self.generate_sync_result(
+                sync_config, batch_token, full_state=full_state, extras=extras,
             )
             defer.returnValue(result)
         else:
             def current_sync_callback(before_token, after_token):
-                return self.current_sync_for_user(sync_config, since_token)
+                return self.generate_sync_result(
+                    sync_config, batch_token, full_state=False, extras=extras,
+                )
 
             result = yield self.notifier.wait_for_events(
                 sync_config.user.to_string(), timeout, current_sync_callback,
-                from_token=since_token,
+                from_token=batch_token.stream_token,
             )
             defer.returnValue(result)
-
-    def current_sync_for_user(self, sync_config, since_token=None,
-                              full_state=False):
-        """Get the sync for client needed to match what the server has now.
-        Returns:
-            A Deferred SyncResult.
-        """
-        return self.generate_sync_result(sync_config, since_token, full_state)
 
     @defer.inlineCallbacks
     def push_rules_for_user(self, user):
@@ -490,13 +542,15 @@ class SyncHandler(object):
             defer.returnValue(None)
 
     @defer.inlineCallbacks
-    def generate_sync_result(self, sync_config, since_token=None, full_state=False):
+    def generate_sync_result(self, sync_config, batch_token=None, full_state=False,
+                             extras=DEFAULT_SYNC_EXTRAS):
         """Generates a sync result.
 
         Args:
             sync_config (SyncConfig)
             since_token (StreamToken)
             full_state (bool)
+            extras (SyncExtras)
 
         Returns:
             Deferred(SyncResult)
@@ -508,10 +562,16 @@ class SyncHandler(object):
         # Always use the `now_token` in `SyncResultBuilder`
         now_token = yield self.event_sources.get_current_token()
 
+        all_joined_rooms = yield self.store.get_rooms_for_user(
+            sync_config.user.to_string()
+        )
+        all_joined_rooms = [room.room_id for room in all_joined_rooms]
+
         sync_result_builder = SyncResultBuilder(
             sync_config, full_state,
-            since_token=since_token,
+            batch_token=batch_token,
             now_token=now_token,
+            all_joined_rooms=all_joined_rooms,
         )
 
         account_data_by_room = yield self._generate_sync_entry_for_account_data(
@@ -519,7 +579,7 @@ class SyncHandler(object):
         )
 
         res = yield self._generate_sync_entry_for_rooms(
-            sync_result_builder, account_data_by_room
+            sync_result_builder, account_data_by_room, extras,
         )
         newly_joined_rooms, newly_joined_users = res
 
@@ -527,14 +587,54 @@ class SyncHandler(object):
             sync_result_builder, newly_joined_rooms, newly_joined_users
         )
 
+        yield self._generate_notification_counts(sync_result_builder)
+
         defer.returnValue(SyncResult(
             presence=sync_result_builder.presence,
             account_data=sync_result_builder.account_data,
             joined=sync_result_builder.joined,
             invited=sync_result_builder.invited,
             archived=sync_result_builder.archived,
-            next_batch=sync_result_builder.now_token,
+            errors=sync_result_builder.errors,
+            next_batch=SyncNextBatchToken(
+                stream_token=sync_result_builder.now_token,
+                pagination_state=sync_result_builder.pagination_state,
+            ),
+            pagination_info=sync_result_builder.pagination_info,
+            unread_notifications=sync_result_builder.unread_notifications,
         ))
+
+    @defer.inlineCallbacks
+    def _generate_notification_counts(self, sync_result_builder):
+        rooms = sync_result_builder.all_joined_rooms
+
+        total_notif_count = [0]
+        rooms_with_notifs = set()
+        total_highlight_count = [0]
+        rooms_with_highlights = set()
+
+        @defer.inlineCallbacks
+        def notif_for_room(room_id):
+            notifs = yield self.unread_notifs_for_room_id(
+                room_id, sync_result_builder.sync_config
+            )
+            if notifs is not None:
+                total_notif_count[0] += notifs["notify_count"]
+                total_highlight_count[0] += notifs["highlight_count"]
+
+                if notifs["notify_count"]:
+                    rooms_with_notifs.add(room_id)
+                if notifs["highlight_count"]:
+                    rooms_with_highlights.add(room_id)
+
+        yield concurrently_execute(notif_for_room, rooms, 10)
+
+        sync_result_builder.unread_notifications = {
+            "total_notification_count": total_notif_count[0],
+            "rooms_notification_count": len(rooms_with_notifs),
+            "total_highlight_count": total_highlight_count[0],
+            "rooms_highlight_count": len(rooms_with_highlights),
+        }
 
     @defer.inlineCallbacks
     def _generate_sync_entry_for_account_data(self, sync_result_builder):
@@ -646,7 +746,8 @@ class SyncHandler(object):
         sync_result_builder.presence = presence
 
     @defer.inlineCallbacks
-    def _generate_sync_entry_for_rooms(self, sync_result_builder, account_data_by_room):
+    def _generate_sync_entry_for_rooms(self, sync_result_builder, account_data_by_room,
+                                       extras):
         """Generates the rooms portion of the sync response. Populates the
         `sync_result_builder` with the result.
 
@@ -690,6 +791,12 @@ class SyncHandler(object):
 
             tags_by_room = yield self.store.get_tags_for_user(user_id)
 
+        yield self._update_room_entries_for_paginated_sync(
+            sync_result_builder, room_entries, extras
+        )
+
+        sync_result_builder.full_state |= sync_result_builder.since_token is None
+
         def handle_room_entries(room_entry):
             return self._generate_room_entry(
                 sync_result_builder,
@@ -698,7 +805,6 @@ class SyncHandler(object):
                 ephemeral=ephemeral_by_room.get(room_entry.room_id, []),
                 tags=tags_by_room.get(room_entry.room_id),
                 account_data=account_data_by_room.get(room_entry.room_id, {}),
-                always_include=sync_result_builder.full_state,
             )
 
         yield concurrently_execute(handle_room_entries, room_entries, 10)
@@ -718,6 +824,162 @@ class SyncHandler(object):
                             newly_joined_users.add(event.state_key)
 
         defer.returnValue((newly_joined_rooms, newly_joined_users))
+
+    @defer.inlineCallbacks
+    def _update_room_entries_for_paginated_sync(self, sync_result_builder,
+                                                room_entries, extras):
+        """Works out which room_entries should be synced to the client, which
+        would need to be resynced if they were sent down, etc.
+
+        Mutates room_entries.
+
+        Args:
+            sync_result_builder (SyncResultBuilder)
+            room_entries (list(RoomSyncResultBuilder))
+            extras (SyncExtras)
+        """
+        user_id = sync_result_builder.sync_config.user.to_string()
+        sync_config = sync_result_builder.sync_config
+
+        if sync_config.pagination_config:
+            pagination_config = sync_config.pagination_config
+            old_pagination_value = 0
+            include_all_tags = pagination_config.tags == SYNC_PAGINATION_TAGS_INCLUDE_ALL
+        elif sync_result_builder.pagination_state:
+            pagination_config = SyncPaginationConfig(
+                order=sync_result_builder.pagination_state.order,
+                limit=sync_result_builder.pagination_state.limit,
+                tags=sync_result_builder.pagination_state.tags,
+            )
+            old_pagination_value = sync_result_builder.pagination_state.value
+            include_all_tags = pagination_config.tags == SYNC_PAGINATION_TAGS_INCLUDE_ALL
+        else:
+            pagination_config = None
+            old_pagination_value = 0
+            include_all_tags = False
+
+        if sync_result_builder.pagination_state:
+            missing_state = yield self._get_rooms_that_need_full_state(
+                room_ids=[r.room_id for r in room_entries],
+                sync_config=sync_config,
+                since_token=sync_result_builder.since_token,
+                pagination_state=sync_result_builder.pagination_state,
+            )
+
+            all_tags = yield self.store.get_tags_for_user(user_id)
+
+            if sync_result_builder.since_token:
+                stream_id = sync_result_builder.since_token.account_data_key
+                now_stream_id = sync_result_builder.now_token.account_data_key
+                tag_changes = yield self.store.get_room_tags_changed(
+                    user_id, stream_id, now_stream_id
+                )
+            else:
+                tag_changes = {}
+
+            if missing_state:
+                for r in room_entries:
+                    if r.room_id in missing_state:
+                        if include_all_tags:
+                            # If we're always including tagged rooms, then only
+                            # resync rooms which are newly tagged.
+                            change = tag_changes.get(r.room_id)
+                            if change == TAG_CHANGE_NEWLY_TAGGED:
+                                r.always_include = True
+                                r.would_require_resync = True
+                                r.synced = True
+                                continue
+                            elif change == TAG_CHANGE_ALL_REMOVED:
+                                r.always_include = True
+                                r.synced = False
+                                continue
+                            elif r.room_id in all_tags:
+                                r.always_include = True
+                                continue
+
+                        if r.room_id in extras.peek:
+                            since = extras.peek[r.room_id].get("since", None)
+                            if since:
+                                tok = SyncNextBatchToken.from_string(since)
+                                r.since_token = tok.stream_token
+                            else:
+                                r.always_include = True
+                                r.would_require_resync = True
+                                r.synced = False
+                        else:
+                            r.would_require_resync = True
+
+        elif pagination_config and include_all_tags:
+            all_tags = yield self.store.get_tags_for_user(user_id)
+
+            for r in room_entries:
+                if r.room_id in all_tags:
+                    r.always_include = True
+
+        for room_id in set(extras.peek.keys()) - {r.room_id for r in room_entries}:
+            sync_result_builder.errors.append(ErrorSyncResult(
+                room_id=room_id,
+                errcode=Codes.CANNOT_PEEK,
+                error="Cannot peek into requested room",
+            ))
+
+        if pagination_config:
+            room_ids = [r.room_id for r in room_entries]
+            pagination_limit = pagination_config.limit
+
+            extra_limit = extras.paginate.get("limit", 0)
+
+            room_map = yield self._get_room_timestamps_at_token(
+                room_ids, sync_result_builder.now_token, sync_config,
+                pagination_limit + extra_limit + 1,
+            )
+
+            limited = False
+            if room_map:
+                sorted_list = sorted(
+                    room_map.items(),
+                    key=lambda item: -item[1]
+                )
+
+                cutoff_list = sorted_list[:pagination_limit + extra_limit]
+
+                if cutoff_list[pagination_limit:]:
+                    new_room_ids = set(r[0] for r in cutoff_list[pagination_limit:])
+                    for r in room_entries:
+                        if r.room_id in new_room_ids:
+                            r.always_include = True
+                            r.would_require_resync = True
+
+                _, bottom_ts = cutoff_list[-1]
+                new_pagination_value = bottom_ts
+
+                # We're limited if there are any rooms that are after cutoff
+                # in the list, but still have an origin server ts from after
+                # the pagination value from the since token.
+                limited = any(
+                    old_pagination_value < r[1]
+                    for r in sorted_list[pagination_limit + extra_limit:]
+                )
+
+                sync_result_builder.pagination_state = SyncPaginationState(
+                    order=pagination_config.order, value=new_pagination_value,
+                    limit=pagination_limit + extra_limit,
+                    tags=pagination_config.tags,
+                )
+
+                to_sync_map = dict(cutoff_list)
+            else:
+                to_sync_map = {}
+
+            sync_result_builder.pagination_info["limited"] = limited
+
+            if len(room_map) == len(room_entries):
+                sync_result_builder.pagination_state = None
+
+            room_entries[:] = [
+                r for r in room_entries
+                if r.room_id in to_sync_map or r.always_include
+            ]
 
     @defer.inlineCallbacks
     def _get_rooms_changed(self, sync_result_builder, ignored_users):
@@ -809,7 +1071,6 @@ class SyncHandler(object):
                     rtype="archived",
                     events=None,
                     newly_joined=room_id in newly_joined_rooms,
-                    full_state=False,
                     since_token=since_token,
                     upto_token=leave_token,
                 ))
@@ -839,7 +1100,6 @@ class SyncHandler(object):
                     rtype="joined",
                     events=events,
                     newly_joined=room_id in newly_joined_rooms,
-                    full_state=False,
                     since_token=None if room_id in newly_joined_rooms else since_token,
                     upto_token=prev_batch_token,
                 ))
@@ -849,7 +1109,6 @@ class SyncHandler(object):
                     rtype="joined",
                     events=[],
                     newly_joined=room_id in newly_joined_rooms,
-                    full_state=False,
                     since_token=since_token,
                     upto_token=since_token,
                 ))
@@ -893,7 +1152,6 @@ class SyncHandler(object):
                     rtype="joined",
                     events=None,
                     newly_joined=False,
-                    full_state=True,
                     since_token=since_token,
                     upto_token=now_token,
                 ))
@@ -920,7 +1178,6 @@ class SyncHandler(object):
                     rtype="archived",
                     events=None,
                     newly_joined=False,
-                    full_state=True,
                     since_token=since_token,
                     upto_token=leave_token,
                 ))
@@ -929,8 +1186,7 @@ class SyncHandler(object):
 
     @defer.inlineCallbacks
     def _generate_room_entry(self, sync_result_builder, ignored_users,
-                             room_builder, ephemeral, tags, account_data,
-                             always_include=False):
+                             room_builder, ephemeral, tags, account_data):
         """Populates the `joined` and `archived` section of `sync_result_builder`
         based on the `room_builder`.
 
@@ -946,19 +1202,23 @@ class SyncHandler(object):
                 even if empty.
         """
         newly_joined = room_builder.newly_joined
-        full_state = (
-            room_builder.full_state
-            or newly_joined
+        always_include = (
+            newly_joined
             or sync_result_builder.full_state
+            or room_builder.always_include
+        )
+        full_state = (
+            newly_joined
+            or sync_result_builder.full_state
+            or room_builder.would_require_resync
         )
         events = room_builder.events
 
         # We want to shortcut out as early as possible.
-        if not (always_include or account_data or ephemeral or full_state):
+        if not (always_include or account_data or ephemeral):
             if events == [] and tags is None:
                 return
 
-        since_token = sync_result_builder.since_token
         now_token = sync_result_builder.now_token
         sync_config = sync_result_builder.sync_config
 
@@ -993,8 +1253,19 @@ class SyncHandler(object):
 
         ephemeral = sync_config.filter_collection.filter_room_ephemeral(ephemeral)
 
-        if not (always_include or batch or account_data or ephemeral or full_state):
+        if not (always_include or batch or account_data or ephemeral):
             return
+
+        # At this point we're guarenteed (?) to send down the room, so if we
+        # need to resync the entire room do so now.
+        if room_builder.would_require_resync:
+            batch = yield self._load_filtered_recents(
+                room_id, sync_config,
+                now_token=upto_token,
+                since_token=None,
+                recents=None,
+                newly_joined_room=newly_joined,
+            )
 
         state = yield self.compute_state_delta(
             room_id, batch, sync_config, since_token, now_token,
@@ -1010,6 +1281,7 @@ class SyncHandler(object):
                 ephemeral=ephemeral,
                 account_data=account_data_events,
                 unread_notifications=unread_notifications,
+                synced=room_builder.synced,
             )
 
             if room_sync or always_include:
@@ -1033,6 +1305,90 @@ class SyncHandler(object):
                 sync_result_builder.archived.append(room_sync)
         else:
             raise Exception("Unrecognized rtype: %r", room_builder.rtype)
+
+    @defer.inlineCallbacks
+    def _get_room_timestamps_at_token(self, room_ids, token, sync_config, limit):
+        """For each room, get the last origin_server_ts timestamp the client
+        would see (after filtering) at a particular token.
+
+        Only attempts finds the latest `limit` room timestamps.
+        """
+        room_to_entries = {}
+
+        @defer.inlineCallbacks
+        def _get_last_ts(room_id):
+            entry = yield self.store.get_last_event_id_ts_for_room(
+                room_id, token.room_key
+            )
+
+            # TODO: Is this ever possible?
+            room_to_entries[room_id] = entry if entry else {
+                "origin_server_ts": 0,
+            }
+
+        yield concurrently_execute(_get_last_ts, room_ids, 10)
+
+        if len(room_to_entries) <= limit:
+            defer.returnValue({
+                room_id: entry["origin_server_ts"]
+                for room_id, entry in room_to_entries.items()
+            })
+
+        queued_events = sorted(
+            room_to_entries.items(),
+            key=lambda e: -e[1]["origin_server_ts"]
+        )
+
+        to_return = {}
+
+        while len(to_return) < limit and len(queued_events) > 0:
+            to_fetch = queued_events[:limit - len(to_return)]
+            event_to_q = {
+                e["event_id"]: (room_id, e) for room_id, e in to_fetch
+                if "event_id" in e
+            }
+
+            # Now we fetch each event to check if its been filtered out
+            event_map = yield self.store.get_events(event_to_q.keys())
+
+            recents = sync_config.filter_collection.filter_room_timeline(
+                event_map.values()
+            )
+            recents = yield filter_events_for_client(
+                self.store,
+                sync_config.user.to_string(),
+                recents,
+            )
+
+            to_return.update({r.room_id: r.origin_server_ts for r in recents})
+
+            for ev_id in set(event_map.keys()) - set(r.event_id for r in recents):
+                queued_events.append(event_to_q[ev_id])
+
+            # FIXME: Need to refetch TS
+            queued_events.sort(key=lambda e: -e[1]["origin_server_ts"])
+
+        defer.returnValue(to_return)
+
+    @defer.inlineCallbacks
+    def _get_rooms_that_need_full_state(self, room_ids, sync_config, since_token,
+                                        pagination_state):
+        """Work out which rooms we haven't sent to the client yet, so would
+        require us to send down the full state
+        """
+        start_ts = yield self._get_room_timestamps_at_token(
+            room_ids, since_token,
+            sync_config=sync_config,
+            limit=len(room_ids),
+        )
+
+        missing_list = frozenset(
+            room_id for room_id, ts in
+            sorted(start_ts.items(), key=lambda item: -item[1])
+            if ts < pagination_state.value
+        )
+
+        defer.returnValue(missing_list)
 
 
 def _action_has_highlight(actions):
@@ -1085,31 +1441,53 @@ def _calculate_state(timeline_contains, timeline_start, previous, current):
 
 class SyncResultBuilder(object):
     "Used to help build up a new SyncResult for a user"
-    def __init__(self, sync_config, full_state, since_token, now_token):
+
+    __slots__ = (
+        "sync_config", "full_state", "batch_token", "since_token", "pagination_state",
+        "now_token", "presence", "account_data", "joined", "invited", "archived",
+        "pagination_info", "errors", "all_joined_rooms", "unread_notifications",
+    )
+
+    def __init__(self, sync_config, full_state, batch_token, now_token,
+                 all_joined_rooms):
         """
         Args:
             sync_config(SyncConfig)
             full_state(bool): The full_state flag as specified by user
-            since_token(StreamToken): The token supplied by user, or None.
+            batch_token(SyncNextBatchToken): The token supplied by user, or None.
             now_token(StreamToken): The token to sync up to.
+            all_joined_rooms(list(str)): List of all joined room ids.
         """
         self.sync_config = sync_config
         self.full_state = full_state
-        self.since_token = since_token
+        self.batch_token = batch_token
+        self.since_token = batch_token.stream_token if batch_token else None
+        self.pagination_state = batch_token.pagination_state if batch_token else None
         self.now_token = now_token
+        self.all_joined_rooms = all_joined_rooms
 
         self.presence = []
         self.account_data = []
         self.joined = []
         self.invited = []
         self.archived = []
+        self.errors = []
+
+        self.pagination_info = {}
+        self.unread_notifications = {}
 
 
 class RoomSyncResultBuilder(object):
     """Stores information needed to create either a `JoinedSyncResult` or
     `ArchivedSyncResult`.
     """
-    def __init__(self, room_id, rtype, events, newly_joined, full_state,
+
+    __slots__ = (
+        "room_id", "rtype", "events", "newly_joined", "since_token",
+        "upto_token", "always_include", "would_require_resync", "synced",
+    )
+
+    def __init__(self, room_id, rtype, events, newly_joined,
                  since_token, upto_token):
         """
         Args:
@@ -1118,7 +1496,6 @@ class RoomSyncResultBuilder(object):
             events(list): List of events to include in the room, (more events
                 may be added when generating result).
             newly_joined(bool): If the user has newly joined the room
-            full_state(bool): Whether the full state should be sent in result
             since_token(StreamToken): Earliest point to return events from, or None
             upto_token(StreamToken): Latest point to return events from.
         """
@@ -1126,6 +1503,12 @@ class RoomSyncResultBuilder(object):
         self.rtype = rtype
         self.events = events
         self.newly_joined = newly_joined
-        self.full_state = full_state
         self.since_token = since_token
         self.upto_token = upto_token
+
+        # Should this room always be included in the sync?
+        self.always_include = False
+        # If we send down this room, should we send down the full state?
+        self.would_require_resync = False
+        # Should the client consider this room "synced"?
+        self.synced = True

@@ -17,10 +17,16 @@ from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached
 from twisted.internet import defer
 
+from collections import Counter
+
 import ujson as json
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+TAG_CHANGE_NEWLY_TAGGED = "newly_tagged"
+TAG_CHANGE_ALL_REMOVED = "all_removed"
 
 
 class TagsStore(SQLBaseStore):
@@ -170,6 +176,45 @@ class TagsStore(SQLBaseStore):
             row["tag"]: json.loads(row["content"]) for row in rows
         })
 
+    def get_room_tags_changed(self, user_id, stream_id, now_id):
+        """Returns the rooms that have been newly tagged or had all their tags
+        removed since `stream_id`.
+
+        Collapses multiple changes into one. For example, if a room has gone
+        from untagged to tagged back to untagged, the room_id won't be returned.
+        """
+        changed = self._account_data_stream_cache.has_entity_changed(
+            user_id, int(stream_id)
+        )
+
+        if not changed:
+            return {}
+
+        def _get_room_tags_changed(txn):
+            txn.execute(
+                "SELECT room_id, change FROM room_tags_change_revisions"
+                " WHERE user_id = ? AND stream_id > ? AND stream_id <= ?",
+                (user_id, stream_id, now_id)
+            )
+
+            results = Counter()
+
+            for room_id, change in txn.fetchall():
+                if change == TAG_CHANGE_NEWLY_TAGGED:
+                    results[room_id] += 1
+                elif change == TAG_CHANGE_ALL_REMOVED:
+                    results[room_id] -= 1
+                else:
+                    logger.warn("Unexpected tag change: %r", change)
+
+            return {
+                room_id: TAG_CHANGE_NEWLY_TAGGED if count > 0 else TAG_CHANGE_ALL_REMOVED
+                for room_id, count in results.items()
+                if count
+            }
+
+        return self.runInteraction("get_room_tags_changed", _get_room_tags_changed)
+
     @defer.inlineCallbacks
     def add_tag_to_room(self, user_id, room_id, tag, content):
         """Add a tag to a room for a user.
@@ -184,6 +229,12 @@ class TagsStore(SQLBaseStore):
         content_json = json.dumps(content)
 
         def add_tag_txn(txn, next_id):
+            txn.execute(
+                "SELECT count(*) FROM room_tags WHERE user_id = ? AND room_id = ?",
+                (user_id, room_id),
+            )
+            existing_tags, = txn.fetchone()
+
             self._simple_upsert_txn(
                 txn,
                 table="room_tags",
@@ -197,6 +248,17 @@ class TagsStore(SQLBaseStore):
                 }
             )
             self._update_revision_txn(txn, user_id, room_id, next_id)
+            if not existing_tags:
+                self._simple_insert_txn(
+                    txn,
+                    table="room_tags_change_revisions",
+                    values={
+                        "user_id": user_id,
+                        "room_id": room_id,
+                        "stream_id": next_id,
+                        "change": TAG_CHANGE_NEWLY_TAGGED,
+                    }
+                )
 
         with self._account_data_id_gen.get_next() as next_id:
             yield self.runInteraction("add_tag", add_tag_txn, next_id)
@@ -218,6 +280,24 @@ class TagsStore(SQLBaseStore):
                 " WHERE user_id = ? AND room_id = ? AND tag = ?"
             )
             txn.execute(sql, (user_id, room_id, tag))
+            if txn.rowcount > 0:
+                txn.execute(
+                    "SELECT count(*) FROM room_tags WHERE user_id = ? AND room_id = ?",
+                    (user_id, room_id),
+                )
+                existing_tags, = txn.fetchone()
+                if not existing_tags:
+                    self._simple_insert_txn(
+                        txn,
+                        table="room_tags_change_revisions",
+                        values={
+                            "user_id": user_id,
+                            "room_id": room_id,
+                            "stream_id": next_id,
+                            "change": TAG_CHANGE_ALL_REMOVED,
+                        }
+                    )
+
             self._update_revision_txn(txn, user_id, room_id, next_id)
 
         with self._account_data_id_gen.get_next() as next_id:

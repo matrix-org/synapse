@@ -51,6 +51,9 @@ class SlavedAccountDataStore(BaseSlavedStore):
     get_updated_account_data_for_user = (
         DataStore.get_updated_account_data_for_user.__func__
     )
+    get_room_tags_changed = (
+        DataStore.get_room_tags_changed.__func__
+    )
 
     def get_max_account_data_stream_id(self):
         return self._account_data_id_gen.get_current_token()
