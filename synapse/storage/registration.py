@@ -147,7 +147,7 @@ class RegistrationStore(SQLBaseStore):
                         "upgrade_ts": now,
                         "is_guest": 1 if make_guest else 0,
                         "appservice_id": appservice_id,
-                        "admin": admin,
+                        "admin": 1 if admin else 0,
                     }
                 )
             else:
@@ -160,7 +160,7 @@ class RegistrationStore(SQLBaseStore):
                         "creation_ts": now,
                         "is_guest": 1 if make_guest else 0,
                         "appservice_id": appservice_id,
-                        "admin": admin,
+                        "admin": 1 if admin else 0,
                     }
                 )
         except self.database_engine.module.IntegrityError:
