@@ -487,13 +487,13 @@ class StreamStore(SQLBaseStore):
             row["topological_ordering"], row["stream_ordering"],)
         )
 
-    def get_max_topological_token_for_stream_and_room(self, room_id, stream_key):
+    def get_max_topological_token(self, room_id, stream_key):
         sql = (
             "SELECT max(topological_ordering) FROM events"
             " WHERE room_id = ? AND stream_ordering < ?"
         )
         return self._execute(
-            "get_max_topological_token_for_stream_and_room", None,
+            "get_max_topological_token", None,
             sql, room_id, stream_key,
         ).addCallback(
             lambda r: r[0][0] if r else 0
