@@ -324,6 +324,8 @@ class RegisterRestServlet(ClientV1RestServlet):
             raise SynapseError(400, "Shared secret registration is not enabled")
 
         user = register_json["user"].encode("utf-8")
+        password = register_json["password"].encode("utf-8")
+        admin = register_json.get("admin", None)
 
         # str() because otherwise hmac complains that 'unicode' does not
         # have the buffer interface
@@ -331,11 +333,12 @@ class RegisterRestServlet(ClientV1RestServlet):
 
         want_mac = hmac.new(
             key=self.hs.config.registration_shared_secret,
-            msg=user,
             digestmod=sha1,
-        ).hexdigest()
-
-        password = register_json["password"].encode("utf-8")
+        )
+        want_mac.update(user)
+        want_mac.update(password)
+        want_mac.update("admin" if admin else "notadmin")
+        want_mac = want_mac.hexdigest()
 
         if compare_digest(want_mac, got_mac):
             handler = self.handlers.registration_handler

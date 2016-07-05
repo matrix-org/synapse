@@ -25,12 +25,17 @@ import urllib2
 import yaml
 
 
-def request_registration(user, password, server_location, shared_secret):
+def request_registration(user, password, server_location, shared_secret, admin=False):
     mac = hmac.new(
         key=shared_secret,
-        msg=user,
         digestmod=hashlib.sha1,
-    ).hexdigest()
+    )
+
+    mac.update(user)
+    mac.update(password)
+    mac.update("admin" if admin else "notadmin")
+
+    mac = mac.hexdigest()
 
     data = {
         "user": user,
