@@ -55,7 +55,8 @@ _STREAM_TOKEN = "stream"
 _TOPOLOGICAL_TOKEN = "topological"
 
 
-def lower_bound(token, engine, inclusive=""):
+def lower_bound(token, engine, inclusive=False):
+    inclusive = "=" if inclusive else ""
     if token.topological is None:
         return "(%d <%s %s)" % (token.stream, inclusive, "stream_ordering")
     else:
@@ -74,7 +75,8 @@ def lower_bound(token, engine, inclusive=""):
         )
 
 
-def upper_bound(token, engine, inclusive="="):
+def upper_bound(token, engine, inclusive=True):
+    inclusive = "=" if inclusive else ""
     if token.topological is None:
         return "(%d >%s %s)" % (token.stream, inclusive, "stream_ordering")
     else:
@@ -616,13 +618,13 @@ class StreamStore(SQLBaseStore):
             "SELECT topological_ordering, stream_ordering, event_id FROM events"
             " WHERE room_id = ? AND %s"
             " ORDER BY topological_ordering DESC, stream_ordering DESC LIMIT ?"
-        ) % (upper_bound(token, self.database_engine, inclusive=""),)
+        ) % (upper_bound(token, self.database_engine, inclusive=False),)
 
         query_after = (
             "SELECT topological_ordering, stream_ordering, event_id FROM events"
             " WHERE room_id = ? AND %s"
             " ORDER BY topological_ordering ASC, stream_ordering ASC LIMIT ?"
-        ) % (lower_bound(token, self.database_engine, inclusive=""),)
+        ) % (lower_bound(token, self.database_engine, inclusive=False),)
 
         txn.execute(query_before, (room_id, before_limit))
 

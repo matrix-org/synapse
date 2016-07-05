@@ -86,7 +86,7 @@ class EventPushActionsStore(SQLBaseStore):
                 " user_id = ?"
                 " AND room_id = ?"
                 " AND %s"
-            ) % (lower_bound(token, self.database_engine, inclusive=""),)
+            ) % (lower_bound(token, self.database_engine, inclusive=False),)
 
             txn.execute(sql, (user_id, room_id))
             row = txn.fetchone()
