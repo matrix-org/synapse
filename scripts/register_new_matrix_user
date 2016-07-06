@@ -32,7 +32,9 @@ def request_registration(user, password, server_location, shared_secret, admin=F
     )
 
     mac.update(user)
+    mac.update("\x00")
     mac.update(password)
+    mac.update("\x00")
     mac.update("admin" if admin else "notadmin")
 
     mac = mac.hexdigest()

@@ -336,7 +336,9 @@ class RegisterRestServlet(ClientV1RestServlet):
             digestmod=sha1,
         )
         want_mac.update(user)
+        want_mac.update("\x00")
         want_mac.update(password)
+        want_mac.update("\x00")
         want_mac.update("admin" if admin else "notadmin")
         want_mac = want_mac.hexdigest()
 
