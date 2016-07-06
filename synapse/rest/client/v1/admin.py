@@ -124,3 +124,4 @@ def register_servlets(hs, http_server):
     WhoisRestServlet(hs).register(http_server)
     PurgeMediaCacheRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
+    PurgeHistoryRestServlet(hs).register(http_server)

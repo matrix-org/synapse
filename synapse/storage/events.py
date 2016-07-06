@@ -1384,10 +1384,6 @@ class EventsStore(SQLBaseStore):
             (event_id,) for event_id, state_key in event_rows
             if state_key is None and not self.hs.is_mine_id(event_id)
         ]
-        to_not_delete = [
-            (event_id,) for event_id, state_key in event_rows
-            if state_key is not None or self.hs.is_mine_id(event_id)
-        ]
         for table in (
             "events",
             "event_json",
@@ -1424,7 +1420,10 @@ class EventsStore(SQLBaseStore):
         txn.executemany(
             "UPDATE events SET outlier = ?"
             " WHERE event_id = ?",
-            to_not_delete
+            [
+                (True, event_id,) for event_id, state_key in event_rows
+                if state_key is not None or self.hs.is_mine_id(event_id)
+            ]
         )
 
 
