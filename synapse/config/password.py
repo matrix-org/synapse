@@ -30,7 +30,7 @@ class PasswordConfig(Config):
         # Enable password for login.
         password_config:
            enabled: true
-           # Change to a secret random string.
+           # Uncomment and change to a secret random string for extra security.
            # DO NOT CHANGE THIS AFTER INITIAL SETUP!
            #pepper: ""
         """
