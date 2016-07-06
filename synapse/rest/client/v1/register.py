@@ -327,6 +327,12 @@ class RegisterRestServlet(ClientV1RestServlet):
         password = register_json["password"].encode("utf-8")
         admin = register_json.get("admin", None)
 
+        # Its important to check as we use null bytes as HMAC field separators
+        if "\x00" in user:
+            raise SynapseError(400, "Invalid user")
+        if "\x00" in password:
+            raise SynapseError(400, "Invalid password")
+
         # str() because otherwise hmac complains that 'unicode' does not
         # have the buffer interface
         got_mac = str(register_json["mac"])
