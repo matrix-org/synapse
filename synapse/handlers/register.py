@@ -90,7 +90,8 @@ class RegistrationHandler(BaseHandler):
         password=None,
         generate_token=True,
         guest_access_token=None,
-        make_guest=False
+        make_guest=False,
+        admin=False,
     ):
         """Registers a new client on the server.
 
@@ -141,6 +142,7 @@ class RegistrationHandler(BaseHandler):
                     # If the user was a guest then they already have a profile
                     None if was_guest else user.localpart
                 ),
+                admin=admin,
             )
         else:
             # autogen a sequential user ID
