@@ -1325,6 +1325,9 @@ class EventsStore(SQLBaseStore):
         max_depth = max(row[0] for row in rows)
 
         if max_depth <= topological_ordering:
+            # We need to ensure we don't delete all the events from the datanase
+            # otherwise we wouldn't be able to send any events (due to not
+            # having any backwards extremeties)
             raise SynapseError(
                 400, "topological_ordering is greater than forward extremeties"
             )
