@@ -637,16 +637,21 @@ class Auth(object):
         try:
             macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
 
-            self.validate_macaroon(macaroon, rights, self.hs.config.expire_access_token)
-
             user_prefix = "user_id = "
             user = None
+            user_id = None
             guest = False
             for caveat in macaroon.caveats:
                 if caveat.caveat_id.startswith(user_prefix):
-                    user = UserID.from_string(caveat.caveat_id[len(user_prefix):])
+                    user_id = caveat.caveat_id[len(user_prefix):]
+                    user = UserID.from_string(user_id)
                 elif caveat.caveat_id == "guest = true":
                     guest = True
+
+            self.validate_macaroon(
+                macaroon, rights, self.hs.config.expire_access_token,
+                user_id=user_id,
+            )
 
             if user is None:
                 raise AuthError(
@@ -692,7 +697,7 @@ class Auth(object):
                 errcode=Codes.UNKNOWN_TOKEN
             )
 
-    def validate_macaroon(self, macaroon, type_string, verify_expiry):
+    def validate_macaroon(self, macaroon, type_string, verify_expiry, user_id):
         """
         validate that a Macaroon is understood by and was signed by this server.
 
@@ -707,7 +712,7 @@ class Auth(object):
         v = pymacaroons.Verifier()
         v.satisfy_exact("gen = 1")
         v.satisfy_exact("type = " + type_string)
-        v.satisfy_general(lambda c: c.startswith("user_id = "))
+        v.satisfy_exact("user_id = %s" % user_id)
         v.satisfy_exact("guest = true")
         if verify_expiry:
             v.satisfy_general(self._verify_expiry)
