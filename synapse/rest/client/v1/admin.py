@@ -77,6 +77,24 @@ class PurgeMediaCacheRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
+class PurgeHistoryRestServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns(
+        "/admin/purge_history/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    )
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, room_id, event_id):
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+
+        yield self.handlers.message_handler.purge_history(room_id, event_id)
+
+        defer.returnValue((200, {}))
+
+
 class DeactivateAccountRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/admin/deactivate/(?P<target_user_id>[^/]*)")
 
@@ -106,3 +124,4 @@ def register_servlets(hs, http_server):
     WhoisRestServlet(hs).register(http_server)
     PurgeMediaCacheRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
+    PurgeHistoryRestServlet(hs).register(http_server)
