@@ -23,6 +23,7 @@ from synapse.util.async import ObservableDeferred
 from synapse.util.logcontext import preserve_fn, PreserveLoggingContext
 from synapse.util.logutils import log_function
 from synapse.api.constants import EventTypes
+from synapse.api.errors import SynapseError
 
 from canonicaljson import encode_canonical_json
 from collections import deque, namedtuple
@@ -1324,7 +1325,9 @@ class EventsStore(SQLBaseStore):
         max_depth = max(row[0] for row in rows)
 
         if max_depth <= topological_ordering:
-            raise Exception("topological_ordering is greater than forward extremeties")
+            raise SynapseError(
+                400, "topological_ordering is greater than forward extremeties"
+            )
 
         txn.execute(
             "SELECT event_id, state_key FROM events"
