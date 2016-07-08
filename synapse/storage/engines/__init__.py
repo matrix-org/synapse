@@ -32,7 +32,7 @@ def create_engine(database_config):
 
     if engine_class:
         module = importlib.import_module(name)
-        return engine_class(module)
+        return engine_class(module, database_config)
 
     raise RuntimeError(
         "Unsupported database engine '%s'" % (name,)

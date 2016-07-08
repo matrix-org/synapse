@@ -21,7 +21,7 @@ import struct
 class Sqlite3Engine(object):
     single_threaded = True
 
-    def __init__(self, database_module):
+    def __init__(self, database_module, database_config):
         self.module = database_module
 
     def check_database(self, txn):
