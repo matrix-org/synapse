@@ -128,6 +128,8 @@ class RegistrationStore(SQLBaseStore):
         try:
             if was_guest:
                 # Ensure that the guest user actually exists
+                # ``allow_none=False`` makes this raise an exception
+                # if the row isn't in the database.
                 self._simple_select_one_txn(
                     txn,
                     "users",
