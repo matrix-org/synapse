@@ -127,11 +127,24 @@ class RegistrationStore(SQLBaseStore):
 
         try:
             if was_guest:
+                # Ensure that the guest user actually exists
+                self._simple_select_one_txn(
+                    txn,
+                    "users",
+                    keyvalues={
+                        "name": user_id,
+                        "is_guest": 1,
+                    },
+                    retcols=("name",),
+                    allow_none=False,
+                )
+
                 self._simple_update_one_txn(
                     txn,
                     "users",
                     keyvalues={
                         "name": user_id,
+                        "is_guest": 1,
                     },
                     updatevalues={
                         "password_hash": password_hash,
