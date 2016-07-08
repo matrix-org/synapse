@@ -1,3 +1,11 @@
+Changes in synapse v0.16.1-r1 (2016-07-08)
+==========================================
+
+THIS IS A CRITICAL SECURITY UPDATE.
+
+This fixes a bug which allowed users' accounts to be accessed by unauthorised
+users.
+
 Changes in synapse v0.16.1 (2016-06-20)
 =======================================
 
