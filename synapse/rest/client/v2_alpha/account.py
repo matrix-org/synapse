@@ -191,8 +191,6 @@ class ThreepidRestServlet(RestServlet):
     def onThreepidEmailTokenRequest(self, request):
         body = parse_json_object_from_request(request)
 
-        logger.error("hi")
-
         required = ['id_server', 'client_secret', 'email', 'send_attempt']
         absent = []
         for k in required:
@@ -205,8 +203,6 @@ class ThreepidRestServlet(RestServlet):
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'email', body['email']
         )
-
-        logger.error("existing %r", existingUid)
 
         if existingUid is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
