@@ -149,8 +149,6 @@ class ThreepidRequestTokenRestServlet(RestServlet):
             'email', body['email']
         )
 
-        logger.error("existing %r", existingUid)
-
         if existingUid is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
