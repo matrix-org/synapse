@@ -46,7 +46,7 @@ class PasswordRequestTokenRestServlet(RestServlet):
             if k not in body:
                 absent.append(k)
 
-        if len(absent) > 0:
+        if absent:
             raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
@@ -58,9 +58,6 @@ class PasswordRequestTokenRestServlet(RestServlet):
 
         ret = yield self.identity_handler.requestEmailToken(**body)
         defer.returnValue((200, ret))
-
-    def on_OPTIONS(self, _):
-        return 200, {}
 
 
 class PasswordRestServlet(RestServlet):
@@ -154,9 +151,6 @@ class ThreepidRequestTokenRestServlet(RestServlet):
 
         ret = yield self.identity_handler.requestEmailToken(**body)
         defer.returnValue((200, ret))
-
-    def on_OPTIONS(self, _):
-        return 200, {}
 
 
 class ThreepidRestServlet(RestServlet):

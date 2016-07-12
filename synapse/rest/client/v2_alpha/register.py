@@ -72,9 +72,6 @@ class RegisterRequestTokenRestServlet(RestServlet):
         ret = yield self.identity_handler.requestEmailToken(**body)
         defer.returnValue((200, ret))
 
-    def on_OPTIONS(self, _):
-        return 200, {}
-
 
 class RegisterRestServlet(RestServlet):
     PATTERNS = client_v2_patterns("/register$")
