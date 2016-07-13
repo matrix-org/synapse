@@ -338,6 +338,25 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
         defer.returnValue((200, msgs))
 
 
+class RoomFileListRestServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/files$")
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id):
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+        pagination_config = PaginationConfig.from_request(
+            request, default_limit=10, default_dir='b',
+        )
+        handler = self.handlers.message_handler
+        msgs = yield handler.get_files(
+            room_id=room_id,
+            requester=requester,
+            pagin_config=pagination_config,
+        )
+
+        defer.returnValue((200, msgs))
+
+
 # TODO: Needs unit testing
 class RoomStateRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/state$")
@@ -667,6 +686,7 @@ def register_servlets(hs, http_server):
     RoomCreateRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
+    RoomFileListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
     RoomForgetRestServlet(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
