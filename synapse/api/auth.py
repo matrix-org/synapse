@@ -115,6 +115,17 @@ class Auth(object):
 
             # FIXME: Temp hack
             if event.type == EventTypes.Aliases:
+                if not event.state_key:
+                    raise AuthError(
+                        403,
+                        "Alias event must have non-empty state_key"
+                    )
+                sender_domain = get_domain_from_id(event.sender)
+                if event.state_key != sender_domain:
+                    raise AuthError(
+                        403,
+                        "Alias event's state_key does not match sender's domain"
+                    )
                 return True
 
             logger.debug(
