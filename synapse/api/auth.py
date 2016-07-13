@@ -86,6 +86,13 @@ class Auth(object):
                 return True
 
             if event.type == EventTypes.Create:
+                room_id_domain = get_domain_from_id(event.room_id)
+                sender_domain = get_domain_from_id(event.sender)
+                if room_id_domain != sender_domain:
+                    raise AuthError(
+                        403,
+                        "Creation event's room_id domain does not match sender's"
+                    )
                 # FIXME
                 return True
 
