@@ -41,8 +41,40 @@ else:
 logger = logging.getLogger(__name__)
 
 
+class RegisterRequestTokenRestServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/register/email/requestToken$")
+
+    def __init__(self, hs):
+        super(RegisterRequestTokenRestServlet, self).__init__()
+        self.hs = hs
+        self.identity_handler = hs.get_handlers().identity_handler
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        body = parse_json_object_from_request(request)
+
+        required = ['id_server', 'client_secret', 'email', 'send_attempt']
+        absent = []
+        for k in required:
+            if k not in body:
+                absent.append(k)
+
+        if len(absent) > 0:
+            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+
+        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+            'email', body['email']
+        )
+
+        if existingUid is not None:
+            raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
+
+        ret = yield self.identity_handler.requestEmailToken(**body)
+        defer.returnValue((200, ret))
+
+
 class RegisterRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/register")
+    PATTERNS = client_v2_patterns("/register$")
 
     def __init__(self, hs):
         super(RegisterRestServlet, self).__init__()
@@ -69,10 +101,6 @@ class RegisterRestServlet(RestServlet):
             raise UnrecognizedRequestError(
                 "Do not understand membership kind: %s" % (kind,)
             )
-
-        if '/register/email/requestToken' in request.path:
-            ret = yield self.onEmailTokenRequest(request)
-            defer.returnValue(ret)
 
         body = parse_json_object_from_request(request)
 
@@ -306,29 +334,6 @@ class RegisterRestServlet(RestServlet):
         })
 
     @defer.inlineCallbacks
-    def onEmailTokenRequest(self, request):
-        body = parse_json_object_from_request(request)
-
-        required = ['id_server', 'client_secret', 'email', 'send_attempt']
-        absent = []
-        for k in required:
-            if k not in body:
-                absent.append(k)
-
-        if len(absent) > 0:
-            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
-
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
-            'email', body['email']
-        )
-
-        if existingUid is not None:
-            raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
-
-        ret = yield self.identity_handler.requestEmailToken(**body)
-        defer.returnValue((200, ret))
-
-    @defer.inlineCallbacks
     def _do_guest_registration(self):
         if not self.hs.config.allow_guest_access:
             defer.returnValue((403, "Guest access is disabled"))
@@ -345,4 +350,5 @@ class RegisterRestServlet(RestServlet):
 
 
 def register_servlets(hs, http_server):
+    RegisterRequestTokenRestServlet(hs).register(http_server)
     RegisterRestServlet(hs).register(http_server)
