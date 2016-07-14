@@ -37,7 +37,7 @@ class EventsStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_count_daily_messages(self):
-        self.db_pool.runQuery("DELETE FROM stats_reporting")
+        yield self.db_pool.runQuery("DELETE FROM stats_reporting")
 
         self.hs.clock.now = 100
 
@@ -60,7 +60,7 @@ class EventsStoreTestCase(unittest.TestCase):
         # it isn't old enough.
         count = yield self.store.count_daily_messages()
         self.assertIsNone(count)
-        self._assert_stats_reporting(1, self.hs.clock.now)
+        yield self._assert_stats_reporting(1, self.hs.clock.now)
 
         # Already reported yesterday, two new events from today.
         yield self.event_injector.inject_message(room, user, "Yeah they are!")
@@ -68,21 +68,21 @@ class EventsStoreTestCase(unittest.TestCase):
         self.hs.clock.now += 60 * 60 * 24
         count = yield self.store.count_daily_messages()
         self.assertEqual(2, count)  # 2 since yesterday
-        self._assert_stats_reporting(3, self.hs.clock.now)  # 3 ever
+        yield self._assert_stats_reporting(3, self.hs.clock.now)  # 3 ever
 
         # Last reported too recently.
         yield self.event_injector.inject_message(room, user, "Who could disagree?")
         self.hs.clock.now += 60 * 60 * 22
         count = yield self.store.count_daily_messages()
         self.assertIsNone(count)
-        self._assert_stats_reporting(4, self.hs.clock.now)
+        yield self._assert_stats_reporting(4, self.hs.clock.now)
 
         # Last reported too long ago
         yield self.event_injector.inject_message(room, user, "No one.")
         self.hs.clock.now += 60 * 60 * 26
         count = yield self.store.count_daily_messages()
         self.assertIsNone(count)
-        self._assert_stats_reporting(5, self.hs.clock.now)
+        yield self._assert_stats_reporting(5, self.hs.clock.now)
 
         # And now let's actually report something
         yield self.event_injector.inject_message(room, user, "Indeed.")
@@ -92,7 +92,7 @@ class EventsStoreTestCase(unittest.TestCase):
         self.hs.clock.now += (60 * 60 * 24) + 50
         count = yield self.store.count_daily_messages()
         self.assertEqual(3, count)
-        self._assert_stats_reporting(8, self.hs.clock.now)
+        yield self._assert_stats_reporting(8, self.hs.clock.now)
 
     @defer.inlineCallbacks
     def _get_last_stream_token(self):

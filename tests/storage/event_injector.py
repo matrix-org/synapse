@@ -30,6 +30,7 @@ class EventInjector:
     def create_room(self, room):
         builder = self.event_builder_factory.new({
             "type": EventTypes.Create,
+            "sender": "",
             "room_id": room.to_string(),
             "content": {},
         })
