@@ -379,7 +379,7 @@ class StateHandler(object):
             try:
                 # FIXME: hs.get_auth() is bad style, but we need to do it to
                 # get around circular deps.
-                self.hs.get_auth().check(event, auth_events)
+                self.hs.get_auth().check(event, auth_events, do_sig_check=False)
                 prev_event = event
             except AuthError:
                 return prev_event
@@ -391,7 +391,7 @@ class StateHandler(object):
             try:
                 # FIXME: hs.get_auth() is bad style, but we need to do it to
                 # get around circular deps.
-                self.hs.get_auth().check(event, auth_events)
+                self.hs.get_auth().check(event, auth_events, do_sig_check=False)
                 return event
             except AuthError:
                 pass

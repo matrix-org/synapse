@@ -688,7 +688,7 @@ class FederationHandler(BaseHandler):
             logger.warn("Failed to create join %r because %s", event, e)
             raise e
 
-        self.auth.check(event, auth_events=context.current_state)
+        self.auth.check(event, auth_events=context.current_state, do_sig_check=False)
 
         defer.returnValue(event)
 
@@ -918,7 +918,7 @@ class FederationHandler(BaseHandler):
         )
 
         try:
-            self.auth.check(event, auth_events=context.current_state)
+            self.auth.check(event, auth_events=context.current_state, do_sig_check=False)
         except AuthError as e:
             logger.warn("Failed to create new leave %r because %s", event, e)
             raise e

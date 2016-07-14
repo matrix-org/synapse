@@ -63,7 +63,7 @@ class Auth(object):
             "user_id = ",
         ])
 
-    def check(self, event, auth_events):
+    def check(self, event, auth_events, do_sig_check=True):
         """ Checks if this event is correctly authed.
 
         Args:
@@ -79,6 +79,13 @@ class Auth(object):
 
             if not hasattr(event, "room_id"):
                 raise AuthError(500, "Event has no room_id: %s" % event)
+
+            sender_domain = get_domain_from_id(event.sender)
+
+            # Check the sender's domain has signed the event
+            if do_sig_check and not event.signatures.get(sender_domain):
+                raise AuthError(403, "Event not signed by sending server")
+
             if auth_events is None:
                 # Oh, we don't know what the state of the room was, so we
                 # are trusting that this is allowed (at least for now)
@@ -87,7 +94,6 @@ class Auth(object):
 
             if event.type == EventTypes.Create:
                 room_id_domain = get_domain_from_id(event.room_id)
-                sender_domain = get_domain_from_id(event.sender)
                 if room_id_domain != sender_domain:
                     raise AuthError(
                         403,
