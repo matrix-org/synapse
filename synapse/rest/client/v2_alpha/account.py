@@ -136,7 +136,6 @@ class DeactivateAccountRestServlet(RestServlet):
 
         authed, result, params, _ = yield self.auth_handler.check_auth([
             [LoginType.PASSWORD],
-            [LoginType.EMAIL_IDENTITY]
         ], body, self.hs.get_ip_from_request(request))
 
         if not authed:
@@ -151,17 +150,6 @@ class DeactivateAccountRestServlet(RestServlet):
             user_id = requester.user.to_string()
             if user_id != result[LoginType.PASSWORD]:
                 raise LoginError(400, "", Codes.UNKNOWN)
-        elif LoginType.EMAIL_IDENTITY in result:
-            threepid = result[LoginType.EMAIL_IDENTITY]
-            if 'medium' not in threepid or 'address' not in threepid:
-                raise SynapseError(500, "Malformed threepid")
-            # if using email, we must know about the email they're authing with!
-            threepid_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
-                threepid['medium'], threepid['address']
-            )
-            if not threepid_user_id:
-                raise SynapseError(404, "Email address not found", Codes.NOT_FOUND)
-            user_id = threepid_user_id
         else:
             logger.error("Auth succeeded but no known type!", result.keys())
             raise SynapseError(500, "", Codes.UNKNOWN)
