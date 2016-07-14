@@ -429,7 +429,7 @@ class CreateUserRestServlet(ClientV1RestServlet):
         user_id, token = yield handler.get_or_create_user(
             localpart=localpart,
             displayname=displayname,
-            duration_seconds=duration_seconds,
+            duration_in_ms=(duration_seconds * 1000),
             password_hash=password_hash
         )
 

@@ -629,7 +629,10 @@ class Auth(object):
         except AuthError:
             # TODO(daniel): Remove this fallback when all existing access tokens
             # have been re-issued as macaroons.
+            if self.hs.config.expire_access_token:
+                raise
             ret = yield self._look_up_user_by_access_token(token)
+
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
