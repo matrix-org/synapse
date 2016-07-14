@@ -121,6 +121,60 @@ class PasswordRestServlet(RestServlet):
         return 200, {}
 
 
+class DeactivateAccountRestServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/account/deactivate$")
+
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
+        super(DeactivateAccountRestServlet, self).__init__()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        body = parse_json_object_from_request(request)
+
+        authed, result, params, _ = yield self.auth_handler.check_auth([
+            [LoginType.PASSWORD],
+            [LoginType.EMAIL_IDENTITY]
+        ], body, self.hs.get_ip_from_request(request))
+
+        if not authed:
+            defer.returnValue((401, result))
+
+        user_id = None
+        requester = None
+
+        if LoginType.PASSWORD in result:
+            # if using password, they should also be logged in
+            requester = yield self.auth.get_user_by_req(request)
+            user_id = requester.user.to_string()
+            if user_id != result[LoginType.PASSWORD]:
+                raise LoginError(400, "", Codes.UNKNOWN)
+        elif LoginType.EMAIL_IDENTITY in result:
+            threepid = result[LoginType.EMAIL_IDENTITY]
+            if 'medium' not in threepid or 'address' not in threepid:
+                raise SynapseError(500, "Malformed threepid")
+            # if using email, we must know about the email they're authing with!
+            threepid_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
+                threepid['medium'], threepid['address']
+            )
+            if not threepid_user_id:
+                raise SynapseError(404, "Email address not found", Codes.NOT_FOUND)
+            user_id = threepid_user_id
+        else:
+            logger.error("Auth succeeded but no known type!", result.keys())
+            raise SynapseError(500, "", Codes.UNKNOWN)
+
+        # FIXME: Theoretically there is a race here wherein user resets password
+        # using threepid.
+        yield self.store.user_delete_access_tokens(user_id)
+        yield self.store.user_delete_threepids(user_id)
+        yield self.store.user_set_password_hash(user_id, None)
+
+        defer.returnValue((200, {}))
+
+
 class ThreepidRequestTokenRestServlet(RestServlet):
     PATTERNS = client_v2_patterns("/account/3pid/email/requestToken$")
 
@@ -223,5 +277,6 @@ class ThreepidRestServlet(RestServlet):
 def register_servlets(hs, http_server):
     PasswordRequestTokenRestServlet(hs).register(http_server)
     PasswordRestServlet(hs).register(http_server)
+    DeactivateAccountRestServlet(hs).register(http_server)
     ThreepidRequestTokenRestServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
