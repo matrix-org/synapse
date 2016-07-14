@@ -125,6 +125,7 @@ class DeactivateAccountRestServlet(RestServlet):
     PATTERNS = client_v2_patterns("/account/deactivate$")
 
     def __init__(self, hs):
+        self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
