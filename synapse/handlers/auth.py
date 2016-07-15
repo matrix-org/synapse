@@ -361,7 +361,7 @@ class AuthHandler(BaseHandler):
         return self._check_password(user_id, password)
 
     @defer.inlineCallbacks
-    def get_login_tuple_for_user_id(self, user_id):
+    def get_login_tuple_for_user_id(self, user_id, device_id=None):
         """
         Gets login tuple for the user with the given user ID.
 
@@ -372,6 +372,7 @@ class AuthHandler(BaseHandler):
 
         Args:
             user_id (str): canonical User ID
+            device_id (str): the device ID to associate with the access token
         Returns:
             A tuple of:
               The access token for the user's session.
@@ -380,9 +381,9 @@ class AuthHandler(BaseHandler):
             StoreError if there was a problem storing the token.
             LoginError if there was an authentication problem.
         """
-        logger.info("Logging in user %s", user_id)
-        access_token = yield self.issue_access_token(user_id)
-        refresh_token = yield self.issue_refresh_token(user_id)
+        logger.info("Logging in user %s on device %s", user_id, device_id)
+        access_token = yield self.issue_access_token(user_id, device_id)
+        refresh_token = yield self.issue_refresh_token(user_id, device_id)
         defer.returnValue((access_token, refresh_token))
 
     @defer.inlineCallbacks
@@ -638,15 +639,17 @@ class AuthHandler(BaseHandler):
             defer.returnValue(False)
 
     @defer.inlineCallbacks
-    def issue_access_token(self, user_id):
+    def issue_access_token(self, user_id, device_id=None):
         access_token = self.generate_access_token(user_id)
-        yield self.store.add_access_token_to_user(user_id, access_token)
+        yield self.store.add_access_token_to_user(user_id, access_token,
+                                                  device_id)
         defer.returnValue(access_token)
 
     @defer.inlineCallbacks
-    def issue_refresh_token(self, user_id):
+    def issue_refresh_token(self, user_id, device_id=None):
         refresh_token = self.generate_refresh_token(user_id)
-        yield self.store.add_refresh_token_to_user(user_id, refresh_token)
+        yield self.store.add_refresh_token_to_user(user_id, refresh_token,
+                                                   device_id)
         defer.returnValue(refresh_token)
 
     def generate_access_token(self, user_id, extra_caveats=None,
