@@ -379,6 +379,7 @@ class StateHandler(object):
             try:
                 # FIXME: hs.get_auth() is bad style, but we need to do it to
                 # get around circular deps.
+                # The signatures have already been checked at this point
                 self.hs.get_auth().check(event, auth_events, do_sig_check=False)
                 prev_event = event
             except AuthError:
@@ -391,6 +392,7 @@ class StateHandler(object):
             try:
                 # FIXME: hs.get_auth() is bad style, but we need to do it to
                 # get around circular deps.
+                # The signatures have already been checked at this point
                 self.hs.get_auth().check(event, auth_events, do_sig_check=False)
                 return event
             except AuthError:

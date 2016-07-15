@@ -688,6 +688,8 @@ class FederationHandler(BaseHandler):
             logger.warn("Failed to create join %r because %s", event, e)
             raise e
 
+        # The remote hasn't signed it yet, obviously. We'll do the full checks
+        # when we get the event back in `on_send_join_request`
         self.auth.check(event, auth_events=context.current_state, do_sig_check=False)
 
         defer.returnValue(event)
@@ -918,6 +920,8 @@ class FederationHandler(BaseHandler):
         )
 
         try:
+            # The remote hasn't signed it yet, obviously. We'll do the full checks
+            # when we get the event back in `on_send_leave_request`
             self.auth.check(event, auth_events=context.current_state, do_sig_check=False)
         except AuthError as e:
             logger.warn("Failed to create new leave %r because %s", event, e)
