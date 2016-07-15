@@ -1411,11 +1411,21 @@ class EventsStore(SQLBaseStore):
                 to_delete
             )
 
+        txn.execute(
+            "SELECT event_id FROM event_backward_extremities WHERE room_id = ?",
+            (room_id,)
+        )
+
+        cur_back_event_ids = [event_id for event_id, in txn.fetchall()]
+
         # Update backward extremeties
         txn.executemany(
             "INSERT INTO event_backward_extremities (room_id, event_id)"
             " VALUES (?, ?)",
-            [(room_id, event_id) for event_id, in new_backwards_extrems]
+            [
+                (room_id, event_id) for event_id, in new_backwards_extrems
+                if event_id not in cur_back_event_ids
+            ]
         )
 
         txn.executemany(
