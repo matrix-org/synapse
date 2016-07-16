@@ -159,6 +159,9 @@ class SyncRestServlet(RestServlet):
 
         time_now = self.clock.time_msec()
 
+        global_highlight_count, global_notification_count = \
+            self.get_global_unread_notification_counts(sync_result)
+
         joined = self.encode_joined(
             sync_result.joined, time_now, requester.access_token_id
         )
@@ -173,6 +176,10 @@ class SyncRestServlet(RestServlet):
 
         response_content = {
             "account_data": {"events": sync_result.account_data},
+            "unread_notifications": {
+                "highlight_count": global_highlight_count,
+                "notification_count": global_notification_count
+            },
             "presence": self.encode_presence(
                 sync_result.presence, time_now
             ),
@@ -185,6 +192,20 @@ class SyncRestServlet(RestServlet):
         }
 
         defer.returnValue((200, response_content))
+
+    def get_global_unread_notification_counts(self, sync_result):
+        unread_notifications_for_each_room = \
+            map(lambda x: x.unread_notifications, sync_result.joined)
+        global_notification_count = self.sum_notification_of_type(
+            'notification_count', unread_notifications_for_each_room)
+        global_highlight_count = self.sum_notification_of_type(
+            'highlight_count', unread_notifications_for_each_room)
+        return global_highlight_count, global_notification_count
+
+    def sum_notification_of_type(self, notification_type,
+                                 unread_notifications_for_each_room):
+        return sum(map(lambda x: x[notification_type] if x else 0,
+                       unread_notifications_for_each_room))
 
     def encode_presence(self, events, time_now):
         formatted = []
