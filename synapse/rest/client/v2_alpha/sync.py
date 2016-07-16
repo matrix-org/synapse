@@ -159,8 +159,9 @@ class SyncRestServlet(RestServlet):
 
         time_now = self.clock.time_msec()
 
-        global_highlight_count, global_notification_count = \
+        global_highlight_count, global_notification_count = (
             self.get_global_unread_notification_counts(sync_result)
+        )
 
         joined = self.encode_joined(
             sync_result.joined, time_now, requester.access_token_id
@@ -194,8 +195,9 @@ class SyncRestServlet(RestServlet):
         defer.returnValue((200, response_content))
 
     def get_global_unread_notification_counts(self, sync_result):
-        unread_notifications_for_each_room = \
+        unread_notifications_for_each_room = (
             map(lambda x: x.unread_notifications, sync_result.joined)
+        )
         global_notification_count = self.sum_notification_of_type(
             'notification_count', unread_notifications_for_each_room)
         global_highlight_count = self.sum_notification_of_type(
