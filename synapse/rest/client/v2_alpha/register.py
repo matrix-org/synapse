@@ -134,9 +134,11 @@ class RegisterRestServlet(RestServlet):
             # fallback to 'username' if they gave one.
             if isinstance(body.get("user"), basestring):
                 desired_username = body["user"]
-            result = yield self._do_appservice_registration(
-                desired_username, request.args["access_token"][0]
-            )
+
+            if isinstance(desired_username, basestring):
+                result = yield self._do_appservice_registration(
+                    desired_username, request.args["access_token"][0]
+                )
             defer.returnValue((200, result))  # we throw for non 200 responses
             return
 
