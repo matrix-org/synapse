@@ -121,6 +121,11 @@ class Auth(object):
 
             # FIXME: Temp hack
             if event.type == EventTypes.Aliases:
+                if not event.is_state():
+                    raise AuthError(
+                        403,
+                        "Alias event must be a state event",
+                    )
                 if not event.state_key:
                     raise AuthError(
                         403,
