@@ -145,10 +145,13 @@ class LoginRestServlet(ClientV1RestServlet):
             ).to_string()
 
         auth_handler = self.auth_handler
-        user_id, access_token, refresh_token = yield auth_handler.login_with_password(
+        user_id = yield auth_handler.validate_password_login(
             user_id=user_id,
-            password=login_submission["password"])
-
+            password=login_submission["password"],
+        )
+        access_token, refresh_token = (
+            yield auth_handler.get_login_tuple_for_user_id(user_id)
+        )
         result = {
             "user_id": user_id,  # may have changed
             "access_token": access_token,
@@ -165,7 +168,7 @@ class LoginRestServlet(ClientV1RestServlet):
         user_id = (
             yield auth_handler.validate_short_term_login_token_and_get_user_id(token)
         )
-        user_id, access_token, refresh_token = (
+        access_token, refresh_token = (
             yield auth_handler.get_login_tuple_for_user_id(user_id)
         )
         result = {
@@ -196,13 +199,15 @@ class LoginRestServlet(ClientV1RestServlet):
 
         user_id = UserID.create(user, self.hs.hostname).to_string()
         auth_handler = self.auth_handler
-        user_exists = yield auth_handler.does_user_exist(user_id)
-        if user_exists:
-            user_id, access_token, refresh_token = (
-                yield auth_handler.get_login_tuple_for_user_id(user_id)
+        registered_user_id = yield auth_handler.check_user_exists(user_id)
+        if registered_user_id:
+            access_token, refresh_token = (
+                yield auth_handler.get_login_tuple_for_user_id(
+                    registered_user_id
+                )
             )
             result = {
-                "user_id": user_id,  # may have changed
+                "user_id": registered_user_id,  # may have changed
                 "access_token": access_token,
                 "refresh_token": refresh_token,
                 "home_server": self.hs.hostname,
@@ -245,13 +250,13 @@ class LoginRestServlet(ClientV1RestServlet):
 
         user_id = UserID.create(user, self.hs.hostname).to_string()
         auth_handler = self.auth_handler
-        user_exists = yield auth_handler.does_user_exist(user_id)
-        if user_exists:
-            user_id, access_token, refresh_token = (
-                yield auth_handler.get_login_tuple_for_user_id(user_id)
+        registered_user_id = yield auth_handler.check_user_exists(user_id)
+        if registered_user_id:
+            access_token, refresh_token = (
+                yield auth_handler.get_login_tuple_for_user_id(registered_user_id)
             )
             result = {
-                "user_id": user_id,  # may have changed
+                "user_id": registered_user_id,
                 "access_token": access_token,
                 "refresh_token": refresh_token,
                 "home_server": self.hs.hostname,
@@ -414,13 +419,13 @@ class CasTicketServlet(ClientV1RestServlet):
 
         user_id = UserID.create(user, self.hs.hostname).to_string()
         auth_handler = self.auth_handler
-        user_exists = yield auth_handler.does_user_exist(user_id)
-        if not user_exists:
-            user_id, _ = (
+        registered_user_id = yield auth_handler.check_user_exists(user_id)
+        if not registered_user_id:
+            registered_user_id, _ = (
                 yield self.handlers.registration_handler.register(localpart=user)
             )
 
-        login_token = auth_handler.generate_short_term_login_token(user_id)
+        login_token = auth_handler.generate_short_term_login_token(registered_user_id)
         redirect_url = self.add_login_token_to_redirect_url(client_redirect_url,
                                                             login_token)
         request.redirect(redirect_url)
