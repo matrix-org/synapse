@@ -31,7 +31,7 @@ class BaseHandler(object):
     Common base class for the event handlers.
 
     Attributes:
-        store (synapse.storage.events.StateStore):
+        store (synapse.storage.DataStore):
         state_handler (synapse.state.StateHandler):
     """
 
