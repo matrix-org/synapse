@@ -1343,7 +1343,7 @@ class EventsStore(SQLBaseStore):
         # We calculate the new entries for the backward extremeties by finding
         # all events that point to events that are to be purged
         txn.execute(
-            "SELECT e.event_id FROM events as e"
+            "SELECT DISTINCT e.event_id FROM events as e"
             " INNER JOIN event_edges as ed ON e.event_id = ed.prev_event_id"
             " INNER JOIN events as e2 ON e2.event_id = ed.event_id"
             " WHERE e.room_id = ? AND e.topological_ordering < ?"
@@ -1351,6 +1351,20 @@ class EventsStore(SQLBaseStore):
             (room_id, topological_ordering, topological_ordering)
         )
         new_backwards_extrems = txn.fetchall()
+
+        txn.execute(
+            "DELETE FROM event_backward_extremities WHERE room_id = ?",
+            (room_id,)
+        )
+
+        # Update backward extremeties
+        txn.executemany(
+            "INSERT INTO event_backward_extremities (room_id, event_id)"
+            " VALUES (?, ?)",
+            [
+                (room_id, event_id) for event_id, in new_backwards_extrems
+            ]
+        )
 
         # Get all state groups that are only referenced by events that are
         # to be deleted.
@@ -1404,29 +1418,11 @@ class EventsStore(SQLBaseStore):
             "event_search",
             "event_signatures",
             "rejections",
-            "event_backward_extremities",
         ):
             txn.executemany(
                 "DELETE FROM %s WHERE event_id = ?" % (table,),
                 to_delete
             )
-
-        txn.execute(
-            "SELECT event_id FROM event_backward_extremities WHERE room_id = ?",
-            (room_id,)
-        )
-
-        cur_back_event_ids = [event_id for event_id, in txn.fetchall()]
-
-        # Update backward extremeties
-        txn.executemany(
-            "INSERT INTO event_backward_extremities (room_id, event_id)"
-            " VALUES (?, ?)",
-            [
-                (room_id, event_id) for event_id, in new_backwards_extrems
-                if event_id not in cur_back_event_ids
-            ]
-        )
 
         txn.executemany(
             "DELETE FROM events WHERE event_id = ?",
