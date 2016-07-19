@@ -25,6 +25,7 @@ from twisted.enterprise import adbapi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
 from synapse.appservice.api import ApplicationServiceApi
 from synapse.federation import initialize_http_replication
+from synapse.handlers.device import DeviceHandler
 from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
 from synapse.notifier import Notifier
 from synapse.api.auth import Auth
@@ -92,6 +93,7 @@ class HomeServer(object):
         'typing_handler',
         'room_list_handler',
         'auth_handler',
+        'device_handler',
         'application_service_api',
         'application_service_scheduler',
         'application_service_handler',
@@ -196,6 +198,9 @@ class HomeServer(object):
 
     def build_auth_handler(self):
         return AuthHandler(self)
+
+    def build_device_handler(self):
+        return DeviceHandler(self)
 
     def build_application_service_api(self):
         return ApplicationServiceApi(self)
