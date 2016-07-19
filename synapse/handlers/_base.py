@@ -36,6 +36,10 @@ class BaseHandler(object):
     """
 
     def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer):
+        """
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()

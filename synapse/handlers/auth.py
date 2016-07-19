@@ -45,6 +45,10 @@ class AuthHandler(BaseHandler):
     SESSION_EXPIRE_MS = 48 * 60 * 60 * 1000
 
     def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer):
+        """
         super(AuthHandler, self).__init__(hs)
         self.checkers = {
             LoginType.PASSWORD: self._check_password_auth,
