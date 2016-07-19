@@ -114,7 +114,8 @@ class RegisterRestServletTestCase(unittest.TestCase):
             "username": "kermit",
             "password": "monkey"
         }, None)
-        self.registration_handler.register = Mock(return_value=(user_id, token))
+        self.registration_handler.register = Mock(return_value=(user_id, None))
+        self.auth_handler.issue_access_token = Mock(return_value=token)
 
         (code, result) = yield self.servlet.on_POST(self.request)
         self.assertEquals(code, 200)
