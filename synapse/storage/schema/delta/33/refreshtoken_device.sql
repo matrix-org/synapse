@@ -13,4 +13,4 @@
  * limitations under the License.
  */
 
-ALTER TABLE refresh_tokens ADD COLUMN device_id BIGINT;
+ALTER TABLE refresh_tokens ADD COLUMN device_id TEXT;
