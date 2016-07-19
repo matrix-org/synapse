@@ -5,6 +5,8 @@
 ROOM='!vOCcdPDdvueotEgTms:matrix.org'
 ADMIN="new_admin_username"
 TOKEN="8KnWIxCa17exampletokenD"
+# find your as_token with
+# grep as_token matrix-appservice-irc/appservice-registration-irc.yaml
 #########################################
 
 # get original settings
