@@ -31,8 +31,7 @@ from .search import SearchHandler
 
 class Handlers(object):
 
-    """
-    Deprecated.
+    """ Deprecated. A collection of handlers.
 
     At some point most of the classes whose name ended "Handler" were
     accessed through this class.
