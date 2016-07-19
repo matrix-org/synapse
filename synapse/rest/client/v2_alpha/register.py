@@ -232,19 +232,10 @@ class RegisterRestServlet(RestServlet):
 
         if add_email and result and LoginType.EMAIL_IDENTITY in result:
             threepid = result[LoginType.EMAIL_IDENTITY]
-            reqd = ('medium', 'address', 'validated_at')
-            if all(x in threepid for x in reqd):
-                yield self._register_email_threepid(
-                    registered_user_id, threepid, access_token
-                )
-                # XXX why is bind_email not protected by this?
-            else:
-                logger.info("Can't add incomplete 3pid")
-            if params.get("bind_email"):
-                logger.info("bind_email specified: binding")
-                yield self._bind_email(registered_user_id, threepid)
-            else:
-                logger.info("bind_email not specified: not binding email")
+            yield self._register_email_threepid(
+                registered_user_id, threepid, access_token,
+                params.get("bind_email")
+            )
 
         result = yield self._create_registration_details(registered_user_id,
                                                          access_token)
@@ -288,19 +279,28 @@ class RegisterRestServlet(RestServlet):
         defer.returnValue((yield self._create_registration_details(user_id, token)))
 
     @defer.inlineCallbacks
-    def _register_email_threepid(self, user_id, threepid, token):
+    def _register_email_threepid(self, user_id, threepid, token, bind_email):
         """Add an email address as a 3pid identifier
 
         Also adds an email pusher for the email address, if configured in the
         HS config
 
+        Also optionally binds emails to the given user_id on the identity server
+
         Args:
             user_id (str): id of user
             threepid (object): m.login.email.identity auth response
             token (str): access_token for the user
+            bind_email (bool): true if the client requested the email to be
+                bound at the identity server
         Returns:
             defer.Deferred:
         """
+        reqd = ('medium', 'address', 'validated_at')
+        if any(x not in threepid for x in reqd):
+            logger.info("Can't add incomplete 3pid")
+            defer.returnValue()
+
         yield self.auth_handler.add_threepid(
             user_id,
             threepid['medium'],
@@ -334,22 +334,19 @@ class RegisterRestServlet(RestServlet):
                 lang=None,  # We don't know a user's language here
                 data={},
             )
+
+        if bind_email:
+            logger.info("bind_email specified: binding")
+            logger.debug("Binding emails %s to %s" % (
+                threepid, user_id
+            ))
+            yield self.identity_handler.bind_threepid(
+                threepid['threepid_creds'], user_id
+            )
+        else:
+            logger.info("bind_email not specified: not binding email")
+
         defer.returnValue()
-
-    def _bind_email(self, user_id, email_threepid):
-        """Bind emails to the given user_id on the identity server
-
-        Args:
-            user_id (str): user id to bind the emails to
-            email_threepid (object): m.login.email.identity auth response
-        Returns:
-            defer.Deferred:
-        """
-        threepid_creds = email_threepid['threepid_creds']
-        logger.debug("Binding emails %s to %s" % (
-            email_threepid, user_id
-        ))
-        return self.identity_handler.bind_threepid(threepid_creds, user_id)
 
     @defer.inlineCallbacks
     def _create_registration_details(self, user_id, token):
