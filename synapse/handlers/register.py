@@ -99,8 +99,13 @@ class RegistrationHandler(BaseHandler):
             localpart : The local part of the user ID to register. If None,
               one will be generated.
             password (str) : The password to assign to this user so they can
-            login again. This can be None which means they cannot login again
-            via a password (e.g. the user is an application service user).
+              login again. This can be None which means they cannot login again
+              via a password (e.g. the user is an application service user).
+            generate_token (bool): Whether a new access token should be
+              generated. Having this be True should be considered deprecated,
+              since it offers no means of associating a device_id with the
+              access_token. Instead you should call auth_handler.issue_access_token
+              after registration.
         Returns:
             A tuple of (user_id, access_token).
         Raises:
@@ -196,15 +201,13 @@ class RegistrationHandler(BaseHandler):
             user_id, allowed_appservice=service
         )
 
-        token = self.auth_handler().generate_access_token(user_id)
         yield self.store.register(
             user_id=user_id,
-            token=token,
             password_hash="",
             appservice_id=service_id,
             create_profile_with_localpart=user.localpart,
         )
-        defer.returnValue((user_id, token))
+        defer.returnValue(user_id)
 
     @defer.inlineCallbacks
     def check_recaptcha(self, ip, private_key, challenge, response):

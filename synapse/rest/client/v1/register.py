@@ -60,6 +60,7 @@ class RegisterRestServlet(ClientV1RestServlet):
         # TODO: persistent storage
         self.sessions = {}
         self.enable_registration = hs.config.enable_registration
+        self.auth_handler = hs.get_auth_handler()
 
     def on_GET(self, request):
         if self.hs.config.enable_registration_captcha:
@@ -299,9 +300,10 @@ class RegisterRestServlet(ClientV1RestServlet):
         user_localpart = register_json["user"].encode("utf-8")
 
         handler = self.handlers.registration_handler
-        (user_id, token) = yield handler.appservice_register(
+        user_id = yield handler.appservice_register(
             user_localpart, as_token
         )
+        token = yield self.auth_handler.issue_access_token(user_id)
         self._remove_session(session)
         defer.returnValue({
             "user_id": user_id,
