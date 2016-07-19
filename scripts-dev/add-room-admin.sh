@@ -2,6 +2,7 @@
 # This script manipulates a matrix room by adding another administrator to it
 
 ### config settings ####################
+SERVER="matrix.yourserver.org"
 ROOM='!vOCcdPDdvueotEgTms:matrix.org'
 ADMIN="new_admin_username"
 TOKEN="8KnWIxCa17exampletokenD"
@@ -17,7 +18,7 @@ echo
 echo copy and paste this into bash:
 echo
 echo "curl -X PUT --header 'Content-Type: application/json' --header 'Accept: application/json' -d '"
-sed '/@appservice_irc:matrix.eclabs.de/a ,"@'$ADMIN':matrix.eclabs.de": 100' /tmp/matrix_room
+sed '/@appservice_irc:'$SERVER'/a ,"@'$ADMIN':matrix.eclabs.de": 100' /tmp/matrix_room
 echo "' '"localhost:8008/_matrix/client/r0/rooms/$ROOM/state/m.room.power_levels?access_token=$TOKEN"'"
 
 exit
