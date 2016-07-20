@@ -586,6 +586,10 @@ class Auth(object):
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
 
+            # device_id may not be present if get_user_by_access_token has been
+            # stubbed out.
+            device_id = user_info.get("device_id")
+
             ip_addr = self.hs.get_ip_from_request(request)
             user_agent = request.requestHeaders.getRawHeaders(
                 "User-Agent",
@@ -597,7 +601,8 @@ class Auth(object):
                     user=user,
                     access_token=access_token,
                     ip=ip_addr,
-                    user_agent=user_agent
+                    user_agent=user_agent,
+                    device_id=device_id,
                 )
 
             if is_guest and not allow_guest:
@@ -695,6 +700,7 @@ class Auth(object):
                     "user": user,
                     "is_guest": True,
                     "token_id": None,
+                    "device_id": None,
                 }
             elif rights == "delete_pusher":
                 # We don't store these tokens in the database
@@ -702,13 +708,20 @@ class Auth(object):
                     "user": user,
                     "is_guest": False,
                     "token_id": None,
+                    "device_id": None,
                 }
             else:
-                # This codepath exists so that we can actually return a
-                # token ID, because we use token IDs in place of device
-                # identifiers throughout the codebase.
-                # TODO(daniel): Remove this fallback when device IDs are
-                # properly implemented.
+                # This codepath exists for several reasons:
+                #   * so that we can actually return a token ID, which is used
+                #     in some parts of the schema (where we probably ought to
+                #     use device IDs instead)
+                #   * the only way we currently have to invalidate an
+                #     access_token is by removing it from the database, so we
+                #     have to check here that it is still in the db
+                #   * some attributes (notably device_id) aren't stored in the
+                #     macaroon. They probably should be.
+                # TODO: build the dictionary from the macaroon once the
+                # above are fixed
                 ret = yield self._look_up_user_by_access_token(macaroon_str)
                 if ret["user"] != user:
                     logger.error(
@@ -782,10 +795,14 @@ class Auth(object):
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Unrecognised access token.",
                 errcode=Codes.UNKNOWN_TOKEN
             )
+        # we use ret.get() below because *lots* of unit tests stub out
+        # get_user_by_access_token in a way where it only returns a couple of
+        # the fields.
         user_info = {
             "user": UserID.from_string(ret.get("name")),
             "token_id": ret.get("token_id", None),
             "is_guest": False,
+            "device_id": ret.get("device_id"),
         }
         defer.returnValue(user_info)
 
