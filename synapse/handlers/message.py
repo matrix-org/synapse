@@ -66,7 +66,7 @@ class MessageHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_messages(self, requester, room_id=None, pagin_config=None,
-                     as_client_event=True):
+                     as_client_event=True, event_filter=None):
         """Get messages in a room.
 
         Args:
@@ -75,11 +75,11 @@ class MessageHandler(BaseHandler):
             pagin_config (synapse.api.streams.PaginationConfig): The pagination
                 config rules to apply, if any.
             as_client_event (bool): True to get events in client-server format.
+            event_filter (Filter): Filter to apply to results or None
         Returns:
             dict: Pagination API results
         """
         user_id = requester.user.to_string()
-        data_source = self.hs.get_event_sources().sources["room"]
 
         if pagin_config.from_token:
             room_token = pagin_config.from_token.room_key
@@ -129,8 +129,13 @@ class MessageHandler(BaseHandler):
                     room_id, max_topo
                 )
 
-            events, next_key = yield data_source.get_pagination_rows(
-                requester.user, source_config, room_id
+            events, next_key = yield self.store.paginate_room_events(
+                room_id=room_id,
+                from_key=source_config.from_key,
+                to_key=source_config.to_key,
+                direction=source_config.direction,
+                limit=source_config.limit,
+                event_filter=event_filter,
             )
 
             next_token = pagin_config.from_token.copy_and_replace(
@@ -143,6 +148,9 @@ class MessageHandler(BaseHandler):
                 "start": pagin_config.from_token.to_string(),
                 "end": next_token.to_string(),
             })
+
+        if event_filter:
+            events = event_filter.filter(events)
 
         events = yield filter_events_for_client(
             self.store,

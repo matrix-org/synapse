@@ -95,6 +95,54 @@ def upper_bound(token, engine, inclusive=True):
         )
 
 
+def filter_to_clause(event_filter):
+    # NB: This may create SQL clauses that don't optimise well (and we don't
+    # have indices on all possible clauses). E.g. it may create
+    # "room_id == X AND room_id != X", which postgres doesn't optimise.
+
+    if not event_filter:
+        return "", []
+
+    clauses = []
+    args = []
+
+    if event_filter.types:
+        clauses.append(
+            "(%s)" % " OR ".join("type = ?" for _ in event_filter.types)
+        )
+        args.extend(event_filter.types)
+
+    for typ in event_filter.not_types:
+        clauses.append("type != ?")
+        args.append(typ)
+
+    if event_filter.senders:
+        clauses.append(
+            "(%s)" % " OR ".join("sender = ?" for _ in event_filter.senders)
+        )
+        args.extend(event_filter.senders)
+
+    for sender in event_filter.not_senders:
+        clauses.append("sender != ?")
+        args.append(sender)
+
+    if event_filter.rooms:
+        clauses.append(
+            "(%s)" % " OR ".join("room_id = ?" for _ in event_filter.rooms)
+        )
+        args.extend(event_filter.rooms)
+
+    for room_id in event_filter.not_rooms:
+        clauses.append("room_id != ?")
+        args.append(room_id)
+
+    if event_filter.contains_url:
+        clauses.append("contains_url = ?")
+        args.append(event_filter.contains_url)
+
+    return " AND ".join(clauses), args
+
+
 class StreamStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_appservice_room_stream(self, service, from_key, to_key, limit=0):
@@ -320,7 +368,7 @@ class StreamStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def paginate_room_events(self, room_id, from_key, to_key=None,
-                             direction='b', limit=-1):
+                             direction='b', limit=-1, event_filter=None):
         # Tokens really represent positions between elements, but we use
         # the convention of pointing to the event before the gap. Hence
         # we have a bit of asymmetry when it comes to equalities.
@@ -343,6 +391,12 @@ class StreamStore(SQLBaseStore):
                 bounds = "%s AND %s" % (bounds, upper_bound(
                     RoomStreamToken.parse(to_key), self.database_engine
                 ))
+
+        filter_clause, filter_args = filter_to_clause(event_filter)
+
+        if filter_clause:
+            bounds += " AND " + filter_clause
+            args.extend(filter_args)
 
         if int(limit) > 0:
             args.append(int(limit))
