@@ -566,9 +566,8 @@ class Auth(object):
         Args:
             request - An HTTP request with an access_token query parameter.
         Returns:
-            tuple of:
-                UserID (str)
-                Access token ID (str)
+            defer.Deferred: resolves to a namedtuple including "user" (UserID)
+            "access_token_id" (int), "is_guest" (bool)
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
