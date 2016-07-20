@@ -1118,11 +1118,12 @@ class FederationHandler(BaseHandler):
             backfilled=backfilled,
         )
 
-        # this intentionally does not yield: we don't care about the result
-        # and don't need to wait for it.
-        preserve_fn(self.hs.get_pusherpool().on_new_notifications)(
-            event_stream_id, max_stream_id
-        )
+        if not backfilled:
+            # this intentionally does not yield: we don't care about the result
+            # and don't need to wait for it.
+            preserve_fn(self.hs.get_pusherpool().on_new_notifications)(
+                event_stream_id, max_stream_id
+            )
 
         defer.returnValue((context, event_stream_id, max_stream_id))
 
