@@ -51,6 +51,7 @@ from synapse.api.urls import (
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.util.logcontext import LoggingContext
+from synapse.metrics import register_memory_metrics
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.replication.resource import ReplicationResource, REPLICATION_PREFIX
 from synapse.federation.transport.server import TransportLayerServer
@@ -334,6 +335,8 @@ def setup(config_options):
         hs.get_datastore().start_profiling()
         hs.get_datastore().start_doing_background_updates()
         hs.get_replication_layer().start_get_pdu_cache()
+
+        register_memory_metrics(hs)
 
     reactor.callWhenRunning(start)
 
