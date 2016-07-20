@@ -61,8 +61,10 @@ class RegisterRestServletTestCase(unittest.TestCase):
             "id": "1234"
         }
         self.registration_handler.appservice_register = Mock(
-            return_value=(user_id, token)
+            return_value=user_id
         )
+        self.auth_handler.issue_access_token = Mock(return_value=token)
+
         (code, result) = yield self.servlet.on_POST(self.request)
         self.assertEquals(code, 200)
         det_data = {
@@ -126,6 +128,8 @@ class RegisterRestServletTestCase(unittest.TestCase):
         }
         self.assertDictContainsSubset(det_data, result)
         self.assertIn("refresh_token", result)
+        self.auth_handler.issue_access_token.assert_called_once_with(
+            user_id)
 
     def test_POST_disabled_registration(self):
         self.hs.config.enable_registration = False

@@ -226,19 +226,17 @@ class RegisterRestServlet(RestServlet):
 
             add_email = True
 
-        access_token = yield self.auth_handler.issue_access_token(
+        result = yield self._create_registration_details(
             registered_user_id
         )
 
         if add_email and result and LoginType.EMAIL_IDENTITY in result:
             threepid = result[LoginType.EMAIL_IDENTITY]
             yield self._register_email_threepid(
-                registered_user_id, threepid, access_token,
+                registered_user_id, threepid, result["access_token"],
                 params.get("bind_email")
             )
 
-        result = yield self._create_registration_details(registered_user_id,
-                                                         access_token)
         defer.returnValue((200, result))
 
     def on_OPTIONS(self, _):
@@ -246,10 +244,10 @@ class RegisterRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def _do_appservice_registration(self, username, as_token):
-        (user_id, token) = yield self.registration_handler.appservice_register(
+        user_id = yield self.registration_handler.appservice_register(
             username, as_token
         )
-        defer.returnValue((yield self._create_registration_details(user_id, token)))
+        defer.returnValue((yield self._create_registration_details(user_id)))
 
     @defer.inlineCallbacks
     def _do_shared_secret_registration(self, username, password, mac):
@@ -273,10 +271,12 @@ class RegisterRestServlet(RestServlet):
                 403, "HMAC incorrect",
             )
 
-        (user_id, token) = yield self.registration_handler.register(
-            localpart=username, password=password
+        (user_id, _) = yield self.registration_handler.register(
+            localpart=username, password=password, generate_token=False,
         )
-        defer.returnValue((yield self._create_registration_details(user_id, token)))
+
+        result = yield self._create_registration_details(user_id)
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def _register_email_threepid(self, user_id, threepid, token, bind_email):
@@ -349,11 +349,31 @@ class RegisterRestServlet(RestServlet):
         defer.returnValue()
 
     @defer.inlineCallbacks
-    def _create_registration_details(self, user_id, token):
-        refresh_token = yield self.auth_handler.issue_refresh_token(user_id)
+    def _create_registration_details(self, user_id):
+        """Complete registration of newly-registered user
+
+        Issues access_token and refresh_token, and builds the success response
+        body.
+
+        Args:
+            (str) user_id: full canonical @user:id
+
+
+        Returns:
+            defer.Deferred: (object) dictionary for response from /register
+        """
+
+        access_token = yield self.auth_handler.issue_access_token(
+            user_id
+        )
+
+        refresh_token = yield self.auth_handler.issue_refresh_token(
+            user_id
+        )
+
         defer.returnValue({
             "user_id": user_id,
-            "access_token": token,
+            "access_token": access_token,
             "home_server": self.hs.hostname,
             "refresh_token": refresh_token,
         })
@@ -366,7 +386,11 @@ class RegisterRestServlet(RestServlet):
             generate_token=False,
             make_guest=True
         )
-        access_token = self.auth_handler.generate_access_token(user_id, ["guest = true"])
+        access_token = self.auth_handler.generate_access_token(
+            user_id, ["guest = true"]
+        )
+        # XXX the "guest" caveat is not copied by /tokenrefresh. That's ok
+        # so long as we don't return a refresh_token here.
         defer.returnValue((200, {
             "user_id": user_id,
             "access_token": access_token,
