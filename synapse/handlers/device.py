@@ -69,3 +69,30 @@ class DeviceHandler(BaseHandler):
                 attempts += 1
 
         raise StoreError(500, "Couldn't generate a device ID.")
+
+    @defer.inlineCallbacks
+    def get_devices_by_user(self, user_id):
+        """
+        Retrieve the given user's devices
+
+        Args:
+            user_id (str):
+        Returns:
+            defer.Deferred: dict[str, dict[str, X]]: map from device_id to
+            info on the device
+        """
+
+        devices = yield self.store.get_devices_by_user(user_id)
+
+        ips = yield self.store.get_last_client_ip_by_device(
+            devices=((user_id, device_id) for device_id in devices.keys())
+        )
+
+        for device_id in devices.keys():
+            ip = ips.get((user_id, device_id), {})
+            devices[device_id].update({
+                "last_seen_ts": ip.get("last_seen"),
+                "last_seen_ip": ip.get("ip"),
+            })
+
+        defer.returnValue(devices)

@@ -65,7 +65,7 @@ class DeviceStore(SQLBaseStore):
             user_id (str): The ID of the user which owns the device
             device_id (str): The ID of the device to retrieve
         Returns:
-            defer.Deferred for a namedtuple containing the device information
+            defer.Deferred for a dict containing the device information
         Raises:
             StoreError: if the device is not found
         """
@@ -75,3 +75,23 @@ class DeviceStore(SQLBaseStore):
             retcols=("user_id", "device_id", "display_name"),
             desc="get_device",
         )
+
+    @defer.inlineCallbacks
+    def get_devices_by_user(self, user_id):
+        """Retrieve all of a user's registered devices.
+
+        Args:
+            user_id (str):
+        Returns:
+            defer.Deferred: resolves to a dict from device_id to a dict
+            containing "device_id", "user_id" and "display_name" for each
+            device.
+        """
+        devices = yield self._simple_select_list(
+            table="devices",
+            keyvalues={"user_id": user_id},
+            retcols=("user_id", "device_id", "display_name"),
+            desc="get_devices_by_user"
+        )
+
+        defer.returnValue({d["device_id"]: d for d in devices})

@@ -25,7 +25,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def client_v2_patterns(path_regex, releases=(0,)):
+def client_v2_patterns(path_regex, releases=(0,),
+                       v2_alpha=True,
+                       unstable=True):
     """Creates a regex compiled client path with the correct client path
     prefix.
 
@@ -35,9 +37,12 @@ def client_v2_patterns(path_regex, releases=(0,)):
     Returns:
         SRE_Pattern
     """
-    patterns = [re.compile("^" + CLIENT_V2_ALPHA_PREFIX + path_regex)]
-    unstable_prefix = CLIENT_V2_ALPHA_PREFIX.replace("/v2_alpha", "/unstable")
-    patterns.append(re.compile("^" + unstable_prefix + path_regex))
+    patterns = []
+    if v2_alpha:
+        patterns.append(re.compile("^" + CLIENT_V2_ALPHA_PREFIX + path_regex))
+    if unstable:
+        unstable_prefix = CLIENT_V2_ALPHA_PREFIX.replace("/v2_alpha", "/unstable")
+        patterns.append(re.compile("^" + unstable_prefix + path_regex))
     for release in releases:
         new_prefix = CLIENT_V2_ALPHA_PREFIX.replace("/v2_alpha", "/r%d" % release)
         patterns.append(re.compile("^" + new_prefix + path_regex))
