@@ -45,6 +45,10 @@ class RegisterRequestTokenRestServlet(RestServlet):
     PATTERNS = client_v2_patterns("/register/email/requestToken$")
 
     def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
         super(RegisterRequestTokenRestServlet, self).__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
@@ -77,7 +81,12 @@ class RegisterRestServlet(RestServlet):
     PATTERNS = client_v2_patterns("/register$")
 
     def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
         super(RegisterRestServlet, self).__init__()
+
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()

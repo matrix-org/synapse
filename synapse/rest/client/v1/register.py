@@ -52,6 +52,10 @@ class RegisterRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/register$", releases=(), include_in_unstable=False)
 
     def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
         super(RegisterRestServlet, self).__init__(hs)
         # sessions are stored as:
         # self.sessions = {
