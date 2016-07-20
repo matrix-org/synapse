@@ -19,6 +19,8 @@ import synapse.handlers.device
 import synapse.storage
 from tests import unittest, utils
 
+user1 = "@boris:aaa"
+user2 = "@theresa:bbb"
 
 class DeviceTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
@@ -78,16 +80,7 @@ class DeviceTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_devices_by_user(self):
-        # check this works for both devices which have a recorded client_ip,
-        # and those which don't.
-        user1 = "@boris:aaa"
-        user2 = "@theresa:bbb"
-        yield self._record_user(user1, "xyz", "display 0")
-        yield self._record_user(user1, "fco", "display 1", "token1", "ip1")
-        yield self._record_user(user1, "abc", "display 2", "token2", "ip2")
-        yield self._record_user(user1, "abc", "display 2", "token3", "ip3")
-
-        yield self._record_user(user2, "def", "dispkay", "token4", "ip4")
+        yield self._record_users()
 
         res = yield self.handler.get_devices_by_user(user1)
         self.assertEqual(3, len(res.keys()))
@@ -112,6 +105,30 @@ class DeviceTestCase(unittest.TestCase):
             "last_seen_ip": "ip3",
             "last_seen_ts": 3000000,
         }, res["abc"])
+
+    @defer.inlineCallbacks
+    def test_get_device(self):
+        yield self._record_users()
+
+        res = yield self.handler.get_device(user1, "abc")
+        self.assertDictContainsSubset({
+            "user_id": user1,
+            "device_id": "abc",
+            "display_name": "display 2",
+            "last_seen_ip": "ip3",
+            "last_seen_ts": 3000000,
+        }, res)
+
+    @defer.inlineCallbacks
+    def _record_users(self):
+        # check this works for both devices which have a recorded client_ip,
+        # and those which don't.
+        yield self._record_user(user1, "xyz", "display 0")
+        yield self._record_user(user1, "fco", "display 1", "token1", "ip1")
+        yield self._record_user(user1, "abc", "display 2", "token2", "ip2")
+        yield self._record_user(user1, "abc", "display 2", "token3", "ip3")
+
+        yield self._record_user(user2, "def", "dispkay", "token4", "ip4")
 
     @defer.inlineCallbacks
     def _record_user(self, user_id, device_id, display_name,
