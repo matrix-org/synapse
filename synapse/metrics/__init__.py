@@ -27,7 +27,8 @@ import gc
 from twisted.internet import reactor
 
 from .metric import (
-    CounterMetric, CallbackMetric, DistributionMetric, CacheMetric
+    CounterMetric, CallbackMetric, DistributionMetric, CacheMetric,
+    MemoryUsageMetric,
 )
 
 
@@ -64,6 +65,12 @@ class Metrics(object):
 
     def register_cache(self, *args, **kwargs):
         return self._register(CacheMetric, *args, **kwargs)
+
+
+def register_memory_metrics(hs):
+    metric = MemoryUsageMetric(hs)
+    all_metrics.append(metric)
+    return metric
 
 
 def get_metrics_for(pkg_name):

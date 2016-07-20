@@ -16,6 +16,8 @@
 
 from itertools import chain
 
+import psutil
+
 
 # TODO(paul): I can't believe Python doesn't have one of these
 def map_concat(func, items):
@@ -152,4 +154,40 @@ class CacheMetric(object):
             """%s:hits{name="%s"} %d""" % (self.name, self.cache_name, hits),
             """%s:total{name="%s"} %d""" % (self.name, self.cache_name, total),
             """%s:size{name="%s"} %d""" % (self.name, self.cache_name, size),
+        ]
+
+
+class MemoryUsageMetric(object):
+    """Keeps track of the current memory usage, using psutil.
+
+    The class will keep the current min/max/sum/counts of rss over the last
+    WINDOW_SIZE_SEC, by polling UPDATE_HZ times per second
+    """
+
+    UPDATE_HZ = 2  # number of times to get memory per second
+    WINDOW_SIZE_SEC = 30  # the size of the window in seconds
+
+    def __init__(self, hs):
+        clock = hs.get_clock()
+        self.memory_snapshots = []
+        self.process = psutil.Process()
+
+        clock.looping_call(self._update_curr_values, 1000 / self.UPDATE_HZ)
+
+    def _update_curr_values(self):
+        max_size = self.UPDATE_HZ * self.WINDOW_SIZE_SEC
+        self.memory_snapshots.append(self.process.memory_info().rss)
+        self.memory_snapshots[:] = self.memory_snapshots[-max_size:]
+
+    def render(self):
+        max_rss = max(self.memory_snapshots)
+        min_rss = min(self.memory_snapshots)
+        sum_rss = sum(self.memory_snapshots)
+        len_rss = len(self.memory_snapshots)
+
+        return [
+            "process_psutil_rss:max %d" % max_rss,
+            "process_psutil_rss:min %d" % min_rss,
+            "process_psutil_rss:total %d" % sum_rss,
+            "process_psutil_rss:count %d" % len_rss,
         ]
