@@ -15,8 +15,6 @@
 
 from twisted.internet import defer
 
-import synapse.server
-import synapse.types
 import tests.unittest
 import tests.utils
 
