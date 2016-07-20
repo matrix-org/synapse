@@ -96,6 +96,10 @@ def upper_bound(token, engine, inclusive=True):
 
 
 def filter_to_clause(event_filter):
+    # NB: This may create SQL clauses that don't optimise well (and we don't
+    # have indices on all possible clauses). E.g. it may create
+    # "room_id == X AND room_id != X", which postgres doesn't optimise.
+
     if not event_filter:
         return "", []
 
