@@ -180,6 +180,9 @@ class MemoryUsageMetric(object):
         self.memory_snapshots[:] = self.memory_snapshots[-max_size:]
 
     def render(self):
+        if not self.memory_snapshots:
+            return []
+
         max_rss = max(self.memory_snapshots)
         min_rss = min(self.memory_snapshots)
         sum_rss = sum(self.memory_snapshots)
