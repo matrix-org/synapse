@@ -38,7 +38,7 @@ class ClientIpStore(SQLBaseStore):
         super(ClientIpStore, self).__init__(hs)
 
     @defer.inlineCallbacks
-    def insert_client_ip(self, user, access_token, ip, user_agent):
+    def insert_client_ip(self, user, access_token, ip, user_agent, device_id):
         now = int(self._clock.time_msec())
         key = (user.to_string(), access_token, ip)
 
@@ -62,6 +62,7 @@ class ClientIpStore(SQLBaseStore):
                 "access_token": access_token,
                 "ip": ip,
                 "user_agent": user_agent,
+                "device_id": device_id,
             },
             values={
                 "last_seen": now,

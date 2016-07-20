@@ -93,6 +93,7 @@ class RegisterRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_handlers().registration_handler
         self.identity_handler = hs.get_handlers().identity_handler
+        self.device_handler = hs.get_device_handler()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -145,7 +146,7 @@ class RegisterRestServlet(RestServlet):
 
             if isinstance(desired_username, basestring):
                 result = yield self._do_appservice_registration(
-                    desired_username, request.args["access_token"][0]
+                    desired_username, request.args["access_token"][0], body
                 )
             defer.returnValue((200, result))  # we throw for non 200 responses
             return
@@ -155,7 +156,7 @@ class RegisterRestServlet(RestServlet):
             # FIXME: Should we really be determining if this is shared secret
             # auth based purely on the 'mac' key?
             result = yield self._do_shared_secret_registration(
-                desired_username, desired_password, body["mac"]
+                desired_username, desired_password, body
             )
             defer.returnValue((200, result))  # we throw for non 200 responses
             return
@@ -236,7 +237,7 @@ class RegisterRestServlet(RestServlet):
             add_email = True
 
         result = yield self._create_registration_details(
-            registered_user_id
+            registered_user_id, body
         )
 
         if add_email and result and LoginType.EMAIL_IDENTITY in result:
@@ -252,14 +253,14 @@ class RegisterRestServlet(RestServlet):
         return 200, {}
 
     @defer.inlineCallbacks
-    def _do_appservice_registration(self, username, as_token):
+    def _do_appservice_registration(self, username, as_token, body):
         user_id = yield self.registration_handler.appservice_register(
             username, as_token
         )
-        defer.returnValue((yield self._create_registration_details(user_id)))
+        defer.returnValue((yield self._create_registration_details(user_id, body)))
 
     @defer.inlineCallbacks
-    def _do_shared_secret_registration(self, username, password, mac):
+    def _do_shared_secret_registration(self, username, password, body):
         if not self.hs.config.registration_shared_secret:
             raise SynapseError(400, "Shared secret registration is not enabled")
 
@@ -267,7 +268,7 @@ class RegisterRestServlet(RestServlet):
 
         # str() because otherwise hmac complains that 'unicode' does not
         # have the buffer interface
-        got_mac = str(mac)
+        got_mac = str(body["mac"])
 
         want_mac = hmac.new(
             key=self.hs.config.registration_shared_secret,
@@ -284,7 +285,7 @@ class RegisterRestServlet(RestServlet):
             localpart=username, password=password, generate_token=False,
         )
 
-        result = yield self._create_registration_details(user_id)
+        result = yield self._create_registration_details(user_id, body)
         defer.returnValue(result)
 
     @defer.inlineCallbacks
@@ -358,34 +359,57 @@ class RegisterRestServlet(RestServlet):
         defer.returnValue()
 
     @defer.inlineCallbacks
-    def _create_registration_details(self, user_id):
+    def _create_registration_details(self, user_id, body):
         """Complete registration of newly-registered user
 
-        Issues access_token and refresh_token, and builds the success response
-        body.
+        Allocates device_id if one was not given; also creates access_token
+        and refresh_token.
 
         Args:
             (str) user_id: full canonical @user:id
-
+            (object) body: dictionary supplied to /register call, from
+               which we pull device_id and initial_device_name
 
         Returns:
             defer.Deferred: (object) dictionary for response from /register
         """
+        device_id = yield self._register_device(user_id, body)
 
         access_token = yield self.auth_handler.issue_access_token(
-            user_id
+            user_id, device_id=device_id
         )
 
         refresh_token = yield self.auth_handler.issue_refresh_token(
-            user_id
+            user_id, device_id=device_id
         )
-
         defer.returnValue({
             "user_id": user_id,
             "access_token": access_token,
             "home_server": self.hs.hostname,
             "refresh_token": refresh_token,
+            "device_id": device_id,
         })
+
+    def _register_device(self, user_id, body):
+        """Register a device for a user.
+
+        This is called after the user's credentials have been validated, but
+        before the access token has been issued.
+
+        Args:
+            (str) user_id: full canonical @user:id
+            (object) body: dictionary supplied to /register call, from
+               which we pull device_id and initial_device_name
+        Returns:
+            defer.Deferred: (str) device_id
+        """
+        # register the user's device
+        device_id = body.get("device_id")
+        initial_display_name = body.get("initial_device_display_name")
+        device_id = self.device_handler.check_device_registered(
+            user_id, device_id, initial_display_name
+        )
+        return device_id
 
     @defer.inlineCallbacks
     def _do_guest_registration(self):

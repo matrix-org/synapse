@@ -45,6 +45,7 @@ class AuthTestCase(unittest.TestCase):
         user_info = {
             "name": self.test_user,
             "token_id": "ditto",
+            "device_id": "device",
         }
         self.store.get_user_by_access_token = Mock(return_value=user_info)
 
@@ -143,7 +144,10 @@ class AuthTestCase(unittest.TestCase):
         # TODO(danielwh): Remove this mock when we remove the
         # get_user_by_access_token fallback.
         self.store.get_user_by_access_token = Mock(
-            return_value={"name": "@baldrick:matrix.org"}
+            return_value={
+                "name": "@baldrick:matrix.org",
+                "device_id": "device",
+            }
         )
 
         user_id = "@baldrick:matrix.org"
@@ -157,6 +161,10 @@ class AuthTestCase(unittest.TestCase):
         user_info = yield self.auth.get_user_from_macaroon(macaroon.serialize())
         user = user_info["user"]
         self.assertEqual(UserID.from_string(user_id), user)
+
+        # TODO: device_id should come from the macaroon, but currently comes
+        # from the db.
+        self.assertEqual(user_info["device_id"], "device")
 
     @defer.inlineCallbacks
     def test_get_guest_user_from_macaroon(self):
