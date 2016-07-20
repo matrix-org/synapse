@@ -30,6 +30,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.registration_handler = Mock()
         self.identity_handler = Mock()
         self.login_handler = Mock()
+        self.device_handler = Mock()
 
         # do the dance to hook it up to the hs global
         self.handlers = Mock(
@@ -42,6 +43,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.hs.get_auth = Mock(return_value=self.auth)
         self.hs.get_handlers = Mock(return_value=self.handlers)
         self.hs.get_auth_handler = Mock(return_value=self.auth_handler)
+        self.hs.get_device_handler = Mock(return_value=self.device_handler)
         self.hs.config.enable_registration = True
 
         # init the thing we're testing
@@ -107,9 +109,11 @@ class RegisterRestServletTestCase(unittest.TestCase):
     def test_POST_user_valid(self):
         user_id = "@kermit:muppet"
         token = "kermits_access_token"
+        device_id = "frogfone"
         self.request_data = json.dumps({
             "username": "kermit",
-            "password": "monkey"
+            "password": "monkey",
+            "device_id": device_id,
         })
         self.registration_handler.check_username = Mock(return_value=True)
         self.auth_result = (True, None, {
@@ -118,18 +122,21 @@ class RegisterRestServletTestCase(unittest.TestCase):
         }, None)
         self.registration_handler.register = Mock(return_value=(user_id, None))
         self.auth_handler.issue_access_token = Mock(return_value=token)
+        self.device_handler.check_device_registered = \
+            Mock(return_value=device_id)
 
         (code, result) = yield self.servlet.on_POST(self.request)
         self.assertEquals(code, 200)
         det_data = {
             "user_id": user_id,
             "access_token": token,
-            "home_server": self.hs.hostname
+            "home_server": self.hs.hostname,
+            "device_id": device_id,
         }
         self.assertDictContainsSubset(det_data, result)
         self.assertIn("refresh_token", result)
         self.auth_handler.issue_access_token.assert_called_once_with(
-            user_id)
+            user_id, device_id=device_id)
 
     def test_POST_disabled_registration(self):
         self.hs.config.enable_registration = False
