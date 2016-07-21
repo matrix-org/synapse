@@ -79,17 +79,17 @@ class DeviceHandler(BaseHandler):
         Args:
             user_id (str):
         Returns:
-            defer.Deferred: dict[str, dict[str, X]]: map from device_id to
-            info on the device
+            defer.Deferred: list[dict[str, X]]: info on each device
         """
 
-        devices = yield self.store.get_devices_by_user(user_id)
+        device_map = yield self.store.get_devices_by_user(user_id)
 
         ips = yield self.store.get_last_client_ip_by_device(
-            devices=((user_id, device_id) for device_id in devices.keys())
+            devices=((user_id, device_id) for device_id in device_map.keys())
         )
 
-        for device in devices.values():
+        devices = device_map.values()
+        for device in devices:
             _update_device_from_client_ips(device, ips)
 
         defer.returnValue(devices)

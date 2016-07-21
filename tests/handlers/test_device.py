@@ -84,28 +84,31 @@ class DeviceTestCase(unittest.TestCase):
         yield self._record_users()
 
         res = yield self.handler.get_devices_by_user(user1)
-        self.assertEqual(3, len(res.keys()))
+        self.assertEqual(3, len(res))
+        device_map = {
+            d["device_id"]: d for d in res
+        }
         self.assertDictContainsSubset({
             "user_id": user1,
             "device_id": "xyz",
             "display_name": "display 0",
             "last_seen_ip": None,
             "last_seen_ts": None,
-        }, res["xyz"])
+        }, device_map["xyz"])
         self.assertDictContainsSubset({
             "user_id": user1,
             "device_id": "fco",
             "display_name": "display 1",
             "last_seen_ip": "ip1",
             "last_seen_ts": 1000000,
-        }, res["fco"])
+        }, device_map["fco"])
         self.assertDictContainsSubset({
             "user_id": user1,
             "device_id": "abc",
             "display_name": "display 2",
             "last_seen_ip": "ip3",
             "last_seen_ts": 3000000,
-        }, res["abc"])
+        }, device_map["abc"])
 
     @defer.inlineCallbacks
     def test_get_device(self):
