@@ -237,7 +237,7 @@ class RegisterRestServlet(RestServlet):
             add_email = True
 
         result = yield self._create_registration_details(
-            registered_user_id, body
+            registered_user_id, params
         )
 
         if add_email and result and LoginType.EMAIL_IDENTITY in result:
@@ -359,7 +359,7 @@ class RegisterRestServlet(RestServlet):
         defer.returnValue()
 
     @defer.inlineCallbacks
-    def _create_registration_details(self, user_id, body):
+    def _create_registration_details(self, user_id, params):
         """Complete registration of newly-registered user
 
         Allocates device_id if one was not given; also creates access_token
@@ -367,13 +367,12 @@ class RegisterRestServlet(RestServlet):
 
         Args:
             (str) user_id: full canonical @user:id
-            (object) body: dictionary supplied to /register call, from
-               which we pull device_id and initial_device_name
-
+            (object) params: registration parameters, from which we pull
+                device_id and initial_device_name
         Returns:
             defer.Deferred: (object) dictionary for response from /register
         """
-        device_id = yield self._register_device(user_id, body)
+        device_id = yield self._register_device(user_id, params)
 
         access_token = yield self.auth_handler.issue_access_token(
             user_id, device_id=device_id
@@ -390,7 +389,7 @@ class RegisterRestServlet(RestServlet):
             "device_id": device_id,
         })
 
-    def _register_device(self, user_id, body):
+    def _register_device(self, user_id, params):
         """Register a device for a user.
 
         This is called after the user's credentials have been validated, but
@@ -398,14 +397,14 @@ class RegisterRestServlet(RestServlet):
 
         Args:
             (str) user_id: full canonical @user:id
-            (object) body: dictionary supplied to /register call, from
-               which we pull device_id and initial_device_name
+            (object) params: registration parameters, from which we pull
+                device_id and initial_device_name
         Returns:
             defer.Deferred: (str) device_id
         """
         # register the user's device
-        device_id = body.get("device_id")
-        initial_display_name = body.get("initial_device_display_name")
+        device_id = params.get("device_id")
+        initial_display_name = params.get("initial_device_display_name")
         device_id = self.device_handler.check_device_registered(
             user_id, device_id, initial_display_name
         )
