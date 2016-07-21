@@ -991,13 +991,8 @@ class FederationHandler(BaseHandler):
         defer.returnValue(None)
 
     @defer.inlineCallbacks
-    def get_state_for_pdu(self, origin, room_id, event_id, do_auth=True):
+    def get_state_for_pdu(self, room_id, event_id):
         yield run_on_reactor()
-
-        if do_auth:
-            in_room = yield self.auth.check_host_in_room(room_id, origin)
-            if not in_room:
-                raise AuthError(403, "Host not in room.")
 
         state_groups = yield self.store.get_state_groups(
             room_id, [event_id]
