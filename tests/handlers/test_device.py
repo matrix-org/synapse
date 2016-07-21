@@ -22,6 +22,7 @@ from tests import unittest, utils
 user1 = "@boris:aaa"
 user2 = "@theresa:bbb"
 
+
 class DeviceTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(DeviceTestCase, self).__init__(*args, **kwargs)
