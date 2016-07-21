@@ -135,5 +135,5 @@ class SynapseKeyClientFactory(Factory):
     def protocol(self):
         protocol = SynapseKeyClientProtocol()
         protocol.path = self.path
-        protocol.path = self.host
+        protocol.host = self.host
         return protocol
