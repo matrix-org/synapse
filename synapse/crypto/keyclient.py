@@ -79,8 +79,7 @@ class SynapseKeyClientProtocol(HTTPClient):
         self.host = None
 
     def connectionMade(self):
-        self.host = self.transport.getHost()
-        logger.debug("Connected to %s", self.host)
+        logger.debug("Connected to %s", self.transport.getPeer())
         self.sendCommand(b"GET", self.path)
         if self.host:
             self.sendHeader(b"Host", self.host)
@@ -124,7 +123,10 @@ class SynapseKeyClientProtocol(HTTPClient):
         self.timer.cancel()
 
     def on_timeout(self):
-        logger.debug("Timeout waiting for response from %s", self.host)
+        logger.debug(
+            "Timeout waiting for response from %s: %s",
+            self.host, self.transport.getPeer(),
+        )
         self.errback(IOError("Timeout waiting for response"))
         self.transport.abortConnection()
 
@@ -133,4 +135,5 @@ class SynapseKeyClientFactory(Factory):
     def protocol(self):
         protocol = SynapseKeyClientProtocol()
         protocol.path = self.path
+        protocol.path = self.host
         return protocol
