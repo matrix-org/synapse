@@ -22,6 +22,10 @@ import OpenSSL
 from signedjson.key import decode_verify_key_bytes
 import hashlib
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class KeyStore(SQLBaseStore):
     """Persistence for signature verification keys and tls X.509 certificates
