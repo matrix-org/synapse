@@ -103,9 +103,6 @@ class ClientIpStore(SQLBaseStore):
 
     @classmethod
     def _get_last_client_ip_by_device_txn(cls, txn, devices, retcols):
-        def where_clause_for_device(d):
-                return
-
         where_clauses = []
         bindings = []
         for (user_id, device_id) in devices:
