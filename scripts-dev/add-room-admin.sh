@@ -1,5 +1,6 @@
 #!/bin/bash
-# This script manipulates a matrix room by adding another administrator to it
+# A room created by the @appservice_irc user of the IRC-bridge has only that user as admin
+# This script manipulates a matrix room, created by the @appservice_irc user by adding another administrator to it
 
 ### config settings ####################
 SERVER="matrix.yourserver.org"
