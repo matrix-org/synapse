@@ -12,7 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.api.errors import StoreError
+
+from synapse.api import errors
 from synapse.util import stringutils
 from twisted.internet import defer
 from ._base import BaseHandler
@@ -65,10 +66,10 @@ class DeviceHandler(BaseHandler):
                     ignore_if_known=False,
                 )
                 defer.returnValue(device_id)
-            except StoreError:
+            except errors.StoreError:
                 attempts += 1
 
-        raise StoreError(500, "Couldn't generate a device ID.")
+        raise errors.StoreError(500, "Couldn't generate a device ID.")
 
     @defer.inlineCallbacks
     def get_devices_by_user(self, user_id):
@@ -88,11 +89,38 @@ class DeviceHandler(BaseHandler):
             devices=((user_id, device_id) for device_id in devices.keys())
         )
 
-        for device_id in devices.keys():
-            ip = ips.get((user_id, device_id), {})
-            devices[device_id].update({
-                "last_seen_ts": ip.get("last_seen"),
-                "last_seen_ip": ip.get("ip"),
-            })
+        for device in devices.values():
+            _update_device_from_client_ips(device, ips)
 
         defer.returnValue(devices)
+
+    @defer.inlineCallbacks
+    def get_device(self, user_id, device_id):
+        """ Retrieve the given device
+
+        Args:
+            user_id (str):
+            device_id (str)
+
+        Returns:
+            defer.Deferred: dict[str, X]: info on the device
+        Raises:
+            errors.NotFoundError: if the device was not found
+        """
+        try:
+            device = yield self.store.get_device(user_id, device_id)
+        except errors.StoreError:
+            raise errors.NotFoundError
+        ips = yield self.store.get_last_client_ip_by_device(
+            devices=((user_id, device_id),)
+        )
+        _update_device_from_client_ips(device, ips)
+        defer.returnValue(device)
+
+
+def _update_device_from_client_ips(device, client_ips):
+    ip = client_ips.get((device["user_id"], device["device_id"]), {})
+    device.update({
+        "last_seen_ts": ip.get("last_seen"),
+        "last_seen_ip": ip.get("ip"),
+    })

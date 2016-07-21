@@ -47,5 +47,30 @@ class DevicesRestServlet(RestServlet):
         defer.returnValue((200, {"devices": devices}))
 
 
+class DeviceRestServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/devices/(?P<device_id>[^/]*)$",
+                                  releases=[], v2_alpha=False)
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(DeviceRestServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.device_handler = hs.get_device_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, device_id):
+        requester = yield self.auth.get_user_by_req(request)
+        device = yield self.device_handler.get_device(
+            requester.user.to_string(),
+            device_id,
+        )
+        defer.returnValue((200, device))
+
+
 def register_servlets(hs, http_server):
     DevicesRestServlet(hs).register(http_server)
+    DeviceRestServlet(hs).register(http_server)
