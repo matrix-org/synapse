@@ -152,7 +152,10 @@ class LoginRestServlet(ClientV1RestServlet):
         )
         device_id = yield self._register_device(user_id, login_submission)
         access_token, refresh_token = (
-            yield auth_handler.get_login_tuple_for_user_id(user_id, device_id)
+            yield auth_handler.get_login_tuple_for_user_id(
+                user_id, device_id,
+                login_submission.get("initial_device_display_name")
+            )
         )
         result = {
             "user_id": user_id,  # may have changed
@@ -173,7 +176,10 @@ class LoginRestServlet(ClientV1RestServlet):
         )
         device_id = yield self._register_device(user_id, login_submission)
         access_token, refresh_token = (
-            yield auth_handler.get_login_tuple_for_user_id(user_id, device_id)
+            yield auth_handler.get_login_tuple_for_user_id(
+                user_id, device_id,
+                login_submission.get("initial_device_display_name")
+            )
         )
         result = {
             "user_id": user_id,  # may have changed
@@ -262,7 +268,8 @@ class LoginRestServlet(ClientV1RestServlet):
             )
             access_token, refresh_token = (
                 yield auth_handler.get_login_tuple_for_user_id(
-                    registered_user_id, device_id
+                    registered_user_id, device_id,
+                    login_submission.get("initial_device_display_name")
                 )
             )
             result = {

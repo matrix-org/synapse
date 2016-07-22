@@ -76,6 +76,21 @@ class DeviceStore(SQLBaseStore):
             desc="get_device",
         )
 
+    def delete_device(self, user_id, device_id):
+        """Delete a device.
+
+        Args:
+            user_id (str): The ID of the user which owns the device
+            device_id (str): The ID of the device to retrieve
+        Returns:
+            defer.Deferred
+        """
+        return self._simple_delete_one(
+            table="devices",
+            keyvalues={"user_id": user_id, "device_id": device_id},
+            desc="delete_device",
+        )
+
     @defer.inlineCallbacks
     def get_devices_by_user(self, user_id):
         """Retrieve all of a user's registered devices.

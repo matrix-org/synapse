@@ -12,11 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse import types
+
 from twisted.internet import defer
 
+import synapse.api.errors
 import synapse.handlers.device
+
 import synapse.storage
+from synapse import types
 from tests import unittest, utils
 
 user1 = "@boris:aaa"
@@ -27,7 +30,7 @@ class DeviceTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(DeviceTestCase, self).__init__(*args, **kwargs)
         self.store = None    # type: synapse.storage.DataStore
-        self.handler = None  # type: device.DeviceHandler
+        self.handler = None  # type: synapse.handlers.device.DeviceHandler
         self.clock = None    # type: utils.MockClock
 
     @defer.inlineCallbacks
@@ -122,6 +125,21 @@ class DeviceTestCase(unittest.TestCase):
             "last_seen_ip": "ip3",
             "last_seen_ts": 3000000,
         }, res)
+
+    @defer.inlineCallbacks
+    def test_delete_device(self):
+        yield self._record_users()
+
+        # delete the device
+        yield self.handler.delete_device(user1, "abc")
+
+        # check the device was deleted
+        with self.assertRaises(synapse.api.errors.NotFoundError):
+            yield self.handler.get_device(user1, "abc")
+
+        # we'd like to check the access token was invalidated, but that's a
+        # bit of a PITA.
+
 
     @defer.inlineCallbacks
     def _record_users(self):

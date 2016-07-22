@@ -18,17 +18,30 @@ import re
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError, Codes
-
-from ._base import SQLBaseStore
+from synapse.storage import background_updates
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 
-class RegistrationStore(SQLBaseStore):
+class RegistrationStore(background_updates.BackgroundUpdateStore):
 
     def __init__(self, hs):
         super(RegistrationStore, self).__init__(hs)
 
         self.clock = hs.get_clock()
+
+        self.register_background_index_update(
+            "access_tokens_device_index",
+            index_name="access_tokens_device_id",
+            table="access_tokens",
+            columns=["user_id", "device_id"],
+        )
+
+        self.register_background_index_update(
+            "refresh_tokens_device_index",
+            index_name="refresh_tokens_device_id",
+            table="refresh_tokens",
+            columns=["user_id", "device_id"],
+        )
 
     @defer.inlineCallbacks
     def add_access_token_to_user(self, user_id, token, device_id=None):
@@ -238,10 +251,15 @@ class RegistrationStore(SQLBaseStore):
         self.get_user_by_id.invalidate((user_id,))
 
     @defer.inlineCallbacks
-    def user_delete_access_tokens(self, user_id, except_token_ids=[]):
+    def user_delete_access_tokens(self, user_id, except_token_ids=[],
+                                  device_id=None):
         def f(txn):
             sql = "SELECT token FROM access_tokens WHERE user_id = ?"
             clauses = [user_id]
+
+            if device_id is not None:
+                sql += " AND device_id = ?"
+                clauses.append(device_id)
 
             if except_token_ids:
                 sql += " AND id NOT IN (%s)" % (

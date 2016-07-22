@@ -374,13 +374,13 @@ class RegisterRestServlet(RestServlet):
         """
         device_id = yield self._register_device(user_id, params)
 
-        access_token = yield self.auth_handler.issue_access_token(
-            user_id, device_id=device_id
+        access_token, refresh_token = (
+            yield self.auth_handler.get_login_tuple_for_user_id(
+                user_id, device_id=device_id,
+                initial_display_name=params.get("initial_device_display_name")
+            )
         )
 
-        refresh_token = yield self.auth_handler.issue_refresh_token(
-            user_id, device_id=device_id
-        )
         defer.returnValue({
             "user_id": user_id,
             "access_token": access_token,

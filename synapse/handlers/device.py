@@ -100,7 +100,7 @@ class DeviceHandler(BaseHandler):
 
         Args:
             user_id (str):
-            device_id (str)
+            device_id (str):
 
         Returns:
             defer.Deferred: dict[str, X]: info on the device
@@ -116,6 +116,31 @@ class DeviceHandler(BaseHandler):
         )
         _update_device_from_client_ips(device, ips)
         defer.returnValue(device)
+
+    @defer.inlineCallbacks
+    def delete_device(self, user_id, device_id):
+        """ Delete the given device
+
+        Args:
+            user_id (str):
+            device_id (str):
+
+        Returns:
+            defer.Deferred:
+        """
+
+        try:
+            yield self.store.delete_device(user_id, device_id)
+        except errors.StoreError, e:
+            if e.code == 404:
+                # no match
+                pass
+            else:
+                raise
+
+        yield self.store.user_delete_access_tokens(user_id,
+                                                   device_id=device_id)
+
 
 
 def _update_device_from_client_ips(device, client_ips):

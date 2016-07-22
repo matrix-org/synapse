@@ -70,6 +70,20 @@ class DeviceRestServlet(RestServlet):
         )
         defer.returnValue((200, device))
 
+    @defer.inlineCallbacks
+    def on_DELETE(self, request, device_id):
+        # XXX: it's not completely obvious we want to expose this endpoint.
+        # It allows the client to delete access tokens, which feels like a
+        # thing which merits extra auth. But if we want to do the interactive-
+        # auth dance, we should really make it possible to delete more than one
+        # device at a time.
+        requester = yield self.auth.get_user_by_req(request)
+        yield self.device_handler.delete_device(
+            requester.user.to_string(),
+            device_id,
+        )
+        defer.returnValue((200, {}))
+
 
 def register_servlets(hs, http_server):
     DevicesRestServlet(hs).register(http_server)
