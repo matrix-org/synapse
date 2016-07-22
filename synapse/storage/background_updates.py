@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from ._base import SQLBaseStore
+from . import engines
 
 from twisted.internet import defer
 
@@ -106,13 +107,13 @@ class BackgroundUpdateStore(SQLBaseStore):
                 )
             except:
                 logger.exception("Error doing update")
-
-            if result is None:
-                logger.info(
-                    "No more background updates to do."
-                    " Unscheduling background update task."
-                )
-                return
+            else:
+                if result is None:
+                    logger.info(
+                        "No more background updates to do."
+                        " Unscheduling background update task."
+                    )
+                    return
 
     @defer.inlineCallbacks
     def do_background_update(self, desired_duration_ms):
@@ -201,6 +202,64 @@ class BackgroundUpdateStore(SQLBaseStore):
             update_handler(function): The function that does the update.
         """
         self._background_update_handlers[update_name] = update_handler
+
+    def register_background_index_update(self, update_name, index_name,
+                                         table, columns):
+        """Helper for store classes to do a background index addition
+
+        To use:
+
+        1. use a schema delta file to add a background update. Example:
+            INSERT INTO background_updates (update_name, progress_json) VALUES
+                ('my_new_index', '{}');
+
+        2. In the Store constructor, call this method
+
+        Args:
+            update_name (str): update_name to register for
+            index_name (str): name of index to add
+            table (str): table to add index to
+            columns (list[str]): columns/expressions to include in index
+        """
+
+        # if this is postgres, we add the indexes concurrently. Otherwise
+        # we fall back to doing it inline
+        if isinstance(self.database_engine, engines.PostgresEngine):
+            conc = True
+        else:
+            conc = False
+
+        sql = "CREATE INDEX %(conc)s %(name)s ON %(table)s (%(columns)s)" \
+              % {
+                  "conc": "CONCURRENTLY" if conc else "",
+                  "name": index_name,
+                  "table": table,
+                  "columns": ", ".join(columns),
+              }
+
+        def create_index_concurrently(conn):
+            conn.rollback()
+            # postgres insists on autocommit for the index
+            conn.set_session(autocommit=True)
+            c = conn.cursor()
+            c.execute(sql)
+            conn.set_session(autocommit=False)
+
+        def create_index(conn):
+            c = conn.cursor()
+            c.execute(sql)
+
+        @defer.inlineCallbacks
+        def updater(progress, batch_size):
+            logger.info("Adding index %s to %s", index_name, table)
+            if conc:
+                yield self.runWithConnection(create_index_concurrently)
+            else:
+                yield self.runWithConnection(create_index)
+            yield self._end_background_update(update_name)
+            defer.returnValue(1)
+
+        self.register_background_update_handler(update_name, updater)
 
     def start_background_update(self, update_name, progress):
         """Starts a background update running.
