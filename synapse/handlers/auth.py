@@ -286,7 +286,7 @@ class AuthHandler(BaseHandler):
             logger.info(
                 "%s reCAPTCHA from hostname %s",
                 "Successful" if resp_body['success'] else "Failed",
-                resp_body['hostname']
+                resp_body.get('hostname')
             )
             if resp_body['success']:
                 defer.returnValue(True)
