@@ -13,19 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from synapse.http.servlet import RestServlet
-
-from ._base import client_v2_patterns
-
 import logging
 
+from twisted.internet import defer
+
+from synapse.http import servlet
+from ._base import client_v2_patterns
 
 logger = logging.getLogger(__name__)
 
 
-class DevicesRestServlet(RestServlet):
+class DevicesRestServlet(servlet.RestServlet):
     PATTERNS = client_v2_patterns("/devices$", releases=[], v2_alpha=False)
 
     def __init__(self, hs):
@@ -47,7 +45,7 @@ class DevicesRestServlet(RestServlet):
         defer.returnValue((200, {"devices": devices}))
 
 
-class DeviceRestServlet(RestServlet):
+class DeviceRestServlet(servlet.RestServlet):
     PATTERNS = client_v2_patterns("/devices/(?P<device_id>[^/]*)$",
                                   releases=[], v2_alpha=False)
 
@@ -81,6 +79,18 @@ class DeviceRestServlet(RestServlet):
         yield self.device_handler.delete_device(
             requester.user.to_string(),
             device_id,
+        )
+        defer.returnValue((200, {}))
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, device_id):
+        requester = yield self.auth.get_user_by_req(request)
+
+        body = servlet.parse_json_object_from_request(request)
+        yield self.device_handler.update_device(
+            requester.user.to_string(),
+            device_id,
+            body
         )
         defer.returnValue((200, {}))
 

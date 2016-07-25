@@ -140,6 +140,22 @@ class DeviceTestCase(unittest.TestCase):
         # we'd like to check the access token was invalidated, but that's a
         # bit of a PITA.
 
+    @defer.inlineCallbacks
+    def test_update_device(self):
+        yield self._record_users()
+
+        update = {"display_name": "new display"}
+        yield self.handler.update_device(user1, "abc", update)
+
+        res = yield self.handler.get_device(user1, "abc")
+        self.assertEqual(res["display_name"], "new display")
+
+    @defer.inlineCallbacks
+    def test_update_unknown_device(self):
+        update = {"display_name": "new_display"}
+        with self.assertRaises(synapse.api.errors.NotFoundError):
+            yield self.handler.update_device("user_id", "unknown_device_id",
+                                             update)
 
     @defer.inlineCallbacks
     def _record_users(self):

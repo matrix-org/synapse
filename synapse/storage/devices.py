@@ -81,7 +81,7 @@ class DeviceStore(SQLBaseStore):
 
         Args:
             user_id (str): The ID of the user which owns the device
-            device_id (str): The ID of the device to retrieve
+            device_id (str): The ID of the device to delete
         Returns:
             defer.Deferred
         """
@@ -89,6 +89,31 @@ class DeviceStore(SQLBaseStore):
             table="devices",
             keyvalues={"user_id": user_id, "device_id": device_id},
             desc="delete_device",
+        )
+
+    def update_device(self, user_id, device_id, new_display_name=None):
+        """Update a device.
+
+        Args:
+            user_id (str): The ID of the user which owns the device
+            device_id (str): The ID of the device to update
+            new_display_name (str|None): new displayname for device; None
+               to leave unchanged
+        Raises:
+            StoreError: if the device is not found
+        Returns:
+            defer.Deferred
+        """
+        updates = {}
+        if new_display_name is not None:
+            updates["display_name"] = new_display_name
+        if not updates:
+            return defer.succeed(None)
+        return self._simple_update_one(
+            table="devices",
+            keyvalues={"user_id": user_id, "device_id": device_id},
+            updatevalues=updates,
+            desc="update_device",
         )
 
     @defer.inlineCallbacks

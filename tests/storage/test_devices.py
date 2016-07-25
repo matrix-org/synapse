@@ -15,6 +15,7 @@
 
 from twisted.internet import defer
 
+import synapse.api.errors
 import tests.unittest
 import tests.utils
 
@@ -67,3 +68,38 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
             "device_id": "device2",
             "display_name": "display_name 2",
         }, res["device2"])
+
+    @defer.inlineCallbacks
+    def test_update_device(self):
+        yield self.store.store_device(
+            "user_id", "device_id", "display_name 1"
+        )
+
+        res = yield self.store.get_device("user_id", "device_id")
+        self.assertEqual("display_name 1", res["display_name"])
+
+        # do a no-op first
+        yield self.store.update_device(
+            "user_id", "device_id",
+        )
+        res = yield self.store.get_device("user_id", "device_id")
+        self.assertEqual("display_name 1", res["display_name"])
+
+        # do the update
+        yield self.store.update_device(
+            "user_id", "device_id",
+            new_display_name="display_name 2",
+        )
+
+        # check it worked
+        res = yield self.store.get_device("user_id", "device_id")
+        self.assertEqual("display_name 2", res["display_name"])
+
+    @defer.inlineCallbacks
+    def test_update_unknown_device(self):
+        with self.assertRaises(synapse.api.errors.StoreError) as cm:
+            yield self.store.update_device(
+                "user_id", "unknown_device_id",
+                new_display_name="display_name 2",
+            )
+        self.assertEqual(404, cm.exception.code)
