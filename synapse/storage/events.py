@@ -498,8 +498,8 @@ class EventsStore(SQLBaseStore):
                     sql,
                     (False, event.event_id,)
                 )
-
-                self._update_extremeties(txn, [event])
+                if not context.rejected:
+                    self._update_extremeties(txn, [event])
 
         events_and_contexts = [
             ec for ec in events_and_contexts if ec[0] not in to_remove
@@ -512,7 +512,10 @@ class EventsStore(SQLBaseStore):
 
         self._handle_mult_prev_events(
             txn,
-            events=[event for event, _ in events_and_contexts],
+            events=[
+                event for event, context in events_and_contexts
+                if not context.rejected
+            ],
         )
 
         for event, _ in events_and_contexts:
