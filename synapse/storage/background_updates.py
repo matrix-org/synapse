@@ -115,7 +115,7 @@ class BackgroundUpdateStore(SQLBaseStore):
                         "No more background updates to do."
                         " Unscheduling background update task."
                     )
-                    defer.returnValue()
+                    defer.returnValue(None)
 
     @defer.inlineCallbacks
     def do_next_background_update(self, desired_duration_ms):
