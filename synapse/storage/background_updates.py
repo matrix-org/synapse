@@ -88,10 +88,12 @@ class BackgroundUpdateStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def start_doing_background_updates(self):
-        while True:
-            if self._background_update_timer is not None:
-                return
+        assert(self._background_update_timer is not None,
+               "background updates already running")
 
+        logger.info("Starting background schema updates")
+
+        while True:
             sleep = defer.Deferred()
             self._background_update_timer = self._clock.call_later(
                 self.BACKGROUND_UPDATE_INTERVAL_MS / 1000., sleep.callback, None
@@ -102,7 +104,7 @@ class BackgroundUpdateStore(SQLBaseStore):
                 self._background_update_timer = None
 
             try:
-                result = yield self.do_background_update(
+                result = yield self.do_next_background_update(
                     self.BACKGROUND_UPDATE_DURATION_MS
                 )
             except:
@@ -113,11 +115,12 @@ class BackgroundUpdateStore(SQLBaseStore):
                         "No more background updates to do."
                         " Unscheduling background update task."
                     )
-                    return
+                    defer.returnValue()
 
     @defer.inlineCallbacks
-    def do_background_update(self, desired_duration_ms):
-        """Does some amount of work on a background update
+    def do_next_background_update(self, desired_duration_ms):
+        """Does some amount of work on the next queued background update
+
         Args:
             desired_duration_ms(float): How long we want to spend
                 updating.
@@ -136,10 +139,20 @@ class BackgroundUpdateStore(SQLBaseStore):
                 self._background_update_queue.append(update['update_name'])
 
         if not self._background_update_queue:
+            # no work left to do
             defer.returnValue(None)
 
+        # pop from the front, and add back to the back
         update_name = self._background_update_queue.pop(0)
         self._background_update_queue.append(update_name)
+
+        res = yield self._do_background_update(update_name, desired_duration_ms)
+        defer.returnValue(res)
+
+    @defer.inlineCallbacks
+    def _do_background_update(self, update_name, desired_duration_ms):
+        logger.info("Starting update batch on background update '%s'",
+                    update_name)
 
         update_handler = self._background_update_handlers[update_name]
 
