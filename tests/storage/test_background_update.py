@@ -68,7 +68,7 @@ class BackgroundUpdateTestCase(unittest.TestCase):
         self.update_handler.side_effect = update
         self.update_handler.reset_mock()
         result = yield self.store.do_next_background_update(
-           duration_ms * desired_count
+            duration_ms * desired_count
         )
         self.assertIsNotNone(result)
         self.update_handler.assert_called_once_with(
