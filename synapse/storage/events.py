@@ -591,10 +591,11 @@ class EventsStore(SQLBaseStore):
             ],
         )
 
-        if context.rejected:
-            self._store_rejections_txn(
-                txn, event.event_id, context.rejected
-            )
+        for event, context in events_and_contexts:
+            if context.rejected:
+                self._store_rejections_txn(
+                    txn, event.event_id, context.rejected
+                )
 
         self._simple_insert_many_txn(
             txn,
