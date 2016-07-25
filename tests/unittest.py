@@ -17,13 +17,18 @@ from twisted.trial import unittest
 
 import logging
 
-
 # logging doesn't have a "don't log anything at all EVARRRR setting,
 # but since the highest value is 50, 1000000 should do ;)
 NEVER = 1000000
 
-logging.getLogger().addHandler(logging.StreamHandler())
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter(
+    "%(levelname)s:%(name)s:%(message)s  [%(pathname)s:%(lineno)d]"
+))
+logging.getLogger().addHandler(handler)
 logging.getLogger().setLevel(NEVER)
+logging.getLogger("synapse.storage.SQL").setLevel(NEVER)
+logging.getLogger("synapse.storage.txn").setLevel(NEVER)
 
 
 def around(target):
@@ -70,8 +75,6 @@ class TestCase(unittest.TestCase):
                     return ret
 
             logging.getLogger().setLevel(level)
-            # Don't set SQL logging
-            logging.getLogger("synapse.storage").setLevel(old_level)
             return orig()
 
     def assertObjectHasAttributes(self, attrs, obj):
