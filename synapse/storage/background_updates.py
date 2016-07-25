@@ -88,8 +88,8 @@ class BackgroundUpdateStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def start_doing_background_updates(self):
-        assert(self._background_update_timer is not None,
-               "background updates already running")
+        assert self._background_update_timer is not None, \
+            "background updates already running"
 
         logger.info("Starting background schema updates")
 
