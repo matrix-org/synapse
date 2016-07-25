@@ -407,20 +407,10 @@ class EventsStore(SQLBaseStore):
                     event.room_id, event.internal_metadata.stream_ordering,
                 )
 
-            if not event.internal_metadata.is_outlier():
+            if not event.internal_metadata.is_outlier() and not context.rejected:
                 depth_updates[event.room_id] = max(
                     event.depth, depth_updates.get(event.room_id, event.depth)
                 )
-
-            if context.push_actions:
-                self._set_push_actions_for_event_and_users_txn(
-                    txn, event, context.push_actions
-                )
-
-        if event.type == EventTypes.Redaction and event.redacts is not None:
-            self._remove_push_actions_for_event_id_txn(
-                txn, event.room_id, event.redacts
-            )
 
         for room_id, depth in depth_updates.items():
             self._update_min_depth_for_room_txn(txn, room_id, depth)
@@ -431,6 +421,7 @@ class EventsStore(SQLBaseStore):
             ),
             [event.event_id for event, _ in events_and_contexts]
         )
+
         have_persisted = {
             event_id: outlier
             for event_id, outlier in txn.fetchall()
@@ -442,6 +433,9 @@ class EventsStore(SQLBaseStore):
             # Handle the case of the list including the same event multiple
             # times. The tricky thing here is when they differ by whether
             # they are an outlier.
+            if context.rejected:
+                continue
+
             if event.event_id in event_map:
                 other = event_map[event.event_id]
 
@@ -498,8 +492,8 @@ class EventsStore(SQLBaseStore):
                     sql,
                     (False, event.event_id,)
                 )
-                if not context.rejected:
-                    self._update_extremeties(txn, [event])
+
+                self._update_extremeties(txn, [event])
 
         events_and_contexts = [
             ec for ec in events_and_contexts if ec[0] not in to_remove
@@ -508,39 +502,8 @@ class EventsStore(SQLBaseStore):
         if not events_and_contexts:
             return
 
-        self._store_mult_state_groups_txn(txn, events_and_contexts)
-
-        self._handle_mult_prev_events(
-            txn,
-            events=[
-                event for event, context in events_and_contexts
-                if not context.rejected
-            ],
-        )
-
-        for event, _ in events_and_contexts:
-            if event.type == EventTypes.Name:
-                self._store_room_name_txn(txn, event)
-            elif event.type == EventTypes.Topic:
-                self._store_room_topic_txn(txn, event)
-            elif event.type == EventTypes.Message:
-                self._store_room_message_txn(txn, event)
-            elif event.type == EventTypes.Redaction:
-                self._store_redaction(txn, event)
-            elif event.type == EventTypes.RoomHistoryVisibility:
-                self._store_history_visibility_txn(txn, event)
-            elif event.type == EventTypes.GuestAccess:
-                self._store_guest_access_txn(txn, event)
-
-        self._store_room_members_txn(
-            txn,
-            [
-                event
-                for event, _ in events_and_contexts
-                if event.type == EventTypes.Member
-            ],
-            backfilled=backfilled,
-        )
+        # From this point onwards the events are only events that we haven't
+        # seen before.
 
         def event_dict(event):
             return {
@@ -594,10 +557,27 @@ class EventsStore(SQLBaseStore):
             ],
         )
 
+        to_remove = set()
         for event, context in events_and_contexts:
             if context.rejected:
                 self._store_rejections_txn(
                     txn, event.event_id, context.rejected
+                )
+                to_remove.add(event.event_id)
+
+        events_and_contexts = [
+            ec for ec in events_and_contexts if ec[0].event_id not in to_remove
+        ]
+
+        if not events_and_contexts:
+            return
+
+        # From this point onwards the events are only ones that weren't rejected.
+
+        for event, context in events_and_contexts:
+            if context.push_actions:
+                self._set_push_actions_for_event_and_users_txn(
+                    txn, event, context.push_actions
                 )
 
         self._simple_insert_many_txn(
@@ -612,6 +592,42 @@ class EventsStore(SQLBaseStore):
                 for event, _ in events_and_contexts
                 for auth_id, _ in event.auth_events
             ],
+        )
+
+        if event.type == EventTypes.Redaction and event.redacts is not None:
+            self._remove_push_actions_for_event_id_txn(
+                txn, event.room_id, event.redacts
+            )
+
+        self._store_mult_state_groups_txn(txn, events_and_contexts)
+
+        self._handle_mult_prev_events(
+            txn,
+            events=[event for event, _ in events_and_contexts],
+        )
+
+        for event, _ in events_and_contexts:
+            if event.type == EventTypes.Name:
+                self._store_room_name_txn(txn, event)
+            elif event.type == EventTypes.Topic:
+                self._store_room_topic_txn(txn, event)
+            elif event.type == EventTypes.Message:
+                self._store_room_message_txn(txn, event)
+            elif event.type == EventTypes.Redaction:
+                self._store_redaction(txn, event)
+            elif event.type == EventTypes.RoomHistoryVisibility:
+                self._store_history_visibility_txn(txn, event)
+            elif event.type == EventTypes.GuestAccess:
+                self._store_guest_access_txn(txn, event)
+
+        self._store_room_members_txn(
+            txn,
+            [
+                event
+                for event, _ in events_and_contexts
+                if event.type == EventTypes.Member
+            ],
+            backfilled=backfilled,
         )
 
         self._store_event_reference_hashes_txn(
@@ -668,11 +684,6 @@ class EventsStore(SQLBaseStore):
         for event, _ in state_events_and_contexts:
             if event.internal_metadata.is_outlier():
                 # Outlier events shouldn't clobber the current state.
-                continue
-
-            if context.rejected:
-                # If the event failed it's auth checks then it shouldn't
-                # clobbler the current state.
                 continue
 
             txn.call_after(

@@ -79,7 +79,7 @@ class StateStore(SQLBaseStore):
 
             state_events = dict(context.current_state)
 
-            if event.is_state() and not context.rejected:
+            if event.is_state():
                 state_events[(event.type, event.state_key)] = event
 
             state_group = context.new_state_group_id
