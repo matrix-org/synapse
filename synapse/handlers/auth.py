@@ -279,8 +279,17 @@ class AuthHandler(BaseHandler):
             data = pde.response
             resp_body = simplejson.loads(data)
 
-        if 'success' in resp_body and resp_body['success']:
-            defer.returnValue(True)
+        if 'success' in resp_body:
+            # Note that we do NOT check the hostname here: we explicitly
+            # intend the CAPTCHA to be presented by whatever client the
+            # user is using, we just care that they have completed a CAPTCHA.
+            logger.info(
+                "%s reCAPTCHA from hostname %s",
+                "Successful" if resp_body['success'] else "Failed",
+                resp_body.get('hostname')
+            )
+            if resp_body['success']:
+                defer.returnValue(True)
         raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
 
     @defer.inlineCallbacks
