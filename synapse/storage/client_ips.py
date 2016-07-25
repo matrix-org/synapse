@@ -15,9 +15,10 @@
 
 import logging
 
-from ._base import SQLBaseStore, Cache
-
 from twisted.internet import defer
+
+from ._base import Cache
+from . import background_updates
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +28,7 @@ logger = logging.getLogger(__name__)
 LAST_SEEN_GRANULARITY = 120 * 1000
 
 
-class ClientIpStore(SQLBaseStore):
-
+class ClientIpStore(background_updates.BackgroundUpdateStore):
     def __init__(self, hs):
         self.client_ip_last_seen = Cache(
             name="client_ip_last_seen",
@@ -36,6 +36,13 @@ class ClientIpStore(SQLBaseStore):
         )
 
         super(ClientIpStore, self).__init__(hs)
+
+        self.register_background_index_update(
+            "user_ips_device_index",
+            index_name="user_ips_device_id",
+            table="user_ips",
+            columns=["user_id", "device_id", "last_seen"],
+        )
 
     @defer.inlineCallbacks
     def insert_client_ip(self, user, access_token, ip, user_agent, device_id):
