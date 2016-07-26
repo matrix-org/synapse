@@ -339,7 +339,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
         Args:
             token (str): The access token of a user.
         Returns:
-            defer.Deferred: None, if the token did not match, ootherwise dict
+            defer.Deferred: None, if the token did not match, otherwise dict
                 including the keys `name`, `is_guest`, `device_id`, `token_id`.
         """
         return self.runInteraction(
