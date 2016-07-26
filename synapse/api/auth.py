@@ -13,22 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
+import pymacaroons
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json, SignatureVerifyException
-
 from twisted.internet import defer
-
-from synapse.api.constants import EventTypes, Membership, JoinRules
-from synapse.api.errors import AuthError, Codes, SynapseError, EventSizeError
-from synapse.types import Requester, UserID, get_domain_from_id
-from synapse.util.logutils import log_function
-from synapse.util.logcontext import preserve_context_over_fn
-from synapse.util.metrics import Measure
 from unpaddedbase64 import decode_base64
 
-import logging
-import pymacaroons
+import synapse.types
+from synapse.api.constants import EventTypes, Membership, JoinRules
+from synapse.api.errors import AuthError, Codes, SynapseError, EventSizeError
+from synapse.types import UserID, get_domain_from_id
+from synapse.util.logcontext import preserve_context_over_fn
+from synapse.util.logutils import log_function
+from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 
@@ -566,8 +566,7 @@ class Auth(object):
         Args:
             request - An HTTP request with an access_token query parameter.
         Returns:
-            defer.Deferred: resolves to a namedtuple including "user" (UserID)
-            "access_token_id" (int), "is_guest" (bool)
+            defer.Deferred: resolves to a ``synapse.types.Requester`` object
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
@@ -576,9 +575,7 @@ class Auth(object):
             user_id = yield self._get_appservice_user_id(request.args)
             if user_id:
                 request.authenticated_entity = user_id
-                defer.returnValue(
-                    Requester(UserID.from_string(user_id), "", False)
-                )
+                defer.returnValue(synapse.types.create_requester(user_id))
 
             access_token = request.args["access_token"][0]
             user_info = yield self.get_user_by_access_token(access_token, rights)
@@ -612,7 +609,8 @@ class Auth(object):
 
             request.authenticated_entity = user.to_string()
 
-            defer.returnValue(Requester(user, token_id, is_guest))
+            defer.returnValue(synapse.types.create_requester(
+                user, token_id, is_guest, device_id))
         except KeyError:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",

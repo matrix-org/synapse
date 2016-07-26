@@ -14,18 +14,19 @@
 # limitations under the License.
 
 """Contains functions for registering clients."""
+import logging
+import urllib
+
 from twisted.internet import defer
 
-from synapse.types import UserID, Requester
+import synapse.types
 from synapse.api.errors import (
     AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError
 )
-from ._base import BaseHandler
-from synapse.util.async import run_on_reactor
 from synapse.http.client import CaptchaServerHttpClient
-
-import logging
-import urllib
+from synapse.types import UserID
+from synapse.util.async import run_on_reactor
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -410,8 +411,9 @@ class RegistrationHandler(BaseHandler):
         if displayname is not None:
             logger.info("setting user display name: %s -> %s", user_id, displayname)
             profile_handler = self.hs.get_handlers().profile_handler
+            requester = synapse.types.create_requester(user)
             yield profile_handler.set_displayname(
-                user, Requester(user, token, False), displayname
+                user, requester, displayname
             )
 
         defer.returnValue((user_id, token))
