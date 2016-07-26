@@ -14,24 +14,22 @@
 # limitations under the License.
 
 
+import logging
+
+from signedjson.key import decode_verify_key_bytes
+from signedjson.sign import verify_signed_json
 from twisted.internet import defer
+from unpaddedbase64 import decode_base64
 
-from ._base import BaseHandler
-
-from synapse.types import UserID, RoomID, Requester
+import synapse.types
 from synapse.api.constants import (
     EventTypes, Membership,
 )
 from synapse.api.errors import AuthError, SynapseError, Codes
+from synapse.types import UserID, RoomID
 from synapse.util.async import Linearizer
 from synapse.util.distributor import user_left_room, user_joined_room
-
-from signedjson.sign import verify_signed_json
-from signedjson.key import decode_verify_key_bytes
-
-from unpaddedbase64 import decode_base64
-
-import logging
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -315,7 +313,7 @@ class RoomMemberHandler(BaseHandler):
             )
             assert self.hs.is_mine(sender), "Sender must be our own: %s" % (sender,)
         else:
-            requester = Requester(target_user, None, False)
+            requester = synapse.types.create_requester(target_user)
 
         message_handler = self.hs.get_handlers().message_handler
         prev_event = message_handler.deduplicate_state_event(event, context)

@@ -13,17 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
+import simplejson as json
+from canonicaljson import encode_canonical_json
 from twisted.internet import defer
 
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import UserID
-
-from canonicaljson import encode_canonical_json
-
 from ._base import client_v2_patterns
-
-import logging
-import simplejson as json
 
 logger = logging.getLogger(__name__)
 
