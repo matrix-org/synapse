@@ -138,8 +138,10 @@ class DeviceHandler(BaseHandler):
             else:
                 raise
 
-        yield self.store.user_delete_access_tokens(user_id,
-                                                   device_id=device_id)
+        yield self.store.user_delete_access_tokens(
+            user_id, device_id=device_id,
+            delete_refresh_tokens=True,
+        )
 
     @defer.inlineCallbacks
     def update_device(self, user_id, device_id, content):

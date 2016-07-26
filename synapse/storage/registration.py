@@ -252,20 +252,36 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
 
     @defer.inlineCallbacks
     def user_delete_access_tokens(self, user_id, except_token_ids=[],
-                                  device_id=None):
-        def f(txn):
-            sql = "SELECT token FROM access_tokens WHERE user_id = ?"
+                                  device_id=None,
+                                  delete_refresh_tokens=False):
+        """
+        Invalidate access/refresh tokens belonging to a user
+
+        Args:
+            user_id (str):  ID of user the tokens belong to
+            except_token_ids (list[str]): list of access_tokens which should
+                *not* be deleted
+            device_id (str|None):  ID of device the tokens are associated with.
+                If None, tokens associated with any device (or no device) will
+                be deleted
+            delete_refresh_tokens (bool):  True to delete refresh tokens as
+                well as access tokens.
+        Returns:
+            defer.Deferred:
+        """
+        def f(txn, table, except_tokens, call_after_delete):
+            sql = "SELECT token FROM %s WHERE user_id = ?" % table
             clauses = [user_id]
 
             if device_id is not None:
                 sql += " AND device_id = ?"
                 clauses.append(device_id)
 
-            if except_token_ids:
+            if except_tokens:
                 sql += " AND id NOT IN (%s)" % (
-                    ",".join(["?" for _ in except_token_ids]),
+                    ",".join(["?" for _ in except_tokens]),
                 )
-                clauses += except_token_ids
+                clauses += except_tokens
 
             txn.execute(sql, clauses)
 
@@ -274,16 +290,33 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             n = 100
             chunks = [rows[i:i + n] for i in xrange(0, len(rows), n)]
             for chunk in chunks:
-                for row in chunk:
-                    txn.call_after(self.get_user_by_access_token.invalidate, (row[0],))
+                if call_after_delete:
+                    for row in chunk:
+                        txn.call_after(call_after_delete, (row[0],))
 
                 txn.execute(
-                    "DELETE FROM access_tokens WHERE token in (%s)" % (
+                    "DELETE FROM %s WHERE token in (%s)" % (
+                        table,
                         ",".join(["?" for _ in chunk]),
                     ), [r[0] for r in chunk]
                 )
 
-        yield self.runInteraction("user_delete_access_tokens", f)
+        # delete refresh tokens first, to stop new access tokens being
+        # allocated while our backs are turned
+        if delete_refresh_tokens:
+            yield self.runInteraction(
+                "user_delete_access_tokens", f,
+                table="refresh_tokens",
+                except_tokens=[],
+                call_after_delete=None,
+            )
+
+        yield self.runInteraction(
+            "user_delete_access_tokens", f,
+            table="access_tokens",
+            except_tokens=except_token_ids,
+            call_after_delete=self.get_user_by_access_token.invalidate,
+        )
 
     def delete_access_token(self, access_token):
         def f(txn):
@@ -306,9 +339,8 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
         Args:
             token (str): The access token of a user.
         Returns:
-            dict: Including the name (user_id) and the ID of their access token.
-        Raises:
-            StoreError if no user was found.
+            defer.Deferred: None, if the token did not match, ootherwise dict
+                including the keys `name`, `is_guest`, `device_id`, `token_id`.
         """
         return self.runInteraction(
             "get_user_by_access_token",
