@@ -522,6 +522,8 @@ class EventsStore(SQLBaseStore):
         ]
 
         if not events_and_contexts:
+            # Make sure we don't pass an empty list to functions that expect to
+            # be storing at least one element.
             return
 
         # From this point onwards the events are only events that we haven't
@@ -608,6 +610,13 @@ class EventsStore(SQLBaseStore):
                     txn, event, context.push_actions
                 )
 
+            if event.type == EventTypes.Redaction and event.redacts is not None:
+                # Remove the entries in the event_push_actions table for the
+                # redacted event.
+                self._remove_push_actions_for_event_id_txn(
+                    txn, event.room_id, event.redacts
+                )
+
         self._simple_insert_many_txn(
             txn,
             table="event_auth",
@@ -621,13 +630,6 @@ class EventsStore(SQLBaseStore):
                 for auth_id, _ in event.auth_events
             ],
         )
-
-        if event.type == EventTypes.Redaction and event.redacts is not None:
-            # Remove the entries in the event_push_actions table for the
-            # redacted event.
-            self._remove_push_actions_for_event_id_txn(
-                txn, event.room_id, event.redacts
-            )
 
         # Insert into the state_groups, state_groups_state, and
         # event_to_state_groups tables.
@@ -716,7 +718,7 @@ class EventsStore(SQLBaseStore):
             ],
         )
 
-        # Prefil the event cache
+        # Prefill the event cache
         self._add_to_cache(txn, events_and_contexts)
 
         if backfilled:
