@@ -376,6 +376,10 @@ class Auth(object):
         if Membership.INVITE == membership and "third_party_invite" in event.content:
             if not self._verify_third_party_invite(event, auth_events):
                 raise AuthError(403, "You are not invited to this room.")
+            if target_banned:
+                raise AuthError(
+                    403, "%s is banned from the room" % (target_user_id,)
+                )
             return True
 
         if Membership.JOIN != membership:
