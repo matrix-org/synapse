@@ -16,13 +16,11 @@
 import sys
 sys.dont_write_bytecode = True
 
-from synapse.python_dependencies import (
-    check_requirements, MissingRequirementError
-)  # NOQA
+from synapse import python_dependencies   # noqa: E402
 
 try:
-    check_requirements()
-except MissingRequirementError as e:
+    python_dependencies.check_requirements()
+except python_dependencies.MissingRequirementError as e:
     message = "\n".join([
         "Missing Requirement: %s" % (e.message,),
         "To install run:",
