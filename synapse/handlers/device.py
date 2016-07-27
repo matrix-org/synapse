@@ -143,6 +143,10 @@ class DeviceHandler(BaseHandler):
             delete_refresh_tokens=True,
         )
 
+        yield self.store.delete_e2e_keys_by_device(
+            user_id=user_id, device_id=device_id
+        )
+
     @defer.inlineCallbacks
     def update_device(self, user_id, device_id, content):
         """ Update the given device

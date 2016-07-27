@@ -86,10 +86,6 @@ class KeyUploadServlet(RestServlet):
                 raise synapse.api.errors.SynapseError(
                     400, "Can only upload keys for current device"
                 )
-
-            self.device_handler.check_device_registered(
-                user_id, device_id, "unknown device"
-            )
         else:
             device_id = requester.device_id
 
@@ -130,6 +126,15 @@ class KeyUploadServlet(RestServlet):
             yield self.store.add_e2e_one_time_keys(
                 user_id, device_id, time_now, key_list
             )
+
+        # the device should have been registered already, but it may have been
+        # deleted due to a race with a DELETE request. Or we may be using an
+        # old access_token without an associated device_id. Either way, we
+        # need to double-check the device is registered to avoid ending up with
+        # keys without a corresponding device.
+        self.device_handler.check_device_registered(
+            user_id, device_id, "unknown device"
+        )
 
         result = yield self.store.count_e2e_one_time_keys(user_id, device_id)
         defer.returnValue((200, {"one_time_key_counts": result}))
