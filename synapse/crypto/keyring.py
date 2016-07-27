@@ -454,7 +454,7 @@ class Keyring(object):
                 )
 
             processed_response = yield self.process_v2_response(
-                perspective_name, response
+                perspective_name, response, only_from_server=False
             )
 
             for server_name, response_keys in processed_response.items():
@@ -534,7 +534,7 @@ class Keyring(object):
 
     @defer.inlineCallbacks
     def process_v2_response(self, from_server, response_json,
-                            requested_ids=[]):
+                            requested_ids=[], only_from_server=True):
         time_now_ms = self.clock.time_msec()
         response_keys = {}
         verify_keys = {}
@@ -558,6 +558,13 @@ class Keyring(object):
 
         results = {}
         server_name = response_json["server_name"]
+        if only_from_server:
+            if server_name != from_server:
+                raise ValueError(
+                    "Expected a response for server %r not %r" % (
+                        from_server, server_name
+                    )
+                )
         for key_id in response_json["signatures"].get(server_name, {}):
             if key_id not in response_json["verify_keys"]:
                 raise ValueError(
