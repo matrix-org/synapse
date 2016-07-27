@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import twisted.internet.defer
+
 from ._base import SQLBaseStore
 
 
@@ -122,4 +124,17 @@ class EndToEndKeyStore(SQLBaseStore):
             return result
         return self.runInteraction(
             "claim_e2e_one_time_keys", _claim_e2e_one_time_keys
+        )
+
+    @twisted.internet.defer.inlineCallbacks
+    def delete_e2e_keys_by_device(self, user_id, device_id):
+        yield self._simple_delete(
+            table="e2e_device_keys_json",
+            keyvalues={"user_id": user_id, "device_id": device_id},
+            desc="delete_e2e_device_keys_by_device"
+        )
+        yield self._simple_delete(
+            table="e2e_one_time_keys_json",
+            keyvalues={"user_id": user_id, "device_id": device_id},
+            desc="delete_e2e_one_time_keys_by_device"
         )
