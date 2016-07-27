@@ -53,6 +53,13 @@ class RegistrationHandler(BaseHandler):
                 Codes.INVALID_USERNAME
             )
 
+        if localpart[0] == '_':
+            raise SynapseError(
+                400,
+                "User ID may not begin with _",
+                Codes.INVALID_USERNAME
+            )
+
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
 
