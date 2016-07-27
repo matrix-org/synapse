@@ -55,7 +55,7 @@ class KeyUploadServlet(RestServlet):
     }
     """
     PATTERNS = client_v2_patterns("/keys/upload(/(?P<device_id>[^/]+))?$",
-                                  releases=(), v2_alpha=False)
+                                  releases=())
 
     def __init__(self, hs):
         """
@@ -78,14 +78,12 @@ class KeyUploadServlet(RestServlet):
 
         if device_id is not None:
             # passing the device_id here is deprecated; however, we allow it
-            # for now for compatibility with older clients. But if a device_id
-            # was given here and in the auth, they must match.
-
+            # for now for compatibility with older clients.
             if (requester.device_id is not None and
                     device_id != requester.device_id):
-                raise synapse.api.errors.SynapseError(
-                    400, "Can only upload keys for current device"
-                )
+                logger.warning("Client uploading keys for a different device "
+                               "(logged in as %s, uploading for %s)",
+                               requester.device_id, device_id)
         else:
             device_id = requester.device_id
 
