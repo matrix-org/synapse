@@ -275,14 +275,15 @@ class Keyring(object):
                     for server_name, groups in missing_groups.items()
                 }
 
-            for group in missing_groups.values():
-                group_id_to_deferred[group.group_id].errback(SynapseError(
-                    401,
-                    "No key for %s with id %s" % (
-                        group.server_name, group.key_ids,
-                    ),
-                    Codes.UNAUTHORIZED,
-                ))
+            for groups in missing_groups.values():
+                for group in groups:
+                    group_id_to_deferred[group.group_id].errback(SynapseError(
+                        401,
+                        "No key for %s with id %s" % (
+                            group.server_name, group.key_ids,
+                        ),
+                        Codes.UNAUTHORIZED,
+                    ))
 
         def on_err(err):
             for deferred in group_id_to_deferred.values():
