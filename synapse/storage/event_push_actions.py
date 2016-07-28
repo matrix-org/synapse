@@ -119,9 +119,28 @@ class EventPushActionsStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_unread_push_actions_for_user_in_range(self, user_id,
                                                   min_stream_ordering,
-                                                  max_stream_ordering=None,
+                                                  max_stream_ordering,
                                                   limit=20):
+        """Get a list of the most recent unread push actions for a given user,
+        within the given stream ordering range.
+
+        Args:
+            user_id (str)
+            min_stream_ordering
+            max_stream_ordering
+            limit (int)
+        Returns:
+            A promise which resolves to a list of dicts with the keys "event_id",
+            "room_id", "stream_ordering", "actions", "received_ts".
+            The list will have between 0~limit entries.
+        """
+        # find rooms that have a read receipt in them and return the most recent
+        # push actions
         def get_after_receipt(txn):
+            # XXX: Do we really need to GROUP BY user_id on the inner SELECT?
+            # XXX: NATURAL JOIN obfuscates which columns are being joined on the
+            #      inner SELECT (the room_id and event_id), can we
+            #      INNER JOIN ... USING instead?
             sql = (
                 "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions, "
                 "e.received_ts "
@@ -160,7 +179,12 @@ class EventPushActionsStore(SQLBaseStore):
             "get_unread_push_actions_for_user_in_range", get_after_receipt
         )
 
+        # There are rooms with push actions in them but you don't have a read receipt in
+        # them e.g. rooms you've been invited to, so get push actions for rooms which do
+        # not have read receipts in them too.
         def get_no_receipt(txn):
+            # XXX: Does the inner SELECT really need to select from the events table?
+            #      We're just extracting the room_id, so isn't receipts_linearized enough?
             sql = (
                 "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,"
                 " e.received_ts"
@@ -198,7 +222,7 @@ class EventPushActionsStore(SQLBaseStore):
         # Now sort it so it's ordered correctly, since currently it will
         # contain results from the first query, correctly ordered, followed
         # by results from the second query, but we want them all ordered
-        # by received_ts
+        # by received_ts (most recent first)
         notifs.sort(key=lambda r: -(r['received_ts'] or 0))
 
         # Now return the first `limit`
