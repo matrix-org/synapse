@@ -25,6 +25,7 @@ from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.keys import SlavedKeyStore
 from synapse.replication.slave.storage.room import RoomStore
+from synapse.replication.slave.storage.transactions import TransactionStore
 from synapse.replication.slave.storage.directory import DirectoryStore
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
@@ -56,6 +57,7 @@ class FederationReaderSlavedStore(
     SlavedKeyStore,
     RoomStore,
     DirectoryStore,
+    TransactionStore,
     BaseSlavedStore,
 ):
     pass
