@@ -24,6 +24,8 @@ from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.keys import SlavedKeyStore
+from synapse.replication.slave.storage.room import RoomStore
+from synapse.replication.slave.storage.directory import DirectoryStore
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.util.async import sleep
@@ -52,6 +54,8 @@ logger = logging.getLogger("synapse.app.federation_reader")
 class FederationReaderSlavedStore(
     SlavedEventStore,
     SlavedKeyStore,
+    RoomStore,
+    DirectoryStore,
     BaseSlavedStore,
 ):
     pass
