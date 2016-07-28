@@ -4,6 +4,9 @@ Changes in synapse v0.17.0-rc1 (2016-07-28)
 This release changes the LDAP configuration format in a backwards incompatible
 way, see PR #843 for details.
 
+This release contains significant security bug fixes regarding authenticating
+events received over federation. Please upgrade.
+
 
 Features:
 
@@ -35,6 +38,7 @@ Changes:
   (PR #927)
 * Add metrics for psutil derived memory usage (PR #936)
 * Record device_id in client_ips (PR #938)
+* Send the correct host header when fetching keys (PR #941)
 * Log the hostname the reCAPTCHA was completed on (PR #946)
 * Make the device id on e2e key upload optional (PR #956)
 * Add r0.2.0 to the "supported versions" list (PR #960)
