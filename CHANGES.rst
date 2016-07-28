@@ -1,3 +1,67 @@
+Changes in synapse v0.17.0-rc1 (2016-07-28)
+===========================================
+
+This release changes the LDAP configuration format in a backwards incompatible
+way, see PR #843 for details.
+
+This release contains significant security bug fixes regarding authenticating
+events received over federation. Please upgrade.
+
+
+Features:
+
+* Add purge_media_cache admin API (PR #902)
+* Add deactivate account admin API (PR #903)
+* Add optional pepper to password hashing (PR #907, #910 by KentShikama)
+* Add an admin option to shared secret registration (breaks backwards compat)
+  (PR #909)
+* Add purge local room history API (PR #911, #923, #924)
+* Add requestToken endpoints (PR #915)
+* Add an /account/deactivate endpoint (PR #921)
+* Add filter param to /messages. Add 'contains_url' to filter. (PR #922)
+* Add device_id support to /login (PR #929)
+* Add device_id support to /v2/register flow. (PR #937, #942)
+* Add GET /devices endpoint (PR #939, #944)
+* Add GET /device/{deviceId} (PR #943)
+* Add update and delete APIs for devices (PR #949)
+
+
+Changes:
+
+* Rewrite LDAP Authentication against ldap3 (PR #843 by mweinelt)
+* Linearize some federation endpoints based on (origin, room_id) (PR #879)
+* Remove the legacy v0 content upload API. (PR #888)
+* Use similar naming we use in email notifs for push (PR #894)
+* Optionally include password hash in createUser endpoint (PR #905 by
+  KentShikama)
+* Use a query that postgresql optimises better for get_events_around (PR #906)
+* Fall back to 'username' if 'user' is not given for appservice registration.
+  (PR #927 by Half-Shot)
+* Add metrics for psutil derived memory usage (PR #936)
+* Record device_id in client_ips (PR #938)
+* Send the correct host header when fetching keys (PR #941)
+* Log the hostname the reCAPTCHA was completed on (PR #946)
+* Make the device id on e2e key upload optional (PR #956)
+* Add r0.2.0 to the "supported versions" list (PR #960)
+* Don't include name of room for invites in push (PR #961)
+
+
+Bug fixes:
+
+* Fix substitution failure in mail template (PR #887)
+* Put most recent 20 messages in email notif (PR #892)
+* Ensure that the guest user is in the database when upgrading accounts
+  (PR #914)
+* Fix various edge cases in auth handling (PR #919)
+* Fix 500 ISE when sending alias event without a state_key (PR #925)
+* Fix bug where we stored rejections in the state_group, persist all
+  rejections (PR #948)
+* Fix lack of check of if the user is banned when handling 3pid invites
+  (PR #952)
+* Fix a couple of bugs in the transaction and keyring code (PR #954, #955)
+
+
+
 Changes in synapse v0.16.1-r1 (2016-07-08)
 ==========================================
 
