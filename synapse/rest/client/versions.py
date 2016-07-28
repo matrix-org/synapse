@@ -28,6 +28,7 @@ class VersionsRestServlet(RestServlet):
         return (200, {
             "versions": [
                 "r0.0.1",
+                "r0.1.0",
                 "r0.2.0",
             ]
         })
