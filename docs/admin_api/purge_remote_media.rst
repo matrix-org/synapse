@@ -6,7 +6,7 @@ media.
 
 The API is::
 
-    POST /_matrix/client/r0/admin/purge_history/
+    POST /_matrix/client/r0/admin/purge_media_cache
 
     {
         "before_ts": <unix_timestamp_in_ms>
