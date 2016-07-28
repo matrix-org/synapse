@@ -147,6 +147,10 @@ class SlavedEventStore(BaseSlavedStore):
     get_missing_events = DataStore.get_missing_events.__func__
     _get_missing_events = DataStore._get_missing_events.__func__
 
+    get_auth_chain = DataStore.get_auth_chain.__func__
+    get_auth_chain_ids = DataStore.get_auth_chain_ids.__func__
+    _get_auth_chain_ids_txn = DataStore._get_auth_chain_ids_txn.__func__
+
     def stream_positions(self):
         result = super(SlavedEventStore, self).stream_positions()
         result["events"] = self._stream_id_gen.get_current_token()
