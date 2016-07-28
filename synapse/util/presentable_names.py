@@ -83,7 +83,10 @@ def calculate_room_name(room_state, user_id, fallback_to_members=True,
     ):
         if ("m.room.member", my_member_event.sender) in room_state:
             inviter_member_event = room_state[("m.room.member", my_member_event.sender)]
-            return "Invite from %s" % (name_from_member_event(inviter_member_event),)
+            if fallback_to_single_member:
+                return "Invite from %s" % (name_from_member_event(inviter_member_event),)
+            else:
+                return None
         else:
             return "Room Invite"
 
