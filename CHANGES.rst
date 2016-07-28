@@ -12,7 +12,7 @@ Features:
 
 * Add purge_media_cache admin API (PR #902)
 * Add deactivate account admin API (PR #903)
-* Add optional pepper to password hashing (PR #907, #910)
+* Add optional pepper to password hashing (PR #907, #910 by KentShikama)
 * Add an admin option to shared secret registration (breaks backwards compat)
   (PR #909)
 * Add purge local room history API (PR #911, #923, #924)
@@ -28,14 +28,15 @@ Features:
 
 Changes:
 
-* Rewrite LDAP Authentication against ldap3 (PR #843)
+* Rewrite LDAP Authentication against ldap3 (PR #843 by mweinelt)
 * Linearize some federation endpoints based on (origin, room_id) (PR #879)
 * Remove the legacy v0 content upload API. (PR #888)
 * Use similar naming we use in email notifs for push (PR #894)
-* Optionally include password hash in createUser endpoint (PR #905)
+* Optionally include password hash in createUser endpoint (PR #905 by
+  KentShikama)
 * Use a query that postgresql optimises better for get_events_around (PR #906)
 * Fall back to 'username' if 'user' is not given for appservice registration.
-  (PR #927)
+  (PR #927 by Half-Shot)
 * Add metrics for psutil derived memory usage (PR #936)
 * Record device_id in client_ips (PR #938)
 * Send the correct host header when fetching keys (PR #941)
