@@ -54,7 +54,7 @@ def get_context_for_event(state_handler, ev, user_id):
     room_state = yield state_handler.get_current_state(ev.room_id)
 
     # we no longer bother setting room_alias, and make room_name the
-    # human-readable name instead, be that m.room.namer, an alias or
+    # human-readable name instead, be that m.room.name, an alias or
     # a list of people in the room
     name = calculate_room_name(
         room_state, user_id, fallback_to_single_member=False
