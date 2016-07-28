@@ -1,5 +1,5 @@
-Changes in synapse v0.17.0-r1 (2016-07-27)
-==========================================
+Changes in synapse v0.17.0-rc1 (2016-07-28)
+===========================================
 
 This release changes the LDAP configuration format in a backwards incompatible
 way, see PR #843 for details.
@@ -36,6 +36,9 @@ Changes:
 * Add metrics for psutil derived memory usage (PR #936)
 * Record device_id in client_ips (PR #938)
 * Log the hostname the reCAPTCHA was completed on (PR #946)
+* Make the device id on e2e key upload optional (PR #956)
+* Add r0.2.0 to the "supported versions" list (PR #960)
+* Don't include name of room for invites in push (PR #961)
 
 
 Bug fixes:
