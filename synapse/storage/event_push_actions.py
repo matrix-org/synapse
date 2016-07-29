@@ -272,8 +272,8 @@ class EventPushActionsStore(SQLBaseStore):
                 "           AND ep.stream_ordering > rl.stream_ordering"
                 "       )"
                 "   )"
-                "   AND ep.stream_ordering > ?"
                 "   AND ep.user_id = ?"
+                "   AND ep.stream_ordering > ?"
                 "   AND ep.stream_ordering <= ?"
                 " ORDER BY ep.stream_ordering DESC LIMIT ?"
             )
