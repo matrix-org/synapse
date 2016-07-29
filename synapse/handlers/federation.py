@@ -1160,6 +1160,12 @@ class FederationHandler(BaseHandler):
         state and event. Then persists the auth chain and state atomically.
         Persists the event seperately.
 
+        Args:
+            origin (str): Where the events came from
+            auth_events (list)
+            state (list)
+            event (Event)
+
         Returns:
             2-tuple of (event_stream_id, max_stream_id) from the persist_event
             call for `event`
