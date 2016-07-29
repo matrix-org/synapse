@@ -1160,6 +1160,8 @@ class FederationHandler(BaseHandler):
         state and event. Then persists the auth chain and state atomically.
         Persists the event seperately.
 
+        Will attempt to fetch missing auth events.
+
         Args:
             origin (str): Where the events came from
             auth_events (list)
