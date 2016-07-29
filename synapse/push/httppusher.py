@@ -141,7 +141,8 @@ class HttpPusher(object):
         run once per pusher.
         """
 
-        unprocessed = yield self.store.get_unread_push_actions_for_user_in_range(
+        fn = self.store.get_unread_push_actions_for_user_in_range_for_http
+        unprocessed = yield fn(
             self.user_id, self.last_stream_ordering, self.max_stream_ordering
         )
 
