@@ -13,5 +13,7 @@
  * limitations under the License.
  */
 
-INSERT INTO background_updates (update_name, progress_json) VALUES
-  ('user_ips_device_index', '{}');
+-- make sure that we have a device record for each set of E2E keys, so that the
+-- user can delete them if they like.
+INSERT INTO devices
+    SELECT user_id, device_id, 'unknown device' FROM e2e_device_keys_json;

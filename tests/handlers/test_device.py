@@ -12,11 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse import types
+
 from twisted.internet import defer
 
+import synapse.api.errors
 import synapse.handlers.device
+
 import synapse.storage
+from synapse import types
 from tests import unittest, utils
 
 user1 = "@boris:aaa"
@@ -27,7 +30,7 @@ class DeviceTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(DeviceTestCase, self).__init__(*args, **kwargs)
         self.store = None    # type: synapse.storage.DataStore
-        self.handler = None  # type: device.DeviceHandler
+        self.handler = None  # type: synapse.handlers.device.DeviceHandler
         self.clock = None    # type: utils.MockClock
 
     @defer.inlineCallbacks
@@ -84,28 +87,31 @@ class DeviceTestCase(unittest.TestCase):
         yield self._record_users()
 
         res = yield self.handler.get_devices_by_user(user1)
-        self.assertEqual(3, len(res.keys()))
+        self.assertEqual(3, len(res))
+        device_map = {
+            d["device_id"]: d for d in res
+        }
         self.assertDictContainsSubset({
             "user_id": user1,
             "device_id": "xyz",
             "display_name": "display 0",
             "last_seen_ip": None,
             "last_seen_ts": None,
-        }, res["xyz"])
+        }, device_map["xyz"])
         self.assertDictContainsSubset({
             "user_id": user1,
             "device_id": "fco",
             "display_name": "display 1",
             "last_seen_ip": "ip1",
             "last_seen_ts": 1000000,
-        }, res["fco"])
+        }, device_map["fco"])
         self.assertDictContainsSubset({
             "user_id": user1,
             "device_id": "abc",
             "display_name": "display 2",
             "last_seen_ip": "ip3",
             "last_seen_ts": 3000000,
-        }, res["abc"])
+        }, device_map["abc"])
 
     @defer.inlineCallbacks
     def test_get_device(self):
@@ -119,6 +125,37 @@ class DeviceTestCase(unittest.TestCase):
             "last_seen_ip": "ip3",
             "last_seen_ts": 3000000,
         }, res)
+
+    @defer.inlineCallbacks
+    def test_delete_device(self):
+        yield self._record_users()
+
+        # delete the device
+        yield self.handler.delete_device(user1, "abc")
+
+        # check the device was deleted
+        with self.assertRaises(synapse.api.errors.NotFoundError):
+            yield self.handler.get_device(user1, "abc")
+
+        # we'd like to check the access token was invalidated, but that's a
+        # bit of a PITA.
+
+    @defer.inlineCallbacks
+    def test_update_device(self):
+        yield self._record_users()
+
+        update = {"display_name": "new display"}
+        yield self.handler.update_device(user1, "abc", update)
+
+        res = yield self.handler.get_device(user1, "abc")
+        self.assertEqual(res["display_name"], "new display")
+
+    @defer.inlineCallbacks
+    def test_update_unknown_device(self):
+        update = {"display_name": "new_display"}
+        with self.assertRaises(synapse.api.errors.NotFoundError):
+            yield self.handler.update_device("user_id", "unknown_device_id",
+                                             update)
 
     @defer.inlineCallbacks
     def _record_users(self):

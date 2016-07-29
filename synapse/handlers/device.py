@@ -79,17 +79,17 @@ class DeviceHandler(BaseHandler):
         Args:
             user_id (str):
         Returns:
-            defer.Deferred: dict[str, dict[str, X]]: map from device_id to
-            info on the device
+            defer.Deferred: list[dict[str, X]]: info on each device
         """
 
-        devices = yield self.store.get_devices_by_user(user_id)
+        device_map = yield self.store.get_devices_by_user(user_id)
 
         ips = yield self.store.get_last_client_ip_by_device(
-            devices=((user_id, device_id) for device_id in devices.keys())
+            devices=((user_id, device_id) for device_id in device_map.keys())
         )
 
-        for device in devices.values():
+        devices = device_map.values()
+        for device in devices:
             _update_device_from_client_ips(device, ips)
 
         defer.returnValue(devices)
@@ -100,7 +100,7 @@ class DeviceHandler(BaseHandler):
 
         Args:
             user_id (str):
-            device_id (str)
+            device_id (str):
 
         Returns:
             defer.Deferred: dict[str, X]: info on the device
@@ -116,6 +116,61 @@ class DeviceHandler(BaseHandler):
         )
         _update_device_from_client_ips(device, ips)
         defer.returnValue(device)
+
+    @defer.inlineCallbacks
+    def delete_device(self, user_id, device_id):
+        """ Delete the given device
+
+        Args:
+            user_id (str):
+            device_id (str):
+
+        Returns:
+            defer.Deferred:
+        """
+
+        try:
+            yield self.store.delete_device(user_id, device_id)
+        except errors.StoreError, e:
+            if e.code == 404:
+                # no match
+                pass
+            else:
+                raise
+
+        yield self.store.user_delete_access_tokens(
+            user_id, device_id=device_id,
+            delete_refresh_tokens=True,
+        )
+
+        yield self.store.delete_e2e_keys_by_device(
+            user_id=user_id, device_id=device_id
+        )
+
+    @defer.inlineCallbacks
+    def update_device(self, user_id, device_id, content):
+        """ Update the given device
+
+        Args:
+            user_id (str):
+            device_id (str):
+            content (dict): body of update request
+
+        Returns:
+            defer.Deferred:
+        """
+
+        try:
+            yield self.store.update_device(
+                user_id,
+                device_id,
+                new_display_name=content.get("display_name")
+            )
+        except errors.StoreError, e:
+            if e.code == 404:
+                raise errors.NotFoundError()
+            else:
+                raise
 
 
 def _update_device_from_client_ips(device, client_ips):

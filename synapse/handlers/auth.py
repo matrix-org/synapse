@@ -77,6 +77,7 @@ class AuthHandler(BaseHandler):
                 self.ldap_bind_password = hs.config.ldap_bind_password
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
+        self.device_handler = hs.get_device_handler()
 
     @defer.inlineCallbacks
     def check_auth(self, flows, clientdict, clientip):
@@ -279,8 +280,17 @@ class AuthHandler(BaseHandler):
             data = pde.response
             resp_body = simplejson.loads(data)
 
-        if 'success' in resp_body and resp_body['success']:
-            defer.returnValue(True)
+        if 'success' in resp_body:
+            # Note that we do NOT check the hostname here: we explicitly
+            # intend the CAPTCHA to be presented by whatever client the
+            # user is using, we just care that they have completed a CAPTCHA.
+            logger.info(
+                "%s reCAPTCHA from hostname %s",
+                "Successful" if resp_body['success'] else "Failed",
+                resp_body.get('hostname')
+            )
+            if resp_body['success']:
+                defer.returnValue(True)
         raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
 
     @defer.inlineCallbacks
@@ -365,7 +375,8 @@ class AuthHandler(BaseHandler):
         return self._check_password(user_id, password)
 
     @defer.inlineCallbacks
-    def get_login_tuple_for_user_id(self, user_id, device_id=None):
+    def get_login_tuple_for_user_id(self, user_id, device_id=None,
+                                    initial_display_name=None):
         """
         Gets login tuple for the user with the given user ID.
 
@@ -374,9 +385,15 @@ class AuthHandler(BaseHandler):
         The user is assumed to have been authenticated by some other
         machanism (e.g. CAS), and the user_id converted to the canonical case.
 
+        The device will be recorded in the table if it is not there already.
+
         Args:
             user_id (str): canonical User ID
-            device_id (str): the device ID to associate with the access token
+            device_id (str|None): the device ID to associate with the tokens.
+               None to leave the tokens unassociated with a device (deprecated:
+               we should always have a device ID)
+            initial_display_name (str): display name to associate with the
+               device if it needs re-registering
         Returns:
             A tuple of:
               The access token for the user's session.
@@ -388,6 +405,16 @@ class AuthHandler(BaseHandler):
         logger.info("Logging in user %s on device %s", user_id, device_id)
         access_token = yield self.issue_access_token(user_id, device_id)
         refresh_token = yield self.issue_refresh_token(user_id, device_id)
+
+        # the device *should* have been registered before we got here; however,
+        # it's possible we raced against a DELETE operation. The thing we
+        # really don't want is active access_tokens without a record of the
+        # device, so we double-check it here.
+        if device_id is not None:
+            yield self.device_handler.check_device_registered(
+                user_id, device_id, initial_display_name
+            )
+
         defer.returnValue((access_token, refresh_token))
 
     @defer.inlineCallbacks

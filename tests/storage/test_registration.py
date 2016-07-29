@@ -128,6 +128,40 @@ class RegistrationStoreTestCase(unittest.TestCase):
         with self.assertRaises(StoreError):
             yield self.store.exchange_refresh_token(last_token, generator.generate)
 
+    @defer.inlineCallbacks
+    def test_user_delete_access_tokens(self):
+        # add some tokens
+        generator = TokenGenerator()
+        refresh_token = generator.generate(self.user_id)
+        yield self.store.register(self.user_id, self.tokens[0], self.pwhash)
+        yield self.store.add_access_token_to_user(self.user_id, self.tokens[1],
+                                                  self.device_id)
+        yield self.store.add_refresh_token_to_user(self.user_id, refresh_token,
+                                                   self.device_id)
+
+        # now delete some
+        yield self.store.user_delete_access_tokens(
+            self.user_id, device_id=self.device_id, delete_refresh_tokens=True)
+
+        # check they were deleted
+        user = yield self.store.get_user_by_access_token(self.tokens[1])
+        self.assertIsNone(user, "access token was not deleted by device_id")
+        with self.assertRaises(StoreError):
+            yield self.store.exchange_refresh_token(refresh_token,
+                                                    generator.generate)
+
+        # check the one not associated with the device was not deleted
+        user = yield self.store.get_user_by_access_token(self.tokens[0])
+        self.assertEqual(self.user_id, user["name"])
+
+        # now delete the rest
+        yield self.store.user_delete_access_tokens(
+            self.user_id, delete_refresh_tokens=True)
+
+        user = yield self.store.get_user_by_access_token(self.tokens[0])
+        self.assertIsNone(user,
+                          "access token was not deleted without device_id")
+
 
 class TokenGenerator:
     def __init__(self):

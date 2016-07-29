@@ -19,11 +19,12 @@ from twisted.internet import defer
 
 from mock import Mock, NonCallableMock
 
+import synapse.types
 from synapse.api.errors import AuthError
 from synapse.handlers.profile import ProfileHandler
 from synapse.types import UserID
 
-from tests.utils import setup_test_homeserver, requester_for_user
+from tests.utils import setup_test_homeserver
 
 
 class ProfileHandlers(object):
@@ -86,7 +87,7 @@ class ProfileTestCase(unittest.TestCase):
     def test_set_my_name(self):
         yield self.handler.set_displayname(
             self.frank,
-            requester_for_user(self.frank),
+            synapse.types.create_requester(self.frank),
             "Frank Jr."
         )
 
@@ -99,7 +100,7 @@ class ProfileTestCase(unittest.TestCase):
     def test_set_my_name_noauth(self):
         d = self.handler.set_displayname(
             self.frank,
-            requester_for_user(self.bob),
+            synapse.types.create_requester(self.bob),
             "Frank Jr."
         )
 
@@ -144,7 +145,8 @@ class ProfileTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_set_my_avatar(self):
         yield self.handler.set_avatar_url(
-            self.frank, requester_for_user(self.frank), "http://my.server/pic.gif"
+            self.frank, synapse.types.create_requester(self.frank),
+            "http://my.server/pic.gif"
         )
 
         self.assertEquals(

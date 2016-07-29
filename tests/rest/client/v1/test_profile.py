@@ -14,17 +14,14 @@
 # limitations under the License.
 
 """Tests REST events for /profile paths."""
-from tests import unittest
+from mock import Mock
 from twisted.internet import defer
 
-from mock import Mock
-
-from ....utils import MockHttpResource, setup_test_homeserver
-
+import synapse.types
 from synapse.api.errors import SynapseError, AuthError
-from synapse.types import Requester, UserID
-
 from synapse.rest.client.v1 import profile
+from tests import unittest
+from ....utils import MockHttpResource, setup_test_homeserver
 
 myid = "@1234ABCD:test"
 PATH_PREFIX = "/_matrix/client/api/v1"
@@ -52,7 +49,7 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         def _get_user_by_req(request=None, allow_guest=False):
-            return Requester(UserID.from_string(myid), "", False)
+            return synapse.types.create_requester(myid)
 
         hs.get_v1auth().get_user_by_req = _get_user_by_req
 

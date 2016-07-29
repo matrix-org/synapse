@@ -128,7 +128,7 @@ class RetryDestinationLimiter(object):
             )
 
         valid_err_code = False
-        if exc_type is CodeMessageException:
+        if exc_type is not None and issubclass(exc_type, CodeMessageException):
             valid_err_code = 0 <= exc_val.code < 500
 
         if exc_type is None or valid_err_code:

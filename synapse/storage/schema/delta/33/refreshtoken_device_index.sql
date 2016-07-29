@@ -14,4 +14,4 @@
  */
 
 INSERT INTO background_updates (update_name, progress_json) VALUES
-  ('user_ips_device_index', '{}');
+  ('refresh_tokens_device_index', '{}');

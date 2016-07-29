@@ -13,15 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.replication.resource import ReplicationResource
-from synapse.types import Requester, UserID
-
-from twisted.internet import defer
-from tests import unittest
-from tests.utils import setup_test_homeserver, requester_for_user
-from mock import Mock, NonCallableMock
-import json
 import contextlib
+import json
+
+from mock import Mock, NonCallableMock
+from twisted.internet import defer
+
+import synapse.types
+from synapse.replication.resource import ReplicationResource
+from synapse.types import UserID
+from tests import unittest
+from tests.utils import setup_test_homeserver
 
 
 class ReplicationResourceCase(unittest.TestCase):
@@ -61,7 +63,7 @@ class ReplicationResourceCase(unittest.TestCase):
     def test_events_and_state(self):
         get = self.get(events="-1", state="-1", timeout="0")
         yield self.hs.get_handlers().room_creation_handler.create_room(
-            Requester(self.user, "", False), {}
+            synapse.types.create_requester(self.user), {}
         )
         code, body = yield get
         self.assertEquals(code, 200)
@@ -144,7 +146,7 @@ class ReplicationResourceCase(unittest.TestCase):
     def send_text_message(self, room_id, message):
         handler = self.hs.get_handlers().message_handler
         event = yield handler.create_and_send_nonmember_event(
-            requester_for_user(self.user),
+            synapse.types.create_requester(self.user),
             {
                 "type": "m.room.message",
                 "content": {"body": "message", "msgtype": "m.text"},
@@ -157,7 +159,7 @@ class ReplicationResourceCase(unittest.TestCase):
     @defer.inlineCallbacks
     def create_room(self):
         result = yield self.hs.get_handlers().room_creation_handler.create_room(
-            Requester(self.user, "", False), {}
+            synapse.types.create_requester(self.user), {}
         )
         defer.returnValue(result["room_id"])
 
