@@ -124,7 +124,7 @@ class FederationHandler(BaseHandler):
 
             try:
                 event_stream_id, max_stream_id = yield self._persist_auth_tree(
-                    auth_chain, state, event
+                    origin, auth_chain, state, event
                 )
             except AuthError as e:
                 raise FederationError(
@@ -637,7 +637,7 @@ class FederationHandler(BaseHandler):
                 pass
 
             event_stream_id, max_stream_id = yield self._persist_auth_tree(
-                auth_chain, state, event
+                origin, auth_chain, state, event
             )
 
             with PreserveLoggingContext():
@@ -1155,10 +1155,18 @@ class FederationHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def _persist_auth_tree(self, auth_events, state, event):
+    def _persist_auth_tree(self, origin, auth_events, state, event):
         """Checks the auth chain is valid (and passes auth checks) for the
         state and event. Then persists the auth chain and state atomically.
         Persists the event seperately.
+
+        Will attempt to fetch missing auth events.
+
+        Args:
+            origin (str): Where the events came from
+            auth_events (list)
+            state (list)
+            event (Event)
 
         Returns:
             2-tuple of (event_stream_id, max_stream_id) from the persist_event
@@ -1172,7 +1180,7 @@ class FederationHandler(BaseHandler):
 
         event_map = {
             e.event_id: e
-            for e in auth_events
+            for e in itertools.chain(auth_events, state, [event])
         }
 
         create_event = None
@@ -1181,10 +1189,29 @@ class FederationHandler(BaseHandler):
                 create_event = e
                 break
 
+        missing_auth_events = set()
+        for e in itertools.chain(auth_events, state, [event]):
+            for e_id, _ in e.auth_events:
+                if e_id not in event_map:
+                    missing_auth_events.add(e_id)
+
+        for e_id in missing_auth_events:
+            m_ev = yield self.replication_layer.get_pdu(
+                [origin],
+                e_id,
+                outlier=True,
+                timeout=10000,
+            )
+            if m_ev and m_ev.event_id == e_id:
+                event_map[e_id] = m_ev
+            else:
+                logger.info("Failed to find auth event %r", e_id)
+
         for e in itertools.chain(auth_events, state, [event]):
             auth_for_e = {
                 (event_map[e_id].type, event_map[e_id].state_key): event_map[e_id]
                 for e_id, _ in e.auth_events
+                if e_id in event_map
             }
             if create_event:
                 auth_for_e[(EventTypes.Create, "")] = create_event
