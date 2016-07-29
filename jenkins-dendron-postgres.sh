@@ -82,6 +82,7 @@ echo >&2 "Running sytest with PostgreSQL";
                              --dendron $WORKSPACE/dendron/bin/dendron \
                              --pusher \
                              --synchrotron \
+                             --federation-reader \
                              --port-range ${PORT_BASE}:$((PORT_BASE+PORT_COUNT-1))
 
 cd ..
