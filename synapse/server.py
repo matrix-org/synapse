@@ -19,39 +19,38 @@
 # partial one for unit test mocking.
 
 # Imports required for the default HomeServer() implementation
-from twisted.web.client import BrowserLikePolicyForHTTPS
-from twisted.enterprise import adbapi
-
-from synapse.appservice.scheduler import ApplicationServiceScheduler
-from synapse.appservice.api import ApplicationServiceApi
-from synapse.federation import initialize_http_replication
-from synapse.handlers.device import DeviceHandler
-from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
-from synapse.notifier import Notifier
-from synapse.api.auth import Auth
-from synapse.handlers import Handlers
-from synapse.handlers.presence import PresenceHandler
-from synapse.handlers.sync import SyncHandler
-from synapse.handlers.typing import TypingHandler
-from synapse.handlers.room import RoomListHandler
-from synapse.handlers.auth import AuthHandler
-from synapse.handlers.appservice import ApplicationServicesHandler
-from synapse.state import StateHandler
-from synapse.storage import DataStore
-from synapse.util import Clock
-from synapse.util.distributor import Distributor
-from synapse.streams.events import EventSources
-from synapse.api.ratelimiting import Ratelimiter
-from synapse.crypto.keyring import Keyring
-from synapse.push.pusherpool import PusherPool
-from synapse.events.builder import EventBuilderFactory
-from synapse.api.filtering import Filtering
-from synapse.rest.media.v1.media_repository import MediaRepository
-
-from synapse.http.matrixfederationclient import MatrixFederationHttpClient
-
 import logging
 
+from twisted.enterprise import adbapi
+from twisted.web.client import BrowserLikePolicyForHTTPS
+
+from synapse.api.auth import Auth
+from synapse.api.filtering import Filtering
+from synapse.api.ratelimiting import Ratelimiter
+from synapse.appservice.api import ApplicationServiceApi
+from synapse.appservice.scheduler import ApplicationServiceScheduler
+from synapse.crypto.keyring import Keyring
+from synapse.events.builder import EventBuilderFactory
+from synapse.federation import initialize_http_replication
+from synapse.handlers import Handlers
+from synapse.handlers.appservice import ApplicationServicesHandler
+from synapse.handlers.auth import AuthHandler
+from synapse.handlers.device import DeviceHandler
+from synapse.handlers.e2e_keys import E2eKeysHandler
+from synapse.handlers.presence import PresenceHandler
+from synapse.handlers.room import RoomListHandler
+from synapse.handlers.sync import SyncHandler
+from synapse.handlers.typing import TypingHandler
+from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
+from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+from synapse.notifier import Notifier
+from synapse.push.pusherpool import PusherPool
+from synapse.rest.media.v1.media_repository import MediaRepository
+from synapse.state import StateHandler
+from synapse.storage import DataStore
+from synapse.streams.events import EventSources
+from synapse.util import Clock
+from synapse.util.distributor import Distributor
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +93,7 @@ class HomeServer(object):
         'room_list_handler',
         'auth_handler',
         'device_handler',
+        'e2e_keys_handler',
         'application_service_api',
         'application_service_scheduler',
         'application_service_handler',
@@ -201,6 +201,9 @@ class HomeServer(object):
 
     def build_device_handler(self):
         return DeviceHandler(self)
+
+    def build_e2e_keys_handler(self):
+        return E2eKeysHandler(self)
 
     def build_application_service_api(self):
         return ApplicationServiceApi(self)
