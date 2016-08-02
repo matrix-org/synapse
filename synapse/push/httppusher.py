@@ -16,6 +16,7 @@
 from synapse.push import PusherConfigException
 
 from twisted.internet import defer, reactor
+from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
 import logging
 import push_rule_evaluator
@@ -109,7 +110,11 @@ class HttpPusher(object):
 
     def on_stop(self):
         if self.timed_call:
-            self.timed_call.cancel()
+            try:
+                self.timed_call.cancel()
+            except (AlreadyCalled, AlreadyCancelled):
+                pass
+            self.timed_call = None
 
     @defer.inlineCallbacks
     def _process(self):
@@ -141,7 +146,8 @@ class HttpPusher(object):
         run once per pusher.
         """
 
-        unprocessed = yield self.store.get_unread_push_actions_for_user_in_range(
+        fn = self.store.get_unread_push_actions_for_user_in_range_for_http
+        unprocessed = yield fn(
             self.user_id, self.last_stream_ordering, self.max_stream_ordering
         )
 

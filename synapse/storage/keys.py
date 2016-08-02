@@ -22,6 +22,10 @@ import OpenSSL
 from signedjson.key import decode_verify_key_bytes
 import hashlib
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class KeyStore(SQLBaseStore):
     """Persistence for signature verification keys and tls X.509 certificates
@@ -74,22 +78,22 @@ class KeyStore(SQLBaseStore):
         )
 
     @cachedInlineCallbacks()
-    def get_all_server_verify_keys(self, server_name):
-        rows = yield self._simple_select_list(
+    def _get_server_verify_key(self, server_name, key_id):
+        verify_key_bytes = yield self._simple_select_one_onecol(
             table="server_signature_keys",
             keyvalues={
                 "server_name": server_name,
+                "key_id": key_id,
             },
-            retcols=["key_id", "verify_key"],
-            desc="get_all_server_verify_keys",
+            retcol="verify_key",
+            desc="_get_server_verify_key",
+            allow_none=True,
         )
 
-        defer.returnValue({
-            row["key_id"]: decode_verify_key_bytes(
-                row["key_id"], str(row["verify_key"])
-            )
-            for row in rows
-        })
+        if verify_key_bytes:
+            defer.returnValue(decode_verify_key_bytes(
+                key_id, str(verify_key_bytes)
+            ))
 
     @defer.inlineCallbacks
     def get_server_verify_keys(self, server_name, key_ids):
@@ -101,12 +105,12 @@ class KeyStore(SQLBaseStore):
         Returns:
             (list of VerifyKey): The verification keys.
         """
-        keys = yield self.get_all_server_verify_keys(server_name)
-        defer.returnValue({
-            k: keys[k]
-            for k in key_ids
-            if k in keys and keys[k]
-        })
+        keys = {}
+        for key_id in key_ids:
+            key = yield self._get_server_verify_key(server_name, key_id)
+            if key:
+                keys[key_id] = key
+        defer.returnValue(keys)
 
     @defer.inlineCallbacks
     def store_server_verify_key(self, server_name, from_server, time_now_ms,
@@ -132,8 +136,6 @@ class KeyStore(SQLBaseStore):
             },
             desc="store_server_verify_key",
         )
-
-        self.get_all_server_verify_keys.invalidate((server_name,))
 
     def store_server_keys_json(self, server_name, key_id, from_server,
                                ts_now_ms, ts_expires_ms, key_json_bytes):

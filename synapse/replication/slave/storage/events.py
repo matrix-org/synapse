@@ -93,8 +93,11 @@ class SlavedEventStore(BaseSlavedStore):
         StreamStore.__dict__["get_recent_event_ids_for_room"]
     )
 
-    get_unread_push_actions_for_user_in_range = (
-        DataStore.get_unread_push_actions_for_user_in_range.__func__
+    get_unread_push_actions_for_user_in_range_for_http = (
+        DataStore.get_unread_push_actions_for_user_in_range_for_http.__func__
+    )
+    get_unread_push_actions_for_user_in_range_for_email = (
+        DataStore.get_unread_push_actions_for_user_in_range_for_email.__func__
     )
     get_push_action_users_in_range = (
         DataStore.get_push_action_users_in_range.__func__
@@ -141,6 +144,15 @@ class SlavedEventStore(BaseSlavedStore):
     _get_all_state_from_cache = DataStore._get_all_state_from_cache.__func__
     _get_events_around_txn = DataStore._get_events_around_txn.__func__
     _get_some_state_from_cache = DataStore._get_some_state_from_cache.__func__
+
+    get_backfill_events = DataStore.get_backfill_events.__func__
+    _get_backfill_events = DataStore._get_backfill_events.__func__
+    get_missing_events = DataStore.get_missing_events.__func__
+    _get_missing_events = DataStore._get_missing_events.__func__
+
+    get_auth_chain = DataStore.get_auth_chain.__func__
+    get_auth_chain_ids = DataStore.get_auth_chain_ids.__func__
+    _get_auth_chain_ids_txn = DataStore._get_auth_chain_ids_txn.__func__
 
     def stream_positions(self):
         result = super(SlavedEventStore, self).stream_positions()

@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from twisted.internet import defer, reactor
+from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
 import logging
 
@@ -92,7 +93,11 @@ class EmailPusher(object):
 
     def on_stop(self):
         if self.timed_call:
-            self.timed_call.cancel()
+            try:
+                self.timed_call.cancel()
+            except (AlreadyCalled, AlreadyCancelled):
+                pass
+            self.timed_call = None
 
     @defer.inlineCallbacks
     def on_new_notifications(self, min_stream_ordering, max_stream_ordering):
@@ -140,9 +145,8 @@ class EmailPusher(object):
         being run.
         """
         start = 0 if INCLUDE_ALL_UNREAD_NOTIFS else self.last_stream_ordering
-        unprocessed = yield self.store.get_unread_push_actions_for_user_in_range(
-            self.user_id, start, self.max_stream_ordering
-        )
+        fn = self.store.get_unread_push_actions_for_user_in_range_for_email
+        unprocessed = yield fn(self.user_id, start, self.max_stream_ordering)
 
         soonest_due_at = None
 
@@ -190,7 +194,10 @@ class EmailPusher(object):
                     soonest_due_at = should_notify_at
 
                 if self.timed_call is not None:
-                    self.timed_call.cancel()
+                    try:
+                        self.timed_call.cancel()
+                    except (AlreadyCalled, AlreadyCancelled):
+                        pass
                     self.timed_call = None
 
         if soonest_due_at is not None:
