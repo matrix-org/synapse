@@ -40,7 +40,7 @@ go get github.com/constabulary/gb/...
 gb generate
 gb build
 
-cd ../jenkins
+cd ../sytest
 
 : ${PORT_BASE:=20000}
 : ${PORT_COUNT=100}
