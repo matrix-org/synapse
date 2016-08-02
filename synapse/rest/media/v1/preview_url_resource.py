@@ -334,6 +334,7 @@ class PreviewUrlResource(Resource):
 
                 # We don't just use XPATH here as that is slow on some machines.
 
+                # We clone `tree` as we modify it.
                 cloned_tree = deepcopy(tree.find("body"))
 
                 TAGS_TO_REMOVE = ("header", "nav", "aside", "footer", "script", "style",)
