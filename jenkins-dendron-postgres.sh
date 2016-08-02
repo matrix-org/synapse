@@ -22,24 +22,10 @@ export PEP8SUFFIX="--output-file=violations.flake8.log || echo flake8 finished w
 
 rm .coverage* || echo "No coverage files to remove"
 
-tox --notest -e py27
+./jenkins/prepare_synapse.sh
 
-TOX_BIN=$WORKSPACE/.tox/py27/bin
-python synapse/python_dependencies.py | xargs -n1 $TOX_BIN/pip install
-$TOX_BIN/pip install psycopg2
-$TOX_BIN/pip install lxml
-
-: ${GIT_BRANCH:="origin/$(git rev-parse --abbrev-ref HEAD)"}
-
-if [[ ! -e .dendron-base ]]; then
-    git clone https://github.com/matrix-org/dendron.git .dendron-base --mirror
-else
-    (cd .dendron-base; git fetch -p)
-fi
-
-rm -rf dendron
-git clone .dendron-base dendron --shared
-cd dendron
+./jenkins/clone.sh sytest https://github.com/matrix-org/sytest.git
+./jenkins/clone.sh dendron https://github.com/matrix-org/dendron.git
 
 : ${GOPATH:=${WORKSPACE}/.gopath}
 if [[ "${GOPATH}" != *:* ]]; then
@@ -48,35 +34,26 @@ if [[ "${GOPATH}" != *:* ]]; then
 fi
 export GOPATH
 
-git checkout "${GIT_BRANCH}" || (echo >&2 "No ref ${GIT_BRANCH} found, falling back to develop" ; git checkout develop)
+cd dendron
 
 go get github.com/constabulary/gb/...
 gb generate
 gb build
 
-cd ..
-
-
-if [[ ! -e .sytest-base ]]; then
-  git clone https://github.com/matrix-org/sytest.git .sytest-base --mirror
-else
-  (cd .sytest-base; git fetch -p)
-fi
-
-rm -rf sytest
-git clone .sytest-base sytest --shared
-cd sytest
-
-git checkout "${GIT_BRANCH}" || (echo >&2 "No ref ${GIT_BRANCH} found, falling back to develop" ; git checkout develop)
+cd ../sytest
 
 : ${PORT_BASE:=20000}
 : ${PORT_COUNT=100}
+export PORT_BASE
+export PORT_COUNT
 
 ./jenkins/prep_sytest_for_postgres.sh
 
 mkdir -p var
 
 echo >&2 "Running sytest with PostgreSQL";
+
+TOX_BIN=$WORKSPACE/.tox/py27/bin
 ./jenkins/install_and_run.sh --python $TOX_BIN/python \
                              --synapse-directory $WORKSPACE \
                              --dendron $WORKSPACE/dendron/bin/dendron \
