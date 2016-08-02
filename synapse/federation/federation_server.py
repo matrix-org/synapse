@@ -235,10 +235,10 @@ class FederationServer(FederationBase):
                     )
                 )
 
-        defer.returnValue((200, {
+        defer.returnValue({
             "pdus": [pdu.get_pdu_json() for pdu in pdus],
             "auth_chain": [pdu.get_pdu_json() for pdu in auth_chain],
-        }))
+        })
 
     @defer.inlineCallbacks
     @log_function
