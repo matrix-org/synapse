@@ -1,3 +1,20 @@
+Changes in synapse v0.17.0-rc2 (2016-08-02)
+===========================================
+
+Changes:
+
+* Forbid non-ASes from registering users whose names begin with '_' (PR #958)
+* Add some basic admin API docs (PR #963)
+
+
+Bug fixes:
+
+* Send the correct host header when fetching keys (PR #941)
+* Fix joining a room that has missing auth events (PR #964)
+* Fix various bush bugs (PR #966, #970)
+* Fix adding emails on registration (PR #968)
+
+
 Changes in synapse v0.17.0-rc1 (2016-07-28)
 ===========================================
 
