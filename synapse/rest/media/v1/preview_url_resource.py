@@ -29,6 +29,8 @@ from synapse.http.server import (
 from synapse.util.async import ObservableDeferred
 from synapse.util.stringutils import is_ascii
 
+from copy import deepcopy
+
 import os
 import re
 import fnmatch
@@ -329,20 +331,74 @@ class PreviewUrlResource(Resource):
                 # ...or if they are within a <script/> or <style/> tag.
                 # This is a very very very coarse approximation to a plain text
                 # render of the page.
-                text_nodes = tree.xpath("//text()[not(ancestor::header | ancestor::nav | "
-                                        "ancestor::aside | ancestor::footer | "
-                                        "ancestor::script | ancestor::style)]" +
-                                        "[ancestor::body]")
-                text = ''
+
+                # We don't just use XPATH here as that is slow on some machines.
+
+                cloned_tree = deepcopy(tree.find("body"))
+
+                TAGS_TO_REMOVE = ("header", "nav", "aside", "footer", "script", "style",)
+                for el in cloned_tree.iter(TAGS_TO_REMOVE):
+                    el.getparent().remove(el)
+
+                # Split all the text nodes into paragraphs (by splitting on new
+                # lines)
+                text_nodes = (
+                    line.strip()
+                    for line in el.text.splitlines()
+                    for el in el.iter() if el.text
+                )
+
+                # Try to get a summary of between 200 and 500 words, respecting
+                # first paragraph and then word boundaries.
+                # TODO: Respect sentences?
+                MIN_SIZE = 200
+                MAX_SIZE = 500
+
+                description = ''
+
+                # Keep adding paragraphs until we get to the MIN_SIZE.
                 for text_node in text_nodes:
-                    if len(text) < 500:
-                        text += text_node + ' '
+                    if len(description) < MIN_SIZE:
+                        description += text_node + '\n'
                     else:
                         break
-                text = re.sub(r'[\t ]+', ' ', text)
-                text = re.sub(r'[\t \r\n]*[\r\n]+', '\n', text)
-                text = text.strip()[:500]
-                og['og:description'] = text if text else None
+
+                description = description.strip()
+                description = re.sub(r'[\t ]+', ' ', description)
+                description = re.sub(r'[\t \r\n]*[\r\n]+', '\n', description)
+
+                # If the concatenation of paragraphs to get above MIN_SIZE
+                # took us over MAX_SIZE, then we need to truncate mid paragraph
+                if len(description) > MAX_SIZE:
+                    new_desc = ""
+
+                    # This splits the paragraph into words, but keeping the
+                    # (proceeding) whitespace intact so we can easily concat
+                    # words back together.
+                    for match in re.finditer("\s*\S+", description):
+                        word = match.group()
+
+                        # Keep adding words while the total length is less than
+                        # MAX_SIZE.
+                        if len(word) + len(new_desc) < MAX_SIZE:
+                            new_desc += word
+                        else:
+                            # At thi point the next word *will* take us over
+                            # MAX_SIZE, but we also want to ensure that its not
+                            # a huge word. If it is add it anyway and we'll
+                            # truncate later.
+                            if len(new_desc) < MIN_SIZE:
+                                new_desc += word
+                            break
+
+                    # Double check that we're not over the limit
+                    if len(new_desc) > MAX_SIZE:
+                        new_desc = new_desc[:MAX_SIZE]
+
+                    # We always add an ellipsis because at the very least
+                    # we chooped mid paragraph.
+                    description = new_desc.strip() + "…"
+                og['og:description'] = description if description else None
 
         # TODO: delete the url downloads to stop diskfilling,
         # as we only ever cared about its OG
