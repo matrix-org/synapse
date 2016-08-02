@@ -196,12 +196,12 @@ class RegisterRestServlet(RestServlet):
                 [LoginType.EMAIL_IDENTITY]
             ]
 
-        authed, result, params, session_id = yield self.auth_handler.check_auth(
+        authed, auth_result, params, session_id = yield self.auth_handler.check_auth(
             flows, body, self.hs.get_ip_from_request(request)
         )
 
         if not authed:
-            defer.returnValue((401, result))
+            defer.returnValue((401, auth_result))
             return
 
         if registered_user_id is not None:
@@ -236,18 +236,18 @@ class RegisterRestServlet(RestServlet):
 
             add_email = True
 
-        result = yield self._create_registration_details(
+        return_dict = yield self._create_registration_details(
             registered_user_id, params
         )
 
-        if add_email and result and LoginType.EMAIL_IDENTITY in result:
-            threepid = result[LoginType.EMAIL_IDENTITY]
+        if add_email and auth_result and LoginType.EMAIL_IDENTITY in auth_result:
+            threepid = auth_result[LoginType.EMAIL_IDENTITY]
             yield self._register_email_threepid(
-                registered_user_id, threepid, result["access_token"],
+                registered_user_id, threepid, return_dict["access_token"],
                 params.get("bind_email")
             )
 
-        defer.returnValue((200, result))
+        defer.returnValue((200, return_dict))
 
     def on_OPTIONS(self, _):
         return 200, {}
@@ -355,8 +355,6 @@ class RegisterRestServlet(RestServlet):
             )
         else:
             logger.info("bind_email not specified: not binding email")
-
-        defer.returnValue()
 
     @defer.inlineCallbacks
     def _create_registration_details(self, user_id, params):
