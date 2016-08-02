@@ -39,7 +39,8 @@ TOX_BIN=$WORKSPACE/.tox/py27/bin
 ./jenkins/install_and_run.sh --coverage \
                              --python $TOX_BIN/python \
                              --synapse-directory $WORKSPACE \
-                             --port-range ${PORT_BASE}:$((PORT_BASE+PORT_COUNT-1)) \
+                             --port-range ${PORT_BASE}:$((PORT_BASE+PORT_COUNT-1))
+
 cd ..
 cp sytest/.coverage.* .
 
