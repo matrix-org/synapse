@@ -44,6 +44,8 @@ cd ../sytest
 
 : ${PORT_BASE:=20000}
 : ${PORT_COUNT=100}
+export PORT_BASE
+export PORT_COUNT
 
 ./jenkins/prep_sytest_for_postgres.sh
 

@@ -28,6 +28,8 @@ rm .coverage* || echo "No coverage files to remove"
 
 : ${PORT_BASE:=20000}
 : ${PORT_COUNT=100}
+export PORT_BASE
+export PORT_COUNT
 
 cd sytest
 
