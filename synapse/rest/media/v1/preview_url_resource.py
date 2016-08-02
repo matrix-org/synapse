@@ -344,9 +344,8 @@ class PreviewUrlResource(Resource):
                 # Split all the text nodes into paragraphs (by splitting on new
                 # lines)
                 text_nodes = (
-                    line.strip()
+                    re.sub(r'\s+', '\n', el.text).strip()
                     for el in cloned_tree.iter() if el.text
-                    for line in el.text.splitlines()
                 )
 
                 # Try to get a summary of between 200 and 500 words, respecting
