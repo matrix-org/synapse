@@ -116,11 +116,12 @@ def get_json(origin_name, origin_key, destination, path):
     authorization_headers = []
 
     for key, sig in signed_json["signatures"][origin_name].items():
-        authorization_headers.append(bytes(
-            "X-Matrix origin=%s,key=\"%s\",sig=\"%s\"" % (
-                origin_name, key, sig,
-            )
-        ))
+        header = "X-Matrix origin=%s,key=\"%s\",sig=\"%s\"" % (
+            origin_name, key, sig,
+        )
+        authorization_headers.append(bytes(header))
+        sys.stderr.write(header)
+        sys.stderr.write("\n")
 
     result = requests.get(
         lookup(destination, path),
