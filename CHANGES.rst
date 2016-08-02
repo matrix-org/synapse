@@ -11,7 +11,7 @@ Bug fixes:
 
 * Send the correct host header when fetching keys (PR #941)
 * Fix joining a room that has missing auth events (PR #964)
-* Fix various bush bugs (PR #966, #970)
+* Fix various push bugs (PR #966, #970)
 * Fix adding emails on registration (PR #968)
 
 
