@@ -373,7 +373,7 @@ class PreviewUrlResource(Resource):
                     new_desc = ""
 
                     # This splits the paragraph into words, but keeping the
-                    # (proceeding) whitespace intact so we can easily concat
+                    # (preceeding) whitespace intact so we can easily concat
                     # words back together.
                     for match in re.finditer("\s*\S+", description):
                         word = match.group()
@@ -383,7 +383,7 @@ class PreviewUrlResource(Resource):
                         if len(word) + len(new_desc) < MAX_SIZE:
                             new_desc += word
                         else:
-                            # At thi point the next word *will* take us over
+                            # At this point the next word *will* take us over
                             # MAX_SIZE, but we also want to ensure that its not
                             # a huge word. If it is add it anyway and we'll
                             # truncate later.
@@ -396,7 +396,7 @@ class PreviewUrlResource(Resource):
                         new_desc = new_desc[:MAX_SIZE]
 
                     # We always add an ellipsis because at the very least
-                    # we chooped mid paragraph.
+                    # we chopped mid paragraph.
                     description = new_desc.strip() + "…"
                 og['og:description'] = description if description else None
 
