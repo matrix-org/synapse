@@ -205,7 +205,7 @@ class FederationServer(FederationBase):
         result = self._state_resp_cache.get((room_id, event_id))
         if not result:
             with (yield self._server_linearizer.queue((origin, room_id))):
-                resp = yield self.response_cache.set(
+                resp = yield self._state_resp_cache.set(
                     (room_id, event_id),
                     self._on_context_state_request_compute(room_id, event_id)
                 )
@@ -235,10 +235,10 @@ class FederationServer(FederationBase):
                     )
                 )
 
-        defer.returnValue((200, {
+        defer.returnValue({
             "pdus": [pdu.get_pdu_json() for pdu in pdus],
             "auth_chain": [pdu.get_pdu_json() for pdu in auth_chain],
-        }))
+        })
 
     @defer.inlineCallbacks
     @log_function
