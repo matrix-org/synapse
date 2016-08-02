@@ -1,4 +1,4 @@
-Changes in synapse v0.17.0-rc2 (2016-08-02)
+Changes in synapse v0.17.0-rc3 (2016-08-02)
 ===========================================
 
 Changes:
@@ -13,6 +13,12 @@ Bug fixes:
 * Fix joining a room that has missing auth events (PR #964)
 * Fix various push bugs (PR #966, #970)
 * Fix adding emails on registration (PR #968)
+
+
+Changes in synapse v0.17.0-rc2 (2016-08-02)
+===========================================
+
+(This release did not include the changes advertised and was identical to RC1)
 
 
 Changes in synapse v0.17.0-rc1 (2016-07-28)
