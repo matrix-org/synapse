@@ -43,8 +43,8 @@ cd sytest
 
 git checkout "${GIT_BRANCH}" || (echo >&2 "No ref ${GIT_BRANCH} found, falling back to develop" ; git checkout develop)
 
-: ${PORT_BASE:=8000}
-: ${PORT_COUNT=20}
+: ${PORT_BASE:=20000}
+: ${PORT_COUNT=100}
 
 ./jenkins/prep_sytest_for_postgres.sh
 
