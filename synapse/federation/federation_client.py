@@ -364,6 +364,20 @@ class FederationClient(FederationBase):
 
     @defer.inlineCallbacks
     def get_events(self, destinations, room_id, event_ids, return_local=True):
+        """Fetch events from some remote destinations, checking if we already
+        have them.
+
+        Args:
+            destinations (list)
+            room_id (str)
+            event_ids (list)
+            return_local (bool): Whether to include events we already have in
+                the DB in the returned list of events
+
+        Returns:
+            Deferred: A deferred resolving to a 2-tuple where the first is a list of
+            events and the second is a list of event ids that we failed to fetch.
+        """
         if return_local:
             seen_events = yield self.store.get_events(event_ids)
             signed_events = seen_events.values()
