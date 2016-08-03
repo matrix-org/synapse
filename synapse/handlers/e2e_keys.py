@@ -117,10 +117,15 @@ class E2eKeysHandler(object):
 
         results = yield self.store.get_e2e_device_keys(local_query)
 
-        # un-jsonify the results
+        # Build the result structure, un-jsonify the results, and add the
+        # "unsigned" section
         for user_id, device_keys in results.items():
-            for device_id, json_bytes in device_keys.items():
-                result_dict[user_id][device_id] = json.loads(json_bytes)
+            for device_id, device_info in device_keys.items():
+                r = json.loads(device_info["key_json"])
+                r["unsigned"] = {
+                    "device_display_name": device_info["device_display_name"],
+                }
+                result_dict[user_id][device_id] = r
 
         defer.returnValue(result_dict)
 
