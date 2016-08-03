@@ -29,7 +29,7 @@ class DeviceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def check_device_registered(self, user_id, device_id,
-                                initial_device_display_name = None):
+                                initial_device_display_name=None):
         """
         If the given device has not been registered, register it with the
         supplied display name.
