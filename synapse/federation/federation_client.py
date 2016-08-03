@@ -411,8 +411,13 @@ class FederationClient(FederationBase):
             return srvs
 
         batch_size = 20
-        for i in xrange(0, len(missing_events), batch_size):
-            batch = missing_events[i:i + batch_size]
+        while missing_events:
+            batch = []
+            try:
+                for _ in range(0, batch_size):
+                    batch.append(missing_events.pop())
+            except KeyError:
+                pass
 
             deferreds = [
                 self.get_pdu(
@@ -423,9 +428,9 @@ class FederationClient(FederationBase):
             ]
 
             res = yield defer.DeferredList(deferreds, consumeErrors=True)
-            for (result, val), (e_id, _) in res:
-                if result and val:
-                    signed_events.append(val)
+            for success, (result, e_id) in res:
+                if success and result:
+                    signed_events.append(result)
                 else:
                     failed_to_fetch.add(e_id)
 
