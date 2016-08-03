@@ -348,6 +348,10 @@ class FederationClient(FederationBase):
             else:
                 raise e
 
+        result = yield self.transport_layer.get_room_state(
+            destination, room_id, event_id=event_id,
+        )
+
         pdus = [
             self.event_from_pdu_json(p, outlier=True) for p in result["pdus"]
         ]
