@@ -99,6 +99,7 @@ class E2eKeysHandler(object):
         """
         local_query = []
 
+        result_dict = {}
         for user_id, device_ids in query.items():
             if not self.is_mine_id(user_id):
                 logger.warning("Request for keys for non-local user %s",
@@ -111,15 +112,17 @@ class E2eKeysHandler(object):
                 for device_id in device_ids:
                     local_query.append((user_id, device_id))
 
+            # make sure that each queried user appears in the result dict
+            result_dict[user_id] = {}
+
         results = yield self.store.get_e2e_device_keys(local_query)
 
         # un-jsonify the results
-        json_result = collections.defaultdict(dict)
         for user_id, device_keys in results.items():
             for device_id, json_bytes in device_keys.items():
-                json_result[user_id][device_id] = json.loads(json_bytes)
+                result_dict[user_id][device_id] = json.loads(json_bytes)
 
-        defer.returnValue(json_result)
+        defer.returnValue(result_dict)
 
     @defer.inlineCallbacks
     def on_federation_query_client_keys(self, query_body):
