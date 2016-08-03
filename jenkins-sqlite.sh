@@ -11,5 +11,5 @@ export SYNAPSE_CACHE_FACTOR=1
 ./jenkins/prepare_synapse.sh
 ./jenkins/clone.sh sytest https://github.com/matrix-org/sytest.git
 
-.sytest/jenkins/install_and_run.sh \
+./sytest/jenkins/install_and_run.sh \
     --synapse-directory $WORKSPACE \

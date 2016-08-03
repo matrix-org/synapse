@@ -14,7 +14,7 @@ export SYNAPSE_CACHE_FACTOR=1
 ./dendron/jenkins/build_dendron.sh
 ./sytest/jenkins/prep_sytest_for_postgres.sh
 
-.sytest/jenkins/install_and_run.sh \
+./sytest/jenkins/install_and_run.sh \
     --synapse-directory $WORKSPACE \
     --dendron $WORKSPACE/dendron/bin/dendron \
     --pusher \
