@@ -450,8 +450,6 @@ class EventsStore(SQLBaseStore):
             for event_id, outlier in txn.fetchall()
         }
 
-        # Remove the events that we've seen before.
-        event_map = {}
         to_remove = set()
         for event, context in events_and_contexts:
             if context.rejected:
@@ -461,23 +459,6 @@ class EventsStore(SQLBaseStore):
                     # If we have already seen the event then ignore it.
                     to_remove.add(event)
                 continue
-
-            # Handle the case of the list including the same event multiple
-            # times. The tricky thing here is when they differ by whether
-            # they are an outlier.
-            if event.event_id in event_map:
-                other = event_map[event.event_id]
-
-                if not other.internal_metadata.is_outlier():
-                    to_remove.add(event)
-                    continue
-                elif not event.internal_metadata.is_outlier():
-                    to_remove.add(event)
-                    continue
-                else:
-                    to_remove.add(other)
-
-            event_map[event.event_id] = event
 
             if event.event_id not in have_persisted:
                 continue
