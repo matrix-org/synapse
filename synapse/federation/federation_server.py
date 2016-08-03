@@ -215,6 +215,27 @@ class FederationServer(FederationBase):
         defer.returnValue((200, resp))
 
     @defer.inlineCallbacks
+    def on_state_ids_request(self, origin, room_id, event_id):
+        if not event_id:
+            raise NotImplementedError("Specify an event")
+
+        in_room = yield self.auth.check_host_in_room(room_id, origin)
+        if not in_room:
+            raise AuthError(403, "Host not in room.")
+
+        pdus = yield self.handler.get_state_for_pdu(
+            room_id, event_id,
+        )
+        auth_chain = yield self.store.get_auth_chain(
+            [pdu.event_id for pdu in pdus]
+        )
+
+        defer.returnValue((200, {
+            "pdus": [pdu.event_id for pdu in pdus],
+            "auth_chain": [pdu.event_id for pdu in auth_chain],
+        }))
+
+    @defer.inlineCallbacks
     def _on_context_state_request_compute(self, room_id, event_id):
         pdus = yield self.handler.get_state_for_pdu(
             room_id, event_id,
