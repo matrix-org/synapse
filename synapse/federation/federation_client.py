@@ -322,8 +322,8 @@ class FederationClient(FederationBase):
                 destination, room_id, event_id=event_id,
             )
 
-            state_event_ids = result["pdus"]
-            auth_event_ids = result.get("auth_chain", [])
+            state_event_ids = result["pdu_ids"]
+            auth_event_ids = result.get("auth_chain_ids", [])
 
             fetched_events, failed_to_fetch = yield self.get_events(
                 [destination], room_id, set(state_event_ids + auth_event_ids)
