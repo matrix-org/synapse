@@ -22,17 +22,15 @@ from twisted.internet import defer
 from synapse.api import errors
 import synapse.types
 
-from ._base import BaseHandler
-
 logger = logging.getLogger(__name__)
 
 
-class E2eKeysHandler(BaseHandler):
+class E2eKeysHandler(object):
     def __init__(self, hs):
-        super(E2eKeysHandler, self).__init__(hs)
         self.store = hs.get_datastore()
         self.federation = hs.get_replication_layer()
         self.is_mine_id = hs.is_mine_id
+        self.server_name = hs.hostname
 
         # doesn't really work as part of the generic query API, because the
         # query request requires an object POST, but we abuse the
@@ -74,7 +72,7 @@ class E2eKeysHandler(BaseHandler):
         # TODO: do these in parallel
         results = {}
         for destination, destination_query in queries_by_domain.items():
-            if destination == self.hs.hostname:
+            if destination == self.server_name:
                 res = yield self.query_local_devices(destination_query)
             else:
                 res = yield self.federation.query_client_keys(
