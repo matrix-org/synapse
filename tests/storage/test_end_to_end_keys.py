@@ -15,7 +15,6 @@
 
 from twisted.internet import defer
 
-import synapse.api.errors
 import tests.unittest
 import tests.utils
 
@@ -67,7 +66,6 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
             "key_json": json,
             "device_display_name": "display_name",
         }, dev)
-
 
     @defer.inlineCallbacks
     def test_multiple_devices(self):

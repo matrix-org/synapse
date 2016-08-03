@@ -63,16 +63,16 @@ class EndToEndKeyStore(SQLBaseStore):
             query_clauses.append(query_clause)
 
         sql = (
-              "SELECT k.user_id, k.device_id, "
-              "    d.display_name AS device_display_name, "
-              "    k.key_json"
-              " FROM e2e_device_keys_json k"
-              "    LEFT JOIN devices d ON d.user_id = k.user_id"
-              "      AND d.device_id = k.device_id"
-              " WHERE %s"
-          ) % (
-              " OR ".join("("+q+")" for q in query_clauses)
-          )
+            "SELECT k.user_id, k.device_id, "
+            "    d.display_name AS device_display_name, "
+            "    k.key_json"
+            " FROM e2e_device_keys_json k"
+            "    LEFT JOIN devices d ON d.user_id = k.user_id"
+            "      AND d.device_id = k.device_id"
+            " WHERE %s"
+        ) % (
+            " OR ".join("(" + q + ")" for q in query_clauses)
+        )
 
         txn.execute(sql, query_params)
         rows = self.cursor_to_dict(txn)
