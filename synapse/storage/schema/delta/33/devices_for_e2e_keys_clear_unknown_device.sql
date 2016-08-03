@@ -13,7 +13,8 @@
  * limitations under the License.
  */
 
--- make sure that we have a device record for each set of E2E keys, so that the
--- user can delete them if they like.
-INSERT INTO devices
-    SELECT user_id, device_id, NULL FROM e2e_device_keys_json;
+-- a previous version of the "devices_for_e2e_keys" delta set all the device
+-- names to "unknown device". This wasn't terribly helpful
+UPDATE devices
+    SET display_name = NULL
+    WHERE display_name = 'unknown device';
