@@ -4,6 +4,7 @@ set -eux
 
 : ${WORKSPACE:="$(pwd)"}
 
+export WORKSPACE
 export PYTHONDONTWRITEBYTECODE=yep
 export SYNAPSE_CACHE_FACTOR=1
 
@@ -22,27 +23,18 @@ export PEP8SUFFIX="--output-file=violations.flake8.log || echo flake8 finished w
 
 rm .coverage* || echo "No coverage files to remove"
 
-tox --notest -e py27
-TOX_BIN=$WORKSPACE/.tox/py27/bin
-python synapse/python_dependencies.py | xargs -n1 $TOX_BIN/pip install
-$TOX_BIN/pip install lxml
+./jenkins/prepare_synapse.sh
 
-: ${GIT_BRANCH:="origin/$(git rev-parse --abbrev-ref HEAD)"}
+./jenkins/clone.sh sytest https://github.com/matrix-org/sytest.git
 
-if [[ ! -e .sytest-base ]]; then
-  git clone https://github.com/matrix-org/sytest.git .sytest-base --mirror
-else
-  (cd .sytest-base; git fetch -p)
-fi
+: ${PORT_BASE:=20000}
+: ${PORT_COUNT=100}
+export PORT_BASE
+export PORT_COUNT
 
-rm -rf sytest
-git clone .sytest-base sytest --shared
 cd sytest
 
-git checkout "${GIT_BRANCH}" || (echo >&2 "No ref ${GIT_BRANCH} found, falling back to develop" ; git checkout develop)
-
-: ${PORT_COUNT=20}
-: ${PORT_BASE:=8000}
+TOX_BIN=$WORKSPACE/.tox/py27/bin
 ./jenkins/install_and_run.sh --coverage \
                              --python $TOX_BIN/python \
                              --synapse-directory $WORKSPACE \

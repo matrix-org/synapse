@@ -21,10 +21,11 @@ from .units import Transaction, Edu
 
 from synapse.util.async import Linearizer
 from synapse.util.logutils import log_function
+from synapse.util.caches.response_cache import ResponseCache
 from synapse.events import FrozenEvent
 import synapse.metrics
 
-from synapse.api.errors import FederationError, SynapseError
+from synapse.api.errors import AuthError, FederationError, SynapseError
 
 from synapse.crypto.event_signing import compute_event_signature
 
@@ -48,8 +49,14 @@ class FederationServer(FederationBase):
     def __init__(self, hs):
         super(FederationServer, self).__init__(hs)
 
+        self.auth = hs.get_auth()
+
         self._room_pdu_linearizer = Linearizer()
         self._server_linearizer = Linearizer()
+
+        # We cache responses to state queries, as they take a while and often
+        # come in waves.
+        self._state_resp_cache = ResponseCache(hs, timeout_ms=30000)
 
     def set_handler(self, handler):
         """Sets the handler that the replication layer will use to communicate
@@ -188,33 +195,50 @@ class FederationServer(FederationBase):
     @defer.inlineCallbacks
     @log_function
     def on_context_state_request(self, origin, room_id, event_id):
-        with (yield self._server_linearizer.queue((origin, room_id))):
-            if event_id:
-                pdus = yield self.handler.get_state_for_pdu(
-                    origin, room_id, event_id,
+        if not event_id:
+            raise NotImplementedError("Specify an event")
+
+        in_room = yield self.auth.check_host_in_room(room_id, origin)
+        if not in_room:
+            raise AuthError(403, "Host not in room.")
+
+        result = self._state_resp_cache.get((room_id, event_id))
+        if not result:
+            with (yield self._server_linearizer.queue((origin, room_id))):
+                resp = yield self._state_resp_cache.set(
+                    (room_id, event_id),
+                    self._on_context_state_request_compute(room_id, event_id)
                 )
-                auth_chain = yield self.store.get_auth_chain(
-                    [pdu.event_id for pdu in pdus]
+        else:
+            resp = yield result
+
+        defer.returnValue((200, resp))
+
+    @defer.inlineCallbacks
+    def _on_context_state_request_compute(self, room_id, event_id):
+        pdus = yield self.handler.get_state_for_pdu(
+            room_id, event_id,
+        )
+        auth_chain = yield self.store.get_auth_chain(
+            [pdu.event_id for pdu in pdus]
+        )
+
+        for event in auth_chain:
+            # We sign these again because there was a bug where we
+            # incorrectly signed things the first time round
+            if self.hs.is_mine_id(event.event_id):
+                event.signatures.update(
+                    compute_event_signature(
+                        event,
+                        self.hs.hostname,
+                        self.hs.config.signing_key[0]
+                    )
                 )
 
-                for event in auth_chain:
-                    # We sign these again because there was a bug where we
-                    # incorrectly signed things the first time round
-                    if self.hs.is_mine_id(event.event_id):
-                        event.signatures.update(
-                            compute_event_signature(
-                                event,
-                                self.hs.hostname,
-                                self.hs.config.signing_key[0]
-                            )
-                        )
-            else:
-                raise NotImplementedError("Specify an event")
-
-        defer.returnValue((200, {
+        defer.returnValue({
             "pdus": [pdu.get_pdu_json() for pdu in pdus],
             "auth_chain": [pdu.get_pdu_json() for pdu in auth_chain],
-        }))
+        })
 
     @defer.inlineCallbacks
     @log_function

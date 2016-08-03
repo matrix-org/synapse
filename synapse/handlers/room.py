@@ -345,8 +345,8 @@ class RoomCreationHandler(BaseHandler):
 class RoomListHandler(BaseHandler):
     def __init__(self, hs):
         super(RoomListHandler, self).__init__(hs)
-        self.response_cache = ResponseCache()
-        self.remote_list_request_cache = ResponseCache()
+        self.response_cache = ResponseCache(hs)
+        self.remote_list_request_cache = ResponseCache(hs)
         self.remote_list_cache = {}
         self.fetch_looping_call = hs.get_clock().looping_call(
             self.fetch_all_remote_lists, REMOTE_ROOM_LIST_POLL_INTERVAL
