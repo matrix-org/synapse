@@ -325,9 +325,16 @@ class FederationClient(FederationBase):
             state_event_ids = result["pdus"]
             auth_event_ids = result.get("auth_chain", [])
 
-            event_map, _failed_to_fetch = yield self.get_events(
+            fetched_events, failed_to_fetch = yield self.get_events(
                 [destination], room_id, set(state_event_ids + auth_event_ids)
             )
+
+            if failed_to_fetch:
+                logger.warn("Failed to get %r", failed_to_fetch)
+
+            event_map = {
+                ev.event_id: ev for ev in fetched_events
+            }
 
             pdus = [event_map[e_id] for e_id in state_event_ids]
             auth_chain = [event_map[e_id] for e_id in auth_event_ids]
