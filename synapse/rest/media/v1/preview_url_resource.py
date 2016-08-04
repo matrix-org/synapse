@@ -347,7 +347,7 @@ class PreviewUrlResource(Resource):
                     re.sub(r'\s+', '\n', el.text).strip()
                     for el in cloned_tree.iter() if el.text
                 )
-                og['og:description'] = _summarize_paragraphs(text_nodes)
+                og['og:description'] = summarize_paragraphs(text_nodes)
 
         # TODO: delete the url downloads to stop diskfilling,
         # as we only ever cared about its OG
