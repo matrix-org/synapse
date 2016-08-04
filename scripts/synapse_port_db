@@ -458,6 +458,27 @@ class Porter(object):
                     ")"
                 )
 
+            # The old port script created a table with just a "rowid" column.
+            # We want people to be able to rerun this script from an old port
+            # so that they can pick up any missing events that were not
+            # ported across.
+            def alter_table(txn):
+                txn.execute(
+                    "ALTER TABLE IF EXISTS port_from_sqlite3"
+                    " RENAME rowid TO forward_rowid"
+                )
+                txn.execute(
+                    "ALTER TABLE IF EXISTS port_from_sqlite3"
+                    " ADD backward_rowid bigint NOT NULL DEFAULT 0"
+                )
+
+            try:
+                yield self.postgres_store.runInteraction(
+                    "alter_table", alter_table
+                )
+            except Exception as e:
+                logger.info("Failed to create port table: %s", e)
+
             try:
                 yield self.postgres_store.runInteraction(
                     "create_port_table", create_port_table
