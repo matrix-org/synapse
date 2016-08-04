@@ -163,11 +163,10 @@ def _retry_on_integrity_error(func):
     def f(self, *args, **kwargs):
         try:
             res = yield func(self, *args, **kwargs)
-            defer.returnValue(res)
         except self.database_engine.module.IntegrityError:
             logger.exception("IntegrityError, retrying.")
             res = yield func(self, *args, delete_existing=True, **kwargs)
-            defer.returnValue(res)
+        defer.returnValue(res)
 
     return f
 
@@ -577,6 +576,8 @@ class EventsStore(SQLBaseStore):
             # This gets around any problems with some tables already having
             # entries.
 
+            logger.info("Deleting existing")
+
             for table in (
                 "events",
                 "event_json",
@@ -595,7 +596,7 @@ class EventsStore(SQLBaseStore):
             ):
                 txn.executemany(
                     "DELETE FROM %s WHERE event_id = ?" % (table,),
-                    [ev for ev, _ in events_and_contexts]
+                    [(ev.event_id,) for ev, _ in events_and_contexts]
                 )
 
         self._simple_insert_many_txn(
