@@ -396,7 +396,7 @@ class FederationClient(FederationBase):
             seen_events = yield self.store.have_events(event_ids)
             signed_events = []
 
-        failed_to_fetch = []
+        failed_to_fetch = set()
 
         missing_events = set(event_ids)
         for k in seen_events:
@@ -411,8 +411,8 @@ class FederationClient(FederationBase):
             return srvs
 
         batch_size = 20
-        missing_events = len(missing_events)
-        for i in xrange(0, batch_size, batch_size):
+        missing_events = list(missing_events)
+        for i in xrange(0, len(missing_events), batch_size):
             batch = set(missing_events[i:i + batch_size])
 
             deferreds = [
