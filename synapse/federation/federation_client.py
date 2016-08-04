@@ -411,28 +411,26 @@ class FederationClient(FederationBase):
             return srvs
 
         batch_size = 20
-        while missing_events:
-            batch = []
-            try:
-                for _ in range(0, batch_size):
-                    batch.append(missing_events.pop())
-            except KeyError:
-                pass
+        missing_events = len(missing_events)
+        for i in xrange(0, batch_size, batch_size):
+            batch = set(missing_events[i:i + batch_size])
 
             deferreds = [
                 self.get_pdu(
                     destinations=random_server_list(),
                     event_id=e_id,
-                ).addBoth(lambda r, e: (r, e), e_id)
+                )
                 for e_id in batch
             ]
 
             res = yield defer.DeferredList(deferreds, consumeErrors=True)
-            for success, (result, e_id) in res:
-                if success and result:
+            for success, result in res:
+                if success:
                     signed_events.append(result)
-                else:
-                    failed_to_fetch.add(e_id)
+                    batch.discard(result.event_id)
+
+            # We removed all events we successfully fetched from `batch`
+            failed_to_fetch.update(batch)
 
         defer.returnValue((signed_events, failed_to_fetch))
 
