@@ -347,58 +347,7 @@ class PreviewUrlResource(Resource):
                     re.sub(r'\s+', '\n', el.text).strip()
                     for el in cloned_tree.iter() if el.text
                 )
-
-                # Try to get a summary of between 200 and 500 words, respecting
-                # first paragraph and then word boundaries.
-                # TODO: Respect sentences?
-                MIN_SIZE = 200
-                MAX_SIZE = 500
-
-                description = ''
-
-                # Keep adding paragraphs until we get to the MIN_SIZE.
-                for text_node in text_nodes:
-                    if len(description) < MIN_SIZE:
-                        description += text_node + '\n'
-                    else:
-                        break
-
-                description = description.strip()
-                description = re.sub(r'[\t ]+', ' ', description)
-                description = re.sub(r'[\t \r\n]*[\r\n]+', '\n', description)
-
-                # If the concatenation of paragraphs to get above MIN_SIZE
-                # took us over MAX_SIZE, then we need to truncate mid paragraph
-                if len(description) > MAX_SIZE:
-                    new_desc = ""
-
-                    # This splits the paragraph into words, but keeping the
-                    # (preceeding) whitespace intact so we can easily concat
-                    # words back together.
-                    for match in re.finditer("\s*\S+", description):
-                        word = match.group()
-
-                        # Keep adding words while the total length is less than
-                        # MAX_SIZE.
-                        if len(word) + len(new_desc) < MAX_SIZE:
-                            new_desc += word
-                        else:
-                            # At this point the next word *will* take us over
-                            # MAX_SIZE, but we also want to ensure that its not
-                            # a huge word. If it is add it anyway and we'll
-                            # truncate later.
-                            if len(new_desc) < MIN_SIZE:
-                                new_desc += word
-                            break
-
-                    # Double check that we're not over the limit
-                    if len(new_desc) > MAX_SIZE:
-                        new_desc = new_desc[:MAX_SIZE]
-
-                    # We always add an ellipsis because at the very least
-                    # we chopped mid paragraph.
-                    description = new_desc.strip() + "…"
-                og['og:description'] = description if description else None
+                og['og:description'] = _summarize_paragraphs(text_nodes)
 
         # TODO: delete the url downloads to stop diskfilling,
         # as we only ever cared about its OG
@@ -506,3 +455,56 @@ class PreviewUrlResource(Resource):
             content_type.startswith("application/xhtml")
         ):
             return True
+
+
+def summarize_paragraphs(text_nodes, min_size=200, max_size=500):
+    # Try to get a summary of between 200 and 500 words, respecting
+    # first paragraph and then word boundaries.
+    # TODO: Respect sentences?
+
+    description = ''
+
+    # Keep adding paragraphs until we get to the MIN_SIZE.
+    for text_node in text_nodes:
+        if len(description) < min_size:
+            text_node = re.sub(r'[\t \r\n]+', ' ', text_node)
+            description += text_node + '\n\n'
+        else:
+            break
+
+    description = description.strip()
+    description = re.sub(r'[\t ]+', ' ', description)
+    description = re.sub(r'[\t \r\n]*[\r\n]+', '\n\n', description)
+
+    # If the concatenation of paragraphs to get above MIN_SIZE
+    # took us over MAX_SIZE, then we need to truncate mid paragraph
+    if len(description) > max_size:
+        new_desc = ""
+
+        # This splits the paragraph into words, but keeping the
+        # (preceeding) whitespace intact so we can easily concat
+        # words back together.
+        for match in re.finditer("\s*\S+", description):
+            word = match.group()
+
+            # Keep adding words while the total length is less than
+            # MAX_SIZE.
+            if len(word) + len(new_desc) < max_size:
+                new_desc += word
+            else:
+                # At this point the next word *will* take us over
+                # MAX_SIZE, but we also want to ensure that its not
+                # a huge word. If it is add it anyway and we'll
+                # truncate later.
+                if len(new_desc) < min_size:
+                    new_desc += word
+                break
+
+        # Double check that we're not over the limit
+        if len(new_desc) > max_size:
+            new_desc = new_desc[:max_size]
+
+        # We always add an ellipsis because at the very least
+        # we chopped mid paragraph.
+        description = new_desc.strip() + "…"
+    return description if description else None
