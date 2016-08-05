@@ -20,11 +20,12 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import JsonResource
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.util.ratelimitutils import FederationRateLimiter
+from synapse.util.versionstring import get_version_string
 
 import functools
 import logging
-import simplejson as json
 import re
+import synapse
 
 
 logger = logging.getLogger(__name__)
@@ -557,6 +558,20 @@ class PublicRoomList(BaseFederationServlet):
         defer.returnValue((200, data))
 
 
+class FederationVersionServlet(BaseFederationServlet):
+    PATH = "/version"
+
+    REQUIRE_AUTH = False
+
+    def on_GET(self, origin, content, query):
+        return defer.succeed((200, {
+            "server": {
+                "name": "Synapse",
+                "version": get_version_string(synapse)
+            },
+        }))
+
+
 SERVLET_CLASSES = (
     FederationSendServlet,
     FederationPullServlet,
@@ -580,6 +595,7 @@ SERVLET_CLASSES = (
     On3pidBindServlet,
     OpenIdUserInfo,
     PublicRoomList,
+    FederationVersionServlet,
 )
 
 

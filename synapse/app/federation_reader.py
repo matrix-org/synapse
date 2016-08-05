@@ -165,7 +165,7 @@ def start(config_options):
         db_config=config.database_config,
         tls_server_context_factory=tls_server_context_factory,
         config=config,
-        version_string=get_version_string("Synapse", synapse),
+        version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
 
