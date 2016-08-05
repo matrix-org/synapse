@@ -128,6 +128,7 @@ def get_json(origin_name, origin_key, destination, path):
         headers={"Authorization": authorization_headers[0]},
         verify=False,
     )
+    sys.stderr.write("Status Code: %d\n" % (result.status_code,))
     return result.json()
 
 

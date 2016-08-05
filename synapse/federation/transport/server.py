@@ -271,6 +271,17 @@ class FederationStateServlet(BaseFederationServlet):
         )
 
 
+class FederationStateIdsServlet(BaseFederationServlet):
+    PATH = "/state_ids/(?P<room_id>[^/]*)/"
+
+    def on_GET(self, origin, content, query, room_id):
+        return self.handler.on_state_ids_request(
+            origin,
+            room_id,
+            query.get("event_id", [None])[0],
+        )
+
+
 class FederationBackfillServlet(BaseFederationServlet):
     PATH = "/backfill/(?P<context>[^/]*)/"
 
@@ -367,10 +378,8 @@ class FederationThirdPartyInviteExchangeServlet(BaseFederationServlet):
 class FederationClientKeysQueryServlet(BaseFederationServlet):
     PATH = "/user/keys/query"
 
-    @defer.inlineCallbacks
     def on_POST(self, origin, content, query):
-        response = yield self.handler.on_query_client_keys(origin, content)
-        defer.returnValue((200, response))
+        return self.handler.on_query_client_keys(origin, content)
 
 
 class FederationClientKeysClaimServlet(BaseFederationServlet):
@@ -538,6 +547,7 @@ SERVLET_CLASSES = (
     FederationPullServlet,
     FederationEventServlet,
     FederationStateServlet,
+    FederationStateIdsServlet,
     FederationBackfillServlet,
     FederationQueryServlet,
     FederationMakeJoinServlet,

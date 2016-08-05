@@ -24,5 +24,7 @@ recursive-include synapse/static *.js
 
 exclude jenkins.sh
 exclude jenkins*.sh
+exclude jenkins*
+recursive-exclude jenkins *.sh
 
 prune demo/etc
