@@ -236,9 +236,9 @@ class FederationClient(FederationBase):
         # TODO: Rate limit the number of times we try and get the same event.
 
         if self._get_pdu_cache:
-            e = self._get_pdu_cache.get(event_id)
-            if e:
-                defer.returnValue(e)
+            ev = self._get_pdu_cache.get(event_id)
+            if ev:
+                defer.returnValue(ev)
 
         pdu = None
         for destination in destinations:
@@ -269,7 +269,7 @@ class FederationClient(FederationBase):
 
                         break
 
-            except SynapseError:
+            except SynapseError as e:
                 logger.info(
                     "Failed to get PDU %s from %s because %s",
                     event_id, destination, e,
@@ -336,8 +336,10 @@ class FederationClient(FederationBase):
                 ev.event_id: ev for ev in fetched_events
             }
 
-            pdus = [event_map[e_id] for e_id in state_event_ids]
-            auth_chain = [event_map[e_id] for e_id in auth_event_ids]
+            pdus = [event_map[e_id] for e_id in state_event_ids if e_id in event_map]
+            auth_chain = [
+                event_map[e_id] for e_id in auth_event_ids if e_id in event_map
+            ]
 
             auth_chain.sort(key=lambda e: e.depth)
 
@@ -523,14 +525,19 @@ class FederationClient(FederationBase):
                     (destination, self.event_from_pdu_json(pdu_dict))
                 )
                 break
-            except CodeMessageException:
-                raise
+            except CodeMessageException as e:
+                if not 500 <= e.code < 600:
+                    raise
+                else:
+                    logger.warn(
+                        "Failed to make_%s via %s: %s",
+                        membership, destination, e.message
+                    )
             except Exception as e:
                 logger.warn(
                     "Failed to make_%s via %s: %s",
                     membership, destination, e.message
                 )
-                raise
 
         raise RuntimeError("Failed to send to any server.")
 
@@ -602,8 +609,14 @@ class FederationClient(FederationBase):
                     "auth_chain": signed_auth,
                     "origin": destination,
                 })
-            except CodeMessageException:
-                raise
+            except CodeMessageException as e:
+                if not 500 <= e.code < 600:
+                    raise
+                else:
+                    logger.exception(
+                        "Failed to send_join via %s: %s",
+                        destination, e.message
+                    )
             except Exception as e:
                 logger.exception(
                     "Failed to send_join via %s: %s",
