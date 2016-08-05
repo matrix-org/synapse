@@ -376,7 +376,7 @@ class FederationClient(FederationBase):
 
         signed_auth = yield self._check_sigs_and_hash_and_fetch(
             destination,
-            [p for p in pdus if p.event_id not in auth_chain],
+            [p for p in auth_chain if p.event_id not in seen_events],
             outlier=True
         )
         signed_auth.extend(
