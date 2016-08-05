@@ -345,7 +345,8 @@ class PreviewUrlResource(Resource):
                 # lines)
                 text_nodes = (
                     re.sub(r'\s+', '\n', el.text).strip()
-                    for el in cloned_tree.iter() if el.text
+                    for el in cloned_tree.iter()
+                    if el.text and isinstance(el.tag, basestring)  # Removes comments
                 )
                 og['og:description'] = summarize_paragraphs(text_nodes)
 
