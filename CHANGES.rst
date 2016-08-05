@@ -1,3 +1,19 @@
+Changes in synapse v0.17.0-rc4 (2016-08-05)
+===========================================
+
+Changes:
+
+* Change the way we summarize URLs when previewing (PR #973)
+* Add new /state_ids federation API (PR #979)
+* Speed up processing of /state/ response (PR #986)
+
+Bug fixes:
+
+* Fix event persistence when event has already been partially persisted
+  (PR #975, #983, #985)
+* Fix port script to also copy across backfilled events (PR #982)
+
+
 Changes in synapse v0.17.0-rc3 (2016-08-02)
 ===========================================
 
