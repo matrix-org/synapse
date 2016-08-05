@@ -143,6 +143,7 @@ def main():
     )
 
     json.dump(result, sys.stdout)
+    print ""
 
 if __name__ == "__main__":
     main()
