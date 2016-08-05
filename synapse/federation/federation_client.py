@@ -523,14 +523,19 @@ class FederationClient(FederationBase):
                     (destination, self.event_from_pdu_json(pdu_dict))
                 )
                 break
-            except CodeMessageException:
-                raise
+            except CodeMessageException as e:
+                if not 500 <= e.code < 600:
+                    raise
+                else:
+                    logger.warn(
+                        "Failed to make_%s via %s: %s",
+                        membership, destination, e.message
+                    )
             except Exception as e:
                 logger.warn(
                     "Failed to make_%s via %s: %s",
                     membership, destination, e.message
                 )
-                raise
 
         raise RuntimeError("Failed to send to any server.")
 
@@ -602,8 +607,14 @@ class FederationClient(FederationBase):
                     "auth_chain": signed_auth,
                     "origin": destination,
                 })
-            except CodeMessageException:
-                raise
+            except CodeMessageException as e:
+                if not 500 <= e.code < 600:
+                    raise
+                else:
+                    logger.exception(
+                        "Failed to send_join via %s: %s",
+                        destination, e.message
+                    )
             except Exception as e:
                 logger.exception(
                     "Failed to send_join via %s: %s",
