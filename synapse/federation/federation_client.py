@@ -343,7 +343,7 @@ class FederationClient(FederationBase):
 
             defer.returnValue((pdus, auth_chain))
         except HttpResponseException as e:
-            if e.code == 404:
+            if e.code == 400 or e.code == 404:
                 logger.info("Failed to use get_room_state_ids API, falling back")
             else:
                 raise e

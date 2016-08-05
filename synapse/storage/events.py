@@ -580,6 +580,7 @@ class EventsStore(SQLBaseStore):
 
             for table in (
                 "events",
+                "event_auth",
                 "event_json",
                 "event_content_hashes",
                 "event_destinations",
@@ -591,8 +592,15 @@ class EventsStore(SQLBaseStore):
                 "event_search",
                 "event_signatures",
                 "event_to_state_groups",
+                "guest_access",
+                "history_visibility",
+                "local_invites",
+                "room_names",
+                "state_events",
                 "rejections",
                 "redactions",
+                "room_memberships",
+                "state_events"
             ):
                 txn.executemany(
                     "DELETE FROM %s WHERE event_id = ?" % (table,),
