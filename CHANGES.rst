@@ -1,3 +1,18 @@
+Changes in synapse v0.17.0 (2016-08-08)
+=======================================
+
+Changes:
+
+* Add federation /version API (PR #990)
+* Make psutil dependency optional (PR #992)
+
+
+Bug fixes:
+
+* Fix preview URL API to exclude html comments in description (PR #988)
+* Fix error handling of remote joins (PR #991)
+
+
 Changes in synapse v0.17.0-rc4 (2016-08-05)
 ===========================================
 
