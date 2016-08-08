@@ -14,12 +14,13 @@
 # limitations under the License.
 
 import pymacaroons
+from twisted.internet import defer
 
+import synapse
+import synapse.api.errors
 from synapse.handlers.auth import AuthHandler
 from tests import unittest
 from tests.utils import setup_test_homeserver
-from twisted.internet import defer
-
 
 class AuthHandlers(object):
     def __init__(self, hs):
@@ -31,11 +32,12 @@ class AuthTestCase(unittest.TestCase):
     def setUp(self):
         self.hs = yield setup_test_homeserver(handlers=None)
         self.hs.handlers = AuthHandlers(self.hs)
+        self.auth_handler = self.hs.handlers.auth_handler
 
     def test_token_is_a_macaroon(self):
         self.hs.config.macaroon_secret_key = "this key is a huge secret"
 
-        token = self.hs.handlers.auth_handler.generate_access_token("some_user")
+        token = self.auth_handler.generate_access_token("some_user")
         # Check that we can parse the thing with pymacaroons
         macaroon = pymacaroons.Macaroon.deserialize(token)
         # The most basic of sanity checks
@@ -46,7 +48,7 @@ class AuthTestCase(unittest.TestCase):
         self.hs.config.macaroon_secret_key = "this key is a massive secret"
         self.hs.clock.now = 5000
 
-        token = self.hs.handlers.auth_handler.generate_access_token("a_user")
+        token = self.auth_handler.generate_access_token("a_user")
         macaroon = pymacaroons.Macaroon.deserialize(token)
 
         def verify_gen(caveat):
@@ -67,3 +69,46 @@ class AuthTestCase(unittest.TestCase):
         v.satisfy_general(verify_type)
         v.satisfy_general(verify_expiry)
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
+
+    def test_short_term_login_token_gives_user_id(self):
+        self.hs.clock.now = 1000
+
+        token = self.auth_handler.generate_short_term_login_token(
+            "a_user", 5000
+        )
+
+        self.assertEqual(
+            "a_user",
+            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                token
+            )
+        )
+
+        # when we advance the clock, the token should be rejected
+        self.hs.clock.now = 6000
+        with self.assertRaises(synapse.api.errors.AuthError):
+            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                token
+            )
+
+    def test_short_term_login_token_cannot_replace_user_id(self):
+        token = self.auth_handler.generate_short_term_login_token(
+            "a_user", 5000
+        )
+        macaroon = pymacaroons.Macaroon.deserialize(token)
+
+        self.assertEqual(
+            "a_user",
+            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                macaroon.serialize()
+            )
+        )
+
+        # add another "user_id" caveat, which might allow us to override the
+        # user_id.
+        macaroon.add_first_party_caveat("user_id = b_user")
+
+        with self.assertRaises(synapse.api.errors.AuthError):
+            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                macaroon.serialize()
+            )

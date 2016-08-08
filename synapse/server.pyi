@@ -1,3 +1,4 @@
+import synapse.api.auth
 import synapse.handlers
 import synapse.handlers.auth
 import synapse.handlers.device
@@ -6,6 +7,9 @@ import synapse.storage
 import synapse.state
 
 class HomeServer(object):
+    def get_auth(self) -> synapse.api.auth.Auth:
+        pass
+
     def get_auth_handler(self) -> synapse.handlers.auth.AuthHandler:
         pass
 

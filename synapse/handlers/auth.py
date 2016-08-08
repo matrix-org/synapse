@@ -720,10 +720,11 @@ class AuthHandler(BaseHandler):
 
     def validate_short_term_login_token_and_get_user_id(self, login_token):
         try:
-            macaroon = pymacaroons.Macaroon.deserialize(login_token)
             auth_api = self.hs.get_auth()
-            auth_api.validate_macaroon(macaroon, "login", True)
-            return self.get_user_from_macaroon(macaroon)
+            macaroon = pymacaroons.Macaroon.deserialize(login_token)
+            user_id = auth_api.get_user_id_from_macaroon(macaroon)
+            auth_api.validate_macaroon(macaroon, "login", True, user_id)
+            return user_id
         except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
             raise AuthError(401, "Invalid token", errcode=Codes.UNKNOWN_TOKEN)
 
@@ -735,16 +736,6 @@ class AuthHandler(BaseHandler):
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         return macaroon
-
-    def get_user_from_macaroon(self, macaroon):
-        user_prefix = "user_id = "
-        for caveat in macaroon.caveats:
-            if caveat.caveat_id.startswith(user_prefix):
-                return caveat.caveat_id[len(user_prefix):]
-        raise AuthError(
-            self.INVALID_TOKEN_HTTP_STATUS, "No user_id found in token",
-            errcode=Codes.UNKNOWN_TOKEN
-        )
 
     @defer.inlineCallbacks
     def set_password(self, user_id, newpassword, requester=None):
