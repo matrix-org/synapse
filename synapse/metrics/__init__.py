@@ -68,9 +68,18 @@ class Metrics(object):
 
 
 def register_memory_metrics(hs):
-    metric = MemoryUsageMetric(hs)
+    try:
+        import psutil
+        process = psutil.Process()
+        process.memory_info().rss
+    except (ImportError, AttributeError):
+        logger.warn(
+            "psutil is not installed or incorrect version."
+            " Disabling memory metrics."
+        )
+        return
+    metric = MemoryUsageMetric(hs, psutil)
     all_metrics.append(metric)
-    return metric
 
 
 def get_metrics_for(pkg_name):
