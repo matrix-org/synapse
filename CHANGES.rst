@@ -2,7 +2,7 @@ Changes in synapse v0.17.0 (2016-08-08)
 =======================================
 
 This release contains significant security bug fixes regarding authenticating
-events received over federation. Upgrading is highly recommended.
+events received over federation. PLEASE UPGRADE.
 
 This release changes the LDAP configuration format in a backwards incompatible
 way, see PR #843 for details.
