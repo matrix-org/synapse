@@ -16,8 +16,6 @@
 
 from itertools import chain
 
-import psutil
-
 
 # TODO(paul): I can't believe Python doesn't have one of these
 def map_concat(func, items):
@@ -167,9 +165,10 @@ class MemoryUsageMetric(object):
     UPDATE_HZ = 2  # number of times to get memory per second
     WINDOW_SIZE_SEC = 30  # the size of the window in seconds
 
-    def __init__(self, hs):
+    def __init__(self, hs, psutil):
         clock = hs.get_clock()
         self.memory_snapshots = []
+
         self.process = psutil.Process()
 
         clock.looping_call(self._update_curr_values, 1000 / self.UPDATE_HZ)

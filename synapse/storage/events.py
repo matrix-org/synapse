@@ -350,7 +350,7 @@ class EventsStore(SQLBaseStore):
         )
 
         if not events and not allow_none:
-            raise RuntimeError("Could not find event %s" % (event_id,))
+            raise SynapseError(404, "Could not find event %s" % (event_id,))
 
         defer.returnValue(events[0] if events else None)
 

@@ -21,7 +21,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_version_string(name, module):
+def get_version_string(module):
     try:
         null = open(os.devnull, 'w')
         cwd = os.path.dirname(os.path.abspath(module.__file__))
@@ -74,11 +74,11 @@ def get_version_string(name, module):
             )
 
             return (
-                "%s/%s (%s)" % (
-                    name, module.__version__, git_version,
+                "%s (%s)" % (
+                    module.__version__, git_version,
                 )
             ).encode("ascii")
     except Exception as e:
         logger.info("Failed to check for git repository: %s", e)
 
-    return ("%s/%s" % (name, module.__version__,)).encode("ascii")
+    return module.__version__.encode("ascii")
