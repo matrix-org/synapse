@@ -9,7 +9,7 @@ Changes:
 
 Bug fixes:
 
-* Fix preview URL API to exclude html comments in description (PR #988)
+* Fix URL preview API to exclude html comments in description (PR #988)
 * Fix error handling of remote joins (PR #991)
 
 
