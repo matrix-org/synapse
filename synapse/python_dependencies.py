@@ -36,7 +36,6 @@ REQUIREMENTS = {
     "blist": ["blist"],
     "pysaml2>=3.0.0,<4.0.0": ["saml2>=3.0.0,<4.0.0"],
     "pymacaroons-pynacl": ["pymacaroons"],
-    "psutil>=2.0.0": ["psutil>=2.0.0"],
 }
 CONDITIONAL_REQUIREMENTS = {
     "web_client": {
@@ -51,6 +50,9 @@ CONDITIONAL_REQUIREMENTS = {
     },
     "ldap": {
         "ldap3>=1.0": ["ldap3>=1.0"],
+    },
+    "psutil": {
+        "psutil>=2.0.0": ["psutil>=2.0.0"],
     },
 }
 
