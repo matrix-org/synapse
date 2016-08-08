@@ -107,26 +107,6 @@ class ServerConfig(Config):
                 ]
             })
 
-        # Attempt to guess the content_addr for the v0 content repostitory
-        content_addr = config.get("content_addr")
-        if not content_addr:
-            for listener in self.listeners:
-                if listener["type"] == "http" and not listener.get("tls", False):
-                    unsecure_port = listener["port"]
-                    break
-            else:
-                raise RuntimeError("Could not determine 'content_addr'")
-
-            host = self.server_name
-            if ':' not in host:
-                host = "%s:%d" % (host, unsecure_port)
-            else:
-                host = host.split(':')[0]
-                host = "%s:%d" % (host, unsecure_port)
-            content_addr = "http://%s" % (host,)
-
-        self.content_addr = content_addr
-
     def default_config(self, server_name, **kwargs):
         if ":" in server_name:
             bind_port = int(server_name.split(":")[1])
@@ -169,7 +149,6 @@ class ServerConfig(Config):
         # room directory.
         # secondary_directory_servers:
         #     - matrix.org
-        #     - vector.im
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.

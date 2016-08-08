@@ -597,10 +597,13 @@ class SQLBaseStore(object):
         more rows, returning the result as a list of dicts.
 
         Args:
-            table : string giving the table name
-            keyvalues : dict of column names and values to select the rows with,
-            or None to not apply a WHERE clause.
-            retcols : list of strings giving the names of the columns to return
+            table (str): the table name
+            keyvalues (dict[str, Any] | None):
+                column names and values to select the rows with, or None to not
+                apply a WHERE clause.
+            retcols (iterable[str]): the names of the columns to return
+        Returns:
+            defer.Deferred: resolves to list[dict[str, Any]]
         """
         return self.runInteraction(
             desc,
@@ -615,9 +618,11 @@ class SQLBaseStore(object):
 
         Args:
             txn : Transaction object
-            table : string giving the table name
-            keyvalues : dict of column names and values to select the rows with
-            retcols : list of strings giving the names of the columns to return
+            table (str): the table name
+            keyvalues (dict[str, T] | None):
+                column names and values to select the rows with, or None to not
+                apply a WHERE clause.
+            retcols (iterable[str]): the names of the columns to return
         """
         if keyvalues:
             sql = "SELECT %s FROM %s WHERE %s" % (
@@ -806,6 +811,11 @@ class SQLBaseStore(object):
             raise StoreError(404, "No row found")
         if txn.rowcount > 1:
             raise StoreError(500, "more than one row matched")
+
+    def _simple_delete(self, table, keyvalues, desc):
+        return self.runInteraction(
+            desc, self._simple_delete_txn, table, keyvalues
+        )
 
     @staticmethod
     def _simple_delete_txn(txn, table, keyvalues):

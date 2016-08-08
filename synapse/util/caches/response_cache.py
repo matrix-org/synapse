@@ -24,8 +24,11 @@ class ResponseCache(object):
     used rather than trying to compute a new response.
     """
 
-    def __init__(self):
+    def __init__(self, hs, timeout_ms=0):
         self.pending_result_cache = {}  # Requests that haven't finished yet.
+
+        self.clock = hs.get_clock()
+        self.timeout_sec = timeout_ms / 1000.
 
     def get(self, key):
         result = self.pending_result_cache.get(key)
@@ -39,7 +42,13 @@ class ResponseCache(object):
         self.pending_result_cache[key] = result
 
         def remove(r):
-            self.pending_result_cache.pop(key, None)
+            if self.timeout_sec:
+                self.clock.call_later(
+                    self.timeout_sec,
+                    self.pending_result_cache.pop, key, None,
+                )
+            else:
+                self.pending_result_cache.pop(key, None)
             return r
 
         result.addBoth(remove)

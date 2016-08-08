@@ -59,47 +59,6 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         [unpatch() for unpatch in self.unpatches]
 
     @defer.inlineCallbacks
-    def test_room_name_and_aliases(self):
-        create = yield self.persist(type="m.room.create", key="", creator=USER_ID)
-        yield self.persist(type="m.room.member", key=USER_ID, membership="join")
-        yield self.persist(type="m.room.name", key="", name="name1")
-        yield self.persist(
-            type="m.room.aliases", key="blue", aliases=["#1:blue"]
-        )
-        yield self.replicate()
-        yield self.check(
-            "get_room_name_and_aliases", (ROOM_ID,), ("name1", ["#1:blue"])
-        )
-
-        # Set the room name.
-        yield self.persist(type="m.room.name", key="", name="name2")
-        yield self.replicate()
-        yield self.check(
-            "get_room_name_and_aliases", (ROOM_ID,), ("name2", ["#1:blue"])
-        )
-
-        # Set the room aliases.
-        yield self.persist(
-            type="m.room.aliases", key="blue", aliases=["#2:blue"]
-        )
-        yield self.replicate()
-        yield self.check(
-            "get_room_name_and_aliases", (ROOM_ID,), ("name2", ["#2:blue"])
-        )
-
-        # Leave and join the room clobbering the state.
-        yield self.persist(type="m.room.member", key=USER_ID, membership="leave")
-        yield self.persist(
-            type="m.room.member", key=USER_ID, membership="join",
-            reset_state=[create]
-        )
-        yield self.replicate()
-
-        yield self.check(
-            "get_room_name_and_aliases", (ROOM_ID,), (None, [])
-        )
-
-    @defer.inlineCallbacks
     def test_room_members(self):
         create = yield self.persist(type="m.room.create", key="", creator=USER_ID)
         yield self.replicate()

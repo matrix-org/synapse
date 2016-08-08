@@ -9,31 +9,35 @@ the Home Server to generate credentials that are valid for use on the TURN
 server through the use of a secret shared between the Home Server and the
 TURN server.
 
-This document described how to install coturn
-(https://code.google.com/p/coturn/) which also supports the TURN REST API,
+This document describes how to install coturn
+(https://github.com/coturn/coturn) which also supports the TURN REST API,
 and integrate it with synapse.
 
 coturn Setup
 ============
 
+You may be able to setup coturn via your package manager,  or set it up manually using the usual ``configure, make, make install`` process.  
+
  1. Check out coturn::
-      svn checkout http://coturn.googlecode.com/svn/trunk/ coturn
+ 
+      git clone https://github.com/coturn/coturn.git coturn
       cd coturn
 
  2. Configure it::
+ 
       ./configure
 
-    You may need to install libevent2: if so, you should do so
+    You may need to install ``libevent2``: if so, you should do so
     in the way recommended by your operating system.
     You can ignore warnings about lack of database support: a
     database is unnecessary for this purpose.
 
  3. Build and install it::
+ 
       make
       make install
 
- 4. Make a config file in /etc/turnserver.conf. You can customise
-    a config file from turnserver.conf.default. The relevant
+ 4. Create or edit the config file in ``/etc/turnserver.conf``. The relevant
     lines, with example values, are::
 
       lt-cred-mech
@@ -41,7 +45,7 @@ coturn Setup
       static-auth-secret=[your secret key here]
       realm=turn.myserver.org
 
-    See turnserver.conf.default for explanations of the options.
+    See turnserver.conf for explanations of the options.
     One way to generate the static-auth-secret is with pwgen::
 
        pwgen -s 64 1
@@ -54,6 +58,7 @@ coturn Setup
     import your private key and certificate.
 
  7. Start the turn server::
+ 
        bin/turnserver -o
 
 

@@ -18,7 +18,6 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 
 from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cachedInlineCallbacks
 from .engines import PostgresEngine, Sqlite3Engine
 
 import collections
@@ -191,49 +190,6 @@ class RoomStore(SQLBaseStore):
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
-
-    @cachedInlineCallbacks()
-    def get_room_name_and_aliases(self, room_id):
-        def get_room_name(txn):
-            sql = (
-                "SELECT name FROM room_names"
-                " INNER JOIN current_state_events USING (room_id, event_id)"
-                " WHERE room_id = ?"
-                " LIMIT 1"
-            )
-
-            txn.execute(sql, (room_id,))
-            rows = txn.fetchall()
-            if rows:
-                return rows[0][0]
-            else:
-                return None
-
-            return [row[0] for row in txn.fetchall()]
-
-        def get_room_aliases(txn):
-            sql = (
-                "SELECT content FROM current_state_events"
-                " INNER JOIN events USING (room_id, event_id)"
-                " WHERE room_id = ?"
-            )
-            txn.execute(sql, (room_id,))
-            return [row[0] for row in txn.fetchall()]
-
-        name = yield self.runInteraction("get_room_name", get_room_name)
-        alias_contents = yield self.runInteraction("get_room_aliases", get_room_aliases)
-
-        aliases = []
-
-        for c in alias_contents:
-            try:
-                content = json.loads(c)
-            except:
-                continue
-
-            aliases.extend(content.get('aliases', []))
-
-        defer.returnValue((name, aliases))
 
     def add_event_report(self, room_id, event_id, user_id, reason, content,
                          received_ts):

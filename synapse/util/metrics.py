@@ -84,7 +84,7 @@ class Measure(object):
 
         if context != self.start_context:
             logger.warn(
-                "Context have unexpectedly changed from '%s' to '%s'. (%r)",
+                "Context has unexpectedly changed from '%s' to '%s'. (%r)",
                 context, self.start_context, self.name
             )
             return

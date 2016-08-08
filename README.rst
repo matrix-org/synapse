@@ -445,7 +445,7 @@ You have two choices here, which will influence the form of your Matrix user
 IDs:
 
 1) Use the machine's own hostname as available on public DNS in the form of
-   its A or AAAA records. This is easier to set up initially, perhaps for
+   its A records. This is easier to set up initially, perhaps for
    testing, but lacks the flexibility of SRV.
 
 2) Set up a SRV record for your domain name. This requires you create a SRV

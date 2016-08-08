@@ -14,6 +14,7 @@ recursive-include docs *
 recursive-include res *
 recursive-include scripts *
 recursive-include scripts-dev *
+recursive-include synapse *.pyi
 recursive-include tests *.py
 
 recursive-include synapse/static *.css
@@ -23,5 +24,7 @@ recursive-include synapse/static *.js
 
 exclude jenkins.sh
 exclude jenkins*.sh
+exclude jenkins*
+recursive-exclude jenkins *.sh
 
 prune demo/etc

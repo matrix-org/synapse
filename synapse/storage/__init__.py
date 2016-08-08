@@ -14,6 +14,8 @@
 # limitations under the License.
 
 from twisted.internet import defer
+
+from synapse.storage.devices import DeviceStore
 from .appservice import (
     ApplicationServiceStore, ApplicationServiceTransactionStore
 )
@@ -80,6 +82,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 EventPushActionsStore,
                 OpenIdStore,
                 ClientIpStore,
+                DeviceStore,
                 ):
 
     def __init__(self, db_conn, hs):
@@ -92,7 +95,8 @@ class DataStore(RoomMemberStore, RoomStore,
             extra_tables=[("local_invites", "stream_id")]
         )
         self._backfill_id_gen = StreamIdGenerator(
-            db_conn, "events", "stream_ordering", step=-1
+            db_conn, "events", "stream_ordering", step=-1,
+            extra_tables=[("ex_outlier_stream", "event_stream_ordering")]
         )
         self._receipts_id_gen = StreamIdGenerator(
             db_conn, "receipts_linearized", "stream_id"

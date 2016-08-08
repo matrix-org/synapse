@@ -27,7 +27,7 @@ running:
     # Pull the latest version of the master branch.
     git pull
     # Update the versions of synapse's python dependencies.
-    python synapse/python_dependencies.py | xargs -n1 pip install
+    python synapse/python_dependencies.py | xargs -n1 pip install --upgrade
 
 
 Upgrading to v0.15.0

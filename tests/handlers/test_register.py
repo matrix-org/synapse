@@ -42,12 +42,12 @@ class RegistrationTestCase(unittest.TestCase):
             http_client=None,
             expire_access_token=True)
         self.auth_handler = Mock(
-            generate_short_term_login_token=Mock(return_value='secret'))
+            generate_access_token=Mock(return_value='secret'))
         self.hs.handlers = RegistrationHandlers(self.hs)
         self.handler = self.hs.get_handlers().registration_handler
         self.hs.get_handlers().profile_handler = Mock()
         self.mock_handler = Mock(spec=[
-            "generate_short_term_login_token",
+            "generate_access_token",
         ])
         self.hs.get_auth_handler = Mock(return_value=self.auth_handler)
 

@@ -27,7 +27,8 @@ import gc
 from twisted.internet import reactor
 
 from .metric import (
-    CounterMetric, CallbackMetric, DistributionMetric, CacheMetric
+    CounterMetric, CallbackMetric, DistributionMetric, CacheMetric,
+    MemoryUsageMetric,
 )
 
 
@@ -64,6 +65,21 @@ class Metrics(object):
 
     def register_cache(self, *args, **kwargs):
         return self._register(CacheMetric, *args, **kwargs)
+
+
+def register_memory_metrics(hs):
+    try:
+        import psutil
+        process = psutil.Process()
+        process.memory_info().rss
+    except (ImportError, AttributeError):
+        logger.warn(
+            "psutil is not installed or incorrect version."
+            " Disabling memory metrics."
+        )
+        return
+    metric = MemoryUsageMetric(hs, psutil)
+    all_metrics.append(metric)
 
 
 def get_metrics_for(pkg_name):

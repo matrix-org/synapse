@@ -16,6 +16,8 @@
 from ._base import SQLBaseStore
 from twisted.internet import defer
 from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.types import RoomStreamToken
+from .stream import lower_bound
 
 import logging
 import ujson as json
@@ -73,6 +75,9 @@ class EventPushActionsStore(SQLBaseStore):
 
             stream_ordering = results[0][0]
             topological_ordering = results[0][1]
+            token = RoomStreamToken(
+                topological_ordering, stream_ordering
+            )
 
             sql = (
                 "SELECT sum(notif), sum(highlight)"
@@ -80,15 +85,10 @@ class EventPushActionsStore(SQLBaseStore):
                 " WHERE"
                 " user_id = ?"
                 " AND room_id = ?"
-                " AND ("
-                "       topological_ordering > ?"
-                "       OR (topological_ordering = ? AND stream_ordering > ?)"
-                ")"
-            )
-            txn.execute(sql, (
-                user_id, room_id,
-                topological_ordering, topological_ordering, stream_ordering
-            ))
+                " AND %s"
+            ) % (lower_bound(token, self.database_engine, inclusive=False),)
+
+            txn.execute(sql, (user_id, room_id))
             row = txn.fetchone()
             if row:
                 return {
@@ -117,21 +117,149 @@ class EventPushActionsStore(SQLBaseStore):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def get_unread_push_actions_for_user_in_range(self, user_id,
-                                                  min_stream_ordering,
-                                                  max_stream_ordering=None,
-                                                  limit=20):
+    def get_unread_push_actions_for_user_in_range_for_http(
+        self, user_id, min_stream_ordering, max_stream_ordering, limit=20
+    ):
+        """Get a list of the most recent unread push actions for a given user,
+        within the given stream ordering range. Called by the httppusher.
+
+        Args:
+            user_id (str): The user to fetch push actions for.
+            min_stream_ordering(int): The exclusive lower bound on the
+                stream ordering of event push actions to fetch.
+            max_stream_ordering(int): The inclusive upper bound on the
+                stream ordering of event push actions to fetch.
+            limit (int): The maximum number of rows to return.
+        Returns:
+            A promise which resolves to a list of dicts with the keys "event_id",
+            "room_id", "stream_ordering", "actions".
+            The list will be ordered by ascending stream_ordering.
+            The list will have between 0~limit entries.
+        """
+        # find rooms that have a read receipt in them and return the next
+        # push actions
+        def get_after_receipt(txn):
+            # find rooms that have a read receipt in them and return the next
+            # push actions
+            sql = (
+                "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions"
+                " FROM ("
+                "   SELECT room_id,"
+                "       MAX(topological_ordering) as topological_ordering,"
+                "       MAX(stream_ordering) as stream_ordering"
+                "   FROM events"
+                "   INNER JOIN receipts_linearized USING (room_id, event_id)"
+                "   WHERE receipt_type = 'm.read' AND user_id = ?"
+                "   GROUP BY room_id"
+                ") AS rl,"
+                " event_push_actions AS ep"
+                " WHERE"
+                "   ep.room_id = rl.room_id"
+                "   AND ("
+                "       ep.topological_ordering > rl.topological_ordering"
+                "       OR ("
+                "           ep.topological_ordering = rl.topological_ordering"
+                "           AND ep.stream_ordering > rl.stream_ordering"
+                "       )"
+                "   )"
+                "   AND ep.user_id = ?"
+                "   AND ep.stream_ordering > ?"
+                "   AND ep.stream_ordering <= ?"
+                " ORDER BY ep.stream_ordering ASC LIMIT ?"
+            )
+            args = [
+                user_id, user_id,
+                min_stream_ordering, max_stream_ordering, limit,
+            ]
+            txn.execute(sql, args)
+            return txn.fetchall()
+        after_read_receipt = yield self.runInteraction(
+            "get_unread_push_actions_for_user_in_range_http_arr", get_after_receipt
+        )
+
+        # There are rooms with push actions in them but you don't have a read receipt in
+        # them e.g. rooms you've been invited to, so get push actions for rooms which do
+        # not have read receipts in them too.
+        def get_no_receipt(txn):
+            sql = (
+                "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,"
+                " e.received_ts"
+                " FROM event_push_actions AS ep"
+                " INNER JOIN events AS e USING (room_id, event_id)"
+                " WHERE"
+                "   ep.room_id NOT IN ("
+                "     SELECT room_id FROM receipts_linearized"
+                "       WHERE receipt_type = 'm.read' AND user_id = ?"
+                "       GROUP BY room_id"
+                "   )"
+                "   AND ep.user_id = ?"
+                "   AND ep.stream_ordering > ?"
+                "   AND ep.stream_ordering <= ?"
+                " ORDER BY ep.stream_ordering ASC LIMIT ?"
+            )
+            args = [
+                user_id, user_id,
+                min_stream_ordering, max_stream_ordering, limit,
+            ]
+            txn.execute(sql, args)
+            return txn.fetchall()
+        no_read_receipt = yield self.runInteraction(
+            "get_unread_push_actions_for_user_in_range_http_nrr", get_no_receipt
+        )
+
+        notifs = [
+            {
+                "event_id": row[0],
+                "room_id": row[1],
+                "stream_ordering": row[2],
+                "actions": json.loads(row[3]),
+            } for row in after_read_receipt + no_read_receipt
+        ]
+
+        # Now sort it so it's ordered correctly, since currently it will
+        # contain results from the first query, correctly ordered, followed
+        # by results from the second query, but we want them all ordered
+        # by stream_ordering, oldest first.
+        notifs.sort(key=lambda r: r['stream_ordering'])
+
+        # Take only up to the limit. We have to stop at the limit because
+        # one of the subqueries may have hit the limit.
+        defer.returnValue(notifs[:limit])
+
+    @defer.inlineCallbacks
+    def get_unread_push_actions_for_user_in_range_for_email(
+        self, user_id, min_stream_ordering, max_stream_ordering, limit=20
+    ):
+        """Get a list of the most recent unread push actions for a given user,
+        within the given stream ordering range. Called by the emailpusher
+
+        Args:
+            user_id (str): The user to fetch push actions for.
+            min_stream_ordering(int): The exclusive lower bound on the
+                stream ordering of event push actions to fetch.
+            max_stream_ordering(int): The inclusive upper bound on the
+                stream ordering of event push actions to fetch.
+            limit (int): The maximum number of rows to return.
+        Returns:
+            A promise which resolves to a list of dicts with the keys "event_id",
+            "room_id", "stream_ordering", "actions", "received_ts".
+            The list will be ordered by descending received_ts.
+            The list will have between 0~limit entries.
+        """
+        # find rooms that have a read receipt in them and return the most recent
+        # push actions
         def get_after_receipt(txn):
             sql = (
-                "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions, "
-                "e.received_ts "
-                "FROM ("
-                "   SELECT room_id, user_id, "
-                "       max(topological_ordering) as topological_ordering, "
-                "       max(stream_ordering) as stream_ordering "
-                "       FROM events"
-                "   NATURAL JOIN receipts_linearized WHERE receipt_type = 'm.read'"
-                "   GROUP BY room_id, user_id"
+                "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,"
+                "  e.received_ts"
+                " FROM ("
+                "   SELECT room_id,"
+                "       MAX(topological_ordering) as topological_ordering,"
+                "       MAX(stream_ordering) as stream_ordering"
+                "   FROM events"
+                "   INNER JOIN receipts_linearized USING (room_id, event_id)"
+                "   WHERE receipt_type = 'm.read' AND user_id = ?"
+                "   GROUP BY room_id"
                 ") AS rl,"
                 " event_push_actions AS ep"
                 " INNER JOIN events AS e USING (room_id, event_id)"
@@ -144,46 +272,53 @@ class EventPushActionsStore(SQLBaseStore):
                 "           AND ep.stream_ordering > rl.stream_ordering"
                 "       )"
                 "   )"
-                "   AND ep.stream_ordering > ?"
                 "   AND ep.user_id = ?"
-                "   AND ep.user_id = rl.user_id"
+                "   AND ep.stream_ordering > ?"
+                "   AND ep.stream_ordering <= ?"
+                " ORDER BY ep.stream_ordering DESC LIMIT ?"
             )
-            args = [min_stream_ordering, user_id]
-            if max_stream_ordering is not None:
-                sql += " AND ep.stream_ordering <= ?"
-                args.append(max_stream_ordering)
-            sql += " ORDER BY ep.stream_ordering ASC LIMIT ?"
-            args.append(limit)
+            args = [
+                user_id, user_id,
+                min_stream_ordering, max_stream_ordering, limit,
+            ]
             txn.execute(sql, args)
             return txn.fetchall()
         after_read_receipt = yield self.runInteraction(
-            "get_unread_push_actions_for_user_in_range", get_after_receipt
+            "get_unread_push_actions_for_user_in_range_email_arr", get_after_receipt
         )
 
+        # There are rooms with push actions in them but you don't have a read receipt in
+        # them e.g. rooms you've been invited to, so get push actions for rooms which do
+        # not have read receipts in them too.
         def get_no_receipt(txn):
             sql = (
                 "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,"
                 " e.received_ts"
                 " FROM event_push_actions AS ep"
-                " JOIN events e ON ep.room_id = e.room_id AND ep.event_id = e.event_id"
-                " WHERE ep.room_id not in ("
-                "   SELECT room_id FROM events NATURAL JOIN receipts_linearized"
-                "   WHERE receipt_type = 'm.read' AND user_id = ?"
-                "   GROUP BY room_id"
-                ") AND ep.user_id = ? AND ep.stream_ordering > ?"
+                " INNER JOIN events AS e USING (room_id, event_id)"
+                " WHERE"
+                "   ep.room_id NOT IN ("
+                "     SELECT room_id FROM receipts_linearized"
+                "       WHERE receipt_type = 'm.read' AND user_id = ?"
+                "       GROUP BY room_id"
+                "   )"
+                "   AND ep.user_id = ?"
+                "   AND ep.stream_ordering > ?"
+                "   AND ep.stream_ordering <= ?"
+                " ORDER BY ep.stream_ordering DESC LIMIT ?"
             )
-            args = [user_id, user_id, min_stream_ordering]
-            if max_stream_ordering is not None:
-                sql += " AND ep.stream_ordering <= ?"
-                args.append(max_stream_ordering)
-            sql += " ORDER BY ep.stream_ordering ASC"
+            args = [
+                user_id, user_id,
+                min_stream_ordering, max_stream_ordering, limit,
+            ]
             txn.execute(sql, args)
             return txn.fetchall()
         no_read_receipt = yield self.runInteraction(
-            "get_unread_push_actions_for_user_in_range", get_no_receipt
+            "get_unread_push_actions_for_user_in_range_email_nrr", get_no_receipt
         )
 
-        defer.returnValue([
+        # Make a list of dicts from the two sets of results.
+        notifs = [
             {
                 "event_id": row[0],
                 "room_id": row[1],
@@ -191,7 +326,16 @@ class EventPushActionsStore(SQLBaseStore):
                 "actions": json.loads(row[3]),
                 "received_ts": row[4],
             } for row in after_read_receipt + no_read_receipt
-        ])
+        ]
+
+        # Now sort it so it's ordered correctly, since currently it will
+        # contain results from the first query, correctly ordered, followed
+        # by results from the second query, but we want them all ordered
+        # by received_ts (most recent first)
+        notifs.sort(key=lambda r: -(r['received_ts'] or 0))
+
+        # Now return the first `limit`
+        defer.returnValue(notifs[:limit])
 
     @defer.inlineCallbacks
     def get_time_of_last_push_action_before(self, stream_ordering):

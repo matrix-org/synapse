@@ -273,7 +273,7 @@ def start(config_options):
         config.server_name,
         db_config=config.database_config,
         config=config,
-        version_string=get_version_string("Synapse", synapse),
+        version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
 

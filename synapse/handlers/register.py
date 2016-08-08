@@ -14,18 +14,19 @@
 # limitations under the License.
 
 """Contains functions for registering clients."""
+import logging
+import urllib
+
 from twisted.internet import defer
 
-from synapse.types import UserID, Requester
+import synapse.types
 from synapse.api.errors import (
     AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError
 )
-from ._base import BaseHandler
-from synapse.util.async import run_on_reactor
 from synapse.http.client import CaptchaServerHttpClient
-
-import logging
-import urllib
+from synapse.types import UserID
+from synapse.util.async import run_on_reactor
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,13 @@ class RegistrationHandler(BaseHandler):
             raise SynapseError(
                 400,
                 "User ID can only contain characters a-z, 0-9, or '_-./'",
+                Codes.INVALID_USERNAME
+            )
+
+        if localpart[0] == '_':
+            raise SynapseError(
+                400,
+                "User ID may not begin with _",
                 Codes.INVALID_USERNAME
             )
 
@@ -90,7 +98,8 @@ class RegistrationHandler(BaseHandler):
         password=None,
         generate_token=True,
         guest_access_token=None,
-        make_guest=False
+        make_guest=False,
+        admin=False,
     ):
         """Registers a new client on the server.
 
@@ -98,8 +107,13 @@ class RegistrationHandler(BaseHandler):
             localpart : The local part of the user ID to register. If None,
               one will be generated.
             password (str) : The password to assign to this user so they can
-            login again. This can be None which means they cannot login again
-            via a password (e.g. the user is an application service user).
+              login again. This can be None which means they cannot login again
+              via a password (e.g. the user is an application service user).
+            generate_token (bool): Whether a new access token should be
+              generated. Having this be True should be considered deprecated,
+              since it offers no means of associating a device_id with the
+              access_token. Instead you should call auth_handler.issue_access_token
+              after registration.
         Returns:
             A tuple of (user_id, access_token).
         Raises:
@@ -141,6 +155,7 @@ class RegistrationHandler(BaseHandler):
                     # If the user was a guest then they already have a profile
                     None if was_guest else user.localpart
                 ),
+                admin=admin,
             )
         else:
             # autogen a sequential user ID
@@ -194,15 +209,13 @@ class RegistrationHandler(BaseHandler):
             user_id, allowed_appservice=service
         )
 
-        token = self.auth_handler().generate_access_token(user_id)
         yield self.store.register(
             user_id=user_id,
-            token=token,
             password_hash="",
             appservice_id=service_id,
             create_profile_with_localpart=user.localpart,
         )
-        defer.returnValue((user_id, token))
+        defer.returnValue(user_id)
 
     @defer.inlineCallbacks
     def check_recaptcha(self, ip, private_key, challenge, response):
@@ -358,7 +371,8 @@ class RegistrationHandler(BaseHandler):
         defer.returnValue(data)
 
     @defer.inlineCallbacks
-    def get_or_create_user(self, localpart, displayname, duration_seconds):
+    def get_or_create_user(self, localpart, displayname, duration_in_ms,
+                           password_hash=None):
         """Creates a new user if the user does not exist,
         else revokes all previous access tokens and generates a new one.
 
@@ -387,14 +401,14 @@ class RegistrationHandler(BaseHandler):
 
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
-        token = self.auth_handler().generate_short_term_login_token(
-            user_id, duration_seconds)
+        token = self.auth_handler().generate_access_token(
+            user_id, None, duration_in_ms)
 
         if need_register:
             yield self.store.register(
                 user_id=user_id,
                 token=token,
-                password_hash=None,
+                password_hash=password_hash,
                 create_profile_with_localpart=user.localpart,
             )
         else:
@@ -404,8 +418,9 @@ class RegistrationHandler(BaseHandler):
         if displayname is not None:
             logger.info("setting user display name: %s -> %s", user_id, displayname)
             profile_handler = self.hs.get_handlers().profile_handler
+            requester = synapse.types.create_requester(user)
             yield profile_handler.set_displayname(
-                user, Requester(user, token, False), displayname
+                user, requester, displayname
             )
 
         defer.returnValue((user_id, token))

@@ -13,22 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
+import pymacaroons
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json, SignatureVerifyException
-
 from twisted.internet import defer
-
-from synapse.api.constants import EventTypes, Membership, JoinRules
-from synapse.api.errors import AuthError, Codes, SynapseError, EventSizeError
-from synapse.types import Requester, UserID, get_domain_from_id
-from synapse.util.logutils import log_function
-from synapse.util.logcontext import preserve_context_over_fn
-from synapse.util.metrics import Measure
 from unpaddedbase64 import decode_base64
 
-import logging
-import pymacaroons
+import synapse.types
+from synapse.api.constants import EventTypes, Membership, JoinRules
+from synapse.api.errors import AuthError, Codes, SynapseError, EventSizeError
+from synapse.types import UserID, get_domain_from_id
+from synapse.util.logcontext import preserve_context_over_fn
+from synapse.util.logutils import log_function
+from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class Auth(object):
             "user_id = ",
         ])
 
-    def check(self, event, auth_events):
+    def check(self, event, auth_events, do_sig_check=True):
         """ Checks if this event is correctly authed.
 
         Args:
@@ -79,6 +79,13 @@ class Auth(object):
 
             if not hasattr(event, "room_id"):
                 raise AuthError(500, "Event has no room_id: %s" % event)
+
+            sender_domain = get_domain_from_id(event.sender)
+
+            # Check the sender's domain has signed the event
+            if do_sig_check and not event.signatures.get(sender_domain):
+                raise AuthError(403, "Event not signed by sending server")
+
             if auth_events is None:
                 # Oh, we don't know what the state of the room was, so we
                 # are trusting that this is allowed (at least for now)
@@ -86,6 +93,12 @@ class Auth(object):
                 return True
 
             if event.type == EventTypes.Create:
+                room_id_domain = get_domain_from_id(event.room_id)
+                if room_id_domain != sender_domain:
+                    raise AuthError(
+                        403,
+                        "Creation event's room_id domain does not match sender's"
+                    )
                 # FIXME
                 return True
 
@@ -108,6 +121,22 @@ class Auth(object):
 
             # FIXME: Temp hack
             if event.type == EventTypes.Aliases:
+                if not event.is_state():
+                    raise AuthError(
+                        403,
+                        "Alias event must be a state event",
+                    )
+                if not event.state_key:
+                    raise AuthError(
+                        403,
+                        "Alias event must have non-empty state_key"
+                    )
+                sender_domain = get_domain_from_id(event.sender)
+                if event.state_key != sender_domain:
+                    raise AuthError(
+                        403,
+                        "Alias event's state_key does not match sender's domain"
+                    )
                 return True
 
             logger.debug(
@@ -347,6 +376,10 @@ class Auth(object):
         if Membership.INVITE == membership and "third_party_invite" in event.content:
             if not self._verify_third_party_invite(event, auth_events):
                 raise AuthError(403, "You are not invited to this room.")
+            if target_banned:
+                raise AuthError(
+                    403, "%s is banned from the room" % (target_user_id,)
+                )
             return True
 
         if Membership.JOIN != membership:
@@ -537,9 +570,7 @@ class Auth(object):
         Args:
             request - An HTTP request with an access_token query parameter.
         Returns:
-            tuple of:
-                UserID (str)
-                Access token ID (str)
+            defer.Deferred: resolves to a ``synapse.types.Requester`` object
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
@@ -548,15 +579,17 @@ class Auth(object):
             user_id = yield self._get_appservice_user_id(request.args)
             if user_id:
                 request.authenticated_entity = user_id
-                defer.returnValue(
-                    Requester(UserID.from_string(user_id), "", False)
-                )
+                defer.returnValue(synapse.types.create_requester(user_id))
 
             access_token = request.args["access_token"][0]
             user_info = yield self.get_user_by_access_token(access_token, rights)
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
+
+            # device_id may not be present if get_user_by_access_token has been
+            # stubbed out.
+            device_id = user_info.get("device_id")
 
             ip_addr = self.hs.get_ip_from_request(request)
             user_agent = request.requestHeaders.getRawHeaders(
@@ -569,7 +602,8 @@ class Auth(object):
                     user=user,
                     access_token=access_token,
                     ip=ip_addr,
-                    user_agent=user_agent
+                    user_agent=user_agent,
+                    device_id=device_id,
                 )
 
             if is_guest and not allow_guest:
@@ -579,7 +613,8 @@ class Auth(object):
 
             request.authenticated_entity = user.to_string()
 
-            defer.returnValue(Requester(user, token_id, is_guest))
+            defer.returnValue(synapse.types.create_requester(
+                user, token_id, is_guest, device_id))
         except KeyError:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",
@@ -629,7 +664,10 @@ class Auth(object):
         except AuthError:
             # TODO(daniel): Remove this fallback when all existing access tokens
             # have been re-issued as macaroons.
+            if self.hs.config.expire_access_token:
+                raise
             ret = yield self._look_up_user_by_access_token(token)
+
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
@@ -664,6 +702,7 @@ class Auth(object):
                     "user": user,
                     "is_guest": True,
                     "token_id": None,
+                    "device_id": None,
                 }
             elif rights == "delete_pusher":
                 # We don't store these tokens in the database
@@ -671,13 +710,20 @@ class Auth(object):
                     "user": user,
                     "is_guest": False,
                     "token_id": None,
+                    "device_id": None,
                 }
             else:
-                # This codepath exists so that we can actually return a
-                # token ID, because we use token IDs in place of device
-                # identifiers throughout the codebase.
-                # TODO(daniel): Remove this fallback when device IDs are
-                # properly implemented.
+                # This codepath exists for several reasons:
+                #   * so that we can actually return a token ID, which is used
+                #     in some parts of the schema (where we probably ought to
+                #     use device IDs instead)
+                #   * the only way we currently have to invalidate an
+                #     access_token is by removing it from the database, so we
+                #     have to check here that it is still in the db
+                #   * some attributes (notably device_id) aren't stored in the
+                #     macaroon. They probably should be.
+                # TODO: build the dictionary from the macaroon once the
+                # above are fixed
                 ret = yield self._look_up_user_by_access_token(macaroon_str)
                 if ret["user"] != user:
                     logger.error(
@@ -751,10 +797,14 @@ class Auth(object):
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Unrecognised access token.",
                 errcode=Codes.UNKNOWN_TOKEN
             )
+        # we use ret.get() below because *lots* of unit tests stub out
+        # get_user_by_access_token in a way where it only returns a couple of
+        # the fields.
         user_info = {
             "user": UserID.from_string(ret.get("name")),
             "token_id": ret.get("token_id", None),
             "is_guest": False,
+            "device_id": ret.get("device_id"),
         }
         defer.returnValue(user_info)
 

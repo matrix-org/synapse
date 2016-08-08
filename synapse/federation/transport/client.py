@@ -55,6 +55,28 @@ class TransportLayerClient(object):
         )
 
     @log_function
+    def get_room_state_ids(self, destination, room_id, event_id):
+        """ Requests all state for a given room from the given server at the
+        given event. Returns the state's event_id's
+
+        Args:
+            destination (str): The host name of the remote home server we want
+                to get the state from.
+            context (str): The name of the context we want the state of
+            event_id (str): The event we want the context at.
+
+        Returns:
+            Deferred: Results in a dict received from the remote homeserver.
+        """
+        logger.debug("get_room_state_ids dest=%s, room=%s",
+                     destination, room_id)
+
+        path = PREFIX + "/state_ids/%s/" % room_id
+        return self.client.get_json(
+            destination, path=path, args={"event_id": event_id},
+        )
+
+    @log_function
     def get_event(self, destination, event_id, timeout=None):
         """ Requests the pdu with give id and origin from the given server.
 

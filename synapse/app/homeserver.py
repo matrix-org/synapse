@@ -51,6 +51,7 @@ from synapse.api.urls import (
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.util.logcontext import LoggingContext
+from synapse.metrics import register_memory_metrics
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.replication.resource import ReplicationResource, REPLICATION_PREFIX
 from synapse.federation.transport.server import TransportLayerServer
@@ -147,7 +148,7 @@ class SynapseHomeServer(HomeServer):
                         MEDIA_PREFIX: media_repo,
                         LEGACY_MEDIA_PREFIX: media_repo,
                         CONTENT_REPO_PREFIX: ContentRepoResource(
-                            self, self.config.uploads_path, self.auth, self.content_addr
+                            self, self.config.uploads_path
                         ),
                     })
 
@@ -284,7 +285,7 @@ def setup(config_options):
     # check any extra requirements we have now we have a config
     check_requirements(config)
 
-    version_string = get_version_string("Synapse", synapse)
+    version_string = "Synapse/" + get_version_string(synapse)
 
     logger.info("Server hostname: %s", config.server_name)
     logger.info("Server version: %s", version_string)
@@ -301,7 +302,6 @@ def setup(config_options):
         db_config=config.database_config,
         tls_server_context_factory=tls_server_context_factory,
         config=config,
-        content_addr=config.content_addr,
         version_string=version_string,
         database_engine=database_engine,
     )
@@ -335,6 +335,8 @@ def setup(config_options):
         hs.get_datastore().start_profiling()
         hs.get_datastore().start_doing_background_updates()
         hs.get_replication_layer().start_get_pdu_cache()
+
+        register_memory_metrics(hs)
 
     reactor.callWhenRunning(start)
 
