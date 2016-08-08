@@ -22,6 +22,7 @@ from synapse.handlers.auth import AuthHandler
 from tests import unittest
 from tests.utils import setup_test_homeserver
 
+
 class AuthHandlers(object):
     def __init__(self, hs):
         self.auth_handler = AuthHandler(hs)
