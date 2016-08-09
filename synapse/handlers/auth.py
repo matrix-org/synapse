@@ -719,14 +719,14 @@ class AuthHandler(BaseHandler):
         return macaroon.serialize()
 
     def validate_short_term_login_token_and_get_user_id(self, login_token):
+        auth_api = self.hs.get_auth()
         try:
-            auth_api = self.hs.get_auth()
             macaroon = pymacaroons.Macaroon.deserialize(login_token)
             user_id = auth_api.get_user_id_from_macaroon(macaroon)
             auth_api.validate_macaroon(macaroon, "login", True, user_id)
             return user_id
-        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
-            raise AuthError(401, "Invalid token", errcode=Codes.UNKNOWN_TOKEN)
+        except Exception:
+            raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
 
     def _generate_base_macaroon(self, user_id):
         macaroon = pymacaroons.Macaroon(
