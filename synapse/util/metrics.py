@@ -13,10 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
 
 from synapse.util.logcontext import LoggingContext
 import synapse.metrics
 
+from functools import wraps
 import logging
 
 
@@ -45,6 +47,18 @@ block_db_txn_count = metrics.register_distribution(
 block_db_txn_duration = metrics.register_distribution(
     "block_db_txn_duration", labels=["block_name"]
 )
+
+
+def measure_func(name):
+    def wrapper(func):
+        @wraps(func)
+        @defer.inlineCallbacks
+        def measured_func(self, *args, **kwargs):
+            with Measure(self.clock, name):
+                r = yield func(self, *args, **kwargs)
+            defer.returnValue(r)
+        return measured_func
+    return wrapper
 
 
 class Measure(object):
