@@ -249,7 +249,7 @@ class FederationHandler(BaseHandler):
                         if ev.type != EventTypes.Member:
                             continue
                         try:
-                            domain = UserID.from_string(ev.state_key).domain
+                            domain = get_domain_from_id(ev.state_key)
                         except:
                             continue
 
@@ -1106,12 +1106,13 @@ class FederationHandler(BaseHandler):
                 )
 
             if do_auth:
-                in_room = yield self.auth.check_host_in_room(
-                    event.room_id,
-                    origin
+                events = yield self._filter_events_for_server(
+                    origin, event.room_id, [event]
                 )
-                if not in_room:
+                if not events:
                     raise AuthError(403, "Host not in room.")
+
+                event = events[0]
 
             defer.returnValue(event)
         else:
