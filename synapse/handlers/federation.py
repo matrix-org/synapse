@@ -1106,11 +1106,16 @@ class FederationHandler(BaseHandler):
                 )
 
             if do_auth:
+                in_room = yield self.auth.check_host_in_room(
+                    event.room_id,
+                    origin
+                )
+                if not in_room:
+                    raise AuthError(403, "Host not in room.")
+
                 events = yield self._filter_events_for_server(
                     origin, event.room_id, [event]
                 )
-                if not events:
-                    raise AuthError(403, "Host not in room.")
 
                 event = events[0]
 
