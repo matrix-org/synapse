@@ -441,7 +441,7 @@ class FederationClient(FederationBase):
             events and the second is a list of event ids that we failed to fetch.
         """
         if return_local:
-            seen_events = yield self.store.get_events(event_ids)
+            seen_events = yield self.store.get_events(event_ids, allow_rejected=True)
             signed_events = seen_events.values()
         else:
             seen_events = yield self.store.have_events(event_ids)
