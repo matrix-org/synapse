@@ -672,7 +672,7 @@ class PresenceHandler(object):
             ])
 
     @defer.inlineCallbacks
-    def set_state(self, target_user, state):
+    def set_state(self, target_user, state, ignore_status_msg=False):
         """Set the presence state of the user.
         """
         status_msg = state.get("status_msg", None)
@@ -689,9 +689,12 @@ class PresenceHandler(object):
         prev_state = yield self.current_state_for_user(user_id)
 
         new_fields = {
-            "state": presence,
-            "status_msg": status_msg if presence != PresenceState.OFFLINE else None
+            "state": presence
         }
+
+        if not ignore_status_msg:
+            msg = status_msg if presence != PresenceState.OFFLINE else None
+            new_fields["status_msg"] = msg
 
         if presence == PresenceState.ONLINE:
             new_fields["last_active_ts"] = self.clock.time_msec()
