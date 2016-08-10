@@ -61,6 +61,10 @@ Attributes:
 """
 
 
+class KeyLookupError(ValueError):
+    pass
+
+
 class Keyring(object):
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -363,7 +367,7 @@ class Keyring(object):
                     )
                 except Exception as e:
                     logger.info(
-                        "Unable to getting key %r for %r directly: %s %s",
+                        "Unable to get key %r for %r directly: %s %s",
                         key_ids, server_name,
                         type(e).__name__, str(e.message),
                     )
@@ -425,7 +429,7 @@ class Keyring(object):
         for response in responses:
             if (u"signatures" not in response
                     or perspective_name not in response[u"signatures"]):
-                raise ValueError(
+                raise KeyLookupError(
                     "Key response not signed by perspective server"
                     " %r" % (perspective_name,)
                 )
@@ -448,7 +452,7 @@ class Keyring(object):
                     list(response[u"signatures"][perspective_name]),
                     list(perspective_keys)
                 )
-                raise ValueError(
+                raise KeyLookupError(
                     "Response not signed with a known key for perspective"
                     " server %r" % (perspective_name,)
                 )
@@ -491,10 +495,10 @@ class Keyring(object):
 
             if (u"signatures" not in response
                     or server_name not in response[u"signatures"]):
-                raise ValueError("Key response not signed by remote server")
+                raise KeyLookupError("Key response not signed by remote server")
 
             if "tls_fingerprints" not in response:
-                raise ValueError("Key response missing TLS fingerprints")
+                raise KeyLookupError("Key response missing TLS fingerprints")
 
             certificate_bytes = crypto.dump_certificate(
                 crypto.FILETYPE_ASN1, tls_certificate
@@ -508,7 +512,7 @@ class Keyring(object):
                     response_sha256_fingerprints.add(fingerprint[u"sha256"])
 
             if sha256_fingerprint_b64 not in response_sha256_fingerprints:
-                raise ValueError("TLS certificate not allowed by fingerprints")
+                raise KeyLookupError("TLS certificate not allowed by fingerprints")
 
             response_keys = yield self.process_v2_response(
                 from_server=server_name,
@@ -560,14 +564,14 @@ class Keyring(object):
         server_name = response_json["server_name"]
         if only_from_server:
             if server_name != from_server:
-                raise ValueError(
+                raise KeyLookupError(
                     "Expected a response for server %r not %r" % (
                         from_server, server_name
                     )
                 )
         for key_id in response_json["signatures"].get(server_name, {}):
             if key_id not in response_json["verify_keys"]:
-                raise ValueError(
+                raise KeyLookupError(
                     "Key response must include verification keys for all"
                     " signatures"
                 )
@@ -635,15 +639,15 @@ class Keyring(object):
 
         if ("signatures" not in response
                 or server_name not in response["signatures"]):
-            raise ValueError("Key response not signed by remote server")
+            raise KeyLookupError("Key response not signed by remote server")
 
         if "tls_certificate" not in response:
-            raise ValueError("Key response missing TLS certificate")
+            raise KeyLookupError("Key response missing TLS certificate")
 
         tls_certificate_b64 = response["tls_certificate"]
 
         if encode_base64(x509_certificate_bytes) != tls_certificate_b64:
-            raise ValueError("TLS certificate doesn't match")
+            raise KeyLookupError("TLS certificate doesn't match")
 
         # Cache the result in the datastore.
 
@@ -659,7 +663,7 @@ class Keyring(object):
 
         for key_id in response["signatures"][server_name]:
             if key_id not in response["verify_keys"]:
-                raise ValueError(
+                raise KeyLookupError(
                     "Key response must include verification keys for all"
                     " signatures"
                 )
