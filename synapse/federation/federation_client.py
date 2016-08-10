@@ -300,23 +300,13 @@ class FederationClient(FederationBase):
 
                         break
 
+                pdu_attempts[destination] = now
+
             except SynapseError as e:
                 logger.info(
                     "Failed to get PDU %s from %s because %s",
                     event_id, destination, e,
                 )
-                continue
-            except CodeMessageException as e:
-                if 400 <= e.code < 500 and e.code != 404:
-                    raise
-
-                pdu_attempts[destination] = now
-
-                logger.info(
-                    "Failed to get PDU %s from %s because %s",
-                    event_id, destination, e,
-                )
-                continue
             except NotRetryingDestination as e:
                 logger.info(e.message)
                 continue
