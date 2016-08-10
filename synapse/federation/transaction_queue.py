@@ -296,7 +296,9 @@ class TransactionQueue(object):
 
                 if code != 200:
                     for p in pdus:
-                        logger.info("Failed to send event %s to %s", p.event_id, destination)
+                        logger.info(
+                            "Failed to send event %s to %s", p.event_id, destination
+                        )
             except NotRetryingDestination:
                 logger.info(
                     "TX [%s] not ready for retry yet - "
