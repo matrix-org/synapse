@@ -317,7 +317,6 @@ def preserve_fn(f):
     def g(*args, **kwargs):
         with PreserveLoggingContext(current):
             return f(*args, **kwargs)
-
     return g
 
 

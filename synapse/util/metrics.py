@@ -78,7 +78,6 @@ class Measure(object):
         self.start = self.clock.time_msec()
         self.start_context = LoggingContext.current_context()
         if not self.start_context:
-            logger.warn("Entered Measure without log context: %s", self.name)
             self.start_context = LoggingContext("Measure")
             self.start_context.__enter__()
             self.created_context = True
@@ -99,7 +98,7 @@ class Measure(object):
         if context != self.start_context:
             logger.warn(
                 "Context has unexpectedly changed from '%s' to '%s'. (%r)",
-                context, self.start_context, self.name
+                self.start_context, context, self.name
             )
             return
 

@@ -21,8 +21,7 @@ from .units import Transaction
 
 from synapse.api.errors import HttpResponseException
 from synapse.util.async import run_on_reactor
-from synapse.util.logutils import log_function
-from synapse.util.logcontext import PreserveLoggingContext
+from synapse.util.logcontext import preserve_context_over_fn
 from synapse.util.retryutils import (
     get_retry_limiter, NotRetryingDestination,
 )
@@ -120,267 +119,215 @@ class TransactionQueue(object):
         if not destinations:
             return
 
-        deferreds = []
-
         for destination in destinations:
-            deferred = defer.Deferred()
             self.pending_pdus_by_dest.setdefault(destination, []).append(
-                (pdu, deferred, order)
+                (pdu, order)
             )
 
-            def chain(failure):
-                if not deferred.called:
-                    deferred.errback(failure)
+            preserve_context_over_fn(
+                self._attempt_new_transaction, destination
+            )
 
-            def log_failure(f):
-                logger.warn("Failed to send pdu to %s: %s", destination, f.value)
-
-            deferred.addErrback(log_failure)
-
-            with PreserveLoggingContext():
-                self._attempt_new_transaction(destination).addErrback(chain)
-
-            deferreds.append(deferred)
-
-    # NO inlineCallbacks
     def enqueue_edu(self, edu):
         destination = edu.destination
 
         if not self.can_send_to(destination):
             return
 
-        deferred = defer.Deferred()
-        self.pending_edus_by_dest.setdefault(destination, []).append(
-            (edu, deferred)
+        self.pending_edus_by_dest.setdefault(destination, []).append(edu)
+
+        preserve_context_over_fn(
+            self._attempt_new_transaction, destination
         )
 
-        def chain(failure):
-            if not deferred.called:
-                deferred.errback(failure)
-
-        def log_failure(f):
-            logger.warn("Failed to send edu to %s: %s", destination, f.value)
-
-        deferred.addErrback(log_failure)
-
-        with PreserveLoggingContext():
-            self._attempt_new_transaction(destination).addErrback(chain)
-
-        return deferred
-
-    @defer.inlineCallbacks
     def enqueue_failure(self, failure, destination):
         if destination == self.server_name or destination == "localhost":
             return
-
-        deferred = defer.Deferred()
 
         if not self.can_send_to(destination):
             return
 
         self.pending_failures_by_dest.setdefault(
             destination, []
-        ).append(
-            (failure, deferred)
+        ).append(failure)
+
+        preserve_context_over_fn(
+            self._attempt_new_transaction, destination
         )
 
-        def chain(f):
-            if not deferred.called:
-                deferred.errback(f)
-
-        def log_failure(f):
-            logger.warn("Failed to send failure to %s: %s", destination, f.value)
-
-        deferred.addErrback(log_failure)
-
-        with PreserveLoggingContext():
-            self._attempt_new_transaction(destination).addErrback(chain)
-
-        yield deferred
-
-    @measure_func("attempt_new_transaction")
     @defer.inlineCallbacks
-    @log_function
     def _attempt_new_transaction(self, destination):
         yield run_on_reactor()
+        while True:
+            # list of (pending_pdu, deferred, order)
+            if destination in self.pending_transactions:
+                # XXX: pending_transactions can get stuck on by a never-ending
+                # request at which point pending_pdus_by_dest just keeps growing.
+                # we need application-layer timeouts of some flavour of these
+                # requests
+                logger.debug(
+                    "TX [%s] Transaction already in progress",
+                    destination
+                )
+                return
 
-        # list of (pending_pdu, deferred, order)
-        if destination in self.pending_transactions:
-            # XXX: pending_transactions can get stuck on by a never-ending
-            # request at which point pending_pdus_by_dest just keeps growing.
-            # we need application-layer timeouts of some flavour of these
-            # requests
-            logger.debug(
-                "TX [%s] Transaction already in progress",
-                destination
+            pending_pdus = self.pending_pdus_by_dest.pop(destination, [])
+            pending_edus = self.pending_edus_by_dest.pop(destination, [])
+            pending_failures = self.pending_failures_by_dest.pop(destination, [])
+
+            if pending_pdus:
+                logger.debug("TX [%s] len(pending_pdus_by_dest[dest]) = %d",
+                             destination, len(pending_pdus))
+
+            if not pending_pdus and not pending_edus and not pending_failures:
+                logger.debug("TX [%s] Nothing to send", destination)
+                return
+
+            yield self._send_new_transaction(
+                destination, pending_pdus, pending_edus, pending_failures
             )
-            return
 
-        pending_pdus = self.pending_pdus_by_dest.pop(destination, [])
-        pending_edus = self.pending_edus_by_dest.pop(destination, [])
-        pending_failures = self.pending_failures_by_dest.pop(destination, [])
-
-        if pending_pdus:
-            logger.debug("TX [%s] len(pending_pdus_by_dest[dest]) = %d",
-                         destination, len(pending_pdus))
-
-        if not pending_pdus and not pending_edus and not pending_failures:
-            logger.debug("TX [%s] Nothing to send", destination)
-            return
-
-        try:
-            self.pending_transactions[destination] = 1
-
-            logger.debug("TX [%s] _attempt_new_transaction", destination)
+    @measure_func("_send_new_transaction")
+    @defer.inlineCallbacks
+    def _send_new_transaction(self, destination, pending_pdus, pending_edus,
+                              pending_failures):
 
             # Sort based on the order field
-            pending_pdus.sort(key=lambda t: t[2])
-
+            pending_pdus.sort(key=lambda t: t[1])
             pdus = [x[0] for x in pending_pdus]
-            edus = [x[0] for x in pending_edus]
-            failures = [x[0].get_dict() for x in pending_failures]
-            deferreds = [
-                x[1]
-                for x in pending_pdus + pending_edus + pending_failures
-            ]
+            edus = pending_edus
+            failures = [x.get_dict() for x in pending_failures]
 
-            txn_id = str(self._next_txn_id)
+            try:
+                self.pending_transactions[destination] = 1
 
-            limiter = yield get_retry_limiter(
-                destination,
-                self.clock,
-                self.store,
-            )
+                logger.debug("TX [%s] _attempt_new_transaction", destination)
 
-            logger.debug(
-                "TX [%s] {%s} Attempting new transaction"
-                " (pdus: %d, edus: %d, failures: %d)",
-                destination, txn_id,
-                len(pending_pdus),
-                len(pending_edus),
-                len(pending_failures)
-            )
+                txn_id = str(self._next_txn_id)
 
-            logger.debug("TX [%s] Persisting transaction...", destination)
-
-            transaction = Transaction.create_new(
-                origin_server_ts=int(self.clock.time_msec()),
-                transaction_id=txn_id,
-                origin=self.server_name,
-                destination=destination,
-                pdus=pdus,
-                edus=edus,
-                pdu_failures=failures,
-            )
-
-            self._next_txn_id += 1
-
-            yield self.transaction_actions.prepare_to_send(transaction)
-
-            logger.debug("TX [%s] Persisted transaction", destination)
-            logger.info(
-                "TX [%s] {%s} Sending transaction [%s],"
-                " (PDUs: %d, EDUs: %d, failures: %d)",
-                destination, txn_id,
-                transaction.transaction_id,
-                len(pending_pdus),
-                len(pending_edus),
-                len(pending_failures),
-            )
-
-            with limiter:
-                # Actually send the transaction
-
-                # FIXME (erikj): This is a bit of a hack to make the Pdu age
-                # keys work
-                def json_data_cb():
-                    data = transaction.get_dict()
-                    now = int(self.clock.time_msec())
-                    if "pdus" in data:
-                        for p in data["pdus"]:
-                            if "age_ts" in p:
-                                unsigned = p.setdefault("unsigned", {})
-                                unsigned["age"] = now - int(p["age_ts"])
-                                del p["age_ts"]
-                    return data
-
-                try:
-                    response = yield self.transport_layer.send_transaction(
-                        transaction, json_data_cb
-                    )
-                    code = 200
-
-                    if response:
-                        for e_id, r in response.get("pdus", {}).items():
-                            if "error" in r:
-                                logger.warn(
-                                    "Transaction returned error for %s: %s",
-                                    e_id, r,
-                                )
-                except HttpResponseException as e:
-                    code = e.code
-                    response = e.response
-
-                logger.info(
-                    "TX [%s] {%s} got %d response",
-                    destination, txn_id, code
+                limiter = yield get_retry_limiter(
+                    destination,
+                    self.clock,
+                    self.store,
                 )
 
-                logger.debug("TX [%s] Sent transaction", destination)
-                logger.debug("TX [%s] Marking as delivered...", destination)
+                logger.debug(
+                    "TX [%s] {%s} Attempting new transaction"
+                    " (pdus: %d, edus: %d, failures: %d)",
+                    destination, txn_id,
+                    len(pending_pdus),
+                    len(pending_edus),
+                    len(pending_failures)
+                )
 
-            yield self.transaction_actions.delivered(
-                transaction, code, response
-            )
+                logger.debug("TX [%s] Persisting transaction...", destination)
 
-            logger.debug("TX [%s] Marked as delivered", destination)
+                transaction = Transaction.create_new(
+                    origin_server_ts=int(self.clock.time_msec()),
+                    transaction_id=txn_id,
+                    origin=self.server_name,
+                    destination=destination,
+                    pdus=pdus,
+                    edus=edus,
+                    pdu_failures=failures,
+                )
 
-            logger.debug("TX [%s] Yielding to callbacks...", destination)
+                self._next_txn_id += 1
 
-            for deferred in deferreds:
-                if code == 200:
-                    deferred.callback(None)
-                else:
-                    deferred.errback(RuntimeError("Got status %d" % code))
+                yield self.transaction_actions.prepare_to_send(transaction)
 
-                # Ensures we don't continue until all callbacks on that
-                # deferred have fired
-                try:
-                    yield deferred
-                except:
-                    pass
+                logger.debug("TX [%s] Persisted transaction", destination)
+                logger.info(
+                    "TX [%s] {%s} Sending transaction [%s],"
+                    " (PDUs: %d, EDUs: %d, failures: %d)",
+                    destination, txn_id,
+                    transaction.transaction_id,
+                    len(pending_pdus),
+                    len(pending_edus),
+                    len(pending_failures),
+                )
 
-            logger.debug("TX [%s] Yielded to callbacks", destination)
-        except NotRetryingDestination:
-            logger.info(
-                "TX [%s] not ready for retry yet - "
-                "dropping transaction for now",
-                destination,
-            )
-        except RuntimeError as e:
-            # We capture this here as there as nothing actually listens
-            # for this finishing functions deferred.
-            logger.warn(
-                "TX [%s] Problem in _attempt_transaction: %s",
-                destination,
-                e,
-            )
-        except Exception as e:
-            # We capture this here as there as nothing actually listens
-            # for this finishing functions deferred.
-            logger.warn(
-                "TX [%s] Problem in _attempt_transaction: %s",
-                destination,
-                e,
-            )
+                with limiter:
+                    # Actually send the transaction
 
-            for deferred in deferreds:
-                if not deferred.called:
-                    deferred.errback(e)
+                    # FIXME (erikj): This is a bit of a hack to make the Pdu age
+                    # keys work
+                    def json_data_cb():
+                        data = transaction.get_dict()
+                        now = int(self.clock.time_msec())
+                        if "pdus" in data:
+                            for p in data["pdus"]:
+                                if "age_ts" in p:
+                                    unsigned = p.setdefault("unsigned", {})
+                                    unsigned["age"] = now - int(p["age_ts"])
+                                    del p["age_ts"]
+                        return data
 
-        finally:
-            # We want to be *very* sure we delete this after we stop processing
-            self.pending_transactions.pop(destination, None)
+                    try:
+                        response = yield self.transport_layer.send_transaction(
+                            transaction, json_data_cb
+                        )
+                        code = 200
 
-            # Check to see if there is anything else to send.
-            self._attempt_new_transaction(destination)
+                        if response:
+                            for e_id, r in response.get("pdus", {}).items():
+                                if "error" in r:
+                                    logger.warn(
+                                        "Transaction returned error for %s: %s",
+                                        e_id, r,
+                                    )
+                    except HttpResponseException as e:
+                        code = e.code
+                        response = e.response
+
+                    logger.info(
+                        "TX [%s] {%s} got %d response",
+                        destination, txn_id, code
+                    )
+
+                    logger.debug("TX [%s] Sent transaction", destination)
+                    logger.debug("TX [%s] Marking as delivered...", destination)
+
+                yield self.transaction_actions.delivered(
+                    transaction, code, response
+                )
+
+                logger.debug("TX [%s] Marked as delivered", destination)
+
+                if code != 200:
+                    for p in pdus:
+                        logger.info(
+                            "Failed to send event %s to %s", p.event_id, destination
+                        )
+            except NotRetryingDestination:
+                logger.info(
+                    "TX [%s] not ready for retry yet - "
+                    "dropping transaction for now",
+                    destination,
+                )
+            except RuntimeError as e:
+                # We capture this here as there as nothing actually listens
+                # for this finishing functions deferred.
+                logger.warn(
+                    "TX [%s] Problem in _attempt_transaction: %s",
+                    destination,
+                    e,
+                )
+
+                for p in pdus:
+                    logger.info("Failed to send event %s to %s", p.event_id, destination)
+            except Exception as e:
+                # We capture this here as there as nothing actually listens
+                # for this finishing functions deferred.
+                logger.warn(
+                    "TX [%s] Problem in _attempt_transaction: %s",
+                    destination,
+                    e,
+                )
+
+                for p in pdus:
+                    logger.info("Failed to send event %s to %s", p.event_id, destination)
+
+            finally:
+                # We want to be *very* sure we delete this after we stop processing
+                self.pending_transactions.pop(destination, None)
