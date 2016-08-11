@@ -119,7 +119,7 @@ class SynchrotronPresence(object):
 
         reactor.addSystemEventTrigger("before", "shutdown", self._on_shutdown)
 
-    def set_state(self, user, state):
+    def set_state(self, user, state, ignore_status_msg=False):
         # TODO Hows this supposed to work?
         pass
 
