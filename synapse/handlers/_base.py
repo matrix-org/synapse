@@ -13,14 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
-from synapse.api.errors import LimitExceededError
+import synapse.types
 from synapse.api.constants import Membership, EventTypes
-from synapse.types import UserID, Requester
-
-
-import logging
+from synapse.api.errors import LimitExceededError
+from synapse.types import UserID
 
 
 logger = logging.getLogger(__name__)
@@ -31,11 +31,15 @@ class BaseHandler(object):
     Common base class for the event handlers.
 
     Attributes:
-        store (synapse.storage.events.StateStore):
+        store (synapse.storage.DataStore):
         state_handler (synapse.state.StateHandler):
     """
 
     def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer):
+        """
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
@@ -120,7 +124,8 @@ class BaseHandler(object):
                 # and having homeservers have their own users leave keeps more
                 # of that decision-making and control local to the guest-having
                 # homeserver.
-                requester = Requester(target_user, "", True)
+                requester = synapse.types.create_requester(
+                    target_user, is_guest=True)
                 handler = self.hs.get_handlers().room_member_handler
                 yield handler.update_membership(
                     requester,

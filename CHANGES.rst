@@ -1,3 +1,297 @@
+Changes in synapse v0.17.0 (2016-08-08)
+=======================================
+
+This release contains significant security bug fixes regarding authenticating
+events received over federation. PLEASE UPGRADE.
+
+This release changes the LDAP configuration format in a backwards incompatible
+way, see PR #843 for details.
+
+
+Changes:
+
+* Add federation /version API (PR #990)
+* Make psutil dependency optional (PR #992)
+
+
+Bug fixes:
+
+* Fix URL preview API to exclude HTML comments in description (PR #988)
+* Fix error handling of remote joins (PR #991)
+
+
+Changes in synapse v0.17.0-rc4 (2016-08-05)
+===========================================
+
+Changes:
+
+* Change the way we summarize URLs when previewing (PR #973)
+* Add new ``/state_ids/`` federation API (PR #979)
+* Speed up processing of ``/state/`` response (PR #986)
+
+Bug fixes:
+
+* Fix event persistence when event has already been partially persisted
+  (PR #975, #983, #985)
+* Fix port script to also copy across backfilled events (PR #982)
+
+
+Changes in synapse v0.17.0-rc3 (2016-08-02)
+===========================================
+
+Changes:
+
+* Forbid non-ASes from registering users whose names begin with '_' (PR #958)
+* Add some basic admin API docs (PR #963)
+
+
+Bug fixes:
+
+* Send the correct host header when fetching keys (PR #941)
+* Fix joining a room that has missing auth events (PR #964)
+* Fix various push bugs (PR #966, #970)
+* Fix adding emails on registration (PR #968)
+
+
+Changes in synapse v0.17.0-rc2 (2016-08-02)
+===========================================
+
+(This release did not include the changes advertised and was identical to RC1)
+
+
+Changes in synapse v0.17.0-rc1 (2016-07-28)
+===========================================
+
+This release changes the LDAP configuration format in a backwards incompatible
+way, see PR #843 for details.
+
+
+Features:
+
+* Add purge_media_cache admin API (PR #902)
+* Add deactivate account admin API (PR #903)
+* Add optional pepper to password hashing (PR #907, #910 by KentShikama)
+* Add an admin option to shared secret registration (breaks backwards compat)
+  (PR #909)
+* Add purge local room history API (PR #911, #923, #924)
+* Add requestToken endpoints (PR #915)
+* Add an /account/deactivate endpoint (PR #921)
+* Add filter param to /messages. Add 'contains_url' to filter. (PR #922)
+* Add device_id support to /login (PR #929)
+* Add device_id support to /v2/register flow. (PR #937, #942)
+* Add GET /devices endpoint (PR #939, #944)
+* Add GET /device/{deviceId} (PR #943)
+* Add update and delete APIs for devices (PR #949)
+
+
+Changes:
+
+* Rewrite LDAP Authentication against ldap3 (PR #843 by mweinelt)
+* Linearize some federation endpoints based on (origin, room_id) (PR #879)
+* Remove the legacy v0 content upload API. (PR #888)
+* Use similar naming we use in email notifs for push (PR #894)
+* Optionally include password hash in createUser endpoint (PR #905 by
+  KentShikama)
+* Use a query that postgresql optimises better for get_events_around (PR #906)
+* Fall back to 'username' if 'user' is not given for appservice registration.
+  (PR #927 by Half-Shot)
+* Add metrics for psutil derived memory usage (PR #936)
+* Record device_id in client_ips (PR #938)
+* Send the correct host header when fetching keys (PR #941)
+* Log the hostname the reCAPTCHA was completed on (PR #946)
+* Make the device id on e2e key upload optional (PR #956)
+* Add r0.2.0 to the "supported versions" list (PR #960)
+* Don't include name of room for invites in push (PR #961)
+
+
+Bug fixes:
+
+* Fix substitution failure in mail template (PR #887)
+* Put most recent 20 messages in email notif (PR #892)
+* Ensure that the guest user is in the database when upgrading accounts
+  (PR #914)
+* Fix various edge cases in auth handling (PR #919)
+* Fix 500 ISE when sending alias event without a state_key (PR #925)
+* Fix bug where we stored rejections in the state_group, persist all
+  rejections (PR #948)
+* Fix lack of check of if the user is banned when handling 3pid invites
+  (PR #952)
+* Fix a couple of bugs in the transaction and keyring code (PR #954, #955)
+
+
+
+Changes in synapse v0.16.1-r1 (2016-07-08)
+==========================================
+
+THIS IS A CRITICAL SECURITY UPDATE.
+
+This fixes a bug which allowed users' accounts to be accessed by unauthorised
+users.
+
+Changes in synapse v0.16.1 (2016-06-20)
+=======================================
+
+Bug fixes:
+
+* Fix assorted bugs in ``/preview_url`` (PR #872)
+* Fix TypeError when setting unicode passwords (PR #873)
+
+
+Performance improvements:
+
+* Turn ``use_frozen_events`` off by default (PR #877)
+* Disable responding with canonical json for federation (PR #878)
+
+
+Changes in synapse v0.16.1-rc1 (2016-06-15)
+===========================================
+
+Features: None
+
+Changes:
+
+* Log requester for ``/publicRoom`` endpoints when possible (PR #856)
+* 502 on ``/thumbnail`` when can't connect to remote server (PR #862)
+* Linearize fetching of gaps on incoming events (PR #871)
+
+
+Bugs fixes:
+
+* Fix bug where rooms where marked as published by default (PR #857)
+* Fix bug where joining room with an event with invalid sender (PR #868)
+* Fix bug where backfilled events were sent down sync streams (PR #869)
+* Fix bug where outgoing connections could wedge indefinitely, causing push
+  notifications to be unreliable (PR #870)
+
+
+Performance improvements:
+
+* Improve ``/publicRooms`` performance(PR #859)
+
+
+Changes in synapse v0.16.0 (2016-06-09)
+=======================================
+
+NB: As of v0.14 all AS config files must have an ID field.
+
+
+Bug fixes:
+
+* Don't make rooms published by default (PR #857)
+
+Changes in synapse v0.16.0-rc2 (2016-06-08)
+===========================================
+
+Features:
+
+* Add configuration option for tuning GC via ``gc.set_threshold`` (PR #849)
+
+Changes:
+
+* Record metrics about GC (PR #771, #847, #852)
+* Add metric counter for number of persisted events (PR #841)
+
+Bug fixes:
+
+* Fix 'From' header in email notifications (PR #843)
+* Fix presence where timeouts were not being fired for the first 8h after
+  restarts (PR #842)
+* Fix bug where synapse sent malformed transactions to AS's when retrying
+  transactions (Commits 310197b, 8437906)
+
+Performance improvements:
+
+* Remove event fetching from DB threads (PR #835)
+* Change the way we cache events (PR #836)
+* Add events to cache when we persist them (PR #840)
+
+
+Changes in synapse v0.16.0-rc1 (2016-06-03)
+===========================================
+
+Version 0.15 was not released. See v0.15.0-rc1 below for additional changes.
+
+Features:
+
+* Add email notifications for missed messages (PR #759, #786, #799, #810, #815,
+  #821)
+* Add a ``url_preview_ip_range_whitelist`` config param (PR #760)
+* Add /report endpoint (PR #762)
+* Add basic ignore user API (PR #763)
+* Add an openidish mechanism for proving that you own a given user_id (PR #765)
+* Allow clients to specify a server_name to avoid 'No known servers' (PR #794)
+* Add secondary_directory_servers option to fetch room list from other servers
+  (PR #808, #813)
+
+Changes:
+
+* Report per request metrics for all of the things using request_handler (PR
+  #756)
+* Correctly handle ``NULL`` password hashes from the database (PR #775)
+* Allow receipts for events we haven't seen in the db (PR #784)
+* Make synctl read a cache factor from config file (PR #785)
+* Increment badge count per missed convo, not per msg (PR #793)
+* Special case m.room.third_party_invite event auth to match invites (PR #814)
+
+
+Bug fixes:
+
+* Fix typo in event_auth servlet path (PR #757)
+* Fix password reset (PR #758)
+
+
+Performance improvements:
+
+* Reduce database inserts when sending transactions (PR #767)
+* Queue events by room for persistence (PR #768)
+* Add cache to ``get_user_by_id`` (PR #772)
+* Add and use ``get_domain_from_id`` (PR #773)
+* Use tree cache for ``get_linearized_receipts_for_room`` (PR #779)
+* Remove unused indices (PR #782)
+* Add caches to ``bulk_get_push_rules*`` (PR #804)
+* Cache ``get_event_reference_hashes`` (PR #806)
+* Add ``get_users_with_read_receipts_in_room`` cache (PR #809)
+* Use state to calculate ``get_users_in_room`` (PR #811)
+* Load push rules in storage layer so that they get cached (PR #825)
+* Make ``get_joined_hosts_for_room`` use get_users_in_room (PR #828)
+* Poke notifier on next reactor tick (PR #829)
+* Change CacheMetrics to be quicker (PR #830)
+
+
+Changes in synapse v0.15.0-rc1 (2016-04-26)
+===========================================
+
+Features:
+
+* Add login support for Javascript Web Tokens, thanks to Niklas Riekenbrauck
+  (PR #671,#687)
+* Add URL previewing support (PR #688)
+* Add login support for LDAP, thanks to Christoph Witzany (PR #701)
+* Add GET endpoint for pushers (PR #716)
+
+Changes:
+
+* Never notify for member events (PR #667)
+* Deduplicate identical ``/sync`` requests (PR #668)
+* Require user to have left room to forget room (PR #673)
+* Use DNS cache if within TTL (PR #677)
+* Let users see their own leave events (PR #699)
+* Deduplicate membership changes (PR #700)
+* Increase performance of pusher code (PR #705)
+* Respond with error status 504 if failed to talk to remote server (PR #731)
+* Increase search performance on postgres (PR #745)
+
+Bug fixes:
+
+* Fix bug where disabling all notifications still resulted in push (PR #678)
+* Fix bug where users couldn't reject remote invites if remote refused (PR #691)
+* Fix bug where synapse attempted to backfill from itself (PR #693)
+* Fix bug where profile information was not correctly added when joining remote
+  rooms (PR #703)
+* Fix bug where register API required incorrect key name for AS registration
+  (PR #727)
+
+
 Changes in synapse v0.14.0 (2016-03-30)
 =======================================
 
@@ -511,7 +805,7 @@ Configuration:
 
 * Add support for changing the bind host of the metrics listener via the
   ``metrics_bind_host`` option.
- 
+
 
 Changes in synapse v0.9.0-r5 (2015-05-21)
 =========================================
@@ -853,7 +1147,7 @@ See UPGRADE for information about changes to the client server API, including
 breaking backwards compatibility with VoIP calls and registration API.
 
 Homeserver:
- * When a user changes their displayname or avatar the server will now update 
+ * When a user changes their displayname or avatar the server will now update
    all their join states to reflect this.
  * The server now adds "age" key to events to indicate how old they are. This
    is clock independent, so at no point does any server or webclient have to
@@ -911,7 +1205,7 @@ Changes in synapse 0.2.2 (2014-09-06)
 =====================================
 
 Homeserver:
- * When the server returns state events it now also includes the previous 
+ * When the server returns state events it now also includes the previous
    content.
  * Add support for inviting people when creating a new room.
  * Make the homeserver inform the room via `m.room.aliases` when a new alias
@@ -923,7 +1217,7 @@ Webclient:
  * Handle `m.room.aliases` events.
  * Asynchronously send messages and show a local echo.
  * Inform the UI when a message failed to send.
- * Only autoscroll on receiving a new message if the user was already at the 
+ * Only autoscroll on receiving a new message if the user was already at the
    bottom of the screen.
  * Add support for ban/kick reasons.
 

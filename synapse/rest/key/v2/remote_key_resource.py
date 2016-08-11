@@ -15,6 +15,7 @@
 from synapse.http.server import request_handler, respond_with_json_bytes
 from synapse.http.servlet import parse_integer, parse_json_object_from_request
 from synapse.api.errors import SynapseError, Codes
+from synapse.crypto.keyring import KeyLookupError
 
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
@@ -210,9 +211,10 @@ class RemoteKey(Resource):
                     yield self.keyring.get_server_verify_key_v2_direct(
                         server_name, key_ids
                     )
+                except KeyLookupError as e:
+                    logger.info("Failed to fetch key: %s", e)
                 except:
                     logger.exception("Failed to get key for %r", server_name)
-                    pass
             yield self.query_keys(
                 request, query, query_remote_on_cache_miss=False
             )

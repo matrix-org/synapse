@@ -20,12 +20,14 @@ from .base import ClientV1RestServlet, client_path_patterns
 from synapse.api.errors import SynapseError, Codes, AuthError
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
+from synapse.api.filtering import Filter
 from synapse.types import UserID, RoomID, RoomAlias
 from synapse.events.utils import serialize_event
 from synapse.http.servlet import parse_json_object_from_request
 
 import logging
 import urllib
+import ujson as json
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +74,6 @@ class RoomCreateRestServlet(ClientV1RestServlet):
 
     def get_room_config(self, request):
         user_supplied_config = parse_json_object_from_request(request)
-        # default visibility
-        user_supplied_config.setdefault("visibility", "public")
         return user_supplied_config
 
     def on_OPTIONS(self, request):
@@ -279,8 +279,16 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        handler = self.handlers.room_list_handler
-        data = yield handler.get_public_room_list()
+        try:
+            yield self.auth.get_user_by_req(request)
+        except AuthError:
+            # This endpoint isn't authed, but its useful to know who's hitting
+            # it if they *do* supply an access token
+            pass
+
+        handler = self.hs.get_room_list_handler()
+        data = yield handler.get_aggregated_public_room_list()
+
         defer.returnValue((200, data))
 
 
@@ -321,12 +329,19 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
             request, default_limit=10,
         )
         as_client_event = "raw" not in request.args
+        filter_bytes = request.args.get("filter", None)
+        if filter_bytes:
+            filter_json = urllib.unquote(filter_bytes[-1]).decode("UTF-8")
+            event_filter = Filter(json.loads(filter_json))
+        else:
+            event_filter = None
         handler = self.handlers.message_handler
         msgs = yield handler.get_messages(
             room_id=room_id,
             requester=requester,
             pagin_config=pagination_config,
-            as_client_event=as_client_event
+            as_client_event=as_client_event,
+            event_filter=event_filter,
         )
 
         defer.returnValue((200, msgs))

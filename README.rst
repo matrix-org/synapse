@@ -11,8 +11,8 @@ VoIP.  The basics you need to know to get up and running are:
   like ``#matrix:matrix.org`` or ``#test:localhost:8448``.
 
 - Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
-  you will normally refer to yourself and others using a 3PID: email
-  address, phone number, etc rather than manipulating Matrix user IDs)
+  you will normally refer to yourself and others using a third party identifier 
+  (3PID): email address, phone number, etc rather than manipulating Matrix user IDs)
 
 The overall architecture is::
 
@@ -58,12 +58,13 @@ the spec in the context of a codebase and let you run your own homeserver and
 generally help bootstrap the ecosystem.
 
 In Matrix, every user runs one or more Matrix clients, which connect through to
-a Matrix homeserver which stores all their personal chat history and user
-account information - much as a mail client connects through to an IMAP/SMTP
-server. Just like email, you can either run your own Matrix homeserver and
-control and own your own communications and history or use one hosted by
-someone else (e.g. matrix.org) - there is no single point of control or
-mandatory service provider in Matrix, unlike WhatsApp, Facebook, Hangouts, etc.
+a Matrix homeserver. The homeserver stores all their personal chat history and
+user account information - much as a mail client connects through to an
+IMAP/SMTP server. Just like email, you can either run your own Matrix
+homeserver and control and own your own communications and history or use one
+hosted by someone else (e.g. matrix.org) - there is no single point of control
+or mandatory service provider in Matrix, unlike WhatsApp, Facebook, Hangouts,
+etc.
 
 Synapse ships with two basic demo Matrix clients: webclient (a basic group chat
 web client demo implemented in AngularJS) and cmdclient (a basic Python
@@ -444,7 +445,7 @@ You have two choices here, which will influence the form of your Matrix user
 IDs:
 
 1) Use the machine's own hostname as available on public DNS in the form of
-   its A or AAAA records. This is easier to set up initially, perhaps for
+   its A records. This is easier to set up initially, perhaps for
    testing, but lacks the flexibility of SRV.
 
 2) Set up a SRV record for your domain name. This requires you create a SRV
@@ -617,7 +618,7 @@ Building internal API documentation::
 
 
 
-Halp!! Synapse eats all my RAM!
+Help!! Synapse eats all my RAM!
 ===============================
 
 Synapse's architecture is quite RAM hungry currently - we deliberately

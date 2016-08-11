@@ -24,6 +24,7 @@ from collections import namedtuple
 
 import itertools
 import logging
+import ujson as json
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,7 @@ class TransactionStore(SQLBaseStore):
         )
 
         if result and result["response_code"]:
-            return result["response_code"], result["response_json"]
+            return result["response_code"], json.loads(str(result["response_json"]))
         else:
             return None
 

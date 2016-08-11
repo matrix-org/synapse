@@ -205,6 +205,7 @@ class JsonResource(HttpServer, resource.Resource):
 
     def register_paths(self, method, path_patterns, callback):
         for path_pattern in path_patterns:
+            logger.debug("Registering for %s %s", method, path_pattern.pattern)
             self.path_regexs.setdefault(method, []).append(
                 self._PathEntry(path_pattern, callback)
             )

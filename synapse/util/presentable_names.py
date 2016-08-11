@@ -14,6 +14,9 @@
 # limitations under the License.
 
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 # intentionally looser than what aliases we allow to be registered since
 # other HSes may allow aliases that we would not
@@ -22,7 +25,8 @@ ALIAS_RE = re.compile(r"^#.*:.+$")
 ALL_ALONE = "Empty Room"
 
 
-def calculate_room_name(room_state, user_id, fallback_to_members=True):
+def calculate_room_name(room_state, user_id, fallback_to_members=True,
+                        fallback_to_single_member=True):
     """
     Works out a user-facing name for the given room as per Matrix
     spec recommendations.
@@ -79,7 +83,10 @@ def calculate_room_name(room_state, user_id, fallback_to_members=True):
     ):
         if ("m.room.member", my_member_event.sender) in room_state:
             inviter_member_event = room_state[("m.room.member", my_member_event.sender)]
-            return "Invite from %s" % (name_from_member_event(inviter_member_event),)
+            if fallback_to_single_member:
+                return "Invite from %s" % (name_from_member_event(inviter_member_event),)
+            else:
+                return None
         else:
             return "Room Invite"
 
@@ -105,19 +112,29 @@ def calculate_room_name(room_state, user_id, fallback_to_members=True):
             # or inbound invite, or outbound 3PID invite.
             if all_members[0].sender == user_id:
                 if "m.room.third_party_invite" in room_state_bytype:
-                    third_party_invites = room_state_bytype["m.room.third_party_invite"]
+                    third_party_invites = (
+                        room_state_bytype["m.room.third_party_invite"].values()
+                    )
+
                     if len(third_party_invites) > 0:
                         # technically third party invite events are not member
                         # events, but they are close enough
-                        return "Inviting %s" (
-                            descriptor_from_member_events(third_party_invites)
-                        )
+
+                        # FIXME: no they're not - they look nothing like a member;
+                        # they have a great big encrypted thing as their name to
+                        # prevent leaking the 3PID name...
+                        # return "Inviting %s" % (
+                        #     descriptor_from_member_events(third_party_invites)
+                        # )
+                        return "Inviting email address"
                     else:
                         return ALL_ALONE
             else:
                 return name_from_member_event(all_members[0])
         else:
             return ALL_ALONE
+    elif len(other_members) == 1 and not fallback_to_single_member:
+        return None
     else:
         return descriptor_from_member_events(other_members)
 

@@ -30,18 +30,20 @@
                         {% include 'room.html' with context %}
                     {% endfor %}
                     <div class="footer">
-                        <small>
-                            Sending email at {{ reason.now|format_ts("%c") }} due to activity in room '{{ reason.room_name }}' because:<br/>
-                            1. An event was received at {{ reason.received_at|format_ts("%c") }}
-                            which is more than {{ "%.1f"|format(reason.delay_before_mail_ms / (60*1000)) }} (delay_before_mail_ms) mins ago.<br/>
+                        <a href="{{ unsubscribe_link }}">Unsubscribe</a>
+                        <br/>
+                        <br/>
+                        <div class="debug">
+                            Sending email at {{ reason.now|format_ts("%c") }} due to activity in room {{ reason.room_name }} because
+                            an event was received at {{ reason.received_at|format_ts("%c") }}
+                            which is more than {{ "%.1f"|format(reason.delay_before_mail_ms / (60*1000)) }} ({{ reason.delay_before_mail_ms }}) mins ago,
                             {% if reason.last_sent_ts %}
-                                2. The last time we sent a mail for this room was {{ reason.last_sent_ts|format_ts("%c") }},
+                                and the last time we sent a mail for this room was {{ reason.last_sent_ts|format_ts("%c") }},
                                 which is more than {{ "%.1f"|format(reason.throttle_ms / (60*1000)) }} (current throttle_ms) mins ago.
                             {% else %}
-                                2. We can't remember the last time we sent a mail for this room.
+                                and we don't have a last time we sent a mail for this room.
                             {% endif %}
-                        </small>
-                        <a href="{{ unsubscribe_link }}">Unsubscribe</a>
+                        </div>
                     </div>
                 </td>
                 <td> </td>

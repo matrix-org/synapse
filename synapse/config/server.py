@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from ._base import Config, ConfigError
 
 
 class ServerConfig(Config):
@@ -27,8 +27,9 @@ class ServerConfig(Config):
         self.daemonize = config.get("daemonize")
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
-        self.use_frozen_dicts = config.get("use_frozen_dicts", True)
+        self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.public_baseurl = config.get("public_baseurl")
+        self.secondary_directory_servers = config.get("secondary_directory_servers", [])
 
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
@@ -36,6 +37,8 @@ class ServerConfig(Config):
         self.start_pushers = config.get("start_pushers", True)
 
         self.listeners = config.get("listeners", [])
+
+        self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
 
         bind_port = config.get("bind_port")
         if bind_port:
@@ -104,26 +107,6 @@ class ServerConfig(Config):
                 ]
             })
 
-        # Attempt to guess the content_addr for the v0 content repostitory
-        content_addr = config.get("content_addr")
-        if not content_addr:
-            for listener in self.listeners:
-                if listener["type"] == "http" and not listener.get("tls", False):
-                    unsecure_port = listener["port"]
-                    break
-            else:
-                raise RuntimeError("Could not determine 'content_addr'")
-
-            host = self.server_name
-            if ':' not in host:
-                host = "%s:%d" % (host, unsecure_port)
-            else:
-                host = host.split(':')[0]
-                host = "%s:%d" % (host, unsecure_port)
-            content_addr = "http://%s" % (host,)
-
-        self.content_addr = content_addr
-
     def default_config(self, server_name, **kwargs):
         if ":" in server_name:
             bind_port = int(server_name.split(":")[1])
@@ -155,6 +138,17 @@ class ServerConfig(Config):
         # Zero is used to indicate synapse should set the soft limit to the
         # hard limit.
         soft_file_limit: 0
+
+        # The GC threshold parameters to pass to `gc.set_threshold`, if defined
+        # gc_thresholds: [700, 10, 10]
+
+        # A list of other Home Servers to fetch the public room directory from
+        # and include in the public room directory of this home server
+        # This is a temporary stopgap solution to populate new server with a
+        # list of rooms until there exists a good solution of a decentralized
+        # room directory.
+        # secondary_directory_servers:
+        #     - matrix.org
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.
@@ -237,3 +231,20 @@ class ServerConfig(Config):
                                   type=int,
                                   help="Turn on the twisted telnet manhole"
                                   " service on the given port.")
+
+
+def read_gc_thresholds(thresholds):
+    """Reads the three integer thresholds for garbage collection. Ensures that
+    the thresholds are integers if thresholds are supplied.
+    """
+    if thresholds is None:
+        return None
+    try:
+        assert len(thresholds) == 3
+        return (
+            int(thresholds[0]), int(thresholds[1]), int(thresholds[2]),
+        )
+    except:
+        raise ConfigError(
+            "Value of `gc_threshold` must be a list of three integers if set"
+        )

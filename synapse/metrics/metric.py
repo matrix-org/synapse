@@ -47,9 +47,6 @@ class BaseMetric(object):
                       for k, v in zip(self.labels, values)])
         )
 
-    def render(self):
-        return map_concat(self.render_item, sorted(self.counts.keys()))
-
 
 class CounterMetric(BaseMetric):
     """The simplest kind of metric; one that stores a monotonically-increasing
@@ -82,6 +79,9 @@ class CounterMetric(BaseMetric):
 
     def render_item(self, k):
         return ["%s%s %d" % (self.name, self._render_key(k), self.counts[k])]
+
+    def render(self):
+        return map_concat(self.render_item, sorted(self.counts.keys()))
 
 
 class CallbackMetric(BaseMetric):
@@ -126,30 +126,70 @@ class DistributionMetric(object):
 
 
 class CacheMetric(object):
-    """A combination of two CounterMetrics, one to count cache hits and one to
-    count a total, and a callback metric to yield the current size.
+    __slots__ = ("name", "cache_name", "hits", "misses", "size_callback")
 
-    This metric generates standard metric name pairs, so that monitoring rules
-    can easily be applied to measure hit ratio."""
-
-    def __init__(self, name, size_callback, labels=[]):
+    def __init__(self, name, size_callback, cache_name):
         self.name = name
+        self.cache_name = cache_name
 
-        self.hits = CounterMetric(name + ":hits", labels=labels)
-        self.total = CounterMetric(name + ":total", labels=labels)
+        self.hits = 0
+        self.misses = 0
 
-        self.size = CallbackMetric(
-            name + ":size",
-            callback=size_callback,
-            labels=labels,
-        )
+        self.size_callback = size_callback
 
-    def inc_hits(self, *values):
-        self.hits.inc(*values)
-        self.total.inc(*values)
+    def inc_hits(self):
+        self.hits += 1
 
-    def inc_misses(self, *values):
-        self.total.inc(*values)
+    def inc_misses(self):
+        self.misses += 1
 
     def render(self):
-        return self.hits.render() + self.total.render() + self.size.render()
+        size = self.size_callback()
+        hits = self.hits
+        total = self.misses + self.hits
+
+        return [
+            """%s:hits{name="%s"} %d""" % (self.name, self.cache_name, hits),
+            """%s:total{name="%s"} %d""" % (self.name, self.cache_name, total),
+            """%s:size{name="%s"} %d""" % (self.name, self.cache_name, size),
+        ]
+
+
+class MemoryUsageMetric(object):
+    """Keeps track of the current memory usage, using psutil.
+
+    The class will keep the current min/max/sum/counts of rss over the last
+    WINDOW_SIZE_SEC, by polling UPDATE_HZ times per second
+    """
+
+    UPDATE_HZ = 2  # number of times to get memory per second
+    WINDOW_SIZE_SEC = 30  # the size of the window in seconds
+
+    def __init__(self, hs, psutil):
+        clock = hs.get_clock()
+        self.memory_snapshots = []
+
+        self.process = psutil.Process()
+
+        clock.looping_call(self._update_curr_values, 1000 / self.UPDATE_HZ)
+
+    def _update_curr_values(self):
+        max_size = self.UPDATE_HZ * self.WINDOW_SIZE_SEC
+        self.memory_snapshots.append(self.process.memory_info().rss)
+        self.memory_snapshots[:] = self.memory_snapshots[-max_size:]
+
+    def render(self):
+        if not self.memory_snapshots:
+            return []
+
+        max_rss = max(self.memory_snapshots)
+        min_rss = min(self.memory_snapshots)
+        sum_rss = sum(self.memory_snapshots)
+        len_rss = len(self.memory_snapshots)
+
+        return [
+            "process_psutil_rss:max %d" % max_rss,
+            "process_psutil_rss:min %d" % min_rss,
+            "process_psutil_rss:total %d" % sum_rss,
+            "process_psutil_rss:count %d" % len_rss,
+        ]

@@ -21,7 +21,7 @@ from synapse.api.errors import (
 )
 from ._base import BaseHandler
 from synapse.util.async import run_on_reactor
-from synapse.api.errors import SynapseError
+from synapse.api.errors import SynapseError, Codes
 
 import json
 import logging
@@ -41,6 +41,20 @@ class IdentityHandler(BaseHandler):
             hs.config.use_insecure_ssl_client_just_for_testing_do_not_use
         )
 
+    def _should_trust_id_server(self, id_server):
+        if id_server not in self.trusted_id_servers:
+            if self.trust_any_id_server_just_for_testing_do_not_use:
+                logger.warn(
+                    "Trusting untrustworthy ID server %r even though it isn't"
+                    " in the trusted id list for testing because"
+                    " 'use_insecure_ssl_client_just_for_testing_do_not_use'"
+                    " is set in the config",
+                    id_server,
+                )
+            else:
+                return False
+        return True
+
     @defer.inlineCallbacks
     def threepid_from_creds(self, creds):
         yield run_on_reactor()
@@ -59,19 +73,12 @@ class IdentityHandler(BaseHandler):
         else:
             raise SynapseError(400, "No client_secret in creds")
 
-        if id_server not in self.trusted_id_servers:
-            if self.trust_any_id_server_just_for_testing_do_not_use:
-                logger.warn(
-                    "Trusting untrustworthy ID server %r even though it isn't"
-                    " in the trusted id list for testing because"
-                    " 'use_insecure_ssl_client_just_for_testing_do_not_use'"
-                    " is set in the config",
-                    id_server,
-                )
-            else:
-                logger.warn('%s is not a trusted ID server: rejecting 3pid ' +
-                            'credentials', id_server)
-                defer.returnValue(None)
+        if not self._should_trust_id_server(id_server):
+            logger.warn(
+                '%s is not a trusted ID server: rejecting 3pid ' +
+                'credentials', id_server
+            )
+            defer.returnValue(None)
 
         data = {}
         try:
@@ -128,6 +135,12 @@ class IdentityHandler(BaseHandler):
     @defer.inlineCallbacks
     def requestEmailToken(self, id_server, email, client_secret, send_attempt, **kwargs):
         yield run_on_reactor()
+
+        if not self._should_trust_id_server(id_server):
+            raise SynapseError(
+                400, "Untrusted ID server '%s'" % id_server,
+                Codes.SERVER_NOT_TRUSTED
+            )
 
         params = {
             'email': email,

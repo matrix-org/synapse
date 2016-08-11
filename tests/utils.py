@@ -20,7 +20,6 @@ from synapse.storage.prepare_database import prepare_database
 from synapse.storage.engines import create_engine
 from synapse.server import HomeServer
 from synapse.federation.transport import server
-from synapse.types import Requester
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 from synapse.util.logcontext import LoggingContext
@@ -54,7 +53,9 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.trusted_third_party_id_servers = []
         config.room_invite_state_types = []
 
+    config.use_frozen_dicts = True
     config.database_config = {"name": "sqlite3"}
+    config.ldap_enabled = False
 
     if "clock" not in kargs:
         kargs["clock"] = MockClock()
@@ -67,6 +68,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
             version_string="Synapse/tests",
             database_engine=create_engine(config.database_config),
             get_db_conn=db_pool.get_db_conn,
+            room_list_handler=object(),
             **kargs
         )
         hs.setup()
@@ -75,20 +77,16 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
             name, db_pool=None, datastore=datastore, config=config,
             version_string="Synapse/tests",
             database_engine=create_engine(config.database_config),
+            room_list_handler=object(),
             **kargs
         )
 
     # bcrypt is far too slow to be doing in unit tests
-    def swap_out_hash_for_testing(old_build_handlers):
-        def build_handlers():
-            handlers = old_build_handlers()
-            auth_handler = handlers.auth_handler
-            auth_handler.hash = lambda p: hashlib.md5(p).hexdigest()
-            auth_handler.validate_hash = lambda p, h: hashlib.md5(p).hexdigest() == h
-            return handlers
-        return build_handlers
-
-    hs.build_handlers = swap_out_hash_for_testing(hs.build_handlers)
+    # Need to let the HS build an auth handler and then mess with it
+    # because AuthHandler's constructor requires the HS, so we can't make one
+    # beforehand and pass it in to the HS's constructor (chicken / egg)
+    hs.get_auth_handler().hash = lambda p: hashlib.md5(p).hexdigest()
+    hs.get_auth_handler().validate_hash = lambda p, h: hashlib.md5(p).hexdigest() == h
 
     fed = kargs.get("resource_for_federation", None)
     if fed:
@@ -513,7 +511,3 @@ class DeferredMockCallable(object):
                     "call(%s)" % _format_call(c[0], c[1]) for c in calls
                 ])
             )
-
-
-def requester_for_user(user):
-    return Requester(user, None, False)

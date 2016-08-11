@@ -28,14 +28,46 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class PasswordRequestTokenRestServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/account/password/email/requestToken$")
+
+    def __init__(self, hs):
+        super(PasswordRequestTokenRestServlet, self).__init__()
+        self.hs = hs
+        self.identity_handler = hs.get_handlers().identity_handler
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        body = parse_json_object_from_request(request)
+
+        required = ['id_server', 'client_secret', 'email', 'send_attempt']
+        absent = []
+        for k in required:
+            if k not in body:
+                absent.append(k)
+
+        if absent:
+            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+
+        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+            'email', body['email']
+        )
+
+        if existingUid is None:
+            raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
+
+        ret = yield self.identity_handler.requestEmailToken(**body)
+        defer.returnValue((200, ret))
+
+
 class PasswordRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/password")
+    PATTERNS = client_v2_patterns("/account/password$")
 
     def __init__(self, hs):
         super(PasswordRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.auth_handler = hs.get_handlers().auth_handler
+        self.auth_handler = hs.get_auth_handler()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -89,15 +121,90 @@ class PasswordRestServlet(RestServlet):
         return 200, {}
 
 
+class DeactivateAccountRestServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/account/deactivate$")
+
+    def __init__(self, hs):
+        self.hs = hs
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
+        super(DeactivateAccountRestServlet, self).__init__()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        body = parse_json_object_from_request(request)
+
+        authed, result, params, _ = yield self.auth_handler.check_auth([
+            [LoginType.PASSWORD],
+        ], body, self.hs.get_ip_from_request(request))
+
+        if not authed:
+            defer.returnValue((401, result))
+
+        user_id = None
+        requester = None
+
+        if LoginType.PASSWORD in result:
+            # if using password, they should also be logged in
+            requester = yield self.auth.get_user_by_req(request)
+            user_id = requester.user.to_string()
+            if user_id != result[LoginType.PASSWORD]:
+                raise LoginError(400, "", Codes.UNKNOWN)
+        else:
+            logger.error("Auth succeeded but no known type!", result.keys())
+            raise SynapseError(500, "", Codes.UNKNOWN)
+
+        # FIXME: Theoretically there is a race here wherein user resets password
+        # using threepid.
+        yield self.store.user_delete_access_tokens(user_id)
+        yield self.store.user_delete_threepids(user_id)
+        yield self.store.user_set_password_hash(user_id, None)
+
+        defer.returnValue((200, {}))
+
+
+class ThreepidRequestTokenRestServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/account/3pid/email/requestToken$")
+
+    def __init__(self, hs):
+        self.hs = hs
+        super(ThreepidRequestTokenRestServlet, self).__init__()
+        self.identity_handler = hs.get_handlers().identity_handler
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        body = parse_json_object_from_request(request)
+
+        required = ['id_server', 'client_secret', 'email', 'send_attempt']
+        absent = []
+        for k in required:
+            if k not in body:
+                absent.append(k)
+
+        if absent:
+            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+
+        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+            'email', body['email']
+        )
+
+        if existingUid is not None:
+            raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
+
+        ret = yield self.identity_handler.requestEmailToken(**body)
+        defer.returnValue((200, ret))
+
+
 class ThreepidRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/3pid")
+    PATTERNS = client_v2_patterns("/account/3pid$")
 
     def __init__(self, hs):
         super(ThreepidRestServlet, self).__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
-        self.auth_handler = hs.get_handlers().auth_handler
+        self.auth_handler = hs.get_auth_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -157,5 +264,8 @@ class ThreepidRestServlet(RestServlet):
 
 
 def register_servlets(hs, http_server):
+    PasswordRequestTokenRestServlet(hs).register(http_server)
     PasswordRestServlet(hs).register(http_server)
+    DeactivateAccountRestServlet(hs).register(http_server)
+    ThreepidRequestTokenRestServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)

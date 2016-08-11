@@ -13,11 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.appservice.scheduler import AppServiceScheduler
-from synapse.appservice.api import ApplicationServiceApi
 from .register import RegistrationHandler
 from .room import (
-    RoomCreationHandler, RoomListHandler, RoomContextHandler,
+    RoomCreationHandler, RoomContextHandler,
 )
 from .room_member import RoomMemberHandler
 from .message import MessageHandler
@@ -26,8 +24,6 @@ from .federation import FederationHandler
 from .profile import ProfileHandler
 from .directory import DirectoryHandler
 from .admin import AdminHandler
-from .appservice import ApplicationServicesHandler
-from .auth import AuthHandler
 from .identity import IdentityHandler
 from .receipts import ReceiptsHandler
 from .search import SearchHandler
@@ -35,10 +31,21 @@ from .search import SearchHandler
 
 class Handlers(object):
 
-    """ A collection of all the event handlers.
+    """ Deprecated. A collection of handlers.
 
-    There's no need to lazily create these; we'll just make them all eagerly
-    at construction time.
+    At some point most of the classes whose name ended "Handler" were
+    accessed through this class.
+
+    However this makes it painful to unit test the handlers and to run cut
+    down versions of synapse that only use specific handlers because using a
+    single handler required creating all of the handlers. So some of the
+    handlers have been lifted out of the Handlers object and are now accessed
+    directly through the homeserver object itself.
+
+    Any new handlers should follow the new pattern of being accessed through
+    the homeserver object and should not be added to the Handlers object.
+
+    The remaining handlers should be moved out of the handlers object.
     """
 
     def __init__(self, hs):
@@ -50,19 +57,9 @@ class Handlers(object):
         self.event_handler = EventHandler(hs)
         self.federation_handler = FederationHandler(hs)
         self.profile_handler = ProfileHandler(hs)
-        self.room_list_handler = RoomListHandler(hs)
         self.directory_handler = DirectoryHandler(hs)
         self.admin_handler = AdminHandler(hs)
         self.receipts_handler = ReceiptsHandler(hs)
-        asapi = ApplicationServiceApi(hs)
-        self.appservice_handler = ApplicationServicesHandler(
-            hs, asapi, AppServiceScheduler(
-                clock=hs.get_clock(),
-                store=hs.get_datastore(),
-                as_api=asapi
-            )
-        )
-        self.auth_handler = AuthHandler(hs)
         self.identity_handler = IdentityHandler(hs)
         self.search_handler = SearchHandler(hs)
         self.room_context_handler = RoomContextHandler(hs)

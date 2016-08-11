@@ -22,22 +22,20 @@ import functools
 import os
 import stat
 import time
+import gc
 
 from twisted.internet import reactor
 
 from .metric import (
-    CounterMetric, CallbackMetric, DistributionMetric, CacheMetric
+    CounterMetric, CallbackMetric, DistributionMetric, CacheMetric,
+    MemoryUsageMetric,
 )
 
 
 logger = logging.getLogger(__name__)
 
 
-# We'll keep all the available metrics in a single toplevel dict, one shared
-# for the entire process. We don't currently support per-HomeServer instances
-# of metrics, because in practice any one python VM will host only one
-# HomeServer anyway. This makes a lot of implementation neater
-all_metrics = {}
+all_metrics = []
 
 
 class Metrics(object):
@@ -53,7 +51,7 @@ class Metrics(object):
 
         metric = metric_class(full_name, *args, **kwargs)
 
-        all_metrics[full_name] = metric
+        all_metrics.append(metric)
         return metric
 
     def register_counter(self, *args, **kwargs):
@@ -67,6 +65,21 @@ class Metrics(object):
 
     def register_cache(self, *args, **kwargs):
         return self._register(CacheMetric, *args, **kwargs)
+
+
+def register_memory_metrics(hs):
+    try:
+        import psutil
+        process = psutil.Process()
+        process.memory_info().rss
+    except (ImportError, AttributeError):
+        logger.warn(
+            "psutil is not installed or incorrect version."
+            " Disabling memory metrics."
+        )
+        return
+    metric = MemoryUsageMetric(hs, psutil)
+    all_metrics.append(metric)
 
 
 def get_metrics_for(pkg_name):
@@ -84,12 +97,12 @@ def render_all():
     # TODO(paul): Internal hack
     update_resource_metrics()
 
-    for name in sorted(all_metrics.keys()):
+    for metric in all_metrics:
         try:
-            strs += all_metrics[name].render()
+            strs += metric.render()
         except Exception:
-            strs += ["# FAILED to render %s" % name]
-            logger.exception("Failed to render %s metric", name)
+            strs += ["# FAILED to render"]
+            logger.exception("Failed to render metric")
 
     strs.append("")  # to generate a final CRLF
 
@@ -156,6 +169,13 @@ reactor_metrics = get_metrics_for("reactor")
 tick_time = reactor_metrics.register_distribution("tick_time")
 pending_calls_metric = reactor_metrics.register_distribution("pending_calls")
 
+gc_time = reactor_metrics.register_distribution("gc_time", labels=["gen"])
+gc_unreachable = reactor_metrics.register_counter("gc_unreachable", labels=["gen"])
+
+reactor_metrics.register_callback(
+    "gc_counts", lambda: {(i,): v for i, v in enumerate(gc.get_count())}, labels=["gen"]
+)
+
 
 def runUntilCurrentTimer(func):
 
@@ -182,6 +202,22 @@ def runUntilCurrentTimer(func):
         end = time.time() * 1000
         tick_time.inc_by(end - start)
         pending_calls_metric.inc_by(num_pending)
+
+        # Check if we need to do a manual GC (since its been disabled), and do
+        # one if necessary.
+        threshold = gc.get_threshold()
+        counts = gc.get_count()
+        for i in (2, 1, 0):
+            if threshold[i] < counts[i]:
+                logger.info("Collecting gc %d", i)
+
+                start = time.time() * 1000
+                unreachable = gc.collect(i)
+                end = time.time() * 1000
+
+                gc_time.inc_by(end - start, i)
+                gc_unreachable.inc_by(unreachable, i)
+
         return ret
 
     return f
@@ -196,5 +232,9 @@ try:
     # runUntilCurrent is called when we have pending calls. It is called once
     # per iteratation after fd polling.
     reactor.runUntilCurrent = runUntilCurrentTimer(reactor.runUntilCurrent)
+
+    # We manually run the GC each reactor tick so that we can get some metrics
+    # about time spent doing GC,
+    gc.disable()
 except AttributeError:
     pass

@@ -191,6 +191,17 @@ class Filter(object):
     def __init__(self, filter_json):
         self.filter_json = filter_json
 
+        self.types = self.filter_json.get("types", None)
+        self.not_types = self.filter_json.get("not_types", [])
+
+        self.rooms = self.filter_json.get("rooms", None)
+        self.not_rooms = self.filter_json.get("not_rooms", [])
+
+        self.senders = self.filter_json.get("senders", None)
+        self.not_senders = self.filter_json.get("not_senders", [])
+
+        self.contains_url = self.filter_json.get("contains_url", None)
+
     def check(self, event):
         """Checks whether the filter matches the given event.
 
@@ -209,9 +220,10 @@ class Filter(object):
             event.get("room_id", None),
             sender,
             event.get("type", None),
+            "url" in event.get("content", {})
         )
 
-    def check_fields(self, room_id, sender, event_type):
+    def check_fields(self, room_id, sender, event_type, contains_url):
         """Checks whether the filter matches the given event fields.
 
         Returns:
@@ -225,14 +237,19 @@ class Filter(object):
 
         for name, match_func in literal_keys.items():
             not_name = "not_%s" % (name,)
-            disallowed_values = self.filter_json.get(not_name, [])
+            disallowed_values = getattr(self, not_name)
             if any(map(match_func, disallowed_values)):
                 return False
 
-            allowed_values = self.filter_json.get(name, None)
+            allowed_values = getattr(self, name)
             if allowed_values is not None:
                 if not any(map(match_func, allowed_values)):
                     return False
+
+        contains_url_filter = self.filter_json.get("contains_url")
+        if contains_url_filter is not None:
+            if contains_url_filter != contains_url:
+                return False
 
         return True
 

@@ -41,11 +41,14 @@ logger = logging.getLogger(__name__)
 
 
 MESSAGE_FROM_PERSON_IN_ROOM = "You have a message on %(app)s from %(person)s " \
-                              "in the %s room..."
+                              "in the %(room)s room..."
 MESSAGE_FROM_PERSON = "You have a message on %(app)s from %(person)s..."
 MESSAGES_FROM_PERSON = "You have messages on %(app)s from %(person)s..."
-MESSAGES_IN_ROOM = "There are some messages on %(app)s for you in the %(room)s room..."
-MESSAGES_IN_ROOMS = "Here are some messages on %(app)s you may have missed..."
+MESSAGES_IN_ROOM = "You have messages on %(app)s in the %(room)s room..."
+MESSAGES_IN_ROOM_AND_OTHERS = \
+    "You have messages on %(app)s in the %(room)s room and others..."
+MESSAGES_FROM_PERSON_AND_OTHERS = \
+    "You have messages on %(app)s from %(person)s and others..."
 INVITE_FROM_PERSON_TO_ROOM = "%(person)s has invited you to join the " \
                              "%(room)s room on %(app)s..."
 INVITE_FROM_PERSON = "%(person)s has invited you to chat on %(app)s..."
@@ -75,12 +78,14 @@ ALLOWED_ATTRS = {
 
 
 class Mailer(object):
-    def __init__(self, hs):
+    def __init__(self, hs, app_name):
         self.hs = hs
         self.store = self.hs.get_datastore()
+        self.auth_handler = self.hs.get_auth_handler()
         self.state_handler = self.hs.get_state_handler()
         loader = jinja2.FileSystemLoader(self.hs.config.email_template_dir)
-        self.app_name = self.hs.config.email_app_name
+        self.app_name = app_name
+        logger.info("Created Mailer for app_name %s" % app_name)
         env = jinja2.Environment(loader=loader)
         env.filters["format_ts"] = format_ts_filter
         env.filters["mxc_to_http"] = self.mxc_to_http_filter
@@ -92,8 +97,16 @@ class Mailer(object):
         )
 
     @defer.inlineCallbacks
-    def send_notification_mail(self, user_id, email_address, push_actions, reason):
-        raw_from = email.utils.parseaddr(self.hs.config.email_notif_from)[1]
+    def send_notification_mail(self, app_id, user_id, email_address,
+                               push_actions, reason):
+        try:
+            from_string = self.hs.config.email_notif_from % {
+                "app": self.app_name
+            }
+        except TypeError:
+            from_string = self.hs.config.email_notif_from
+
+        raw_from = email.utils.parseaddr(from_string)[1]
         raw_to = email.utils.parseaddr(email_address)[1]
 
         if raw_to == '':
@@ -119,6 +132,8 @@ class Mailer(object):
             user_display_name = yield self.store.get_profile_displayname(
                 UserID.from_string(user_id).localpart
             )
+            if user_display_name is None:
+                user_display_name = user_id
         except StoreError:
             user_display_name = user_id
 
@@ -128,8 +143,13 @@ class Mailer(object):
             state_by_room[room_id] = room_state
 
         # Run at most 3 of these at once: sync does 10 at a time but email
-        # notifs are much realtime than sync so we can afford to wait a bit.
+        # notifs are much less realtime than sync so we can afford to wait a bit.
         yield concurrently_execute(_fetch_room_state, rooms_in_order, 3)
+
+        # actually sort our so-called rooms_in_order list, most recent room first
+        rooms_in_order.sort(
+            key=lambda r: -(notifs_by_room[r][-1]['received_ts'] or 0)
+        )
 
         rooms = []
 
@@ -139,17 +159,19 @@ class Mailer(object):
             )
             rooms.append(roomvars)
 
-        summary_text = self.make_summary_text(
-            notifs_by_room, state_by_room, notif_events, user_id
+        reason['room_name'] = calculate_room_name(
+            state_by_room[reason['room_id']], user_id, fallback_to_members=True
         )
 
-        reason['room_name'] = calculate_room_name(
-            state_by_room[reason['room_id']], user_id, fallback_to_members=False
+        summary_text = self.make_summary_text(
+            notifs_by_room, state_by_room, notif_events, user_id, reason
         )
 
         template_vars = {
             "user_display_name": user_display_name,
-            "unsubscribe_link": self.make_unsubscribe_link(),
+            "unsubscribe_link": self.make_unsubscribe_link(
+                user_id, app_id, email_address
+            ),
             "summary_text": summary_text,
             "app_name": self.app_name,
             "rooms": rooms,
@@ -164,7 +186,7 @@ class Mailer(object):
 
         multipart_msg = MIMEMultipart('alternative')
         multipart_msg['Subject'] = "[%s] %s" % (self.app_name, summary_text)
-        multipart_msg['From'] = self.hs.config.email_notif_from
+        multipart_msg['From'] = from_string
         multipart_msg['To'] = email_address
         multipart_msg['Date'] = email.utils.formatdate()
         multipart_msg['Message-ID'] = email.utils.make_msgid()
@@ -251,14 +273,16 @@ class Mailer(object):
 
         sender_state_event = room_state[("m.room.member", event.sender)]
         sender_name = name_from_member_event(sender_state_event)
-        sender_avatar_url = sender_state_event.content["avatar_url"]
+        sender_avatar_url = sender_state_event.content.get("avatar_url")
 
         # 'hash' for deterministically picking default images: use
         # sender_hash % the number of default images to choose from
         sender_hash = string_ordinal_total(event.sender)
 
+        msgtype = event.content.get("msgtype")
+
         ret = {
-            "msgtype": event.content["msgtype"],
+            "msgtype": msgtype,
             "is_historical": event.event_id != notif['event_id'],
             "id": event.event_id,
             "ts": event.origin_server_ts,
@@ -267,9 +291,9 @@ class Mailer(object):
             "sender_hash": sender_hash,
         }
 
-        if event.content["msgtype"] == "m.text":
+        if msgtype == "m.text":
             self.add_text_message_vars(ret, event)
-        elif event.content["msgtype"] == "m.image":
+        elif msgtype == "m.image":
             self.add_image_message_vars(ret, event)
 
         if "body" in event.content:
@@ -278,16 +302,17 @@ class Mailer(object):
         return ret
 
     def add_text_message_vars(self, messagevars, event):
-        if "format" in event.content:
-            msgformat = event.content["format"]
-        else:
-            msgformat = None
+        msgformat = event.content.get("format")
+
         messagevars["format"] = msgformat
 
-        if msgformat == "org.matrix.custom.html":
-            messagevars["body_text_html"] = safe_markup(event.content["formatted_body"])
-        else:
-            messagevars["body_text_html"] = safe_text(event.content["body"])
+        formatted_body = event.content.get("formatted_body")
+        body = event.content.get("body")
+
+        if msgformat == "org.matrix.custom.html" and formatted_body:
+            messagevars["body_text_html"] = safe_markup(formatted_body)
+        elif body:
+            messagevars["body_text_html"] = safe_text(body)
 
         return messagevars
 
@@ -296,7 +321,8 @@ class Mailer(object):
 
         return messagevars
 
-    def make_summary_text(self, notifs_by_room, state_by_room, notif_events, user_id):
+    def make_summary_text(self, notifs_by_room, state_by_room,
+                          notif_events, user_id, reason):
         if len(notifs_by_room) == 1:
             # Only one room has new stuff
             room_id = notifs_by_room.keys()[0]
@@ -371,9 +397,28 @@ class Mailer(object):
                     }
         else:
             # Stuff's happened in multiple different rooms
-            return MESSAGES_IN_ROOMS % {
-                "app": self.app_name,
-            }
+
+            # ...but we still refer to the 'reason' room which triggered the mail
+            if reason['room_name'] is not None:
+                return MESSAGES_IN_ROOM_AND_OTHERS % {
+                    "room": reason['room_name'],
+                    "app": self.app_name,
+                }
+            else:
+                # If the reason room doesn't have a name, say who the messages
+                # are from explicitly to avoid, "messages in the Bob room"
+                sender_ids = list(set([
+                    notif_events[n['event_id']].sender
+                    for n in notifs_by_room[reason['room_id']]
+                ]))
+
+                return MESSAGES_FROM_PERSON_AND_OTHERS % {
+                    "person": descriptor_from_member_events([
+                        state_by_room[reason['room_id']][("m.room.member", s)]
+                        for s in sender_ids
+                    ]),
+                    "app": self.app_name,
+                }
 
     def make_room_link(self, room_id):
         # need /beta for Universal Links to work on iOS
@@ -393,9 +438,18 @@ class Mailer(object):
                 notif['room_id'], notif['event_id']
             )
 
-    def make_unsubscribe_link(self):
-        # XXX: matrix.to
-        return "https://vector.im/#/settings"
+    def make_unsubscribe_link(self, user_id, app_id, email_address):
+        params = {
+            "access_token": self.auth_handler.generate_delete_pusher_token(user_id),
+            "app_id": app_id,
+            "pushkey": email_address,
+        }
+
+        # XXX: make r0 once API is stable
+        return "%s_matrix/client/unstable/pushers/remove?%s" % (
+            self.hs.config.public_baseurl,
+            urllib.urlencode(params),
+        )
 
     def mxc_to_http_filter(self, value, width, height, resize_method="crop"):
         if value[0:6] != "mxc://":

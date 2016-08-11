@@ -13,14 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
+import synapse.types
 from synapse.api.errors import SynapseError, AuthError, CodeMessageException
-from synapse.types import UserID, Requester
-
+from synapse.types import UserID
 from ._base import BaseHandler
-
-import logging
 
 
 logger = logging.getLogger(__name__)
@@ -35,13 +35,6 @@ class ProfileHandler(BaseHandler):
         self.federation.register_query_handler(
             "profile", self.on_profile_query
         )
-
-        distributor = hs.get_distributor()
-
-        distributor.observe("registered_user", self.registered_user)
-
-    def registered_user(self, user):
-        return self.store.create_profile(user.localpart)
 
     @defer.inlineCallbacks
     def get_displayname(self, target_user):
@@ -172,7 +165,9 @@ class ProfileHandler(BaseHandler):
             try:
                 # Assume the user isn't a guest because we don't let guests set
                 # profile or avatar data.
-                requester = Requester(user, "", False)
+                # XXX why are we recreating `requester` here for each room?
+                # what was wrong with the `requester` we were passed?
+                requester = synapse.types.create_requester(user)
                 yield handler.update_membership(
                     requester,
                     user,

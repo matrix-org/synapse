@@ -29,6 +29,8 @@ from synapse.http.server import (
 from synapse.util.async import ObservableDeferred
 from synapse.util.stringutils import is_ascii
 
+from copy import deepcopy
+
 import os
 import re
 import fnmatch
@@ -252,7 +254,8 @@ class PreviewUrlResource(Resource):
 
         og = {}
         for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
-            og[tag.attrib['property']] = tag.attrib['content']
+            if 'content' in tag.attrib:
+                og[tag.attrib['property']] = tag.attrib['content']
 
         # TODO: grab article: meta tags too, e.g.:
 
@@ -279,7 +282,7 @@ class PreviewUrlResource(Resource):
                 # TODO: consider inlined CSS styles as well as width & height attribs
                 images = tree.xpath("//img[@src][number(@width)>10][number(@height)>10]")
                 images = sorted(images, key=lambda i: (
-                    -1 * int(i.attrib['width']) * int(i.attrib['height'])
+                    -1 * float(i.attrib['width']) * float(i.attrib['height'])
                 ))
                 if not images:
                     images = tree.xpath("//img[@src]")
@@ -287,9 +290,9 @@ class PreviewUrlResource(Resource):
                     og['og:image'] = images[0].attrib['src']
 
         # pre-cache the image for posterity
-        # FIXME: it might be cleaner to use the same flow as the main /preview_url request
-        # itself and benefit from the same caching etc.  But for now we just rely on the
-        # caching on the master request to speed things up.
+        # FIXME: it might be cleaner to use the same flow as the main /preview_url
+        # request itself and benefit from the same caching etc.  But for now we
+        # just rely on the caching on the master request to speed things up.
         if 'og:image' in og and og['og:image']:
             image_info = yield self._download_url(
                 self._rebase_url(og['og:image'], media_info['uri']), requester.user
@@ -328,20 +331,24 @@ class PreviewUrlResource(Resource):
                 # ...or if they are within a <script/> or <style/> tag.
                 # This is a very very very coarse approximation to a plain text
                 # render of the page.
-                text_nodes = tree.xpath("//text()[not(ancestor::header | ancestor::nav | "
-                                        "ancestor::aside | ancestor::footer | "
-                                        "ancestor::script | ancestor::style)]" +
-                                        "[ancestor::body]")
-                text = ''
-                for text_node in text_nodes:
-                    if len(text) < 500:
-                        text += text_node + ' '
-                    else:
-                        break
-                text = re.sub(r'[\t ]+', ' ', text)
-                text = re.sub(r'[\t \r\n]*[\r\n]+', '\n', text)
-                text = text.strip()[:500]
-                og['og:description'] = text if text else None
+
+                # We don't just use XPATH here as that is slow on some machines.
+
+                # We clone `tree` as we modify it.
+                cloned_tree = deepcopy(tree.find("body"))
+
+                TAGS_TO_REMOVE = ("header", "nav", "aside", "footer", "script", "style",)
+                for el in cloned_tree.iter(TAGS_TO_REMOVE):
+                    el.getparent().remove(el)
+
+                # Split all the text nodes into paragraphs (by splitting on new
+                # lines)
+                text_nodes = (
+                    re.sub(r'\s+', '\n', el.text).strip()
+                    for el in cloned_tree.iter()
+                    if el.text and isinstance(el.tag, basestring)  # Removes comments
+                )
+                og['og:description'] = summarize_paragraphs(text_nodes)
 
         # TODO: delete the url downloads to stop diskfilling,
         # as we only ever cared about its OG
@@ -449,3 +456,56 @@ class PreviewUrlResource(Resource):
             content_type.startswith("application/xhtml")
         ):
             return True
+
+
+def summarize_paragraphs(text_nodes, min_size=200, max_size=500):
+    # Try to get a summary of between 200 and 500 words, respecting
+    # first paragraph and then word boundaries.
+    # TODO: Respect sentences?
+
+    description = ''
+
+    # Keep adding paragraphs until we get to the MIN_SIZE.
+    for text_node in text_nodes:
+        if len(description) < min_size:
+            text_node = re.sub(r'[\t \r\n]+', ' ', text_node)
+            description += text_node + '\n\n'
+        else:
+            break
+
+    description = description.strip()
+    description = re.sub(r'[\t ]+', ' ', description)
+    description = re.sub(r'[\t \r\n]*[\r\n]+', '\n\n', description)
+
+    # If the concatenation of paragraphs to get above MIN_SIZE
+    # took us over MAX_SIZE, then we need to truncate mid paragraph
+    if len(description) > max_size:
+        new_desc = ""
+
+        # This splits the paragraph into words, but keeping the
+        # (preceeding) whitespace intact so we can easily concat
+        # words back together.
+        for match in re.finditer("\s*\S+", description):
+            word = match.group()
+
+            # Keep adding words while the total length is less than
+            # MAX_SIZE.
+            if len(word) + len(new_desc) < max_size:
+                new_desc += word
+            else:
+                # At this point the next word *will* take us over
+                # MAX_SIZE, but we also want to ensure that its not
+                # a huge word. If it is add it anyway and we'll
+                # truncate later.
+                if len(new_desc) < min_size:
+                    new_desc += word
+                break
+
+        # Double check that we're not over the limit
+        if len(new_desc) > max_size:
+            new_desc = new_desc[:max_size]
+
+        # We always add an ellipsis because at the very least
+        # we chopped mid paragraph.
+        description = new_desc.strip() + "…"
+    return description if description else None

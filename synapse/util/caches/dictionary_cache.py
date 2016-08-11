@@ -15,7 +15,7 @@
 
 from synapse.util.caches.lrucache import LruCache
 from collections import namedtuple
-from . import caches_by_name, cache_counter
+from . import register_cache
 import threading
 import logging
 
@@ -43,7 +43,7 @@ class DictionaryCache(object):
             __slots__ = []
 
         self.sentinel = Sentinel()
-        caches_by_name[name] = self.cache
+        self.metrics = register_cache(name, self.cache)
 
     def check_thread(self):
         expected_thread = self.thread
@@ -58,7 +58,7 @@ class DictionaryCache(object):
     def get(self, key, dict_keys=None):
         entry = self.cache.get(key, self.sentinel)
         if entry is not self.sentinel:
-            cache_counter.inc_hits(self.name)
+            self.metrics.inc_hits()
 
             if dict_keys is None:
                 return DictionaryEntry(entry.full, dict(entry.value))
@@ -69,7 +69,7 @@ class DictionaryCache(object):
                     if k in entry.value
                 })
 
-        cache_counter.inc_misses(self.name)
+        self.metrics.inc_misses()
         return DictionaryEntry(False, {})
 
     def invalidate(self, key):

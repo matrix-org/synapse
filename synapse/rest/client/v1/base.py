@@ -52,6 +52,10 @@ class ClientV1RestServlet(RestServlet):
     """
 
     def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer):
+        """
         self.hs = hs
         self.handlers = hs.get_handlers()
         self.builder_factory = hs.get_event_builder_factory()

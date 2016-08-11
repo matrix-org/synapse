@@ -18,7 +18,6 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 
 from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cachedInlineCallbacks
 from .engines import PostgresEngine, Sqlite3Engine
 
 import collections
@@ -191,37 +190,6 @@ class RoomStore(SQLBaseStore):
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
-
-    @cachedInlineCallbacks()
-    def get_room_name_and_aliases(self, room_id):
-        def f(txn):
-            sql = (
-                "SELECT event_id FROM current_state_events "
-                "WHERE room_id = ? "
-            )
-
-            sql += " AND ((type = 'm.room.name' AND state_key = '')"
-            sql += " OR type = 'm.room.aliases')"
-
-            txn.execute(sql, (room_id,))
-            results = self.cursor_to_dict(txn)
-
-            return self._parse_events_txn(txn, results)
-
-        events = yield self.runInteraction("get_room_name_and_aliases", f)
-
-        name = None
-        aliases = []
-
-        for e in events:
-            if e.type == 'm.room.name':
-                if 'name' in e.content:
-                    name = e.content['name']
-            elif e.type == 'm.room.aliases':
-                if 'aliases' in e.content:
-                    aliases.extend(e.content['aliases'])
-
-        defer.returnValue((name, aliases))
 
     def add_event_report(self, room_id, event_id, user_id, reason, content,
                          received_ts):

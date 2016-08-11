@@ -40,7 +40,7 @@ class ActionGenerator:
     def handle_push_actions_for_event(self, event, context):
         with Measure(self.clock, "handle_push_actions_for_event"):
             bulk_evaluator = yield evaluator_for_event(
-                event, self.hs, self.store
+                event, self.hs, self.store, context.current_state
             )
 
             actions_by_user = yield bulk_evaluator.action_for_event_by_user(

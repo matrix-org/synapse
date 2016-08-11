@@ -41,17 +41,59 @@ else:
 logger = logging.getLogger(__name__)
 
 
-class RegisterRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/register")
+class RegisterRequestTokenRestServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/register/email/requestToken$")
 
     def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(RegisterRequestTokenRestServlet, self).__init__()
+        self.hs = hs
+        self.identity_handler = hs.get_handlers().identity_handler
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        body = parse_json_object_from_request(request)
+
+        required = ['id_server', 'client_secret', 'email', 'send_attempt']
+        absent = []
+        for k in required:
+            if k not in body:
+                absent.append(k)
+
+        if len(absent) > 0:
+            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+
+        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+            'email', body['email']
+        )
+
+        if existingUid is not None:
+            raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
+
+        ret = yield self.identity_handler.requestEmailToken(**body)
+        defer.returnValue((200, ret))
+
+
+class RegisterRestServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/register$")
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
         super(RegisterRestServlet, self).__init__()
+
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
-        self.auth_handler = hs.get_handlers().auth_handler
+        self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_handlers().registration_handler
         self.identity_handler = hs.get_handlers().identity_handler
+        self.device_handler = hs.get_device_handler()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -69,10 +111,6 @@ class RegisterRestServlet(RestServlet):
             raise UnrecognizedRequestError(
                 "Do not understand membership kind: %s" % (kind,)
             )
-
-        if '/register/email/requestToken' in request.path:
-            ret = yield self.onEmailTokenRequest(request)
-            defer.returnValue(ret)
 
         body = parse_json_object_from_request(request)
 
@@ -104,11 +142,12 @@ class RegisterRestServlet(RestServlet):
             # Set the desired user according to the AS API (which uses the
             # 'user' key not 'username'). Since this is a new addition, we'll
             # fallback to 'username' if they gave one.
-            if isinstance(body.get("user"), basestring):
-                desired_username = body["user"]
-            result = yield self._do_appservice_registration(
-                desired_username, request.args["access_token"][0]
-            )
+            desired_username = body.get("user", desired_username)
+
+            if isinstance(desired_username, basestring):
+                result = yield self._do_appservice_registration(
+                    desired_username, request.args["access_token"][0], body
+                )
             defer.returnValue((200, result))  # we throw for non 200 responses
             return
 
@@ -117,7 +156,7 @@ class RegisterRestServlet(RestServlet):
             # FIXME: Should we really be determining if this is shared secret
             # auth based purely on the 'mac' key?
             result = yield self._do_shared_secret_registration(
-                desired_username, desired_password, body["mac"]
+                desired_username, desired_password, body
             )
             defer.returnValue((200, result))  # we throw for non 200 responses
             return
@@ -157,12 +196,12 @@ class RegisterRestServlet(RestServlet):
                 [LoginType.EMAIL_IDENTITY]
             ]
 
-        authed, result, params, session_id = yield self.auth_handler.check_auth(
+        authed, auth_result, params, session_id = yield self.auth_handler.check_auth(
             flows, body, self.hs.get_ip_from_request(request)
         )
 
         if not authed:
-            defer.returnValue((401, result))
+            defer.returnValue((401, auth_result))
             return
 
         if registered_user_id is not None:
@@ -170,106 +209,58 @@ class RegisterRestServlet(RestServlet):
                 "Already registered user ID %r for this session",
                 registered_user_id
             )
-            access_token = yield self.auth_handler.issue_access_token(registered_user_id)
-            refresh_token = yield self.auth_handler.issue_refresh_token(
-                registered_user_id
+            # don't re-register the email address
+            add_email = False
+        else:
+            # NB: This may be from the auth handler and NOT from the POST
+            if 'password' not in params:
+                raise SynapseError(400, "Missing password.",
+                                   Codes.MISSING_PARAM)
+
+            desired_username = params.get("username", None)
+            new_password = params.get("password", None)
+            guest_access_token = params.get("guest_access_token", None)
+
+            (registered_user_id, _) = yield self.registration_handler.register(
+                localpart=desired_username,
+                password=new_password,
+                guest_access_token=guest_access_token,
+                generate_token=False,
             )
-            defer.returnValue((200, {
-                "user_id": registered_user_id,
-                "access_token": access_token,
-                "home_server": self.hs.hostname,
-                "refresh_token": refresh_token,
-            }))
 
-        # NB: This may be from the auth handler and NOT from the POST
-        if 'password' not in params:
-            raise SynapseError(400, "Missing password.", Codes.MISSING_PARAM)
+            # remember that we've now registered that user account, and with
+            #  what user ID (since the user may not have specified)
+            self.auth_handler.set_session_data(
+                session_id, "registered_user_id", registered_user_id
+            )
 
-        desired_username = params.get("username", None)
-        new_password = params.get("password", None)
-        guest_access_token = params.get("guest_access_token", None)
+            add_email = True
 
-        (user_id, token) = yield self.registration_handler.register(
-            localpart=desired_username,
-            password=new_password,
-            guest_access_token=guest_access_token,
+        return_dict = yield self._create_registration_details(
+            registered_user_id, params
         )
 
-        # remember that we've now registered that user account, and with what
-        # user ID (since the user may not have specified)
-        self.auth_handler.set_session_data(
-            session_id, "registered_user_id", user_id
-        )
+        if add_email and auth_result and LoginType.EMAIL_IDENTITY in auth_result:
+            threepid = auth_result[LoginType.EMAIL_IDENTITY]
+            yield self._register_email_threepid(
+                registered_user_id, threepid, return_dict["access_token"],
+                params.get("bind_email")
+            )
 
-        if result and LoginType.EMAIL_IDENTITY in result:
-            threepid = result[LoginType.EMAIL_IDENTITY]
-
-            for reqd in ['medium', 'address', 'validated_at']:
-                if reqd not in threepid:
-                    logger.info("Can't add incomplete 3pid")
-                else:
-                    yield self.auth_handler.add_threepid(
-                        user_id,
-                        threepid['medium'],
-                        threepid['address'],
-                        threepid['validated_at'],
-                    )
-
-                    # And we add an email pusher for them by default, but only
-                    # if email notifications are enabled (so people don't start
-                    # getting mail spam where they weren't before if email
-                    # notifs are set up on a home server)
-                    if (
-                        self.hs.config.email_enable_notifs and
-                        self.hs.config.email_notif_for_new_users
-                    ):
-                        # Pull the ID of the access token back out of the db
-                        # It would really make more sense for this to be passed
-                        # up when the access token is saved, but that's quite an
-                        # invasive change I'd rather do separately.
-                        user_tuple = yield self.store.get_user_by_access_token(
-                            token
-                        )
-
-                        yield self.hs.get_pusherpool().add_pusher(
-                            user_id=user_id,
-                            access_token=user_tuple["token_id"],
-                            kind="email",
-                            app_id="m.email",
-                            app_display_name="Email Notifications",
-                            device_display_name=threepid["address"],
-                            pushkey=threepid["address"],
-                            lang=None,  # We don't know a user's language here
-                            data={},
-                        )
-
-            if 'bind_email' in params and params['bind_email']:
-                logger.info("bind_email specified: binding")
-
-                emailThreepid = result[LoginType.EMAIL_IDENTITY]
-                threepid_creds = emailThreepid['threepid_creds']
-                logger.debug("Binding emails %s to %s" % (
-                    emailThreepid, user_id
-                ))
-                yield self.identity_handler.bind_threepid(threepid_creds, user_id)
-            else:
-                logger.info("bind_email not specified: not binding email")
-
-        result = yield self._create_registration_details(user_id, token)
-        defer.returnValue((200, result))
+        defer.returnValue((200, return_dict))
 
     def on_OPTIONS(self, _):
         return 200, {}
 
     @defer.inlineCallbacks
-    def _do_appservice_registration(self, username, as_token):
-        (user_id, token) = yield self.registration_handler.appservice_register(
+    def _do_appservice_registration(self, username, as_token, body):
+        user_id = yield self.registration_handler.appservice_register(
             username, as_token
         )
-        defer.returnValue((yield self._create_registration_details(user_id, token)))
+        defer.returnValue((yield self._create_registration_details(user_id, body)))
 
     @defer.inlineCallbacks
-    def _do_shared_secret_registration(self, username, password, mac):
+    def _do_shared_secret_registration(self, username, password, body):
         if not self.hs.config.registration_shared_secret:
             raise SynapseError(400, "Shared secret registration is not enabled")
 
@@ -277,7 +268,7 @@ class RegisterRestServlet(RestServlet):
 
         # str() because otherwise hmac complains that 'unicode' does not
         # have the buffer interface
-        got_mac = str(mac)
+        got_mac = str(body["mac"])
 
         want_mac = hmac.new(
             key=self.hs.config.registration_shared_secret,
@@ -290,43 +281,132 @@ class RegisterRestServlet(RestServlet):
                 403, "HMAC incorrect",
             )
 
-        (user_id, token) = yield self.registration_handler.register(
-            localpart=username, password=password
+        (user_id, _) = yield self.registration_handler.register(
+            localpart=username, password=password, generate_token=False,
         )
-        defer.returnValue((yield self._create_registration_details(user_id, token)))
+
+        result = yield self._create_registration_details(user_id, body)
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def _create_registration_details(self, user_id, token):
-        refresh_token = yield self.auth_handler.issue_refresh_token(user_id)
+    def _register_email_threepid(self, user_id, threepid, token, bind_email):
+        """Add an email address as a 3pid identifier
+
+        Also adds an email pusher for the email address, if configured in the
+        HS config
+
+        Also optionally binds emails to the given user_id on the identity server
+
+        Args:
+            user_id (str): id of user
+            threepid (object): m.login.email.identity auth response
+            token (str): access_token for the user
+            bind_email (bool): true if the client requested the email to be
+                bound at the identity server
+        Returns:
+            defer.Deferred:
+        """
+        reqd = ('medium', 'address', 'validated_at')
+        if any(x not in threepid for x in reqd):
+            logger.info("Can't add incomplete 3pid")
+            defer.returnValue()
+
+        yield self.auth_handler.add_threepid(
+            user_id,
+            threepid['medium'],
+            threepid['address'],
+            threepid['validated_at'],
+        )
+
+        # And we add an email pusher for them by default, but only
+        # if email notifications are enabled (so people don't start
+        # getting mail spam where they weren't before if email
+        # notifs are set up on a home server)
+        if (self.hs.config.email_enable_notifs and
+                self.hs.config.email_notif_for_new_users):
+            # Pull the ID of the access token back out of the db
+            # It would really make more sense for this to be passed
+            # up when the access token is saved, but that's quite an
+            # invasive change I'd rather do separately.
+            user_tuple = yield self.store.get_user_by_access_token(
+                token
+            )
+            token_id = user_tuple["token_id"]
+
+            yield self.hs.get_pusherpool().add_pusher(
+                user_id=user_id,
+                access_token=token_id,
+                kind="email",
+                app_id="m.email",
+                app_display_name="Email Notifications",
+                device_display_name=threepid["address"],
+                pushkey=threepid["address"],
+                lang=None,  # We don't know a user's language here
+                data={},
+            )
+
+        if bind_email:
+            logger.info("bind_email specified: binding")
+            logger.debug("Binding emails %s to %s" % (
+                threepid, user_id
+            ))
+            yield self.identity_handler.bind_threepid(
+                threepid['threepid_creds'], user_id
+            )
+        else:
+            logger.info("bind_email not specified: not binding email")
+
+    @defer.inlineCallbacks
+    def _create_registration_details(self, user_id, params):
+        """Complete registration of newly-registered user
+
+        Allocates device_id if one was not given; also creates access_token
+        and refresh_token.
+
+        Args:
+            (str) user_id: full canonical @user:id
+            (object) params: registration parameters, from which we pull
+                device_id and initial_device_name
+        Returns:
+            defer.Deferred: (object) dictionary for response from /register
+        """
+        device_id = yield self._register_device(user_id, params)
+
+        access_token, refresh_token = (
+            yield self.auth_handler.get_login_tuple_for_user_id(
+                user_id, device_id=device_id,
+                initial_display_name=params.get("initial_device_display_name")
+            )
+        )
+
         defer.returnValue({
             "user_id": user_id,
-            "access_token": token,
+            "access_token": access_token,
             "home_server": self.hs.hostname,
             "refresh_token": refresh_token,
+            "device_id": device_id,
         })
 
-    @defer.inlineCallbacks
-    def onEmailTokenRequest(self, request):
-        body = parse_json_object_from_request(request)
+    def _register_device(self, user_id, params):
+        """Register a device for a user.
 
-        required = ['id_server', 'client_secret', 'email', 'send_attempt']
-        absent = []
-        for k in required:
-            if k not in body:
-                absent.append(k)
+        This is called after the user's credentials have been validated, but
+        before the access token has been issued.
 
-        if len(absent) > 0:
-            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
-
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
-            'email', body['email']
+        Args:
+            (str) user_id: full canonical @user:id
+            (object) params: registration parameters, from which we pull
+                device_id and initial_device_name
+        Returns:
+            defer.Deferred: (str) device_id
+        """
+        # register the user's device
+        device_id = params.get("device_id")
+        initial_display_name = params.get("initial_device_display_name")
+        device_id = self.device_handler.check_device_registered(
+            user_id, device_id, initial_display_name
         )
-
-        if existingUid is not None:
-            raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
-
-        ret = yield self.identity_handler.requestEmailToken(**body)
-        defer.returnValue((200, ret))
+        return device_id
 
     @defer.inlineCallbacks
     def _do_guest_registration(self):
@@ -336,7 +416,11 @@ class RegisterRestServlet(RestServlet):
             generate_token=False,
             make_guest=True
         )
-        access_token = self.auth_handler.generate_access_token(user_id, ["guest = true"])
+        access_token = self.auth_handler.generate_access_token(
+            user_id, ["guest = true"]
+        )
+        # XXX the "guest" caveat is not copied by /tokenrefresh. That's ok
+        # so long as we don't return a refresh_token here.
         defer.returnValue((200, {
             "user_id": user_id,
             "access_token": access_token,
@@ -345,4 +429,5 @@ class RegisterRestServlet(RestServlet):
 
 
 def register_servlets(hs, http_server):
+    RegisterRequestTokenRestServlet(hs).register(http_server)
     RegisterRestServlet(hs).register(http_server)

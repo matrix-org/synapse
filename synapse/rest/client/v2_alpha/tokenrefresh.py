@@ -38,10 +38,14 @@ class TokenRefreshRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
         try:
             old_refresh_token = body["refresh_token"]
-            auth_handler = self.hs.get_handlers().auth_handler
-            (user_id, new_refresh_token) = yield self.store.exchange_refresh_token(
-                old_refresh_token, auth_handler.generate_refresh_token)
-            new_access_token = yield auth_handler.issue_access_token(user_id)
+            auth_handler = self.hs.get_auth_handler()
+            refresh_result = yield self.store.exchange_refresh_token(
+                old_refresh_token, auth_handler.generate_refresh_token
+            )
+            (user_id, new_refresh_token, device_id) = refresh_result
+            new_access_token = yield auth_handler.issue_access_token(
+                user_id, device_id
+            )
             defer.returnValue((200, {
                 "access_token": new_access_token,
                 "refresh_token": new_refresh_token,

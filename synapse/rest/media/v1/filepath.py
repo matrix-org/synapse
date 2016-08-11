@@ -65,3 +65,9 @@ class MediaFilePaths(object):
             file_id[0:2], file_id[2:4], file_id[4:],
             file_name
         )
+
+    def remote_media_thumbnail_dir(self, server_name, file_id):
+        return os.path.join(
+            self.base_path, "remote_thumbnail", server_name,
+            file_id[0:2], file_id[2:4], file_id[4:],
+        )

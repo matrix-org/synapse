@@ -13,10 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
 
 from synapse.util.logcontext import LoggingContext
 import synapse.metrics
 
+from functools import wraps
 import logging
 
 
@@ -47,6 +49,18 @@ block_db_txn_duration = metrics.register_distribution(
 )
 
 
+def measure_func(name):
+    def wrapper(func):
+        @wraps(func)
+        @defer.inlineCallbacks
+        def measured_func(self, *args, **kwargs):
+            with Measure(self.clock, name):
+                r = yield func(self, *args, **kwargs)
+            defer.returnValue(r)
+        return measured_func
+    return wrapper
+
+
 class Measure(object):
     __slots__ = [
         "clock", "name", "start_context", "start", "new_context", "ru_utime",
@@ -64,7 +78,6 @@ class Measure(object):
         self.start = self.clock.time_msec()
         self.start_context = LoggingContext.current_context()
         if not self.start_context:
-            logger.warn("Entered Measure without log context: %s", self.name)
             self.start_context = LoggingContext("Measure")
             self.start_context.__enter__()
             self.created_context = True
@@ -84,8 +97,8 @@ class Measure(object):
 
         if context != self.start_context:
             logger.warn(
-                "Context have unexpectedly changed from '%s' to '%s'. (%r)",
-                context, self.start_context, self.name
+                "Context has unexpectedly changed from '%s' to '%s'. (%r)",
+                self.start_context, context, self.name
             )
             return
 

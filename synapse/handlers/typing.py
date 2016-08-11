@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 # A tiny object useful for storing a user's membership in a room, as a mapping
 # key
-RoomMember = namedtuple("RoomMember", ("room_id", "user"))
+RoomMember = namedtuple("RoomMember", ("room_id", "user_id"))
 
 
 class TypingHandler(object):
@@ -38,7 +38,7 @@ class TypingHandler(object):
         self.store = hs.get_datastore()
         self.server_name = hs.config.server_name
         self.auth = hs.get_auth()
-        self.is_mine = hs.is_mine
+        self.is_mine_id = hs.is_mine_id
         self.notifier = hs.get_notifier()
 
         self.clock = hs.get_clock()
@@ -67,20 +67,23 @@ class TypingHandler(object):
 
     @defer.inlineCallbacks
     def started_typing(self, target_user, auth_user, room_id, timeout):
-        if not self.is_mine(target_user):
+        target_user_id = target_user.to_string()
+        auth_user_id = auth_user.to_string()
+
+        if not self.is_mine_id(target_user_id):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
-        if target_user != auth_user:
+        if target_user_id != auth_user_id:
             raise AuthError(400, "Cannot set another user's typing state")
 
-        yield self.auth.check_joined_room(room_id, target_user.to_string())
+        yield self.auth.check_joined_room(room_id, target_user_id)
 
         logger.debug(
-            "%s has started typing in %s", target_user.to_string(), room_id
+            "%s has started typing in %s", target_user_id, room_id
         )
 
         until = self.clock.time_msec() + timeout
-        member = RoomMember(room_id=room_id, user=target_user)
+        member = RoomMember(room_id=room_id, user_id=target_user_id)
 
         was_present = member in self._member_typing_until
 
@@ -104,25 +107,28 @@ class TypingHandler(object):
 
         yield self._push_update(
             room_id=room_id,
-            user=target_user,
+            user_id=target_user_id,
             typing=True,
         )
 
     @defer.inlineCallbacks
     def stopped_typing(self, target_user, auth_user, room_id):
-        if not self.is_mine(target_user):
+        target_user_id = target_user.to_string()
+        auth_user_id = auth_user.to_string()
+
+        if not self.is_mine_id(target_user_id):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
-        if target_user != auth_user:
+        if target_user_id != auth_user_id:
             raise AuthError(400, "Cannot set another user's typing state")
 
-        yield self.auth.check_joined_room(room_id, target_user.to_string())
+        yield self.auth.check_joined_room(room_id, target_user_id)
 
         logger.debug(
-            "%s has stopped typing in %s", target_user.to_string(), room_id
+            "%s has stopped typing in %s", target_user_id, room_id
         )
 
-        member = RoomMember(room_id=room_id, user=target_user)
+        member = RoomMember(room_id=room_id, user_id=target_user_id)
 
         if member in self._member_typing_timer:
             self.clock.cancel_call_later(self._member_typing_timer[member])
@@ -132,8 +138,9 @@ class TypingHandler(object):
 
     @defer.inlineCallbacks
     def user_left_room(self, user, room_id):
-        if self.is_mine(user):
-            member = RoomMember(room_id=room_id, user=user)
+        user_id = user.to_string()
+        if self.is_mine_id(user_id):
+            member = RoomMember(room_id=room_id, user_id=user_id)
             yield self._stopped_typing(member)
 
     @defer.inlineCallbacks
@@ -144,7 +151,7 @@ class TypingHandler(object):
 
         yield self._push_update(
             room_id=member.room_id,
-            user=member.user,
+            user_id=member.user_id,
             typing=False,
         )
 
@@ -156,7 +163,7 @@ class TypingHandler(object):
             del self._member_typing_timer[member]
 
     @defer.inlineCallbacks
-    def _push_update(self, room_id, user, typing):
+    def _push_update(self, room_id, user_id, typing):
         domains = yield self.store.get_joined_hosts_for_room(room_id)
 
         deferreds = []
@@ -164,7 +171,7 @@ class TypingHandler(object):
             if domain == self.server_name:
                 self._push_update_local(
                     room_id=room_id,
-                    user=user,
+                    user_id=user_id,
                     typing=typing
                 )
             else:
@@ -173,7 +180,7 @@ class TypingHandler(object):
                     edu_type="m.typing",
                     content={
                         "room_id": room_id,
-                        "user_id": user.to_string(),
+                        "user_id": user_id,
                         "typing": typing,
                     },
                 ))
@@ -183,23 +190,26 @@ class TypingHandler(object):
     @defer.inlineCallbacks
     def _recv_edu(self, origin, content):
         room_id = content["room_id"]
-        user = UserID.from_string(content["user_id"])
+        user_id = content["user_id"]
+
+        # Check that the string is a valid user id
+        UserID.from_string(user_id)
 
         domains = yield self.store.get_joined_hosts_for_room(room_id)
 
         if self.server_name in domains:
             self._push_update_local(
                 room_id=room_id,
-                user=user,
+                user_id=user_id,
                 typing=content["typing"]
             )
 
-    def _push_update_local(self, room_id, user, typing):
+    def _push_update_local(self, room_id, user_id, typing):
         room_set = self._room_typing.setdefault(room_id, set())
         if typing:
-            room_set.add(user)
+            room_set.add(user_id)
         else:
-            room_set.discard(user)
+            room_set.discard(user_id)
 
         self._latest_room_serial += 1
         self._room_serials[room_id] = self._latest_room_serial
@@ -211,13 +221,14 @@ class TypingHandler(object):
 
     def get_all_typing_updates(self, last_id, current_id):
         # TODO: Work out a way to do this without scanning the entire state.
+        if last_id == current_id:
+            return []
+
         rows = []
         for room_id, serial in self._room_serials.items():
             if last_id < serial and serial <= current_id:
                 typing = self._room_typing[room_id]
-                typing_bytes = json.dumps([
-                    u.to_string() for u in typing
-                ], ensure_ascii=False)
+                typing_bytes = json.dumps(list(typing), ensure_ascii=False)
                 rows.append((serial, room_id, typing_bytes))
         rows.sort()
         return rows
@@ -239,7 +250,7 @@ class TypingNotificationEventSource(object):
             "type": "m.typing",
             "room_id": room_id,
             "content": {
-                "user_ids": [u.to_string() for u in typing],
+                "user_ids": list(typing),
             },
         }
 
