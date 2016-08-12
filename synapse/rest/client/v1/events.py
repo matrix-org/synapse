@@ -32,6 +32,10 @@ class EventStreamRestServlet(ClientV1RestServlet):
 
     DEFAULT_LONGPOLL_TIME_MS = 30000
 
+    def __init__(self, hs):
+        super(EventStreamRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+
     @defer.inlineCallbacks
     def on_GET(self, request):
         requester = yield self.auth.get_user_by_req(

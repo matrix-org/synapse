@@ -36,6 +36,10 @@ def register_servlets(hs, http_server):
 class ClientDirectoryServer(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/directory/room/(?P<room_alias>[^/]*)$")
 
+    def __init__(self, hs):
+        super(ClientDirectoryServer, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+
     @defer.inlineCallbacks
     def on_GET(self, request, room_alias):
         room_alias = RoomAlias.from_string(room_alias)
@@ -146,6 +150,7 @@ class ClientDirectoryListServer(ClientV1RestServlet):
     def __init__(self, hs):
         super(ClientDirectoryListServer, self).__init__(hs)
         self.store = hs.get_datastore()
+        self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
