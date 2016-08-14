@@ -70,11 +70,11 @@ class AuthHandler(BaseHandler):
             self.ldap_uri = hs.config.ldap_uri
             self.ldap_start_tls = hs.config.ldap_start_tls
             self.ldap_base = hs.config.ldap_base
-            self.ldap_filter = hs.config.ldap_filter
             self.ldap_attributes = hs.config.ldap_attributes
             if self.ldap_mode == LDAPMode.SEARCH:
                 self.ldap_bind_dn = hs.config.ldap_bind_dn
                 self.ldap_bind_password = hs.config.ldap_bind_password
+                self.ldap_filter = hs.config.ldap_filter
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.device_handler = hs.get_device_handler()
