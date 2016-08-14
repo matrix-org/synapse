@@ -660,7 +660,7 @@ class AuthHandler(BaseHandler):
                 else:
                     logger.warn(
                         "ldap registration failed: unexpected (%d!=1) amount of results",
-                        len(result)
+                        len(conn.response)
                     )
                     defer.returnValue(False)
 
