@@ -277,7 +277,6 @@ class RoomMemberStore(SQLBaseStore):
             user_id, membership_list=[Membership.JOIN],
         )
 
-    @defer.inlineCallbacks
     def forget(self, user_id, room_id):
         """Indicate that user_id wishes to discard history for room_id."""
         def f(txn):
@@ -292,10 +291,13 @@ class RoomMemberStore(SQLBaseStore):
                 "  room_id = ?"
             )
             txn.execute(sql, (user_id, room_id))
-        yield self.runInteraction("forget_membership", f)
-        self.was_forgotten_at.invalidate_all()
-        self.who_forgot_in_room.invalidate_all()
-        self.did_forget.invalidate((user_id, room_id))
+
+            txn.call_after(self.was_forgotten_at.invalidate_all)
+            txn.call_after(self.did_forget.invalidate, (user_id, room_id))
+            self._invalidate_cache_and_stream(
+                txn, self.who_forgot_in_room, (room_id,)
+            )
+        return self.runInteraction("forget_membership", f)
 
     @cachedInlineCallbacks(num_args=2)
     def did_forget(self, user_id, room_id):

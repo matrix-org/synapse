@@ -861,6 +861,24 @@ class SQLBaseStore(object):
 
         return cache, min_val
 
+    def _invalidate_cache_and_stream(self, txn, cache_func, keys):
+        txn.call_after(cache_func.invalidate, keys)
+
+        ctx = self._cache_id_gen.get_next()
+        stream_id = ctx.__enter__()
+        txn.call_after(ctx.__exit__, None, None, None)
+
+        self._simple_insert_txn(
+            txn,
+            table="cache_stream",
+            values={
+                "stream_id": stream_id,
+                "cache_func": cache_func.__name__,
+                "keys": list(keys),
+                "invalidation_ts": self.clock.time_msec(),
+            }
+        )
+
 
 class _RollbackButIsFineException(Exception):
     """ This exception is used to rollback a transaction without implying

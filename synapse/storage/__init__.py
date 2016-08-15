@@ -122,6 +122,9 @@ class DataStore(RoomMemberStore, RoomStore,
             db_conn, "pushers", "id",
             extra_tables=[("deleted_pushers", "stream_id")],
         )
+        self._cache_id_gen = StreamIdGenerator(
+            db_conn, "cache_stream", "stream_id",
+        )
 
         events_max = self._stream_id_gen.get_current_token()
         event_cache_prefill, min_event_val = self._get_cache_dict(
