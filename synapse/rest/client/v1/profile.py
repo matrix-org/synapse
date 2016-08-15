@@ -24,6 +24,10 @@ from synapse.http.servlet import parse_json_object_from_request
 class ProfileDisplaynameRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)/displayname")
 
+    def __init__(self, hs):
+        super(ProfileDisplaynameRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         user = UserID.from_string(user_id)
@@ -62,6 +66,10 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
 class ProfileAvatarURLRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)/avatar_url")
 
+    def __init__(self, hs):
+        super(ProfileAvatarURLRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         user = UserID.from_string(user_id)
@@ -98,6 +106,10 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
 
 class ProfileRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)")
+
+    def __init__(self, hs):
+        super(ProfileRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):

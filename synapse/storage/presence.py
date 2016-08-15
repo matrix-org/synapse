@@ -189,18 +189,30 @@ class PresenceStore(SQLBaseStore):
             desc="add_presence_list_pending",
         )
 
-    @defer.inlineCallbacks
     def set_presence_list_accepted(self, observer_localpart, observed_userid):
-        result = yield self._simple_update_one(
-            table="presence_list",
-            keyvalues={"user_id": observer_localpart,
-                       "observed_user_id": observed_userid},
-            updatevalues={"accepted": True},
-            desc="set_presence_list_accepted",
+        def update_presence_list_txn(txn):
+            result = self._simple_update_one_txn(
+                txn,
+                table="presence_list",
+                keyvalues={
+                    "user_id": observer_localpart,
+                    "observed_user_id": observed_userid
+                },
+                updatevalues={"accepted": True},
+            )
+
+            self._invalidate_cache_and_stream(
+                txn, self.get_presence_list_accepted, (observer_localpart,)
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_presence_list_observers_accepted, (observed_userid,)
+            )
+
+            return result
+
+        return self.runInteraction(
+            "set_presence_list_accepted", update_presence_list_txn,
         )
-        self.get_presence_list_accepted.invalidate((observer_localpart,))
-        self.get_presence_list_observers_accepted.invalidate((observed_userid,))
-        defer.returnValue(result)
 
     def get_presence_list(self, observer_localpart, accepted=None):
         if accepted:

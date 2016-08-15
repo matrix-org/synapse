@@ -32,6 +32,10 @@ class EventStreamRestServlet(ClientV1RestServlet):
 
     DEFAULT_LONGPOLL_TIME_MS = 30000
 
+    def __init__(self, hs):
+        super(EventStreamRestServlet, self).__init__(hs)
+        self.event_stream_handler = hs.get_event_stream_handler()
+
     @defer.inlineCallbacks
     def on_GET(self, request):
         requester = yield self.auth.get_user_by_req(
@@ -46,7 +50,6 @@ class EventStreamRestServlet(ClientV1RestServlet):
         if "room_id" in request.args:
             room_id = request.args["room_id"][0]
 
-        handler = self.handlers.event_stream_handler
         pagin_config = PaginationConfig.from_request(request)
         timeout = EventStreamRestServlet.DEFAULT_LONGPOLL_TIME_MS
         if "timeout" in request.args:
@@ -57,7 +60,7 @@ class EventStreamRestServlet(ClientV1RestServlet):
 
         as_client_event = "raw" not in request.args
 
-        chunk = yield handler.get_stream(
+        chunk = yield self.event_stream_handler.get_stream(
             requester.user.to_string(),
             pagin_config,
             timeout=timeout,
@@ -80,12 +83,12 @@ class EventRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(EventRestServlet, self).__init__(hs)
         self.clock = hs.get_clock()
+        self.event_handler = hs.get_event_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, event_id):
         requester = yield self.auth.get_user_by_req(request)
-        handler = self.handlers.event_handler
-        event = yield handler.get_event(requester.user, event_id)
+        event = yield self.event_handler.get_event(requester.user, event_id)
 
         time_now = self.clock.time_msec()
         if event:
