@@ -863,6 +863,13 @@ class SQLBaseStore(object):
         return cache, min_val
 
     def _invalidate_cache_and_stream(self, txn, cache_func, keys):
+        """Invalidates the cache and adds it to the cache stream so slaves
+        will know to invalidate their caches.
+
+        This should only be used to invalidate caches where slaves won't
+        otherwise know from other replication streams that the cache should
+        be invalidated.
+        """
         txn.call_after(cache_func.invalidate, keys)
 
         if isinstance(self.database_engine, PostgresEngine):
@@ -872,7 +879,7 @@ class SQLBaseStore(object):
 
             self._simple_insert_txn(
                 txn,
-                table="cache_stream",
+                table="cache_invalidation_stream",
                 values={
                     "stream_id": stream_id,
                     "cache_func": cache_func.__name__,
@@ -887,7 +894,8 @@ class SQLBaseStore(object):
             # send across cache invalidations as quickly as possible. Cache
             # invalidations are idempotent, so duplicates are fine.
             sql = (
-                "SELECT stream_id, cache_func, keys, invalidation_ts FROM cache_stream"
+                "SELECT stream_id, cache_func, keys, invalidation_ts"
+                " FROM cache_invalidation_stream"
                 " WHERE stream_id > ? ORDER BY stream_id ASC LIMIT ?"
             )
             txn.execute(sql, (last_id, limit,))

@@ -126,7 +126,7 @@ class DataStore(RoomMemberStore, RoomStore,
 
         if isinstance(self.database_engine, PostgresEngine):
             self._cache_id_gen = StreamIdGenerator(
-                db_conn, "cache_stream", "stream_id",
+                db_conn, "cache_invalidation_stream", "stream_id",
             )
         else:
             self._cache_id_gen = None

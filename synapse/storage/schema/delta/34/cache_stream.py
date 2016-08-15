@@ -20,15 +20,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# This stream is used to notify replication slaves that some caches have
+# been invalidated that they cannot infer from the other streams.
 CREATE_TABLE = """
-CREATE TABLE cache_stream (
+CREATE TABLE cache_invalidation_stream (
     stream_id       BIGINT,
     cache_func      TEXT,
     keys            TEXT[],
     invalidation_ts BIGINT
 );
 
-CREATE INDEX cache_stream_id ON cache_stream(stream_id);
+CREATE INDEX cache_invalidation_stream_id ON cache_invalidation_stream(stream_id);
 """
 
 
