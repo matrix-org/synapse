@@ -75,11 +75,6 @@ class SynchrotronSlavedStore(
     BaseSlavedStore,
     ClientIpStore,  # After BaseSlavedStore because the constructor is different
 ):
-    # XXX: This is a bit broken because we don't persist forgotten rooms
-    # in a way that they can be streamed. This means that we don't have a
-    # way to invalidate the forgotten rooms cache correctly.
-    # For now we expire the cache every 10 minutes.
-    BROKEN_CACHE_EXPIRY_MS = 60 * 60 * 1000
     who_forgot_in_room = (
         RoomMemberStore.__dict__["who_forgot_in_room"]
     )
