@@ -51,6 +51,6 @@ class BaseSlavedStore(SQLBaseStore):
                 try:
                     getattr(self, cache_func).invalidate(tuple(keys))
                 except AttributeError:
-                    logger.warn("Got unexpected cache_func: %r", cache_func)
+                    logger.info("Got unexpected cache_func: %r", cache_func)
             self._cache_id_gen.advance(int(stream["position"]))
         return defer.succeed(None)
