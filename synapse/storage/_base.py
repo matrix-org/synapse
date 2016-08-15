@@ -305,13 +305,14 @@ class SQLBaseStore(object):
                     func, *args, **kwargs
                 )
 
-        with PreserveLoggingContext():
-            result = yield self._db_pool.runWithConnection(
-                inner_func, *args, **kwargs
-            )
-
-        for after_callback, after_args in after_callbacks:
-            after_callback(*after_args)
+        try:
+            with PreserveLoggingContext():
+                result = yield self._db_pool.runWithConnection(
+                    inner_func, *args, **kwargs
+                )
+        finally:
+            for after_callback, after_args in after_callbacks:
+                after_callback(*after_args)
         defer.returnValue(result)
 
     @defer.inlineCallbacks
