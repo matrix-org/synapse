@@ -873,6 +873,10 @@ class SQLBaseStore(object):
         txn.call_after(cache_func.invalidate, keys)
 
         if isinstance(self.database_engine, PostgresEngine):
+            # get_next() returns a context manager which is designed to wrap
+            # the transaction. However, we want to only get an ID when we want
+            # to use it, here, so we need to call __enter__ manually, and have
+            # __exit__ called after the transaction finishes.
             ctx = self._cache_id_gen.get_next()
             stream_id = ctx.__enter__()
             txn.call_after(ctx.__exit__, None, None, None)
