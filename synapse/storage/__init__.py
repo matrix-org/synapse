@@ -50,6 +50,7 @@ from .openid import OpenIdStore
 from .client_ips import ClientIpStore
 
 from .util.id_generators import IdGenerator, StreamIdGenerator, ChainedIdGenerator
+from .engines import PostgresEngine
 
 from synapse.api.constants import PresenceState
 from synapse.util.caches.stream_change_cache import StreamChangeCache
@@ -122,9 +123,13 @@ class DataStore(RoomMemberStore, RoomStore,
             db_conn, "pushers", "id",
             extra_tables=[("deleted_pushers", "stream_id")],
         )
-        self._cache_id_gen = StreamIdGenerator(
-            db_conn, "cache_stream", "stream_id",
-        )
+
+        if isinstance(self.database_engine, PostgresEngine):
+            self._cache_id_gen = StreamIdGenerator(
+                db_conn, "cache_stream", "stream_id",
+            )
+        else:
+            self._cache_id_gen = None
 
         events_max = self._stream_id_gen.get_current_token()
         event_cache_prefill, min_event_val = self._get_cache_dict(

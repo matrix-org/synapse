@@ -19,6 +19,7 @@ from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.caches.dictionary_cache import DictionaryCache
 from synapse.util.caches.descriptors import Cache
 from synapse.util.caches import intern_dict
+from synapse.storage.engines import PostgresEngine
 import synapse.metrics
 
 
@@ -864,20 +865,42 @@ class SQLBaseStore(object):
     def _invalidate_cache_and_stream(self, txn, cache_func, keys):
         txn.call_after(cache_func.invalidate, keys)
 
-        ctx = self._cache_id_gen.get_next()
-        stream_id = ctx.__enter__()
-        txn.call_after(ctx.__exit__, None, None, None)
+        if isinstance(self.database_engine, PostgresEngine):
+            ctx = self._cache_id_gen.get_next()
+            stream_id = ctx.__enter__()
+            txn.call_after(ctx.__exit__, None, None, None)
 
-        self._simple_insert_txn(
-            txn,
-            table="cache_stream",
-            values={
-                "stream_id": stream_id,
-                "cache_func": cache_func.__name__,
-                "keys": list(keys),
-                "invalidation_ts": self.clock.time_msec(),
-            }
+            self._simple_insert_txn(
+                txn,
+                table="cache_stream",
+                values={
+                    "stream_id": stream_id,
+                    "cache_func": cache_func.__name__,
+                    "keys": list(keys),
+                    "invalidation_ts": self.clock.time_msec(),
+                }
+            )
+
+    def get_all_updated_caches(self, last_id, current_id, limit):
+        def get_all_updated_caches_txn(txn):
+            # We purposefully don't bound by the current token, as we want to
+            # send across cache invalidations as quickly as possible. Cache
+            # invalidations are idempotent, so duplicates are fine.
+            sql = (
+                "SELECT stream_id, cache_func, keys, invalidation_ts FROM cache_stream"
+                " WHERE stream_id > ? ORDER BY stream_id ASC LIMIT ?"
+            )
+            txn.execute(sql, (last_id, limit,))
+            return txn.fetchall()
+        return self.runInteraction(
+            "get_all_updated_caches", get_all_updated_caches_txn
         )
+
+    def get_cache_stream_token(self):
+        if self._cache_id_gen:
+            return self._cache_id_gen.get_current_token()
+        else:
+            return 0
 
 
 class _RollbackButIsFineException(Exception):
