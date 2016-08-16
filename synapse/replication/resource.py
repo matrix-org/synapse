@@ -390,7 +390,7 @@ class ReplicationResource(Resource):
 
         caches = request_streams.get("caches")
 
-        if caches is not None:
+        if caches is not None and current_position != caches:
             updated_caches = yield self.store.get_all_updated_caches(
                 caches, current_position, limit
             )
