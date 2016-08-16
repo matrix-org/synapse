@@ -600,7 +600,8 @@ class EventsStore(SQLBaseStore):
                 "rejections",
                 "redactions",
                 "room_memberships",
-                "state_events"
+                "state_events",
+                "topics"
             ):
                 txn.executemany(
                     "DELETE FROM %s WHERE event_id = ?" % (table,),
