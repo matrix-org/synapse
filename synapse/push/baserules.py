@@ -222,7 +222,7 @@ BASE_APPEND_OVERRIDE_RULES = [
     # way a room rule is lower priority than both but a custom override rule
     # is higher priority than both.
     {
-        'rule_id': 'global/underride/.m.rule.contains_display_name',
+        'rule_id': 'global/override/.m.rule.contains_display_name',
         'conditions': [
             {
                 'kind': 'contains_display_name'
