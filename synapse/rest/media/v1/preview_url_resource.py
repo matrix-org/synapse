@@ -29,14 +29,13 @@ from synapse.http.server import (
 from synapse.util.async import ObservableDeferred
 from synapse.util.stringutils import is_ascii
 
-from copy import deepcopy
-
 import os
 import re
 import fnmatch
 import cgi
 import ujson as json
 import urlparse
+import itertools
 
 import logging
 logger = logging.getLogger(__name__)
@@ -442,8 +441,6 @@ def _iterate_over_text(tree, *tags_to_ignore):
     """Iterate over the tree returning text nodes in a depth first fashion,
     skipping text nodes inside certain tags.
     """
-    import itertools
-
     # This is basically a stack that we extend using itertools.chain.
     # This will either consist of an element to iterate over *or* a string
     # to be returned.
