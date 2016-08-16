@@ -15,7 +15,9 @@
 
 from . import unittest
 
-from synapse.rest.media.v1.preview_url_resource import summarize_paragraphs
+from synapse.rest.media.v1.preview_url_resource import (
+    summarize_paragraphs, decode_and_calc_og
+)
 
 
 class PreviewTestCase(unittest.TestCase):
@@ -137,3 +139,79 @@ class PreviewTestCase(unittest.TestCase):
             " of old wooden houses in Northern Norway, the oldest house dating from"
             " 1789. The Arctic Cathedral, a modern church…"
         )
+
+
+class PreviewUrlTestCase(unittest.TestCase):
+    def test_simple(self):
+        html = """
+        <html>
+        <head><title>Foo</title></head>
+        <body>
+        Some text.
+        </body>
+        </html>
+        """
+
+        og = decode_and_calc_og(html, "http://example.com/test.html")
+
+        self.assertEquals(og, {
+            "og:title": "Foo",
+            "og:description": "Some text."
+        })
+
+    def test_comment(self):
+        html = """
+        <html>
+        <head><title>Foo</title></head>
+        <body>
+        <!-- HTML comment -->
+        Some text.
+        </body>
+        </html>
+        """
+
+        og = decode_and_calc_og(html, "http://example.com/test.html")
+
+        self.assertEquals(og, {
+            "og:title": "Foo",
+            "og:description": "Some text."
+        })
+
+    def test_comment2(self):
+        html = """
+        <html>
+        <head><title>Foo</title></head>
+        <body>
+        Some text.
+        <!-- HTML comment -->
+        Some more text.
+        <p>Text</p>
+        More text
+        </body>
+        </html>
+        """
+
+        og = decode_and_calc_og(html, "http://example.com/test.html")
+
+        self.assertEquals(og, {
+            "og:title": "Foo",
+            "og:description": "Some text.\n\nSome more text.\n\nText\n\nMore text"
+        })
+
+    def test_script(self):
+        html = """
+        <html>
+        <head><title>Foo</title></head>
+        <body>
+        <script> (function() {})() </script>
+        Some text.
+        </body>
+        </html>
+        """
+
+        og = decode_and_calc_og(html, "http://example.com/test.html")
+
+        self.assertEquals(og, {
+            "og:title": "Foo",
+            "og:description": "Some text."
+        })
