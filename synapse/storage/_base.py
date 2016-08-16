@@ -880,6 +880,7 @@ class SQLBaseStore(object):
             ctx = self._cache_id_gen.get_next()
             stream_id = ctx.__enter__()
             txn.call_after(ctx.__exit__, None, None, None)
+            txn.call_after(self.hs.get_notifier().on_new_replication_data)
 
             self._simple_insert_txn(
                 txn,
