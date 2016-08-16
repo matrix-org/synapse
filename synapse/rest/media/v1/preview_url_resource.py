@@ -163,7 +163,7 @@ class PreviewUrlResource(Resource):
 
         logger.debug("got media_info of '%s'" % media_info)
 
-        if self._is_media(media_info['media_type']):
+        if _is_media(media_info['media_type']):
             dims = yield self.media_repo._generate_local_thumbnails(
                 media_info['filesystem_id'], media_info
             )
@@ -184,10 +184,8 @@ class PreviewUrlResource(Resource):
                 logger.warn("Couldn't get dims for %s" % url)
 
             # define our OG response for this media
-        elif self._is_html(media_info['media_type']):
+        elif _is_html(media_info['media_type']):
             # TODO: somehow stop a big HTML tree from exploding synapse's RAM
-
-            from lxml import etree
 
             file = open(media_info['filename'])
             body = file.read()
@@ -199,17 +197,35 @@ class PreviewUrlResource(Resource):
             match = re.match(r'.*; *charset=(.*?)(;|$)', media_info['media_type'], re.I)
             encoding = match.group(1) if match else "utf-8"
 
-            try:
-                parser = etree.HTMLParser(recover=True, encoding=encoding)
-                tree = etree.fromstring(body, parser)
-                og = yield self._calc_og(tree, media_info, requester)
-            except UnicodeDecodeError:
-                # blindly try decoding the body as utf-8, which seems to fix
-                # the charset mismatches on https://google.com
-                parser = etree.HTMLParser(recover=True, encoding=encoding)
-                tree = etree.fromstring(body.decode('utf-8', 'ignore'), parser)
-                og = yield self._calc_og(tree, media_info, requester)
+            og = decode_and_calc_og(body, media_info['uri'], encoding)
 
+            # pre-cache the image for posterity
+            # FIXME: it might be cleaner to use the same flow as the main /preview_url
+            # request itself and benefit from the same caching etc.  But for now we
+            # just rely on the caching on the master request to speed things up.
+            if 'og:image' in og and og['og:image']:
+                image_info = yield self._download_url(
+                    _rebase_url(og['og:image'], media_info['uri']), requester.user
+                )
+
+                if _is_media(image_info['media_type']):
+                    # TODO: make sure we don't choke on white-on-transparent images
+                    dims = yield self.media_repo._generate_local_thumbnails(
+                        image_info['filesystem_id'], image_info
+                    )
+                    if dims:
+                        og["og:image:width"] = dims['width']
+                        og["og:image:height"] = dims['height']
+                    else:
+                        logger.warn("Couldn't get dims for %s" % og["og:image"])
+
+                    og["og:image"] = "mxc://%s/%s" % (
+                        self.server_name, image_info['filesystem_id']
+                    )
+                    og["og:image:type"] = image_info['media_type']
+                    og["matrix:image:size"] = image_info['media_length']
+                else:
+                    del og["og:image"]
         else:
             logger.warn("Failed to find any OG data in %s", url)
             og = {}
@@ -231,139 +247,6 @@ class PreviewUrlResource(Resource):
         )
 
         respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
-
-    @defer.inlineCallbacks
-    def _calc_og(self, tree, media_info, requester):
-        # suck our tree into lxml and define our OG response.
-
-        # if we see any image URLs in the OG response, then spider them
-        # (although the client could choose to do this by asking for previews of those
-        # URLs to avoid DoSing the server)
-
-        # "og:type"         : "video",
-        # "og:url"          : "https://www.youtube.com/watch?v=LXDBoHyjmtw",
-        # "og:site_name"    : "YouTube",
-        # "og:video:type"   : "application/x-shockwave-flash",
-        # "og:description"  : "Fun stuff happening here",
-        # "og:title"        : "RemoteJam - Matrix team hack for Disrupt Europe Hackathon",
-        # "og:image"        : "https://i.ytimg.com/vi/LXDBoHyjmtw/maxresdefault.jpg",
-        # "og:video:url"    : "http://www.youtube.com/v/LXDBoHyjmtw?version=3&autohide=1",
-        # "og:video:width"  : "1280"
-        # "og:video:height" : "720",
-        # "og:video:secure_url": "https://www.youtube.com/v/LXDBoHyjmtw?version=3",
-
-        og = {}
-        for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
-            if 'content' in tag.attrib:
-                og[tag.attrib['property']] = tag.attrib['content']
-
-        # TODO: grab article: meta tags too, e.g.:
-
-        # "article:publisher" : "https://www.facebook.com/thethudonline" />
-        # "article:author" content="https://www.facebook.com/thethudonline" />
-        # "article:tag" content="baby" />
-        # "article:section" content="Breaking News" />
-        # "article:published_time" content="2016-03-31T19:58:24+00:00" />
-        # "article:modified_time" content="2016-04-01T18:31:53+00:00" />
-
-        if 'og:title' not in og:
-            # do some basic spidering of the HTML
-            title = tree.xpath("(//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1]")
-            og['og:title'] = title[0].text.strip() if title else None
-
-        if 'og:image' not in og:
-            # TODO: extract a favicon failing all else
-            meta_image = tree.xpath(
-                "//*/meta[translate(@itemprop, 'IMAGE', 'image')='image']/@content"
-            )
-            if meta_image:
-                og['og:image'] = self._rebase_url(meta_image[0], media_info['uri'])
-            else:
-                # TODO: consider inlined CSS styles as well as width & height attribs
-                images = tree.xpath("//img[@src][number(@width)>10][number(@height)>10]")
-                images = sorted(images, key=lambda i: (
-                    -1 * float(i.attrib['width']) * float(i.attrib['height'])
-                ))
-                if not images:
-                    images = tree.xpath("//img[@src]")
-                if images:
-                    og['og:image'] = images[0].attrib['src']
-
-        # pre-cache the image for posterity
-        # FIXME: it might be cleaner to use the same flow as the main /preview_url
-        # request itself and benefit from the same caching etc.  But for now we
-        # just rely on the caching on the master request to speed things up.
-        if 'og:image' in og and og['og:image']:
-            image_info = yield self._download_url(
-                self._rebase_url(og['og:image'], media_info['uri']), requester.user
-            )
-
-            if self._is_media(image_info['media_type']):
-                # TODO: make sure we don't choke on white-on-transparent images
-                dims = yield self.media_repo._generate_local_thumbnails(
-                    image_info['filesystem_id'], image_info
-                )
-                if dims:
-                    og["og:image:width"] = dims['width']
-                    og["og:image:height"] = dims['height']
-                else:
-                    logger.warn("Couldn't get dims for %s" % og["og:image"])
-
-                og["og:image"] = "mxc://%s/%s" % (
-                    self.server_name, image_info['filesystem_id']
-                )
-                og["og:image:type"] = image_info['media_type']
-                og["matrix:image:size"] = image_info['media_length']
-            else:
-                del og["og:image"]
-
-        if 'og:description' not in og:
-            meta_description = tree.xpath(
-                "//*/meta"
-                "[translate(@name, 'DESCRIPTION', 'description')='description']"
-                "/@content")
-            if meta_description:
-                og['og:description'] = meta_description[0]
-            else:
-                # grab any text nodes which are inside the <body/> tag...
-                # unless they are within an HTML5 semantic markup tag...
-                # <header/>, <nav/>, <aside/>, <footer/>
-                # ...or if they are within a <script/> or <style/> tag.
-                # This is a very very very coarse approximation to a plain text
-                # render of the page.
-
-                # We don't just use XPATH here as that is slow on some machines.
-
-                # We clone `tree` as we modify it.
-                cloned_tree = deepcopy(tree.find("body"))
-
-                TAGS_TO_REMOVE = ("header", "nav", "aside", "footer", "script", "style",)
-                for el in cloned_tree.iter(TAGS_TO_REMOVE):
-                    el.getparent().remove(el)
-
-                # Split all the text nodes into paragraphs (by splitting on new
-                # lines)
-                text_nodes = (
-                    re.sub(r'\s+', '\n', el.text).strip()
-                    for el in cloned_tree.iter()
-                    if el.text and isinstance(el.tag, basestring)  # Removes comments
-                )
-                og['og:description'] = summarize_paragraphs(text_nodes)
-
-        # TODO: delete the url downloads to stop diskfilling,
-        # as we only ever cared about its OG
-        defer.returnValue(og)
-
-    def _rebase_url(self, url, base):
-        base = list(urlparse.urlparse(base))
-        url = list(urlparse.urlparse(url))
-        if not url[0]:  # fix up schema
-            url[0] = base[0] or "http"
-        if not url[1]:  # fix up hostname
-            url[1] = base[1]
-            if not url[2].startswith('/'):
-                url[2] = re.sub(r'/[^/]+$', '/', base[2]) + url[2]
-        return urlparse.urlunparse(url)
 
     @defer.inlineCallbacks
     def _download_url(self, url, user):
@@ -445,17 +328,173 @@ class PreviewUrlResource(Resource):
             "etag": headers["ETag"][0] if "ETag" in headers else None,
         })
 
-    def _is_media(self, content_type):
-        if content_type.lower().startswith("image/"):
-            return True
 
-    def _is_html(self, content_type):
-        content_type = content_type.lower()
-        if (
-            content_type.startswith("text/html") or
-            content_type.startswith("application/xhtml")
-        ):
-            return True
+def decode_and_calc_og(body, media_uri, request_encoding=None):
+    from lxml import etree
+
+    try:
+        parser = etree.HTMLParser(recover=True, encoding=request_encoding)
+        tree = etree.fromstring(body, parser)
+        og = _calc_og(tree, media_uri)
+    except UnicodeDecodeError:
+        # blindly try decoding the body as utf-8, which seems to fix
+        # the charset mismatches on https://google.com
+        parser = etree.HTMLParser(recover=True, encoding=request_encoding)
+        tree = etree.fromstring(body.decode('utf-8', 'ignore'), parser)
+        og = _calc_og(tree, media_uri)
+
+    return og
+
+
+def _calc_og(tree, media_uri):
+    # suck our tree into lxml and define our OG response.
+
+    # if we see any image URLs in the OG response, then spider them
+    # (although the client could choose to do this by asking for previews of those
+    # URLs to avoid DoSing the server)
+
+    # "og:type"         : "video",
+    # "og:url"          : "https://www.youtube.com/watch?v=LXDBoHyjmtw",
+    # "og:site_name"    : "YouTube",
+    # "og:video:type"   : "application/x-shockwave-flash",
+    # "og:description"  : "Fun stuff happening here",
+    # "og:title"        : "RemoteJam - Matrix team hack for Disrupt Europe Hackathon",
+    # "og:image"        : "https://i.ytimg.com/vi/LXDBoHyjmtw/maxresdefault.jpg",
+    # "og:video:url"    : "http://www.youtube.com/v/LXDBoHyjmtw?version=3&autohide=1",
+    # "og:video:width"  : "1280"
+    # "og:video:height" : "720",
+    # "og:video:secure_url": "https://www.youtube.com/v/LXDBoHyjmtw?version=3",
+
+    og = {}
+    for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
+        if 'content' in tag.attrib:
+            og[tag.attrib['property']] = tag.attrib['content']
+
+    # TODO: grab article: meta tags too, e.g.:
+
+    # "article:publisher" : "https://www.facebook.com/thethudonline" />
+    # "article:author" content="https://www.facebook.com/thethudonline" />
+    # "article:tag" content="baby" />
+    # "article:section" content="Breaking News" />
+    # "article:published_time" content="2016-03-31T19:58:24+00:00" />
+    # "article:modified_time" content="2016-04-01T18:31:53+00:00" />
+
+    if 'og:title' not in og:
+        # do some basic spidering of the HTML
+        title = tree.xpath("(//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1]")
+        og['og:title'] = title[0].text.strip() if title else None
+
+    if 'og:image' not in og:
+        # TODO: extract a favicon failing all else
+        meta_image = tree.xpath(
+            "//*/meta[translate(@itemprop, 'IMAGE', 'image')='image']/@content"
+        )
+        if meta_image:
+            og['og:image'] = _rebase_url(meta_image[0], media_uri)
+        else:
+            # TODO: consider inlined CSS styles as well as width & height attribs
+            images = tree.xpath("//img[@src][number(@width)>10][number(@height)>10]")
+            images = sorted(images, key=lambda i: (
+                -1 * float(i.attrib['width']) * float(i.attrib['height'])
+            ))
+            if not images:
+                images = tree.xpath("//img[@src]")
+            if images:
+                og['og:image'] = images[0].attrib['src']
+
+    if 'og:description' not in og:
+        meta_description = tree.xpath(
+            "//*/meta"
+            "[translate(@name, 'DESCRIPTION', 'description')='description']"
+            "/@content")
+        if meta_description:
+            og['og:description'] = meta_description[0]
+        else:
+            # grab any text nodes which are inside the <body/> tag...
+            # unless they are within an HTML5 semantic markup tag...
+            # <header/>, <nav/>, <aside/>, <footer/>
+            # ...or if they are within a <script/> or <style/> tag.
+            # This is a very very very coarse approximation to a plain text
+            # render of the page.
+
+            # We don't just use XPATH here as that is slow on some machines.
+
+            from lxml import etree
+
+            TAGS_TO_REMOVE = (
+                "header", "nav", "aside", "footer", "script", "style", etree.Comment
+            )
+
+            # Split all the text nodes into paragraphs (by splitting on new
+            # lines)
+            text_nodes = (
+                re.sub(r'\s+', '\n', el).strip()
+                for el in _iterate_over_text(tree.find("body"), *TAGS_TO_REMOVE)
+            )
+            og['og:description'] = summarize_paragraphs(text_nodes)
+
+    # TODO: delete the url downloads to stop diskfilling,
+    # as we only ever cared about its OG
+    return og
+
+
+def _iterate_over_text(tree, *tags_to_ignore):
+    """Iterate over the tree returning text nodes in a depth first fashion,
+    skipping text nodes inside certain tags.
+    """
+    import itertools
+
+    # This is basically a stack that we extend using itertools.chain.
+    # This will either consist of an element to iterate over *or* a string
+    # to be returned.
+    elements = iter([tree])
+    while True:
+        el = elements.next()
+        if isinstance(el, basestring):
+            yield el
+        elif el.tag not in tags_to_ignore:
+            # el.text is the text before the first child, so we can immediately
+            # return it if the text exists.
+            if el.text:
+                yield el.text
+
+            # We add to the stack all the elements children, interspersed with
+            # each child's tail text (if it exists). The tail text of a node
+            # is text that comes *after* the node, so we always include it even
+            # if we ignore the child node.
+            elements = itertools.chain(
+                itertools.chain.from_iterable(  # Basically a flatmap
+                    [child, child.tail] if child.tail else [child]
+                    for child in el.iterchildren()
+                ),
+                elements
+            )
+
+
+def _rebase_url(url, base):
+    base = list(urlparse.urlparse(base))
+    url = list(urlparse.urlparse(url))
+    if not url[0]:  # fix up schema
+        url[0] = base[0] or "http"
+    if not url[1]:  # fix up hostname
+        url[1] = base[1]
+        if not url[2].startswith('/'):
+            url[2] = re.sub(r'/[^/]+$', '/', base[2]) + url[2]
+    return urlparse.urlunparse(url)
+
+
+def _is_media(content_type):
+    if content_type.lower().startswith("image/"):
+        return True
+
+
+def _is_html(content_type):
+    content_type = content_type.lower()
+    if (
+        content_type.startswith("text/html") or
+        content_type.startswith("application/xhtml")
+    ):
+        return True
 
 
 def summarize_paragraphs(text_nodes, min_size=200, max_size=500):
