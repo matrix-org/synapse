@@ -17,6 +17,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.appservice import ApplicationService
+from synapse.util.metrics import Measure
 
 import logging
 
@@ -42,6 +43,7 @@ class ApplicationServicesHandler(object):
         self.appservice_api = hs.get_application_service_api()
         self.scheduler = hs.get_application_service_scheduler()
         self.started_scheduler = False
+        self.clock = hs.get_clock()
 
     @defer.inlineCallbacks
     def notify_interested_services(self, event):
@@ -53,25 +55,26 @@ class ApplicationServicesHandler(object):
         Args:
             event(Event): The event to push out to interested services.
         """
-        # Gather interested services
-        services = yield self._get_services_for_event(event)
-        if len(services) == 0:
-            return  # no services need notifying
+        with Measure(self.clock, "notify_interested_services"):
+            # Gather interested services
+            services = yield self._get_services_for_event(event)
+            if len(services) == 0:
+                return  # no services need notifying
 
-        # Do we know this user exists? If not, poke the user query API for
-        # all services which match that user regex. This needs to block as these
-        # user queries need to be made BEFORE pushing the event.
-        yield self._check_user_exists(event.sender)
-        if event.type == EventTypes.Member:
-            yield self._check_user_exists(event.state_key)
+            # Do we know this user exists? If not, poke the user query API for
+            # all services which match that user regex. This needs to block as these
+            # user queries need to be made BEFORE pushing the event.
+            yield self._check_user_exists(event.sender)
+            if event.type == EventTypes.Member:
+                yield self._check_user_exists(event.state_key)
 
-        if not self.started_scheduler:
-            self.scheduler.start().addErrback(log_failure)
-            self.started_scheduler = True
+            if not self.started_scheduler:
+                self.scheduler.start().addErrback(log_failure)
+                self.started_scheduler = True
 
-        # Fork off pushes to these services
-        for service in services:
-            self.scheduler.submit_event_for_as(service, event)
+            # Fork off pushes to these services
+            for service in services:
+                self.scheduler.submit_event_for_as(service, event)
 
     @defer.inlineCallbacks
     def query_user_exists(self, user_id):
