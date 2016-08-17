@@ -71,8 +71,17 @@ class ApplicationServiceApi(SimpleHttpClient):
             logger.warning("query_alias to %s threw exception %s", uri, ex)
         defer.returnValue(False)
 
+    @defer.inlineCallbacks
     def query_3pu(self, service, protocol, fields):
-        return False
+        uri = service.url + ("/3pu/%s" % urllib.quote(protocol))
+        response = None
+        try:
+            response = yield self.get_json(uri, fields)
+            defer.returnValue(response)
+        except:
+            # TODO: would be noisy to log lookup failures, but we want to log
+            # other things. Hrm.
+            defer.returnValue([])
 
     @defer.inlineCallbacks
     def push_bulk(self, service, events, txn_id=None):
