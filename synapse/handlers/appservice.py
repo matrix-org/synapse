@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, Membership
 from synapse.appservice import ApplicationService
 from synapse.util.metrics import Measure
 
@@ -146,7 +146,11 @@ class ApplicationServicesHandler(object):
                 )
             # We need to know the members associated with this event.room_id,
             # if any.
-            member_list = yield self.store.get_users_in_room(event.room_id)
+            state = yield self.store.get_state_for_event(event.event_id)
+            member_list = [
+                e.state_key for e in state.values()
+                if e.type == EventTypes.Member and e.membership == Membership.JOIN
+            ]
 
         services = yield self.store.get_app_services()
         interested_list = [
