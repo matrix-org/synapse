@@ -67,10 +67,8 @@ class _NotifierUserStream(object):
     so that it can remove itself from the indexes in the Notifier class.
     """
 
-    def __init__(self, user_id, rooms, current_token, time_now_ms,
-                 appservice=None):
+    def __init__(self, user_id, rooms, current_token, time_now_ms):
         self.user_id = user_id
-        self.appservice = appservice
         self.rooms = set(rooms)
         self.current_token = current_token
         self.last_notified_ms = time_now_ms
@@ -107,11 +105,6 @@ class _NotifierUserStream(object):
 
         notifier.user_to_user_stream.pop(self.user_id)
 
-        if self.appservice:
-            notifier.appservice_to_user_streams.get(
-                self.appservice, set()
-            ).discard(self)
-
     def count_listeners(self):
         return len(self.notify_deferred.observers())
 
@@ -142,7 +135,6 @@ class Notifier(object):
     def __init__(self, hs):
         self.user_to_user_stream = {}
         self.room_to_user_streams = {}
-        self.appservice_to_user_streams = {}
 
         self.event_sources = hs.get_event_sources()
         self.store = hs.get_datastore()
@@ -168,8 +160,6 @@ class Notifier(object):
                 all_user_streams |= x
             for x in self.user_to_user_stream.values():
                 all_user_streams.add(x)
-            for x in self.appservice_to_user_streams.values():
-                all_user_streams |= x
 
             return sum(stream.count_listeners() for stream in all_user_streams)
         metrics.register_callback("listeners", count_listeners)
@@ -181,10 +171,6 @@ class Notifier(object):
         metrics.register_callback(
             "users",
             lambda: len(self.user_to_user_stream),
-        )
-        metrics.register_callback(
-            "appservices",
-            lambda: count(bool, self.appservice_to_user_streams.values()),
         )
 
     def on_new_room_event(self, event, room_stream_id, max_room_stream_id,
@@ -230,20 +216,6 @@ class Notifier(object):
         # poke any interested application service.
         self.appservice_handler.notify_interested_services(event)
 
-        app_streams = set()
-
-        for appservice in self.appservice_to_user_streams:
-            # TODO (kegan): Redundant appservice listener checks?
-            # App services will already be in the room_to_user_streams set, but
-            # that isn't enough. They need to be checked here in order to
-            # receive *invites* for users they are interested in. Does this
-            # make the room_to_user_streams check somewhat obselete?
-            if appservice.is_interested(event):
-                app_user_streams = self.appservice_to_user_streams.get(
-                    appservice, set()
-                )
-                app_streams |= app_user_streams
-
         if event.type == EventTypes.Member and event.membership == Membership.JOIN:
             self._user_joined_room(event.state_key, event.room_id)
 
@@ -251,11 +223,9 @@ class Notifier(object):
             "room_key", room_stream_id,
             users=extra_users,
             rooms=[event.room_id],
-            extra_streams=app_streams,
         )
 
-    def on_new_event(self, stream_key, new_token, users=[], rooms=[],
-                     extra_streams=set()):
+    def on_new_event(self, stream_key, new_token, users=[], rooms=[]):
         """ Used to inform listeners that something has happend event wise.
 
         Will wake up all listeners for the given users and rooms.
@@ -294,7 +264,6 @@ class Notifier(object):
         """
         user_stream = self.user_to_user_stream.get(user_id)
         if user_stream is None:
-            appservice = yield self.store.get_app_service_by_user_id(user_id)
             current_token = yield self.event_sources.get_current_token()
             if room_ids is None:
                 rooms = yield self.store.get_rooms_for_user(user_id)
@@ -302,7 +271,6 @@ class Notifier(object):
             user_stream = _NotifierUserStream(
                 user_id=user_id,
                 rooms=room_ids,
-                appservice=appservice,
                 current_token=current_token,
                 time_now_ms=self.clock.time_msec(),
             )
@@ -476,11 +444,6 @@ class Notifier(object):
         for room in user_stream.rooms:
             s = self.room_to_user_streams.setdefault(room, set())
             s.add(user_stream)
-
-        if user_stream.appservice:
-            self.appservice_to_user_stream.setdefault(
-                user_stream.appservice, set()
-            ).add(user_stream)
 
     def _user_joined_room(self, user_id, room_id):
         new_user_stream = self.user_to_user_stream.get(user_id)
