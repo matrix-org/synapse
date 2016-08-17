@@ -193,7 +193,7 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
 
     def setUp(self):
         self.txn_ctrl = Mock()
-        self.queuer = _ServiceQueuer(self.txn_ctrl)
+        self.queuer = _ServiceQueuer(self.txn_ctrl, MockClock())
 
     def test_send_single_event_no_queue(self):
         # Expect the event to be sent immediately.
