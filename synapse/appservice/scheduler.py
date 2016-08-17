@@ -113,20 +113,20 @@ class _ServiceQueuer(object):
         if service.id in self.requests_in_flight:
             return
 
-        with Measure(self.clock, "_ServiceQueuer._send_request"):
-            self.requests_in_flight.add(service.id)
-            try:
-                while True:
-                    events = self.queued_events.pop(service.id, [])
-                    if not events:
-                        return
+        self.requests_in_flight.add(service.id)
+        try:
+            while True:
+                events = self.queued_events.pop(service.id, [])
+                if not events:
+                    return
 
+                with Measure(self.clock, "_ServiceQueuer._send_request"):
                     try:
                         yield self.txn_ctrl.send(service, events)
                     except:
                         logger.exception("AS request failed")
-            finally:
-                self.requests_in_flight.discard(service.id)
+        finally:
+            self.requests_in_flight.discard(service.id)
 
 
 class _TransactionController(object):
