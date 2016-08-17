@@ -121,6 +121,21 @@ class ApplicationServicesHandler(object):
                 defer.returnValue(result)
 
     @defer.inlineCallbacks
+    def query_3pu(self, protocol, fields):
+        services = yield self._get_services_for_3pn(protocol)
+
+        # TODO(paul): scattergather
+        results = []
+        for service in services:
+            result = yield self.appservice_api.query_3pu(
+                service, protocol, fields
+            )
+            if result:
+                results.append(result)
+
+        defer.returnValue(results)
+
+    @defer.inlineCallbacks
     def _get_services_for_event(self, event, restrict_to="", alias_list=None):
         """Retrieve a list of application services interested in this event.
 
@@ -162,6 +177,12 @@ class ApplicationServicesHandler(object):
             )
         ]
         defer.returnValue(interested_list)
+
+    @defer.inlineCallbacks
+    def _get_services_for_3pn(self, protocol):
+        # TODO(paul): Filter by protocol
+        services = yield self.store.get_app_services()
+        defer.returnValue(services)
 
     @defer.inlineCallbacks
     def _is_unknown_user(self, user_id):

@@ -16,6 +16,8 @@
 
 import logging
 
+from twisted.internet import defer
+
 from synapse.http.servlet import RestServlet
 from ._base import client_v2_patterns
 
@@ -28,10 +30,15 @@ class ThirdPartyUserServlet(RestServlet):
 
     def __init__(self, hs):
         super(ThirdPartyUserServlet, self).__init__()
-        pass
 
+        self.appservice_handler = hs.get_application_service_handler()
+
+    @defer.inlineCallbacks
     def on_GET(self, request, protocol):
-        return (200, {"TODO":"TODO"})
+        fields = {} # TODO
+        results = yield self.appservice_handler.query_3pu(protocol, fields)
+
+        defer.returnValue((200, results))
 
 
 def register_servlets(hs, http_server):
