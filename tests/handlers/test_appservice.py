@@ -15,6 +15,7 @@
 
 from twisted.internet import defer
 from .. import unittest
+from tests.utils import MockClock
 
 from synapse.handlers.appservice import ApplicationServicesHandler
 
@@ -32,6 +33,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         hs.get_datastore = Mock(return_value=self.mock_store)
         hs.get_application_service_api = Mock(return_value=self.mock_as_api)
         hs.get_application_service_scheduler = Mock(return_value=self.mock_scheduler)
+        hs.get_clock.return_value = MockClock()
         self.handler = ApplicationServicesHandler(hs)
 
     @defer.inlineCallbacks
