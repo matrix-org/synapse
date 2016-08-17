@@ -36,6 +36,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         hs.get_clock.return_value = MockClock()
         self.handler = ApplicationServicesHandler(hs)
 
+        self.mock_store.get_state_for_event = Mock(return_value={})
+
     @defer.inlineCallbacks
     def test_notify_interested_services(self):
         interested_service = self._mkservice(is_interested=True)
