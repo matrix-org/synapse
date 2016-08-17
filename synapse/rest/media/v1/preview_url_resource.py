@@ -449,7 +449,7 @@ def _iterate_over_text(tree, *tags_to_ignore):
         el = elements.next()
         if isinstance(el, basestring):
             yield el
-        elif el.tag not in tags_to_ignore:
+        elif el is not None and el.tag not in tags_to_ignore:
             # el.text is the text before the first child, so we can immediately
             # return it if the text exists.
             if el.text:
