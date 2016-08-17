@@ -120,7 +120,7 @@ class _ServiceQueuer(object):
                 if not events:
                     return
 
-                with Measure(self.clock, "_ServiceQueuer._send_request"):
+                with Measure(self.clock, "servicequeuer.send"):
                     try:
                         yield self.txn_ctrl.send(service, events)
                     except:
