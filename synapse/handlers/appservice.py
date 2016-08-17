@@ -16,7 +16,6 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
-from synapse.appservice import ApplicationService
 from synapse.util.metrics import Measure
 
 import logging
@@ -107,11 +106,12 @@ class ApplicationServicesHandler(object):
             association can be found.
         """
         room_alias_str = room_alias.to_string()
-        alias_query_services = yield self._get_services_for_event(
-            event=None,
-            restrict_to=ApplicationService.NS_ALIASES,
-            alias_list=[room_alias_str]
-        )
+        services = yield self.store.get_app_services()
+        alias_query_services = [
+            s for s in services if (
+                s.is_interested_in_alias(room_alias_str)
+            )
+        ]
         for alias_service in alias_query_services:
             is_known_alias = yield self.appservice_api.query_alias(
                 alias_service, room_alias_str
@@ -124,34 +124,19 @@ class ApplicationServicesHandler(object):
                 defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def _get_services_for_event(self, event, restrict_to="", alias_list=None):
+    def _get_services_for_event(self, event):
         """Retrieve a list of application services interested in this event.
 
         Args:
             event(Event): The event to check. Can be None if alias_list is not.
-            restrict_to(str): The namespace to restrict regex tests to.
-            alias_list: A list of aliases to get services for. If None, this
-            list is obtained from the database.
         Returns:
             list<ApplicationService>: A list of services interested in this
             event based on the service regex.
         """
-        member_list = None
-        if hasattr(event, "room_id"):
-            # We need to know the aliases associated with this event.room_id,
-            # if any.
-            if not alias_list:
-                alias_list = yield self.store.get_aliases_for_room(
-                    event.room_id
-                )
-            # We need to know the members associated with this event.room_id,
-            # if any.
-            member_list = yield self.store.get_users_in_room(event.room_id)
-
         services = yield self.store.get_app_services()
         interested_list = [
             s for s in services if (
-                s.is_interested(event, restrict_to, alias_list, member_list)
+                yield s.is_interested(event, self.store)
             )
         ]
         defer.returnValue(interested_list)

@@ -110,11 +110,11 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         room_id = "!alpha:bet"
         servers = ["aperture"]
-        interested_service = self._mkservice(is_interested=True)
+        interested_service = self._mkservice_alias(is_interested_in_alias=True)
         services = [
-            self._mkservice(is_interested=False),
+            self._mkservice_alias(is_interested_in_alias=False),
             interested_service,
-            self._mkservice(is_interested=False)
+            self._mkservice_alias(is_interested_in_alias=False)
         ]
 
         self.mock_store.get_app_services = Mock(return_value=services)
@@ -134,6 +134,13 @@ class AppServiceHandlerTestCase(unittest.TestCase):
     def _mkservice(self, is_interested):
         service = Mock()
         service.is_interested = Mock(return_value=is_interested)
+        service.token = "mock_service_token"
+        service.url = "mock_service_url"
+        return service
+
+    def _mkservice_alias(self, is_interested_in_alias):
+        service = Mock()
+        service.is_interested_in_alias = Mock(return_value=is_interested_in_alias)
         service.token = "mock_service_token"
         service.url = "mock_service_url"
         return service
