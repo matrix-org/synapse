@@ -18,7 +18,6 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes
 from synapse.util.metrics import Measure
 from synapse.util.logcontext import preserve_fn
-from synapse.types import ThirdPartyEntityKind
 
 import logging
 
@@ -34,28 +33,6 @@ def log_failure(failure):
             failure.getTracebackObject()
         )
     )
-
-
-def _is_valid_3pentity_result(r, field):
-    if not isinstance(r, dict):
-        return False
-
-    for k in (field, "protocol"):
-        if k not in r:
-            return False
-        if not isinstance(r[k], str):
-            return False
-
-    if "fields" not in r:
-        return False
-    fields = r["fields"]
-    if not isinstance(fields, dict):
-        return False
-    for k in fields.keys():
-        if not isinstance(fields[k], str):
-            return False
-
-    return True
 
 
 class ApplicationServicesHandler(object):
@@ -178,29 +155,10 @@ class ApplicationServicesHandler(object):
             for service in services
         ], consumeErrors=True)
 
-        required_field = (
-            "userid" if kind == ThirdPartyEntityKind.USER else
-            "alias" if kind == ThirdPartyEntityKind.LOCATION else
-            None
-        )
-
         ret = []
         for (success, result) in results:
-            if not success:
-                logger.warn("Application service failed %r", result)
-                continue
-            if not isinstance(result, list):
-                logger.warn(
-                    "Application service returned an invalid response %r", result
-                )
-                continue
-            for r in result:
-                if _is_valid_3pentity_result(r, field=required_field):
-                    ret.append(r)
-                else:
-                    logger.warn(
-                        "Application service returned an invalid result %r", r
-                    )
+            if success:
+                ret.extend(result)
 
         defer.returnValue(ret)
 
