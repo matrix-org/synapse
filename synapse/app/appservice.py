@@ -128,11 +128,9 @@ class AppserviceServer(HomeServer):
 
         while True:
             try:
-                logger.info("Hitting replication")
                 args = store.stream_positions()
                 args["timeout"] = 30000
                 result = yield http_client.get_json(replication_url, args=args)
-                logger.info("Got replication response")
                 yield store.process_replication(result)
                 replicate(result)
             except:
