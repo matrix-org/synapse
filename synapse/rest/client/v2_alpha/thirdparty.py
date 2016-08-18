@@ -31,10 +31,13 @@ class ThirdPartyUserServlet(RestServlet):
     def __init__(self, hs):
         super(ThirdPartyUserServlet, self).__init__()
 
+        self.auth = hs.get_auth()
         self.appservice_handler = hs.get_application_service_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, protocol):
+        yield self.auth.get_user_by_req(request)
+
         fields = request.args
         del fields["access_token"]
 
@@ -50,10 +53,13 @@ class ThirdPartyLocationServlet(RestServlet):
     def __init__(self, hs):
         super(ThirdPartyLocationServlet, self).__init__()
 
+        self.auth = hs.get_auth()
         self.appservice_handler = hs.get_application_service_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, protocol):
+        yield self.auth.get_user_by_req(request)
+
         fields = request.args
         del fields["access_token"]
 
