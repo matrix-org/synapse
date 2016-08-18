@@ -191,9 +191,11 @@ class ApplicationServicesHandler(object):
 
     @defer.inlineCallbacks
     def _get_services_for_3pn(self, protocol):
-        # TODO(paul): Filter by protocol
         services = yield self.store.get_app_services()
-        defer.returnValue(services)
+        interested_list = [
+            s for s in services if s.is_interested_in_protocol(protocol)
+        ]
+        defer.returnValue(interested_list)
 
     @defer.inlineCallbacks
     def _is_unknown_user(self, user_id):

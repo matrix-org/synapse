@@ -81,13 +81,17 @@ class ApplicationService(object):
     NS_LIST = [NS_USERS, NS_ALIASES, NS_ROOMS]
 
     def __init__(self, token, url=None, namespaces=None, hs_token=None,
-                 sender=None, id=None):
+                 sender=None, id=None, protocols=None):
         self.token = token
         self.url = url
         self.hs_token = hs_token
         self.sender = sender
         self.namespaces = self._check_namespaces(namespaces)
         self.id = id
+        if protocols:
+            self.protocols = set(protocols)
+        else:
+            self.protocols = set()
 
     def _check_namespaces(self, namespaces):
         # Sanity check that it is of the form:
@@ -218,6 +222,9 @@ class ApplicationService(object):
             self._is_exclusive(ApplicationService.NS_USERS, user_id)
             or user_id == self.sender
         )
+
+    def is_interested_in_protocol(self, protocol):
+        return protocol in self.protocols
 
     def is_exclusive_alias(self, alias):
         return self._is_exclusive(ApplicationService.NS_ALIASES, alias)
