@@ -17,6 +17,7 @@ from twisted.internet import defer
 from synapse.api.errors import CodeMessageException
 from synapse.http.client import SimpleHttpClient
 from synapse.events.utils import serialize_event
+from synapse.types import ThirdPartyEntityKind
 
 import logging
 import urllib
@@ -72,25 +73,21 @@ class ApplicationServiceApi(SimpleHttpClient):
         defer.returnValue(False)
 
     @defer.inlineCallbacks
-    def query_3pu(self, service, protocol, fields):
-        uri = "%s/3pu/%s" % (service.url, urllib.quote(protocol))
-        response = None
-        try:
-            response = yield self.get_json(uri, fields)
-            defer.returnValue(response)
-        except Exception as ex:
-            logger.warning("query_3pu to %s threw exception %s", uri, ex)
-            defer.returnValue([])
+    def query_3pe(self, service, kind, protocol, fields):
+        if kind == ThirdPartyEntityKind.USER:
+            uri = "%s/3pu/%s" % (service.url, urllib.quote(protocol))
+        elif kind == ThirdPartyEntityKind.LOCATION:
+            uri = "%s/3pl/%s" % (service.url, urllib.quote(protocol))
+        else:
+            raise ValueError(
+                "Unrecognised 'kind' argument %r to query_3pe()", kind
+            )
 
-    @defer.inlineCallbacks
-    def query_3pl(self, service, protocol, fields):
-        uri = "%s/3pl/%s" % (service.url, urllib.quote(protocol))
-        response = None
         try:
             response = yield self.get_json(uri, fields)
             defer.returnValue(response)
         except Exception as ex:
-            logger.warning("query_3pl to %s threw exception %s", uri, ex)
+            logger.warning("query_3pe to %s threw exception %s", uri, ex)
             defer.returnValue([])
 
     @defer.inlineCallbacks

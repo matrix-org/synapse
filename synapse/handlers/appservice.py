@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes
 from synapse.util.metrics import Measure
 from synapse.util.logcontext import preserve_fn
+from synapse.types import ThirdPartyEntityKind
 
 import logging
 
@@ -169,13 +170,19 @@ class ApplicationServicesHandler(object):
                 defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def query_3pu(self, protocol, fields):
+    def query_3pe(self, kind, protocol, fields):
         services = yield self._get_services_for_3pn(protocol)
 
         results = yield defer.DeferredList([
-            self.appservice_api.query_3pu(service, protocol, fields)
+            self.appservice_api.query_3pe(service, kind, protocol, fields)
             for service in services
         ], consumeErrors=True)
+
+        required_field = (
+            "userid" if kind == ThirdPartyEntityKind.USER else
+            "alias" if kind == ThirdPartyEntityKind.LOCATION else
+            None
+        )
 
         ret = []
         for (success, result) in results:
@@ -184,31 +191,7 @@ class ApplicationServicesHandler(object):
             if not isinstance(result, list):
                 continue
             for r in result:
-                if _is_valid_3pentity_result(r, field="userid"):
-                    ret.append(r)
-                else:
-                    logger.warn("Application service returned an " +
-                                "invalid result %r", r)
-
-        defer.returnValue(ret)
-
-    @defer.inlineCallbacks
-    def query_3pl(self, protocol, fields):
-        services = yield self._get_services_for_3pn(protocol)
-
-        results = yield defer.DeferredList([
-            self.appservice_api.query_3pl(service, protocol, fields)
-            for service in services
-        ], consumeErrors=True)
-
-        ret = []
-        for (success, result) in results:
-            if not success:
-                continue
-            if not isinstance(result, list):
-                continue
-            for r in result:
-                if _is_valid_3pentity_result(r, field="alias"):
+                if _is_valid_3pentity_result(r, field=required_field):
                     ret.append(r)
                 else:
                     logger.warn("Application service returned an " +
