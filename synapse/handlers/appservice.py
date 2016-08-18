@@ -172,13 +172,10 @@ class ApplicationServicesHandler(object):
     def query_3pu(self, protocol, fields):
         services = yield self._get_services_for_3pn(protocol)
 
-        deferreds = []
-        for service in services:
-            deferreds.append(self.appservice_api.query_3pu(
-                service, protocol, fields
-            ))
-
-        results = yield defer.DeferredList(deferreds, consumeErrors=True)
+        results = yield defer.DeferredList([
+            self.appservice_api.query_3pu(service, protocol, fields)
+            for service in services
+        ], consumeErrors=True)
 
         ret = []
         for (success, result) in results:
@@ -199,13 +196,10 @@ class ApplicationServicesHandler(object):
     def query_3pl(self, protocol, fields):
         services = yield self._get_services_for_3pn(protocol)
 
-        deferreds = []
-        for service in services:
-            deferreds.append(self.appservice_api.query_3pl(
-                service, protocol, fields
-            ))
-
-        results = yield defer.DeferredList(deferreds, consumeErrors=True)
+        results = yield defer.DeferredList([
+            self.appservice_api.query_3pl(service, protocol, fields)
+            for service in services
+        ], consumeErrors=True)
 
         ret = []
         for (success, result) in results:

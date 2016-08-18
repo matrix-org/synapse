@@ -73,7 +73,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
     @defer.inlineCallbacks
     def query_3pu(self, service, protocol, fields):
-        uri = service.url + ("/3pu/%s" % urllib.quote(protocol))
+        uri = "%s/3pu/%s" % (service.url, urllib.quote(protocol))
         response = None
         try:
             response = yield self.get_json(uri, fields)
@@ -84,7 +84,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
     @defer.inlineCallbacks
     def query_3pl(self, service, protocol, fields):
-        uri = service.url + ("/3pl/%s" % urllib.quote(protocol))
+        uri = "%s/3pl/%s" % (service.url, urllib.quote(protocol))
         response = None
         try:
             response = yield self.get_json(uri, fields)
