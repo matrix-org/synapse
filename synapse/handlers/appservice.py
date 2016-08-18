@@ -187,15 +187,20 @@ class ApplicationServicesHandler(object):
         ret = []
         for (success, result) in results:
             if not success:
+                logger.warn("Application service failed %r", result)
                 continue
             if not isinstance(result, list):
+                logger.warn(
+                    "Application service returned an invalid response %r", result
+                )
                 continue
             for r in result:
                 if _is_valid_3pentity_result(r, field=required_field):
                     ret.append(r)
                 else:
-                    logger.warn("Application service returned an " +
-                                "invalid result %r", r)
+                    logger.warn(
+                        "Application service returned an invalid result %r", r
+                    )
 
         defer.returnValue(ret)
 
