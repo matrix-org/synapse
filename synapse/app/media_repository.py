@@ -113,7 +113,7 @@ class MediaRepositoryServer(HomeServer):
             ),
             interface=bind_address
         )
-        logger.info("Synapse federation reader now listening on port %d", port)
+        logger.info("Synapse media repository now listening on port %d", port)
 
     def start_listening(self, listeners):
         for listener in listeners:
