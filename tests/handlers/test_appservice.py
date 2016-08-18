@@ -53,8 +53,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             type="m.room.message",
             room_id="!foo:bar"
         )
+        self.mock_store.get_new_events_for_appservice.return_value = (0, [event])
         self.mock_as_api.push = Mock()
-        yield self.handler.notify_interested_services(event)
+        yield self.handler.notify_interested_services(0)
         self.mock_scheduler.submit_event_for_as.assert_called_once_with(
             interested_service, event
         )
@@ -74,7 +75,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
         self.mock_as_api.push = Mock()
         self.mock_as_api.query_user = Mock()
-        yield self.handler.notify_interested_services(event)
+        self.mock_store.get_new_events_for_appservice.return_value = (0, [event])
+        yield self.handler.notify_interested_services(0)
         self.mock_as_api.query_user.assert_called_once_with(
             services[0], user_id
         )
@@ -96,7 +98,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
         self.mock_as_api.push = Mock()
         self.mock_as_api.query_user = Mock()
-        yield self.handler.notify_interested_services(event)
+        self.mock_store.get_new_events_for_appservice.return_value = (0, [event])
+        yield self.handler.notify_interested_services(0)
         self.assertFalse(
             self.mock_as_api.query_user.called,
             "query_user called when it shouldn't have been."
