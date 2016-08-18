@@ -28,3 +28,6 @@ class SlavedRegistrationStore(BaseSlavedStore):
     ]
 
     _query_for_auth = DataStore._query_for_auth.__func__
+    get_user_by_id = RegistrationStore.__dict__[
+        "get_user_by_id"
+    ]

@@ -28,3 +28,13 @@ class SlavedApplicationServiceStore(BaseSlavedStore):
 
     get_app_service_by_token = DataStore.get_app_service_by_token.__func__
     get_app_service_by_user_id = DataStore.get_app_service_by_user_id.__func__
+    get_app_services = DataStore.get_app_services.__func__
+    get_new_events_for_appservice = DataStore.get_new_events_for_appservice.__func__
+    create_appservice_txn = DataStore.create_appservice_txn.__func__
+    get_appservices_by_state = DataStore.get_appservices_by_state.__func__
+    get_oldest_unsent_txn = DataStore.get_oldest_unsent_txn.__func__
+    _get_last_txn = DataStore._get_last_txn.__func__
+    complete_appservice_txn = DataStore.complete_appservice_txn.__func__
+    get_appservice_state = DataStore.get_appservice_state.__func__
+    set_appservice_last_pos = DataStore.set_appservice_last_pos.__func__
+    set_appservice_state = DataStore.set_appservice_state.__func__

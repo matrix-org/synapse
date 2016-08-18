@@ -28,6 +28,7 @@ class AppServiceConfig(Config):
 
     def read_config(self, config):
         self.app_service_config_files = config.get("app_service_config_files", [])
+        self.notify_appservices = config.get("notify_appservices", True)
 
     def default_config(cls, **kwargs):
         return """\

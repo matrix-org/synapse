@@ -93,7 +93,6 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             desc="add_refresh_token_to_user",
         )
 
-    @defer.inlineCallbacks
     def register(self, user_id, token=None, password_hash=None,
                  was_guest=False, make_guest=False, appservice_id=None,
                  create_profile_with_localpart=None, admin=False):
@@ -115,7 +114,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
         Raises:
             StoreError if the user_id could not be registered.
         """
-        yield self.runInteraction(
+        return self.runInteraction(
             "register",
             self._register,
             user_id,
@@ -127,8 +126,6 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             create_profile_with_localpart,
             admin
         )
-        self.get_user_by_id.invalidate((user_id,))
-        self.is_guest.invalidate((user_id,))
 
     def _register(
         self,
@@ -210,6 +207,11 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
                 (create_profile_with_localpart,)
             )
 
+        self._invalidate_cache_and_stream(
+            txn, self.get_user_by_id, (user_id,)
+        )
+        txn.call_after(self.is_guest.invalidate, (user_id,))
+
     @cached()
     def get_user_by_id(self, user_id):
         return self._simple_select_one(
@@ -236,19 +238,28 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
 
         return self.runInteraction("get_users_by_id_case_insensitive", f)
 
-    @defer.inlineCallbacks
     def user_set_password_hash(self, user_id, password_hash):
         """
         NB. This does *not* evict any cache because the one use for this
             removes most of the entries subsequently anyway so it would be
             pointless. Use flush_user separately.
         """
-        yield self._simple_update_one('users', {
-            'name': user_id
-        }, {
-            'password_hash': password_hash
-        })
-        self.get_user_by_id.invalidate((user_id,))
+        def user_set_password_hash_txn(txn):
+            self._simple_update_one_txn(
+                txn,
+                'users', {
+                    'name': user_id
+                },
+                {
+                    'password_hash': password_hash
+                }
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_user_by_id, (user_id,)
+            )
+        return self.runInteraction(
+            "user_set_password_hash", user_set_password_hash_txn
+        )
 
     @defer.inlineCallbacks
     def user_delete_access_tokens(self, user_id, except_token_id=None,
