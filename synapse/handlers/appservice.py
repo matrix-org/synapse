@@ -34,6 +34,7 @@ def log_failure(failure):
         )
     )
 
+
 def _is_valid_3pentity_result(r, field):
     if not isinstance(r, dict):
         return False
@@ -54,6 +55,7 @@ def _is_valid_3pentity_result(r, field):
             return False
 
     return True
+
 
 class ApplicationServicesHandler(object):
 
