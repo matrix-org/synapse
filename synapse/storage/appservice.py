@@ -352,3 +352,42 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             return 0
         else:
             return int(last_txn_id[0])  # select 'last_txn' col
+
+    def set_appservice_last_pos(self, pos):
+        def set_appservice_last_pos_txn(txn):
+            txn.execute(
+                "UPDATE appservice_stream_position SET stream_ordering = ?", (pos,)
+            )
+        return self.runInteraction(
+            "set_appservice_last_pos", set_appservice_last_pos_txn
+        )
+
+    @defer.inlineCallbacks
+    def get_new_events_for_appservice(self, current_id, limit):
+        """Get all new evnets"""
+
+        def get_new_events_for_appservice_txn(txn):
+            sql = (
+                "SELECT e.stream_ordering, e.event_id"
+                " FROM events AS e, appservice_stream_position AS a"
+                " WHERE a.stream_ordering < e.stream_ordering AND e.stream_ordering <= ?"
+                " ORDER BY e.stream_ordering ASC"
+                " LIMIT ?"
+            )
+
+            txn.execute(sql, (current_id, limit))
+            rows = txn.fetchall()
+
+            upper_bound = current_id
+            if len(rows) == limit:
+                upper_bound = rows[-1][0]
+
+            return upper_bound, [row[1] for row in rows]
+
+        upper_bound, event_ids = yield self.runInteraction(
+            "get_new_events_for_appservice", get_new_events_for_appservice_txn,
+        )
+
+        events = yield self._get_events(event_ids)
+
+        defer.returnValue((upper_bound, events))

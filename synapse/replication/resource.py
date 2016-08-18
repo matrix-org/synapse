@@ -41,6 +41,7 @@ STREAM_NAMES = (
     ("push_rules",),
     ("pushers",),
     ("state",),
+    ("caches",),
 )
 
 
@@ -70,6 +71,7 @@ class ReplicationResource(Resource):
     * "backfill": Old events that have been backfilled from other servers.
     * "push_rules": Per user changes to push rules.
     * "pushers": Per user changes to their pushers.
+    * "caches": Cache invalidations.
 
     The API takes two additional query parameters:
 
@@ -129,6 +131,7 @@ class ReplicationResource(Resource):
         push_rules_token, room_stream_token = self.store.get_push_rules_stream_token()
         pushers_token = self.store.get_pushers_stream_token()
         state_token = self.store.get_state_stream_token()
+        caches_token = self.store.get_cache_stream_token()
 
         defer.returnValue(_ReplicationToken(
             room_stream_token,
@@ -140,6 +143,7 @@ class ReplicationResource(Resource):
             push_rules_token,
             pushers_token,
             state_token,
+            caches_token,
         ))
 
     @request_handler()
@@ -188,6 +192,7 @@ class ReplicationResource(Resource):
         yield self.push_rules(writer, current_token, limit, request_streams)
         yield self.pushers(writer, current_token, limit, request_streams)
         yield self.state(writer, current_token, limit, request_streams)
+        yield self.caches(writer, current_token, limit, request_streams)
         self.streams(writer, current_token, request_streams)
 
         logger.info("Replicated %d rows", writer.total)
@@ -379,6 +384,20 @@ class ReplicationResource(Resource):
                 "position", "type", "state_key", "event_id"
             ))
 
+    @defer.inlineCallbacks
+    def caches(self, writer, current_token, limit, request_streams):
+        current_position = current_token.caches
+
+        caches = request_streams.get("caches")
+
+        if caches is not None:
+            updated_caches = yield self.store.get_all_updated_caches(
+                caches, current_position, limit
+            )
+            writer.write_header_and_rows("caches", updated_caches, (
+                "position", "cache_func", "keys", "invalidation_ts"
+            ))
+
 
 class _Writer(object):
     """Writes the streams as a JSON object as the response to the request"""
@@ -407,7 +426,7 @@ class _Writer(object):
 
 class _ReplicationToken(collections.namedtuple("_ReplicationToken", (
     "events", "presence", "typing", "receipts", "account_data", "backfill",
-    "push_rules", "pushers", "state"
+    "push_rules", "pushers", "state", "caches",
 ))):
     __slots__ = []
 

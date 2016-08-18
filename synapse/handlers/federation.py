@@ -274,7 +274,7 @@ class FederationHandler(BaseHandler):
 
     @log_function
     @defer.inlineCallbacks
-    def backfill(self, dest, room_id, limit, extremities=[]):
+    def backfill(self, dest, room_id, limit, extremities):
         """ Trigger a backfill request to `dest` for the given `room_id`
 
         This will attempt to get more events from the remote. This may return
@@ -283,9 +283,6 @@ class FederationHandler(BaseHandler):
         """
         if dest == self.server_name:
             raise SynapseError(400, "Can't backfill from self.")
-
-        if not extremities:
-            extremities = yield self.store.get_oldest_events_in_room(room_id)
 
         events = yield self.replication_layer.backfill(
             dest,
@@ -454,6 +451,10 @@ class FederationHandler(BaseHandler):
             key=lambda e: -int(e[1])
         )
         max_depth = sorted_extremeties_tuple[0][1]
+
+        # We don't want to specify too many extremities as it causes the backfill
+        # request URI to be too long.
+        extremities = dict(sorted_extremeties_tuple[:5])
 
         if current_depth > max_depth:
             logger.debug(

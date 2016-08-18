@@ -82,32 +82,39 @@ class DirectoryStore(SQLBaseStore):
         Returns:
             Deferred
         """
-        try:
-            yield self._simple_insert(
+        def alias_txn(txn):
+            self._simple_insert_txn(
+                txn,
                 "room_aliases",
                 {
                     "room_alias": room_alias.to_string(),
                     "room_id": room_id,
                     "creator": creator,
                 },
-                desc="create_room_alias_association",
+            )
+
+            self._simple_insert_many_txn(
+                txn,
+                table="room_alias_servers",
+                values=[{
+                    "room_alias": room_alias.to_string(),
+                    "server": server,
+                } for server in servers],
+            )
+
+            self._invalidate_cache_and_stream(
+                txn, self.get_aliases_for_room, (room_id,)
+            )
+
+        try:
+            ret = yield self.runInteraction(
+                "create_room_alias_association", alias_txn
             )
         except self.database_engine.module.IntegrityError:
             raise SynapseError(
                 409, "Room alias %s already exists" % room_alias.to_string()
             )
-
-        for server in servers:
-            # TODO(erikj): Fix this to bulk insert
-            yield self._simple_insert(
-                "room_alias_servers",
-                {
-                    "room_alias": room_alias.to_string(),
-                    "server": server,
-                },
-                desc="create_room_alias_association",
-            )
-        self.get_aliases_for_room.invalidate((room_id,))
+        defer.returnValue(ret)
 
     def get_room_alias_creator(self, room_alias):
         return self._simple_select_one_onecol(

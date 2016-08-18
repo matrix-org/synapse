@@ -41,6 +41,7 @@ from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.room import RoomListHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import TypingHandler
+from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier
@@ -94,6 +95,8 @@ class HomeServer(object):
         'auth_handler',
         'device_handler',
         'e2e_keys_handler',
+        'event_handler',
+        'event_stream_handler',
         'application_service_api',
         'application_service_scheduler',
         'application_service_handler',
@@ -213,6 +216,12 @@ class HomeServer(object):
 
     def build_application_service_handler(self):
         return ApplicationServicesHandler(self)
+
+    def build_event_handler(self):
+        return EventHandler(self)
+
+    def build_event_stream_handler(self):
+        return EventStreamHandler(self)
 
     def build_event_sources(self):
         return EventSources(self)

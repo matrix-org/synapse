@@ -28,6 +28,10 @@ logger = logging.getLogger(__name__)
 class WhoisRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/admin/whois/(?P<user_id>[^/]*)")
 
+    def __init__(self, hs):
+        super(WhoisRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         target_user = UserID.from_string(user_id)
@@ -81,6 +85,10 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns(
         "/admin/purge_history/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
     )
+
+    def __init__(self, hs):
+        super(PurgeHistoryRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_id):

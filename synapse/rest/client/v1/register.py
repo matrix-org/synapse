@@ -65,6 +65,7 @@ class RegisterRestServlet(ClientV1RestServlet):
         self.sessions = {}
         self.enable_registration = hs.config.enable_registration
         self.auth_handler = hs.get_auth_handler()
+        self.handlers = hs.get_handlers()
 
     def on_GET(self, request):
         if self.hs.config.enable_registration_captcha:
@@ -383,6 +384,7 @@ class CreateUserRestServlet(ClientV1RestServlet):
         super(CreateUserRestServlet, self).__init__(hs)
         self.store = hs.get_datastore()
         self.direct_user_creation_max_duration = hs.config.user_creation_max_duration
+        self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
