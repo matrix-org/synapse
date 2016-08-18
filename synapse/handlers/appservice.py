@@ -34,6 +34,26 @@ def log_failure(failure):
         )
     )
 
+def _is_valid_3pu_result(r):
+    if not isinstance(r, dict):
+        return False
+
+    for k in ("userid", "protocol"):
+        if k not in r:
+            return False
+        if not isinstance(r[k], str):
+            return False
+
+    if "fields" not in r:
+        return False
+    fields = r["fields"]
+    if not isinstance(fields, dict):
+        return False
+    for k in fields.keys():
+        if not isinstance(fields[k], str):
+            return False
+
+    return True
 
 class ApplicationServicesHandler(object):
 
@@ -150,16 +170,23 @@ class ApplicationServicesHandler(object):
     def query_3pu(self, protocol, fields):
         services = yield self._get_services_for_3pn(protocol)
 
-        # TODO(paul): scattergather
-        results = []
+        deferreds = []
         for service in services:
-            result = yield self.appservice_api.query_3pu(
+            deferreds.append(self.appservice_api.query_3pu(
                 service, protocol, fields
-            )
-            if result:
-                results.extend(result)
+            ))
 
-        defer.returnValue(results)
+        results = yield defer.DeferredList(deferreds, consumeErrors=True)
+
+        ret = []
+        for (success, result) in results:
+            if not success:
+                continue
+            if not isinstance(result, list):
+                continue
+            ret.extend(r for r in result if _is_valid_3pu_result(r))
+
+        defer.returnValue(ret)
 
     @defer.inlineCallbacks
     def _get_services_for_event(self, event):
