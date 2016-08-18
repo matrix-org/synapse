@@ -43,5 +43,25 @@ class ThirdPartyUserServlet(RestServlet):
         defer.returnValue((200, results))
 
 
+class ThirdPartyLocationServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/3pl(/(?P<protocol>[^/]+))?$",
+                                  releases=())
+
+    def __init__(self, hs):
+        super(ThirdPartyLocationServlet, self).__init__()
+
+        self.appservice_handler = hs.get_application_service_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, protocol):
+        fields = request.args
+        del fields["access_token"]
+
+        results = yield self.appservice_handler.query_3pl(protocol, fields)
+
+        defer.returnValue((200, results))
+
+
 def register_servlets(hs, http_server):
     ThirdPartyUserServlet(hs).register(http_server)
+    ThirdPartyLocationServlet(hs).register(http_server)

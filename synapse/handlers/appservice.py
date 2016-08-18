@@ -34,11 +34,11 @@ def log_failure(failure):
         )
     )
 
-def _is_valid_3pu_result(r):
+def _is_valid_3pentity_result(r, field):
     if not isinstance(r, dict):
         return False
 
-    for k in ("userid", "protocol"):
+    for k in (field, "protocol"):
         if k not in r:
             return False
         if not isinstance(r[k], str):
@@ -185,7 +185,34 @@ class ApplicationServicesHandler(object):
             if not isinstance(result, list):
                 continue
             for r in result:
-                if _is_valid_3pu_result(r):
+                if _is_valid_3pentity_result(r, field="userid"):
+                    ret.append(r)
+                else:
+                    logger.warn("Application service returned an " +
+                                "invalid result %r", r)
+
+        defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def query_3pl(self, protocol, fields):
+        services = yield self._get_services_for_3pn(protocol)
+
+        deferreds = []
+        for service in services:
+            deferreds.append(self.appservice_api.query_3pl(
+                service, protocol, fields
+            ))
+
+        results = yield defer.DeferredList(deferreds, consumeErrors=True)
+
+        ret = []
+        for (success, result) in results:
+            if not success:
+                continue
+            if not isinstance(result, list):
+                continue
+            for r in result:
+                if _is_valid_3pentity_result(r, field="alias"):
                     ret.append(r)
                 else:
                     logger.warn("Application service returned an " +

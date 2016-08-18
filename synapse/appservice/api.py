@@ -83,6 +83,17 @@ class ApplicationServiceApi(SimpleHttpClient):
             defer.returnValue([])
 
     @defer.inlineCallbacks
+    def query_3pl(self, service, protocol, fields):
+        uri = service.url + ("/3pl/%s" % urllib.quote(protocol))
+        response = None
+        try:
+            response = yield self.get_json(uri, fields)
+            defer.returnValue(response)
+        except Exception as ex:
+            logger.warning("query_3pl to %s threw exception %s", uri, ex)
+            defer.returnValue([])
+
+    @defer.inlineCallbacks
     def push_bulk(self, service, events, txn_id=None):
         events = self._serialize(events)
 
