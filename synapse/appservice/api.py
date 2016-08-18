@@ -78,7 +78,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         try:
             response = yield self.get_json(uri, fields)
             defer.returnValue(response)
-        except:
+        except Exception:
             # TODO: would be noisy to log lookup failures, but we want to log
             # other things. Hrm.
             defer.returnValue([])
