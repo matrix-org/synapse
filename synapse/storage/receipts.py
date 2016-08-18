@@ -100,8 +100,8 @@ class ReceiptsStore(SQLBaseStore):
             sql = (
                 "SELECT rl.room_id, rl.event_id,"
                 " e.topological_ordering, e.stream_ordering"
-                " FROM receipts_linearized rl,"
-                " events e"
+                " FROM receipts_linearized AS rl"
+                " INNER JOIN events AS e USING (room_id, event_id)"
                 " WHERE rl.room_id = e.room_id"
                 " AND rl.event_id = e.event_id"
                 " AND user_id = ?"
