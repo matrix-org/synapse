@@ -217,6 +217,27 @@ BASE_APPEND_OVERRIDE_RULES = [
             'dont_notify'
         ]
     },
+    # This was changed from underride to override so it's closer in priority
+    # to the content rules where the user name highlight rule lives. This
+    # way a room rule is lower priority than both but a custom override rule
+    # is higher priority than both.
+    {
+        'rule_id': 'global/override/.m.rule.contains_display_name',
+        'conditions': [
+            {
+                'kind': 'contains_display_name'
+            }
+        ],
+        'actions': [
+            'notify',
+            {
+                'set_tweak': 'sound',
+                'value': 'default'
+            }, {
+                'set_tweak': 'highlight'
+            }
+        ]
+    },
 ]
 
 
@@ -239,23 +260,6 @@ BASE_APPEND_UNDERRIDE_RULES = [
             }, {
                 'set_tweak': 'highlight',
                 'value': False
-            }
-        ]
-    },
-    {
-        'rule_id': 'global/underride/.m.rule.contains_display_name',
-        'conditions': [
-            {
-                'kind': 'contains_display_name'
-            }
-        ],
-        'actions': [
-            'notify',
-            {
-                'set_tweak': 'sound',
-                'value': 'default'
-            }, {
-                'set_tweak': 'highlight'
             }
         ]
     },

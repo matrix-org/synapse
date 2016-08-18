@@ -146,7 +146,7 @@ class SyncRestServlet(RestServlet):
         affect_presence = set_presence != PresenceState.OFFLINE
 
         if affect_presence:
-            yield self.presence_handler.set_state(user, {"presence": set_presence})
+            yield self.presence_handler.set_state(user, {"presence": set_presence}, True)
 
         context = yield self.presence_handler.user_syncing(
             user.to_string(), affect_presence=affect_presence,

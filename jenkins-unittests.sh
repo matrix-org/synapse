@@ -25,5 +25,6 @@ rm .coverage* || echo "No coverage files to remove"
 tox --notest -e py27
 TOX_BIN=$WORKSPACE/.tox/py27/bin
 python synapse/python_dependencies.py | xargs -n1 $TOX_BIN/pip install
+$TOX_BIN/pip install lxml
 
 tox -e py27

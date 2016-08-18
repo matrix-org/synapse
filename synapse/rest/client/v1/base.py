@@ -57,7 +57,6 @@ class ClientV1RestServlet(RestServlet):
             hs (synapse.server.HomeServer):
         """
         self.hs = hs
-        self.handlers = hs.get_handlers()
         self.builder_factory = hs.get_event_builder_factory()
         self.auth = hs.get_v1auth()
         self.txns = HttpTransactionStore()

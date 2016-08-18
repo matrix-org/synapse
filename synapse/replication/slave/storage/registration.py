@@ -25,6 +25,9 @@ class SlavedRegistrationStore(BaseSlavedStore):
     # TODO: use the cached version and invalidate deleted tokens
     get_user_by_access_token = RegistrationStore.__dict__[
         "get_user_by_access_token"
-    ].orig
+    ]
 
     _query_for_auth = DataStore._query_for_auth.__func__
+    get_user_by_id = RegistrationStore.__dict__[
+        "get_user_by_id"
+    ]

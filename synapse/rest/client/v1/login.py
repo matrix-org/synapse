@@ -56,6 +56,7 @@ class LoginRestServlet(ClientV1RestServlet):
         self.cas_enabled = hs.config.cas_enabled
         self.auth_handler = self.hs.get_auth_handler()
         self.device_handler = self.hs.get_device_handler()
+        self.handlers = hs.get_handlers()
 
     def on_GET(self, request):
         flows = []
@@ -260,6 +261,7 @@ class SAML2RestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(SAML2RestServlet, self).__init__(hs)
         self.sp_config = hs.config.saml2_config_path
+        self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -329,6 +331,7 @@ class CasTicketServlet(ClientV1RestServlet):
         self.cas_service_url = hs.config.cas_service_url
         self.cas_required_attributes = hs.config.cas_required_attributes
         self.auth_handler = hs.get_auth_handler()
+        self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
     def on_GET(self, request):

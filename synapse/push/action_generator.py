@@ -38,15 +38,16 @@ class ActionGenerator:
 
     @defer.inlineCallbacks
     def handle_push_actions_for_event(self, event, context):
-        with Measure(self.clock, "handle_push_actions_for_event"):
+        with Measure(self.clock, "evaluator_for_event"):
             bulk_evaluator = yield evaluator_for_event(
                 event, self.hs, self.store, context.current_state
             )
 
+        with Measure(self.clock, "action_for_event_by_user"):
             actions_by_user = yield bulk_evaluator.action_for_event_by_user(
                 event, context.current_state
             )
 
-            context.push_actions = [
-                (uid, actions) for uid, actions in actions_by_user.items()
-            ]
+        context.push_actions = [
+            (uid, actions) for uid, actions in actions_by_user.items()
+        ]

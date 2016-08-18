@@ -141,7 +141,7 @@ class RoomMemberHandler(BaseHandler):
             third_party_signed=None,
             ratelimit=True,
     ):
-        key = (target, room_id,)
+        key = (room_id,)
 
         with (yield self.member_linearizer.queue(key)):
             result = yield self._update_membership(

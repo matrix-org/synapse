@@ -14,6 +14,7 @@ fi
 tox -e py27 --notest -v
 
 TOX_BIN=$TOX_DIR/py27/bin
+$TOX_BIN/pip install setuptools
 python synapse/python_dependencies.py | xargs -n1 $TOX_BIN/pip install
 $TOX_BIN/pip install lxml
 $TOX_BIN/pip install psycopg2
