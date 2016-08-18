@@ -82,10 +82,9 @@ class NotificationsServlet(RestServlet):
                 receipt = receipts_by_room[pa["room_id"]]
 
                 returned_pa["read"] = (
-                    receipt["topological_ordering"] >= pa["topological_ordering"] or (
-                        receipt["topological_ordering"] == pa["topological_ordering"] and
-                        receipt["stream_ordering"] >= pa["stream_ordering"]
-                    )
+                    receipt["topological_ordering"], receipt["stream_ordering"]
+                ) >= (
+                    pa["topological_ordering"], pa["stream_ordering"]
                 )
             returned_push_actions.append(returned_pa)
             next_token = pa["stream_ordering"]
