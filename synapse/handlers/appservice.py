@@ -131,7 +131,7 @@ class ApplicationServicesHandler(object):
                 service, protocol, fields
             )
             if result:
-                results.append(result)
+                results.extend(result)
 
         defer.returnValue(results)
 
