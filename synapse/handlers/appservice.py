@@ -184,7 +184,12 @@ class ApplicationServicesHandler(object):
                 continue
             if not isinstance(result, list):
                 continue
-            ret.extend(r for r in result if _is_valid_3pu_result(r))
+            for r in result:
+                if _is_valid_3pu_result(r):
+                    ret.append(r)
+                else:
+                    logger.warn("Application service returned an " +
+                                "invalid result %r", r)
 
         defer.returnValue(ret)
 
