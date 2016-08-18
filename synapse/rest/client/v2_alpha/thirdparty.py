@@ -38,8 +38,6 @@ class ThirdPartyUserServlet(RestServlet):
         fields = request.args
         del fields["access_token"]
 
-        # TODO(paul): Some type checking on the request args might be nice
-        #   They should probably all be strings
         results = yield self.appservice_handler.query_3pu(protocol, fields)
 
         defer.returnValue((200, results))
