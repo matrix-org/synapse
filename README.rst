@@ -95,7 +95,7 @@ Synapse is the reference python/twisted Matrix homeserver implementation.
 System requirements:
 - POSIX-compliant system (tested on Linux & OS X)
 - Python 2.7
-- At least 512 MB RAM.
+- At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 Synapse is written in python but some of the libraries is uses are written in
 C. So before we can install synapse itself we need a working C compiler and the
