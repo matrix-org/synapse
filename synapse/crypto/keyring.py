@@ -22,6 +22,7 @@ from synapse.util.logcontext import (
     preserve_context_over_deferred, preserve_context_over_fn, PreserveLoggingContext,
     preserve_fn
 )
+from synapse.util.metrics import Measure
 
 from twisted.internet import defer
 
@@ -115,42 +116,43 @@ class Keyring(object):
 
         @defer.inlineCallbacks
         def handle_key_deferred(verify_request):
-            server_name = verify_request.server_name
-            try:
-                _, key_id, verify_key = yield verify_request.deferred
-            except IOError as e:
-                logger.warn(
-                    "Got IOError when downloading keys for %s: %s %s",
-                    server_name, type(e).__name__, str(e.message),
-                )
-                raise SynapseError(
-                    502,
-                    "Error downloading keys for %s" % (server_name,),
-                    Codes.UNAUTHORIZED,
-                )
-            except Exception as e:
-                logger.exception(
-                    "Got Exception when downloading keys for %s: %s %s",
-                    server_name, type(e).__name__, str(e.message),
-                )
-                raise SynapseError(
-                    401,
-                    "No key for %s with id %s" % (server_name, key_ids),
-                    Codes.UNAUTHORIZED,
-                )
+            with Measure(self.clock, "handle_key_deferred"):
+                server_name = verify_request.server_name
+                try:
+                    _, key_id, verify_key = yield verify_request.deferred
+                except IOError as e:
+                    logger.warn(
+                        "Got IOError when downloading keys for %s: %s %s",
+                        server_name, type(e).__name__, str(e.message),
+                    )
+                    raise SynapseError(
+                        502,
+                        "Error downloading keys for %s" % (server_name,),
+                        Codes.UNAUTHORIZED,
+                    )
+                except Exception as e:
+                    logger.exception(
+                        "Got Exception when downloading keys for %s: %s %s",
+                        server_name, type(e).__name__, str(e.message),
+                    )
+                    raise SynapseError(
+                        401,
+                        "No key for %s with id %s" % (server_name, key_ids),
+                        Codes.UNAUTHORIZED,
+                    )
 
-            json_object = verify_request.json_object
+                json_object = verify_request.json_object
 
-            try:
-                verify_signed_json(json_object, server_name, verify_key)
-            except:
-                raise SynapseError(
-                    401,
-                    "Invalid signature for server %s with key %s:%s" % (
-                        server_name, verify_key.alg, verify_key.version
-                    ),
-                    Codes.UNAUTHORIZED,
-                )
+                try:
+                    verify_signed_json(json_object, server_name, verify_key)
+                except:
+                    raise SynapseError(
+                        401,
+                        "Invalid signature for server %s with key %s:%s" % (
+                            server_name, verify_key.alg, verify_key.version
+                        ),
+                        Codes.UNAUTHORIZED,
+                    )
 
         server_to_deferred = {
             server_name: defer.Deferred()
