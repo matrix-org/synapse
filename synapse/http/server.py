@@ -235,42 +235,41 @@ class JsonResource(HttpServer, resource.Resource):
         request_metrics = RequestMetrics()
         request_metrics.start(self.clock)
 
-        with Measure(self.clock, "http.render"):
-            # Loop through all the registered callbacks to check if the method
-            # and path regex match
-            for path_entry in self.path_regexs.get(request.method, []):
-                m = path_entry.pattern.match(request.path)
-                if not m:
-                    continue
+        # Loop through all the registered callbacks to check if the method
+        # and path regex match
+        for path_entry in self.path_regexs.get(request.method, []):
+            m = path_entry.pattern.match(request.path)
+            if not m:
+                continue
 
-                # We found a match! Trigger callback and then return the
-                # returned response. We pass both the request and any
-                # matched groups from the regex to the callback.
+            # We found a match! Trigger callback and then return the
+            # returned response. We pass both the request and any
+            # matched groups from the regex to the callback.
 
-                callback = path_entry.callback
+            callback = path_entry.callback
 
-                servlet_instance = getattr(callback, "__self__", None)
-                if servlet_instance is not None:
-                    servlet_classname = servlet_instance.__class__.__name__
-                else:
-                    servlet_classname = "%r" % callback
+            servlet_instance = getattr(callback, "__self__", None)
+            if servlet_instance is not None:
+                servlet_classname = servlet_instance.__class__.__name__
+            else:
+                servlet_classname = "%r" % callback
 
-                kwargs = intern_dict({
-                    name: urllib.unquote(value).decode("UTF-8") if value else value
-                    for name, value in m.groupdict().items()
-                })
+            kwargs = intern_dict({
+                name: urllib.unquote(value).decode("UTF-8") if value else value
+                for name, value in m.groupdict().items()
+            })
 
-                callback_return = yield callback(request, **kwargs)
-                if callback_return is not None:
-                    code, response = callback_return
-                    self._send_response(request, code, response)
+            callback_return = yield callback(request, **kwargs)
+            if callback_return is not None:
+                code, response = callback_return
+                self._send_response(request, code, response)
 
-                try:
-                    request_metrics.stop(self.clock, request, servlet_classname)
-                except:
-                    pass
+            try:
+                request_metrics.stop(self.clock, request, servlet_classname)
+            except:
+                pass
 
-                return
+            return
 
         # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
         raise UnrecognizedRequestError()
