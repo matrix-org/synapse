@@ -160,6 +160,22 @@ class ApplicationServicesHandler(object):
                 defer.returnValue(result)
 
     @defer.inlineCallbacks
+    def query_3pe(self, kind, protocol, fields):
+        services = yield self._get_services_for_3pn(protocol)
+
+        results = yield defer.DeferredList([
+            self.appservice_api.query_3pe(service, kind, protocol, fields)
+            for service in services
+        ], consumeErrors=True)
+
+        ret = []
+        for (success, result) in results:
+            if success:
+                ret.extend(result)
+
+        defer.returnValue(ret)
+
+    @defer.inlineCallbacks
     def _get_services_for_event(self, event):
         """Retrieve a list of application services interested in this event.
 
@@ -184,6 +200,14 @@ class ApplicationServicesHandler(object):
             s for s in services if (
                 s.is_interested_in_user(user_id)
             )
+        ]
+        defer.returnValue(interested_list)
+
+    @defer.inlineCallbacks
+    def _get_services_for_3pn(self, protocol):
+        services = yield self.store.get_app_services()
+        interested_list = [
+            s for s in services if s.is_interested_in_protocol(protocol)
         ]
         defer.returnValue(interested_list)
 

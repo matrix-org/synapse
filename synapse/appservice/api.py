@@ -17,11 +17,34 @@ from twisted.internet import defer
 from synapse.api.errors import CodeMessageException
 from synapse.http.client import SimpleHttpClient
 from synapse.events.utils import serialize_event
+from synapse.types import ThirdPartyEntityKind
 
 import logging
 import urllib
 
 logger = logging.getLogger(__name__)
+
+
+def _is_valid_3pe_result(r, field):
+    if not isinstance(r, dict):
+        return False
+
+    for k in (field, "protocol"):
+        if k not in r:
+            return False
+        if not isinstance(r[k], str):
+            return False
+
+    if "fields" not in r:
+        return False
+    fields = r["fields"]
+    if not isinstance(fields, dict):
+        return False
+    for k in fields.keys():
+        if not isinstance(fields[k], str):
+            return False
+
+    return True
 
 
 class ApplicationServiceApi(SimpleHttpClient):
@@ -70,6 +93,43 @@ class ApplicationServiceApi(SimpleHttpClient):
         except Exception as ex:
             logger.warning("query_alias to %s threw exception %s", uri, ex)
         defer.returnValue(False)
+
+    @defer.inlineCallbacks
+    def query_3pe(self, service, kind, protocol, fields):
+        if kind == ThirdPartyEntityKind.USER:
+            uri = "%s/3pu/%s" % (service.url, urllib.quote(protocol))
+            required_field = "userid"
+        elif kind == ThirdPartyEntityKind.LOCATION:
+            uri = "%s/3pl/%s" % (service.url, urllib.quote(protocol))
+            required_field = "alias"
+        else:
+            raise ValueError(
+                "Unrecognised 'kind' argument %r to query_3pe()", kind
+            )
+
+        try:
+            response = yield self.get_json(uri, fields)
+            if not isinstance(response, list):
+                logger.warning(
+                    "query_3pe to %s returned an invalid response %r",
+                    uri, response
+                )
+                defer.returnValue([])
+
+            ret = []
+            for r in response:
+                if _is_valid_3pe_result(r, field=required_field):
+                    ret.append(r)
+                else:
+                    logger.warning(
+                        "query_3pe to %s returned an invalid result %r",
+                        uri, r
+                    )
+
+            defer.returnValue(ret)
+        except Exception as ex:
+            logger.warning("query_3pe to %s threw exception %s", uri, ex)
+            defer.returnValue([])
 
     @defer.inlineCallbacks
     def push_bulk(self, service, events, txn_id=None):

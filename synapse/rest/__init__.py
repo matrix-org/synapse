@@ -48,6 +48,7 @@ from synapse.rest.client.v2_alpha import (
     openid,
     notifications,
     devices,
+    thirdparty,
 )
 
 from synapse.http.server import JsonResource
@@ -94,3 +95,4 @@ class ClientRestResource(JsonResource):
         openid.register_servlets(hs, client_resource)
         notifications.register_servlets(hs, client_resource)
         devices.register_servlets(hs, client_resource)
+        thirdparty.register_servlets(hs, client_resource)
