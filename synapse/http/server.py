@@ -104,54 +104,55 @@ def wrap_request_handler(request_handler, report_metrics):
         _next_request_id += 1
 
         with LoggingContext(request_id) as request_context:
-            if report_metrics:
-                request_metrics = RequestMetrics()
-                request_metrics.start(self.clock)
+            with Measure(self.clock, "wrapped_request_handler"):
+                if report_metrics:
+                    request_metrics = RequestMetrics()
+                    request_metrics.start(self.clock)
 
-            request_context.request = request_id
-            with request.processing():
-                try:
-                    with PreserveLoggingContext(request_context):
-                        yield request_handler(self, request)
-                except CodeMessageException as e:
-                    code = e.code
-                    if isinstance(e, SynapseError):
-                        logger.info(
-                            "%s SynapseError: %s - %s", request, code, e.msg
-                        )
-                    else:
-                        logger.exception(e)
-                    outgoing_responses_counter.inc(request.method, str(code))
-                    respond_with_json(
-                        request, code, cs_exception(e), send_cors=True,
-                        pretty_print=_request_user_agent_is_curl(request),
-                        version_string=self.version_string,
-                    )
-                except:
-                    logger.exception(
-                        "Failed handle request %s.%s on %r: %r",
-                        request_handler.__module__,
-                        request_handler.__name__,
-                        self,
-                        request
-                    )
-                    respond_with_json(
-                        request,
-                        500,
-                        {
-                            "error": "Internal server error",
-                            "errcode": Codes.UNKNOWN,
-                        },
-                        send_cors=True
-                    )
-                finally:
+                request_context.request = request_id
+                with request.processing():
                     try:
-                        if report_metrics:
-                            request_metrics.stop(
-                                self.clock, request, self.__class__.__name__
+                        with PreserveLoggingContext(request_context):
+                            yield request_handler(self, request)
+                    except CodeMessageException as e:
+                        code = e.code
+                        if isinstance(e, SynapseError):
+                            logger.info(
+                                "%s SynapseError: %s - %s", request, code, e.msg
                             )
+                        else:
+                            logger.exception(e)
+                        outgoing_responses_counter.inc(request.method, str(code))
+                        respond_with_json(
+                            request, code, cs_exception(e), send_cors=True,
+                            pretty_print=_request_user_agent_is_curl(request),
+                            version_string=self.version_string,
+                        )
                     except:
-                        pass
+                        logger.exception(
+                            "Failed handle request %s.%s on %r: %r",
+                            request_handler.__module__,
+                            request_handler.__name__,
+                            self,
+                            request
+                        )
+                        respond_with_json(
+                            request,
+                            500,
+                            {
+                                "error": "Internal server error",
+                                "errcode": Codes.UNKNOWN,
+                            },
+                            send_cors=True
+                        )
+                    finally:
+                        try:
+                            if report_metrics:
+                                request_metrics.stop(
+                                    self.clock, request, self.__class__.__name__
+                                )
+                        except:
+                            pass
     return wrapped_request_handler
 
 
