@@ -32,7 +32,7 @@ def enumerate_leaves(node, depth):
 class _Node(object):
     __slots__ = ["prev_node", "next_node", "key", "value", "callbacks"]
 
-    def __init__(self, prev_node, next_node, key, value, callbacks=[]):
+    def __init__(self, prev_node, next_node, key, value, callbacks=set()):
         self.prev_node = prev_node
         self.next_node = next_node
         self.key = key
@@ -66,7 +66,7 @@ class LruCache(object):
 
             return inner
 
-        def add_node(key, value, callbacks=[]):
+        def add_node(key, value, callbacks=set()):
             prev_node = list_root
             next_node = prev_node.next_node
             node = _Node(prev_node, next_node, key, value, callbacks)
@@ -94,7 +94,7 @@ class LruCache(object):
 
             for cb in node.callbacks:
                 cb()
-            node.callbacks = []
+            node.callbacks.clear()
 
         @synchronized
         def cache_get(key, default=None, callback=None):
@@ -102,7 +102,7 @@ class LruCache(object):
             if node is not None:
                 move_node_to_front(node)
                 if callback:
-                    node.callbacks.append(callback)
+                    node.callbacks.add(callback)
                 return node.value
             else:
                 return default
@@ -114,18 +114,18 @@ class LruCache(object):
                 if value != node.value:
                     for cb in node.callbacks:
                         cb()
-                    node.callbacks = []
+                    node.callbacks.clear()
 
                 if callback:
-                    node.callbacks.append(callback)
+                    node.callbacks.add(callback)
 
                 move_node_to_front(node)
                 node.value = value
             else:
                 if callback:
-                    callbacks = [callback]
+                    callbacks = set([callback])
                 else:
-                    callbacks = []
+                    callbacks = set()
                 add_node(key, value, callbacks)
                 if len(cache) > max_size:
                     todelete = list_root.prev_node

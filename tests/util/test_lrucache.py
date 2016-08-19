@@ -50,6 +50,8 @@ class LruCacheTestCase(unittest.TestCase):
         self.assertEquals(cache.get("key"), 1)
         self.assertEquals(cache.setdefault("key", 2), 1)
         self.assertEquals(cache.get("key"), 1)
+        cache["key"] = 2  # Make sure overriding works.
+        self.assertEquals(cache.get("key"), 2)
 
     def test_pop(self):
         cache = LruCache(1)
@@ -84,6 +86,44 @@ class LruCacheTestCase(unittest.TestCase):
 
 
 class LruCacheCallbacksTestCase(unittest.TestCase):
+    def test_get(self):
+        m = Mock()
+        cache = LruCache(1)
+
+        cache.set("key", "value")
+        self.assertFalse(m.called)
+
+        cache.get("key", callback=m)
+        self.assertFalse(m.called)
+
+        cache.get("key", "value")
+        self.assertFalse(m.called)
+
+        cache.set("key", "value2")
+        self.assertEquals(m.call_count, 1)
+
+        cache.set("key", "value")
+        self.assertEquals(m.call_count, 1)
+
+    def test_multi_get(self):
+        m = Mock()
+        cache = LruCache(1)
+
+        cache.set("key", "value")
+        self.assertFalse(m.called)
+
+        cache.get("key", callback=m)
+        self.assertFalse(m.called)
+
+        cache.get("key", callback=m)
+        self.assertFalse(m.called)
+
+        cache.set("key", "value2")
+        self.assertEquals(m.call_count, 1)
+
+        cache.set("key", "value")
+        self.assertEquals(m.call_count, 1)
+
     def test_set(self):
         m = Mock()
         cache = LruCache(1)

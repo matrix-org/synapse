@@ -25,6 +25,7 @@ from synapse.util.logcontext import (
 from . import DEBUG_CACHES, register_cache
 
 from twisted.internet import defer
+from collections import namedtuple
 
 import os
 import functools
@@ -210,16 +211,17 @@ class CacheDescriptor(object):
             # whenever we are invalidated
             invalidate_callback = kwargs.pop("on_invalidate", None)
 
-            # Add our own `cache_context` to argument list if the wrapped function
-            # has asked for one
-            self_context = _CacheContext(cache, None)
+            # Add temp cache_context so inspect.getcallargs doesn't explode
             if self.add_cache_context:
-                kwargs["cache_context"] = self_context
+                kwargs["cache_context"] = None
 
             arg_dict = inspect.getcallargs(self.orig, obj, *args, **kwargs)
             cache_key = tuple(arg_dict[arg_nm] for arg_nm in self.arg_names)
 
-            self_context.key = cache_key
+            # Add our own `cache_context` to argument list if the wrapped function
+            # has asked for one
+            if self.add_cache_context:
+                kwargs["cache_context"] = _CacheContext(cache, cache_key)
 
             try:
                 cached_result_d = cache.get(cache_key, callback=invalidate_callback)
@@ -414,13 +416,7 @@ class CacheListDescriptor(object):
         return wrapped
 
 
-class _CacheContext(object):
-    __slots__ = ["cache", "key"]
-
-    def __init__(self, cache, key):
-        self.cache = cache
-        self.key = key
-
+class _CacheContext(namedtuple("_CacheContext", ("cache", "key"))):
     def invalidate(self):
         self.cache.invalidate(self.key)
 
