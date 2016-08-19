@@ -22,6 +22,7 @@ from synapse.events.utils import prune_event
 from synapse.util.async import ObservableDeferred
 from synapse.util.logcontext import preserve_fn, PreserveLoggingContext
 from synapse.util.logutils import log_function
+from synapse.util.metrics import Measure
 from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 
@@ -1132,56 +1133,57 @@ class EventsStore(SQLBaseStore):
     @defer.inlineCallbacks
     def _get_event_from_row(self, internal_metadata, js, redacted,
                             rejected_reason=None):
-        d = json.loads(js)
-        internal_metadata = json.loads(internal_metadata)
+        with Measure(self._clock, "_get_event_from_row"):
+            d = json.loads(js)
+            internal_metadata = json.loads(internal_metadata)
 
-        if rejected_reason:
-            rejected_reason = yield self._simple_select_one_onecol(
-                table="rejections",
-                keyvalues={"event_id": rejected_reason},
-                retcol="reason",
-                desc="_get_event_from_row_rejected_reason",
+            if rejected_reason:
+                rejected_reason = yield self._simple_select_one_onecol(
+                    table="rejections",
+                    keyvalues={"event_id": rejected_reason},
+                    retcol="reason",
+                    desc="_get_event_from_row_rejected_reason",
+                )
+
+            original_ev = FrozenEvent(
+                d,
+                internal_metadata_dict=internal_metadata,
+                rejected_reason=rejected_reason,
             )
 
-        original_ev = FrozenEvent(
-            d,
-            internal_metadata_dict=internal_metadata,
-            rejected_reason=rejected_reason,
-        )
+            redacted_event = None
+            if redacted:
+                redacted_event = prune_event(original_ev)
 
-        redacted_event = None
-        if redacted:
-            redacted_event = prune_event(original_ev)
+                redaction_id = yield self._simple_select_one_onecol(
+                    table="redactions",
+                    keyvalues={"redacts": redacted_event.event_id},
+                    retcol="event_id",
+                    desc="_get_event_from_row_redactions",
+                )
 
-            redaction_id = yield self._simple_select_one_onecol(
-                table="redactions",
-                keyvalues={"redacts": redacted_event.event_id},
-                retcol="event_id",
-                desc="_get_event_from_row_redactions",
+                redacted_event.unsigned["redacted_by"] = redaction_id
+                # Get the redaction event.
+
+                because = yield self.get_event(
+                    redaction_id,
+                    check_redacted=False,
+                    allow_none=True,
+                )
+
+                if because:
+                    # It's fine to do add the event directly, since get_pdu_json
+                    # will serialise this field correctly
+                    redacted_event.unsigned["redacted_because"] = because
+
+            cache_entry = _EventCacheEntry(
+                event=original_ev,
+                redacted_event=redacted_event,
             )
 
-            redacted_event.unsigned["redacted_by"] = redaction_id
-            # Get the redaction event.
+            self._get_event_cache.prefill((original_ev.event_id,), cache_entry)
 
-            because = yield self.get_event(
-                redaction_id,
-                check_redacted=False,
-                allow_none=True,
-            )
-
-            if because:
-                # It's fine to do add the event directly, since get_pdu_json
-                # will serialise this field correctly
-                redacted_event.unsigned["redacted_because"] = because
-
-        cache_entry = _EventCacheEntry(
-            event=original_ev,
-            redacted_event=redacted_event,
-        )
-
-        self._get_event_cache.prefill((original_ev.event_id,), cache_entry)
-
-        defer.returnValue(cache_entry)
+            defer.returnValue(cache_entry)
 
     @defer.inlineCallbacks
     def count_daily_messages(self):
