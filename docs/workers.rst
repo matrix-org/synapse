@@ -20,13 +20,17 @@ To enable workers, you need to add a replication listener to the master synapse,
 
     listeners:
       - port: 9092
-        bind_address: ''
+        bind_address: '127.0.0.1'
         type: http
         tls: false
         x_forwarded: false
         resources:
           - names: [replication]
             compress: false
+
+Under **no circumstances** should this replication API listener be exposed to the
+public internet; it currently implements no authentication whatsoever and is
+unencrypted HTTP.
 
 You then create a set of configs for the various worker processes.  These should be
 worker configuration files should be stored in a dedicated subdirectory, to allow
@@ -65,12 +69,12 @@ For instance::
     worker_pid_file: /home/matrix/synapse/synchrotron.pid
     worker_log_config: /home/matrix/synapse/config/synchrotron_log_config.yaml
 
-...is a full configuration for a synchotron worker instance, which will expose a
+...is a full configuration for a synchrotron worker instance, which will expose a
 plain HTTP /sync endpoint on port 8083 separately from the /sync endpoint provided
 by the main synapse.
 
 Obviously you should configure your loadbalancer to route the /sync endpoint to
-the synchotron instance(s) in this instance.
+the synchrotron instance(s) in this instance.
 
 Finally, to actually run your worker-based synapse, you must pass synctl the -a
 commandline option to tell it to operate on all the worker configurations found
@@ -80,12 +84,12 @@ in the given directory, e.g.::
 
 Currently one should always restart all workers when restarting or upgrading
 synapse, unless you explicitly know it's safe not to.  For instance, restarting
-synapse without restarting all the synchotrons may result in broken typing
+synapse without restarting all the synchrotrons may result in broken typing
 notifications.
 
 To manipulate a specific worker, you pass the -w option to synctl::
 
-    synctl -w $CONFIG/workers/synchotron.yaml restart
+    synctl -w $CONFIG/workers/synchrotron.yaml restart
 
 All of the above is highly experimental and subject to change as Synapse evolves,
 but documenting it here to help folks needing highly scalable Synapses similar
