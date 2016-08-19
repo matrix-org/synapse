@@ -156,14 +156,14 @@ class PushRuleStore(SQLBaseStore):
         # users in the room who have pushers need to get push rules run because
         # that's how their pushers work
         if_users_with_pushers = yield self.get_if_users_have_pushers(
-            local_users_in_room, cache_context=cache_context,
+            local_users_in_room, on_invalidate=cache_context.invalidate,
         )
         user_ids = set(
             uid for uid, have_pusher in if_users_with_pushers.items() if have_pusher
         )
 
         users_with_receipts = yield self.get_users_with_read_receipts_in_room(
-            room_id, cache_context=cache_context,
+            room_id, on_invalidate=cache_context.invalidate,
         )
 
         # any users with pushers must be ours: they have pushers
@@ -172,7 +172,7 @@ class PushRuleStore(SQLBaseStore):
                 user_ids.add(uid)
 
         rules_by_user = yield self.bulk_get_push_rules(
-            user_ids, cache_context=cache_context
+            user_ids, on_invalidate=cache_context.invalidate,
         )
 
         rules_by_user = {k: v for k, v in rules_by_user.items() if v is not None}
