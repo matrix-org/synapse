@@ -134,7 +134,7 @@ class PushRuleStore(SQLBaseStore):
 
         return self._bulk_get_push_rules_for_room(room_id, state_group, current_state)
 
-    @cachedInlineCallbacks(num_args=2)
+    @cachedInlineCallbacks(num_args=2, cache_context=True)
     def _bulk_get_push_rules_for_room(self, room_id, state_group, current_state,
                                       cache_context):
         # We don't use `state_group`, its there so that we can cache based

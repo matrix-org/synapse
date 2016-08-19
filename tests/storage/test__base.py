@@ -211,7 +211,7 @@ class CacheDecoratorTestCase(unittest.TestCase):
                 callcount[0] += 1
                 return key
 
-            @cached()
+            @cached(cache_context=True)
             def func2(self, key, cache_context):
                 callcount2[0] += 1
                 return self.func(key, cache_context=cache_context)
@@ -244,7 +244,7 @@ class CacheDecoratorTestCase(unittest.TestCase):
                 callcount[0] += 1
                 return key
 
-            @cached()
+            @cached(cache_context=True)
             def func2(self, key, cache_context):
                 callcount2[0] += 1
                 return self.func(key, cache_context=cache_context)
