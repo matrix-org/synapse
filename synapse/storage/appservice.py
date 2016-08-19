@@ -366,8 +366,11 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
         def get_new_events_for_appservice_txn(txn):
             sql = (
                 "SELECT e.stream_ordering, e.event_id"
-                " FROM events AS e, appservice_stream_position AS a"
-                " WHERE a.stream_ordering < e.stream_ordering AND e.stream_ordering <= ?"
+                " FROM events AS e"
+                " WHERE"
+                " (SELECT stream_ordering FROM appservice_stream_position)"
+                "     < e.stream_ordering"
+                " AND e.stream_ordering <= ?"
                 " ORDER BY e.stream_ordering ASC"
                 " LIMIT ?"
             )
