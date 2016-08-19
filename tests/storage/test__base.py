@@ -72,7 +72,7 @@ class CacheTestCase(unittest.TestCase):
         cache.get(3)
 
     def test_eviction_lru(self):
-        cache = Cache("test", max_entries=2, lru=True)
+        cache = Cache("test", max_entries=2)
 
         cache.prefill(1, "one")
         cache.prefill(2, "two")

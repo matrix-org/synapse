@@ -26,8 +26,6 @@ from . import DEBUG_CACHES, register_cache
 
 from twisted.internet import defer
 
-from collections import OrderedDict
-
 import os
 import functools
 import inspect
@@ -54,16 +52,11 @@ class Cache(object):
         "metrics",
     )
 
-    def __init__(self, name, max_entries=1000, keylen=1, lru=True, tree=False):
-        if True:
-            cache_type = TreeCache if tree else dict
-            self.cache = LruCache(
-                max_size=max_entries, keylen=keylen, cache_type=cache_type
-            )
-            self.max_entries = None
-        else:
-            self.cache = OrderedDict()
-            self.max_entries = max_entries
+    def __init__(self, name, max_entries=1000, keylen=1, tree=False):
+        cache_type = TreeCache if tree else dict
+        self.cache = LruCache(
+            max_size=max_entries, keylen=keylen, cache_type=cache_type
+        )
 
         self.name = name
         self.keylen = keylen
@@ -102,10 +95,6 @@ class Cache(object):
             self.prefill(key, value, callback=callback)
 
     def prefill(self, key, value, callback=None):
-        if self.max_entries is not None:
-            while len(self.cache) >= self.max_entries:
-                self.cache.popitem(last=False, callback=None)
-
         self.cache.set(key, value, callback=callback)
 
     def invalidate(self, key):
@@ -164,7 +153,7 @@ class CacheDescriptor(object):
             defer.returnValue(r1 + r2)
 
     """
-    def __init__(self, orig, max_entries=1000, num_args=1, lru=True, tree=False,
+    def __init__(self, orig, max_entries=1000, num_args=1, tree=False,
                  inlineCallbacks=False):
         max_entries = int(max_entries * CACHE_SIZE_FACTOR)
 
@@ -177,7 +166,6 @@ class CacheDescriptor(object):
 
         self.max_entries = max_entries
         self.num_args = num_args
-        self.lru = lru
         self.tree = tree
 
         all_args = inspect.getargspec(orig)
@@ -200,7 +188,6 @@ class CacheDescriptor(object):
             name=self.orig.__name__,
             max_entries=self.max_entries,
             keylen=self.num_args,
-            lru=self.lru,
             tree=self.tree,
         )
 
@@ -427,22 +414,20 @@ class _CacheContext(object):
         self.cache.invalidate(self.key)
 
 
-def cached(max_entries=1000, num_args=1, lru=True, tree=False):
+def cached(max_entries=1000, num_args=1, tree=False):
     return lambda orig: CacheDescriptor(
         orig,
         max_entries=max_entries,
         num_args=num_args,
-        lru=lru,
         tree=tree,
     )
 
 
-def cachedInlineCallbacks(max_entries=1000, num_args=1, lru=False, tree=False):
+def cachedInlineCallbacks(max_entries=1000, num_args=1, tree=False):
     return lambda orig: CacheDescriptor(
         orig,
         max_entries=max_entries,
         num_args=num_args,
-        lru=lru,
         tree=tree,
         inlineCallbacks=True,
     )
