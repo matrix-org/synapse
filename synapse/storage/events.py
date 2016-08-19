@@ -1183,7 +1183,7 @@ class EventsStore(SQLBaseStore):
 
             self._get_event_cache.prefill((original_ev.event_id,), cache_entry)
 
-            defer.returnValue(cache_entry)
+        defer.returnValue(cache_entry)
 
     @defer.inlineCallbacks
     def count_daily_messages(self):
