@@ -338,6 +338,36 @@ class EventPushActionsStore(SQLBaseStore):
         defer.returnValue(notifs[:limit])
 
     @defer.inlineCallbacks
+    def get_push_actions_for_user(self, user_id, before=None, limit=50):
+        def f(txn):
+            before_clause = ""
+            if before:
+                before_clause = "AND stream_ordering < ?"
+                args = [user_id, before, limit]
+            else:
+                args = [user_id, limit]
+            sql = (
+                "SELECT epa.event_id, epa.room_id,"
+                " epa.stream_ordering, epa.topological_ordering,"
+                " epa.actions, epa.profile_tag, e.received_ts"
+                " FROM event_push_actions epa, events e"
+                " WHERE epa.room_id = e.room_id AND epa.event_id = e.event_id"
+                " AND epa.user_id = ? %s"
+                " ORDER BY epa.stream_ordering DESC"
+                " LIMIT ?"
+                % (before_clause,)
+            )
+            txn.execute(sql, args)
+            return self.cursor_to_dict(txn)
+
+        push_actions = yield self.runInteraction(
+            "get_push_actions_for_user", f
+        )
+        for pa in push_actions:
+            pa["actions"] = json.loads(pa["actions"])
+        defer.returnValue(push_actions)
+
+    @defer.inlineCallbacks
     def get_time_of_last_push_action_before(self, stream_ordering):
         def f(txn):
             sql = (
