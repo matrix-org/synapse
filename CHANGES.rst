@@ -1,3 +1,36 @@
+Changes in synapse v0.17.1-rc1 (2016-08-22)
+===========================================
+
+Features:
+
+* Add notification API (PR #1028)
+
+
+Changes:
+
+* Don't print stack traces when failing to get remote keys (PR #996)
+* Various federation /event/ perf improvements (PR #998)
+* Only process one local membership event per room at a time (PR #1005)
+* Move default display name push rule (PR #1011, #1023)
+* Fix up preview URL API. Add tests. (PR #1015)
+* Set ``Content-Security-Policy`` on media repo (PR #1021)
+* Make notify_interested_services faster (PR #1022)
+* Add usage stats to prometheus monitoring (PR #1037)
+
+
+Bug fixes:
+
+* Fix token login (PR #993)
+* Fix CAS login (PR #994, #995)
+* Fix /sync to not clobber status_msg (PR #997)
+* Fix redacted state events to include prev_content (PR #1003)
+* Fix some bugs in the auth/ldap handler (PR #1007)
+* Fix backfill request to limit URI length, so that remotes don't reject the
+  requests due to path length limits (PR #1012)
+* Fix AS push code to not send duplicate events (PR #1025)
+
+
+
 Changes in synapse v0.17.0 (2016-08-08)
 =======================================
 
