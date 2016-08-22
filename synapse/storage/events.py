@@ -29,6 +29,7 @@ from synapse.api.errors import SynapseError
 from canonicaljson import encode_canonical_json
 from collections import deque, namedtuple, OrderedDict
 from functools import wraps
+from time import sleep
 
 import synapse
 import synapse.metrics
@@ -1632,6 +1633,7 @@ class EventsStore(SQLBaseStore):
             "event_signatures",
             "rejections",
         ):
+            sleep(0.1)
             txn.executemany(
                 "DELETE FROM %s WHERE event_id = ?" % (table,),
                 to_delete
