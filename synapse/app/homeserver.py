@@ -51,7 +51,7 @@ from synapse.api.urls import (
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.util.logcontext import LoggingContext
-from synapse.metrics import register_memory_metrics
+from synapse.metrics import register_memory_metrics, get_metrics_for
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.replication.resource import ReplicationResource, REPLICATION_PREFIX
 from synapse.federation.transport.server import TransportLayerServer
@@ -385,6 +385,8 @@ def run(hs):
 
     start_time = hs.get_clock().time()
 
+    stats = {}
+
     @defer.inlineCallbacks
     def phone_stats_home():
         logger.info("Gathering stats for reporting")
@@ -393,7 +395,10 @@ def run(hs):
         if uptime < 0:
             uptime = 0
 
-        stats = {}
+        # If the stats directory is empty then this is the first time we've
+        # reported stats.
+        first_time = not stats
+
         stats["homeserver"] = hs.config.server_name
         stats["timestamp"] = now
         stats["uptime_seconds"] = uptime
@@ -406,6 +411,24 @@ def run(hs):
         daily_messages = yield hs.get_datastore().count_daily_messages()
         if daily_messages is not None:
             stats["daily_messages"] = daily_messages
+        else:
+            stats.pop("daily_messages", None)
+
+        if first_time:
+            # Report the stats as synapse metrics.
+            # As some of the stats are expensive to calculate we only update
+            # them when synapse phones home to matrix.org every 24 hours.
+            metrics = get_metrics_for("synapse.usage")
+            metrics.add_callback("timestamp", lambda: stats["timestamp"])
+            metrics.add_callback("uptime_seconds", lambda: stats["uptime_seconds"])
+            metrics.add_callback("total_users", lambda: stats["total_users"])
+            metrics.add_callback("total_room_count", lambda: stats["total_room_count"])
+            metrics.add_callback(
+                "daily_active_users", lambda: stats["daily_active_users"]
+            )
+            metrics.add_callback(
+                "daily_messages", lambda: stats.get("daily_messages", 0)
+            )
 
         logger.info("Reporting stats to matrix.org: %s" % (stats,))
         try:
