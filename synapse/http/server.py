@@ -150,10 +150,10 @@ def wrap_request_handler(request_handler, include_metrics=False):
                     finally:
                         try:
                             request_metrics.stop(
-                                self.clock, request, self.__class__.__name__
+                                self.clock, request
                             )
-                        except:
-                            pass
+                        except Exception as e:
+                            logger.warn("Failed to stop metrics: %r", e)
     return wrapped_request_handler
 
 
