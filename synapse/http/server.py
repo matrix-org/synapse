@@ -75,12 +75,12 @@ response_db_txn_duration = metrics.register_distribution(
 _next_request_id = 0
 
 
-def request_handler(report_metrics=True):
+def request_handler(include_metrics=False):
     """Decorator for ``wrap_request_handler``"""
-    return lambda request_handler: wrap_request_handler(request_handler, report_metrics)
+    return lambda request_handler: wrap_request_handler(request_handler, include_metrics)
 
 
-def wrap_request_handler(request_handler, report_metrics):
+def wrap_request_handler(request_handler, include_metrics=False):
     """Wraps a method that acts as a request handler with the necessary logging
     and exception handling.
 
@@ -105,15 +105,17 @@ def wrap_request_handler(request_handler, report_metrics):
 
         with LoggingContext(request_id) as request_context:
             with Measure(self.clock, "wrapped_request_handler"):
-                if report_metrics:
-                    request_metrics = RequestMetrics()
-                    request_metrics.start(self.clock)
+                request_metrics = RequestMetrics()
+                request_metrics.start(self.clock, name=self.__class__.__name__)
 
                 request_context.request = request_id
                 with request.processing():
                     try:
                         with PreserveLoggingContext(request_context):
-                            yield request_handler(self, request)
+                            if include_metrics:
+                                yield request_handler(self, request, request_metrics)
+                            else:
+                                yield request_handler(self, request)
                     except CodeMessageException as e:
                         code = e.code
                         if isinstance(e, SynapseError):
@@ -147,10 +149,9 @@ def wrap_request_handler(request_handler, report_metrics):
                         )
                     finally:
                         try:
-                            if report_metrics:
-                                request_metrics.stop(
-                                    self.clock, request, self.__class__.__name__
-                                )
+                            request_metrics.stop(
+                                self.clock, request, self.__class__.__name__
+                            )
                         except:
                             pass
     return wrapped_request_handler
@@ -222,9 +223,9 @@ class JsonResource(HttpServer, resource.Resource):
     # It does its own metric reporting because _async_render dispatches to
     # a callback and it's the class name of that callback we want to report
     # against rather than the JsonResource itself.
-    @request_handler()
+    @request_handler(include_metrics=True)
     @defer.inlineCallbacks
-    def _async_render(self, request):
+    def _async_render(self, request, request_metrics):
         """ This gets called from render() every time someone sends us a request.
             This checks if anyone has registered a callback for that method and
             path.
@@ -256,6 +257,14 @@ class JsonResource(HttpServer, resource.Resource):
                 code, response = callback_return
                 self._send_response(request, code, response)
 
+            servlet_instance = getattr(callback, "__self__", None)
+            if servlet_instance is not None:
+                servlet_classname = servlet_instance.__class__.__name__
+            else:
+                servlet_classname = "%r" % callback
+
+            request_metrics.name = servlet_classname
+
             return
 
         # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
@@ -286,11 +295,12 @@ class JsonResource(HttpServer, resource.Resource):
 
 
 class RequestMetrics(object):
-    def start(self, clock):
+    def start(self, clock, name):
         self.start = clock.time_msec()
         self.start_context = LoggingContext.current_context()
+        self.name = name
 
-    def stop(self, clock, request, servlet_classname):
+    def stop(self, clock, request):
         context = LoggingContext.current_context()
 
         tag = ""
@@ -304,26 +314,26 @@ class RequestMetrics(object):
                 )
                 return
 
-        incoming_requests_counter.inc(request.method, servlet_classname, tag)
+        incoming_requests_counter.inc(request.method, self.name, tag)
 
         response_timer.inc_by(
             clock.time_msec() - self.start, request.method,
-            servlet_classname, tag
+            self.name, tag
         )
 
         ru_utime, ru_stime = context.get_resource_usage()
 
         response_ru_utime.inc_by(
-            ru_utime, request.method, servlet_classname, tag
+            ru_utime, request.method, self.name, tag
         )
         response_ru_stime.inc_by(
-            ru_stime, request.method, servlet_classname, tag
+            ru_stime, request.method, self.name, tag
         )
         response_db_txn_count.inc_by(
-            context.db_txn_count, request.method, servlet_classname, tag
+            context.db_txn_count, request.method, self.name, tag
         )
         response_db_txn_duration.inc_by(
-            context.db_txn_duration, request.method, servlet_classname, tag
+            context.db_txn_duration, request.method, self.name, tag
         )
 
 
