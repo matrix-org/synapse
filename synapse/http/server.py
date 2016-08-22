@@ -222,7 +222,7 @@ class JsonResource(HttpServer, resource.Resource):
     # It does its own metric reporting because _async_render dispatches to
     # a callback and it's the class name of that callback we want to report
     # against rather than the JsonResource itself.
-    @request_handler(report_metrics=False)
+    @request_handler()
     @defer.inlineCallbacks
     def _async_render(self, request):
         """ This gets called from render() every time someone sends us a request.
@@ -232,9 +232,6 @@ class JsonResource(HttpServer, resource.Resource):
         if request.method == "OPTIONS":
             self._send_response(request, 200, {})
             return
-
-        request_metrics = RequestMetrics()
-        request_metrics.start(self.clock)
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
@@ -249,12 +246,6 @@ class JsonResource(HttpServer, resource.Resource):
 
             callback = path_entry.callback
 
-            servlet_instance = getattr(callback, "__self__", None)
-            if servlet_instance is not None:
-                servlet_classname = servlet_instance.__class__.__name__
-            else:
-                servlet_classname = "%r" % callback
-
             kwargs = intern_dict({
                 name: urllib.unquote(value).decode("UTF-8") if value else value
                 for name, value in m.groupdict().items()
@@ -264,11 +255,6 @@ class JsonResource(HttpServer, resource.Resource):
             if callback_return is not None:
                 code, response = callback_return
                 self._send_response(request, code, response)
-
-            try:
-                request_metrics.stop(self.clock, request, servlet_classname)
-            except:
-                pass
 
             return
 
