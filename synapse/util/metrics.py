@@ -87,7 +87,7 @@ class Measure(object):
         self.db_txn_duration = self.start_context.db_txn_duration
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is not None or not self.start_context:
+        if isinstance(exc_type, Exception) or not self.start_context:
             return
 
         duration = self.clock.time_msec() - self.start

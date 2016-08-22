@@ -22,6 +22,7 @@ from synapse.util.logcontext import (
     preserve_context_over_deferred, preserve_context_over_fn, PreserveLoggingContext,
     preserve_fn
 )
+from synapse.util.metrics import Measure
 
 from twisted.internet import defer
 
@@ -243,59 +244,60 @@ class Keyring(object):
 
         @defer.inlineCallbacks
         def do_iterations():
-            merged_results = {}
+            with Measure(self.clock, "get_server_verify_keys"):
+                merged_results = {}
 
-            missing_keys = {}
-            for verify_request in verify_requests:
-                missing_keys.setdefault(verify_request.server_name, set()).update(
-                    verify_request.key_ids
-                )
-
-            for fn in key_fetch_fns:
-                results = yield fn(missing_keys.items())
-                merged_results.update(results)
-
-                # We now need to figure out which verify requests we have keys
-                # for and which we don't
                 missing_keys = {}
-                requests_missing_keys = []
                 for verify_request in verify_requests:
-                    server_name = verify_request.server_name
-                    result_keys = merged_results[server_name]
+                    missing_keys.setdefault(verify_request.server_name, set()).update(
+                        verify_request.key_ids
+                    )
 
-                    if verify_request.deferred.called:
-                        # We've already called this deferred, which probably
-                        # means that we've already found a key for it.
-                        continue
+                for fn in key_fetch_fns:
+                    results = yield fn(missing_keys.items())
+                    merged_results.update(results)
 
-                    for key_id in verify_request.key_ids:
-                        if key_id in result_keys:
-                            with PreserveLoggingContext():
-                                verify_request.deferred.callback((
-                                    server_name,
-                                    key_id,
-                                    result_keys[key_id],
-                                ))
-                            break
-                    else:
-                        # The else block is only reached if the loop above
-                        # doesn't break.
-                        missing_keys.setdefault(server_name, set()).update(
-                            verify_request.key_ids
-                        )
-                        requests_missing_keys.append(verify_request)
+                    # We now need to figure out which verify requests we have keys
+                    # for and which we don't
+                    missing_keys = {}
+                    requests_missing_keys = []
+                    for verify_request in verify_requests:
+                        server_name = verify_request.server_name
+                        result_keys = merged_results[server_name]
 
-                if not missing_keys:
-                    break
+                        if verify_request.deferred.called:
+                            # We've already called this deferred, which probably
+                            # means that we've already found a key for it.
+                            continue
 
-            for verify_request in requests_missing_keys.values():
-                verify_request.deferred.errback(SynapseError(
-                    401,
-                    "No key for %s with id %s" % (
-                        verify_request.server_name, verify_request.key_ids,
-                    ),
-                    Codes.UNAUTHORIZED,
-                ))
+                        for key_id in verify_request.key_ids:
+                            if key_id in result_keys:
+                                with PreserveLoggingContext():
+                                    verify_request.deferred.callback((
+                                        server_name,
+                                        key_id,
+                                        result_keys[key_id],
+                                    ))
+                                break
+                        else:
+                            # The else block is only reached if the loop above
+                            # doesn't break.
+                            missing_keys.setdefault(server_name, set()).update(
+                                verify_request.key_ids
+                            )
+                            requests_missing_keys.append(verify_request)
+
+                    if not missing_keys:
+                        break
+
+                for verify_request in requests_missing_keys.values():
+                    verify_request.deferred.errback(SynapseError(
+                        401,
+                        "No key for %s with id %s" % (
+                            verify_request.server_name, verify_request.key_ids,
+                        ),
+                        Codes.UNAUTHORIZED,
+                    ))
 
         def on_err(err):
             for verify_request in verify_requests:
