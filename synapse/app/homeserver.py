@@ -415,7 +415,8 @@ def run(hs):
             stats.pop("daily_messages", None)
 
         if first_time:
-            # Report the stats as synapse metrics.
+            # Add callbacks to report the synapse stats as metrics whenever
+            # prometheus requests them, typically every 30s.
             # As some of the stats are expensive to calculate we only update
             # them when synapse phones home to matrix.org every 24 hours.
             metrics = get_metrics_for("synapse.usage")
