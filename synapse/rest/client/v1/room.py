@@ -268,6 +268,7 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
             action="join",
             txn_id=txn_id,
             remote_room_hosts=remote_room_hosts,
+            content=content,
             third_party_signed=content.get("third_party_signed", None),
         )
 
