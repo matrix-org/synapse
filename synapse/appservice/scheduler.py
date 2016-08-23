@@ -150,12 +150,12 @@ class _TransactionController(object):
             if service_is_up:
                 sent = yield txn.send(self.as_api)
                 if sent:
-                    txn.complete(self.store)
+                    yield txn.complete(self.store)
                 else:
-                    self._start_recoverer(service)
+                    preserve_fn(self._start_recoverer)(service)
         except Exception as e:
             logger.exception(e)
-            self._start_recoverer(service)
+            preserve_fn(self._start_recoverer)(service)
 
     @defer.inlineCallbacks
     def on_recovered(self, recoverer):

@@ -20,7 +20,9 @@ from synapse.events import FrozenEvent, USE_FROZEN_DICTS
 from synapse.events.utils import prune_event
 
 from synapse.util.async import ObservableDeferred
-from synapse.util.logcontext import preserve_fn, PreserveLoggingContext
+from synapse.util.logcontext import (
+    preserve_fn, PreserveLoggingContext, preserve_context_over_deferred
+)
 from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 from synapse.api.constants import EventTypes
@@ -202,7 +204,7 @@ class EventsStore(SQLBaseStore):
 
         deferreds = []
         for room_id, evs_ctxs in partitioned.items():
-            d = self._event_persist_queue.add_to_queue(
+            d = preserve_fn(self._event_persist_queue.add_to_queue)(
                 room_id, evs_ctxs,
                 backfilled=backfilled,
                 current_state=None,
@@ -212,7 +214,9 @@ class EventsStore(SQLBaseStore):
         for room_id in partitioned.keys():
             self._maybe_start_persisting(room_id)
 
-        return defer.gatherResults(deferreds, consumeErrors=True)
+        return preserve_context_over_deferred(
+            defer.gatherResults(deferreds, consumeErrors=True)
+        )
 
     @defer.inlineCallbacks
     @log_function
@@ -225,7 +229,7 @@ class EventsStore(SQLBaseStore):
 
         self._maybe_start_persisting(event.room_id)
 
-        yield deferred
+        yield preserve_context_over_deferred(deferred)
 
         max_persisted_id = yield self._stream_id_gen.get_current_token()
         defer.returnValue((event.internal_metadata.stream_ordering, max_persisted_id))
@@ -1088,7 +1092,7 @@ class EventsStore(SQLBaseStore):
         if not allow_rejected:
             rows[:] = [r for r in rows if not r["rejects"]]
 
-        res = yield defer.gatherResults(
+        res = yield preserve_context_over_deferred(defer.gatherResults(
             [
                 preserve_fn(self._get_event_from_row)(
                     row["internal_metadata"], row["json"], row["redacts"],
@@ -1097,7 +1101,7 @@ class EventsStore(SQLBaseStore):
                 for row in rows
             ],
             consumeErrors=True
-        )
+        ))
 
         defer.returnValue({
             e.event.event_id: e

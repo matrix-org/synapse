@@ -16,7 +16,9 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, AuthError
-from synapse.util.logcontext import PreserveLoggingContext
+from synapse.util.logcontext import (
+    PreserveLoggingContext, preserve_fn, preserve_context_over_deferred,
+)
 from synapse.util.metrics import Measure
 from synapse.types import UserID
 
@@ -169,13 +171,13 @@ class TypingHandler(object):
         deferreds = []
         for domain in domains:
             if domain == self.server_name:
-                self._push_update_local(
+                preserve_fn(self._push_update_local)(
                     room_id=room_id,
                     user_id=user_id,
                     typing=typing
                 )
             else:
-                deferreds.append(self.federation.send_edu(
+                deferreds.append(preserve_fn(self.federation.send_edu)(
                     destination=domain,
                     edu_type="m.typing",
                     content={
@@ -185,7 +187,9 @@ class TypingHandler(object):
                     },
                 ))
 
-        yield defer.DeferredList(deferreds, consumeErrors=True)
+        yield preserve_context_over_deferred(
+            defer.DeferredList(deferreds, consumeErrors=True)
+        )
 
     @defer.inlineCallbacks
     def _recv_edu(self, origin, content):

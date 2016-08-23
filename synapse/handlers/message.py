@@ -28,7 +28,8 @@ from synapse.types import (
 from synapse.util import unwrapFirstError
 from synapse.util.async import concurrently_execute, run_on_reactor, ReadWriteLock
 from synapse.util.caches.snapshot_cache import SnapshotCache
-from synapse.util.logcontext import preserve_fn
+from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
+from synapse.util.metrics import measure_func
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -502,15 +503,17 @@ class MessageHandler(BaseHandler):
                         lambda states: states[event.event_id]
                     )
 
-                (messages, token), current_state = yield defer.gatherResults(
-                    [
-                        self.store.get_recent_events_for_room(
-                            event.room_id,
-                            limit=limit,
-                            end_token=room_end_token,
-                        ),
-                        deferred_room_state,
-                    ]
+                (messages, token), current_state = yield preserve_context_over_deferred(
+                    defer.gatherResults(
+                        [
+                            preserve_fn(self.store.get_recent_events_for_room)(
+                                event.room_id,
+                                limit=limit,
+                                end_token=room_end_token,
+                            ),
+                            deferred_room_state,
+                        ]
+                    )
                 ).addErrback(unwrapFirstError)
 
                 messages = yield filter_events_for_client(
@@ -719,9 +722,9 @@ class MessageHandler(BaseHandler):
 
         presence, receipts, (messages, token) = yield defer.gatherResults(
             [
-                get_presence(),
-                get_receipts(),
-                self.store.get_recent_events_for_room(
+                preserve_fn(get_presence)(),
+                preserve_fn(get_receipts)(),
+                preserve_fn(self.store.get_recent_events_for_room)(
                     room_id,
                     limit=limit,
                     end_token=now_token.room_key,
@@ -755,6 +758,7 @@ class MessageHandler(BaseHandler):
 
         defer.returnValue(ret)
 
+    @measure_func("_create_new_client_event")
     @defer.inlineCallbacks
     def _create_new_client_event(self, builder, prev_event_ids=None):
         if prev_event_ids:
@@ -806,6 +810,7 @@ class MessageHandler(BaseHandler):
             (event, context,)
         )
 
+    @measure_func("handle_new_client_event")
     @defer.inlineCallbacks
     def handle_new_client_event(
         self,
@@ -934,7 +939,7 @@ class MessageHandler(BaseHandler):
         @defer.inlineCallbacks
         def _notify():
             yield run_on_reactor()
-            self.notifier.on_new_room_event(
+            yield self.notifier.on_new_room_event(
                 event, event_stream_id, max_stream_id,
                 extra_users=extra_users
             )
@@ -944,6 +949,6 @@ class MessageHandler(BaseHandler):
         # If invite, remove room_state from unsigned before sending.
         event.unsigned.pop("invite_room_state", None)
 
-        federation_handler.handle_new_event(
+        preserve_fn(federation_handler.handle_new_event)(
             event, destinations=destinations,
         )
