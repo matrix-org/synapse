@@ -30,6 +30,9 @@ class ThirdPartyProtocolsServlet(RestServlet):
 
     META = {
         # TODO(paul): Declare kinds of metadata in here
+        "gitter": {
+            "user_fields": ["username"],
+        }
     }
 
     def __init__(self, hs):
