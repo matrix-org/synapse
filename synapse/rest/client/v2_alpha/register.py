@@ -403,10 +403,9 @@ class RegisterRestServlet(RestServlet):
         # register the user's device
         device_id = params.get("device_id")
         initial_display_name = params.get("initial_device_display_name")
-        device_id = self.device_handler.check_device_registered(
+        return self.device_handler.check_device_registered(
             user_id, device_id, initial_display_name
         )
-        return device_id
 
     @defer.inlineCallbacks
     def _do_guest_registration(self):
