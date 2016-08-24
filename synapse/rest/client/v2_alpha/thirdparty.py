@@ -28,13 +28,6 @@ logger = logging.getLogger(__name__)
 class ThirdPartyProtocolsServlet(RestServlet):
     PATTERNS = client_v2_patterns("/thirdparty/protocols", releases=())
 
-    META = {
-        # TODO(paul): Declare kinds of metadata in here
-        "gitter": {
-            "user_fields": ["username"],
-        }
-    }
-
     def __init__(self, hs):
         super(ThirdPartyProtocolsServlet, self).__init__()
 
@@ -46,19 +39,7 @@ class ThirdPartyProtocolsServlet(RestServlet):
         yield self.auth.get_user_by_req(request)
 
         protocols = yield self.appservice_handler.get_3pe_protocols()
-
-        result = {}
-        # TODO(paul): Eventually this kind of metadata wants to come from the
-        #   ASes themselves
-        for protocol in protocols:
-            if protocol in self.META:
-                result[protocol] = self.META[protocol]
-            else:
-                # We don't know any metadata for it, but we'd best at least
-                # still declare that we know it exists
-                result[protocol] = {}
-
-        defer.returnValue((200, result))
+        defer.returnValue((200, protocols))
 
 
 class ThirdPartyUserServlet(RestServlet):

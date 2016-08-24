@@ -37,6 +37,13 @@ def log_failure(failure):
 
 class ApplicationServicesHandler(object):
 
+    PROTOCOL_META = {
+        # TODO(paul): Declare kinds of metadata in here
+        "gitter": {
+            "user_fields": ["username"],
+        }
+    }
+
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.is_mine_id = hs.is_mine_id
@@ -48,6 +55,7 @@ class ApplicationServicesHandler(object):
 
         self.current_max = 0
         self.is_processing = False
+        self.supported_protocols = None
 
     @defer.inlineCallbacks
     def notify_interested_services(self, current_id):
@@ -177,10 +185,24 @@ class ApplicationServicesHandler(object):
 
     @defer.inlineCallbacks
     def get_3pe_protocols(self):
+        # The set of supported AS protocols and the metadata about them is
+        # effectively static during the lifetime of a homeserver process. We
+        # can look this up once and just cache it.
+        if self.supported_protocols:
+            defer.returnValue(self.supported_protocols)
+
         services = yield self.store.get_app_services()
-        protocols = set()
+        protocols = {}
         for s in services:
-            protocols.update(s.protocols)
+            for p in s.protocols:
+                if p in self.PROTOCOL_META:
+                    protocols[p] = self.PROTOCOL_META[p]
+                else:
+                    # We don't know any metadata for it, but we'd best at least
+                    # still declare that we know it exists
+                    protocols[p] = {}
+
+        self.supported_protocols = protocols
         defer.returnValue(protocols)
 
     @defer.inlineCallbacks
