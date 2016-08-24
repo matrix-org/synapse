@@ -375,9 +375,9 @@ class FederationHandler(BaseHandler):
                     ],
                     consumeErrors=True
                 )).addErrback(unwrapFirstError)
-                auth_events.update({a.event_id: a for a in results})
+                auth_events.update({a.event_id: a for a in results if a})
                 required_auth.update(
-                    a_id for event in results for a_id, _ in event.auth_events
+                    a_id for event in results for a_id, _ in event.auth_events if event
                 )
                 missing_auth = required_auth - set(auth_events)
 
