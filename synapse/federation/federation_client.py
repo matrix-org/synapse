@@ -27,6 +27,7 @@ from synapse.util import unwrapFirstError
 from synapse.util.async import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logutils import log_function
+from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
 from synapse.events import FrozenEvent
 import synapse.metrics
 
@@ -225,10 +226,10 @@ class FederationClient(FederationBase):
         ]
 
         # FIXME: We should handle signature failures more gracefully.
-        pdus[:] = yield defer.gatherResults(
+        pdus[:] = yield preserve_context_over_deferred(defer.gatherResults(
             self._check_sigs_and_hashes(pdus),
             consumeErrors=True,
-        ).addErrback(unwrapFirstError)
+        )).addErrback(unwrapFirstError)
 
         defer.returnValue(pdus)
 
@@ -457,14 +458,16 @@ class FederationClient(FederationBase):
             batch = set(missing_events[i:i + batch_size])
 
             deferreds = [
-                self.get_pdu(
+                preserve_fn(self.get_pdu)(
                     destinations=random_server_list(),
                     event_id=e_id,
                 )
                 for e_id in batch
             ]
 
-            res = yield defer.DeferredList(deferreds, consumeErrors=True)
+            res = yield preserve_context_over_deferred(
+                defer.DeferredList(deferreds, consumeErrors=True)
+            )
             for success, result in res:
                 if success:
                     signed_events.append(result)
@@ -853,14 +856,16 @@ class FederationClient(FederationBase):
                 return srvs
 
             deferreds = [
-                self.get_pdu(
+                preserve_fn(self.get_pdu)(
                     destinations=random_server_list(),
                     event_id=e_id,
                 )
                 for e_id, depth in ordered_missing[:limit - len(signed_events)]
             ]
 
-            res = yield defer.DeferredList(deferreds, consumeErrors=True)
+            res = yield preserve_context_over_deferred(
+                defer.DeferredList(deferreds, consumeErrors=True)
+            )
             for (result, val), (e_id, _) in zip(res, ordered_missing):
                 if result and val:
                     signed_events.append(val)

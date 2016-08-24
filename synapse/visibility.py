@@ -17,7 +17,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import Membership, EventTypes
 
-from synapse.util.logcontext import preserve_fn
+from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
 
 import logging
 
@@ -55,12 +55,12 @@ def filter_events_for_clients(store, user_tuples, events, event_id_to_state):
             given events
         events ([synapse.events.EventBase]): list of events to filter
     """
-    forgotten = yield defer.gatherResults([
+    forgotten = yield preserve_context_over_deferred(defer.gatherResults([
         preserve_fn(store.who_forgot_in_room)(
             room_id,
         )
         for room_id in frozenset(e.room_id for e in events)
-    ], consumeErrors=True)
+    ], consumeErrors=True))
 
     # Set of membership event_ids that have been forgotten
     event_id_forgotten = frozenset(

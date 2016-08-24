@@ -19,7 +19,7 @@ from synapse.api.errors import AuthError
 
 from synapse.util.logutils import log_function
 from synapse.util.async import ObservableDeferred
-from synapse.util.logcontext import PreserveLoggingContext
+from synapse.util.logcontext import PreserveLoggingContext, preserve_fn
 from synapse.util.metrics import Measure
 from synapse.types import StreamToken
 from synapse.visibility import filter_events_for_client
@@ -174,6 +174,7 @@ class Notifier(object):
             lambda: len(self.user_to_user_stream),
         )
 
+    @preserve_fn
     def on_new_room_event(self, event, room_stream_id, max_room_stream_id,
                           extra_users=[]):
         """ Used by handlers to inform the notifier something has happened
@@ -195,6 +196,7 @@ class Notifier(object):
 
             self.notify_replication()
 
+    @preserve_fn
     def _notify_pending_new_room_events(self, max_room_stream_id):
         """Notify for the room events that were queued waiting for a previous
         event to be persisted.
@@ -212,6 +214,7 @@ class Notifier(object):
             else:
                 self._on_new_room_event(event, room_stream_id, extra_users)
 
+    @preserve_fn
     def _on_new_room_event(self, event, room_stream_id, extra_users=[]):
         """Notify any user streams that are interested in this room event"""
         # poke any interested application service.
@@ -226,6 +229,7 @@ class Notifier(object):
             rooms=[event.room_id],
         )
 
+    @preserve_fn
     def on_new_event(self, stream_key, new_token, users=[], rooms=[]):
         """ Used to inform listeners that something has happend event wise.
 
@@ -252,6 +256,7 @@ class Notifier(object):
 
                 self.notify_replication()
 
+    @preserve_fn
     def on_new_replication_data(self):
         """Used to inform replication listeners that something has happend
         without waking up any of the normal user event streams"""
