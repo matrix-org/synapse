@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class ThirdPartyUserServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/3pu(/(?P<protocol>[^/]+))?$",
+    PATTERNS = client_v2_patterns("/thirdparty/user(/(?P<protocol>[^/]+))?$",
                                   releases=())
 
     def __init__(self, hs):
@@ -50,7 +50,7 @@ class ThirdPartyUserServlet(RestServlet):
 
 
 class ThirdPartyLocationServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/3pl(/(?P<protocol>[^/]+))?$",
+    PATTERNS = client_v2_patterns("/thirdparty/location(/(?P<protocol>[^/]+))?$",
                                   releases=())
 
     def __init__(self, hs):
