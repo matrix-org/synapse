@@ -1,3 +1,17 @@
+Changes in synapse v0.17.1 (2016-08-24)
+=======================================
+
+Changes:
+
+* Delete old received_transactions rows (PR #1038)
+* Pass through user-supplied content in /join/$room_id (PR #1039)
+
+
+Bug fixes:
+
+* Fix bug with backfill (PR #1040)
+
+
 Changes in synapse v0.17.1-rc1 (2016-08-22)
 ===========================================
 
