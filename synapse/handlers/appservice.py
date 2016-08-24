@@ -176,6 +176,14 @@ class ApplicationServicesHandler(object):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
+    def get_3pe_protocols(self):
+        services = yield self.store.get_app_services()
+        protocols = set()
+        for s in services:
+            protocols.update(s.protocols)
+        defer.returnValue(protocols)
+
+    @defer.inlineCallbacks
     def _get_services_for_event(self, event):
         """Retrieve a list of application services interested in this event.
 
