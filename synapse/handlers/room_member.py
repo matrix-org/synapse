@@ -59,10 +59,13 @@ class RoomMemberHandler(BaseHandler):
         prev_event_ids,
         txn_id=None,
         ratelimit=True,
+        content=None,
     ):
+        if content is None:
+            content = {}
         msg_handler = self.hs.get_handlers().message_handler
 
-        content = {"membership": membership}
+        content["membership"] = membership
         if requester.is_guest:
             content["kind"] = "guest"
 
@@ -140,8 +143,9 @@ class RoomMemberHandler(BaseHandler):
             remote_room_hosts=None,
             third_party_signed=None,
             ratelimit=True,
+            content=None,
     ):
-        key = (target, room_id,)
+        key = (room_id,)
 
         with (yield self.member_linearizer.queue(key)):
             result = yield self._update_membership(
@@ -153,6 +157,7 @@ class RoomMemberHandler(BaseHandler):
                 remote_room_hosts=remote_room_hosts,
                 third_party_signed=third_party_signed,
                 ratelimit=ratelimit,
+                content=content,
             )
 
         defer.returnValue(result)
@@ -168,7 +173,11 @@ class RoomMemberHandler(BaseHandler):
             remote_room_hosts=None,
             third_party_signed=None,
             ratelimit=True,
+            content=None,
     ):
+        if content is None:
+            content = {}
+
         effective_membership_state = action
         if action in ["kick", "unban"]:
             effective_membership_state = "leave"
@@ -218,7 +227,7 @@ class RoomMemberHandler(BaseHandler):
                 if inviter and not self.hs.is_mine(inviter):
                     remote_room_hosts.append(inviter.domain)
 
-                content = {"membership": Membership.JOIN}
+                content["membership"] = Membership.JOIN
 
                 profile = self.hs.get_handlers().profile_handler
                 content["displayname"] = yield profile.get_displayname(target)
@@ -272,6 +281,7 @@ class RoomMemberHandler(BaseHandler):
             txn_id=txn_id,
             ratelimit=ratelimit,
             prev_event_ids=latest_event_ids,
+            content=content,
         )
 
     @defer.inlineCallbacks

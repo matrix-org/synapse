@@ -70,11 +70,11 @@ class AuthHandler(BaseHandler):
             self.ldap_uri = hs.config.ldap_uri
             self.ldap_start_tls = hs.config.ldap_start_tls
             self.ldap_base = hs.config.ldap_base
-            self.ldap_filter = hs.config.ldap_filter
             self.ldap_attributes = hs.config.ldap_attributes
             if self.ldap_mode == LDAPMode.SEARCH:
                 self.ldap_bind_dn = hs.config.ldap_bind_dn
                 self.ldap_bind_password = hs.config.ldap_bind_password
+                self.ldap_filter = hs.config.ldap_filter
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.device_handler = hs.get_device_handler()
@@ -660,7 +660,7 @@ class AuthHandler(BaseHandler):
                 else:
                     logger.warn(
                         "ldap registration failed: unexpected (%d!=1) amount of results",
-                        len(result)
+                        len(conn.response)
                     )
                     defer.returnValue(False)
 
@@ -719,13 +719,14 @@ class AuthHandler(BaseHandler):
         return macaroon.serialize()
 
     def validate_short_term_login_token_and_get_user_id(self, login_token):
+        auth_api = self.hs.get_auth()
         try:
             macaroon = pymacaroons.Macaroon.deserialize(login_token)
-            auth_api = self.hs.get_auth()
-            auth_api.validate_macaroon(macaroon, "login", True)
-            return self.get_user_from_macaroon(macaroon)
-        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
-            raise AuthError(401, "Invalid token", errcode=Codes.UNKNOWN_TOKEN)
+            user_id = auth_api.get_user_id_from_macaroon(macaroon)
+            auth_api.validate_macaroon(macaroon, "login", True, user_id)
+            return user_id
+        except Exception:
+            raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
 
     def _generate_base_macaroon(self, user_id):
         macaroon = pymacaroons.Macaroon(
@@ -736,21 +737,11 @@ class AuthHandler(BaseHandler):
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         return macaroon
 
-    def get_user_from_macaroon(self, macaroon):
-        user_prefix = "user_id = "
-        for caveat in macaroon.caveats:
-            if caveat.caveat_id.startswith(user_prefix):
-                return caveat.caveat_id[len(user_prefix):]
-        raise AuthError(
-            self.INVALID_TOKEN_HTTP_STATUS, "No user_id found in token",
-            errcode=Codes.UNKNOWN_TOKEN
-        )
-
     @defer.inlineCallbacks
     def set_password(self, user_id, newpassword, requester=None):
         password_hash = self.hash(newpassword)
 
-        except_access_token_ids = [requester.access_token_id] if requester else []
+        except_access_token_id = requester.access_token_id if requester else None
 
         try:
             yield self.store.user_set_password_hash(user_id, password_hash)
@@ -759,10 +750,10 @@ class AuthHandler(BaseHandler):
                 raise SynapseError(404, "Unknown user", Codes.NOT_FOUND)
             raise e
         yield self.store.user_delete_access_tokens(
-            user_id, except_access_token_ids
+            user_id, except_access_token_id
         )
         yield self.hs.get_pusherpool().remove_pushers_by_user(
-            user_id, except_access_token_ids
+            user_id, except_access_token_id
         )
 
     @defer.inlineCallbacks

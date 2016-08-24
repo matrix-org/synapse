@@ -15,6 +15,7 @@
 
 from twisted.internet import defer
 from .. import unittest
+from tests.utils import MockClock
 
 from synapse.handlers.appservice import ApplicationServicesHandler
 
@@ -32,6 +33,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         hs.get_datastore = Mock(return_value=self.mock_store)
         hs.get_application_service_api = Mock(return_value=self.mock_as_api)
         hs.get_application_service_scheduler = Mock(return_value=self.mock_scheduler)
+        hs.get_clock.return_value = MockClock()
         self.handler = ApplicationServicesHandler(hs)
 
     @defer.inlineCallbacks
@@ -51,8 +53,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             type="m.room.message",
             room_id="!foo:bar"
         )
+        self.mock_store.get_new_events_for_appservice.return_value = (0, [event])
         self.mock_as_api.push = Mock()
-        yield self.handler.notify_interested_services(event)
+        yield self.handler.notify_interested_services(0)
         self.mock_scheduler.submit_event_for_as.assert_called_once_with(
             interested_service, event
         )
@@ -72,7 +75,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
         self.mock_as_api.push = Mock()
         self.mock_as_api.query_user = Mock()
-        yield self.handler.notify_interested_services(event)
+        self.mock_store.get_new_events_for_appservice.return_value = (0, [event])
+        yield self.handler.notify_interested_services(0)
         self.mock_as_api.query_user.assert_called_once_with(
             services[0], user_id
         )
@@ -94,7 +98,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
         self.mock_as_api.push = Mock()
         self.mock_as_api.query_user = Mock()
-        yield self.handler.notify_interested_services(event)
+        self.mock_store.get_new_events_for_appservice.return_value = (0, [event])
+        yield self.handler.notify_interested_services(0)
         self.assertFalse(
             self.mock_as_api.query_user.called,
             "query_user called when it shouldn't have been."
@@ -108,11 +113,11 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         room_id = "!alpha:bet"
         servers = ["aperture"]
-        interested_service = self._mkservice(is_interested=True)
+        interested_service = self._mkservice_alias(is_interested_in_alias=True)
         services = [
-            self._mkservice(is_interested=False),
+            self._mkservice_alias(is_interested_in_alias=False),
             interested_service,
-            self._mkservice(is_interested=False)
+            self._mkservice_alias(is_interested_in_alias=False)
         ]
 
         self.mock_store.get_app_services = Mock(return_value=services)
@@ -132,6 +137,13 @@ class AppServiceHandlerTestCase(unittest.TestCase):
     def _mkservice(self, is_interested):
         service = Mock()
         service.is_interested = Mock(return_value=is_interested)
+        service.token = "mock_service_token"
+        service.url = "mock_service_url"
+        return service
+
+    def _mkservice_alias(self, is_interested_in_alias):
+        service = Mock()
+        service.is_interested_in_alias = Mock(return_value=is_interested_in_alias)
         service.token = "mock_service_token"
         service.url = "mock_service_url"
         return service

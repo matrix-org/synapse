@@ -14,6 +14,8 @@
 # limitations under the License.
 from synapse.api.constants import EventTypes
 
+from twisted.internet import defer
+
 import logging
 import re
 
@@ -79,13 +81,17 @@ class ApplicationService(object):
     NS_LIST = [NS_USERS, NS_ALIASES, NS_ROOMS]
 
     def __init__(self, token, url=None, namespaces=None, hs_token=None,
-                 sender=None, id=None):
+                 sender=None, id=None, protocols=None):
         self.token = token
         self.url = url
         self.hs_token = hs_token
         self.sender = sender
         self.namespaces = self._check_namespaces(namespaces)
         self.id = id
+        if protocols:
+            self.protocols = set(protocols)
+        else:
+            self.protocols = set()
 
     def _check_namespaces(self, namespaces):
         # Sanity check that it is of the form:
@@ -138,65 +144,66 @@ class ApplicationService(object):
             return regex_obj["exclusive"]
         return False
 
-    def _matches_user(self, event, member_list):
-        if (hasattr(event, "sender") and
-                self.is_interested_in_user(event.sender)):
-            return True
+    @defer.inlineCallbacks
+    def _matches_user(self, event, store):
+        if not event:
+            defer.returnValue(False)
+
+        if self.is_interested_in_user(event.sender):
+            defer.returnValue(True)
         # also check m.room.member state key
-        if (hasattr(event, "type") and event.type == EventTypes.Member
-                and hasattr(event, "state_key")
-                and self.is_interested_in_user(event.state_key)):
-            return True
+        if (event.type == EventTypes.Member and
+                self.is_interested_in_user(event.state_key)):
+            defer.returnValue(True)
+
+        if not store:
+            defer.returnValue(False)
+
+        member_list = yield store.get_users_in_room(event.room_id)
+
         # check joined member events
         for user_id in member_list:
             if self.is_interested_in_user(user_id):
-                return True
-        return False
+                defer.returnValue(True)
+        defer.returnValue(False)
 
     def _matches_room_id(self, event):
         if hasattr(event, "room_id"):
             return self.is_interested_in_room(event.room_id)
         return False
 
-    def _matches_aliases(self, event, alias_list):
+    @defer.inlineCallbacks
+    def _matches_aliases(self, event, store):
+        if not store or not event:
+            defer.returnValue(False)
+
+        alias_list = yield store.get_aliases_for_room(event.room_id)
         for alias in alias_list:
             if self.is_interested_in_alias(alias):
-                return True
-        return False
+                defer.returnValue(True)
+        defer.returnValue(False)
 
-    def is_interested(self, event, restrict_to=None, aliases_for_event=None,
-                      member_list=None):
+    @defer.inlineCallbacks
+    def is_interested(self, event, store=None):
         """Check if this service is interested in this event.
 
         Args:
             event(Event): The event to check.
-            restrict_to(str): The namespace to restrict regex tests to.
-            aliases_for_event(list): A list of all the known room aliases for
-            this event.
-            member_list(list): A list of all joined user_ids in this room.
+            store(DataStore)
         Returns:
             bool: True if this service would like to know about this event.
         """
-        if aliases_for_event is None:
-            aliases_for_event = []
-        if member_list is None:
-            member_list = []
+        # Do cheap checks first
+        if self._matches_room_id(event):
+            defer.returnValue(True)
 
-        if restrict_to and restrict_to not in ApplicationService.NS_LIST:
-            # this is a programming error, so fail early and raise a general
-            # exception
-            raise Exception("Unexpected restrict_to value: %s". restrict_to)
+        if (yield self._matches_aliases(event, store)):
+            defer.returnValue(True)
 
-        if not restrict_to:
-            return (self._matches_user(event, member_list)
-                    or self._matches_aliases(event, aliases_for_event)
-                    or self._matches_room_id(event))
-        elif restrict_to == ApplicationService.NS_ALIASES:
-            return self._matches_aliases(event, aliases_for_event)
-        elif restrict_to == ApplicationService.NS_ROOMS:
-            return self._matches_room_id(event)
-        elif restrict_to == ApplicationService.NS_USERS:
-            return self._matches_user(event, member_list)
+        if (yield self._matches_user(event, store)):
+            defer.returnValue(True)
+
+        defer.returnValue(False)
 
     def is_interested_in_user(self, user_id):
         return (
@@ -215,6 +222,9 @@ class ApplicationService(object):
             self._is_exclusive(ApplicationService.NS_USERS, user_id)
             or user_id == self.sender
         )
+
+    def is_interested_in_protocol(self, protocol):
+        return protocol in self.protocols
 
     def is_exclusive_alias(self, alias):
         return self._is_exclusive(ApplicationService.NS_ALIASES, alias)

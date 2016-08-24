@@ -88,6 +88,8 @@ def prune_event(event):
 
     if "age_ts" in event.unsigned:
         allowed_fields["unsigned"]["age_ts"] = event.unsigned["age_ts"]
+    if "replaces_state" in event.unsigned:
+        allowed_fields["unsigned"]["replaces_state"] = event.unsigned["replaces_state"]
 
     return type(event)(
         allowed_fields,

@@ -28,6 +28,7 @@ class AppServiceConfig(Config):
 
     def read_config(self, config):
         self.app_service_config_files = config.get("app_service_config_files", [])
+        self.notify_appservices = config.get("notify_appservices", True)
 
     def default_config(cls, **kwargs):
         return """\
@@ -122,6 +123,15 @@ def _load_appservice(hostname, as_info, config_filename):
                     raise ValueError(
                         "Missing/bad type 'exclusive' key in %s", regex_obj
                     )
+    # protocols check
+    protocols = as_info.get("protocols")
+    if protocols:
+        # Because strings are lists in python
+        if isinstance(protocols, str) or not isinstance(protocols, list):
+            raise KeyError("Optional 'protocols' must be a list if present.")
+        for p in protocols:
+            if not isinstance(p, str):
+                raise KeyError("Bad value for 'protocols' item")
     return ApplicationService(
         token=as_info["as_token"],
         url=as_info["url"],
@@ -129,4 +139,5 @@ def _load_appservice(hostname, as_info, config_filename):
         hs_token=as_info["hs_token"],
         sender=user_id,
         id=as_info["id"],
+        protocols=protocols,
     )

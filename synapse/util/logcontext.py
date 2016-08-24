@@ -297,12 +297,13 @@ def preserve_context_over_fn(fn, *args, **kwargs):
         return res
 
 
-def preserve_context_over_deferred(deferred):
+def preserve_context_over_deferred(deferred, context=None):
     """Given a deferred wrap it such that any callbacks added later to it will
     be invoked with the current context.
     """
-    current_context = LoggingContext.current_context()
-    d = _PreservingContextDeferred(current_context)
+    if context is None:
+        context = LoggingContext.current_context()
+    d = _PreservingContextDeferred(context)
     deferred.chainDeferred(d)
     return d
 
@@ -316,8 +317,13 @@ def preserve_fn(f):
 
     def g(*args, **kwargs):
         with PreserveLoggingContext(current):
-            return f(*args, **kwargs)
-
+            res = f(*args, **kwargs)
+            if isinstance(res, defer.Deferred):
+                return preserve_context_over_deferred(
+                    res, context=LoggingContext.sentinel
+                )
+            else:
+                return res
     return g
 
 

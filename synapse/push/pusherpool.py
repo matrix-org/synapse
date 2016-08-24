@@ -17,7 +17,7 @@
 from twisted.internet import defer
 
 import pusher
-from synapse.util.logcontext import preserve_fn
+from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
 from synapse.util.async import run_on_reactor
 
 import logging
@@ -102,14 +102,14 @@ class PusherPool:
                 yield self.remove_pusher(p['app_id'], p['pushkey'], p['user_name'])
 
     @defer.inlineCallbacks
-    def remove_pushers_by_user(self, user_id, except_token_ids=[]):
+    def remove_pushers_by_user(self, user_id, except_access_token_id=None):
         all = yield self.store.get_all_pushers()
         logger.info(
-            "Removing all pushers for user %s except access tokens ids %r",
-            user_id, except_token_ids
+            "Removing all pushers for user %s except access tokens id %r",
+            user_id, except_access_token_id
         )
         for p in all:
-            if p['user_name'] == user_id and p['access_token'] not in except_token_ids:
+            if p['user_name'] == user_id and p['access_token'] != except_access_token_id:
                 logger.info(
                     "Removing pusher for app id %s, pushkey %s, user %s",
                     p['app_id'], p['pushkey'], p['user_name']
@@ -130,10 +130,12 @@ class PusherPool:
                 if u in self.pushers:
                     for p in self.pushers[u].values():
                         deferreds.append(
-                            p.on_new_notifications(min_stream_id, max_stream_id)
+                            preserve_fn(p.on_new_notifications)(
+                                min_stream_id, max_stream_id
+                            )
                         )
 
-            yield defer.gatherResults(deferreds)
+            yield preserve_context_over_deferred(defer.gatherResults(deferreds))
         except:
             logger.exception("Exception in pusher on_new_notifications")
 
@@ -155,10 +157,10 @@ class PusherPool:
                 if u in self.pushers:
                     for p in self.pushers[u].values():
                         deferreds.append(
-                            p.on_new_receipts(min_stream_id, max_stream_id)
+                            preserve_fn(p.on_new_receipts)(min_stream_id, max_stream_id)
                         )
 
-            yield defer.gatherResults(deferreds)
+            yield preserve_context_over_deferred(defer.gatherResults(deferreds))
         except:
             logger.exception("Exception in pusher on_new_receipts")
 

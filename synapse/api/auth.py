@@ -675,27 +675,18 @@ class Auth(object):
         try:
             macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
 
-            user_prefix = "user_id = "
-            user = None
-            user_id = None
-            guest = False
-            for caveat in macaroon.caveats:
-                if caveat.caveat_id.startswith(user_prefix):
-                    user_id = caveat.caveat_id[len(user_prefix):]
-                    user = UserID.from_string(user_id)
-                elif caveat.caveat_id == "guest = true":
-                    guest = True
+            user_id = self.get_user_id_from_macaroon(macaroon)
+            user = UserID.from_string(user_id)
 
             self.validate_macaroon(
                 macaroon, rights, self.hs.config.expire_access_token,
                 user_id=user_id,
             )
 
-            if user is None:
-                raise AuthError(
-                    self.TOKEN_NOT_FOUND_HTTP_STATUS, "No user caveat in macaroon",
-                    errcode=Codes.UNKNOWN_TOKEN
-                )
+            guest = False
+            for caveat in macaroon.caveats:
+                if caveat.caveat_id == "guest = true":
+                    guest = True
 
             if guest:
                 ret = {
@@ -743,6 +734,29 @@ class Auth(object):
                 errcode=Codes.UNKNOWN_TOKEN
             )
 
+    def get_user_id_from_macaroon(self, macaroon):
+        """Retrieve the user_id given by the caveats on the macaroon.
+
+        Does *not* validate the macaroon.
+
+        Args:
+            macaroon (pymacaroons.Macaroon): The macaroon to validate
+
+        Returns:
+            (str) user id
+
+        Raises:
+            AuthError if there is no user_id caveat in the macaroon
+        """
+        user_prefix = "user_id = "
+        for caveat in macaroon.caveats:
+            if caveat.caveat_id.startswith(user_prefix):
+                return caveat.caveat_id[len(user_prefix):]
+        raise AuthError(
+            self.TOKEN_NOT_FOUND_HTTP_STATUS, "No user caveat in macaroon",
+            errcode=Codes.UNKNOWN_TOKEN
+        )
+
     def validate_macaroon(self, macaroon, type_string, verify_expiry, user_id):
         """
         validate that a Macaroon is understood by and was signed by this server.
@@ -754,6 +768,7 @@ class Auth(object):
             verify_expiry(bool): Whether to verify whether the macaroon has expired.
                 This should really always be True, but no clients currently implement
                 token refresh, so we can't enforce expiry yet.
+            user_id (str): The user_id required
         """
         v = pymacaroons.Verifier()
         v.satisfy_exact("gen = 1")

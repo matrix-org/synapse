@@ -464,10 +464,10 @@ class SyncHandler(object):
             else:
                 state = {}
 
-            defer.returnValue({
-                (e.type, e.state_key): e
-                for e in sync_config.filter_collection.filter_room_state(state.values())
-            })
+        defer.returnValue({
+            (e.type, e.state_key): e
+            for e in sync_config.filter_collection.filter_room_state(state.values())
+        })
 
     @defer.inlineCallbacks
     def unread_notifs_for_room_id(self, room_id, sync_config):
@@ -485,9 +485,9 @@ class SyncHandler(object):
                 )
                 defer.returnValue(notifs)
 
-            # There is no new information in this period, so your notification
-            # count is whatever it was last time.
-            defer.returnValue(None)
+        # There is no new information in this period, so your notification
+        # count is whatever it was last time.
+        defer.returnValue(None)
 
     @defer.inlineCallbacks
     def generate_sync_result(self, sync_config, since_token=None, full_state=False):

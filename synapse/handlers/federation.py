@@ -26,7 +26,9 @@ from synapse.api.errors import (
 from synapse.api.constants import EventTypes, Membership, RejectedReason
 from synapse.events.validator import EventValidator
 from synapse.util import unwrapFirstError
-from synapse.util.logcontext import PreserveLoggingContext, preserve_fn
+from synapse.util.logcontext import (
+    PreserveLoggingContext, preserve_fn, preserve_context_over_deferred
+)
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
 from synapse.util.frozenutils import unfreeze
@@ -249,7 +251,7 @@ class FederationHandler(BaseHandler):
                         if ev.type != EventTypes.Member:
                             continue
                         try:
-                            domain = UserID.from_string(ev.state_key).domain
+                            domain = get_domain_from_id(ev.state_key)
                         except:
                             continue
 
@@ -274,7 +276,7 @@ class FederationHandler(BaseHandler):
 
     @log_function
     @defer.inlineCallbacks
-    def backfill(self, dest, room_id, limit, extremities=[]):
+    def backfill(self, dest, room_id, limit, extremities):
         """ Trigger a backfill request to `dest` for the given `room_id`
 
         This will attempt to get more events from the remote. This may return
@@ -283,9 +285,6 @@ class FederationHandler(BaseHandler):
         """
         if dest == self.server_name:
             raise SynapseError(400, "Can't backfill from self.")
-
-        if not extremities:
-            extremities = yield self.store.get_oldest_events_in_room(room_id)
 
         events = yield self.replication_layer.backfill(
             dest,
@@ -364,9 +363,9 @@ class FederationHandler(BaseHandler):
                     missing_auth - failed_to_fetch
                 )
 
-                results = yield defer.gatherResults(
+                results = yield preserve_context_over_deferred(defer.gatherResults(
                     [
-                        self.replication_layer.get_pdu(
+                        preserve_fn(self.replication_layer.get_pdu)(
                             [dest],
                             event_id,
                             outlier=True,
@@ -375,10 +374,10 @@ class FederationHandler(BaseHandler):
                         for event_id in missing_auth - failed_to_fetch
                     ],
                     consumeErrors=True
-                ).addErrback(unwrapFirstError)
-                auth_events.update({a.event_id: a for a in results})
+                )).addErrback(unwrapFirstError)
+                auth_events.update({a.event_id: a for a in results if a})
                 required_auth.update(
-                    a_id for event in results for a_id, _ in event.auth_events
+                    a_id for event in results for a_id, _ in event.auth_events if event
                 )
                 missing_auth = required_auth - set(auth_events)
 
@@ -454,6 +453,10 @@ class FederationHandler(BaseHandler):
             key=lambda e: -int(e[1])
         )
         max_depth = sorted_extremeties_tuple[0][1]
+
+        # We don't want to specify too many extremities as it causes the backfill
+        # request URI to be too long.
+        extremities = dict(sorted_extremeties_tuple[:5])
 
         if current_depth > max_depth:
             logger.debug(
@@ -551,10 +554,10 @@ class FederationHandler(BaseHandler):
 
         event_ids = list(extremities.keys())
 
-        states = yield defer.gatherResults([
-            self.state_handler.resolve_state_groups(room_id, [e])
+        states = yield preserve_context_over_deferred(defer.gatherResults([
+            preserve_fn(self.state_handler.resolve_state_groups)(room_id, [e])
             for e in event_ids
-        ])
+        ]))
         states = dict(zip(event_ids, [s[1] for s in states]))
 
         for e_id, _ in sorted_extremeties_tuple:
@@ -1093,16 +1096,17 @@ class FederationHandler(BaseHandler):
         )
 
         if event:
-            # FIXME: This is a temporary work around where we occasionally
-            # return events slightly differently than when they were
-            # originally signed
-            event.signatures.update(
-                compute_event_signature(
-                    event,
-                    self.hs.hostname,
-                    self.hs.config.signing_key[0]
+            if self.hs.is_mine_id(event.event_id):
+                # FIXME: This is a temporary work around where we occasionally
+                # return events slightly differently than when they were
+                # originally signed
+                event.signatures.update(
+                    compute_event_signature(
+                        event,
+                        self.hs.hostname,
+                        self.hs.config.signing_key[0]
+                    )
                 )
-            )
 
             if do_auth:
                 in_room = yield self.auth.check_host_in_room(
@@ -1111,6 +1115,12 @@ class FederationHandler(BaseHandler):
                 )
                 if not in_room:
                     raise AuthError(403, "Host not in room.")
+
+                events = yield self._filter_events_for_server(
+                    origin, event.room_id, [event]
+                )
+
+                event = events[0]
 
             defer.returnValue(event)
         else:
@@ -1158,9 +1168,9 @@ class FederationHandler(BaseHandler):
         a bunch of outliers, but not a chunk of individual events that depend
         on each other for state calculations.
         """
-        contexts = yield defer.gatherResults(
+        contexts = yield preserve_context_over_deferred(defer.gatherResults(
             [
-                self._prep_event(
+                preserve_fn(self._prep_event)(
                     origin,
                     ev_info["event"],
                     state=ev_info.get("state"),
@@ -1168,7 +1178,7 @@ class FederationHandler(BaseHandler):
                 )
                 for ev_info in event_infos
             ]
-        )
+        ))
 
         yield self.store.persist_events(
             [
@@ -1452,9 +1462,9 @@ class FederationHandler(BaseHandler):
             # Do auth conflict res.
             logger.info("Different auth: %s", different_auth)
 
-            different_events = yield defer.gatherResults(
+            different_events = yield preserve_context_over_deferred(defer.gatherResults(
                 [
-                    self.store.get_event(
+                    preserve_fn(self.store.get_event)(
                         d,
                         allow_none=True,
                         allow_rejected=False,
@@ -1463,7 +1473,7 @@ class FederationHandler(BaseHandler):
                     if d in have_events and not have_events[d]
                 ],
                 consumeErrors=True
-            ).addErrback(unwrapFirstError)
+            )).addErrback(unwrapFirstError)
 
             if different_events:
                 local_view = dict(auth_events)

@@ -45,6 +45,7 @@ class DownloadResource(Resource):
     @request_handler()
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
+        request.setHeader("Content-Security-Policy", "sandbox")
         server_name, media_id, name = parse_media_id(request)
         if server_name == self.server_name:
             yield self._respond_local_file(request, media_id, name)

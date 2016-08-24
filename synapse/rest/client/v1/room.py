@@ -35,6 +35,10 @@ logger = logging.getLogger(__name__)
 class RoomCreateRestServlet(ClientV1RestServlet):
     # No PATTERN; we have custom dispatch rules here
 
+    def __init__(self, hs):
+        super(RoomCreateRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+
     def register(self, http_server):
         PATTERNS = "/createRoom"
         register_txn_path(self, PATTERNS, http_server)
@@ -82,6 +86,10 @@ class RoomCreateRestServlet(ClientV1RestServlet):
 
 # TODO: Needs unit testing for generic events
 class RoomStateEventRestServlet(ClientV1RestServlet):
+    def __init__(self, hs):
+        super(RoomStateEventRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+
     def register(self, http_server):
         # /room/$roomid/state/$eventtype
         no_state_key = "/rooms/(?P<room_id>[^/]*)/state/(?P<event_type>[^/]*)$"
@@ -166,6 +174,10 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
 # TODO: Needs unit testing for generic events + feedback
 class RoomSendEventRestServlet(ClientV1RestServlet):
 
+    def __init__(self, hs):
+        super(RoomSendEventRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+
     def register(self, http_server):
         # /rooms/$roomid/send/$event_type[/$txn_id]
         PATTERNS = ("/rooms/(?P<room_id>[^/]*)/send/(?P<event_type>[^/]*)")
@@ -210,6 +222,9 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
 
 # TODO: Needs unit testing for room ID + alias joins
 class JoinRoomAliasServlet(ClientV1RestServlet):
+    def __init__(self, hs):
+        super(JoinRoomAliasServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
 
     def register(self, http_server):
         # /join/$room_identifier[/$txn_id]
@@ -253,6 +268,7 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
             action="join",
             txn_id=txn_id,
             remote_room_hosts=remote_room_hosts,
+            content=content,
             third_party_signed=content.get("third_party_signed", None),
         )
 
@@ -296,6 +312,10 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
 class RoomMemberListRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/members$")
 
+    def __init__(self, hs):
+        super(RoomMemberListRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         # TODO support Pagination stream API (limit/tokens)
@@ -321,6 +341,10 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
 # TODO: Needs better unit testing
 class RoomMessageListRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/messages$")
+
+    def __init__(self, hs):
+        super(RoomMessageListRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
@@ -351,6 +375,10 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
 class RoomStateRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/state$")
 
+    def __init__(self, hs):
+        super(RoomStateRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
@@ -367,6 +395,10 @@ class RoomStateRestServlet(ClientV1RestServlet):
 # TODO: Needs unit testing
 class RoomInitialSyncRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/initialSync$")
+
+    def __init__(self, hs):
+        super(RoomInitialSyncRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
@@ -388,6 +420,7 @@ class RoomEventContext(ClientV1RestServlet):
     def __init__(self, hs):
         super(RoomEventContext, self).__init__(hs)
         self.clock = hs.get_clock()
+        self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_id):
@@ -424,6 +457,10 @@ class RoomEventContext(ClientV1RestServlet):
 
 
 class RoomForgetRestServlet(ClientV1RestServlet):
+    def __init__(self, hs):
+        super(RoomForgetRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+
     def register(self, http_server):
         PATTERNS = ("/rooms/(?P<room_id>[^/]*)/forget")
         register_txn_path(self, PATTERNS, http_server)
@@ -461,6 +498,10 @@ class RoomForgetRestServlet(ClientV1RestServlet):
 
 # TODO: Needs unit testing
 class RoomMembershipRestServlet(ClientV1RestServlet):
+
+    def __init__(self, hs):
+        super(RoomMembershipRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
 
     def register(self, http_server):
         # /rooms/$roomid/[invite|join|leave]
@@ -542,6 +583,10 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
 
 
 class RoomRedactEventRestServlet(ClientV1RestServlet):
+    def __init__(self, hs):
+        super(RoomRedactEventRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+
     def register(self, http_server):
         PATTERNS = ("/rooms/(?P<room_id>[^/]*)/redact/(?P<event_id>[^/]*)")
         register_txn_path(self, PATTERNS, http_server)
@@ -623,6 +668,10 @@ class SearchRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns(
         "/search$"
     )
+
+    def __init__(self, hs):
+        super(SearchRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
     def on_POST(self, request):

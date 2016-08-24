@@ -23,6 +23,10 @@ from .base import ClientV1RestServlet, client_path_patterns
 class InitialSyncRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/initialSync$")
 
+    def __init__(self, hs):
+        super(InitialSyncRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+
     @defer.inlineCallbacks
     def on_GET(self, request):
         requester = yield self.auth.get_user_by_req(request)

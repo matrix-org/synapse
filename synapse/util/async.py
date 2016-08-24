@@ -146,10 +146,10 @@ def concurrently_execute(func, args, limit):
         except StopIteration:
             pass
 
-    return defer.gatherResults([
+    return preserve_context_over_deferred(defer.gatherResults([
         preserve_fn(_concurrently_execute_inner)()
         for _ in xrange(limit)
-    ], consumeErrors=True).addErrback(unwrapFirstError)
+    ], consumeErrors=True)).addErrback(unwrapFirstError)
 
 
 class Linearizer(object):
@@ -181,7 +181,8 @@ class Linearizer(object):
         self.key_to_defer[key] = new_defer
 
         if current_defer:
-            yield preserve_context_over_deferred(current_defer)
+            with PreserveLoggingContext():
+                yield current_defer
 
         @contextmanager
         def _ctx_manager():
@@ -264,7 +265,7 @@ class ReadWriteLock(object):
         curr_readers.clear()
         self.key_to_current_writer[key] = new_defer
 
-        yield defer.gatherResults(to_wait_on)
+        yield preserve_context_over_deferred(defer.gatherResults(to_wait_on))
 
         @contextmanager
         def _ctx_manager():
