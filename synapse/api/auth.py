@@ -278,18 +278,19 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def check_host_in_room(self, room_id, host):
-        curr_state = yield self.state.get_current_state(room_id)
+        curr_state_id = yield self.state.get_current_state_ids(room_id)
 
-        for event in curr_state.values():
-            if event.type == EventTypes.Member:
+        for (etype, state_key), event_id in curr_state_id.items():
+            if etype == EventTypes.Member:
                 try:
-                    if get_domain_from_id(event.state_key) != host:
+                    if get_domain_from_id(state_key) != host:
                         continue
                 except:
-                    logger.warn("state_key not user_id: %s", event.state_key)
+                    logger.warn("state_key not user_id: %s", state_key)
                     continue
 
-                if event.content["membership"] == Membership.JOIN:
+                event = yield self.store.get_event(event_id, allow_none=True)
+                if event and event.content["membership"] == Membership.JOIN:
                     defer.returnValue(True)
 
         defer.returnValue(False)

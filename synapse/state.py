@@ -95,14 +95,18 @@ class StateHandler(object):
 
         _, state = yield self.resolve_state_groups(room_id, latest_event_ids)
 
+        if event_type:
+            event_id = state.get((event_type, state_key))
+            event = None
+            if event_id:
+                event = yield self.store.get_event(event_id, allow_none=True)
+            defer.returnValue(event)
+            return
+
         state_map = yield self.store.get_events(state.values(), get_prev_content=False)
         state = {
             key: state_map[e_id] for key, e_id in state.items() if e_id in state_map
         }
-
-        if event_type:
-            defer.returnValue(state.get((event_type, state_key)))
-            return
 
         defer.returnValue(state)
 
