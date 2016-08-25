@@ -37,13 +37,6 @@ def log_failure(failure):
 
 class ApplicationServicesHandler(object):
 
-    PROTOCOL_META = {
-        # TODO(paul): Declare kinds of metadata in here
-        "gitter": {
-            "user_fields": ["username"],
-        }
-    }
-
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.is_mine_id = hs.is_mine_id
@@ -195,12 +188,7 @@ class ApplicationServicesHandler(object):
         protocols = {}
         for s in services:
             for p in s.protocols:
-                if p in self.PROTOCOL_META:
-                    protocols[p] = self.PROTOCOL_META[p]
-                else:
-                    # We don't know any metadata for it, but we'd best at least
-                    # still declare that we know it exists
-                    protocols[p] = {}
+                protocols[p] = yield self.appservice_api.get_3pe_protocol(s, p)
 
         self.supported_protocols = protocols
         defer.returnValue(protocols)

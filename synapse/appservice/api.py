@@ -52,6 +52,13 @@ class ApplicationServiceApi(SimpleHttpClient):
     pushing.
     """
 
+    PROTOCOL_META = {
+        # TODO(paul): Declare kinds of metadata in here
+        "gitter": {
+            "user_fields": ["username"],
+        }
+    }
+
     def __init__(self, hs):
         super(ApplicationServiceApi, self).__init__(hs)
         self.clock = hs.get_clock()
@@ -130,6 +137,19 @@ class ApplicationServiceApi(SimpleHttpClient):
         except Exception as ex:
             logger.warning("query_3pe to %s threw exception %s", uri, ex)
             defer.returnValue([])
+
+    @defer.inlineCallbacks
+    def get_3pe_protocol(self, service, protocol):
+        # TODO: cache
+        uri = "%s/thirdparty/protocol/%s" % (service.url, urllib.quote(protocol))
+        try:
+            response = yield self.get_json(uri, {})
+            defer.returnValue(response)
+        except Exception as ex:
+            logger.warning("query_3pe_protocol to %s threw exception %s",
+                uri, ex
+            )
+            defer.returnValue({})
 
     @defer.inlineCallbacks
     def push_bulk(self, service, events, txn_id=None):
