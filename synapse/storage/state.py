@@ -89,17 +89,17 @@ class StateStore(SQLBaseStore):
             if event.internal_metadata.is_outlier():
                 continue
 
-            if context.current_state is None:
+            if context.current_state_ids is None:
                 continue
 
             if context.state_group is not None:
                 state_groups[event.event_id] = context.state_group
                 continue
 
-            state_events = dict(context.current_state)
+            state_event_ids = dict(context.current_state_ids)
 
             if event.is_state():
-                state_events[(event.type, event.state_key)] = event
+                state_event_ids[(event.type, event.state_key)] = event.event_id
 
             state_group = context.new_state_group_id
 
@@ -119,12 +119,12 @@ class StateStore(SQLBaseStore):
                 values=[
                     {
                         "state_group": state_group,
-                        "room_id": state.room_id,
-                        "type": state.type,
-                        "state_key": state.state_key,
-                        "event_id": state.event_id,
+                        "room_id": event.room_id,
+                        "type": key[0],
+                        "state_key": key[1],
+                        "event_id": state_id,
                     }
-                    for state in state_events.values()
+                    for key, state_id in state_event_ids.items()
                 ],
             )
             state_groups[event.event_id] = state_group

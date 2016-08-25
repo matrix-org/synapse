@@ -15,17 +15,8 @@
 
 
 class EventContext(object):
-    def _set_current_state(self, current_state):
-        if current_state is not None:
-            self.current_state_ids = {k: e.event_id for k, e in current_state.items()}
-        else:
-            self.current_state_ids = None
-        self._current_state = current_state
-
-    current_state = property(lambda self: self._current_state, _set_current_state)
-
-    def __init__(self, current_state=None):
-        self.current_state = current_state
+    def __init__(self, current_state_ids=None):
+        self.current_state_ids = current_state_ids
         self.state_group = None
         self.rejected = False
         self.push_actions = []
