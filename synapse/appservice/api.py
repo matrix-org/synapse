@@ -106,10 +106,8 @@ class ApplicationServiceApi(SimpleHttpClient):
     @defer.inlineCallbacks
     def query_3pe(self, service, kind, protocol, fields):
         if kind == ThirdPartyEntityKind.USER:
-            fragment = "user"
             required_field = "userid"
         elif kind == ThirdPartyEntityKind.LOCATION:
-            fragment = "location"
             required_field = "alias"
         else:
             raise ValueError(
@@ -119,7 +117,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         uri = "%s%s/thirdparty/%s/%s" % (
             service.url,
             APP_SERVICE_PREFIX,
-            fragment,
+            kind,
             urllib.quote(protocol)
         )
         try:
