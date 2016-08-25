@@ -560,6 +560,18 @@ class FederationHandler(BaseHandler):
         ]))
         states = dict(zip(event_ids, [s[1] for s in states]))
 
+        state_map = yield self.store.get_events(
+            [e_id for ids in states.values() for e_id in ids],
+            get_prev_content=False
+        )
+        states = {
+            key: {
+                k: state_map[e_id]
+                for k, e_id in state_dict.items()
+                if e_id in state_map
+            } for key, state_dict in states.items()
+        }
+
         for e_id, _ in sorted_extremeties_tuple:
             likely_domains = get_domains_from_state(states[e_id])
 
