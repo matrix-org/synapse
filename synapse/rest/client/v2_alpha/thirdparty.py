@@ -18,8 +18,8 @@ import logging
 
 from twisted.internet import defer
 
+from synapse.api.constants import ThirdPartyEntityKind
 from synapse.http.servlet import RestServlet
-from synapse.types import ThirdPartyEntityKind
 from ._base import client_v2_patterns
 
 logger = logging.getLogger(__name__)

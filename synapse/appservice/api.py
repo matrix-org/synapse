@@ -14,11 +14,11 @@
 # limitations under the License.
 from twisted.internet import defer
 
+from synapse.api.constants import ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
 from synapse.http.client import SimpleHttpClient
 from synapse.events.utils import serialize_event
 from synapse.util.caches.response_cache import ResponseCache
-from synapse.types import ThirdPartyEntityKind
 
 import logging
 import urllib
