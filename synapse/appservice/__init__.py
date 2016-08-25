@@ -88,6 +88,8 @@ class ApplicationService(object):
         self.sender = sender
         self.namespaces = self._check_namespaces(namespaces)
         self.id = id
+
+        # .protocols is a publicly visible field
         if protocols:
             self.protocols = set(protocols)
         else:
