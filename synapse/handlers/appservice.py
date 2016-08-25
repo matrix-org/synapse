@@ -48,7 +48,6 @@ class ApplicationServicesHandler(object):
 
         self.current_max = 0
         self.is_processing = False
-        self.supported_protocols = None
 
     @defer.inlineCallbacks
     def notify_interested_services(self, current_id):
@@ -178,19 +177,12 @@ class ApplicationServicesHandler(object):
 
     @defer.inlineCallbacks
     def get_3pe_protocols(self):
-        # The set of supported AS protocols and the metadata about them is
-        # effectively static during the lifetime of a homeserver process. We
-        # can look this up once and just cache it.
-        if self.supported_protocols:
-            defer.returnValue(self.supported_protocols)
-
         services = yield self.store.get_app_services()
         protocols = {}
         for s in services:
             for p in s.protocols:
                 protocols[p] = yield self.appservice_api.get_3pe_protocol(s, p)
 
-        self.supported_protocols = protocols
         defer.returnValue(protocols)
 
     @defer.inlineCallbacks
