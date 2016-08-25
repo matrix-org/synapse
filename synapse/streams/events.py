@@ -43,6 +43,7 @@ class EventSources(object):
     @defer.inlineCallbacks
     def get_current_token(self, direction='f'):
         push_rules_key, _ = self.store.get_push_rules_stream_token()
+        to_device_key = self.store.get_to_device_stream_token()
 
         token = StreamToken(
             room_key=(
@@ -61,5 +62,6 @@ class EventSources(object):
                 yield self.sources["account_data"].get_current_key()
             ),
             push_rules_key=push_rules_key,
+            to_device_key=to_device_key,
         )
         defer.returnValue(token)

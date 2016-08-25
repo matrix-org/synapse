@@ -49,6 +49,7 @@ from synapse.rest.client.v2_alpha import (
     notifications,
     devices,
     thirdparty,
+    sendtodevice,
 )
 
 from synapse.http.server import JsonResource
@@ -96,3 +97,4 @@ class ClientRestResource(JsonResource):
         notifications.register_servlets(hs, client_resource)
         devices.register_servlets(hs, client_resource)
         thirdparty.register_servlets(hs, client_resource)
+        sendtodevice.register_servlets(hs, client_resource)

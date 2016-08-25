@@ -35,6 +35,7 @@ SyncConfig = collections.namedtuple("SyncConfig", [
     "filter_collection",
     "is_guest",
     "request_key",
+    "device_id",
 ])
 
 
@@ -113,6 +114,7 @@ class SyncResult(collections.namedtuple("SyncResult", [
     "joined",  # JoinedSyncResult for each joined room.
     "invited",  # InvitedSyncResult for each invited room.
     "archived",  # ArchivedSyncResult for each archived room.
+    "to_device",  # List of direct messages for the device.
 ])):
     __slots__ = []
 
@@ -126,7 +128,8 @@ class SyncResult(collections.namedtuple("SyncResult", [
             self.joined or
             self.invited or
             self.archived or
-            self.account_data
+            self.account_data or
+            self.to_device
         )
 
 
@@ -527,14 +530,51 @@ class SyncHandler(object):
             sync_result_builder, newly_joined_rooms, newly_joined_users
         )
 
+        yield self._generate_sync_entry_for_to_device(sync_result_builder)
+
         defer.returnValue(SyncResult(
             presence=sync_result_builder.presence,
             account_data=sync_result_builder.account_data,
             joined=sync_result_builder.joined,
             invited=sync_result_builder.invited,
             archived=sync_result_builder.archived,
+            to_device=sync_result_builder.to_device,
             next_batch=sync_result_builder.now_token,
         ))
+
+    @defer.inlineCallbacks
+    def _generate_sync_entry_for_to_device(self, sync_result_builder):
+        """Generates the portion of the sync response. Populates
+        `sync_result_builder` with the result.
+
+        Args:
+            sync_result_builder(SyncResultBuilder)
+
+        Returns:
+            Deferred(dict): A dictionary containing the per room account data.
+        """
+        user_id = sync_result_builder.sync_config.user.to_string()
+        device_id = sync_result_builder.sync_config.device_id
+        now_token = sync_result_builder.now_token
+        since_stream_id = 0
+        if sync_result_builder.since_token is not None:
+            since_stream_id = int(sync_result_builder.since_token.to_device_key)
+
+        if since_stream_id:
+            logger.debug("Deleting messages up to %d", since_stream_id)
+            yield self.store.delete_messages_for_device(
+                user_id, device_id, since_stream_id
+            )
+
+        logger.debug("Getting messages up to %d", now_token.to_device_key)
+        messages, stream_id = yield self.store.get_new_messages_for_device(
+            user_id, device_id, now_token.to_device_key
+        )
+        logger.debug("Got messages up to %d: %r", stream_id, messages)
+        sync_result_builder.now_token = now_token.copy_and_replace(
+            "to_device_key", stream_id
+        )
+        sync_result_builder.to_device = messages
 
     @defer.inlineCallbacks
     def _generate_sync_entry_for_account_data(self, sync_result_builder):
@@ -1103,6 +1143,7 @@ class SyncResultBuilder(object):
         self.joined = []
         self.invited = []
         self.archived = []
+        self.device = []
 
 
 class RoomSyncResultBuilder(object):
