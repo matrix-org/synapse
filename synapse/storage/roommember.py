@@ -395,7 +395,8 @@ class RoomMemberStore(SQLBaseStore):
             retcols=['user_id'],
             keyvalues={
                 "membership": Membership.JOIN,
-            }
+            },
+            desc="_get_joined_users_from_context",
         )
 
         defer.returnValue(set(row["user_id"] for row in rows))
