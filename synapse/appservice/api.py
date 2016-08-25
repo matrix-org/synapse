@@ -60,7 +60,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         super(ApplicationServiceApi, self).__init__(hs)
         self.clock = hs.get_clock()
 
-        self.protocol_meta_cache = ResponseCache(hs, timeout_ms=1*HOUR_IN_MS)
+        self.protocol_meta_cache = ResponseCache(hs, timeout_ms=HOUR_IN_MS)
 
     @defer.inlineCallbacks
     def query_user(self, service, user_id):
@@ -145,8 +145,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                 defer.returnValue((yield self.get_json(uri, {})))
             except Exception as ex:
                 logger.warning("query_3pe_protocol to %s threw exception %s",
-                    uri, ex
-                )
+                               uri, ex)
                 defer.returnValue({})
 
         key = (service.id, protocol)
