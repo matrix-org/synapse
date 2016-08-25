@@ -284,6 +284,22 @@ class StateStore(SQLBaseStore):
         defer.returnValue({event: event_to_state[event] for event in event_ids})
 
     @defer.inlineCallbacks
+    def get_state_ids_for_events(self, event_ids, types):
+        event_to_groups = yield self._get_state_group_for_events(
+            event_ids,
+        )
+
+        groups = set(event_to_groups.values())
+        group_to_state = yield self._get_state_for_groups(groups, types)
+
+        event_to_state = {
+            event_id: group_to_state[group]
+            for event_id, group in event_to_groups.items()
+        }
+
+        defer.returnValue({event: event_to_state[event] for event in event_ids})
+
+    @defer.inlineCallbacks
     def get_state_for_event(self, event_id, types=None):
         """
         Get the state dict corresponding to a particular event
@@ -298,6 +314,23 @@ class StateStore(SQLBaseStore):
             A deferred dict from (type, state_key) -> state_event
         """
         state_map = yield self.get_state_for_events([event_id], types)
+        defer.returnValue(state_map[event_id])
+
+    @defer.inlineCallbacks
+    def get_state_ids_for_event(self, event_id, types=None):
+        """
+        Get the state dict corresponding to a particular event
+
+        Args:
+            event_id(str): event whose state should be returned
+            types(list[(str, str)]|None): List of (type, state_key) tuples
+                which are used to filter the state fetched. May be None, which
+                matches any key
+
+        Returns:
+            A deferred dict from (type, state_key) -> state_event
+        """
+        state_map = yield self.get_state_ids_for_events([event_id], types)
         defer.returnValue(state_map[event_id])
 
     @cached(num_args=2, max_entries=10000)
