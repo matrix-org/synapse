@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from twisted.internet import defer
-from synapse.util.presentable_names import (
+from synapse.push.presentable_names import (
     calculate_room_name, name_from_member_event
 )
 from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
@@ -49,21 +49,22 @@ def get_badge_count(store, user_id):
 
 
 @defer.inlineCallbacks
-def get_context_for_event(state_handler, ev, user_id):
+def get_context_for_event(store, state_handler, ev, user_id):
     ctx = {}
 
-    room_state = yield state_handler.get_current_state(ev.room_id)
+    room_state_ids = yield state_handler.get_current_state_ids(ev.room_id)
 
     # we no longer bother setting room_alias, and make room_name the
     # human-readable name instead, be that m.room.name, an alias or
     # a list of people in the room
-    name = calculate_room_name(
-        room_state, user_id, fallback_to_single_member=False
+    name = yield calculate_room_name(
+        store, room_state_ids, user_id, fallback_to_single_member=False
     )
     if name:
         ctx['name'] = name
 
-    sender_state_event = room_state[("m.room.member", ev.sender)]
+    sender_state_event_id = room_state_ids[("m.room.member", ev.sender)]
+    sender_state_event = yield store.get_event(sender_state_event_id)
     ctx['sender_display_name'] = name_from_member_event(sender_state_event)
 
     defer.returnValue(ctx)

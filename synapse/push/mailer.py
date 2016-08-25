@@ -22,7 +22,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 from synapse.util.async import concurrently_execute
-from synapse.util.presentable_names import (
+from synapse.push.presentable_names import (
     calculate_room_name, name_from_member_event, descriptor_from_member_events
 )
 from synapse.types import UserID
@@ -139,7 +139,7 @@ class Mailer(object):
 
         @defer.inlineCallbacks
         def _fetch_room_state(room_id):
-            room_state = yield self.state_handler.get_current_state(room_id)
+            room_state = yield self.state_handler.get_current_state_ids(room_id)
             state_by_room[room_id] = room_state
 
         # Run at most 3 of these at once: sync does 10 at a time but email
@@ -160,7 +160,8 @@ class Mailer(object):
             rooms.append(roomvars)
 
         reason['room_name'] = calculate_room_name(
-            state_by_room[reason['room_id']], user_id, fallback_to_members=True
+            self.store, state_by_room[reason['room_id']], user_id,
+            fallback_to_members=True
         )
 
         summary_text = self.make_summary_text(
@@ -203,12 +204,15 @@ class Mailer(object):
         )
 
     @defer.inlineCallbacks
-    def get_room_vars(self, room_id, user_id, notifs, notif_events, room_state):
-        my_member_event = room_state[("m.room.member", user_id)]
+    def get_room_vars(self, room_id, user_id, notifs, notif_events, room_state_ids):
+        my_member_event_id = room_state_ids[("m.room.member", user_id)]
+        my_member_event = yield self.store.get_event(my_member_event_id)
         is_invite = my_member_event.content["membership"] == "invite"
 
+        room_name = yield calculate_room_name(self.store, room_state_ids, user_id)
+
         room_vars = {
-            "title": calculate_room_name(room_state, user_id),
+            "title": room_name,
             "hash": string_ordinal_total(room_id),  # See sender avatar hash
             "notifs": [],
             "invite": is_invite,
@@ -218,7 +222,7 @@ class Mailer(object):
         if not is_invite:
             for n in notifs:
                 notifvars = yield self.get_notif_vars(
-                    n, user_id, notif_events[n['event_id']], room_state
+                    n, user_id, notif_events[n['event_id']], room_state_ids
                 )
 
                 # merge overlapping notifs together.
@@ -243,7 +247,7 @@ class Mailer(object):
         defer.returnValue(room_vars)
 
     @defer.inlineCallbacks
-    def get_notif_vars(self, notif, user_id, notif_event, room_state):
+    def get_notif_vars(self, notif, user_id, notif_event, room_state_ids):
         results = yield self.store.get_events_around(
             notif['room_id'], notif['event_id'],
             before_limit=CONTEXT_BEFORE, after_limit=CONTEXT_AFTER
@@ -261,17 +265,19 @@ class Mailer(object):
         the_events.append(notif_event)
 
         for event in the_events:
-            messagevars = self.get_message_vars(notif, event, room_state)
+            messagevars = yield self.get_message_vars(notif, event, room_state_ids)
             if messagevars is not None:
                 ret['messages'].append(messagevars)
 
         defer.returnValue(ret)
 
-    def get_message_vars(self, notif, event, room_state):
+    @defer.inlineCallbacks
+    def get_message_vars(self, notif, event, room_state_ids):
         if event.type != EventTypes.Message:
-            return None
+            return
 
-        sender_state_event = room_state[("m.room.member", event.sender)]
+        sender_state_event_id = room_state_ids[("m.room.member", event.sender)]
+        sender_state_event = yield self.store.get_event(sender_state_event_id)
         sender_name = name_from_member_event(sender_state_event)
         sender_avatar_url = sender_state_event.content.get("avatar_url")
 
@@ -299,7 +305,7 @@ class Mailer(object):
         if "body" in event.content:
             ret["body_text_plain"] = event.content["body"]
 
-        return ret
+        defer.returnValue(ret)
 
     def add_text_message_vars(self, messagevars, event):
         msgformat = event.content.get("format")
