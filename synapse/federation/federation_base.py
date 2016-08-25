@@ -23,6 +23,7 @@ from synapse.crypto.event_signing import check_event_content_hash
 from synapse.api.errors import SynapseError
 
 from synapse.util import unwrapFirstError
+from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
 
 import logging
 
@@ -102,10 +103,10 @@ class FederationBase(object):
                 warn, pdu
             )
 
-        valid_pdus = yield defer.gatherResults(
+        valid_pdus = yield preserve_context_over_deferred(defer.gatherResults(
             deferreds,
             consumeErrors=True
-        ).addErrback(unwrapFirstError)
+        )).addErrback(unwrapFirstError)
 
         if include_none:
             defer.returnValue(valid_pdus)
@@ -129,7 +130,7 @@ class FederationBase(object):
             for pdu in pdus
         ]
 
-        deferreds = self.keyring.verify_json_objects_for_server([
+        deferreds = preserve_fn(self.keyring.verify_json_objects_for_server)([
             (p.origin, p.get_pdu_json())
             for p in redacted_pdus
         ])

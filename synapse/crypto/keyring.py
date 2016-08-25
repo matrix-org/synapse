@@ -308,15 +308,15 @@ class Keyring(object):
 
     @defer.inlineCallbacks
     def get_keys_from_store(self, server_name_and_key_ids):
-        res = yield defer.gatherResults(
+        res = yield preserve_context_over_deferred(defer.gatherResults(
             [
-                self.store.get_server_verify_keys(
+                preserve_fn(self.store.get_server_verify_keys)(
                     server_name, key_ids
                 ).addCallback(lambda ks, server: (server, ks), server_name)
                 for server_name, key_ids in server_name_and_key_ids
             ],
             consumeErrors=True,
-        ).addErrback(unwrapFirstError)
+        )).addErrback(unwrapFirstError)
 
         defer.returnValue(dict(res))
 
@@ -337,13 +337,13 @@ class Keyring(object):
                 )
                 defer.returnValue({})
 
-        results = yield defer.gatherResults(
+        results = yield preserve_context_over_deferred(defer.gatherResults(
             [
-                get_key(p_name, p_keys)
+                preserve_fn(get_key)(p_name, p_keys)
                 for p_name, p_keys in self.perspective_servers.items()
             ],
             consumeErrors=True,
-        ).addErrback(unwrapFirstError)
+        )).addErrback(unwrapFirstError)
 
         union_of_keys = {}
         for result in results:
@@ -383,13 +383,13 @@ class Keyring(object):
 
             defer.returnValue(keys)
 
-        results = yield defer.gatherResults(
+        results = yield preserve_context_over_deferred(defer.gatherResults(
             [
-                get_key(server_name, key_ids)
+                preserve_fn(get_key)(server_name, key_ids)
                 for server_name, key_ids in server_name_and_key_ids
             ],
             consumeErrors=True,
-        ).addErrback(unwrapFirstError)
+        )).addErrback(unwrapFirstError)
 
         merged = {}
         for result in results:
@@ -466,9 +466,9 @@ class Keyring(object):
             for server_name, response_keys in processed_response.items():
                 keys.setdefault(server_name, {}).update(response_keys)
 
-        yield defer.gatherResults(
+        yield preserve_context_over_deferred(defer.gatherResults(
             [
-                self.store_keys(
+                preserve_fn(self.store_keys)(
                     server_name=server_name,
                     from_server=perspective_name,
                     verify_keys=response_keys,
@@ -476,7 +476,7 @@ class Keyring(object):
                 for server_name, response_keys in keys.items()
             ],
             consumeErrors=True
-        ).addErrback(unwrapFirstError)
+        )).addErrback(unwrapFirstError)
 
         defer.returnValue(keys)
 
@@ -524,7 +524,7 @@ class Keyring(object):
 
             keys.update(response_keys)
 
-        yield defer.gatherResults(
+        yield preserve_context_over_deferred(defer.gatherResults(
             [
                 preserve_fn(self.store_keys)(
                     server_name=key_server_name,
@@ -534,7 +534,7 @@ class Keyring(object):
                 for key_server_name, verify_keys in keys.items()
             ],
             consumeErrors=True
-        ).addErrback(unwrapFirstError)
+        )).addErrback(unwrapFirstError)
 
         defer.returnValue(keys)
 
@@ -600,7 +600,7 @@ class Keyring(object):
         response_keys.update(verify_keys)
         response_keys.update(old_verify_keys)
 
-        yield defer.gatherResults(
+        yield preserve_context_over_deferred(defer.gatherResults(
             [
                 preserve_fn(self.store.store_server_keys_json)(
                     server_name=server_name,
@@ -613,7 +613,7 @@ class Keyring(object):
                 for key_id in updated_key_ids
             ],
             consumeErrors=True,
-        ).addErrback(unwrapFirstError)
+        )).addErrback(unwrapFirstError)
 
         results[server_name] = response_keys
 
@@ -702,7 +702,7 @@ class Keyring(object):
             A deferred that completes when the keys are stored.
         """
         # TODO(markjh): Store whether the keys have expired.
-        yield defer.gatherResults(
+        yield preserve_context_over_deferred(defer.gatherResults(
             [
                 preserve_fn(self.store.store_server_verify_key)(
                     server_name, server_name, key.time_added, key
@@ -710,4 +710,4 @@ class Keyring(object):
                 for key_id, key in verify_keys.items()
             ],
             consumeErrors=True,
-        ).addErrback(unwrapFirstError)
+        )).addErrback(unwrapFirstError)

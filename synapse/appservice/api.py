@@ -17,12 +17,16 @@ from twisted.internet import defer
 from synapse.api.errors import CodeMessageException
 from synapse.http.client import SimpleHttpClient
 from synapse.events.utils import serialize_event
+from synapse.util.caches.response_cache import ResponseCache
 from synapse.types import ThirdPartyEntityKind
 
 import logging
 import urllib
 
 logger = logging.getLogger(__name__)
+
+
+HOUR_IN_MS = 60 * 60 * 1000
 
 
 def _is_valid_3pe_result(r, field):
@@ -55,6 +59,8 @@ class ApplicationServiceApi(SimpleHttpClient):
     def __init__(self, hs):
         super(ApplicationServiceApi, self).__init__(hs)
         self.clock = hs.get_clock()
+
+        self.protocol_meta_cache = ResponseCache(hs, timeout_ms=HOUR_IN_MS)
 
     @defer.inlineCallbacks
     def query_user(self, service, user_id):
@@ -97,10 +103,10 @@ class ApplicationServiceApi(SimpleHttpClient):
     @defer.inlineCallbacks
     def query_3pe(self, service, kind, protocol, fields):
         if kind == ThirdPartyEntityKind.USER:
-            uri = "%s/3pu/%s" % (service.url, urllib.quote(protocol))
+            uri = "%s/thirdparty/user/%s" % (service.url, urllib.quote(protocol))
             required_field = "userid"
         elif kind == ThirdPartyEntityKind.LOCATION:
-            uri = "%s/3pl/%s" % (service.url, urllib.quote(protocol))
+            uri = "%s/thirdparty/location/%s" % (service.url, urllib.quote(protocol))
             required_field = "alias"
         else:
             raise ValueError(
@@ -130,6 +136,22 @@ class ApplicationServiceApi(SimpleHttpClient):
         except Exception as ex:
             logger.warning("query_3pe to %s threw exception %s", uri, ex)
             defer.returnValue([])
+
+    def get_3pe_protocol(self, service, protocol):
+        @defer.inlineCallbacks
+        def _get():
+            uri = "%s/thirdparty/protocol/%s" % (service.url, urllib.quote(protocol))
+            try:
+                defer.returnValue((yield self.get_json(uri, {})))
+            except Exception as ex:
+                logger.warning("query_3pe_protocol to %s threw exception %s",
+                               uri, ex)
+                defer.returnValue({})
+
+        key = (service.id, protocol)
+        return self.protocol_meta_cache.get(key) or (
+            self.protocol_meta_cache.set(key, _get())
+        )
 
     @defer.inlineCallbacks
     def push_bulk(self, service, events, txn_id=None):
