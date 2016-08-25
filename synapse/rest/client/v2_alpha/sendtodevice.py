@@ -56,6 +56,10 @@ class SendToDeviceRestServlet(servlet.RestServlet):
 
         content = parse_json_object_from_request(request)
 
+        # TODO: Prod the notifier to wake up sync streams.
+        # TODO: Implement replication for the messages.
+        # TODO: Send the messages to remote servers if needed.
+
         local_messages = {}
         for user_id, by_device in content["messages"].items():
             if self.is_mine_id(user_id):
