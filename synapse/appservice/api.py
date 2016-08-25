@@ -52,13 +52,6 @@ class ApplicationServiceApi(SimpleHttpClient):
     pushing.
     """
 
-    PROTOCOL_META = {
-        # TODO(paul): Declare kinds of metadata in here
-        "gitter": {
-            "user_fields": ["username"],
-        }
-    }
-
     def __init__(self, hs):
         super(ApplicationServiceApi, self).__init__(hs)
         self.clock = hs.get_clock()
