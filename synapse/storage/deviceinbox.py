@@ -132,5 +132,9 @@ class DeviceInboxStore(SQLBaseStore):
             )
             txn.execute(sql, (user_id, device_id, up_to_stream_id))
 
+        return self.runInteraction(
+            "delete_messages_for_device", delete_messages_for_device_txn
+        )
+
     def get_to_device_stream_token(self):
         return self._device_inbox_id_gen.get_current_token()

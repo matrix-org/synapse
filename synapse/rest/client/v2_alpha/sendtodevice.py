@@ -19,6 +19,7 @@ from twisted.internet import defer
 from synapse.http.servlet import parse_json_object_from_request
 
 from synapse.http import servlet
+from synapse.rest.client.v1.transactions import HttpTransactionStore
 from ._base import client_v2_patterns
 
 logger = logging.getLogger(__name__)
@@ -40,9 +41,17 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.is_mine_id = hs.is_mine_id
+        self.txns = HttpTransactionStore()
 
     @defer.inlineCallbacks
     def on_PUT(self, request, message_type, txn_id):
+        try:
+            defer.returnValue(
+                self.txns.get_client_transaction(request, txn_id)
+            )
+        except KeyError:
+            pass
+
         requester = yield self.auth.get_user_by_req(request)
 
         content = parse_json_object_from_request(request)
@@ -62,7 +71,9 @@ class SendToDeviceRestServlet(servlet.RestServlet):
 
         yield self.store.add_messages_to_device_inbox(local_messages)
 
-        defer.returnValue((200, {}))
+        response = (200, {})
+        self.txns.store_client_transaction(request, txn_id, response)
+        defer.returnValue(response)
 
 
 def register_servlets(hs, http_server):
