@@ -36,6 +36,7 @@ from .push_rule import PushRuleStore
 from .media_repository import MediaRepositoryStore
 from .rejections import RejectionsStore
 from .event_push_actions import EventPushActionsStore
+from .deviceinbox import DeviceInboxStore
 
 from .state import StateStore
 from .signatures import SignatureStore
@@ -84,6 +85,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 OpenIdStore,
                 ClientIpStore,
                 DeviceStore,
+                DeviceInboxStore,
                 ):
 
     def __init__(self, db_conn, hs):
@@ -107,6 +109,9 @@ class DataStore(RoomMemberStore, RoomStore,
         )
         self._presence_id_gen = StreamIdGenerator(
             db_conn, "presence_stream", "stream_id"
+        )
+        self._device_inbox_id_gen = StreamIdGenerator(
+            db_conn, "device_inbox", "stream_id"
         )
 
         self._transaction_id_gen = IdGenerator(db_conn, "sent_transactions", "id")
