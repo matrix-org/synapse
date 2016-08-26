@@ -199,6 +199,21 @@ run (e.g. ``~/.synapse``), and::
     source ./bin/activate
     synctl start
 
+Security Note
+=============
+
+Matrix serves raw user generated data in some APIs - specifically the content
+repository endpoints: http://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-media-r0-download-servername-mediaid
+Whilst we have tried to mitigate against possible XSS attacks (e.g.
+https://github.com/matrix-org/synapse/pull/1021) we recommend running
+matrix homeservers on a dedicated domain name, to limit any malicious user generated
+content served to web browsers a matrix API from being able to attack webapps hosted
+on the same domain.  This is particularly true of sharing a matrix webclient and
+server on the same domain.
+
+See https://github.com/vector-im/vector-web/issues/1977 and
+https://developer.github.com/changes/2014-04-25-user-content-security for more details.
+
 Using PostgreSQL
 ================
 
