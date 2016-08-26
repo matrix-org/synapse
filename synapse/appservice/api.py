@@ -14,11 +14,11 @@
 # limitations under the License.
 from twisted.internet import defer
 
+from synapse.api.constants import ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
 from synapse.http.client import SimpleHttpClient
 from synapse.events.utils import serialize_event
 from synapse.util.caches.response_cache import ResponseCache
-from synapse.types import ThirdPartyEntityKind
 
 import logging
 import urllib
@@ -27,6 +27,9 @@ logger = logging.getLogger(__name__)
 
 
 HOUR_IN_MS = 60 * 60 * 1000
+
+
+APP_SERVICE_PREFIX = "/_matrix/app/unstable"
 
 
 def _is_valid_3pe_result(r, field):
@@ -103,16 +106,20 @@ class ApplicationServiceApi(SimpleHttpClient):
     @defer.inlineCallbacks
     def query_3pe(self, service, kind, protocol, fields):
         if kind == ThirdPartyEntityKind.USER:
-            uri = "%s/thirdparty/user/%s" % (service.url, urllib.quote(protocol))
             required_field = "userid"
         elif kind == ThirdPartyEntityKind.LOCATION:
-            uri = "%s/thirdparty/location/%s" % (service.url, urllib.quote(protocol))
             required_field = "alias"
         else:
             raise ValueError(
                 "Unrecognised 'kind' argument %r to query_3pe()", kind
             )
 
+        uri = "%s%s/thirdparty/%s/%s" % (
+            service.url,
+            APP_SERVICE_PREFIX,
+            kind,
+            urllib.quote(protocol)
+        )
         try:
             response = yield self.get_json(uri, fields)
             if not isinstance(response, list):
@@ -140,7 +147,11 @@ class ApplicationServiceApi(SimpleHttpClient):
     def get_3pe_protocol(self, service, protocol):
         @defer.inlineCallbacks
         def _get():
-            uri = "%s/thirdparty/protocol/%s" % (service.url, urllib.quote(protocol))
+            uri = "%s%s/thirdparty/protocol/%s" % (
+                service.url,
+                APP_SERVICE_PREFIX,
+                urllib.quote(protocol)
+            )
             try:
                 defer.returnValue((yield self.get_json(uri, {})))
             except Exception as ex:

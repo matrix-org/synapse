@@ -271,10 +271,3 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
             return "t%d-%d" % (self.topological, self.stream)
         else:
             return "s%d" % (self.stream,)
-
-
-# Some arbitrary constants used for internal API enumerations. Don't rely on
-# exact values; always pass or compare symbolically
-class ThirdPartyEntityKind(object):
-    USER = 'user'
-    LOCATION = 'location'
