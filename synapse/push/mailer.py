@@ -159,12 +159,12 @@ class Mailer(object):
             )
             rooms.append(roomvars)
 
-        reason['room_name'] = calculate_room_name(
+        reason['room_name'] = yield calculate_room_name(
             self.store, state_by_room[reason['room_id']], user_id,
             fallback_to_members=True
         )
 
-        summary_text = self.make_summary_text(
+        summary_text = yield self.make_summary_text(
             notifs_by_room, state_by_room, notif_events, user_id, reason
         )
 
@@ -327,6 +327,7 @@ class Mailer(object):
 
         return messagevars
 
+    @defer.inlineCallbacks
     def make_summary_text(self, notifs_by_room, state_by_room,
                           notif_events, user_id, reason):
         if len(notifs_by_room) == 1:
@@ -336,7 +337,7 @@ class Mailer(object):
             # If the room has some kind of name, use it, but we don't
             # want the generated-from-names one here otherwise we'll
             # end up with, "new message from Bob in the Bob room"
-            room_name = calculate_room_name(
+            room_name = yield calculate_room_name(
                 state_by_room[room_id], user_id, fallback_to_members=False
             )
 
@@ -348,16 +349,16 @@ class Mailer(object):
                 inviter_name = name_from_member_event(inviter_member_event)
 
                 if room_name is None:
-                    return INVITE_FROM_PERSON % {
+                    defer.returnValue(INVITE_FROM_PERSON % {
                         "person": inviter_name,
                         "app": self.app_name
-                    }
+                    })
                 else:
-                    return INVITE_FROM_PERSON_TO_ROOM % {
+                    defer.returnValue(INVITE_FROM_PERSON_TO_ROOM % {
                         "person": inviter_name,
                         "room": room_name,
                         "app": self.app_name,
-                    }
+                    })
 
             sender_name = None
             if len(notifs_by_room[room_id]) == 1:
@@ -368,24 +369,24 @@ class Mailer(object):
                     sender_name = name_from_member_event(state_event)
 
                 if sender_name is not None and room_name is not None:
-                    return MESSAGE_FROM_PERSON_IN_ROOM % {
+                    defer.returnValue(MESSAGE_FROM_PERSON_IN_ROOM % {
                         "person": sender_name,
                         "room": room_name,
                         "app": self.app_name,
-                    }
+                    })
                 elif sender_name is not None:
-                    return MESSAGE_FROM_PERSON % {
+                    defer.returnValue(MESSAGE_FROM_PERSON % {
                         "person": sender_name,
                         "app": self.app_name,
-                    }
+                    })
             else:
                 # There's more than one notification for this room, so just
                 # say there are several
                 if room_name is not None:
-                    return MESSAGES_IN_ROOM % {
+                    defer.returnValue(MESSAGES_IN_ROOM % {
                         "room": room_name,
                         "app": self.app_name,
-                    }
+                    })
                 else:
                     # If the room doesn't have a name, say who the messages
                     # are from explicitly to avoid, "messages in the Bob room"
@@ -394,22 +395,22 @@ class Mailer(object):
                         for n in notifs_by_room[room_id]
                     ]))
 
-                    return MESSAGES_FROM_PERSON % {
+                    defer.returnValue(MESSAGES_FROM_PERSON % {
                         "person": descriptor_from_member_events([
                             state_by_room[room_id][("m.room.member", s)]
                             for s in sender_ids
                         ]),
                         "app": self.app_name,
-                    }
+                    })
         else:
             # Stuff's happened in multiple different rooms
 
             # ...but we still refer to the 'reason' room which triggered the mail
             if reason['room_name'] is not None:
-                return MESSAGES_IN_ROOM_AND_OTHERS % {
+                defer.returnValue(MESSAGES_IN_ROOM_AND_OTHERS % {
                     "room": reason['room_name'],
                     "app": self.app_name,
-                }
+                })
             else:
                 # If the reason room doesn't have a name, say who the messages
                 # are from explicitly to avoid, "messages in the Bob room"
@@ -418,13 +419,13 @@ class Mailer(object):
                     for n in notifs_by_room[reason['room_id']]
                 ]))
 
-                return MESSAGES_FROM_PERSON_AND_OTHERS % {
+                defer.returnValue(MESSAGES_FROM_PERSON_AND_OTHERS % {
                     "person": descriptor_from_member_events([
                         state_by_room[reason['room_id']][("m.room.member", s)]
                         for s in sender_ids
                     ]),
                     "app": self.app_name,
-                }
+                })
 
     def make_room_link(self, room_id):
         # need /beta for Universal Links to work on iOS
