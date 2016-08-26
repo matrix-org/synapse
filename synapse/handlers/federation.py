@@ -29,6 +29,7 @@ from synapse.util import unwrapFirstError
 from synapse.util.logcontext import (
     PreserveLoggingContext, preserve_fn, preserve_context_over_deferred
 )
+from synapse.util.metrics import measure_func
 from synapse.util.logutils import log_function
 from synapse.util.async import run_on_reactor
 from synapse.util.frozenutils import unfreeze
@@ -235,6 +236,7 @@ class FederationHandler(BaseHandler):
                     user = UserID.from_string(event.state_key)
                     yield user_joined_room(self.distributor, user, event.room_id)
 
+    @measure_func("_filter_events_for_server")
     @defer.inlineCallbacks
     def _filter_events_for_server(self, server_name, room_id, events):
         event_to_state_ids = yield self.store.get_state_ids_for_events(
