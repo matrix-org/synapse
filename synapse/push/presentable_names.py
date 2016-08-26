@@ -57,7 +57,6 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
         canon_alias = yield store.get_event(
             room_state_ids[("m.room.canonical_alias", "")], allow_none=True
         )
-        canon_alias = room_state_ids[("m.room.canonical_alias", "")]
         if (
             canon_alias and canon_alias.content and canon_alias.content["alias"] and
             _looks_like_an_alias(canon_alias.content["alias"])
