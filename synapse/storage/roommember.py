@@ -56,7 +56,6 @@ class RoomMemberStore(SQLBaseStore):
 
         for event in events:
             txn.call_after(self.get_rooms_for_user.invalidate, (event.state_key,))
-            txn.call_after(self.get_joined_hosts_for_room.invalidate, (event.room_id,))
             txn.call_after(self.get_users_in_room.invalidate, (event.room_id,))
             txn.call_after(
                 self._membership_stream_cache.entity_has_changed,
@@ -238,11 +237,6 @@ class RoomMemberStore(SQLBaseStore):
 
         return results
 
-    @cachedInlineCallbacks(max_entries=5000)
-    def get_joined_hosts_for_room(self, room_id):
-        user_ids = yield self.get_users_in_room(room_id)
-        defer.returnValue(set(get_domain_from_id(uid) for uid in user_ids))
-
     def _get_members_rows_txn(self, txn, room_id, membership=None, user_id=None):
         where_clause = "c.room_id = ?"
         where_values = [room_id]
@@ -360,8 +354,7 @@ class RoomMemberStore(SQLBaseStore):
             desc="who_forgot"
         )
 
-    def get_joined_users_from_context(self, room_id, context):
-        state_group = context.state_group
+    def get_joined_users_from_context(self, room_id, state_group, state_ids):
         if not state_group:
             # If state_group is None it means it has yet to be assigned a
             # state group, i.e. we need to make sure that calls with a state_group
@@ -370,7 +363,7 @@ class RoomMemberStore(SQLBaseStore):
             state_group = object()
 
         return self._get_joined_users_from_context(
-            room_id, state_group, context.current_state_ids
+            room_id, state_group, state_ids
         )
 
     @cachedInlineCallbacks(num_args=2, cache_context=True)

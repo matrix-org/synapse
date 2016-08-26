@@ -125,6 +125,15 @@ class StateHandler(object):
         defer.returnValue(state)
 
     @defer.inlineCallbacks
+    def get_current_user_in_room(self, room_id):
+        latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
+        group, state_ids = yield self.resolve_state_groups(room_id, latest_event_ids)
+        joined_users = yield self.store.get_joined_users_from_context(
+            room_id, group, state_ids
+        )
+        defer.returnValue(joined_users)
+
+    @defer.inlineCallbacks
     def compute_event_context(self, event, old_state=None):
         """ Fills out the context with the `current state` of the graph. The
         `current state` here is defined to be the state of the event graph

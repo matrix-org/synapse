@@ -87,7 +87,7 @@ class BulkPushRuleEvaluator:
         )
 
         room_members = yield self.store.get_joined_users_from_context(
-            event.room_id, context,
+            event.room_id, context.state_group, context.current_state_ids
         )
 
         evaluator = PushRuleEvaluatorForEvent(event, len(room_members))

@@ -216,7 +216,6 @@ class SlavedEventStore(BaseSlavedStore):
             self._get_current_state_for_key.invalidate_all()
             self.get_rooms_for_user.invalidate_all()
             self.get_users_in_room.invalidate((event.room_id,))
-            # self.get_joined_hosts_for_room.invalidate((event.room_id,))
 
         self._invalidate_get_event_cache(event.event_id)
 
@@ -240,7 +239,6 @@ class SlavedEventStore(BaseSlavedStore):
 
         if event.type == EventTypes.Member:
             self.get_rooms_for_user.invalidate((event.state_key,))
-            # self.get_joined_hosts_for_room.invalidate((event.room_id,))
             self.get_users_in_room.invalidate((event.room_id,))
             self._membership_stream_cache.entity_has_changed(
                 event.state_key, event.internal_metadata.stream_ordering
