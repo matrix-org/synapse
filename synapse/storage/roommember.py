@@ -396,6 +396,7 @@ class RoomMemberStore(SQLBaseStore):
             keyvalues={
                 "membership": Membership.JOIN,
             },
+            batch_size=1000,
             desc="_get_joined_users_from_context",
         )
 
@@ -409,8 +410,8 @@ class RoomMemberStore(SQLBaseStore):
             # To do this we set the state_group to a new object as object() != object()
             state_group = object()
 
-        return self._get_joined_users_from_context(
-            room_id, state_group, state_ids
+        return self._is_host_joined(
+            room_id, host, state_group, state_ids
         )
 
     @cachedInlineCallbacks(num_args=3)
@@ -430,7 +431,7 @@ class RoomMemberStore(SQLBaseStore):
                     logger.warn("state_key not user_id: %s", state_key)
                     continue
 
-                event = yield self.store.get_event(event_id, allow_none=True)
+                event = yield self.get_event(event_id, allow_none=True)
                 if event and event.content["membership"] == Membership.JOIN:
                     defer.returnValue(True)
 
