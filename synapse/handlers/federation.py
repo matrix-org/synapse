@@ -237,13 +237,37 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _filter_events_for_server(self, server_name, room_id, events):
-        event_to_state = yield self.store.get_state_for_events(
+        event_to_state_ids = yield self.store.get_state_ids_for_events(
             frozenset(e.event_id for e in events),
             types=(
                 (EventTypes.RoomHistoryVisibility, ""),
                 (EventTypes.Member, None),
             )
         )
+
+        # We only want to pull out member events that correspond to the
+        # server's domain.
+
+        def check_match(id):
+            try:
+                return server_name == get_domain_from_id(id)
+            except:
+                return False
+
+        event_map = yield self.store.get_events([
+            e_id for key_to_eid in event_to_state_ids.values()
+            for key, e_id in key_to_eid
+            if key[0] != EventTypes.Member or check_match(key[1])
+        ])
+
+        event_to_state = {
+            e_id: {
+                key: event_map[inner_e_id]
+                for key, inner_e_id in key_to_eid.items()
+                if inner_e_id in event_map
+            }
+            for e_id, key_to_eid in event_to_state_ids.items()
+        }
 
         def redact_disallowed(event, state):
             if not state:
