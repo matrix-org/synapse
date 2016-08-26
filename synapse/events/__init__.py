@@ -99,7 +99,7 @@ class EventBase(object):
 
         return d
 
-    def get(self, key, default):
+    def get(self, key, default=None):
         return self._event_dict.get(key, default)
 
     def get_internal_metadata_dict(self):

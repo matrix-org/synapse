@@ -120,10 +120,15 @@ class SlavedEventStore(BaseSlavedStore):
     get_state_for_event = DataStore.get_state_for_event.__func__
     get_state_for_events = DataStore.get_state_for_events.__func__
     get_state_groups = DataStore.get_state_groups.__func__
+    get_state_groups_ids = DataStore.get_state_groups_ids.__func__
+    get_state_ids_for_event = DataStore.get_state_ids_for_event.__func__
+    get_state_ids_for_events = DataStore.get_state_ids_for_events.__func__
     get_recent_events_for_room = DataStore.get_recent_events_for_room.__func__
     get_room_events_stream_for_rooms = (
         DataStore.get_room_events_stream_for_rooms.__func__
     )
+    is_host_joined = DataStore.is_host_joined.__func__
+    _is_host_joined = RoomMemberStore.__dict__["_is_host_joined"]
     get_stream_token_for_event = DataStore.get_stream_token_for_event.__func__
 
     _set_before_and_after = staticmethod(DataStore._set_before_and_after)

@@ -245,7 +245,7 @@ class HttpPusher(object):
     @defer.inlineCallbacks
     def _build_notification_dict(self, event, tweaks, badge):
         ctx = yield push_tools.get_context_for_event(
-            self.state_handler, event, self.user_id
+            self.store, self.state_handler, event, self.user_id
         )
 
         d = {

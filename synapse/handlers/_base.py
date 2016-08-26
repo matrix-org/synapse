@@ -65,33 +65,21 @@ class BaseHandler(object):
                 retry_after_ms=int(1000 * (time_allowed - time_now)),
             )
 
-    def is_host_in_room(self, current_state):
-        room_members = [
-            (state_key, event.membership)
-            for ((event_type, state_key), event) in current_state.items()
-            if event_type == EventTypes.Member
-        ]
-        if len(room_members) == 0:
-            # Have we just created the room, and is this about to be the very
-            # first member event?
-            create_event = current_state.get(("m.room.create", ""))
-            if create_event:
-                return True
-        for (state_key, membership) in room_members:
-            if (
-                self.hs.is_mine_id(state_key)
-                and membership == Membership.JOIN
-            ):
-                return True
-        return False
-
     @defer.inlineCallbacks
-    def maybe_kick_guest_users(self, event, current_state):
+    def maybe_kick_guest_users(self, event, context=None):
         # Technically this function invalidates current_state by changing it.
         # Hopefully this isn't that important to the caller.
         if event.type == EventTypes.GuestAccess:
             guest_access = event.content.get("guest_access", "forbidden")
             if guest_access != "can_join":
+                if context:
+                    current_state = yield self.store.get_events(
+                        context.current_state_ids.values()
+                    )
+                    current_state = current_state.values()
+                else:
+                    current_state = yield self.store.get_current_state(event.room_id)
+                logger.info("maybe_kick_guest_users %r", current_state)
                 yield self.kick_guest_users(current_state)
 
     @defer.inlineCallbacks
