@@ -85,3 +85,8 @@ class RoomCreationPreset(object):
     PRIVATE_CHAT = "private_chat"
     PUBLIC_CHAT = "public_chat"
     TRUSTED_PRIVATE_CHAT = "trusted_private_chat"
+
+
+class ThirdPartyEntityKind(object):
+    USER = "user"
+    LOCATION = "location"
