@@ -40,7 +40,6 @@ STREAM_NAMES = (
     ("backfill",),
     ("push_rules",),
     ("pushers",),
-    ("state",),
     ("caches",),
 )
 
@@ -130,7 +129,6 @@ class ReplicationResource(Resource):
         backfill_token = yield self.store.get_current_backfill_token()
         push_rules_token, room_stream_token = self.store.get_push_rules_stream_token()
         pushers_token = self.store.get_pushers_stream_token()
-        state_token = self.store.get_state_stream_token()
         caches_token = self.store.get_cache_stream_token()
 
         defer.returnValue(_ReplicationToken(
@@ -142,7 +140,7 @@ class ReplicationResource(Resource):
             backfill_token,
             push_rules_token,
             pushers_token,
-            state_token,
+            0,  # State stream is no longer a thing
             caches_token,
         ))
 
@@ -191,7 +189,6 @@ class ReplicationResource(Resource):
         yield self.receipts(writer, current_token, limit, request_streams)
         yield self.push_rules(writer, current_token, limit, request_streams)
         yield self.pushers(writer, current_token, limit, request_streams)
-        yield self.state(writer, current_token, limit, request_streams)
         yield self.caches(writer, current_token, limit, request_streams)
         self.streams(writer, current_token, request_streams)
 
@@ -363,25 +360,6 @@ class ReplicationResource(Resource):
             ))
             writer.write_header_and_rows("deleted_pushers", deleted, (
                 "position", "user_id", "app_id", "pushkey"
-            ))
-
-    @defer.inlineCallbacks
-    def state(self, writer, current_token, limit, request_streams):
-        current_position = current_token.state
-
-        state = request_streams.get("state")
-
-        if state is not None:
-            state_groups, state_group_state = (
-                yield self.store.get_all_new_state_groups(
-                    state, current_position, limit
-                )
-            )
-            writer.write_header_and_rows("state_groups", state_groups, (
-                "position", "room_id", "event_id"
-            ))
-            writer.write_header_and_rows("state_group_state", state_group_state, (
-                "position", "type", "state_key", "event_id"
             ))
 
     @defer.inlineCallbacks
