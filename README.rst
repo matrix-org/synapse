@@ -230,9 +230,6 @@ The advantages of Postgres include:
   pointing at the same DB master, as well as enabling DB replication in
   synapse itself.
 
-The only disadvantage is that the code is relatively new as of April 2015 and
-may have a few regressions relative to SQLite.
-
 For information on how to install and use PostgreSQL, please see
 `docs/postgres.rst <docs/postgres.rst>`_.
 
