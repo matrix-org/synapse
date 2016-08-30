@@ -36,6 +36,7 @@ from synapse.replication.slave.storage.registration import SlavedRegistrationSto
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.presence import SlavedPresenceStore
+from synapse.replication.slave.storage.deviceinbox import SlavedDeviceInboxStore
 from synapse.server import HomeServer
 from synapse.storage.client_ips import ClientIpStore
 from synapse.storage.engines import create_engine
@@ -72,6 +73,7 @@ class SynchrotronSlavedStore(
     SlavedRegistrationStore,
     SlavedFilteringStore,
     SlavedPresenceStore,
+    SlavedDeviceInboxStore,
     BaseSlavedStore,
     ClientIpStore,  # After BaseSlavedStore because the constructor is different
 ):
