@@ -153,6 +153,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     def get_3pe_protocol(self, service, protocol):
         if service.url == "":
             defer.returnValue({})
+
         @defer.inlineCallbacks
         def _get():
             uri = "%s%s/thirdparty/protocol/%s" % (

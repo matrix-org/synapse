@@ -135,7 +135,8 @@ def _load_appservice(hostname, as_info, config_filename):
 
     if as_info["url"] == "":
         logger.info(
-            "(%s) Explicitly empty 'url' provided. This application service will not receive events or queries.",
+            "(%s) Explicitly empty 'url' provided. This application service " +
+            "will not receive events or queries.",
             config_filename,
         )
     return ApplicationService(
