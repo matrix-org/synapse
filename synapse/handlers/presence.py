@@ -236,7 +236,7 @@ class PresenceHandler(object):
         unpersisted = self.unpersisted_users_changes
         self.unpersisted_users_changes = set()
 
-        if self.unpersisted_users_changes:
+        if unpersisted:
             yield self.store.update_presence([
                 self.user_to_current_state[user_id]
                 for user_id in unpersisted
