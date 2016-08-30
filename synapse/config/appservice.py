@@ -96,7 +96,8 @@ def _load_appservice(hostname, as_info, config_filename):
 
     # 'url' must either be a string or explicitly null, not missing
     # to avoid accidentally turning off push for ASes.
-    if not isinstance(as_info.get("url"), basestring) and as_info.get("url", "") is not None:
+    if (not isinstance(as_info.get("url"), basestring) and
+            as_info.get("url", "") is not None):
         raise KeyError(
             "Required string field or explicit null: 'url' (%s)" % (config_filename,)
         )
@@ -140,7 +141,7 @@ def _load_appservice(hostname, as_info, config_filename):
             if not isinstance(p, str):
                 raise KeyError("Bad value for 'protocols' item")
 
-    if as_info["url"] == None:
+    if as_info["url"] is None:
         logger.info(
             "(%s) Explicitly empty 'url' provided. This application service"
             " will not receive events or queries.",
