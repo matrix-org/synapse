@@ -566,6 +566,9 @@ class SyncHandler(object):
             since_stream_id = int(sync_result_builder.since_token.to_device_key)
 
         if since_stream_id != int(now_token.to_device_key):
+            # We only delete messages when a new message comes in, but that's
+            # fine so long as we delete them at some point.
+
             logger.debug("Deleting messages up to %d", since_stream_id)
             yield self.store.delete_messages_for_device(
                 user_id, device_id, since_stream_id
