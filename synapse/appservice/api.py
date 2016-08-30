@@ -67,7 +67,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
     @defer.inlineCallbacks
     def query_user(self, service, user_id):
-        if service.url == "":
+        if service.url is None:
             defer.returnValue(False)
         uri = service.url + ("/users/%s" % urllib.quote(user_id))
         response = None
@@ -88,7 +88,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
     @defer.inlineCallbacks
     def query_alias(self, service, alias):
-        if service.url == "":
+        if service.url is None:
             defer.returnValue(False)
         uri = service.url + ("/rooms/%s" % urllib.quote(alias))
         response = None
@@ -117,7 +117,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             raise ValueError(
                 "Unrecognised 'kind' argument %r to query_3pe()", kind
             )
-        if service.url == "":
+        if service.url is None:
             defer.returnValue([])
 
         uri = "%s%s/thirdparty/%s/%s" % (
@@ -151,7 +151,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             defer.returnValue([])
 
     def get_3pe_protocol(self, service, protocol):
-        if service.url == "":
+        if service.url is None:
             defer.returnValue({})
 
         @defer.inlineCallbacks
@@ -175,7 +175,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
     @defer.inlineCallbacks
     def push_bulk(self, service, events, txn_id=None):
-        if service.url == "":
+        if service.url is None:
             defer.returnValue(True)
 
         events = self._serialize(events)
