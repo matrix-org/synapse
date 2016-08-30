@@ -132,6 +132,12 @@ def _load_appservice(hostname, as_info, config_filename):
         for p in protocols:
             if not isinstance(p, str):
                 raise KeyError("Bad value for 'protocols' item")
+
+    if as_info["url"] == "":
+        logger.info(
+            "(%s) Explicitly empty 'url' provided. This application service will not receive events or queries.",
+            config_filename,
+        )
     return ApplicationService(
         token=as_info["as_token"],
         url=as_info["url"],
