@@ -191,6 +191,13 @@ class PresenceHandler(object):
             5000,
         )
 
+        self.clock.call_later(
+            60,
+            self.clock.looping_call,
+            self._persist_unpersisted_changes,
+            60 * 1000,
+        )
+
         metrics.register_callback("wheel_timer_size", lambda: len(self.wheel_timer))
 
     @defer.inlineCallbacks
@@ -215,6 +222,27 @@ class PresenceHandler(object):
                 for user_id in self.unpersisted_users_changes
             ])
         logger.info("Finished _on_shutdown")
+
+    @defer.inlineCallbacks
+    def _persist_unpersisted_changes(self):
+        """We periodically persist the unpersisted changes, as otherwise they
+        may stack up and slow down shutdown times.
+        """
+        logger.info(
+            "Performing _persist_unpersisted_changes. Persiting %d unpersisted changes",
+            len(self.user_to_current_state)
+        )
+
+        unpersisted = self.unpersisted_users_changes
+        self.unpersisted_users_changes = set()
+
+        if self.unpersisted_users_changes:
+            yield self.store.update_presence([
+                self.user_to_current_state[user_id]
+                for user_id in unpersisted
+            ])
+
+        logger.info("Finished _persist_unpersisted_changes")
 
     @defer.inlineCallbacks
     def _update_states(self, new_states):
