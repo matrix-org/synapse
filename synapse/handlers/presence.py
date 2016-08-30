@@ -922,7 +922,12 @@ def should_notify(old_state, new_state):
         if new_state.currently_active != old_state.currently_active:
             return True
 
-    if new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
+        if new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
+            # Only notify about last active bumps if we're not currently acive
+            if not (old_state.currently_active and new_state.currently_active):
+                return True
+
+    elif new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
         # Always notify for a transition where last active gets bumped.
         return True
 

@@ -115,6 +115,53 @@ class PresenceUpdateTestCase(unittest.TestCase):
             ),
         ], any_order=True)
 
+    def test_online_to_online_last_active_noop(self):
+        wheel_timer = Mock()
+        user_id = "@foo:bar"
+        now = 5000000
+
+        prev_state = UserPresenceState.default(user_id)
+        prev_state = prev_state.copy_and_replace(
+            state=PresenceState.ONLINE,
+            last_active_ts=now - LAST_ACTIVE_GRANULARITY - 10,
+            currently_active=True,
+        )
+
+        new_state = prev_state.copy_and_replace(
+            state=PresenceState.ONLINE,
+            last_active_ts=now,
+        )
+
+        state, persist_and_notify, federation_ping = handle_update(
+            prev_state, new_state, is_mine=True, wheel_timer=wheel_timer, now=now
+        )
+
+        self.assertFalse(persist_and_notify)
+        self.assertTrue(federation_ping)
+        self.assertTrue(state.currently_active)
+        self.assertEquals(new_state.state, state.state)
+        self.assertEquals(new_state.status_msg, state.status_msg)
+        self.assertEquals(state.last_federation_update_ts, now)
+
+        self.assertEquals(wheel_timer.insert.call_count, 3)
+        wheel_timer.insert.assert_has_calls([
+            call(
+                now=now,
+                obj=user_id,
+                then=new_state.last_active_ts + IDLE_TIMER
+            ),
+            call(
+                now=now,
+                obj=user_id,
+                then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT
+            ),
+            call(
+                now=now,
+                obj=user_id,
+                then=new_state.last_active_ts + LAST_ACTIVE_GRANULARITY
+            ),
+        ], any_order=True)
+
     def test_online_to_online_last_active(self):
         wheel_timer = Mock()
         user_id = "@foo:bar"
