@@ -571,15 +571,18 @@ class SyncHandler(object):
                 user_id, device_id, since_stream_id
             )
 
-        logger.debug("Getting messages up to %d", now_token.to_device_key)
-        messages, stream_id = yield self.store.get_new_messages_for_device(
-            user_id, device_id, now_token.to_device_key
-        )
-        logger.debug("Got messages up to %d: %r", stream_id, messages)
-        sync_result_builder.now_token = now_token.copy_and_replace(
-            "to_device_key", stream_id
-        )
-        sync_result_builder.to_device = messages
+        if since_stream_id and since_stream_id == int(now_token.to_device_key):
+            logger.debug("Getting messages up to %d", now_token.to_device_key)
+            messages, stream_id = yield self.store.get_new_messages_for_device(
+                user_id, device_id, now_token.to_device_key
+            )
+            logger.debug("Got messages up to %d: %r", stream_id, messages)
+            sync_result_builder.now_token = now_token.copy_and_replace(
+                "to_device_key", stream_id
+            )
+            sync_result_builder.to_device = messages
+        else:
+            sync_result_builder.to_device = []
 
     @defer.inlineCallbacks
     def _generate_sync_entry_for_account_data(self, sync_result_builder):
