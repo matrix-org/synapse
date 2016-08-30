@@ -88,6 +88,8 @@ class PresenceHandler(object):
         self.notifier = hs.get_notifier()
         self.federation = hs.get_replication_layer()
 
+        self.state = hs.get_state_handler()
+
         self.federation.register_edu_handler(
             "m.presence", self.incoming_presence
         )
@@ -532,7 +534,9 @@ class PresenceHandler(object):
                 if not local_states:
                     continue
 
-                hosts = yield self.store.get_joined_hosts_for_room(room_id)
+                users = yield self.state.get_current_user_in_room(room_id)
+                hosts = set(get_domain_from_id(u) for u in users)
+
                 for host in hosts:
                     hosts_to_states.setdefault(host, []).extend(local_states)
 
@@ -725,13 +729,13 @@ class PresenceHandler(object):
         # don't need to send to local clients here, as that is done as part
         # of the event stream/sync.
         # TODO: Only send to servers not already in the room.
+        user_ids = yield self.state.get_current_user_in_room(room_id)
         if self.is_mine(user):
             state = yield self.current_state_for_user(user.to_string())
 
-            hosts = yield self.store.get_joined_hosts_for_room(room_id)
+            hosts = set(get_domain_from_id(u) for u in user_ids)
             self._push_to_remotes({host: (state,) for host in hosts})
         else:
-            user_ids = yield self.store.get_users_in_room(room_id)
             user_ids = filter(self.is_mine_id, user_ids)
 
             states = yield self.current_state_for_users(user_ids)
@@ -955,6 +959,7 @@ class PresenceEventSource(object):
         self.get_presence_handler = hs.get_presence_handler
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
+        self.state = hs.get_state_handler()
 
     @defer.inlineCallbacks
     @log_function
@@ -1017,7 +1022,7 @@ class PresenceEventSource(object):
 
                 user_ids_to_check = set()
                 for room_id in room_ids:
-                    users = yield self.store.get_users_in_room(room_id)
+                    users = yield self.state.get_current_user_in_room(room_id)
                     user_ids_to_check.update(users)
 
                 user_ids_to_check.update(friends)

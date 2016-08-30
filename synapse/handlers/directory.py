@@ -19,7 +19,7 @@ from ._base import BaseHandler
 
 from synapse.api.errors import SynapseError, Codes, CodeMessageException, AuthError
 from synapse.api.constants import EventTypes
-from synapse.types import RoomAlias, UserID
+from synapse.types import RoomAlias, UserID, get_domain_from_id
 
 import logging
 import string
@@ -55,7 +55,8 @@ class DirectoryHandler(BaseHandler):
         # TODO(erikj): Add transactions.
         # TODO(erikj): Check if there is a current association.
         if not servers:
-            servers = yield self.store.get_joined_hosts_for_room(room_id)
+            users = yield self.state.get_current_user_in_room(room_id)
+            servers = set(get_domain_from_id(u) for u in users)
 
         if not servers:
             raise SynapseError(400, "Failed to get server list")
@@ -193,7 +194,8 @@ class DirectoryHandler(BaseHandler):
                 Codes.NOT_FOUND
             )
 
-        extra_servers = yield self.store.get_joined_hosts_for_room(room_id)
+        users = yield self.state.get_current_user_in_room(room_id)
+        extra_servers = set(get_domain_from_id(u) for u in users)
         servers = set(extra_servers) | set(servers)
 
         # If this server is in the list of servers, return it first.

@@ -29,6 +29,7 @@ from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
 from synapse.events import FrozenEvent
+from synapse.types import get_domain_from_id
 import synapse.metrics
 
 from synapse.util.retryutils import get_retry_limiter, NotRetryingDestination
@@ -63,6 +64,7 @@ class FederationClient(FederationBase):
         self._clock.looping_call(
             self._clear_tried_cache, 60 * 1000,
         )
+        self.state = hs.get_state_handler()
 
     def _clear_tried_cache(self):
         """Clear pdu_destination_tried cache"""
@@ -811,7 +813,8 @@ class FederationClient(FederationBase):
         if len(signed_events) >= limit:
             defer.returnValue(signed_events)
 
-        servers = yield self.store.get_joined_hosts_for_room(room_id)
+        users = yield self.state.get_current_user_in_room(room_id)
+        servers = set(get_domain_from_id(u) for u in users)
 
         servers = set(servers)
         servers.discard(self.server_name)

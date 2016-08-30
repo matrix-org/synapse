@@ -18,6 +18,7 @@ from ._base import BaseHandler
 from twisted.internet import defer
 
 from synapse.util.logcontext import PreserveLoggingContext
+from synapse.types import get_domain_from_id
 
 import logging
 
@@ -37,6 +38,7 @@ class ReceiptsHandler(BaseHandler):
             "m.receipt", self._received_remote_receipt
         )
         self.clock = self.hs.get_clock()
+        self.state = hs.get_state_handler()
 
     @defer.inlineCallbacks
     def received_client_receipt(self, room_id, receipt_type, user_id,
@@ -133,7 +135,8 @@ class ReceiptsHandler(BaseHandler):
             event_ids = receipt["event_ids"]
             data = receipt["data"]
 
-            remotedomains = yield self.store.get_joined_hosts_for_room(room_id)
+            users = yield self.state.get_current_user_in_room(room_id)
+            remotedomains = set(get_domain_from_id(u) for u in users)
             remotedomains = remotedomains.copy()
             remotedomains.discard(self.server_name)
 
