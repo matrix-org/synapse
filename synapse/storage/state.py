@@ -526,6 +526,3 @@ class StateStore(SQLBaseStore):
         return self.runInteraction(
             "get_all_new_state_groups", get_all_new_state_groups_txn
         )
-
-    def get_state_stream_token(self):
-        return self._state_groups_id_gen.get_current_token()
