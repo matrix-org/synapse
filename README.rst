@@ -134,6 +134,12 @@ Installing prerequisites on Raspbian::
     sudo pip install --upgrade ndg-httpsclient
     sudo pip install --upgrade virtualenv
 
+Installing prerequisites on openSUSE::
+
+    sudo zypper in -t pattern devel_basis
+    sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
+                   python-devel libffi-devel libopenssl-devel libjpeg62-devel
+
 To install the synapse homeserver run::
 
     virtualenv -p python2.7 ~/.synapse
