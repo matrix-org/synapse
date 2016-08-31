@@ -281,11 +281,13 @@ class Auth(object):
         with Measure(self.clock, "check_host_in_room"):
             latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
 
-            group, curr_state_ids = yield self.state.resolve_state_groups(
+            entry = yield self.state.resolve_state_groups(
                 room_id, latest_event_ids
             )
 
-            ret = yield self.store.is_host_joined(room_id, host, group, curr_state_ids)
+            ret = yield self.store.is_host_joined(
+                room_id, host, entry.state_group, entry.state
+            )
             defer.returnValue(ret)
 
     def check_event_sender_in_room(self, event, auth_events):
