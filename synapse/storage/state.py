@@ -108,9 +108,6 @@ class StateStore(SQLBaseStore):
 
             state_event_ids = dict(context.current_state_ids)
 
-            if event.is_state():
-                state_event_ids[(event.type, event.state_key)] = event.event_id
-
             self._simple_insert_txn(
                 txn,
                 table="state_groups",

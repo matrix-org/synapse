@@ -93,7 +93,7 @@ class RoomMemberHandler(BaseHandler):
             ratelimit=ratelimit,
         )
 
-        prev_member_event_id = context.current_state_ids.get(
+        prev_member_event_id = context.prev_state_ids.get(
             (EventTypes.Member, target.to_string()),
             None
         )
@@ -341,7 +341,7 @@ class RoomMemberHandler(BaseHandler):
 
         if event.membership == Membership.JOIN:
             if requester.is_guest:
-                guest_can_join = yield self._can_guest_join(context.current_state_ids)
+                guest_can_join = yield self._can_guest_join(context.prev_state_ids)
                 if not guest_can_join:
                     # This should be an auth check, but guests are a local concept,
                     # so don't really fit into the general auth process.
@@ -355,7 +355,7 @@ class RoomMemberHandler(BaseHandler):
             ratelimit=ratelimit,
         )
 
-        prev_member_event_id = context.current_state_ids.get(
+        prev_member_event_id = context.prev_state_ids.get(
             (EventTypes.Member, event.state_key),
             None
         )

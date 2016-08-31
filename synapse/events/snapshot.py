@@ -15,8 +15,9 @@
 
 
 class EventContext(object):
-    def __init__(self, current_state_ids=None):
-        self.current_state_ids = current_state_ids
+    def __init__(self):
+        self.current_state_ids = None
+        self.prev_state_ids = None
         self.state_group = None
         self.rejected = False
         self.push_actions = []

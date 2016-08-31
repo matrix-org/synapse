@@ -60,8 +60,8 @@ class ReplicationResourceCase(unittest.TestCase):
         self.assertEquals(body, {})
 
     @defer.inlineCallbacks
-    def test_events_and_state(self):
-        get = self.get(events="-1", state="-1", timeout="0")
+    def test_events(self):
+        get = self.get(events="-1", timeout="0")
         yield self.hs.get_handlers().room_creation_handler.create_room(
             synapse.types.create_requester(self.user), {}
         )
@@ -69,12 +69,6 @@ class ReplicationResourceCase(unittest.TestCase):
         self.assertEquals(code, 200)
         self.assertEquals(body["events"]["field_names"], [
             "position", "internal", "json", "state_group"
-        ])
-        self.assertEquals(body["state_groups"]["field_names"], [
-            "position", "room_id", "event_id"
-        ])
-        self.assertEquals(body["state_group_state"]["field_names"], [
-            "position", "type", "state_key", "event_id"
         ])
 
     @defer.inlineCallbacks
