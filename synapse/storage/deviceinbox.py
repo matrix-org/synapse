@@ -33,7 +33,8 @@ class DeviceInboxStore(SQLBaseStore):
             messages_by_user_and_device(dict):
                 Dictionary of user_id to device_id to message.
         Returns:
-            A deferred that resolves when the messages have been inserted.
+            A deferred stream_id that resolves when the messages have been
+            inserted.
         """
 
         def select_devices_txn(txn, user_id, devices):
@@ -80,6 +81,8 @@ class DeviceInboxStore(SQLBaseStore):
                 add_messages_to_device_inbox_txn,
                 stream_id
             )
+
+        defer.returnValue(self._device_inbox_id_gen.get_current_token())
 
     def get_new_messages_for_device(
         self, user_id, device_id, current_stream_id, limit=100
