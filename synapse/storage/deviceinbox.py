@@ -33,7 +33,8 @@ class DeviceInboxStore(SQLBaseStore):
             messages_by_user_and_device(dict):
                 Dictionary of user_id to device_id to message.
         Returns:
-            A deferred that resolves when the messages have been inserted.
+            A deferred stream_id that resolves when the messages have been
+            inserted.
         """
 
         def select_devices_txn(txn, user_id, devices):
@@ -80,6 +81,8 @@ class DeviceInboxStore(SQLBaseStore):
                 add_messages_to_device_inbox_txn,
                 stream_id
             )
+
+        defer.returnValue(self._device_inbox_id_gen.get_current_token())
 
     def get_new_messages_for_device(
         self, user_id, device_id, current_stream_id, limit=100
@@ -134,6 +137,45 @@ class DeviceInboxStore(SQLBaseStore):
 
         return self.runInteraction(
             "delete_messages_for_device", delete_messages_for_device_txn
+        )
+
+    def get_all_new_device_messages(self, last_pos, current_pos, limit):
+        """
+        Args:
+            last_pos(int):
+            current_pos(int):
+            limit(int):
+        Returns:
+            A deferred list of rows from the device inbox
+        """
+        if last_pos == current_pos:
+            return defer.succeed([])
+
+        def get_all_new_device_messages_txn(txn):
+            sql = (
+                "SELECT stream_id FROM device_inbox"
+                " WHERE ? < stream_id AND stream_id <= ?"
+                " GROUP BY stream_id"
+                " ORDER BY stream_id ASC"
+                " LIMIT ?"
+            )
+            txn.execute(sql, (last_pos, current_pos, limit))
+            stream_ids = txn.fetchall()
+            if not stream_ids:
+                return []
+            max_stream_id_in_limit = stream_ids[-1]
+
+            sql = (
+                "SELECT stream_id, user_id, device_id, message_json"
+                " FROM device_inbox"
+                " WHERE ? < stream_id AND stream_id <= ?"
+                " ORDER BY stream_id ASC"
+            )
+            txn.execute(sql, (last_pos, max_stream_id_in_limit))
+            return txn.fetchall()
+
+        return self.runInteraction(
+            "get_all_new_device_messages", get_all_new_device_messages_txn
         )
 
     def get_to_device_stream_token(self):

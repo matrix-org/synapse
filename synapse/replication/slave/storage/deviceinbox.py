@@ -28,3 +28,15 @@ class SlavedDeviceInboxStore(BaseSlavedStore):
     get_to_device_stream_token = DataStore.get_to_device_stream_token.__func__
     get_new_messages_for_device = DataStore.get_new_messages_for_device.__func__
     delete_messages_for_device = DataStore.delete_messages_for_device.__func__
+
+    def stream_positions(self):
+        result = super(SlavedDeviceInboxStore, self).stream_positions()
+        result["to_device"] = self._device_inbox_id_gen.get_current_token()
+        return result
+
+    def process_replication(self, result):
+        stream = result.get("to_device")
+        if stream:
+            self._device_inbox_id_gen.advance(int(stream["position"]))
+
+        return super(SlavedDeviceInboxStore, self).process_replication(result)
