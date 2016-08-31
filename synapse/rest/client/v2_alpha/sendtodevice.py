@@ -40,6 +40,7 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
+        self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
         self.txns = HttpTransactionStore()
 
@@ -71,9 +72,14 @@ class SendToDeviceRestServlet(servlet.RestServlet):
                     }
                     for device_id, message_content in by_device.items()
                 }
-                local_messages[user_id] = messages_by_device
+                if messages_by_device:
+                    local_messages[user_id] = messages_by_device
 
-        yield self.store.add_messages_to_device_inbox(local_messages)
+        stream_id = yield self.store.add_messages_to_device_inbox(local_messages)
+
+        self.notifier.on_new_event(
+            "to_device", stream_id, users=local_messages.keys()
+        )
 
         response = (200, {})
         self.txns.store_client_transaction(request, txn_id, response)
