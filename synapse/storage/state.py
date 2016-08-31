@@ -85,7 +85,7 @@ class StateStore(SQLBaseStore):
 
     def _have_persisted_state_group_txn(self, txn, state_group):
         txn.execute(
-            "SELECT count(*) FROM state_groups_state WHERE state_group = ?",
+            "SELECT count(*) FROM state_groups WHERE id = ?",
             (state_group,)
         )
         row = txn.fetchone()
