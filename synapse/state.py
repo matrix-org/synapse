@@ -160,14 +160,14 @@ class StateHandler(object):
             else:
                 context.current_state_ids = {}
             context.prev_state_events = []
-            context.state_group = None
+            context.state_group = self.store.get_next_state_group()
             defer.returnValue(context)
 
         if old_state:
             context.current_state_ids = {
                 (s.type, s.state_key): s.event_id for s in old_state
             }
-            context.state_group = None
+            context.state_group = self.store.get_next_state_group()
 
             if event.is_state():
                 key = (event.type, event.state_key)
@@ -193,7 +193,10 @@ class StateHandler(object):
         group, curr_state = ret
 
         context.current_state_ids = curr_state
-        context.state_group = group if not event.is_state() else None
+        if event.is_state() or group is None:
+            context.state_group = self.store.get_next_state_group()
+        else:
+            context.state_group = group
 
         if event.is_state():
             key = (event.type, event.state_key)

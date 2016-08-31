@@ -276,13 +276,6 @@ class EventsStore(SQLBaseStore):
                 events_and_contexts, stream_orderings
             ):
                 event.internal_metadata.stream_ordering = stream
-                # Assign a state group_id in case a new id is needed for
-                # this context. In theory we only need to assign this
-                # for contexts that have current_state and aren't outliers
-                # but that make the code more complicated. Assigning an ID
-                # per event only causes the state_group_ids to grow as fast
-                # as the stream_ordering so in practise shouldn't be a problem.
-                context.new_state_group_id = self._state_groups_id_gen.get_next()
 
             chunks = [
                 events_and_contexts[x:x + 100]
@@ -309,7 +302,6 @@ class EventsStore(SQLBaseStore):
         try:
             with self._stream_id_gen.get_next() as stream_ordering:
                 event.internal_metadata.stream_ordering = stream_ordering
-                context.new_state_group_id = self._state_groups_id_gen.get_next()
                 yield self.runInteraction(
                     "persist_event",
                     self._persist_event_txn,
@@ -523,7 +515,7 @@ class EventsStore(SQLBaseStore):
                 # Add an entry to the ex_outlier_stream table to replicate the
                 # change in outlier status to our workers.
                 stream_order = event.internal_metadata.stream_ordering
-                state_group_id = context.state_group or context.new_state_group_id
+                state_group_id = context.state_group
                 self._simple_insert_txn(
                     txn,
                     table="ex_outlier_stream",
