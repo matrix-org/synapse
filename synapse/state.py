@@ -302,6 +302,8 @@ class StateHandler(object):
             if new_state_event_ids == frozenset(e_id for e_id in events):
                 state_group = sg
                 break
+        if not state_group:
+            state_group = self.store.get_next_state_group()
 
         if self._state_cache is not None:
             cache = _StateCacheEntry(
