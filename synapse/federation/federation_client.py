@@ -269,7 +269,7 @@ class FederationClient(FederationBase):
 
         pdu_attempts = self.pdu_destination_tried.setdefault(event_id, {})
 
-        pdu = None
+        signed_pdu = None
         for destination in destinations:
             now = self._clock.time_msec()
             last_attempt = pdu_attempts.get(destination, 0)
@@ -299,7 +299,7 @@ class FederationClient(FederationBase):
                         pdu = pdu_list[0]
 
                         # Check signatures are correct.
-                        pdu = yield self._check_sigs_and_hashes([pdu])[0]
+                        signed_pdu = yield self._check_sigs_and_hashes([pdu])[0]
 
                         break
 
@@ -322,10 +322,10 @@ class FederationClient(FederationBase):
                 )
                 continue
 
-        if self._get_pdu_cache is not None and pdu:
-            self._get_pdu_cache[event_id] = pdu
+        if self._get_pdu_cache is not None and signed_pdu:
+            self._get_pdu_cache[event_id] = signed_pdu
 
-        defer.returnValue(pdu)
+        defer.returnValue(signed_pdu)
 
     @defer.inlineCallbacks
     @log_function
