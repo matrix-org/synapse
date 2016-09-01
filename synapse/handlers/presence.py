@@ -230,7 +230,7 @@ class PresenceHandler(object):
         """
         logger.info(
             "Performing _persist_unpersisted_changes. Persiting %d unpersisted changes",
-            len(self.user_to_current_state)
+            len(self.unpersisted_users_changes)
         )
 
         unpersisted = self.unpersisted_users_changes
