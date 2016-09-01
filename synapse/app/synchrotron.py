@@ -399,6 +399,9 @@ class SynchrotronServer(HomeServer):
             notify_from_stream(
                 result, "typing", "typing_key", room="room_id"
             )
+            notify_from_stream(
+                result, "to_device", "to_device_key", user="user_id"
+            )
 
         while True:
             try:

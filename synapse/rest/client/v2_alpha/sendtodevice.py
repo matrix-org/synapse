@@ -78,7 +78,7 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         stream_id = yield self.store.add_messages_to_device_inbox(local_messages)
 
         self.notifier.on_new_event(
-            "to_device", stream_id, users=local_messages.keys()
+            "to_device_key", stream_id, users=local_messages.keys()
         )
 
         response = (200, {})
