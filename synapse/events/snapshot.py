@@ -15,9 +15,25 @@
 
 
 class EventContext(object):
+    __slots__ = [
+        "current_state_ids",
+        "prev_state_ids",
+        "state_group",
+        "rejected",
+        "push_actions",
+        "prev_group",
+        "delta_ids",
+        "prev_state_events",
+    ]
+
     def __init__(self):
         self.current_state_ids = None
         self.prev_state_ids = None
         self.state_group = None
         self.rejected = False
         self.push_actions = []
+
+        self.prev_group = None
+        self.delta_ids = None
+
+        self.prev_state_events = None
