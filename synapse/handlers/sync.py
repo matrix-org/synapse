@@ -576,7 +576,7 @@ class SyncHandler(object):
 
             logger.debug("Getting messages up to %d", now_token.to_device_key)
             messages, stream_id = yield self.store.get_new_messages_for_device(
-                user_id, device_id, now_token.to_device_key
+                user_id, device_id, since_stream_id, now_token.to_device_key
             )
             logger.debug("Got messages up to %d: %r", stream_id, messages)
             sync_result_builder.now_token = now_token.copy_and_replace(

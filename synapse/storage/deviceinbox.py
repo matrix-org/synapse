@@ -85,7 +85,7 @@ class DeviceInboxStore(SQLBaseStore):
         defer.returnValue(self._device_inbox_id_gen.get_current_token())
 
     def get_new_messages_for_device(
-        self, user_id, device_id, current_stream_id, limit=100
+        self, user_id, device_id, last_stream_id, current_stream_id, limit=100
     ):
         """
         Args:
@@ -101,11 +101,13 @@ class DeviceInboxStore(SQLBaseStore):
             sql = (
                 "SELECT stream_id, message_json FROM device_inbox"
                 " WHERE user_id = ? AND device_id = ?"
-                " AND stream_id <= ?"
+                " AND ? < stream_id AND stream_id <= ?"
                 " ORDER BY stream_id ASC"
                 " LIMIT ?"
             )
-            txn.execute(sql, (user_id, device_id, current_stream_id, limit))
+            txn.execute(sql, (
+                user_id, device_id, last_stream_id, current_stream_id, limit
+            ))
             messages = []
             for row in txn.fetchall():
                 stream_pos = row[0]
