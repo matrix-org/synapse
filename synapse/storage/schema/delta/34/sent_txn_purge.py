@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,11 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.storage.engines import PostgresEngine
 
-class EventContext(object):
-    def __init__(self):
-        self.current_state_ids = None
-        self.prev_state_ids = None
-        self.state_group = None
-        self.rejected = False
-        self.push_actions = []
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def run_create(cur, database_engine, *args, **kwargs):
+    if isinstance(database_engine, PostgresEngine):
+        cur.execute("TRUNCATE sent_transactions")
+    else:
+        cur.execute("DELETE FROM sent_transactions")
+
+    cur.execute("CREATE INDEX sent_transactions_ts ON sent_transactions(ts)")
+
+
+def run_upgrade(cur, database_engine, *args, **kwargs):
+    pass

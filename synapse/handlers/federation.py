@@ -222,7 +222,7 @@ class FederationHandler(BaseHandler):
                 # joined the room. Don't bother if the user is just
                 # changing their profile info.
                 newly_joined = True
-                prev_state_id = context.current_state_ids.get(
+                prev_state_id = context.prev_state_ids.get(
                     (event.type, event.state_key)
                 )
                 if prev_state_id:
@@ -835,12 +835,12 @@ class FederationHandler(BaseHandler):
 
         self.replication_layer.send_pdu(new_pdu, destinations)
 
-        state_ids = context.current_state_ids.values()
+        state_ids = context.prev_state_ids.values()
         auth_chain = yield self.store.get_auth_chain(set(
             [event.event_id] + state_ids
         ))
 
-        state = yield self.store.get_events(context.current_state_ids.values())
+        state = yield self.store.get_events(context.prev_state_ids.values())
 
         defer.returnValue({
             "state": state.values(),
@@ -1333,7 +1333,7 @@ class FederationHandler(BaseHandler):
 
         if not auth_events:
             auth_events_ids = yield self.auth.compute_auth_events(
-                event, context.current_state_ids, for_verification=True,
+                event, context.prev_state_ids, for_verification=True,
             )
             auth_events = yield self.store.get_events(auth_events_ids)
             auth_events = {
@@ -1431,6 +1431,11 @@ class FederationHandler(BaseHandler):
         # Check if we have all the auth events.
         current_state = set(e.event_id for e in auth_events.values())
         event_auth_events = set(e_id for e_id, _ in event.auth_events)
+
+        if event.is_state():
+            event_key = (event.type, event.state_key)
+        else:
+            event_key = None
 
         if event_auth_events - current_state:
             have_events = yield self.store.have_events(
@@ -1537,8 +1542,12 @@ class FederationHandler(BaseHandler):
 
                 context.current_state_ids.update({
                     k: a.event_id for k, a in auth_events.items()
+                    if k != event_key
                 })
-                context.state_group = None
+                context.prev_state_ids.update({
+                    k: a.event_id for k, a in auth_events.items()
+                })
+                context.state_group = self.store.get_next_state_group()
 
         if different_auth and not event.internal_metadata.is_outlier():
             logger.info("Different auth after resolution: %s", different_auth)
@@ -1560,7 +1569,7 @@ class FederationHandler(BaseHandler):
             if do_resolution:
                 # 1. Get what we think is the auth chain.
                 auth_ids = yield self.auth.compute_auth_events(
-                    event, context.current_state_ids
+                    event, context.prev_state_ids
                 )
                 local_auth_chain = yield self.store.get_auth_chain(auth_ids)
 
@@ -1618,8 +1627,12 @@ class FederationHandler(BaseHandler):
 
                 context.current_state_ids.update({
                     k: a.event_id for k, a in auth_events.items()
+                    if k != event_key
                 })
-                context.state_group = None
+                context.prev_state_ids.update({
+                    k: a.event_id for k, a in auth_events.items()
+                })
+                context.state_group = self.store.get_next_state_group()
 
         try:
             self.auth.check(event, auth_events=auth_events)
@@ -1855,7 +1868,7 @@ class FederationHandler(BaseHandler):
             event.content["third_party_invite"]["signed"]["token"]
         )
         original_invite = None
-        original_invite_id = context.current_state_ids.get(key)
+        original_invite_id = context.prev_state_ids.get(key)
         if original_invite_id:
             original_invite = yield self.store.get_event(
                 original_invite_id, allow_none=True
@@ -1893,7 +1906,7 @@ class FederationHandler(BaseHandler):
         signed = event.content["third_party_invite"]["signed"]
         token = signed["token"]
 
-        invite_event_id = context.current_state_ids.get(
+        invite_event_id = context.prev_state_ids.get(
             (EventTypes.ThirdPartyInvite, token,)
         )
 

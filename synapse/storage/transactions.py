@@ -387,8 +387,10 @@ class TransactionStore(SQLBaseStore):
     def _cleanup_transactions(self):
         now = self._clock.time_msec()
         month_ago = now - 30 * 24 * 60 * 60 * 1000
+        six_hours_ago = now - 6 * 60 * 60 * 1000
 
         def _cleanup_transactions_txn(txn):
             txn.execute("DELETE FROM received_transactions WHERE ts < ?", (month_ago,))
+            txn.execute("DELETE FROM sent_transactions WHERE ts < ?", (six_hours_ago,))
 
         return self.runInteraction("_persist_in_mem_txns", _cleanup_transactions_txn)

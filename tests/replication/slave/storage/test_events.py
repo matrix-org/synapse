@@ -312,7 +312,9 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         else:
             state_ids = None
 
-        context = EventContext(current_state_ids=state_ids)
+        context = EventContext()
+        context.current_state_ids = state_ids
+        context.prev_state_ids = state_ids
         context.push_actions = push_actions
 
         ordering = None

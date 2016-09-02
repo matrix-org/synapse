@@ -134,6 +134,12 @@ Installing prerequisites on Raspbian::
     sudo pip install --upgrade ndg-httpsclient
     sudo pip install --upgrade virtualenv
 
+Installing prerequisites on openSUSE::
+
+    sudo zypper in -t pattern devel_basis
+    sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
+                   python-devel libffi-devel libopenssl-devel libjpeg62-devel
+
 To install the synapse homeserver run::
 
     virtualenv -p python2.7 ~/.synapse
@@ -229,9 +235,6 @@ The advantages of Postgres include:
 * allowing basic active/backup high-availability with a "hot spare" synapse
   pointing at the same DB master, as well as enabling DB replication in
   synapse itself.
-
-The only disadvantage is that the code is relatively new as of April 2015 and
-may have a few regressions relative to SQLite.
 
 For information on how to install and use PostgreSQL, please see
 `docs/postgres.rst <docs/postgres.rst>`_.

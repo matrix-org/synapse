@@ -74,7 +74,7 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
             alias_event = yield store.get_event(
                 alias_id, allow_none=True
             )
-            if alias_event and alias_event.content and alias_event.get("aliases"):
+            if alias_event and alias_event.content.get("aliases"):
                 the_aliases = alias_event.content["aliases"]
                 if len(the_aliases) > 0 and _looks_like_an_alias(the_aliases[0]):
                     defer.returnValue(the_aliases[0])

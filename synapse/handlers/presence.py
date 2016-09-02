@@ -191,6 +191,13 @@ class PresenceHandler(object):
             5000,
         )
 
+        self.clock.call_later(
+            60,
+            self.clock.looping_call,
+            self._persist_unpersisted_changes,
+            60 * 1000,
+        )
+
         metrics.register_callback("wheel_timer_size", lambda: len(self.wheel_timer))
 
     @defer.inlineCallbacks
@@ -215,6 +222,27 @@ class PresenceHandler(object):
                 for user_id in self.unpersisted_users_changes
             ])
         logger.info("Finished _on_shutdown")
+
+    @defer.inlineCallbacks
+    def _persist_unpersisted_changes(self):
+        """We periodically persist the unpersisted changes, as otherwise they
+        may stack up and slow down shutdown times.
+        """
+        logger.info(
+            "Performing _persist_unpersisted_changes. Persiting %d unpersisted changes",
+            len(self.unpersisted_users_changes)
+        )
+
+        unpersisted = self.unpersisted_users_changes
+        self.unpersisted_users_changes = set()
+
+        if unpersisted:
+            yield self.store.update_presence([
+                self.user_to_current_state[user_id]
+                for user_id in unpersisted
+            ])
+
+        logger.info("Finished _persist_unpersisted_changes")
 
     @defer.inlineCallbacks
     def _update_states(self, new_states):
@@ -922,7 +950,12 @@ def should_notify(old_state, new_state):
         if new_state.currently_active != old_state.currently_active:
             return True
 
-    if new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
+        if new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
+            # Only notify about last active bumps if we're not currently acive
+            if not (old_state.currently_active and new_state.currently_active):
+                return True
+
+    elif new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
         # Always notify for a transition where last active gets bumped.
         return True
 

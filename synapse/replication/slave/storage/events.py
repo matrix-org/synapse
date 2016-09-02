@@ -123,6 +123,7 @@ class SlavedEventStore(BaseSlavedStore):
     get_state_groups_ids = DataStore.get_state_groups_ids.__func__
     get_state_ids_for_event = DataStore.get_state_ids_for_event.__func__
     get_state_ids_for_events = DataStore.get_state_ids_for_events.__func__
+    get_joined_users_from_state = DataStore.get_joined_users_from_state.__func__
     get_joined_users_from_context = DataStore.get_joined_users_from_context.__func__
     _get_joined_users_from_context = (
         RoomMemberStore.__dict__["_get_joined_users_from_context"]
