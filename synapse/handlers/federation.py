@@ -1103,6 +1103,32 @@ class FederationHandler(BaseHandler):
             defer.returnValue([])
 
     @defer.inlineCallbacks
+    def get_state_ids_for_pdu(self, room_id, event_id):
+        yield run_on_reactor()
+
+        state_groups = yield self.store.get_state_groups_ids(
+            room_id, [event_id]
+        )
+
+        if state_groups:
+            _, state = state_groups.items().pop()
+            results = state
+
+            event = yield self.store.get_event(event_id)
+            if event and event.is_state():
+                # Get previous state
+                if "replaces_state" in event.unsigned:
+                    prev_id = event.unsigned["replaces_state"]
+                    if prev_id != event.event_id:
+                        results[(event.type, event.state_key)] = prev_id
+                else:
+                    del results[(event.type, event.state_key)]
+
+            defer.returnValue(results.values())
+        else:
+            defer.returnValue([])
+
+    @defer.inlineCallbacks
     @log_function
     def on_backfill_request(self, origin, room_id, pdu_list, limit):
         in_room = yield self.auth.check_host_in_room(room_id, origin)

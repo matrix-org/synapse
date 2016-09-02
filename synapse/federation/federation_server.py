@@ -223,16 +223,14 @@ class FederationServer(FederationBase):
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
-        pdus = yield self.handler.get_state_for_pdu(
+        state_ids = yield self.handler.get_state_ids_for_pdu(
             room_id, event_id,
         )
-        auth_chain = yield self.store.get_auth_chain(
-            [pdu.event_id for pdu in pdus]
-        )
+        auth_chain_ids = yield self.store.get_auth_chain_ids(state_ids)
 
         defer.returnValue((200, {
-            "pdu_ids": [pdu.event_id for pdu in pdus],
-            "auth_chain_ids": [pdu.event_id for pdu in auth_chain],
+            "pdu_ids": state_ids,
+            "auth_chain_ids": auth_chain_ids,
         }))
 
     @defer.inlineCallbacks
