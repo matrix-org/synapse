@@ -1062,6 +1062,8 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_state_for_pdu(self, room_id, event_id):
+        """Returns the state at the event. i.e. not including said event.
+        """
         yield run_on_reactor()
 
         state_groups = yield self.store.get_state_groups(
@@ -1104,6 +1106,8 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_state_ids_for_pdu(self, room_id, event_id):
+        """Returns the state at the event. i.e. not including said event.
+        """
         yield run_on_reactor()
 
         state_groups = yield self.store.get_state_groups_ids(
