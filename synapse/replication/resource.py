@@ -41,6 +41,7 @@ STREAM_NAMES = (
     ("push_rules",),
     ("pushers",),
     ("caches",),
+    ("to_device",),
 )
 
 
@@ -142,6 +143,7 @@ class ReplicationResource(Resource):
             pushers_token,
             0,  # State stream is no longer a thing
             caches_token,
+            int(stream_token.to_device_key),
         ))
 
     @request_handler()
@@ -190,6 +192,7 @@ class ReplicationResource(Resource):
         yield self.push_rules(writer, current_token, limit, request_streams)
         yield self.pushers(writer, current_token, limit, request_streams)
         yield self.caches(writer, current_token, limit, request_streams)
+        yield self.to_device(writer, current_token, limit, request_streams)
         self.streams(writer, current_token, request_streams)
 
         logger.info("Replicated %d rows", writer.total)
@@ -376,6 +379,20 @@ class ReplicationResource(Resource):
                 "position", "cache_func", "keys", "invalidation_ts"
             ))
 
+    @defer.inlineCallbacks
+    def to_device(self, writer, current_token, limit, request_streams):
+        current_position = current_token.to_device
+
+        to_device = request_streams.get("to_device")
+
+        if to_device is not None:
+            to_device_rows = yield self.store.get_all_new_device_messages(
+                to_device, current_position, limit
+            )
+            writer.write_header_and_rows("to_device", to_device_rows, (
+                "position", "user_id", "device_id", "message_json"
+            ))
+
 
 class _Writer(object):
     """Writes the streams as a JSON object as the response to the request"""
@@ -404,7 +421,7 @@ class _Writer(object):
 
 class _ReplicationToken(collections.namedtuple("_ReplicationToken", (
     "events", "presence", "typing", "receipts", "account_data", "backfill",
-    "push_rules", "pushers", "state", "caches",
+    "push_rules", "pushers", "state", "caches", "to_device",
 ))):
     __slots__ = []
 

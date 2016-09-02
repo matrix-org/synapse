@@ -338,7 +338,7 @@ class Mailer(object):
             # want the generated-from-names one here otherwise we'll
             # end up with, "new message from Bob in the Bob room"
             room_name = yield calculate_room_name(
-                state_by_room[room_id], user_id, fallback_to_members=False
+                self.store, state_by_room[room_id], user_id, fallback_to_members=False
             )
 
             my_member_event = state_by_room[room_id][("m.room.member", user_id)]

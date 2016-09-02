@@ -23,6 +23,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.api.auth import AuthEventTypes
 from synapse.events.snapshot import EventContext
+from synapse.util.async import Linearizer
 
 from collections import namedtuple
 
@@ -87,6 +88,7 @@ class StateHandler(object):
 
         # dict of set of event_ids -> _StateCacheEntry.
         self._state_cache = None
+        self.resolve_linearizer = Linearizer()
 
     def start_caching(self):
         logger.debug("start_caching")
@@ -297,85 +299,85 @@ class StateHandler(object):
                 delta_ids={},
             ))
 
-        if self._state_cache is not None:
-            cache = self._state_cache.get(group_names, None)
-            if cache:
-                defer.returnValue(cache)
+        with (yield self.resolve_linearizer.queue(group_names)):
+            if self._state_cache is not None:
+                cache = self._state_cache.get(group_names, None)
+                if cache:
+                    defer.returnValue(cache)
 
-        logger.info(
-            "Resolving state for %s with %d groups", room_id, len(state_groups_ids)
-        )
-
-        state = {}
-        for st in state_groups_ids.values():
-            for key, e_id in st.items():
-                state.setdefault(key, set()).add(e_id)
-
-        conflicted_state = {
-            k: list(v)
-            for k, v in state.items()
-            if len(v) > 1
-        }
-
-        if conflicted_state:
-            logger.info("Resolving conflicted state for %r", room_id)
-            state_map = yield self.store.get_events(
-                [e_id for st in state_groups_ids.values() for e_id in st.values()],
-                get_prev_content=False
+            logger.info(
+                "Resolving state for %s with %d groups", room_id, len(state_groups_ids)
             )
-            state_sets = [
-                [state_map[e_id] for key, e_id in st.items() if e_id in state_map]
-                for st in state_groups_ids.values()
-            ]
-            new_state, _ = self._resolve_events(
-                state_sets, event_type, state_key
-            )
-            new_state = {
-                key: e.event_id for key, e in new_state.items()
-            }
-        else:
-            new_state = {
-                key: e_ids.pop() for key, e_ids in state.items()
+
+            state = {}
+            for st in state_groups_ids.values():
+                for key, e_id in st.items():
+                    state.setdefault(key, set()).add(e_id)
+
+            conflicted_state = {
+                k: list(v)
+                for k, v in state.items()
+                if len(v) > 1
             }
 
-        state_group = None
-        new_state_event_ids = frozenset(new_state.values())
-        for sg, events in state_groups_ids.items():
-            if new_state_event_ids == frozenset(e_id for e_id in events):
-                state_group = sg
-                break
-
-        if state_group is None:
-            # Worker instances don't have access to this method, but we want
-            # to set the state_group on the main instance to increase cache
-            # hits.
-            if hasattr(self.store, "get_next_state_group"):
-                state_group = self.store.get_next_state_group()
-
-        prev_group = None
-        delta_ids = None
-        for old_group, old_ids in state_groups_ids.items():
-            if not set(new_state.iterkeys()) - set(old_ids.iterkeys()):
-                n_delta_ids = {
-                    k: v
-                    for k, v in new_state.items()
-                    if old_ids.get(k) != v
+            if conflicted_state:
+                logger.info("Resolving conflicted state for %r", room_id)
+                state_map = yield self.store.get_events(
+                    [e_id for st in state_groups_ids.values() for e_id in st.values()],
+                    get_prev_content=False
+                )
+                state_sets = [
+                    [state_map[e_id] for key, e_id in st.items() if e_id in state_map]
+                    for st in state_groups_ids.values()
+                ]
+                new_state, _ = self._resolve_events(
+                    state_sets, event_type, state_key
+                )
+                new_state = {
+                    key: e.event_id for key, e in new_state.items()
                 }
-                if not delta_ids or len(n_delta_ids) < len(delta_ids):
-                    prev_group = old_group
-                    delta_ids = n_delta_ids
+            else:
+                new_state = {
+                    key: e_ids.pop() for key, e_ids in state.items()
+                }
 
-        cache = _StateCacheEntry(
-            state=new_state,
-            state_group=state_group,
-            prev_group=prev_group,
-            delta_ids=delta_ids,
-        )
+            state_group = None
+            new_state_event_ids = frozenset(new_state.values())
+            for sg, events in state_groups_ids.items():
+                if new_state_event_ids == frozenset(e_id for e_id in events):
+                    state_group = sg
+                    break
+            if state_group is None:
+                # Worker instances don't have access to this method, but we want
+                # to set the state_group on the main instance to increase cache
+                # hits.
+                if hasattr(self.store, "get_next_state_group"):
+                    state_group = self.store.get_next_state_group()
 
-        if self._state_cache is not None:
-            self._state_cache[group_names] = cache
+            prev_group = None
+            delta_ids = None
+            for old_group, old_ids in state_groups_ids.items():
+                if not set(new_state.iterkeys()) - set(old_ids.iterkeys()):
+                    n_delta_ids = {
+                        k: v
+                        for k, v in new_state.items()
+                        if old_ids.get(k) != v
+                    }
+                    if not delta_ids or len(n_delta_ids) < len(delta_ids):
+                        prev_group = old_group
+                        delta_ids = n_delta_ids
 
-        defer.returnValue(cache)
+            cache = _StateCacheEntry(
+                state=new_state,
+                state_group=state_group,
+                prev_group=prev_group,
+                delta_ids=delta_ids,
+            )
+
+            if self._state_cache is not None:
+                self._state_cache[group_names] = cache
+
+            defer.returnValue(cache)
 
     def resolve_events(self, state_sets, event):
         logger.info(
