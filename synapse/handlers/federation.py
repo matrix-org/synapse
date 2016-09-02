@@ -118,12 +118,18 @@ class FederationHandler(BaseHandler):
 
         # FIXME (erikj): Awful hack to make the case where we are not currently
         # in the room work
-        is_in_room = yield self.auth.check_host_in_room(
-            event.room_id,
-            self.server_name
-        )
-        if not is_in_room and not event.internal_metadata.is_outlier():
-            logger.debug("Got event for room we're not in.")
+        if state and auth_chain and not event.internal_metadata.is_outlier():
+            is_in_room = yield self.auth.check_host_in_room(
+                event.room_id,
+                self.server_name
+            )
+        else:
+            is_in_room = True
+        if not is_in_room:
+            logger.info(
+                "Got event for room we're not in: %r %r",
+                event.room_id, event.event_id
+            )
 
             try:
                 event_stream_id, max_stream_id = yield self._persist_auth_tree(
