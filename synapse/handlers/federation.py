@@ -118,6 +118,9 @@ class FederationHandler(BaseHandler):
 
         # FIXME (erikj): Awful hack to make the case where we are not currently
         # in the room work
+        # If state and auth_chain are None, then we don't need to do this check
+        # as we already know we have enough state in the DB to handle this
+        # event.
         if state and auth_chain and not event.internal_metadata.is_outlier():
             is_in_room = yield self.auth.check_host_in_room(
                 event.room_id,
