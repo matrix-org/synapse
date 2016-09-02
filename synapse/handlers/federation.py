@@ -101,6 +101,9 @@ class FederationHandler(BaseHandler):
     def on_receive_pdu(self, origin, pdu, state=None, auth_chain=None):
         """ Called by the ReplicationLayer when we have a new pdu. We need to
         do auth checks and put it through the StateHandler.
+
+        auth_chain and state are None if we already have the necessary state
+        and prev_events in the db
         """
         event = pdu
 
