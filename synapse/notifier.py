@@ -423,7 +423,8 @@ class Notifier(object):
     def _is_world_readable(self, room_id):
         state = yield self.state_handler.get_current_state(
             room_id,
-            EventTypes.RoomHistoryVisibility
+            EventTypes.RoomHistoryVisibility,
+            "",
         )
         if state and "history_visibility" in state.content:
             defer.returnValue(state.content["history_visibility"] == "world_readable")

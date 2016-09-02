@@ -245,7 +245,7 @@ class TransactionStore(SQLBaseStore):
 
         return self.cursor_to_dict(txn)
 
-    @cached()
+    @cached(max_entries=10000)
     def get_destination_retry_timings(self, destination):
         """Gets the current retry timings (if any) for a given destination.
 
