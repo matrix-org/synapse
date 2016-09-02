@@ -497,7 +497,11 @@ class EventsStore(SQLBaseStore):
 
                 # insert into the state_group, state_groups_state and
                 # event_to_state_groups tables.
-                self._store_mult_state_groups_txn(txn, ((event, context),))
+                try:
+                    self._store_mult_state_groups_txn(txn, ((event, context),))
+                except Exception:
+                    logger.exception("")
+                    raise
 
                 metadata_json = encode_json(
                     event.internal_metadata.get_dict()
@@ -1543,6 +1547,9 @@ class EventsStore(SQLBaseStore):
         )
         event_rows = txn.fetchall()
 
+        for event_id, state_key in event_rows:
+            txn.call_after(self._get_state_group_for_event.invalidate, (event_id,))
+
         # We calculate the new entries for the backward extremeties by finding
         # all events that point to events that are to be purged
         txn.execute(
@@ -1571,26 +1578,26 @@ class EventsStore(SQLBaseStore):
 
         # Get all state groups that are only referenced by events that are
         # to be deleted.
-        txn.execute(
-            "SELECT state_group FROM event_to_state_groups"
-            " INNER JOIN events USING (event_id)"
-            " WHERE state_group IN ("
-            "   SELECT DISTINCT state_group FROM events"
-            "   INNER JOIN event_to_state_groups USING (event_id)"
-            "   WHERE room_id = ? AND topological_ordering < ?"
-            " )"
-            " GROUP BY state_group HAVING MAX(topological_ordering) < ?",
-            (room_id, topological_ordering, topological_ordering)
-        )
-        state_rows = txn.fetchall()
-        txn.executemany(
-            "DELETE FROM state_groups_state WHERE state_group = ?",
-            state_rows
-        )
-        txn.executemany(
-            "DELETE FROM state_groups WHERE id = ?",
-            state_rows
-        )
+        # txn.execute(
+        #     "SELECT state_group FROM event_to_state_groups"
+        #     " INNER JOIN events USING (event_id)"
+        #     " WHERE state_group IN ("
+        #     "   SELECT DISTINCT state_group FROM events"
+        #     "   INNER JOIN event_to_state_groups USING (event_id)"
+        #     "   WHERE room_id = ? AND topological_ordering < ?"
+        #     " )"
+        #     " GROUP BY state_group HAVING MAX(topological_ordering) < ?",
+        #     (room_id, topological_ordering, topological_ordering)
+        # )
+        # state_rows = txn.fetchall()
+        # txn.executemany(
+        #     "DELETE FROM state_groups_state WHERE state_group = ?",
+        #     state_rows
+        # )
+        # txn.executemany(
+        #     "DELETE FROM state_groups WHERE id = ?",
+        #     state_rows
+        # )
         # Delete all non-state
         txn.executemany(
             "DELETE FROM event_to_state_groups WHERE event_id = ?",
