@@ -101,6 +101,9 @@ class FederationHandler(BaseHandler):
     def on_receive_pdu(self, origin, pdu, state=None, auth_chain=None):
         """ Called by the ReplicationLayer when we have a new pdu. We need to
         do auth checks and put it through the StateHandler.
+
+        auth_chain and state are None if we already have the necessary state
+        and prev_events in the db
         """
         event = pdu
 
@@ -118,12 +121,21 @@ class FederationHandler(BaseHandler):
 
         # FIXME (erikj): Awful hack to make the case where we are not currently
         # in the room work
-        is_in_room = yield self.auth.check_host_in_room(
-            event.room_id,
-            self.server_name
-        )
-        if not is_in_room and not event.internal_metadata.is_outlier():
-            logger.debug("Got event for room we're not in.")
+        # If state and auth_chain are None, then we don't need to do this check
+        # as we already know we have enough state in the DB to handle this
+        # event.
+        if state and auth_chain and not event.internal_metadata.is_outlier():
+            is_in_room = yield self.auth.check_host_in_room(
+                event.room_id,
+                self.server_name
+            )
+        else:
+            is_in_room = True
+        if not is_in_room:
+            logger.info(
+                "Got event for room we're not in: %r %r",
+                event.room_id, event.event_id
+            )
 
             try:
                 event_stream_id, max_stream_id = yield self._persist_auth_tree(
