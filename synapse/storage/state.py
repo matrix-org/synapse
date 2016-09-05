@@ -209,6 +209,8 @@ class StateStore(SQLBaseStore):
             else:
                 return 0
         else:
+            # We don't use WITH RECURSIVE on sqlite3 as there are distributions
+            # that ship with an sqlite3 version that doesn't support it (e.g. wheezy)
             next_group = state_group
             count = 0
 
@@ -340,6 +342,8 @@ class StateStore(SQLBaseStore):
                     key = (row["type"], row["state_key"])
                     results[group][key] = row["event_id"]
         else:
+            # We don't use WITH RECURSIVE on sqlite3 as there are distributions
+            # that ship with an sqlite3 version that doesn't support it (e.g. wheezy)
             for group in groups:
                 group_tree = [group]
                 next_group = group
