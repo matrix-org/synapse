@@ -674,6 +674,17 @@ class StateStore(SQLBaseStore):
                     return True, count
 
                 txn.execute(
+                    "SELECT state_group FROM state_group_edges"
+                    " WHERE state_group = ?",
+                    (state_group,)
+                )
+
+                # If we reach a point where we've already started inserting
+                # edges we should stop.
+                if txn.fetchall():
+                    return True, count
+
+                txn.execute(
                     "SELECT coalesce(max(id), 0) FROM state_groups"
                     " WHERE id < ? AND room_id = ?",
                     (state_group, room_id,)
@@ -708,6 +719,14 @@ class StateStore(SQLBaseStore):
                             key: value for key, value in curr_state.items()
                             if prev_state.get(key, None) != value
                         }
+
+                        self._simple_delete_txn(
+                            txn,
+                            table="state_group_edges",
+                            keyvalues={
+                                "state_group": state_group,
+                            }
+                        )
 
                         self._simple_insert_txn(
                             txn,
