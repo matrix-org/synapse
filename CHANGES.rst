@@ -21,6 +21,8 @@ Bug fixes:
 
 * Fix None check in backfill (PR #1043)
 * Fix membership changes to be idempotent (PR #1067)
+* Fix bug in get_pdu where it would sometimes return events with incorrect
+  signature
 
 
 
