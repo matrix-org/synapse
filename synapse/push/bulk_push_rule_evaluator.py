@@ -38,7 +38,7 @@ def _get_rules(room_id, user_ids, store):
 @defer.inlineCallbacks
 def evaluator_for_event(event, hs, store, context):
     rules_by_user = yield store.bulk_get_push_rules_for_room(
-        event.room_id, context
+        event, context
     )
 
     # if this event is an invite event, we may need to run rules for the user

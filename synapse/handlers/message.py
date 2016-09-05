@@ -30,7 +30,6 @@ from synapse.util.async import concurrently_execute, run_on_reactor, ReadWriteLo
 from synapse.util.caches.snapshot_cache import SnapshotCache
 from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
 from synapse.util.metrics import measure_func
-from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -945,7 +944,12 @@ class MessageHandler(BaseHandler):
             event_stream_id, max_stream_id
         )
 
-        destinations = yield self.get_joined_hosts_for_room_from_state(context)
+        users_in_room = yield self.store.get_joined_users_from_context(event, context)
+
+        destinations = [
+            get_domain_from_id(user_id) for user_id in users_in_room
+            if not self.hs.is_mine_id(user_id)
+        ]
 
         @defer.inlineCallbacks
         def _notify():
@@ -963,39 +967,3 @@ class MessageHandler(BaseHandler):
         preserve_fn(federation_handler.handle_new_event)(
             event, destinations=destinations,
         )
-
-    def get_joined_hosts_for_room_from_state(self, context):
-        state_group = context.state_group
-        if not state_group:
-            # If state_group is None it means it has yet to be assigned a
-            # state group, i.e. we need to make sure that calls with a state_group
-            # of None don't hit previous cached calls with a None state_group.
-            # To do this we set the state_group to a new object as object() != object()
-            state_group = object()
-
-        return self._get_joined_hosts_for_room_from_state(
-            state_group, context.current_state_ids
-        )
-
-    @cachedInlineCallbacks(num_args=1, cache_context=True)
-    def _get_joined_hosts_for_room_from_state(self, state_group, current_state_ids,
-                                              cache_context):
-
-        # Don't bother getting state for people on the same HS
-        current_state = yield self.store.get_events([
-            e_id for key, e_id in current_state_ids.items()
-            if key[0] == EventTypes.Member and not self.hs.is_mine_id(key[1])
-        ])
-
-        destinations = set()
-        for e in current_state.itervalues():
-            try:
-                if e.type == EventTypes.Member:
-                    if e.content["membership"] == Membership.JOIN:
-                        destinations.add(get_domain_from_id(e.state_key))
-            except SynapseError:
-                logger.warn(
-                    "Failed to get destination from event %s", e.event_id
-                )
-
-        defer.returnValue(destinations)
