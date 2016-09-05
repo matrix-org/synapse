@@ -85,6 +85,12 @@ class RoomMemberHandler(BaseHandler):
             prev_event_ids=prev_event_ids,
         )
 
+        # Check if this event matches the previous membership event for the user.
+        duplicate = yield msg_handler.deduplicate_state_event(event, context)
+        if duplicate is not None:
+            # Discard the new event since this membership change is a no-op.
+            return
+
         yield msg_handler.handle_new_client_event(
             requester,
             event,
