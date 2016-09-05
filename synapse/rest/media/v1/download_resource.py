@@ -47,7 +47,8 @@ class DownloadResource(Resource):
     def _async_render_GET(self, request):
         request.setHeader(
             "Content-Security-Policy",
-            "default-src none;"
+            "default-src 'none';"
+            " script-src 'none';"
             " plugin-types application/pdf;"
             " style-src 'unsafe-inline';"
             " object-src 'self';"
