@@ -649,6 +649,10 @@ class StateStore(SQLBaseStore):
         rows_inserted = progress.get("rows_inserted", 0)
         max_group = progress.get("max_group", None)
 
+        BATCH_SIZE_SCALE_FACTOR = 100
+
+        batch_size = max(1, int(batch_size / BATCH_SIZE_SCALE_FACTOR))
+
         if max_group is None:
             rows = yield self._execute(
                 "_background_deduplicate_state", None,
@@ -779,4 +783,4 @@ class StateStore(SQLBaseStore):
         if finished:
             yield self._end_background_update(self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME)
 
-        defer.returnValue(result)
+        defer.returnValue(result * BATCH_SIZE_SCALE_FACTOR)
