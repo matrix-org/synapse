@@ -124,7 +124,7 @@ class PushRuleStore(SQLBaseStore):
 
         defer.returnValue(results)
 
-    def bulk_get_push_rules_for_room(self, room_id, context):
+    def bulk_get_push_rules_for_room(self, event, context):
         state_group = context.state_group
         if not state_group:
             # If state_group is None it means it has yet to be assigned a
@@ -134,12 +134,12 @@ class PushRuleStore(SQLBaseStore):
             state_group = object()
 
         return self._bulk_get_push_rules_for_room(
-            room_id, state_group, context.current_state_ids
+            event.room_id, state_group, context.current_state_ids, event=event
         )
 
     @cachedInlineCallbacks(num_args=2, cache_context=True)
     def _bulk_get_push_rules_for_room(self, room_id, state_group, current_state_ids,
-                                      cache_context):
+                                      cache_context, event=None):
         # We don't use `state_group`, its there so that we can cache based
         # on it. However, its important that its never None, since two current_state's
         # with a state_group of None are likely to be different.
@@ -150,16 +150,11 @@ class PushRuleStore(SQLBaseStore):
         # their unread countss are correct in the event stream, but to avoid
         # generating them for bot / AS users etc, we only do so for people who've
         # sent a read receipt into the room.
-        local_user_member_ids = [
-            e_id for (etype, state_key), e_id in current_state_ids.iteritems()
-            if etype == EventTypes.Member and self.hs.is_mine_id(state_key)
-        ]
 
-        local_member_events = yield self._get_events(local_user_member_ids)
-
-        local_users_in_room = set(
-            member_event.state_key for member_event in local_member_events
-            if member_event.membership == Membership.JOIN
+        local_users_in_room = yield self._get_joined_users_from_context(
+            room_id, state_group, current_state_ids,
+            on_invalidate=cache_context.invalidate,
+            event=event,
         )
 
         # users in the room who have pushers need to get push rules run because
