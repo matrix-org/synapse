@@ -151,11 +151,13 @@ class PushRuleStore(SQLBaseStore):
         # generating them for bot / AS users etc, we only do so for people who've
         # sent a read receipt into the room.
 
-        local_users_in_room = yield self._get_joined_users_from_context(
+        users_in_room = yield self._get_joined_users_from_context(
             room_id, state_group, current_state_ids,
             on_invalidate=cache_context.invalidate,
             event=event,
         )
+
+        local_users_in_room = set(u for u in users_in_room if self.hs.is_mine_id(u))
 
         # users in the room who have pushers need to get push rules run because
         # that's how their pushers work
