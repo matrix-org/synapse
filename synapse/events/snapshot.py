@@ -27,12 +27,17 @@ class EventContext(object):
     ]
 
     def __init__(self):
+        # The current state including the current event
         self.current_state_ids = None
+        # The current state excluding the current event
         self.prev_state_ids = None
         self.state_group = None
+
         self.rejected = False
         self.push_actions = []
 
+        # A previously persisted state group and a delta between that
+        # and this state.
         self.prev_group = None
         self.delta_ids = None
 
