@@ -693,12 +693,12 @@ class StateStore(SQLBaseStore):
                     prev_state = self._get_state_groups_from_groups_txn(
                         txn, [prev_group], types=None
                     )
-                    prev_state = prev_state.values()[0]
+                    prev_state = prev_state[prev_group]
 
                     curr_state = self._get_state_groups_from_groups_txn(
                         txn, [state_group], types=None
                     )
-                    curr_state = curr_state.values()[0]
+                    curr_state = curr_state[state_group]
 
                     if not set(prev_state.keys()) - set(curr_state.keys()):
                         # We can only do a delta if the current has a strict super set

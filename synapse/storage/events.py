@@ -1616,7 +1616,7 @@ class EventsStore(SQLBaseStore):
             curr_state = self._get_state_groups_from_groups_txn(
                 txn, [new_state_edge], types=None
             )
-            curr_state = curr_state.values()[0]
+            curr_state = curr_state[new_state_edge]
 
             self._simple_delete_txn(
                 txn,
