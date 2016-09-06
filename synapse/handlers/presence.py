@@ -941,33 +941,31 @@ class PresenceHandler(object):
 def should_notify(old_state, new_state):
     """Decides if a presence state change should be sent to interested parties.
     """
+    if old_state == new_state:
+        return False
+
     if old_state.status_msg != new_state.status_msg:
         notify_reason_counter.inc("status_msg_change")
         return True
 
-    if old_state.state == PresenceState.ONLINE:
-        if new_state.state != PresenceState.ONLINE:
-            # Always notify for online -> anything
-            notify_reason_counter.inc("online_to_not")
-            return True
+    if old_state.state != new_state.state:
+        notify_reason_counter.inc("state_change")
+        return True
 
+    if old_state.state == PresenceState.ONLINE:
         if new_state.currently_active != old_state.currently_active:
             notify_reason_counter.inc("current_active_change")
             return True
 
         if new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
             # Only notify about last active bumps if we're not currently acive
-            if not (old_state.currently_active and new_state.currently_active):
-                notify_reason_counter.inc("last_active_change")
+            if not new_state.currently_active:
+                notify_reason_counter.inc("last_active_change_online")
                 return True
 
     elif new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
         # Always notify for a transition where last active gets bumped.
-        notify_reason_counter.inc("last_active_change")
-        return True
-
-    if old_state.state != new_state.state:
-        notify_reason_counter.inc("state_change")
+        notify_reason_counter.inc("last_active_change_not_online")
         return True
 
     return False
