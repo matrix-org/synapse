@@ -473,6 +473,7 @@ class FederationHandler(BaseHandler):
             logger.warn(
                 "Failed to handle auth events because: %s", e
             )
+            raise
 
         events.sort(key=lambda e: e.depth)
 
@@ -1417,6 +1418,7 @@ class FederationHandler(BaseHandler):
                 "Failed to auth event: %s because %s",
                 event.event_id, e.msg
             )
+            raise
 
         if event.type == EventTypes.GuestAccess:
             yield self.maybe_kick_guest_users(event)
