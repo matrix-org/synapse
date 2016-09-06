@@ -464,10 +464,15 @@ class FederationHandler(BaseHandler):
                 }
             })
 
-        yield self._handle_new_events(
-            dest, ev_infos,
-            backfilled=True,
-        )
+        try:
+            yield self._handle_new_events(
+                dest, ev_infos,
+                backfilled=True,
+            )
+        except Exception as e:
+            logger.warn(
+                "Failed to handle auth events because: %s", e
+            )
 
         events.sort(key=lambda e: e.depth)
 
@@ -1407,6 +1412,11 @@ class FederationHandler(BaseHandler):
             )
 
             context.rejected = RejectedReason.AUTH_ERROR
+        except Exception as e:
+            logger.warn(
+                "Failed to auth event: %s because %s",
+                event.event_id, e.msg
+            )
 
         if event.type == EventTypes.GuestAccess:
             yield self.maybe_kick_guest_users(event)
