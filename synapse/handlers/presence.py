@@ -53,6 +53,9 @@ bump_active_time_counter = metrics.register_counter("bump_active_time")
 get_updates_counter = metrics.register_counter("get_updates", labels=["type"])
 
 notify_reason_counter = metrics.register_counter("notify_reason", labels=["reason"])
+state_transition_counter = metrics.register_counter(
+    "state_transition", labels=["from", "to"]
+)
 
 
 # If a user was last active in the last LAST_ACTIVE_GRANULARITY, consider them
@@ -950,6 +953,7 @@ def should_notify(old_state, new_state):
 
     if old_state.state != new_state.state:
         notify_reason_counter.inc("state_change")
+        state_transition_counter.inc(old_state.state, new_state.state)
         return True
 
     if old_state.state == PresenceState.ONLINE:
