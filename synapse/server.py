@@ -35,6 +35,7 @@ from synapse.federation import initialize_http_replication
 from synapse.handlers import Handlers
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler
+from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.device import DeviceHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.presence import PresenceHandler
@@ -100,6 +101,7 @@ class HomeServer(object):
         'application_service_api',
         'application_service_scheduler',
         'application_service_handler',
+        'device_message_handler',
         'notifier',
         'distributor',
         'client_resource',
@@ -204,6 +206,9 @@ class HomeServer(object):
 
     def build_device_handler(self):
         return DeviceHandler(self)
+
+    def build_device_message_handler(self):
+        return DeviceMessageHandler(self)
 
     def build_e2e_keys_handler(self):
         return E2eKeysHandler(self)

@@ -59,10 +59,10 @@ class DeviceInboxStore(SQLBaseStore):
             self._add_messages_to_local_device_inbox_txn(
                 txn, stream_id, local_messages_by_user_then_device
             )
-            add_messages_to_device_federation_outbox(now_ms, stream_id)
+            add_messages_to_device_federation_outbox(txn, now_ms, stream_id)
 
         with self._device_inbox_id_gen.get_next() as stream_id:
-            now_ms = self.clock.time_now_ms()
+            now_ms = self.clock.time_msec()
             yield self.runInteraction(
                 "add_messages_to_device_inbox",
                 add_messages_txn,
@@ -100,7 +100,7 @@ class DeviceInboxStore(SQLBaseStore):
             )
 
         with self._device_inbox_id_gen.get_next() as stream_id:
-            now_ms = self.clock.time_now_ms()
+            now_ms = self.clock.time_msec()
             yield self.runInteraction(
                 "add_messages_from_remote_to_device_inbox",
                 add_messages_txn,
@@ -239,8 +239,7 @@ class DeviceInboxStore(SQLBaseStore):
     def get_to_device_stream_token(self):
         return self._device_inbox_id_gen.get_current_token()
 
-    @defer.inlineCallbacks
-    def get_new_device_messages_for_remote_destination(
+    def get_new_device_msgs_for_remote(
         self, destination, last_stream_id, current_stream_id, limit=100
     ):
         """
@@ -274,13 +273,11 @@ class DeviceInboxStore(SQLBaseStore):
             return (messages, stream_pos)
 
         return self.runInteraction(
-            "get_new_device_messages_for_remote_destination",
+            "get_new_device_msgs_for_remote",
             get_new_messages_for_remote_destination_txn,
         )
 
-    @defer.inlineCallbacks
-    def delete_device_messages_for_remote_destination(self, destination,
-                                                      up_to_stream_id):
+    def delete_device_msgs_for_remote(self, destination, up_to_stream_id):
         """Used to delete messages when the remote destination acknowledges
         their receipt.
 
@@ -293,12 +290,12 @@ class DeviceInboxStore(SQLBaseStore):
         def delete_messages_for_remote_destination_txn(txn):
             sql = (
                 "DELETE FROM device_federation_outbox"
-                " WHERE destination = ? AND"
+                " WHERE destination = ?"
                 " AND stream_id <= ?"
             )
             txn.execute(sql, (destination, up_to_stream_id))
 
         return self.runInteraction(
-            "delete_device_messages_for_remote_destination",
+            "delete_device_msgs_for_remote",
             delete_messages_for_remote_destination_txn
         )

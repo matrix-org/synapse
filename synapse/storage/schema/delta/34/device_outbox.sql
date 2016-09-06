@@ -16,9 +16,7 @@
 CREATE TABLE device_federation_outbox (
     destination TEXT NOT NULL,
     stream_id BIGINT NOT NULL,
-    sender TEXT NOT NULL,
-    message_id TEXT NOT NULL,
-    sent_ts BIGINT NOT NULL,
+    queued_ts BIGINT NOT NULL,
     messages_json TEXT NOT NULL
 );
 
