@@ -70,6 +70,14 @@ class DeviceInboxStore(SQLBaseStore):
                 now_ms,
                 stream_id,
             )
+            for user_id in local_messages_by_user_then_device.keys():
+                self._device_inbox_stream_cache.entity_has_changed(
+                    user_id, stream_id
+                )
+            for destination in remote_messages_by_destination.keys():
+                self._device_federation_outbox_stream_cache.entity_has_changed(
+                    destination, stream_id
+                )
 
         defer.returnValue(self._device_inbox_id_gen.get_current_token())
 
@@ -115,6 +123,10 @@ class DeviceInboxStore(SQLBaseStore):
                 now_ms,
                 stream_id,
             )
+            for user_id in local_messages_by_user_then_device.keys():
+                self._device_inbox_stream_cache.entity_has_changed(
+                    user_id, stream_id
+                )
 
     def _add_messages_to_local_device_inbox_txn(self, txn, stream_id,
                                                 messages_by_user_then_device):
@@ -161,6 +173,12 @@ class DeviceInboxStore(SQLBaseStore):
             Deferred ([dict], int): List of messages for the device and where
                 in the stream the messages got to.
         """
+        has_changed = self._device_inbox_stream_cache.has_entity_changed(
+            user_id, last_stream_id
+        )
+        if not has_changed:
+            return defer.succeed(([], current_stream_id))
+
         def get_new_messages_for_device_txn(txn):
             sql = (
                 "SELECT stream_id, message_json FROM device_inbox"
@@ -261,6 +279,13 @@ class DeviceInboxStore(SQLBaseStore):
             Deferred ([dict], int): List of messages for the device and where
                 in the stream the messages got to.
         """
+
+        has_changed = self._device_federation_outbox_stream_cache.has_entity_changed(
+            destination, last_stream_id
+        )
+        if not has_changed:
+            return defer.succeed(([], current_stream_id))
+
         def get_new_messages_for_remote_destination_txn(txn):
             sql = (
                 "SELECT stream_id, messages_json FROM device_federation_outbox"

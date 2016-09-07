@@ -81,6 +81,8 @@ class TransactionQueue(object):
         # destination -> list of tuple(failure, deferred)
         self.pending_failures_by_dest = {}
 
+        self.last_device_stream_id_by_dest = {}
+
         # HACK to get unique tx id
         self._next_txn_id = int(self.clock.time_msec())
 
@@ -189,7 +191,7 @@ class TransactionQueue(object):
 
     @defer.inlineCallbacks
     def _get_new_device_messages(self, destination):
-        last_device_stream_id = 0
+        last_device_stream_id = self.last_device_stream_id_by_dest.get(destination, 0)
         to_device_stream_id = self.store.get_to_device_stream_token()
         contents, stream_id = yield self.store.get_new_device_msgs_for_remote(
             destination, last_device_stream_id, to_device_stream_id
@@ -328,6 +330,7 @@ class TransactionQueue(object):
                     yield self.store.delete_device_msgs_for_remote(
                         destination, device_stream_id
                     )
+                    self.last_device_stream_id_by_dest[destination] = device_stream_id
             except NotRetryingDestination:
                 logger.info(
                     "TX [%s] not ready for retry yet - "
