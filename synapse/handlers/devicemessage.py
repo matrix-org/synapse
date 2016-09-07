@@ -112,10 +112,6 @@ class DeviceMessageHandler(object):
         )
 
         for destination in remote_messages.keys():
-            # Hack to send make synapse send a federation transaction
-            # to the remote servers.
-            self.federation.send_edu(
-                destination=destination,
-                edu_type="m.ping",
-                content={},
-            )
+            # Enqueue a new federation transaction to send the new
+            # device messages to each remote destination.
+            self.federation.send_device_messages(destination)
