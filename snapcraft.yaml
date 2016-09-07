@@ -19,3 +19,4 @@ parts:
     source: .
     plugin: python
     python-version: python2
+    build-packages: [libffi-dev, libssl-dev]
