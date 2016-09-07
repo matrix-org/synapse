@@ -202,7 +202,7 @@ class DataStore(RoomMemberStore, RoomStore,
             max_value=max_device_inbox_id,
         )
         self._device_federation_outbox_stream_cache = StreamChangeCache(
-            "DeviceInboxStreamChangeCache", min_device_outbox_id,
+            "DeviceFederationOutboxStreamChangeCache", min_device_outbox_id,
             prefilled_cache=device_outbox_prefill,
         )
 
