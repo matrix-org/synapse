@@ -315,6 +315,10 @@ class StateStore(SQLBaseStore):
             # against `state_groups_state` to fetch the latest state.
             # It assumes that previous state groups are always numerically
             # lesser.
+            # The PARTITION is used to get the event_id in the greatest state
+            # group for the given type, state_key.
+            # This may return multiple rows per (type, state_key), but last_value
+            # should be the same.
             sql = ("""
                 WITH RECURSIVE state(state_group) AS (
                     VALUES(?::bigint)
@@ -322,11 +326,12 @@ class StateStore(SQLBaseStore):
                     SELECT prev_state_group FROM state_group_edges e, state s
                     WHERE s.state_group = e.state_group
                 )
-                SELECT type, state_key, event_id FROM state_groups_state
-                WHERE ROW(type, state_key, state_group) IN (
-                    SELECT type, state_key, max(state_group) FROM state
-                    INNER JOIN state_groups_state USING (state_group)
-                    GROUP BY type, state_key
+                SELECT type, state_key, last_value(event_id) OVER (
+                    PARTITION BY type, state_key ORDER BY state_group ASC
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+                ) AS event_id FROM state_groups_state
+                WHERE state_group IN (
+                    SELECT state_group FROM state
                 )
                 %s;
             """) % (where_clause,)
