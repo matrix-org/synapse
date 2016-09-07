@@ -1,0 +1,21 @@
+name: synapse
+version: "0.17.1"
+summary: Matrix reference homeserver
+description: |
+  Matrix is an ambitious new ecosystem for open federated Instant Messaging and VoIP.
+confinement: strict
+
+apps:
+  synctl:
+    command: synctl
+    plugs: [network, network-bind]
+  register-new-matrix-user:
+    command: register_new_matrix_user
+  homeserver:
+    command: python -m synapse.app.homeserver
+
+parts:
+  synapse:
+    source: .
+    plugin: python
+    python-version: python2
