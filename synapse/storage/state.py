@@ -324,6 +324,7 @@ class StateStore(SQLBaseStore):
                 )
                 SELECT type, state_key, last_value(event_id) OVER (
                     PARTITION BY type, state_key ORDER BY state_group ASC
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
                 ) AS event_id FROM state_groups_state
                 WHERE state_group IN (
                     SELECT state_group FROM state
