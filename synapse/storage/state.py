@@ -315,6 +315,10 @@ class StateStore(SQLBaseStore):
             # against `state_groups_state` to fetch the latest state.
             # It assumes that previous state groups are always numerically
             # lesser.
+            # The PARTITION is used to get the event_id in the greatest state
+            # group for the given type, state_key.
+            # This may return multiple rows per (type, state_key), but last_value
+            # should be the same.
             sql = ("""
                 WITH RECURSIVE state(state_group) AS (
                     VALUES(?::bigint)
