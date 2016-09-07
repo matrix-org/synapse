@@ -322,11 +322,11 @@ class StateStore(SQLBaseStore):
                     SELECT prev_state_group FROM state_group_edges e, state s
                     WHERE s.state_group = e.state_group
                 )
-                SELECT type, state_key, event_id FROM state_groups_state
-                WHERE ROW(type, state_key, state_group) IN (
-                    SELECT type, state_key, max(state_group) FROM state
-                    INNER JOIN state_groups_state USING (state_group)
-                    GROUP BY type, state_key
+                SELECT type, state_key, last_value(event_id) OVER (
+                    PARTITION BY type, state_key ORDER BY state_group ASC
+                ) AS event_id FROM state_groups_state
+                WHERE state_group IN (
+                    SELECT state_group FROM state
                 )
                 %s;
             """) % (where_clause,)
