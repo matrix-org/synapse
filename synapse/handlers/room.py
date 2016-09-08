@@ -444,6 +444,16 @@ class RoomListHandler(BaseHandler):
         self.remote_list_cache = yield deferred
 
     @defer.inlineCallbacks
+    def get_remote_public_room_list(self, server_name):
+        res = yield self.hs.get_replication_layer().get_public_rooms(
+            [server_name]
+        )
+
+        if server_name not in res:
+            raise SynapseError(404, "Server not found")
+        defer.returnValue(res[server_name])
+
+    @defer.inlineCallbacks
     def get_aggregated_public_room_list(self):
         """
         Get the public room list from this server and the servers
