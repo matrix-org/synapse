@@ -45,11 +45,12 @@ class NotificationsServlet(RestServlet):
 
         from_token = parse_string(request, "from", required=False)
         limit = parse_integer(request, "limit", default=50)
+        only = parse_string(request, "only", required=False)
 
         limit = min(limit, 500)
 
         push_actions = yield self.store.get_push_actions_for_user(
-            user_id, from_token, limit
+            user_id, from_token, limit, only_highlight=(only == "highlight")
         )
 
         receipts_by_room = yield self.store.get_receipts_for_user_with_orderings(
