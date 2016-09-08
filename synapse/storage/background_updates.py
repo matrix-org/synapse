@@ -133,10 +133,12 @@ class BackgroundUpdateStore(SQLBaseStore):
             updates = yield self._simple_select_list(
                 "background_updates",
                 keyvalues=None,
-                retcols=("update_name",),
+                retcols=("update_name", "depends_on"),
             )
+            in_flight = set(update["update_name"] for update in updates)
             for update in updates:
-                self._background_update_queue.append(update['update_name'])
+                if update["depends_on"] not in in_flight:
+                    self._background_update_queue.append(update['update_name'])
 
         if not self._background_update_queue:
             # no work left to do
