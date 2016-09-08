@@ -242,7 +242,7 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
                     module = imp.load_source(
                         module_name, absolute_path, python_file
                     )
-                logger.debug("Running script %s", relative_path)
+                logger.info("Running script %s", relative_path)
                 module.run_create(cur, database_engine)
                 if not is_empty:
                     module.run_upgrade(cur, database_engine, config=config)
@@ -253,7 +253,7 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
                 pass
             elif ext == ".sql":
                 # A plain old .sql file, just read and execute it
-                logger.debug("Applying schema %s", relative_path)
+                logger.info("Applying schema %s", relative_path)
                 executescript(cur, absolute_path)
             else:
                 # Not a valid delta file.
