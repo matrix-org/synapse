@@ -295,15 +295,26 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
+        server = request.args.get("server", [None])[0]
+
         try:
             yield self.auth.get_user_by_req(request)
-        except AuthError:
-            # This endpoint isn't authed, but its useful to know who's hitting
-            # it if they *do* supply an access token
-            pass
+        except AuthError as e:
+            # We allow people to not be authed if they're just looking at our
+            # room list, but require auth when we proxy the request.
+            # In both cases we call the auth function, as that has the side
+            # effect of logging who issued this request if an access token was
+            # provided.
+            if server:
+                raise e
+            else:
+                pass
 
         handler = self.hs.get_room_list_handler()
-        data = yield handler.get_aggregated_public_room_list()
+        if server:
+            data = yield handler.get_remote_public_room_list(server)
+        else:
+            data = yield handler.get_aggregated_public_room_list()
 
         defer.returnValue((200, data))
 
