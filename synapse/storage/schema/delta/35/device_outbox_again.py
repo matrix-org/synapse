@@ -28,3 +28,7 @@ def run_create(cur, database_engine, *args, **kwargs):
         )
     except:
         pass
+
+
+def run_upgrade(cur, database_engine, *args, **kwargs):
+    pass
