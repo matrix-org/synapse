@@ -86,6 +86,9 @@ class SlavedEventStore(BaseSlavedStore):
     _get_state_groups_from_groups = (
         StateStore.__dict__["_get_state_groups_from_groups"]
     )
+    _get_state_groups_from_groups_txn = (
+        DataStore._get_state_groups_from_groups_txn.__func__
+    )
     _get_state_group_from_group = (
         StateStore.__dict__["_get_state_group_from_group"]
     )

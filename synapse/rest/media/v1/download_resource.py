@@ -45,7 +45,14 @@ class DownloadResource(Resource):
     @request_handler()
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
-        request.setHeader("Content-Security-Policy", "sandbox")
+        request.setHeader(
+            "Content-Security-Policy",
+            "default-src 'none';"
+            " script-src 'none';"
+            " plugin-types application/pdf;"
+            " style-src 'unsafe-inline';"
+            " object-src 'self';"
+        )
         server_name, media_id, name = parse_media_id(request)
         if server_name == self.server_name:
             yield self._respond_local_file(request, media_id, name)

@@ -121,6 +121,14 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         self.auth.check_joined_room = check_joined_room
 
+        self.datastore.get_to_device_stream_token = lambda: 0
+        self.datastore.get_new_device_msgs_for_remote = (
+            lambda *args, **kargs: ([], 0)
+        )
+        self.datastore.delete_device_msgs_for_remote = (
+            lambda *args, **kargs: None
+        )
+
         # Some local users to test with
         self.u_apple = UserID.from_string("@apple:test")
         self.u_banana = UserID.from_string("@banana:test")
