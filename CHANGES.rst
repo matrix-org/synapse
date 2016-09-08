@@ -1,3 +1,12 @@
+Changes in synapse v0.17.2 (2016-09-08)
+=======================================
+
+This release contains security bug fixes. Please upgrade.
+
+
+No changes since v0.17.2
+
+
 Changes in synapse v0.17.2-rc1 (2016-09-05)
 ===========================================
 
