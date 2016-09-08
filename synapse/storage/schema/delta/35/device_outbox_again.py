@@ -26,7 +26,7 @@ def run_create(cur, database_engine, *args, **kwargs):
         synapse.storage.prepare_database.executescript(
             cur, os.path.join(delta_dir, "34", "device_outbox.sql")
         )
-    except:
+    except database_engine.module.DatabaseError:
         pass
 
 
