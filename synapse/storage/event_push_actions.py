@@ -338,7 +338,8 @@ class EventPushActionsStore(SQLBaseStore):
         defer.returnValue(notifs[:limit])
 
     @defer.inlineCallbacks
-    def get_push_actions_for_user(self, user_id, before=None, limit=50):
+    def get_push_actions_for_user(self, user_id, before=None, limit=50,
+                                  only_highlight=False):
         def f(txn):
             before_clause = ""
             if before:
@@ -346,6 +347,12 @@ class EventPushActionsStore(SQLBaseStore):
                 args = [user_id, before, limit]
             else:
                 args = [user_id, limit]
+
+            if only_highlight:
+                if len(before_clause) > 0:
+                    before_clause += " "
+                before_clause += "AND epa.highlight = 1"
+
             sql = (
                 "SELECT epa.event_id, epa.room_id,"
                 " epa.stream_ordering, epa.topological_ordering,"
