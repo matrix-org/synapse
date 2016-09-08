@@ -47,6 +47,7 @@ class EventStreamHandler(BaseHandler):
         self.clock = hs.get_clock()
 
         self.notifier = hs.get_notifier()
+        self.state = hs.get_state_handler()
 
     @defer.inlineCallbacks
     @log_function
@@ -90,7 +91,7 @@ class EventStreamHandler(BaseHandler):
                     # Send down presence.
                     if event.state_key == auth_user_id:
                         # Send down presence for everyone in the room.
-                        users = yield self.store.get_users_in_room(event.room_id)
+                        users = yield self.state.get_current_user_in_room(event.room_id)
                         states = yield presence_handler.get_states(
                             users,
                             as_event=True,

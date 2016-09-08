@@ -40,8 +40,8 @@ STREAM_NAMES = (
     ("backfill",),
     ("push_rules",),
     ("pushers",),
-    ("state",),
     ("caches",),
+    ("to_device",),
 )
 
 
@@ -130,7 +130,6 @@ class ReplicationResource(Resource):
         backfill_token = yield self.store.get_current_backfill_token()
         push_rules_token, room_stream_token = self.store.get_push_rules_stream_token()
         pushers_token = self.store.get_pushers_stream_token()
-        state_token = self.store.get_state_stream_token()
         caches_token = self.store.get_cache_stream_token()
 
         defer.returnValue(_ReplicationToken(
@@ -142,8 +141,9 @@ class ReplicationResource(Resource):
             backfill_token,
             push_rules_token,
             pushers_token,
-            state_token,
+            0,  # State stream is no longer a thing
             caches_token,
+            int(stream_token.to_device_key),
         ))
 
     @request_handler()
@@ -191,8 +191,8 @@ class ReplicationResource(Resource):
         yield self.receipts(writer, current_token, limit, request_streams)
         yield self.push_rules(writer, current_token, limit, request_streams)
         yield self.pushers(writer, current_token, limit, request_streams)
-        yield self.state(writer, current_token, limit, request_streams)
         yield self.caches(writer, current_token, limit, request_streams)
+        yield self.to_device(writer, current_token, limit, request_streams)
         self.streams(writer, current_token, request_streams)
 
         logger.info("Replicated %d rows", writer.total)
@@ -366,25 +366,6 @@ class ReplicationResource(Resource):
             ))
 
     @defer.inlineCallbacks
-    def state(self, writer, current_token, limit, request_streams):
-        current_position = current_token.state
-
-        state = request_streams.get("state")
-
-        if state is not None:
-            state_groups, state_group_state = (
-                yield self.store.get_all_new_state_groups(
-                    state, current_position, limit
-                )
-            )
-            writer.write_header_and_rows("state_groups", state_groups, (
-                "position", "room_id", "event_id"
-            ))
-            writer.write_header_and_rows("state_group_state", state_group_state, (
-                "position", "type", "state_key", "event_id"
-            ))
-
-    @defer.inlineCallbacks
     def caches(self, writer, current_token, limit, request_streams):
         current_position = current_token.caches
 
@@ -396,6 +377,20 @@ class ReplicationResource(Resource):
             )
             writer.write_header_and_rows("caches", updated_caches, (
                 "position", "cache_func", "keys", "invalidation_ts"
+            ))
+
+    @defer.inlineCallbacks
+    def to_device(self, writer, current_token, limit, request_streams):
+        current_position = current_token.to_device
+
+        to_device = request_streams.get("to_device")
+
+        if to_device is not None:
+            to_device_rows = yield self.store.get_all_new_device_messages(
+                to_device, current_position, limit
+            )
+            writer.write_header_and_rows("to_device", to_device_rows, (
+                "position", "user_id", "device_id", "message_json"
             ))
 
 
@@ -426,7 +421,7 @@ class _Writer(object):
 
 class _ReplicationToken(collections.namedtuple("_ReplicationToken", (
     "events", "presence", "typing", "receipts", "account_data", "backfill",
-    "push_rules", "pushers", "state", "caches",
+    "push_rules", "pushers", "state", "caches", "to_device",
 ))):
     __slots__ = []
 

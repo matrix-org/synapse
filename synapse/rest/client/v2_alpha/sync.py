@@ -97,6 +97,7 @@ class SyncRestServlet(RestServlet):
             request, allow_guest=True
         )
         user = requester.user
+        device_id = requester.device_id
 
         timeout = parse_integer(request, "timeout", default=0)
         since = parse_string(request, "since")
@@ -109,12 +110,12 @@ class SyncRestServlet(RestServlet):
 
         logger.info(
             "/sync: user=%r, timeout=%r, since=%r,"
-            " set_presence=%r, filter_id=%r" % (
-                user, timeout, since, set_presence, filter_id
+            " set_presence=%r, filter_id=%r, device_id=%r" % (
+                user, timeout, since, set_presence, filter_id, device_id
             )
         )
 
-        request_key = (user, timeout, since, filter_id, full_state)
+        request_key = (user, timeout, since, filter_id, full_state, device_id)
 
         if filter_id:
             if filter_id.startswith('{'):
@@ -136,6 +137,7 @@ class SyncRestServlet(RestServlet):
             filter_collection=filter,
             is_guest=requester.is_guest,
             request_key=request_key,
+            device_id=device_id,
         )
 
         if since is not None:
@@ -173,6 +175,7 @@ class SyncRestServlet(RestServlet):
 
         response_content = {
             "account_data": {"events": sync_result.account_data},
+            "to_device": {"events": sync_result.to_device},
             "presence": self.encode_presence(
                 sync_result.presence, time_now
             ),

@@ -134,6 +134,12 @@ Installing prerequisites on Raspbian::
     sudo pip install --upgrade ndg-httpsclient
     sudo pip install --upgrade virtualenv
 
+Installing prerequisites on openSUSE::
+
+    sudo zypper in -t pattern devel_basis
+    sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
+                   python-devel libffi-devel libopenssl-devel libjpeg62-devel
+
 To install the synapse homeserver run::
 
     virtualenv -p python2.7 ~/.synapse
@@ -199,6 +205,21 @@ run (e.g. ``~/.synapse``), and::
     source ./bin/activate
     synctl start
 
+Security Note
+=============
+
+Matrix serves raw user generated data in some APIs - specifically the content
+repository endpoints: http://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-media-r0-download-servername-mediaid
+Whilst we have tried to mitigate against possible XSS attacks (e.g.
+https://github.com/matrix-org/synapse/pull/1021) we recommend running
+matrix homeservers on a dedicated domain name, to limit any malicious user generated
+content served to web browsers a matrix API from being able to attack webapps hosted
+on the same domain.  This is particularly true of sharing a matrix webclient and
+server on the same domain.
+
+See https://github.com/vector-im/vector-web/issues/1977 and
+https://developer.github.com/changes/2014-04-25-user-content-security for more details.
+
 Using PostgreSQL
 ================
 
@@ -214,9 +235,6 @@ The advantages of Postgres include:
 * allowing basic active/backup high-availability with a "hot spare" synapse
   pointing at the same DB master, as well as enabling DB replication in
   synapse itself.
-
-The only disadvantage is that the code is relatively new as of April 2015 and
-may have a few regressions relative to SQLite.
 
 For information on how to install and use PostgreSQL, please see
 `docs/postgres.rst <docs/postgres.rst>`_.

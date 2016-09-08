@@ -19,8 +19,8 @@ from twisted.internet import defer
 
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
-from synapse.api.constants import EventTypes, Membership
-from synapse.visibility import filter_events_for_clients
+from synapse.api.constants import EventTypes
+from synapse.visibility import filter_events_for_clients_context
 
 
 logger = logging.getLogger(__name__)
@@ -36,9 +36,9 @@ def _get_rules(room_id, user_ids, store):
 
 
 @defer.inlineCallbacks
-def evaluator_for_event(event, hs, store, state_group, current_state):
+def evaluator_for_event(event, hs, store, context):
     rules_by_user = yield store.bulk_get_push_rules_for_room(
-        event.room_id, state_group, current_state
+        event, context
     )
 
     # if this event is an invite event, we may need to run rules for the user
@@ -72,7 +72,7 @@ class BulkPushRuleEvaluator:
         self.store = store
 
     @defer.inlineCallbacks
-    def action_for_event_by_user(self, event, current_state):
+    def action_for_event_by_user(self, event, context):
         actions_by_user = {}
 
         # None of these users can be peeking since this list of users comes
@@ -82,27 +82,25 @@ class BulkPushRuleEvaluator:
             (u, False) for u in self.rules_by_user.keys()
         ]
 
-        filtered_by_user = yield filter_events_for_clients(
-            self.store, user_tuples, [event], {event.event_id: current_state}
+        filtered_by_user = yield filter_events_for_clients_context(
+            self.store, user_tuples, [event], {event.event_id: context}
         )
 
-        room_members = set(
-            e.state_key for e in current_state.values()
-            if e.type == EventTypes.Member and e.membership == Membership.JOIN
+        room_members = yield self.store.get_joined_users_from_context(
+            event, context
         )
 
         evaluator = PushRuleEvaluatorForEvent(event, len(room_members))
 
         condition_cache = {}
 
-        display_names = {}
-        for ev in current_state.values():
-            nm = ev.content.get("displayname", None)
-            if nm and ev.type == EventTypes.Member:
-                display_names[ev.state_key] = nm
-
         for uid, rules in self.rules_by_user.items():
-            display_name = display_names.get(uid, None)
+            display_name = None
+            member_ev_id = context.current_state_ids.get((EventTypes.Member, uid))
+            if member_ev_id:
+                member_ev = yield self.store.get_event(member_ev_id, allow_none=True)
+                if member_ev:
+                    display_name = member_ev.content.get("displayname", None)
 
             filtered = filtered_by_user[uid]
             if len(filtered) == 0:

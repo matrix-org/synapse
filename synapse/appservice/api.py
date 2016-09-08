@@ -14,15 +14,22 @@
 # limitations under the License.
 from twisted.internet import defer
 
+from synapse.api.constants import ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
 from synapse.http.client import SimpleHttpClient
 from synapse.events.utils import serialize_event
-from synapse.types import ThirdPartyEntityKind
+from synapse.util.caches.response_cache import ResponseCache
 
 import logging
 import urllib
 
 logger = logging.getLogger(__name__)
+
+
+HOUR_IN_MS = 60 * 60 * 1000
+
+
+APP_SERVICE_PREFIX = "/_matrix/app/unstable"
 
 
 def _is_valid_3pe_result(r, field):
@@ -56,8 +63,12 @@ class ApplicationServiceApi(SimpleHttpClient):
         super(ApplicationServiceApi, self).__init__(hs)
         self.clock = hs.get_clock()
 
+        self.protocol_meta_cache = ResponseCache(hs, timeout_ms=HOUR_IN_MS)
+
     @defer.inlineCallbacks
     def query_user(self, service, user_id):
+        if service.url is None:
+            defer.returnValue(False)
         uri = service.url + ("/users/%s" % urllib.quote(user_id))
         response = None
         try:
@@ -77,6 +88,8 @@ class ApplicationServiceApi(SimpleHttpClient):
 
     @defer.inlineCallbacks
     def query_alias(self, service, alias):
+        if service.url is None:
+            defer.returnValue(False)
         uri = service.url + ("/rooms/%s" % urllib.quote(alias))
         response = None
         try:
@@ -97,16 +110,22 @@ class ApplicationServiceApi(SimpleHttpClient):
     @defer.inlineCallbacks
     def query_3pe(self, service, kind, protocol, fields):
         if kind == ThirdPartyEntityKind.USER:
-            uri = "%s/3pu/%s" % (service.url, urllib.quote(protocol))
             required_field = "userid"
         elif kind == ThirdPartyEntityKind.LOCATION:
-            uri = "%s/3pl/%s" % (service.url, urllib.quote(protocol))
             required_field = "alias"
         else:
             raise ValueError(
                 "Unrecognised 'kind' argument %r to query_3pe()", kind
             )
+        if service.url is None:
+            defer.returnValue([])
 
+        uri = "%s%s/thirdparty/%s/%s" % (
+            service.url,
+            APP_SERVICE_PREFIX,
+            kind,
+            urllib.quote(protocol)
+        )
         try:
             response = yield self.get_json(uri, fields)
             if not isinstance(response, list):
@@ -131,8 +150,34 @@ class ApplicationServiceApi(SimpleHttpClient):
             logger.warning("query_3pe to %s threw exception %s", uri, ex)
             defer.returnValue([])
 
+    def get_3pe_protocol(self, service, protocol):
+        if service.url is None:
+            defer.returnValue({})
+
+        @defer.inlineCallbacks
+        def _get():
+            uri = "%s%s/thirdparty/protocol/%s" % (
+                service.url,
+                APP_SERVICE_PREFIX,
+                urllib.quote(protocol)
+            )
+            try:
+                defer.returnValue((yield self.get_json(uri, {})))
+            except Exception as ex:
+                logger.warning("query_3pe_protocol to %s threw exception %s",
+                               uri, ex)
+                defer.returnValue({})
+
+        key = (service.id, protocol)
+        return self.protocol_meta_cache.get(key) or (
+            self.protocol_meta_cache.set(key, _get())
+        )
+
     @defer.inlineCallbacks
     def push_bulk(self, service, events, txn_id=None):
+        if service.url is None:
+            defer.returnValue(True)
+
         events = self._serialize(events)
 
         if txn_id is None:

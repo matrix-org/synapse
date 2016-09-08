@@ -154,6 +154,7 @@ class StreamToken(
         "receipt_key",
         "account_data_key",
         "push_rules_key",
+        "to_device_key",
     ))
 ):
     _SEPARATOR = "_"
@@ -190,6 +191,7 @@ class StreamToken(
             or (int(other.receipt_key) < int(self.receipt_key))
             or (int(other.account_data_key) < int(self.account_data_key))
             or (int(other.push_rules_key) < int(self.push_rules_key))
+            or (int(other.to_device_key) < int(self.to_device_key))
         )
 
     def copy_and_advance(self, key, new_value):
@@ -269,10 +271,3 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
             return "t%d-%d" % (self.topological, self.stream)
         else:
             return "s%d" % (self.stream,)
-
-
-# Some arbitrary constants used for internal API enumerations. Don't rely on
-# exact values; always pass or compare symbolically
-class ThirdPartyEntityKind(object):
-    USER = 'user'
-    LOCATION = 'location'

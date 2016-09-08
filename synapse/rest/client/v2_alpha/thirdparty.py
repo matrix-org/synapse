@@ -18,15 +18,32 @@ import logging
 
 from twisted.internet import defer
 
+from synapse.api.constants import ThirdPartyEntityKind
 from synapse.http.servlet import RestServlet
-from synapse.types import ThirdPartyEntityKind
 from ._base import client_v2_patterns
 
 logger = logging.getLogger(__name__)
 
 
+class ThirdPartyProtocolsServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/thirdparty/protocols", releases=())
+
+    def __init__(self, hs):
+        super(ThirdPartyProtocolsServlet, self).__init__()
+
+        self.auth = hs.get_auth()
+        self.appservice_handler = hs.get_application_service_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        yield self.auth.get_user_by_req(request)
+
+        protocols = yield self.appservice_handler.get_3pe_protocols()
+        defer.returnValue((200, protocols))
+
+
 class ThirdPartyUserServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/3pu(/(?P<protocol>[^/]+))?$",
+    PATTERNS = client_v2_patterns("/thirdparty/user(/(?P<protocol>[^/]+))?$",
                                   releases=())
 
     def __init__(self, hs):
@@ -50,7 +67,7 @@ class ThirdPartyUserServlet(RestServlet):
 
 
 class ThirdPartyLocationServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/3pl(/(?P<protocol>[^/]+))?$",
+    PATTERNS = client_v2_patterns("/thirdparty/location(/(?P<protocol>[^/]+))?$",
                                   releases=())
 
     def __init__(self, hs):
@@ -74,5 +91,6 @@ class ThirdPartyLocationServlet(RestServlet):
 
 
 def register_servlets(hs, http_server):
+    ThirdPartyProtocolsServlet(hs).register(http_server)
     ThirdPartyUserServlet(hs).register(http_server)
     ThirdPartyLocationServlet(hs).register(http_server)

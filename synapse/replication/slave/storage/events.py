@@ -120,10 +120,21 @@ class SlavedEventStore(BaseSlavedStore):
     get_state_for_event = DataStore.get_state_for_event.__func__
     get_state_for_events = DataStore.get_state_for_events.__func__
     get_state_groups = DataStore.get_state_groups.__func__
+    get_state_groups_ids = DataStore.get_state_groups_ids.__func__
+    get_state_ids_for_event = DataStore.get_state_ids_for_event.__func__
+    get_state_ids_for_events = DataStore.get_state_ids_for_events.__func__
+    get_joined_users_from_state = DataStore.get_joined_users_from_state.__func__
+    get_joined_users_from_context = DataStore.get_joined_users_from_context.__func__
+    _get_joined_users_from_context = (
+        RoomMemberStore.__dict__["_get_joined_users_from_context"]
+    )
+
     get_recent_events_for_room = DataStore.get_recent_events_for_room.__func__
     get_room_events_stream_for_rooms = (
         DataStore.get_room_events_stream_for_rooms.__func__
     )
+    is_host_joined = DataStore.is_host_joined.__func__
+    _is_host_joined = RoomMemberStore.__dict__["_is_host_joined"]
     get_stream_token_for_event = DataStore.get_stream_token_for_event.__func__
 
     _set_before_and_after = staticmethod(DataStore._set_before_and_after)
@@ -211,7 +222,6 @@ class SlavedEventStore(BaseSlavedStore):
             self._get_current_state_for_key.invalidate_all()
             self.get_rooms_for_user.invalidate_all()
             self.get_users_in_room.invalidate((event.room_id,))
-            # self.get_joined_hosts_for_room.invalidate((event.room_id,))
 
         self._invalidate_get_event_cache(event.event_id)
 
@@ -235,7 +245,6 @@ class SlavedEventStore(BaseSlavedStore):
 
         if event.type == EventTypes.Member:
             self.get_rooms_for_user.invalidate((event.state_key,))
-            # self.get_joined_hosts_for_room.invalidate((event.room_id,))
             self.get_users_in_room.invalidate((event.room_id,))
             self._membership_stream_cache.entity_has_changed(
                 event.state_key, event.internal_metadata.stream_ordering

@@ -20,7 +20,7 @@ from collections import namedtuple
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
-from synapse.api.constants import Membership
+from synapse.api.constants import Membership, EventTypes
 from synapse.types import get_domain_from_id
 
 import logging
@@ -56,7 +56,6 @@ class RoomMemberStore(SQLBaseStore):
 
         for event in events:
             txn.call_after(self.get_rooms_for_user.invalidate, (event.state_key,))
-            txn.call_after(self.get_joined_hosts_for_room.invalidate, (event.room_id,))
             txn.call_after(self.get_users_in_room.invalidate, (event.room_id,))
             txn.call_after(
                 self._membership_stream_cache.entity_has_changed,
@@ -238,11 +237,6 @@ class RoomMemberStore(SQLBaseStore):
 
         return results
 
-    @cachedInlineCallbacks(max_entries=5000)
-    def get_joined_hosts_for_room(self, room_id):
-        user_ids = yield self.get_users_in_room(room_id)
-        defer.returnValue(set(get_domain_from_id(uid) for uid in user_ids))
-
     def _get_members_rows_txn(self, txn, room_id, membership=None, user_id=None):
         where_clause = "c.room_id = ?"
         where_values = [room_id]
@@ -325,7 +319,8 @@ class RoomMemberStore(SQLBaseStore):
 
     @cachedInlineCallbacks(num_args=3)
     def was_forgotten_at(self, user_id, room_id, event_id):
-        """Returns whether user_id has elected to discard history for room_id at event_id.
+        """Returns whether user_id has elected to discard history for room_id at
+        event_id.
 
         event_id must be a membership event."""
         def f(txn):
@@ -358,3 +353,98 @@ class RoomMemberStore(SQLBaseStore):
             },
             desc="who_forgot"
         )
+
+    def get_joined_users_from_context(self, event, context):
+        state_group = context.state_group
+        if not state_group:
+            # If state_group is None it means it has yet to be assigned a
+            # state group, i.e. we need to make sure that calls with a state_group
+            # of None don't hit previous cached calls with a None state_group.
+            # To do this we set the state_group to a new object as object() != object()
+            state_group = object()
+
+        return self._get_joined_users_from_context(
+            event.room_id, state_group, context.current_state_ids, event=event,
+        )
+
+    def get_joined_users_from_state(self, room_id, state_group, state_ids):
+        if not state_group:
+            # If state_group is None it means it has yet to be assigned a
+            # state group, i.e. we need to make sure that calls with a state_group
+            # of None don't hit previous cached calls with a None state_group.
+            # To do this we set the state_group to a new object as object() != object()
+            state_group = object()
+
+        return self._get_joined_users_from_context(
+            room_id, state_group, state_ids,
+        )
+
+    @cachedInlineCallbacks(num_args=2, cache_context=True)
+    def _get_joined_users_from_context(self, room_id, state_group, current_state_ids,
+                                       cache_context, event=None):
+        # We don't use `state_group`, its there so that we can cache based
+        # on it. However, its important that its never None, since two current_state's
+        # with a state_group of None are likely to be different.
+        # See bulk_get_push_rules_for_room for how we work around this.
+        assert state_group is not None
+
+        member_event_ids = [
+            e_id
+            for key, e_id in current_state_ids.iteritems()
+            if key[0] == EventTypes.Member
+        ]
+
+        rows = yield self._simple_select_many_batch(
+            table="room_memberships",
+            column="event_id",
+            iterable=member_event_ids,
+            retcols=['user_id'],
+            keyvalues={
+                "membership": Membership.JOIN,
+            },
+            batch_size=1000,
+            desc="_get_joined_users_from_context",
+        )
+
+        users_in_room = set(row["user_id"] for row in rows)
+        if event is not None and event.type == EventTypes.Member:
+            if event.membership == Membership.JOIN:
+                if event.event_id in member_event_ids:
+                    users_in_room.add(event.state_key)
+
+        defer.returnValue(users_in_room)
+
+    def is_host_joined(self, room_id, host, state_group, state_ids):
+        if not state_group:
+            # If state_group is None it means it has yet to be assigned a
+            # state group, i.e. we need to make sure that calls with a state_group
+            # of None don't hit previous cached calls with a None state_group.
+            # To do this we set the state_group to a new object as object() != object()
+            state_group = object()
+
+        return self._is_host_joined(
+            room_id, host, state_group, state_ids
+        )
+
+    @cachedInlineCallbacks(num_args=3)
+    def _is_host_joined(self, room_id, host, state_group, current_state_ids):
+        # We don't use `state_group`, its there so that we can cache based
+        # on it. However, its important that its never None, since two current_state's
+        # with a state_group of None are likely to be different.
+        # See bulk_get_push_rules_for_room for how we work around this.
+        assert state_group is not None
+
+        for (etype, state_key), event_id in current_state_ids.items():
+            if etype == EventTypes.Member:
+                try:
+                    if get_domain_from_id(state_key) != host:
+                        continue
+                except:
+                    logger.warn("state_key not user_id: %s", state_key)
+                    continue
+
+                event = yield self.get_event(event_id, allow_none=True)
+                if event and event.content["membership"] == Membership.JOIN:
+                    defer.returnValue(True)
+
+        defer.returnValue(False)

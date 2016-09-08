@@ -16,7 +16,6 @@
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
 from synapse.push.baserules import list_with_base_rules
-from synapse.api.constants import EventTypes, Membership
 from twisted.internet import defer
 
 import logging
@@ -124,7 +123,8 @@ class PushRuleStore(SQLBaseStore):
 
         defer.returnValue(results)
 
-    def bulk_get_push_rules_for_room(self, room_id, state_group, current_state):
+    def bulk_get_push_rules_for_room(self, event, context):
+        state_group = context.state_group
         if not state_group:
             # If state_group is None it means it has yet to be assigned a
             # state group, i.e. we need to make sure that calls with a state_group
@@ -132,11 +132,13 @@ class PushRuleStore(SQLBaseStore):
             # To do this we set the state_group to a new object as object() != object()
             state_group = object()
 
-        return self._bulk_get_push_rules_for_room(room_id, state_group, current_state)
+        return self._bulk_get_push_rules_for_room(
+            event.room_id, state_group, context.current_state_ids, event=event
+        )
 
     @cachedInlineCallbacks(num_args=2, cache_context=True)
-    def _bulk_get_push_rules_for_room(self, room_id, state_group, current_state,
-                                      cache_context):
+    def _bulk_get_push_rules_for_room(self, room_id, state_group, current_state_ids,
+                                      cache_context, event=None):
         # We don't use `state_group`, its there so that we can cache based
         # on it. However, its important that its never None, since two current_state's
         # with a state_group of None are likely to be different.
@@ -147,11 +149,14 @@ class PushRuleStore(SQLBaseStore):
         # their unread countss are correct in the event stream, but to avoid
         # generating them for bot / AS users etc, we only do so for people who've
         # sent a read receipt into the room.
-        local_users_in_room = set(
-            e.state_key for e in current_state.values()
-            if e.type == EventTypes.Member and e.membership == Membership.JOIN
-            and self.hs.is_mine_id(e.state_key)
+
+        users_in_room = yield self._get_joined_users_from_context(
+            room_id, state_group, current_state_ids,
+            on_invalidate=cache_context.invalidate,
+            event=event,
         )
+
+        local_users_in_room = set(u for u in users_in_room if self.hs.is_mine_id(u))
 
         # users in the room who have pushers need to get push rules run because
         # that's how their pushers work

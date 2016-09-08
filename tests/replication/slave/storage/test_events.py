@@ -305,7 +305,16 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
         self.event_id += 1
 
-        context = EventContext(current_state=state)
+        if state is not None:
+            state_ids = {
+                key: e.event_id for key, e in state.items()
+            }
+        else:
+            state_ids = None
+
+        context = EventContext()
+        context.current_state_ids = state_ids
+        context.prev_state_ids = state_ids
         context.push_actions = push_actions
 
         ordering = None

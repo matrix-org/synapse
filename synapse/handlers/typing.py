@@ -20,7 +20,7 @@ from synapse.util.logcontext import (
     PreserveLoggingContext, preserve_fn, preserve_context_over_deferred,
 )
 from synapse.util.metrics import Measure
-from synapse.types import UserID
+from synapse.types import UserID, get_domain_from_id
 
 import logging
 
@@ -42,6 +42,7 @@ class TypingHandler(object):
         self.auth = hs.get_auth()
         self.is_mine_id = hs.is_mine_id
         self.notifier = hs.get_notifier()
+        self.state = hs.get_state_handler()
 
         self.clock = hs.get_clock()
 
@@ -166,7 +167,8 @@ class TypingHandler(object):
 
     @defer.inlineCallbacks
     def _push_update(self, room_id, user_id, typing):
-        domains = yield self.store.get_joined_hosts_for_room(room_id)
+        users = yield self.state.get_current_user_in_room(room_id)
+        domains = set(get_domain_from_id(u) for u in users)
 
         deferreds = []
         for domain in domains:
@@ -199,7 +201,8 @@ class TypingHandler(object):
         # Check that the string is a valid user id
         UserID.from_string(user_id)
 
-        domains = yield self.store.get_joined_hosts_for_room(room_id)
+        users = yield self.state.get_current_user_in_room(room_id)
+        domains = set(get_domain_from_id(u) for u in users)
 
         if self.server_name in domains:
             self._push_update_local(

@@ -1,3 +1,40 @@
+Changes in synapse v0.17.2 (2016-09-08)
+=======================================
+
+This release contains security bug fixes. Please upgrade.
+
+
+No changes since v0.17.2
+
+
+Changes in synapse v0.17.2-rc1 (2016-09-05)
+===========================================
+
+Features:
+
+* Start adding store-and-forward direct-to-device messaging (PR #1046, #1050,
+  #1062, #1066)
+
+
+Changes:
+
+* Avoid pulling the full state of a room out so often (PR #1047, #1049, #1063,
+  #1068)
+* Don't notify for online to online presence transitions. (PR #1054)
+* Occasionally persist unpersisted presence updates (PR #1055)
+* Allow application services to have an optional 'url' (PR #1056)
+* Clean up old sent transactions from DB (PR #1059)
+
+
+Bug fixes:
+
+* Fix None check in backfill (PR #1043)
+* Fix membership changes to be idempotent (PR #1067)
+* Fix bug in get_pdu where it would sometimes return events with incorrect
+  signature
+
+
+
 Changes in synapse v0.17.1 (2016-08-24)
 =======================================
 
