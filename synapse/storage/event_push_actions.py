@@ -342,7 +342,7 @@ class EventPushActionsStore(SQLBaseStore):
         def f(txn):
             before_clause = ""
             if before:
-                before_clause = "AND stream_ordering < ?"
+                before_clause = "AND epa.stream_ordering < ?"
                 args = [user_id, before, limit]
             else:
                 args = [user_id, limit]
