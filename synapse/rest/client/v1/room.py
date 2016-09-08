@@ -23,7 +23,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.filtering import Filter
 from synapse.types import UserID, RoomID, RoomAlias
 from synapse.events.utils import serialize_event
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.servlet import parse_json_object_from_request, parse_string
 
 import logging
 import urllib
@@ -295,7 +295,7 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        server = request.args.get("server", [None])[0]
+        server = parse_string(request, "server", default=None)
 
         try:
             yield self.auth.get_user_by_req(request)
