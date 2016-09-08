@@ -179,9 +179,37 @@ class ApplicationServicesHandler(object):
     def get_3pe_protocols(self):
         services = yield self.store.get_app_services()
         protocols = {}
+
+        # Collect up all the individual protocol responses out of the ASes
         for s in services:
             for p in s.protocols:
-                protocols[p] = yield self.appservice_api.get_3pe_protocol(s, p)
+                info = yield self.appservice_api.get_3pe_protocol(s, p)
+
+                # Ignore any result that doesn't contain an "instances" list
+                if "instances" not in info:
+                    continue
+                if not isinstance(info["instances"], list):
+                    continue
+
+                if p not in protocols:
+                    protocols[p] = []
+                protocols[p].append(info)
+
+        def _merge_instances(infos):
+            if len(infos) == 0:
+                return {}
+
+            # Merge the 'instances' lists of multiple results, but just take
+            # the other fields from the first as they ought to be identical
+            combined = dict(infos[0])
+
+            for info in infos[1:]:
+                combined["instances"].extend(info["instances"])
+
+            return combined
+
+        for p in protocols.keys():
+            protocols[p] = _merge_instances(protocols[p])
 
         defer.returnValue(protocols)
 
