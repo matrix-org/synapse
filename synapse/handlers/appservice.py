@@ -186,17 +186,13 @@ class ApplicationServicesHandler(object):
                 if only_protocol is not None and p != only_protocol:
                     continue
 
-                info = yield self.appservice_api.get_3pe_protocol(s, p)
-
-                # Ignore any result that doesn't contain an "instances" list
-                if "instances" not in info:
-                    continue
-                if not isinstance(info["instances"], list):
-                    continue
-
                 if p not in protocols:
                     protocols[p] = []
-                protocols[p].append(info)
+
+                info = yield self.appservice_api.get_3pe_protocol(s, p)
+
+                if info is not None:
+                    protocols[p].append(info)
 
         def _merge_instances(infos):
             if not infos:

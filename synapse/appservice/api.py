@@ -162,11 +162,19 @@ class ApplicationServiceApi(SimpleHttpClient):
                 urllib.quote(protocol)
             )
             try:
-                defer.returnValue((yield self.get_json(uri, {})))
+                info = yield self.get_json(uri, {})
+
+                # Ignore any result that doesn't contain an "instances" list
+                if "instances" not in info:
+                    defer.returnValue(None)
+                if not isinstance(info["instances"], list):
+                    defer.returnValue(None)
+
+                defer.returnValue(info)
             except Exception as ex:
                 logger.warning("query_3pe_protocol to %s threw exception %s",
                                uri, ex)
-                defer.returnValue({})
+                defer.returnValue(None)
 
         key = (service.id, protocol)
         return self.protocol_meta_cache.get(key) or (
