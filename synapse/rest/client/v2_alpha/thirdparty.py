@@ -61,7 +61,7 @@ class ThirdPartyProtocolServlet(RestServlet):
         if protocol in protocols:
             defer.returnValue((200, protocols[protocol]))
         else:
-            defer.returnValue((404, {error: "Unknown protocol"}))
+            defer.returnValue((404, {"error": "Unknown protocol"}))
 
 
 class ThirdPartyUserServlet(RestServlet):
