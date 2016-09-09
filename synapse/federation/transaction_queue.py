@@ -154,7 +154,9 @@ class TransactionQueue(object):
             return
 
         if key:
-            self.pending_edus_keyed_by_dest.setdefault(destination, {})[key] = edu
+            self.pending_edus_keyed_by_dest.setdefault(
+                destination, {}
+            )[(edu.type, key)] = edu
         else:
             self.pending_edus_by_dest.setdefault(destination, []).append(edu)
 
@@ -228,7 +230,6 @@ class TransactionQueue(object):
                     )
 
                     pending_edus.extend(device_message_edus)
-                    logger.info("Sending presence: %r", pending_presence)
                     if pending_presence:
                         pending_edus.append(
                             Edu(
