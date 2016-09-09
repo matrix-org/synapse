@@ -130,6 +130,13 @@ class DeviceInboxStore(SQLBaseStore):
 
     def _add_messages_to_local_device_inbox_txn(self, txn, stream_id,
                                                 messages_by_user_then_device):
+        sql = (
+            "UPDATE device_max_stream_id"
+            " SET stream_id = ?"
+            " WHERE stream_id < ?"
+        )
+        txn.execute(sql, (stream_id, stream_id))
+
         local_by_user_then_device = {}
         for user_id, messages_by_device in messages_by_user_then_device.items():
             messages_json_for_user = {}
@@ -148,6 +155,8 @@ class DeviceInboxStore(SQLBaseStore):
                     device = row[0]
                     messages_json_for_user[device] = message_json
             else:
+                if not devices:
+                    continue
                 sql = (
                     "SELECT device_id FROM devices"
                     " WHERE user_id = ? AND device_id IN ("
@@ -164,7 +173,11 @@ class DeviceInboxStore(SQLBaseStore):
                     message_json = ujson.dumps(messages_by_device[device])
                     messages_json_for_user[device] = message_json
 
-            local_by_user_then_device[user_id] = messages_json_for_user
+            if messages_json_for_user:
+                local_by_user_then_device[user_id] = messages_json_for_user
+
+        if not local_by_user_then_device:
+            return
 
         sql = (
             "INSERT INTO device_inbox"
@@ -301,7 +314,7 @@ class DeviceInboxStore(SQLBaseStore):
         has_changed = self._device_federation_outbox_stream_cache.has_entity_changed(
             destination, last_stream_id
         )
-        if not has_changed:
+        if not has_changed or last_stream_id == current_stream_id:
             return defer.succeed(([], current_stream_id))
 
         def get_new_messages_for_remote_destination_txn(txn):
