@@ -181,7 +181,7 @@ class ReplicationResource(Resource):
     def replicate(self, request_streams, limit):
         writer = _Writer()
         current_token = yield self.current_replication_token()
-        logger.info("Replicating up to %r", current_token)
+        logger.debug("Replicating up to %r", current_token)
 
         yield self.account_data(writer, current_token, limit, request_streams)
         yield self.events(writer, current_token, limit, request_streams)
@@ -195,7 +195,7 @@ class ReplicationResource(Resource):
         yield self.to_device(writer, current_token, limit, request_streams)
         self.streams(writer, current_token, request_streams)
 
-        logger.info("Replicated %d rows", writer.total)
+        logger.debug("Replicated %d rows", writer.total)
         defer.returnValue(writer.finish())
 
     def streams(self, writer, current_token, request_streams):

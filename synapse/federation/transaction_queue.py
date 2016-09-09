@@ -229,7 +229,6 @@ class TransactionQueue(object):
                 "dropping transaction for now",
                 destination,
             )
-            success = False
         finally:
             # We want to be *very* sure we delete this after we stop processing
             self.pending_transactions.pop(destination, None)
