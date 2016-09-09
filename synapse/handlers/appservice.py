@@ -199,12 +199,12 @@ class ApplicationServicesHandler(object):
                 protocols[p].append(info)
 
         def _merge_instances(infos):
-            if len(infos) == 0:
+            if not infos:
                 return {}
 
             # Merge the 'instances' lists of multiple results, but just take
             # the other fields from the first as they ought to be identical
-            # deep-clone the result so as not to corrupt the cached one
+            # copy the result so as not to corrupt the cached one
             combined = dict(infos[0])
             combined["instances"] = list(combined["instances"])
 
