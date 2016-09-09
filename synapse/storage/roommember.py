@@ -402,7 +402,7 @@ class RoomMemberStore(SQLBaseStore):
             keyvalues={
                 "membership": Membership.JOIN,
             },
-            batch_size=1000,
+            batch_size=500,
             desc="_get_joined_users_from_context",
         )
 
