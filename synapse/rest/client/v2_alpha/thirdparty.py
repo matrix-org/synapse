@@ -57,7 +57,7 @@ class ThirdPartyUserServlet(RestServlet):
         yield self.auth.get_user_by_req(request)
 
         fields = request.args
-        del fields["access_token"]
+        fields.pop("access_token", None)
 
         results = yield self.appservice_handler.query_3pe(
             ThirdPartyEntityKind.USER, protocol, fields
@@ -81,7 +81,7 @@ class ThirdPartyLocationServlet(RestServlet):
         yield self.auth.get_user_by_req(request)
 
         fields = request.args
-        del fields["access_token"]
+        fields.pop("access_token", None)
 
         results = yield self.appservice_handler.query_3pe(
             ThirdPartyEntityKind.LOCATION, protocol, fields

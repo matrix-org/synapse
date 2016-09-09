@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, Codes
+from synapse.api.auth import get_access_token_from_request
 
 from .base import ClientV1RestServlet, client_path_patterns
 
@@ -37,13 +37,7 @@ class LogoutRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        try:
-            access_token = request.args["access_token"][0]
-        except KeyError:
-            raise AuthError(
-                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",
-                errcode=Codes.MISSING_TOKEN
-            )
+        access_token = get_access_token_from_request(request)
         yield self.store.delete_access_token(access_token)
         defer.returnValue((200, {}))
 
