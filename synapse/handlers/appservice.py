@@ -201,7 +201,9 @@ class ApplicationServicesHandler(object):
 
             # Merge the 'instances' lists of multiple results, but just take
             # the other fields from the first as they ought to be identical
+            # deep-clone the result so as not to corrupt the cached one
             combined = dict(infos[0])
+            combined["instances"] = list(combined["instances"])
 
             for info in infos[1:]:
                 combined["instances"].extend(info["instances"])
