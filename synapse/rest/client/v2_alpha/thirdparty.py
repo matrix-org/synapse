@@ -43,7 +43,8 @@ class ThirdPartyProtocolsServlet(RestServlet):
 
 
 class ThirdPartyProtocolServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/thirdparty/protocol/(?P<protocol>[^/]+)$", releases=())
+    PATTERNS = client_v2_patterns("/thirdparty/protocol/(?P<protocol>[^/]+)$",
+                                  releases=())
 
     def __init__(self, hs):
         super(ThirdPartyProtocolServlet, self).__init__()
