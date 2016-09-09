@@ -200,6 +200,7 @@ class TransactionQueue(object):
 
             if not pending_pdus and not pending_edus and not pending_failures:
                 logger.debug("TX [%s] Nothing to send", destination)
+                self.last_device_stream_id_by_dest[destination] = device_stream_id
                 return
 
             yield self._send_new_transaction(
