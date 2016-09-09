@@ -22,7 +22,7 @@ from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.filtering import Filter
 from synapse.types import UserID, RoomID, RoomAlias
-from synapse.events.utils import serialize_event
+from synapse.events.utils import serialize_event, format_event_for_client_v2
 from synapse.http.servlet import parse_json_object_from_request, parse_string
 
 import logging
@@ -138,7 +138,8 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
             )
 
         if format == "event":
-            defer.returnValue((200, data.get_dict()))
+            event = format_event_for_client_v2(data.get_dict())
+            defer.returnValue((200, event))
         elif format == "content":
             defer.returnValue((200, data.get_dict()["content"]))
 
