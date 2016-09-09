@@ -42,6 +42,26 @@ class ThirdPartyProtocolsServlet(RestServlet):
         defer.returnValue((200, protocols))
 
 
+class ThirdPartyProtocolServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/thirdparty/protocol/(?P<protocol>[^/]+)$", releases=())
+
+    def __init__(self, hs):
+        super(ThirdPartyProtocolServlet, self).__init__()
+
+        self.auth = hs.get_auth()
+        self.appservice_handler = hs.get_application_service_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, protocol):
+        yield self.auth.get_user_by_req(request)
+
+        protocols = yield self.appservice_handler.get_3pe_protocols()
+        if protocol in protocols:
+            defer.returnValue((200, protocols[protocol]))
+        else:
+            defer.returnValue((404, {error: "Unknown protocol"}))
+
+
 class ThirdPartyUserServlet(RestServlet):
     PATTERNS = client_v2_patterns("/thirdparty/user(/(?P<protocol>[^/]+))?$",
                                   releases=())
@@ -92,5 +112,6 @@ class ThirdPartyLocationServlet(RestServlet):
 
 def register_servlets(hs, http_server):
     ThirdPartyProtocolsServlet(hs).register(http_server)
+    ThirdPartyProtocolServlet(hs).register(http_server)
     ThirdPartyUserServlet(hs).register(http_server)
     ThirdPartyLocationServlet(hs).register(http_server)
