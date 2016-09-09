@@ -32,6 +32,14 @@ HOUR_IN_MS = 60 * 60 * 1000
 APP_SERVICE_PREFIX = "/_matrix/app/unstable"
 
 
+def _is_valid_3pe_metadata(info):
+    if "instances" not in info:
+        return False
+    if not isinstance(info["instances"], list):
+        return False
+    return True
+
+
 def _is_valid_3pe_result(r, field):
     if not isinstance(r, dict):
         return False
@@ -164,10 +172,9 @@ class ApplicationServiceApi(SimpleHttpClient):
             try:
                 info = yield self.get_json(uri, {})
 
-                # Ignore any result that doesn't contain an "instances" list
-                if "instances" not in info:
-                    defer.returnValue(None)
-                if not isinstance(info["instances"], list):
+                if not _is_valid_3pe_metadata(info):
+                    logger.warning("query_3pe_protocol to %s did not return a"
+                                   " valid result", uri)
                     defer.returnValue(None)
 
                 defer.returnValue(info)
