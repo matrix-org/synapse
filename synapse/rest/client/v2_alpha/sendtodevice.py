@@ -16,10 +16,11 @@
 import logging
 
 from twisted.internet import defer
-from synapse.http.servlet import parse_json_object_from_request
 
 from synapse.http import servlet
+from synapse.http.servlet import parse_json_object_from_request
 from synapse.rest.client.v1.transactions import HttpTransactionStore
+
 from ._base import client_v2_patterns
 
 logger = logging.getLogger(__name__)
@@ -39,10 +40,8 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         super(SendToDeviceRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
-        self.notifier = hs.get_notifier()
-        self.is_mine_id = hs.is_mine_id
         self.txns = HttpTransactionStore()
+        self.device_message_handler = hs.get_device_message_handler()
 
     @defer.inlineCallbacks
     def on_PUT(self, request, message_type, txn_id):
@@ -57,28 +56,10 @@ class SendToDeviceRestServlet(servlet.RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        # TODO: Prod the notifier to wake up sync streams.
-        # TODO: Implement replication for the messages.
-        # TODO: Send the messages to remote servers if needed.
+        sender_user_id = requester.user.to_string()
 
-        local_messages = {}
-        for user_id, by_device in content["messages"].items():
-            if self.is_mine_id(user_id):
-                messages_by_device = {
-                    device_id: {
-                        "content": message_content,
-                        "type": message_type,
-                        "sender": requester.user.to_string(),
-                    }
-                    for device_id, message_content in by_device.items()
-                }
-                if messages_by_device:
-                    local_messages[user_id] = messages_by_device
-
-        stream_id = yield self.store.add_messages_to_device_inbox(local_messages)
-
-        self.notifier.on_new_event(
-            "to_device_key", stream_id, users=local_messages.keys()
+        yield self.device_message_handler.send_device_message(
+            sender_user_id, message_type, content["messages"]
         )
 
         response = (200, {})

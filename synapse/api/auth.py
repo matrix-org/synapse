@@ -583,12 +583,15 @@ class Auth(object):
         """
         # Can optionally look elsewhere in the request (e.g. headers)
         try:
-            user_id = yield self._get_appservice_user_id(request.args)
+            user_id = yield self._get_appservice_user_id(request)
             if user_id:
                 request.authenticated_entity = user_id
                 defer.returnValue(synapse.types.create_requester(user_id))
 
-            access_token = request.args["access_token"][0]
+            access_token = get_access_token_from_request(
+                request, self.TOKEN_NOT_FOUND_HTTP_STATUS
+            )
+
             user_info = yield self.get_user_by_access_token(access_token, rights)
             user = user_info["user"]
             token_id = user_info["token_id"]
@@ -629,17 +632,19 @@ class Auth(object):
             )
 
     @defer.inlineCallbacks
-    def _get_appservice_user_id(self, request_args):
+    def _get_appservice_user_id(self, request):
         app_service = yield self.store.get_app_service_by_token(
-            request_args["access_token"][0]
+            get_access_token_from_request(
+                request, self.TOKEN_NOT_FOUND_HTTP_STATUS
+            )
         )
         if app_service is None:
             defer.returnValue(None)
 
-        if "user_id" not in request_args:
+        if "user_id" not in request.args:
             defer.returnValue(app_service.sender)
 
-        user_id = request_args["user_id"][0]
+        user_id = request.args["user_id"][0]
         if app_service.sender == user_id:
             defer.returnValue(app_service.sender)
 
@@ -833,7 +838,9 @@ class Auth(object):
     @defer.inlineCallbacks
     def get_appservice_by_req(self, request):
         try:
-            token = request.args["access_token"][0]
+            token = get_access_token_from_request(
+                request, self.TOKEN_NOT_FOUND_HTTP_STATUS
+            )
             service = yield self.store.get_app_service_by_token(token)
             if not service:
                 logger.warn("Unrecognised appservice access token: %s" % (token,))
@@ -1142,3 +1149,40 @@ class Auth(object):
                 "This server requires you to be a moderator in the room to"
                 " edit its room list entry"
             )
+
+
+def has_access_token(request):
+    """Checks if the request has an access_token.
+
+    Returns:
+        bool: False if no access_token was given, True otherwise.
+    """
+    query_params = request.args.get("access_token")
+    return bool(query_params)
+
+
+def get_access_token_from_request(request, token_not_found_http_status=401):
+    """Extracts the access_token from the request.
+
+    Args:
+        request: The http request.
+        token_not_found_http_status(int): The HTTP status code to set in the
+            AuthError if the token isn't found. This is used in some of the
+            legacy APIs to change the status code to 403 from the default of
+            401 since some of the old clients depended on auth errors returning
+            403.
+    Returns:
+        str: The access_token
+    Raises:
+        AuthError: If there isn't an access_token in the request.
+    """
+    query_params = request.args.get("access_token")
+    # Try to get the access_token from the query params.
+    if not query_params:
+        raise AuthError(
+            token_not_found_http_status,
+            "Missing access token.",
+            errcode=Codes.MISSING_TOKEN
+        )
+
+    return query_params[0]

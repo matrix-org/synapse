@@ -111,7 +111,7 @@ class DataStore(RoomMemberStore, RoomStore,
             db_conn, "presence_stream", "stream_id"
         )
         self._device_inbox_id_gen = StreamIdGenerator(
-            db_conn, "device_inbox", "stream_id"
+            db_conn, "device_max_stream_id", "stream_id"
         )
 
         self._transaction_id_gen = IdGenerator(db_conn, "sent_transactions", "id")
@@ -180,6 +180,30 @@ class DataStore(RoomMemberStore, RoomStore,
         self.push_rules_stream_cache = StreamChangeCache(
             "PushRulesStreamChangeCache", push_rules_id,
             prefilled_cache=push_rules_prefill,
+        )
+
+        max_device_inbox_id = self._device_inbox_id_gen.get_current_token()
+        device_inbox_prefill, min_device_inbox_id = self._get_cache_dict(
+            db_conn, "device_inbox",
+            entity_column="user_id",
+            stream_column="stream_id",
+            max_value=max_device_inbox_id
+        )
+        self._device_inbox_stream_cache = StreamChangeCache(
+            "DeviceInboxStreamChangeCache", min_device_inbox_id,
+            prefilled_cache=device_inbox_prefill,
+        )
+        # The federation outbox and the local device inbox uses the same
+        # stream_id generator.
+        device_outbox_prefill, min_device_outbox_id = self._get_cache_dict(
+            db_conn, "device_federation_outbox",
+            entity_column="destination",
+            stream_column="stream_id",
+            max_value=max_device_inbox_id,
+        )
+        self._device_federation_outbox_stream_cache = StreamChangeCache(
+            "DeviceFederationOutboxStreamChangeCache", min_device_outbox_id,
+            prefilled_cache=device_outbox_prefill,
         )
 
         cur = LoggingTransaction(

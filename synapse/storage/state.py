@@ -48,12 +48,17 @@ class StateStore(SQLBaseStore):
     """
 
     STATE_GROUP_DEDUPLICATION_UPDATE_NAME = "state_group_state_deduplication"
+    STATE_GROUP_INDEX_UPDATE_NAME = "state_group_state_type_index"
 
     def __init__(self, hs):
         super(StateStore, self).__init__(hs)
         self.register_background_update_handler(
             self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME,
             self._background_deduplicate_state,
+        )
+        self.register_background_update_handler(
+            self.STATE_GROUP_INDEX_UPDATE_NAME,
+            self._background_index_state,
         )
 
     @defer.inlineCallbacks
@@ -793,3 +798,31 @@ class StateStore(SQLBaseStore):
             yield self._end_background_update(self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME)
 
         defer.returnValue(result * BATCH_SIZE_SCALE_FACTOR)
+
+    @defer.inlineCallbacks
+    def _background_index_state(self, progress, batch_size):
+        def reindex_txn(txn):
+            if isinstance(self.database_engine, PostgresEngine):
+                txn.execute(
+                    "CREATE INDEX state_groups_state_type_idx"
+                    " ON state_groups_state(state_group, type, state_key)"
+                )
+                txn.execute(
+                    "DROP INDEX IF EXISTS state_groups_state_id"
+                )
+            else:
+                txn.execute(
+                    "CREATE INDEX state_groups_state_type_idx"
+                    " ON state_groups_state(state_group, type, state_key)"
+                )
+                txn.execute(
+                    "DROP INDEX IF EXISTS state_groups_state_id"
+                )
+
+        yield self.runInteraction(
+            self.STATE_GROUP_INDEX_UPDATE_NAME, reindex_txn
+        )
+
+        yield self._end_background_update(self.STATE_GROUP_INDEX_UPDATE_NAME)
+
+        defer.returnValue(1)

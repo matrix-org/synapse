@@ -16,13 +16,18 @@
 from ._base import BaseSlavedStore
 from ._slaved_id_tracker import SlavedIdTracker
 from synapse.storage import DataStore
+from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 
 class SlavedDeviceInboxStore(BaseSlavedStore):
     def __init__(self, db_conn, hs):
         super(SlavedDeviceInboxStore, self).__init__(db_conn, hs)
         self._device_inbox_id_gen = SlavedIdTracker(
-            db_conn, "device_inbox", "stream_id",
+            db_conn, "device_max_stream_id", "stream_id",
+        )
+        self._device_inbox_stream_cache = StreamChangeCache(
+            "DeviceInboxStreamChangeCache",
+            self._device_inbox_id_gen.get_current_token()
         )
 
     get_to_device_stream_token = DataStore.get_to_device_stream_token.__func__
@@ -38,5 +43,11 @@ class SlavedDeviceInboxStore(BaseSlavedStore):
         stream = result.get("to_device")
         if stream:
             self._device_inbox_id_gen.advance(int(stream["position"]))
+            for row in stream["rows"]:
+                stream_id = row[0]
+                user_id = row[1]
+                self._device_inbox_stream_cache.entity_has_changed(
+                    user_id, stream_id
+                )
 
         return super(SlavedDeviceInboxStore, self).process_replication(result)
