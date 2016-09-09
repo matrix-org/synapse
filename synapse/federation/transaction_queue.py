@@ -70,6 +70,7 @@ class TransactionQueue(object):
         # destination -> list of tuple(edu, deferred)
         self.pending_edus_by_dest = edus = {}
 
+        # Presence needs to be separate as we send single aggragate EDUs
         self.pending_presence_by_dest = presence = {}
         self.pending_edus_keyed_by_dest = edus_keyed = {}
 
