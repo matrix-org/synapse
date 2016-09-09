@@ -111,7 +111,7 @@ class DataStore(RoomMemberStore, RoomStore,
             db_conn, "presence_stream", "stream_id"
         )
         self._device_inbox_id_gen = StreamIdGenerator(
-            db_conn, "device_inbox", "stream_id"
+            db_conn, "device_max_stream_id", "stream_id"
         )
 
         self._transaction_id_gen = IdGenerator(db_conn, "sent_transactions", "id")
