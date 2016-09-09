@@ -17,6 +17,8 @@
 to ensure idempotency when performing PUTs using the REST API."""
 import logging
 
+from synapse.api.auth import get_access_token_from_request
+
 logger = logging.getLogger(__name__)
 
 
@@ -90,6 +92,6 @@ class HttpTransactionStore(object):
         return response
 
     def _get_key(self, request):
-        token = request.args["access_token"][0]
+        token = get_access_token_from_request(request)
         path_without_txn_id = request.path.rsplit("/", 1)[0]
         return path_without_txn_id + "/" + token

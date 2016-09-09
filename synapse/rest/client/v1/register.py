@@ -18,6 +18,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, Codes
 from synapse.api.constants import LoginType
+from synapse.api.auth import get_access_token_from_request
 from .base import ClientV1RestServlet, client_path_patterns
 import synapse.util.stringutils as stringutils
 from synapse.http.servlet import parse_json_object_from_request
@@ -296,12 +297,11 @@ class RegisterRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def _do_app_service(self, request, register_json, session):
-        if "access_token" not in request.args:
-            raise SynapseError(400, "Expected application service token.")
+        as_token = get_access_token_from_request(request)
+
         if "user" not in register_json:
             raise SynapseError(400, "Expected 'user' key.")
 
-        as_token = request.args["access_token"][0]
         user_localpart = register_json["user"].encode("utf-8")
 
         handler = self.handlers.registration_handler
@@ -390,11 +390,9 @@ class CreateUserRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         user_json = parse_json_object_from_request(request)
 
-        if "access_token" not in request.args:
-            raise SynapseError(400, "Expected application service token.")
-
+        access_token = get_access_token_from_request(request)
         app_service = yield self.store.get_app_service_by_token(
-            request.args["access_token"][0]
+            access_token
         )
         if not app_service:
             raise SynapseError(403, "Invalid application service token.")
