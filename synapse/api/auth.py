@@ -1158,7 +1158,8 @@ def has_access_token(request):
         bool: False if no access_token was given, True otherwise.
     """
     query_params = request.args.get("access_token")
-    return bool(query_params)
+    auth_headers = request.requestHeaders.getRawHeaders("Authorization")
+    return bool(query_params) or bool(auth_headers)
 
 
 def get_access_token_from_request(request, token_not_found_http_status=401):
@@ -1176,13 +1177,40 @@ def get_access_token_from_request(request, token_not_found_http_status=401):
     Raises:
         AuthError: If there isn't an access_token in the request.
     """
-    query_params = request.args.get("access_token")
-    # Try to get the access_token from the query params.
-    if not query_params:
-        raise AuthError(
-            token_not_found_http_status,
-            "Missing access token.",
-            errcode=Codes.MISSING_TOKEN
-        )
 
-    return query_params[0]
+    auth_headers = request.requestHeaders.getRawHeaders("Authorization")
+    query_params = request.args.get("access_token")
+    if auth_headers is not None:
+        # Try the get the access_token from a "Authorization: Bearer"
+        # header
+        if query_params is not None:
+            raise AuthError(
+                token_not_found_http_status,
+                "Mixing Authorization headers and access_token query parameters.",
+                errcode=Codes.MISSING_TOKEN,
+            )
+        if len(auth_headers) > 1:
+            raise AuthError(
+                token_not_found_http_status,
+                "Too many Authorization headers.",
+                errcode=Codes.MISSING_TOKEN,
+            )
+        parts = auth_headers[0].split(" ")
+        if parts[0] == "Bearer" and len(parts) == 2:
+            return parts[1]
+        else:
+            raise AuthError(
+                token_not_found_http_status,
+                "Invalid Authorization header.",
+                errcode=Codes.MISSING_TOKEN,
+            )
+    else:
+        # Try to get the access_token from the query params.
+        if not query_params:
+            raise AuthError(
+                token_not_found_http_status,
+                "Missing access token.",
+                errcode=Codes.MISSING_TOKEN
+            )
+
+        return query_params[0]
