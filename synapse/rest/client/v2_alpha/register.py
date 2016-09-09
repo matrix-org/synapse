@@ -15,6 +15,7 @@
 
 from twisted.internet import defer
 
+from synapse.api.auth import get_access_token_from_request, has_access_token
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -131,7 +132,7 @@ class RegisterRestServlet(RestServlet):
             desired_username = body['username']
 
         appservice = None
-        if 'access_token' in request.args:
+        if has_access_token(request):
             appservice = yield self.auth.get_appservice_by_req(request)
 
         # fork off as soon as possible for ASes and shared secret auth which
@@ -143,10 +144,11 @@ class RegisterRestServlet(RestServlet):
             # 'user' key not 'username'). Since this is a new addition, we'll
             # fallback to 'username' if they gave one.
             desired_username = body.get("user", desired_username)
+            access_token = get_access_token_from_request(request)
 
             if isinstance(desired_username, basestring):
                 result = yield self._do_appservice_registration(
-                    desired_username, request.args["access_token"][0], body
+                    desired_username, access_token, body
                 )
             defer.returnValue((200, result))  # we throw for non 200 responses
             return

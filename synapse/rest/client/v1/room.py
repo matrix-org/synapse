@@ -22,7 +22,7 @@ from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.filtering import Filter
 from synapse.types import UserID, RoomID, RoomAlias
-from synapse.events.utils import serialize_event
+from synapse.events.utils import serialize_event, format_event_for_client_v2
 from synapse.http.servlet import parse_json_object_from_request, parse_string
 
 import logging
@@ -120,6 +120,8 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_type, state_key):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+        format = parse_string(request, "format", default="content",
+                              allowed_values=["content", "event"])
 
         msg_handler = self.handlers.message_handler
         data = yield msg_handler.get_room_data(
@@ -134,7 +136,12 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
             raise SynapseError(
                 404, "Event not found.", errcode=Codes.NOT_FOUND
             )
-        defer.returnValue((200, data.get_dict()["content"]))
+
+        if format == "event":
+            event = format_event_for_client_v2(data.get_dict())
+            defer.returnValue((200, event))
+        elif format == "content":
+            defer.returnValue((200, data.get_dict()["content"]))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_type, state_key, txn_id=None):
