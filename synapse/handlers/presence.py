@@ -265,6 +265,12 @@ class PresenceHandler(object):
             to_notify = {}  # Changes we want to notify everyone about
             to_federation_ping = {}  # These need sending keep-alives
 
+            # Only bother handling the last presence change for each user
+            new_states_dict = {}
+            for new_state in new_states:
+                new_states_dict[new_state.user_id] = new_state
+            new_state = new_states_dict.values()
+
             for new_state in new_states:
                 user_id = new_state.user_id
 
