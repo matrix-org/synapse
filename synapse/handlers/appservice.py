@@ -176,13 +176,16 @@ class ApplicationServicesHandler(object):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def get_3pe_protocols(self):
+    def get_3pe_protocols(self, only_protocol=None):
         services = yield self.store.get_app_services()
         protocols = {}
 
         # Collect up all the individual protocol responses out of the ASes
         for s in services:
             for p in s.protocols:
+                if only_protocol is not None and p != only_protocol:
+                    continue
+
                 info = yield self.appservice_api.get_3pe_protocol(s, p)
 
                 # Ignore any result that doesn't contain an "instances" list
