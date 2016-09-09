@@ -157,7 +157,7 @@ class TransactionQueue(object):
         if key:
             self.pending_edus_keyed_by_dest.setdefault(
                 destination, {}
-            )[(edu.type, key)] = edu
+            )[(edu.edu_type, key)] = edu
         else:
             self.pending_edus_by_dest.setdefault(destination, []).append(edu)
 
