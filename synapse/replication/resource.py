@@ -274,11 +274,18 @@ class ReplicationResource(Resource):
 
     @defer.inlineCallbacks
     def typing(self, writer, current_token, request_streams):
-        current_position = current_token.presence
+        current_position = current_token.typing
 
         request_typing = request_streams.get("typing")
 
         if request_typing is not None:
+            # If they have a higher token than current max, we can assume that
+            # they had been talking to a previous instance of the master. Since
+            # we reset the token on restart, the best (but hacky) thing we can
+            # do is to simply resend down all the typing notifications.
+            if request_typing > current_position:
+                request_typing = 0
+
             typing_rows = yield self.typing_handler.get_all_typing_updates(
                 request_typing, current_position
             )
