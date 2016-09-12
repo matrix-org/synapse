@@ -128,6 +128,8 @@ class DeviceInboxStore(SQLBaseStore):
                     user_id, stream_id
                 )
 
+        defer.returnValue(stream_id)
+
     def _add_messages_to_local_device_inbox_txn(self, txn, stream_id,
                                                 messages_by_user_then_device):
         sql = (
