@@ -13,6 +13,10 @@
  * limitations under the License.
  */
 
+/** Using CREATE INDEX directly is deprecated in favour of using background
+ * update see synapse/storage/schema/delta/33/access_tokens_device_index.sql
+ * and synapse/storage/registration.py for an example using
+ * "access_tokens_device_index" **/
 CREATE INDEX receipts_linearized_room_stream ON receipts_linearized(
     room_id, stream_id
 );
