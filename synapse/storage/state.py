@@ -820,7 +820,7 @@ class StateStore(SQLBaseStore):
         def reindex_txn(txn):
             if isinstance(self.database_engine, PostgresEngine):
                 txn.execute(
-                    "CREATE INDEX state_groups_state_type_idx"
+                    "CREATE INDEX CONCURRENTLY state_groups_state_type_idx"
                     " ON state_groups_state(state_group, type, state_key)"
                 )
                 txn.execute(
