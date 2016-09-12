@@ -36,7 +36,8 @@ class EventPushActionsStore(SQLBaseStore):
             self.EPA_HIGHLIGHT_INDEX,
             index_name="event_push_actions_u_highlight",
             table="event_push_actions",
-            columns=["user_id", "stream_ordering", "highlight"],
+            columns=["user_id", "stream_ordering"],
+            where_clause="highlight = 1",
         )
 
     def _set_push_actions_for_event_and_users_txn(self, txn, event, tuples):
