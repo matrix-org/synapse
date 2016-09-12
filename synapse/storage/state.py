@@ -306,13 +306,6 @@ class StateStore(SQLBaseStore):
         defer.returnValue(results)
 
     def _get_state_groups_from_groups_txn(self, txn, groups, types=None):
-        if types is not None:
-            where_clause = "AND (%s)" % (
-                " OR ".join(["(type = ? AND state_key = ?)"] * len(types)),
-            )
-        else:
-            where_clause = ""
-
         results = {group: {} for group in groups}
         if isinstance(self.database_engine, PostgresEngine):
             # Temporarily disable sequential scans in this transaction. This is
@@ -342,20 +335,43 @@ class StateStore(SQLBaseStore):
                 WHERE state_group IN (
                     SELECT state_group FROM state
                 )
-                %s;
-            """) % (where_clause,)
+                %s
+            """)
 
-            for group in groups:
-                args = [group]
-                if types is not None:
-                    args.extend([i for typ in types for i in typ])
+            # Turns out that postgres doesn't like doing a list of OR's and
+            # is about 1000x slower, so we just issue a query for each specific
+            # type seperately.
+            if types:
+                clause_to_args = [
+                    (
+                        "AND type = ? AND state_key = ?",
+                        (etype, state_key)
+                    )
+                    for etype, state_key in types
+                ]
+            else:
+                # If types is None we fetch all the state, and so just use an
+                # empty where clause with no extra args.
+                clause_to_args = [("", [])]
 
-                txn.execute(sql, args)
-                rows = self.cursor_to_dict(txn)
-                for row in rows:
-                    key = (row["type"], row["state_key"])
-                    results[group][key] = row["event_id"]
+            for where_clause, where_args in clause_to_args:
+                for group in groups:
+                    args = [group]
+                    args.extend(where_args)
+
+                    txn.execute(sql % (where_clause,), args)
+                    rows = self.cursor_to_dict(txn)
+                    for row in rows:
+                        key = (row["type"], row["state_key"])
+                        results[group][key] = row["event_id"]
         else:
+            if types is not None:
+                where_clause = "AND (%s)" % (
+                    " OR ".join(["(type = ? AND state_key = ?)"] * len(types)),
+                )
+            else:
+                where_clause = ""
+
             # We don't use WITH RECURSIVE on sqlite3 as there are distributions
             # that ship with an sqlite3 version that doesn't support it (e.g. wheezy)
             for group in groups:
