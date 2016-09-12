@@ -26,9 +26,18 @@ logger = logging.getLogger(__name__)
 
 
 class EventPushActionsStore(SQLBaseStore):
+    EPA_HIGHLIGHT_INDEX = "epa_highlight_index"
+
     def __init__(self, hs):
         self.stream_ordering_month_ago = None
         super(EventPushActionsStore, self).__init__(hs)
+
+        self.register_background_index_update(
+            self.EPA_HIGHLIGHT_INDEX,
+            index_name="event_push_actions_u_highlight",
+            table="event_push_actions",
+            columns=["user_id", "stream_ordering", "highlight"],
+        )
 
     def _set_push_actions_for_event_and_users_txn(self, txn, event, tuples):
         """
@@ -353,12 +362,14 @@ class EventPushActionsStore(SQLBaseStore):
                     before_clause += " "
                 before_clause += "AND epa.highlight = 1"
 
+            # NB. This assumes event_ids are globally unique since
+            # it makes the query easier to index
             sql = (
                 "SELECT epa.event_id, epa.room_id,"
                 " epa.stream_ordering, epa.topological_ordering,"
                 " epa.actions, epa.profile_tag, e.received_ts"
                 " FROM event_push_actions epa, events e"
-                " WHERE epa.room_id = e.room_id AND epa.event_id = e.event_id"
+                " WHERE epa.event_id = e.event_id"
                 " AND epa.user_id = ? %s"
                 " ORDER BY epa.stream_ordering DESC"
                 " LIMIT ?"
