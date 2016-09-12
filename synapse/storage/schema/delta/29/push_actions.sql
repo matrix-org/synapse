@@ -26,6 +26,10 @@ UPDATE event_push_actions SET stream_ordering = (
 
 UPDATE event_push_actions SET notif = 1, highlight = 0;
 
+/** Using CREATE INDEX directly is deprecated in favour of using background
+ * update see synapse/storage/schema/delta/33/access_tokens_device_index.sql
+ * and synapse/storage/registration.py for an example using
+ * "access_tokens_device_index" **/
 CREATE INDEX event_push_actions_rm_tokens on event_push_actions(
     user_id, room_id, topological_ordering, stream_ordering
 );
