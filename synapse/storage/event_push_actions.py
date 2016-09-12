@@ -17,7 +17,6 @@ from ._base import SQLBaseStore
 from twisted.internet import defer
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.types import RoomStreamToken
-from synapse.storage.engines import PostgresEngine
 from .stream import lower_bound
 
 import logging
