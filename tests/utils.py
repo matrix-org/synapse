@@ -115,6 +115,15 @@ def get_mock_call_args(pattern_func, mock_func):
     return getcallargs(pattern_func, *invoked_args, **invoked_kargs)
 
 
+def mock_getRawHeaders(headers=None):
+    headers = headers if headers is not None else {}
+
+    def getRawHeaders(name, default=None):
+        return headers.get(name, default)
+
+    return getRawHeaders
+
+
 # This is a mock /resource/ not an entire server
 class MockHttpResource(HttpServer):
 
@@ -127,7 +136,7 @@ class MockHttpResource(HttpServer):
 
     @patch('twisted.web.http.Request')
     @defer.inlineCallbacks
-    def trigger(self, http_method, path, content, mock_request):
+    def trigger(self, http_method, path, content, mock_request, federation_auth=False):
         """ Fire an HTTP event.
 
         Args:
@@ -155,9 +164,10 @@ class MockHttpResource(HttpServer):
 
         mock_request.getClientIP.return_value = "-"
 
-        mock_request.requestHeaders.getRawHeaders.return_value = [
-            "X-Matrix origin=test,key=,sig="
-        ]
+        headers = {}
+        if federation_auth:
+            headers["Authorization"] = ["X-Matrix origin=test,key=,sig="]
+        mock_request.requestHeaders.getRawHeaders = mock_getRawHeaders(headers)
 
         # return the right path if the event requires it
         mock_request.path = path

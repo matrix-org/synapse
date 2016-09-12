@@ -1180,7 +1180,7 @@ def get_access_token_from_request(request, token_not_found_http_status=401):
 
     auth_headers = request.requestHeaders.getRawHeaders("Authorization")
     query_params = request.args.get("access_token")
-    if auth_headers is not None:
+    if auth_headers:
         # Try the get the access_token from a "Authorization: Bearer"
         # header
         if query_params is not None:
