@@ -318,7 +318,7 @@ class CasRedirectServlet(ClientV1RestServlet):
         service_param = urllib.urlencode({
             "service": "%s?%s" % (hs_redirect_url, client_redirect_url_param)
         })
-        request.redirect("%s?%s" % (self.cas_server_url, service_param))
+        request.redirect("%s/login?%s" % (self.cas_server_url, service_param))
         finish_request(request)
 
 
@@ -385,7 +385,7 @@ class CasTicketServlet(ClientV1RestServlet):
 
     def parse_cas_response(self, cas_response_body):
         user = None
-        attributes = None
+        attributes = {}
         try:
             root = ET.fromstring(cas_response_body)
             if not root.tag.endswith("serviceResponse"):
@@ -395,7 +395,6 @@ class CasTicketServlet(ClientV1RestServlet):
                 if child.tag.endswith("user"):
                     user = child.text
                 if child.tag.endswith("attributes"):
-                    attributes = {}
                     for attribute in child:
                         # ElementTree library expands the namespace in
                         # attribute tags to the full URL of the namespace.
@@ -407,8 +406,6 @@ class CasTicketServlet(ClientV1RestServlet):
                         attributes[tag] = attribute.text
             if user is None:
                 raise Exception("CAS response does not contain user")
-            if attributes is None:
-                raise Exception("CAS response does not contain attributes")
         except Exception:
             logger.error("Error parsing CAS response", exc_info=1)
             raise LoginError(401, "Invalid CAS response",
