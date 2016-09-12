@@ -17,6 +17,7 @@ from ._base import SQLBaseStore
 from twisted.internet import defer
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.types import RoomStreamToken
+from synapse.storage.engines import PostgresEngine
 from .stream import lower_bound
 
 import logging
@@ -26,9 +27,16 @@ logger = logging.getLogger(__name__)
 
 
 class EventPushActionsStore(SQLBaseStore):
+    EPA_HIGHLIGHT_INDEX = "epa_highlight_index"
+
     def __init__(self, hs):
         self.stream_ordering_month_ago = None
         super(EventPushActionsStore, self).__init__(hs)
+
+        self.register_background_update_handler(
+            self.EPA_HIGHLIGHT_INDEX,
+            self._background_index_epa_highlight,
+        )
 
     def _set_push_actions_for_event_and_users_txn(self, txn, event, tuples):
         """
@@ -499,6 +507,28 @@ class EventPushActionsStore(SQLBaseStore):
                 range_end = middle
 
         return range_end
+
+    @defer.inlineCallbacks
+    def _background_index_epa_highlight(self, progress, batch_size):
+        def reindex_txn(txn):
+            if isinstance(self.database_engine, PostgresEngine):
+                txn.execute(
+                    "CREATE INDEX CONCURRENTLY event_push_actions_u_highlight"
+                    " on event_push_actions(user_id, highlight, stream_ordering)"
+                )
+            else:
+                txn.execute(
+                    "CREATE INDEX event_push_actions_u_highlight"
+                    " on event_push_actions(user_id, highlight, stream_ordering)"
+                )
+
+        yield self.runInteraction(
+            self.EPA_HIGHLIGHT_INDEX, reindex_txn
+        )
+
+        yield self._end_background_update(self.EPA_HIGHLIGHT_INDEX)
+
+        defer.returnValue(1)
 
 
 def _action_has_highlight(actions):

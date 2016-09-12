@@ -13,6 +13,5 @@
  * limitations under the License.
  */
 
- CREATE INDEX event_push_actions_user_id_highlight_stream_ordering on event_push_actions(
-     user_id, highlight, stream_ordering
- );
+ INSERT into background_updates (update_name, progress_json)
+     VALUES ('epa_highlight_index', '{}');
