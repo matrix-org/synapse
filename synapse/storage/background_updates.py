@@ -219,7 +219,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         self._background_update_handlers[update_name] = update_handler
 
     def register_background_index_update(self, update_name, index_name,
-                                         table, columns):
+                                         table, columns, where_clause=None):
         """Helper for store classes to do a background index addition
 
         To use:
@@ -243,14 +243,20 @@ class BackgroundUpdateStore(SQLBaseStore):
             conc = True
         else:
             conc = False
+            # We don't use partial indices on SQLite as it wasn't introduced
+            # until 3.8, and wheezy has 3.7
+            where_clause = None
 
-        sql = "CREATE INDEX %(conc)s %(name)s ON %(table)s (%(columns)s)" \
-              % {
-                  "conc": "CONCURRENTLY" if conc else "",
-                  "name": index_name,
-                  "table": table,
-                  "columns": ", ".join(columns),
-              }
+        sql = (
+            "CREATE INDEX %(conc)s %(name)s ON %(table)s (%(columns)s)"
+            " %(where_clause)s"
+        ) % {
+            "conc": "CONCURRENTLY" if conc else "",
+            "name": index_name,
+            "table": table,
+            "columns": ", ".join(columns),
+            "where_clause": "WHERE " + where_clause if where_clause else ""
+        }
 
         def create_index_concurrently(conn):
             conn.rollback()
