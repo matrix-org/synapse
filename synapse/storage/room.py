@@ -48,15 +48,31 @@ class RoomStore(SQLBaseStore):
             StoreError if the room could not be stored.
         """
         try:
-            yield self._simple_insert(
-                "rooms",
-                {
-                    "room_id": room_id,
-                    "creator": room_creator_user_id,
-                    "is_public": is_public,
-                },
-                desc="store_room",
-            )
+            def store_room_txn(txn, next_id):
+                self._simple_insert_txn(
+                    txn,
+                    "rooms",
+                    {
+                        "room_id": room_id,
+                        "creator": room_creator_user_id,
+                        "is_public": is_public,
+                    },
+                )
+                if is_public:
+                    self._simple_insert_txn(
+                        txn,
+                        table="public_room_list_stream",
+                        values={
+                            "stream_id": next_id,
+                            "room_id": room_id,
+                            "visibility": is_public,
+                        }
+                    )
+            with self._public_room_id_gen.get_next() as next_id:
+                yield self.runInteraction(
+                    "store_room_txn",
+                    store_room_txn, next_id,
+                )
         except Exception as e:
             logger.error("store_room with room_id=%s failed: %s", room_id, e)
             raise StoreError(500, "Problem creating room.")
@@ -77,13 +93,45 @@ class RoomStore(SQLBaseStore):
             allow_none=True,
         )
 
+    @defer.inlineCallbacks
     def set_room_is_public(self, room_id, is_public):
-        return self._simple_update_one(
-            table="rooms",
-            keyvalues={"room_id": room_id},
-            updatevalues={"is_public": is_public},
-            desc="set_room_is_public",
-        )
+        def set_room_is_public_txn(txn, next_id):
+            self._simple_update_one_txn(
+                txn,
+                table="rooms",
+                keyvalues={"room_id": room_id},
+                updatevalues={"is_public": is_public},
+            )
+
+            entries = self._simple_select_list_txn(
+                txn,
+                table="public_room_list_stream",
+                keyvalues={"room_id": room_id},
+                retcols=("stream_id", "visibility"),
+            )
+
+            entries.sort(key=lambda r: r["stream_id"])
+
+            add_to_stream = True
+            if entries:
+                add_to_stream = bool(entries[-1]["visibility"]) != is_public
+
+            if add_to_stream:
+                self._simple_insert_txn(
+                    txn,
+                    table="public_room_list_stream",
+                    values={
+                        "stream_id": next_id,
+                        "room_id": room_id,
+                        "visibility": is_public,
+                    }
+                )
+
+        with self._public_room_id_gen.get_next() as next_id:
+            yield self.runInteraction(
+                "set_room_is_public",
+                set_room_is_public_txn, next_id,
+            )
 
     def get_public_room_ids(self):
         return self._simple_select_onecol(

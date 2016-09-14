@@ -366,7 +366,7 @@ class EventFederationStore(SQLBaseStore):
         """)
 
         def get_forward_extremeties_for_room_txn(txn):
-            txn.execute(sql, (room_id, stream_ordering,))
+            txn.execute(sql, (stream_ordering, room_id))
             rows = txn.fetchall()
             return [event_id for event_id, in rows]
 
