@@ -819,11 +819,11 @@ class StateStore(SQLBaseStore):
     def _background_index_state(self, progress, batch_size):
         def reindex_txn(conn):
             conn.rollback()
-            # postgres insists on autocommit for the index
-            conn.set_session(autocommit=True)
-            try:
-                txn = conn.cursor()
-                if isinstance(self.database_engine, PostgresEngine):
+            if isinstance(self.database_engine, PostgresEngine):
+                # postgres insists on autocommit for the index
+                conn.set_session(autocommit=True)
+                try:
+                    txn = conn.cursor()
                     txn.execute(
                         "CREATE INDEX CONCURRENTLY state_groups_state_type_idx"
                         " ON state_groups_state(state_group, type, state_key)"
@@ -831,16 +831,17 @@ class StateStore(SQLBaseStore):
                     txn.execute(
                         "DROP INDEX IF EXISTS state_groups_state_id"
                     )
-                else:
-                    txn.execute(
-                        "CREATE INDEX state_groups_state_type_idx"
-                        " ON state_groups_state(state_group, type, state_key)"
-                    )
-                    txn.execute(
-                        "DROP INDEX IF EXISTS state_groups_state_id"
-                    )
-            finally:
-                conn.set_session(autocommit=False)
+                finally:
+                    conn.set_session(autocommit=False)
+            else:
+                txn = conn.cursor()
+                txn.execute(
+                    "CREATE INDEX state_groups_state_type_idx"
+                    " ON state_groups_state(state_group, type, state_key)"
+                )
+                txn.execute(
+                    "DROP INDEX IF EXISTS state_groups_state_id"
+                )
 
         yield self.runWithConnection(reindex_txn)
 
