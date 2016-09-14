@@ -20,3 +20,5 @@ export SYNAPSE_CACHE_FACTOR=1
     --pusher \
     --synchrotron \
     --federation-reader \
+    --client-reader \
+    --appservice \
