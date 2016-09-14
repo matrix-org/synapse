@@ -52,12 +52,49 @@ class RoomListHandler(BaseHandler):
     def _get_public_room_list(self):
         room_ids = yield self.store.get_public_room_ids()
 
+        rooms_to_order_value = {}
+        rooms_to_num_joined = {}
+        rooms_to_latest_event_ids = {}
+
+        current_stream_token = yield self.store.get_room_max_stream_ordering()
+
+        # We want to return rooms in a particular order: the number of joined
+        # users. We then arbitrarily use the room_id as a tie breaker.
+
+        @defer.inlineCallbacks
+        def get_order_for_room(room_id):
+            latest_event_ids = rooms_to_latest_event_ids.get(room_id, None)
+            if not latest_event_ids:
+                latest_event_ids = yield self.store.get_forward_extremeties_for_room(
+                    room_id, current_stream_token
+                )
+                rooms_to_latest_event_ids[room_id] = latest_event_ids
+
+            if not latest_event_ids:
+                return
+
+            joined_users = yield self.state_handler.get_current_user_in_room(
+                room_id, latest_event_ids,
+            )
+            num_joined_users = len(joined_users)
+            rooms_to_num_joined[room_id] = num_joined_users
+
+            if num_joined_users == 0:
+                return
+
+            # We want larger rooms to be first, hence negating num_joined_users
+            rooms_to_order_value[room_id] = (-num_joined_users, room_id)
+
+        yield concurrently_execute(get_order_for_room, room_ids, 10)
+
+        sorted_entries = sorted(rooms_to_order_value.items(), key=lambda e: e[1])
+        sorted_rooms = [room_id for room_id, _ in sorted_entries]
+
         results = []
 
         @defer.inlineCallbacks
         def handle_room(room_id):
-            joined_users = yield self.state_handler.get_current_user_in_room(room_id)
-            num_joined_users = len(joined_users)
+            num_joined_users = rooms_to_num_joined[room_id]
             if num_joined_users == 0:
                 return
 
@@ -135,7 +172,7 @@ class RoomListHandler(BaseHandler):
 
             results.append(result)
 
-        yield concurrently_execute(handle_room, room_ids, 10)
+        yield concurrently_execute(handle_room, sorted_rooms, 10)
 
         # FIXME (erikj): START is no longer a valid value
         defer.returnValue({"start": "START", "end": "END", "chunk": results})
