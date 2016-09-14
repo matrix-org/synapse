@@ -238,13 +238,7 @@ class StateHandler(object):
         context.prev_state_ids = curr_state
         if event.is_state():
             context.state_group = self.store.get_next_state_group()
-        else:
-            if entry.state_group is None:
-                entry.state_group = self.store.get_next_state_group()
-                entry.state_id = entry.state_group
-            context.state_group = entry.state_group
 
-        if event.is_state():
             key = (event.type, event.state_key)
             if key in context.prev_state_ids:
                 replaces = context.prev_state_ids[key]
@@ -259,8 +253,12 @@ class StateHandler(object):
                 context.delta_ids = dict(context.delta_ids)
                 context.delta_ids[key] = event.event_id
         else:
-            context.current_state_ids = context.prev_state_ids
+            if entry.state_group is None:
+                entry.state_group = self.store.get_next_state_group()
+                entry.state_id = entry.state_group
 
+            context.state_group = entry.state_group
+            context.current_state_ids = context.prev_state_ids
             context.prev_group = entry.prev_group
             context.delta_ids = entry.delta_ids
 
