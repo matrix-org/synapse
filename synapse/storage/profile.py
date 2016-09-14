@@ -25,33 +25,43 @@ class ProfileStore(SQLBaseStore):
         )
 
     def get_profile_displayname(self, user_localpart):
-        return self._simple_select_one_onecol(
+        return self._simple_select_one_row(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            retcol="displayname",
+            retcol=["displayname", "lock_version"],
             desc="get_profile_displayname",
         )
 
-    def set_profile_displayname(self, user_localpart, new_displayname):
+    def set_profile_displayname(self, user_localpart, new_displayname, lock_version=None):
+        keyvalues = {"user_id": user_localpart}
+        updatevalues = {"displayname": new_displayname}
+        if lock_version is not None:
+            keyvalues["lock_version"] = lock_version
+            updatevalues["lock_version"] = lock_version + 1
         return self._simple_update_one(
             table="profiles",
-            keyvalues={"user_id": user_localpart},
-            updatevalues={"displayname": new_displayname},
+            keyvalues=keyvalues,
+            updatevalues=updatevalues,
             desc="set_profile_displayname",
         )
 
     def get_profile_avatar_url(self, user_localpart):
-        return self._simple_select_one_onecol(
+        return self._simple_select_one_row(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            retcol="avatar_url",
+            retcol=["avatar_url", "lock_version"],
             desc="get_profile_avatar_url",
         )
 
-    def set_profile_avatar_url(self, user_localpart, new_avatar_url):
+    def set_profile_avatar_url(self, user_localpart, new_avatar_url, lock_version=None):
+        keyvalues = {"user_id": user_localpart}
+        updatevalues = {"avatar_url": new_avatar_url}
+        if lock_version is not None:
+            keyvalues["lock_version"] = lock_version
+            updatevalues["lock_version"] = lock_version + 1
         return self._simple_update_one(
             table="profiles",
-            keyvalues={"user_id": user_localpart},
-            updatevalues={"avatar_url": new_avatar_url},
+            keyvalues=keyvalues,
+            updatevalues=updatevalues,
             desc="set_profile_avatar_url",
         )

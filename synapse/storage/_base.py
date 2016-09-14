@@ -48,6 +48,7 @@ sql_scheduling_timer = metrics.register_distribution("schedule_time")
 sql_query_timer = metrics.register_distribution("query_time", labels=["verb"])
 sql_txn_timer = metrics.register_distribution("transaction_time", labels=["desc"])
 
+ensure_list = lambda l: l if isinstance(l, list) else (l,)
 
 class LoggingTransaction(object):
     """An object that almost-transparently proxies for the 'txn' object
@@ -574,6 +575,59 @@ class SQLBaseStore(object):
 
         return [r[0] for r in txn.fetchall()]
 
+    def _simple_select_one_row(self, table, keyvalues, retcol,
+                                  allow_none=False,
+                                  desc="_simple_select_one_onecol"):
+        """Executes a SELECT query on the named table, which is expected to
+        return a single row, returning a single hash with the set of specified
+        columns mapped to the row value or an empty hash if no row was found.
+
+        Args:
+            table : string giving the table name
+            keyvalues : dict of column names and values to select the row with
+            retcol : list giving the name of the columns to return
+        """
+        return self.runInteraction(
+            desc,
+            self._simple_select_one_row_txn,
+            table, keyvalues, retcol, allow_none=allow_none,
+        )
+
+    @classmethod
+    def _simple_select_one_row_txn(cls, txn, table, keyvalues, retcol,
+                                      allow_none=False):
+        ret = cls._simple_select_row_txn(
+            txn,
+            table=table,
+            keyvalues=keyvalues,
+            retcol=retcol,
+        )
+
+        if ret:
+            return ret
+        else:
+            if allow_none:
+                return None
+            else:
+                raise StoreError(404, "No row found")
+
+    @staticmethod
+    def _simple_select_row_txn(txn, table, keyvalues, retcol):
+        retcol = ensure_list(retcol)
+        sql = (
+            "SELECT %(retcol)s FROM %(table)s WHERE %(where)s"
+        ) % {
+            "retcol": ", ".join(col for col in retcol),
+            "table": table,
+            "where": " AND ".join("%s = ?" % k for k in keyvalues.keys()),
+        }
+
+        txn.execute(sql, keyvalues.values())
+        ret = txn.fetchall()
+        if ret:
+            return { col: r for r, col in zip(ret[0], retcol) }
+        return {}
+
     def _simple_select_onecol(self, table, keyvalues, retcol,
                               desc="_simple_select_onecol"):
         """Executes a SELECT query on the named table, which returns a list
@@ -757,7 +811,12 @@ class SQLBaseStore(object):
         )
 
         if txn.rowcount == 0:
-            raise StoreError(404, "No row found")
+            if keyvalues.get("lock_version"):
+                raise StoreError(404, "Invalid lock version")
+            else:
+                raise StoreError(404, "No row found")
+
+
         if txn.rowcount > 1:
             raise StoreError(500, "More than one row matched")
 

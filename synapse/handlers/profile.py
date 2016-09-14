@@ -65,7 +65,7 @@ class ProfileHandler(BaseHandler):
                 defer.returnValue(result["displayname"])
 
     @defer.inlineCallbacks
-    def set_displayname(self, target_user, requester, new_displayname):
+    def set_displayname(self, target_user, requester, new_displayname, lock_version=None):
         """target_user is the user whose displayname is to be changed;
         auth_user is the user attempting to make this change."""
         if not self.hs.is_mine(target_user):
@@ -78,7 +78,7 @@ class ProfileHandler(BaseHandler):
             new_displayname = None
 
         yield self.store.set_profile_displayname(
-            target_user.localpart, new_displayname
+            target_user.localpart, new_displayname, lock_version
         )
 
         yield self._update_join_states(requester)
@@ -111,7 +111,7 @@ class ProfileHandler(BaseHandler):
             defer.returnValue(result["avatar_url"])
 
     @defer.inlineCallbacks
-    def set_avatar_url(self, target_user, requester, new_avatar_url):
+    def set_avatar_url(self, target_user, requester, new_avatar_url, lock_version=None):
         """target_user is the user whose avatar_url is to be changed;
         auth_user is the user attempting to make this change."""
         if not self.hs.is_mine(target_user):
@@ -121,7 +121,7 @@ class ProfileHandler(BaseHandler):
             raise AuthError(400, "Cannot set another user's avatar_url")
 
         yield self.store.set_profile_avatar_url(
-            target_user.localpart, new_avatar_url
+            target_user.localpart, new_avatar_url, lock_version
         )
 
         yield self._update_join_states(requester)

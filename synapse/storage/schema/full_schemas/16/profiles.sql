@@ -16,5 +16,6 @@ CREATE TABLE IF NOT EXISTS profiles(
     user_id TEXT NOT NULL,
     displayname TEXT,
     avatar_url TEXT,
+    lock_version INTEGER DEFAULT 0,
     UNIQUE(user_id)
 );

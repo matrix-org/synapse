@@ -32,13 +32,9 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
     def on_GET(self, request, user_id):
         user = UserID.from_string(user_id)
 
-        displayname = yield self.handlers.profile_handler.get_displayname(
+        ret = yield self.handlers.profile_handler.get_displayname(
             user,
         )
-
-        ret = {}
-        if displayname is not None:
-            ret["displayname"] = displayname
 
         defer.returnValue((200, ret))
 
@@ -55,7 +51,7 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
             defer.returnValue((400, "Unable to parse name"))
 
         yield self.handlers.profile_handler.set_displayname(
-            user, requester, new_name)
+            user, requester, new_name, content.get("lock_version"))
 
         defer.returnValue((200, {}))
 
