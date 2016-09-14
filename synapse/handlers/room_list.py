@@ -18,7 +18,7 @@ from twisted.internet import defer
 from ._base import BaseHandler
 
 from synapse.api.constants import (
-    EventTypes, JoinRules, Membership,
+    EventTypes, JoinRules,
 )
 from synapse.api.errors import SynapseError
 from synapse.util.async import concurrently_execute
@@ -56,7 +56,35 @@ class RoomListHandler(BaseHandler):
 
         @defer.inlineCallbacks
         def handle_room(room_id):
-            current_state = yield self.state_handler.get_current_state(room_id)
+            joined_users = yield self.state_handler.get_current_user_in_room(room_id)
+            num_joined_users = len(joined_users)
+            if num_joined_users == 0:
+                return
+
+            result = {
+                "room_id": room_id,
+                "num_joined_members": num_joined_users,
+            }
+
+            current_state_ids = yield self.state_handler.get_current_state_ids(room_id)
+
+            event_map = yield self.store.get_events([
+                event_id for key, event_id in current_state_ids.items()
+                if key[0] in (
+                    EventTypes.JoinRules,
+                    EventTypes.Name,
+                    EventTypes.Topic,
+                    EventTypes.CanonicalAlias,
+                    EventTypes.RoomHistoryVisibility,
+                    EventTypes.GuestAccess,
+                    "m.room.avatar",
+                )
+            ])
+
+            current_state = {
+                (ev.type, ev.state_key): ev
+                for ev in event_map.values()
+            }
 
             # Double check that this is actually a public room.
             join_rules_event = current_state.get((EventTypes.JoinRules, ""))
@@ -64,18 +92,6 @@ class RoomListHandler(BaseHandler):
                 join_rule = join_rules_event.content.get("join_rule", None)
                 if join_rule and join_rule != JoinRules.PUBLIC:
                     defer.returnValue(None)
-
-            result = {"room_id": room_id}
-
-            num_joined_users = len([
-                1 for _, event in current_state.items()
-                if event.type == EventTypes.Member
-                and event.membership == Membership.JOIN
-            ])
-            if num_joined_users == 0:
-                return
-
-            result["num_joined_members"] = num_joined_users
 
             aliases = yield self.store.get_aliases_for_room(room_id)
             if aliases:
