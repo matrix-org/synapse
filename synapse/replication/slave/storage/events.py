@@ -61,6 +61,8 @@ class SlavedEventStore(BaseSlavedStore):
             "MembershipStreamChangeCache", events_max,
         )
 
+        self.stream_ordering_month_ago = 0
+
     # Cached functions can't be accessed through a class instance so we need
     # to reach inside the __dict__ to extract them.
     get_rooms_for_user = RoomMemberStore.__dict__["get_rooms_for_user"]
@@ -167,6 +169,12 @@ class SlavedEventStore(BaseSlavedStore):
     get_auth_chain = DataStore.get_auth_chain.__func__
     get_auth_chain_ids = DataStore.get_auth_chain_ids.__func__
     _get_auth_chain_ids_txn = DataStore._get_auth_chain_ids_txn.__func__
+
+    get_room_max_stream_ordering = DataStore.get_room_max_stream_ordering.__func__
+
+    get_forward_extremeties_for_room = (
+        DataStore.get_forward_extremeties_for_room.__func__
+    )
 
     def stream_positions(self):
         result = super(SlavedEventStore, self).stream_positions()

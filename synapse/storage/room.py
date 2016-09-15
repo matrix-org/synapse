@@ -307,3 +307,19 @@ class RoomStore(SQLBaseStore):
         return self.runInteraction(
             "get_public_room_changes", get_public_room_changes_txn
         )
+
+    def get_all_new_public_rooms(self, prev_id, current_id, limit):
+        def get_all_new_public_rooms(txn):
+            sql = ("""
+                SELECT stream_id, room_id, visibility FROM public_room_list_stream
+                WHERE stream_id > ? AND stream_id <= ?
+                ORDER BY stream_id ASC
+                LIMIT ?
+            """)
+
+            txn.execute(sql, (prev_id, current_id, limit,))
+            return txn.fetchall()
+
+        return self.runInteraction(
+            "get_all_new_public_rooms", get_all_new_public_rooms
+        )

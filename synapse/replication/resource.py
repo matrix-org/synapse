@@ -42,6 +42,7 @@ STREAM_NAMES = (
     ("pushers",),
     ("caches",),
     ("to_device",),
+    ("public_rooms",),
 )
 
 
@@ -131,6 +132,7 @@ class ReplicationResource(Resource):
         push_rules_token, room_stream_token = self.store.get_push_rules_stream_token()
         pushers_token = self.store.get_pushers_stream_token()
         caches_token = self.store.get_cache_stream_token()
+        public_rooms_token = self.store.get_current_public_room_stream_id()
 
         defer.returnValue(_ReplicationToken(
             room_stream_token,
@@ -144,6 +146,7 @@ class ReplicationResource(Resource):
             0,  # State stream is no longer a thing
             caches_token,
             int(stream_token.to_device_key),
+            int(public_rooms_token),
         ))
 
     @request_handler()
@@ -193,6 +196,7 @@ class ReplicationResource(Resource):
         yield self.pushers(writer, current_token, limit, request_streams)
         yield self.caches(writer, current_token, limit, request_streams)
         yield self.to_device(writer, current_token, limit, request_streams)
+        yield self.public_rooms(writer, current_token, limit, request_streams)
         self.streams(writer, current_token, request_streams)
 
         logger.debug("Replicated %d rows", writer.total)
@@ -400,6 +404,20 @@ class ReplicationResource(Resource):
                 "position", "user_id", "device_id", "message_json"
             ))
 
+    @defer.inlineCallbacks
+    def public_rooms(self, writer, current_token, limit, request_streams):
+        current_position = current_token.public_rooms
+
+        public_rooms = request_streams.get("public_rooms")
+
+        if public_rooms is not None:
+            public_rooms_rows = yield self.store.get_all_new_public_rooms(
+                public_rooms, current_position, limit
+            )
+            writer.write_header_and_rows("public_rooms", public_rooms_rows, (
+                "position", "room_id", "visibility"
+            ))
+
 
 class _Writer(object):
     """Writes the streams as a JSON object as the response to the request"""
@@ -428,7 +446,7 @@ class _Writer(object):
 
 class _ReplicationToken(collections.namedtuple("_ReplicationToken", (
     "events", "presence", "typing", "receipts", "account_data", "backfill",
-    "push_rules", "pushers", "state", "caches", "to_device",
+    "push_rules", "pushers", "state", "caches", "to_device", "public_rooms",
 ))):
     __slots__ = []
 
