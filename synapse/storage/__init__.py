@@ -222,6 +222,8 @@ class DataStore(RoomMemberStore, RoomStore,
             self._find_stream_orderings_for_times, 60 * 60 * 1000
         )
 
+        self._stream_order_on_start = self.get_room_max_stream_ordering()
+
         super(DataStore, self).__init__(hs)
 
     def take_presence_startup_info(self):
