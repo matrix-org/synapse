@@ -319,7 +319,7 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
             else:
                 pass
 
-        limit = parse_integer(request, "limit", 0)
+        limit = parse_integer(request, "limit", 100)
         since_token = parse_string(request, "since", None)
 
         handler = self.hs.get_room_list_handler()
