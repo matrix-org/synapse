@@ -29,7 +29,6 @@ class ServerConfig(Config):
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.public_baseurl = config.get("public_baseurl")
-        self.secondary_directory_servers = config.get("secondary_directory_servers", [])
 
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
@@ -141,14 +140,6 @@ class ServerConfig(Config):
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         # gc_thresholds: [700, 10, 10]
-
-        # A list of other Home Servers to fetch the public room directory from
-        # and include in the public room directory of this home server
-        # This is a temporary stopgap solution to populate new server with a
-        # list of rooms until there exists a good solution of a decentralized
-        # room directory.
-        # secondary_directory_servers:
-        #     - matrix.org
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.

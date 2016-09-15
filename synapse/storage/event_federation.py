@@ -16,6 +16,7 @@
 from twisted.internet import defer
 
 from ._base import SQLBaseStore
+from synapse.api.errors import StoreError
 from synapse.util.caches.descriptors import cached
 from unpaddedbase64 import encode_base64
 
@@ -35,6 +36,13 @@ class EventFederationStore(SQLBaseStore):
     of the event graphs. These are used to generate the parents for new events
     and backfilling from another server respectively.
     """
+
+    def __init__(self, hs):
+        super(EventFederationStore, self).__init__(hs)
+
+        hs.get_clock().looping_call(
+            self._delete_old_forward_extrem_cache, 60 * 60 * 1000
+        )
 
     def get_auth_chain(self, event_ids):
         return self.get_auth_chain_ids(event_ids).addCallback(self._get_events)
@@ -270,6 +278,37 @@ class EventFederationStore(SQLBaseStore):
             ]
         )
 
+        # We now insert into stream_ordering_to_exterm a mapping from room_id,
+        # new stream_ordering to new forward extremeties in the room.
+        # This allows us to later efficiently look up the forward extremeties
+        # for a room before a given stream_ordering
+        max_stream_ord = max(
+            ev.internal_metadata.stream_ordering for ev in events
+        )
+        new_extrem = {}
+        for room_id in events_by_room:
+            event_ids = self._simple_select_onecol_txn(
+                txn,
+                table="event_forward_extremities",
+                keyvalues={"room_id": room_id},
+                retcol="event_id",
+            )
+            new_extrem[room_id] = event_ids
+
+        self._simple_insert_many_txn(
+            txn,
+            table="stream_ordering_to_exterm",
+            values=[
+                {
+                    "room_id": room_id,
+                    "event_id": event_id,
+                    "stream_ordering": max_stream_ord,
+                }
+                for room_id, extrem_evs in new_extrem.items()
+                for event_id in extrem_evs
+            ]
+        )
+
         query = (
             "INSERT INTO event_backward_extremities (event_id, room_id)"
             " SELECT ?, ? WHERE NOT EXISTS ("
@@ -304,6 +343,48 @@ class EventFederationStore(SQLBaseStore):
             txn.call_after(
                 self.get_latest_event_ids_in_room.invalidate, (room_id,)
             )
+
+    def get_forward_extremeties_for_room(self, room_id, stream_ordering):
+        """For a given room_id and stream_ordering, return the forward
+        extremeties of the room at that point in "time".
+
+        Throws a StoreError if we have since purged the index for
+        stream_orderings from that point.
+        """
+
+        if stream_ordering <= self.stream_ordering_month_ago:
+            raise StoreError(400, "stream_ordering too old")
+
+        sql = ("""
+                SELECT event_id FROM stream_ordering_to_exterm
+                INNER JOIN (
+                    SELECT room_id, MAX(stream_ordering) AS stream_ordering
+                    FROM stream_ordering_to_exterm
+                    WHERE stream_ordering < ? GROUP BY room_id
+                ) AS rms USING (room_id, stream_ordering)
+                WHERE room_id = ?
+        """)
+
+        def get_forward_extremeties_for_room_txn(txn):
+            txn.execute(sql, (stream_ordering, room_id))
+            rows = txn.fetchall()
+            return [event_id for event_id, in rows]
+
+        return self.runInteraction(
+            "get_forward_extremeties_for_room",
+            get_forward_extremeties_for_room_txn
+        )
+
+    def _delete_old_forward_extrem_cache(self):
+        def _delete_old_forward_extrem_cache_txn(txn):
+            txn.execute(
+                "DELETE FROM stream_ordering_to_exterm WHERE stream_ordering < ?",
+                (self.stream_ordering_month_ago,)
+            )
+        return self.runInteraction(
+            "_delete_old_forward_extrem_cache",
+            _delete_old_forward_extrem_cache_txn
+        )
 
     def get_backfill_events(self, room_id, event_list, limit):
         """Get a list of Events for a given topic that occurred before (and

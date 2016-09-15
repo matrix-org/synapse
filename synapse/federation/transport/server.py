@@ -18,7 +18,9 @@ from twisted.internet import defer
 from synapse.api.urls import FEDERATION_PREFIX as PREFIX
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import JsonResource
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.servlet import (
+    parse_json_object_from_request, parse_integer_from_args, parse_string_from_args,
+)
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.versionstring import get_version_string
 
@@ -554,7 +556,11 @@ class PublicRoomList(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query):
-        data = yield self.room_list_handler.get_local_public_room_list()
+        limit = parse_integer_from_args(query, "limit", 0)
+        since_token = parse_string_from_args(query, "since", None)
+        data = yield self.room_list_handler.get_local_public_room_list(
+            limit, since_token
+        )
         defer.returnValue((200, data))
 
 
