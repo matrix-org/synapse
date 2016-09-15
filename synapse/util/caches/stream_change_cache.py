@@ -121,3 +121,8 @@ class StreamChangeCache(object):
                 k, r = self._cache.popitem()
                 self._earliest_known_stream_pos = max(k, self._earliest_known_stream_pos)
                 self._entity_to_key.pop(r, None)
+
+    def get_pos_of_last_change(self, entity):
+        """Returns the stream pos of the last change for an entitiy, if known.
+        """
+        return self._entity_to_key.get(entity, None)
