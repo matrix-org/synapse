@@ -55,16 +55,26 @@ class RoomListHandler(BaseHandler):
         else:
             since_token = None
 
-        room_ids = yield self.store.get_public_room_ids()
-
         rooms_to_order_value = {}
         rooms_to_num_joined = {}
         rooms_to_latest_event_ids = {}
 
+        newly_visible = []
+        newly_unpublished = []
         if since_token:
-            current_stream_token = since_token.stream_ordering
+            stream_token = since_token.stream_ordering
+            current_public_id = yield self.store.get_current_public_room_stream_id()
+            public_room_stream_id = since_token.public_room_stream_id
+            newly_visible, newly_unpublished = yield self.store.get_public_room_changes(
+                public_room_stream_id, current_public_id
+            )
         else:
-            current_stream_token = yield self.store.get_room_max_stream_ordering()
+            stream_token = yield self.store.get_room_max_stream_ordering()
+            public_room_stream_id = yield self.store.get_current_public_room_stream_id()
+
+        room_ids = yield self.store.get_public_room_ids_at_stream_id(
+            public_room_stream_id
+        )
 
         # We want to return rooms in a particular order: the number of joined
         # users. We then arbitrarily use the room_id as a tie breaker.
@@ -74,7 +84,7 @@ class RoomListHandler(BaseHandler):
             latest_event_ids = rooms_to_latest_event_ids.get(room_id, None)
             if not latest_event_ids:
                 latest_event_ids = yield self.store.get_forward_extremeties_for_room(
-                    room_id, current_stream_token
+                    room_id, stream_token
                 )
                 rooms_to_latest_event_ids[room_id] = latest_event_ids
 
@@ -123,6 +133,9 @@ class RoomListHandler(BaseHandler):
         def handle_room(room_id):
             num_joined_users = rooms_to_num_joined[room_id]
             if num_joined_users == 0:
+                return
+
+            if room_id in newly_unpublished:
                 return
 
             result = {
@@ -207,10 +220,14 @@ class RoomListHandler(BaseHandler):
             "chunk": chunk,
         }
 
+        if since_token:
+            results["new_rooms"] = bool(newly_visible)
+
         if not since_token or since_token.direction_is_forward:
             if new_limit:
                 results["next_batch"] = RoomListNextBatch(
-                    stream_ordering=current_stream_token,
+                    stream_ordering=stream_token,
+                    public_room_stream_id=public_room_stream_id,
                     current_limit=new_limit,
                     direction_is_forward=True,
                 ).to_token()
@@ -222,7 +239,8 @@ class RoomListHandler(BaseHandler):
         else:
             if new_limit:
                 results["prev_batch"] = RoomListNextBatch(
-                    stream_ordering=current_stream_token,
+                    stream_ordering=stream_token,
+                    public_room_stream_id=public_room_stream_id,
                     current_limit=new_limit,
                     direction_is_forward=False,
                 ).to_token()
@@ -245,12 +263,14 @@ class RoomListHandler(BaseHandler):
 
 class RoomListNextBatch(namedtuple("RoomListNextBatch", (
     "stream_ordering",  # stream_ordering of the first public room list
+    "public_room_stream_id",  # public room stream id for first public room list
     "current_limit",  # The number of previous rooms returned
     "direction_is_forward",  # Bool if this is a next_batch, false if prev_batch
 ))):
 
     KEY_DICT = {
         "stream_ordering": "s",
+        "public_room_stream_id": "p",
         "current_limit": "n",
         "direction_is_forward": "d",
     }

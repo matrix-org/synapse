@@ -255,3 +255,55 @@ class RoomStore(SQLBaseStore):
             },
             desc="add_event_report"
         )
+
+    def get_current_public_room_stream_id(self):
+        return self._public_room_id_gen.get_current_token()
+
+    def get_public_room_ids_at_stream_id(self, stream_id):
+        return self.runInteraction(
+            "get_public_room_ids_at_stream_id",
+            self.get_public_room_ids_at_stream_id_txn, stream_id
+        )
+
+    def get_public_room_ids_at_stream_id_txn(self, txn, stream_id):
+        return {
+            rm
+            for rm, vis in self.get_published_at_stream_id_txn(txn, stream_id).items()
+            if vis
+        }
+
+    def get_published_at_stream_id_txn(self, txn, stream_id):
+        sql = ("""
+            SELECT room_id, visibility FROM public_room_list_stream
+            INNER JOIN (
+                SELECT room_id, max(stream_id) AS stream_id
+                FROM public_room_list_stream
+                WHERE stream_id <= ?
+                GROUP BY room_id
+            ) grouped USING (room_id, stream_id)
+        """)
+
+        txn.execute(sql, (stream_id,))
+        return dict(txn.fetchall())
+
+    def get_public_room_changes(self, prev_stream_id, new_stream_id):
+        def get_public_room_changes_txn(txn):
+            then_rooms = self.get_public_room_ids_at_stream_id_txn(txn, prev_stream_id)
+
+            now_rooms_dict = self.get_published_at_stream_id_txn(txn, new_stream_id)
+
+            now_rooms_visible = set(
+                rm for rm, vis in now_rooms_dict.items() if vis
+            )
+            now_rooms_not_visible = set(
+                rm for rm, vis in now_rooms_dict.items() if not vis
+            )
+
+            newly_visible = now_rooms_visible - then_rooms
+            newly_unpublished = now_rooms_not_visible & then_rooms
+
+            return newly_visible, newly_unpublished
+
+        return self.runInteraction(
+            "get_public_room_changes", get_public_room_changes_txn
+        )
