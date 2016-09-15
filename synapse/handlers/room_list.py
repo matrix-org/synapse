@@ -24,7 +24,11 @@ from synapse.api.errors import SynapseError
 from synapse.util.async import concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
 
+from collections import namedtuple
+from unpaddedbase64 import encode_base64, decode_base64
+
 import logging
+import msgpack
 
 logger = logging.getLogger(__name__)
 
@@ -42,21 +46,32 @@ class RoomListHandler(BaseHandler):
         )
         self.fetch_all_remote_lists()
 
-    def get_local_public_room_list(self):
-        result = self.response_cache.get(())
+    def get_local_public_room_list(self, limit=None, next_batch=None):
+        result = self.response_cache.get((limit, next_batch))
         if not result:
-            result = self.response_cache.set((), self._get_public_room_list())
+            result = self.response_cache.set(
+                (limit, next_batch),
+                self._get_public_room_list(limit, next_batch)
+            )
         return result
 
     @defer.inlineCallbacks
-    def _get_public_room_list(self):
+    def _get_public_room_list(self, limit=None, next_batch=None):
+        if next_batch and next_batch != "END":
+            next_batch = RoomListNextBatch.from_token(next_batch)
+        else:
+            next_batch = None
+
         room_ids = yield self.store.get_public_room_ids()
 
         rooms_to_order_value = {}
         rooms_to_num_joined = {}
         rooms_to_latest_event_ids = {}
 
-        current_stream_token = yield self.store.get_room_max_stream_ordering()
+        if next_batch:
+            current_stream_token = next_batch.sstream_ordering
+        else:
+            current_stream_token = yield self.store.get_room_max_stream_ordering()
 
         # We want to return rooms in a particular order: the number of joined
         # users. We then arbitrarily use the room_id as a tie breaker.
@@ -89,6 +104,17 @@ class RoomListHandler(BaseHandler):
 
         sorted_entries = sorted(rooms_to_order_value.items(), key=lambda e: e[1])
         sorted_rooms = [room_id for room_id, _ in sorted_entries]
+
+        if next_batch:
+            sorted_rooms = sorted_rooms[next_batch.current_limit:]
+
+        new_limit = None
+        if limit:
+            if sorted_rooms[limit:]:
+                new_limit = limit
+                if next_batch:
+                    new_limit += next_batch.current_limit
+            sorted_rooms = sorted_rooms[:limit]
 
         results = []
 
@@ -174,8 +200,24 @@ class RoomListHandler(BaseHandler):
 
         yield concurrently_execute(handle_room, sorted_rooms, 10)
 
-        # FIXME (erikj): START is no longer a valid value
-        defer.returnValue({"start": "START", "end": "END", "chunk": results})
+        if new_limit:
+            end_token = RoomListNextBatch(
+                stream_ordering=current_stream_token,
+                current_limit=new_limit,
+            ).to_token()
+        else:
+            end_token = "END"
+
+        if next_batch:
+            start_token = next_batch.to_token()
+        else:
+            start_token = "START"
+
+        defer.returnValue({
+            "start": start_token,
+            "end": end_token,
+            "chunk": results,
+        })
 
     @defer.inlineCallbacks
     def fetch_all_remote_lists(self):
@@ -235,3 +277,29 @@ class RoomListHandler(BaseHandler):
                     room_ids.add(room["room_id"])
 
         defer.returnValue(public_rooms)
+
+
+class RoomListNextBatch(namedtuple("RoomListNextBatch", (
+    "stream_ordering",  # stream_ordering of the first public room list
+    "current_limit",  # The number of previous rooms returned
+))):
+
+    KEY_DICT = {
+        "stream_ordering": "s",
+        "current_limit": "n",
+    }
+
+    REVERSE_KEY_DICT = {v: k for k, v in KEY_DICT.items()}
+
+    @classmethod
+    def from_token(cls, token):
+        return RoomListNextBatch(**{
+            cls.REVERSE_KEY_DICT[key]: val
+            for key, val in msgpack.loads(decode_base64(token)).items()
+        })
+
+    def to_token(self):
+        return encode_base64(msgpack.dumps({
+            self.KEY_DICT[key]: val
+            for key, val in self._asdict().items()
+        }))
