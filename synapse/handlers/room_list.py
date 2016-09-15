@@ -39,7 +39,8 @@ class RoomListHandler(BaseHandler):
         super(RoomListHandler, self).__init__(hs)
         self.response_cache = ResponseCache(hs)
 
-    def get_local_public_room_list(self, limit=None, since_token=None):
+    def get_local_public_room_list(self, limit=None, since_token=None,
+                                   search_filter=None):
         result = self.response_cache.get((limit, since_token))
         if not result:
             result = self.response_cache.set(
@@ -49,7 +50,8 @@ class RoomListHandler(BaseHandler):
         return result
 
     @defer.inlineCallbacks
-    def _get_public_room_list(self, limit=None, since_token=None):
+    def _get_public_room_list(self, limit=None, since_token=None,
+                              search_filter=None):
         if since_token and since_token != "END":
             since_token = RoomListNextBatch.from_token(since_token)
         else:
@@ -115,22 +117,18 @@ class RoomListHandler(BaseHandler):
                 sorted_rooms = sorted_rooms[:since_token.current_limit]
                 sorted_rooms.reverse()
 
-        new_limit = None
-        if limit:
-            if sorted_rooms[limit:]:
-                new_limit = limit
-                if since_token:
-                    if since_token.direction_is_forward:
-                        new_limit += since_token.current_limit
-                    else:
-                        new_limit = since_token.current_limit - new_limit
-                        new_limit = max(0, new_limit)
-            sorted_rooms = sorted_rooms[:limit]
+        rooms_to_scan = sorted_rooms
+        if limit and not search_filter:
+            rooms_to_scan = sorted_rooms[:limit]
 
         chunk = []
 
         @defer.inlineCallbacks
         def handle_room(room_id):
+            if limit and len(chunk) > limit:
+                # We've already got enough, so lets just drop it.
+                return
+
             num_joined_users = rooms_to_num_joined[room_id]
             if num_joined_users == 0:
                 return
@@ -212,9 +210,28 @@ class RoomListHandler(BaseHandler):
 
             chunk.append(result)
 
-        yield concurrently_execute(handle_room, sorted_rooms, 10)
+        yield concurrently_execute(handle_room, rooms_to_scan, 10)
 
         chunk.sort(key=lambda e: (-e["num_joined_members"], e["room_id"]))
+
+        new_limit = None
+        if chunk:
+            addition = 1
+            if since_token:
+                addition += since_token.current_limit
+
+            if not since_token or since_token.direction_is_forward:
+                last_room_id = chunk[-1]["room_id"]
+            else:
+                last_room_id = chunk[0]["room_id"]
+                addition *= -1
+
+            try:
+                new_limit = sorted_rooms.index(last_room_id) + addition
+                if new_limit >= len(sorted_rooms):
+                    new_limit = None
+            except ValueError:
+                pass
 
         results = {
             "chunk": chunk,
@@ -253,7 +270,8 @@ class RoomListHandler(BaseHandler):
         defer.returnValue(results)
 
     @defer.inlineCallbacks
-    def get_remote_public_room_list(self, server_name, limit=None, since_token=None):
+    def get_remote_public_room_list(self, server_name, limit=None, since_token=None,
+                                    search_filter=None):
         res = yield self.hs.get_replication_layer().get_public_rooms(
             server_name, limit=limit, since_token=since_token,
         )

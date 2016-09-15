@@ -337,6 +337,35 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
 
         defer.returnValue((200, data))
 
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        # FIXME
+        # yield self.auth.get_user_by_req(request)
+
+        server = parse_string(request, "server", default=None)
+        content = parse_json_object_from_request(request)
+
+        limit = int(content.get("limit", 100))
+        since_token = content.get("since", None)
+        search_filter = content.get("filter", None)
+
+        handler = self.hs.get_room_list_handler()
+        if server:
+            data = yield handler.get_remote_public_room_list(
+                server,
+                limit=limit,
+                since_token=since_token,
+                search_filter=search_filter,
+            )
+        else:
+            data = yield handler.get_local_public_room_list(
+                limit=limit,
+                since_token=since_token,
+                search_filter=search_filter,
+            )
+
+        defer.returnValue((200, data))
+
 
 # TODO: Needs unit testing
 class RoomMemberListRestServlet(ClientV1RestServlet):
