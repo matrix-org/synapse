@@ -320,19 +320,19 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
                 pass
 
         limit = parse_integer(request, "limit", 0)
-        next_batch = parse_string(request, "since", None)
+        since_token = parse_string(request, "since", None)
 
         handler = self.hs.get_room_list_handler()
         if server:
             data = yield handler.get_remote_public_room_list(
                 server,
                 limit=limit,
-                next_batch=next_batch,
+                since_token=since_token,
             )
         else:
             data = yield handler.get_local_public_room_list(
                 limit=limit,
-                next_batch=next_batch,
+                since_token=since_token,
             )
 
         defer.returnValue((200, data))

@@ -20,7 +20,6 @@ from ._base import BaseHandler
 from synapse.api.constants import (
     EventTypes, JoinRules,
 )
-from synapse.api.errors import SynapseError
 from synapse.util.async import concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
 
@@ -40,21 +39,21 @@ class RoomListHandler(BaseHandler):
         super(RoomListHandler, self).__init__(hs)
         self.response_cache = ResponseCache(hs)
 
-    def get_local_public_room_list(self, limit=None, next_batch=None):
-        result = self.response_cache.get((limit, next_batch))
+    def get_local_public_room_list(self, limit=None, since_token=None):
+        result = self.response_cache.get((limit, since_token))
         if not result:
             result = self.response_cache.set(
-                (limit, next_batch),
-                self._get_public_room_list(limit, next_batch)
+                (limit, since_token),
+                self._get_public_room_list(limit, since_token)
             )
         return result
 
     @defer.inlineCallbacks
-    def _get_public_room_list(self, limit=None, next_batch=None):
-        if next_batch and next_batch != "END":
-            next_batch = RoomListNextBatch.from_token(next_batch)
+    def _get_public_room_list(self, limit=None, since_token=None):
+        if since_token and since_token != "END":
+            since_token = RoomListNextBatch.from_token(since_token)
         else:
-            next_batch = None
+            since_token = None
 
         room_ids = yield self.store.get_public_room_ids()
 
@@ -62,8 +61,8 @@ class RoomListHandler(BaseHandler):
         rooms_to_num_joined = {}
         rooms_to_latest_event_ids = {}
 
-        if next_batch:
-            current_stream_token = next_batch.stream_ordering
+        if since_token:
+            current_stream_token = since_token.stream_ordering
         else:
             current_stream_token = yield self.store.get_room_max_stream_ordering()
 
@@ -99,22 +98,22 @@ class RoomListHandler(BaseHandler):
         sorted_entries = sorted(rooms_to_order_value.items(), key=lambda e: e[1])
         sorted_rooms = [room_id for room_id, _ in sorted_entries]
 
-        if next_batch:
-            if next_batch.direction_is_forward:
-                sorted_rooms = sorted_rooms[next_batch.current_limit:]
+        if since_token:
+            if since_token.direction_is_forward:
+                sorted_rooms = sorted_rooms[since_token.current_limit:]
             else:
-                sorted_rooms = sorted_rooms[:next_batch.current_limit]
+                sorted_rooms = sorted_rooms[:since_token.current_limit]
                 sorted_rooms.reverse()
 
         new_limit = None
         if limit:
             if sorted_rooms[limit:]:
                 new_limit = limit
-                if next_batch:
-                    if next_batch.direction_is_forward:
-                        new_limit += next_batch.current_limit
+                if since_token:
+                    if since_token.direction_is_forward:
+                        new_limit += since_token.current_limit
                     else:
-                        new_limit = next_batch.current_limit - new_limit
+                        new_limit = since_token.current_limit - new_limit
                         new_limit = max(0, new_limit)
             sorted_rooms = sorted_rooms[:limit]
 
@@ -208,7 +207,7 @@ class RoomListHandler(BaseHandler):
             "chunk": chunk,
         }
 
-        if not next_batch or next_batch.direction_is_forward:
+        if not since_token or since_token.direction_is_forward:
             if new_limit:
                 results["next_batch"] = RoomListNextBatch(
                     stream_ordering=current_stream_token,
@@ -216,8 +215,8 @@ class RoomListHandler(BaseHandler):
                     direction_is_forward=True,
                 ).to_token()
 
-            if next_batch:
-                results["prev_batch"] = next_batch.copy_and_replace(
+            if since_token:
+                results["prev_batch"] = since_token.copy_and_replace(
                     direction_is_forward=False,
                 ).to_token()
         else:
@@ -228,22 +227,20 @@ class RoomListHandler(BaseHandler):
                     direction_is_forward=False,
                 ).to_token()
 
-            if next_batch:
-                results["next_batch"] = next_batch.copy_and_replace(
+            if since_token:
+                results["next_batch"] = since_token.copy_and_replace(
                     direction_is_forward=True,
                 ).to_token()
 
         defer.returnValue(results)
 
     @defer.inlineCallbacks
-    def get_remote_public_room_list(self, server_name, limit=None, next_batch=None):
+    def get_remote_public_room_list(self, server_name, limit=None, since_token=None):
         res = yield self.hs.get_replication_layer().get_public_rooms(
-            [server_name]
+            server_name, limit=limit, since_token=since_token,
         )
 
-        if server_name not in res:
-            raise SynapseError(404, "Server not found")
-        defer.returnValue(res[server_name])
+        defer.returnValue(res)
 
 
 class RoomListNextBatch(namedtuple("RoomListNextBatch", (
