@@ -63,7 +63,7 @@ class RoomListHandler(BaseHandler):
         rooms_to_latest_event_ids = {}
 
         if next_batch:
-            current_stream_token = next_batch.sstream_ordering
+            current_stream_token = next_batch.stream_ordering
         else:
             current_stream_token = yield self.store.get_room_max_stream_ordering()
 
@@ -100,17 +100,25 @@ class RoomListHandler(BaseHandler):
         sorted_rooms = [room_id for room_id, _ in sorted_entries]
 
         if next_batch:
-            sorted_rooms = sorted_rooms[next_batch.current_limit:]
+            if next_batch.direction_is_forward:
+                sorted_rooms = sorted_rooms[next_batch.current_limit:]
+            else:
+                sorted_rooms = sorted_rooms[:next_batch.current_limit]
+                sorted_rooms.reverse()
 
         new_limit = None
         if limit:
             if sorted_rooms[limit:]:
                 new_limit = limit
                 if next_batch:
-                    new_limit += next_batch.current_limit
+                    if next_batch.direction_is_forward:
+                        new_limit += next_batch.current_limit
+                    else:
+                        new_limit = next_batch.current_limit - new_limit
+                        new_limit = max(0, new_limit)
             sorted_rooms = sorted_rooms[:limit]
 
-        results = []
+        chunk = []
 
         @defer.inlineCallbacks
         def handle_room(room_id):
@@ -190,31 +198,45 @@ class RoomListHandler(BaseHandler):
                 if avatar_url:
                     result["avatar_url"] = avatar_url
 
-            results.append(result)
+            chunk.append(result)
 
         yield concurrently_execute(handle_room, sorted_rooms, 10)
 
-        if new_limit:
-            end_token = RoomListNextBatch(
-                stream_ordering=current_stream_token,
-                current_limit=new_limit,
-            ).to_token()
-        else:
-            end_token = "END"
+        chunk.sort(key=lambda e: (-e["num_joined_members"], e["room_id"]))
 
-        if next_batch:
-            start_token = next_batch.to_token()
-        else:
-            start_token = "START"
+        results = {
+            "chunk": chunk,
+        }
 
-        defer.returnValue({
-            "start": start_token,
-            "end": end_token,
-            "chunk": results,
-        })
+        if not next_batch or next_batch.direction_is_forward:
+            if new_limit:
+                results["next_batch"] = RoomListNextBatch(
+                    stream_ordering=current_stream_token,
+                    current_limit=new_limit,
+                    direction_is_forward=True,
+                ).to_token()
+
+            if next_batch:
+                results["prev_batch"] = next_batch.copy_and_replace(
+                    direction_is_forward=False,
+                ).to_token()
+        else:
+            if new_limit:
+                results["prev_batch"] = RoomListNextBatch(
+                    stream_ordering=current_stream_token,
+                    current_limit=new_limit,
+                    direction_is_forward=False,
+                ).to_token()
+
+            if next_batch:
+                results["next_batch"] = next_batch.copy_and_replace(
+                    direction_is_forward=True,
+                ).to_token()
+
+        defer.returnValue(results)
 
     @defer.inlineCallbacks
-    def get_remote_public_room_list(self, server_name):
+    def get_remote_public_room_list(self, server_name, limit=None, next_batch=None):
         res = yield self.hs.get_replication_layer().get_public_rooms(
             [server_name]
         )
@@ -227,11 +249,13 @@ class RoomListHandler(BaseHandler):
 class RoomListNextBatch(namedtuple("RoomListNextBatch", (
     "stream_ordering",  # stream_ordering of the first public room list
     "current_limit",  # The number of previous rooms returned
+    "direction_is_forward",  # Bool if this is a next_batch, false if prev_batch
 ))):
 
     KEY_DICT = {
         "stream_ordering": "s",
         "current_limit": "n",
+        "direction_is_forward": "d",
     }
 
     REVERSE_KEY_DICT = {v: k for k, v in KEY_DICT.items()}
@@ -248,3 +272,8 @@ class RoomListNextBatch(namedtuple("RoomListNextBatch", (
             self.KEY_DICT[key]: val
             for key, val in self._asdict().items()
         }))
+
+    def copy_and_replace(self, **kwds):
+        return self._replace(
+            **kwds
+        )

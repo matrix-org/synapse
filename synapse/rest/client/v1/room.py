@@ -23,7 +23,9 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.filtering import Filter
 from synapse.types import UserID, RoomID, RoomAlias
 from synapse.events.utils import serialize_event, format_event_for_client_v2
-from synapse.http.servlet import parse_json_object_from_request, parse_string
+from synapse.http.servlet import (
+    parse_json_object_from_request, parse_string, parse_integer
+)
 
 import logging
 import urllib
@@ -317,11 +319,21 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
             else:
                 pass
 
+        limit = parse_integer(request, "limit", 0)
+        next_batch = parse_string(request, "since", None)
+
         handler = self.hs.get_room_list_handler()
         if server:
-            data = yield handler.get_remote_public_room_list(server)
+            data = yield handler.get_remote_public_room_list(
+                server,
+                limit=limit,
+                next_batch=next_batch,
+            )
         else:
-            data = yield handler.get_local_public_room_list()
+            data = yield handler.get_local_public_room_list(
+                limit=limit,
+                next_batch=next_batch,
+            )
 
         defer.returnValue((200, data))
 
