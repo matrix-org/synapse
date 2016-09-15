@@ -45,7 +45,7 @@ class RoomListHandler(BaseHandler):
         if not result:
             result = self.response_cache.set(
                 (limit, since_token),
-                self._get_public_room_list(limit, since_token)
+                self._get_public_room_list(limit, since_token, search_filter)
             )
         return result
 
@@ -119,13 +119,13 @@ class RoomListHandler(BaseHandler):
 
         rooms_to_scan = sorted_rooms
         if limit and not search_filter:
-            rooms_to_scan = sorted_rooms[:limit]
+            rooms_to_scan = sorted_rooms[:limit + 1]
 
         chunk = []
 
         @defer.inlineCallbacks
         def handle_room(room_id):
-            if limit and len(chunk) > limit:
+            if limit and len(chunk) > limit + 1:
                 # We've already got enough, so lets just drop it.
                 return
 
@@ -208,14 +208,27 @@ class RoomListHandler(BaseHandler):
                 if avatar_url:
                     result["avatar_url"] = avatar_url
 
-            chunk.append(result)
+            logger.info("search_filter: %r", search_filter)
+            if search_filter and search_filter.get("generic_search_term", None):
+                generic_search_term = search_filter["generic_search_term"]
+                if generic_search_term in result.get("name", ""):
+                    chunk.append(result)
+                elif generic_search_term in result.get("topic", ""):
+                    chunk.append(result)
+                elif generic_search_term in result.get("canonical_alias", ""):
+                    chunk.append(result)
+            else:
+                chunk.append(result)
 
         yield concurrently_execute(handle_room, rooms_to_scan, 10)
 
         chunk.sort(key=lambda e: (-e["num_joined_members"], e["room_id"]))
 
         new_limit = None
-        if chunk:
+        if chunk and (not limit or len(chunk) > limit):
+            if limit:
+                chunk = chunk[:limit]
+
             addition = 1
             if since_token:
                 addition += since_token.current_limit
