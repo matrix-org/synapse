@@ -27,15 +27,6 @@ logger = logging.getLogger(__name__)
 
 
 @defer.inlineCallbacks
-def _get_rules(room_id, user_ids, store):
-    rules_by_user = yield store.bulk_get_push_rules(user_ids)
-
-    rules_by_user = {k: v for k, v in rules_by_user.items() if v is not None}
-
-    defer.returnValue(rules_by_user)
-
-
-@defer.inlineCallbacks
 def evaluator_for_event(event, hs, store, context):
     rules_by_user = yield store.bulk_get_push_rules_for_room(
         event, context
@@ -48,6 +39,7 @@ def evaluator_for_event(event, hs, store, context):
         if invited_user and hs.is_mine_id(invited_user):
             has_pusher = yield store.user_has_pusher(invited_user)
             if has_pusher:
+                rules_by_user = dict(rules_by_user)
                 rules_by_user[invited_user] = yield store.get_push_rules_for_user(
                     invited_user
                 )
