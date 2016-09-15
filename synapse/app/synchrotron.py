@@ -465,6 +465,7 @@ def start(config_options):
     def start():
         ss.get_datastore().start_profiling()
         ss.replicate()
+        ss.get_state_handler().start_caching()
 
     reactor.callWhenRunning(start)
 

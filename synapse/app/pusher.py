@@ -276,6 +276,7 @@ def start(config_options):
         ps.replicate()
         ps.get_pusherpool().start()
         ps.get_datastore().start_profiling()
+        ps.get_state_handler().start_caching()
 
     reactor.callWhenRunning(start)
 
