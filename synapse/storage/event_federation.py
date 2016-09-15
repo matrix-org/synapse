@@ -344,8 +344,17 @@ class EventFederationStore(SQLBaseStore):
                 self.get_latest_event_ids_in_room.invalidate, (room_id,)
             )
 
-    @cached(max_entries=5000, num_args=2)
     def get_forward_extremeties_for_room(self, room_id, stream_ordering):
+        # We want to make the cache more effective, so we clamp to the last
+        # change before the given ordering.
+        last_change = self._events_stream_cache.get_pos_of_last_change(room_id)
+        if last_change:
+            stream_ordering = min(last_change, stream_ordering)
+
+        return self._get_forward_extremeties_for_room(room_id, stream_ordering)
+
+    @cached(max_entries=5000, num_args=2)
+    def _get_forward_extremeties_for_room(self, room_id, stream_ordering):
         """For a given room_id and stream_ordering, return the forward
         extremeties of the room at that point in "time".
 

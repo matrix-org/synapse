@@ -173,7 +173,10 @@ class SlavedEventStore(BaseSlavedStore):
     get_room_max_stream_ordering = DataStore.get_room_max_stream_ordering.__func__
 
     get_forward_extremeties_for_room = (
-        EventFederationStore.__dict__["get_forward_extremeties_for_room"]
+        DataStore.get_forward_extremeties_for_room.__func__
+    )
+    _get_forward_extremeties_for_room = (
+        EventFederationStore.__dict__["_get_forward_extremeties_for_room"]
     )
 
     def stream_positions(self):
