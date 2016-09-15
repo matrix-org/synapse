@@ -321,7 +321,7 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
         if server:
             data = yield handler.get_remote_public_room_list(server)
         else:
-            data = yield handler.get_aggregated_public_room_list()
+            data = yield handler.get_local_public_room_list()
 
         defer.returnValue((200, data))
 
