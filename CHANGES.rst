@@ -4,8 +4,9 @@ Changes in synapse v0.18.0-rc1 (2016-09-16)
 The release includes major changes to the state storage database schemas, which
 significantly reduce database size. Synapse will attempt to upgrade the current
 data in the background. Servers with large SQLite database may experience
-degradation of performance while this upgrade is in progress, therefore it is
-recommended to migrate to using Postgres before upgrading for such databases.
+degradation of performance while this upgrade is in progress, therefore you may
+want to consider migrating to using Postgres before upgrading very large SQLite
+daabases
 
 
 Features:
