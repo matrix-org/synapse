@@ -1,3 +1,43 @@
+Changes in synapse v0.18.0-rc1 (2016-09-16)
+===========================================
+
+The release includes major changes to the state storage database schemas, which
+significantly reduce database size. Synapse will attempt to upgrade the current
+data in the background. Servers with large SQLite database may experience
+degradation of performance while this upgrade is in progress, therefore it is
+recommended to migrate to using Postgres before upgrading for such databases.
+
+
+Features:
+
+* Add ``only=highlight`` on ``/notifications`` (PR #1081)
+* Add server param to /publicRooms (PR #1082)
+* Allow clients to ask for the whole of a single state event (PR #1094)
+* Add is_direct param to /createRoom (PR #1108)
+* Add pagination support to publicRooms (PR #1121)
+* Add very basic filter API to /publicRooms (PR #1126)
+* Add basic direct to device messaging support for E2E (PR #1074, #1084, #1104,
+  #1111)
+
+
+Changes:
+
+* Move to storing state_groups_state as deltas, greatly reducing DB size (PR
+  #1065)
+* Reduce amount of state pulled out of the DB during common requests (PR #1069)
+* Allow PDF to be rendered from media repo (PR #1071)
+* Reindex state_groups_state after pruning (PR #1085)
+* Clobber EDUs in send queue (PR #1095)
+* Conform better to the CAS protocol specification (PR #1100)
+* Limit how often we ask for keys from dead servers (PR #1114)
+
+
+Bug fixes:
+
+* Fix /notifications API when used with ``from`` param (PR #1080)
+* Fix backfill when cannot find an event. (PR #1107)
+
+
 Changes in synapse v0.17.3 (2016-09-09)
 =======================================
 
