@@ -339,8 +339,7 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        # FIXME
-        # yield self.auth.get_user_by_req(request)
+        yield self.auth.get_user_by_req(request)
 
         server = parse_string(request, "server", default=None)
         content = parse_json_object_from_request(request)
