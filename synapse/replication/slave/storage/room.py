@@ -38,6 +38,7 @@ class RoomStore(BaseSlavedStore):
     get_published_at_stream_id_txn = (
         DataStore.get_published_at_stream_id_txn.__func__
     )
+    get_public_room_changes = DataStore.get_public_room_changes.__func__
 
     def stream_positions(self):
         result = super(RoomStore, self).stream_positions()
