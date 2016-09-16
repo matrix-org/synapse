@@ -280,17 +280,23 @@ class RoomListHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_remote_public_room_list(self, server_name, limit=None, since_token=None,
                                     search_filter=None):
+        if search_filter:
+            # We currently don't support searching across federation, so we have
+            # to do it manually without pagination
+            limit = None
+            since_token = None
+
         res = yield self.hs.get_replication_layer().get_public_rooms(
             server_name, limit=limit, since_token=since_token,
             search_filter=search_filter,
         )
 
         if search_filter:
-            res["chunk"] = [
+            res = {"chunk": [
                 entry
-                for entry in dict(res.get("chunk", []))
+                for entry in list(res.get("chunk", []))
                 if _matches_room_entry(entry, search_filter)
-            ]
+            ]}
 
         defer.returnValue(res)
 
