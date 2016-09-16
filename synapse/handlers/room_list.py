@@ -38,6 +38,7 @@ class RoomListHandler(BaseHandler):
     def __init__(self, hs):
         super(RoomListHandler, self).__init__(hs)
         self.response_cache = ResponseCache(hs)
+        self.remote_response_cache = ResponseCache(hs, timeout_ms=30 * 1000)
 
     def get_local_public_room_list(self, limit=None, since_token=None,
                                    search_filter=None):
@@ -286,9 +287,8 @@ class RoomListHandler(BaseHandler):
             limit = None
             since_token = None
 
-        res = yield self.hs.get_replication_layer().get_public_rooms(
+        res = yield self._get_remote_list_cached(
             server_name, limit=limit, since_token=since_token,
-            search_filter=search_filter,
         )
 
         if search_filter:
@@ -299,6 +299,27 @@ class RoomListHandler(BaseHandler):
             ]}
 
         defer.returnValue(res)
+
+    def _get_remote_list_cached(self, server_name, limit=None, since_token=None,
+                                search_filter=None):
+        repl_layer = self.hs.get_replication_layer()
+        if search_filter:
+            # We can't cache when asking for search
+            return repl_layer.get_public_rooms(
+                server_name, limit=limit, since_token=since_token,
+                search_filter=search_filter,
+            )
+
+        result = self.remote_response_cache.get((server_name, limit, since_token))
+        if not result:
+            result = self.remote_response_cache.set(
+                (server_name, limit, since_token),
+                repl_layer.get_public_rooms(
+                    server_name, limit=limit, since_token=since_token,
+                    search_filter=search_filter,
+                )
+            )
+        return result
 
 
 class RoomListNextBatch(namedtuple("RoomListNextBatch", (
