@@ -220,6 +220,8 @@ class RoomListHandler(BaseHandler):
 
         chunk.sort(key=lambda e: (-e["num_joined_members"], e["room_id"]))
 
+        # Work out the new limit of the batch for pagination, or None if we
+        # know there are no more results that would be returned.
         new_limit = None
         if chunk and (not limit or len(chunk) > limit):
             if limit:
