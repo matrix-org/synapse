@@ -41,11 +41,15 @@ class RoomListHandler(BaseHandler):
 
     def get_local_public_room_list(self, limit=None, since_token=None,
                                    search_filter=None):
+        if search_filter:
+            # We explicitly don't bother caching searches.
+            return self._get_public_room_list(limit, since_token, search_filter)
+
         result = self.response_cache.get((limit, since_token))
         if not result:
             result = self.response_cache.set(
                 (limit, since_token),
-                self._get_public_room_list(limit, since_token, search_filter)
+                self._get_public_room_list(limit, since_token)
             )
         return result
 
