@@ -376,7 +376,7 @@ class EventFederationStore(SQLBaseStore):
                 INNER JOIN (
                     SELECT room_id, MAX(stream_ordering) AS stream_ordering
                     FROM stream_ordering_to_exterm
-                    WHERE stream_ordering < ? GROUP BY room_id
+                    WHERE stream_ordering <= ? GROUP BY room_id
                 ) AS rms USING (room_id, stream_ordering)
                 WHERE room_id = ?
         """)

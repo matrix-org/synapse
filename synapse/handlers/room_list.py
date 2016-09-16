@@ -212,16 +212,7 @@ class RoomListHandler(BaseHandler):
                 if avatar_url:
                     result["avatar_url"] = avatar_url
 
-            logger.info("search_filter: %r", search_filter)
-            if search_filter and search_filter.get("generic_search_term", None):
-                generic_search_term = search_filter["generic_search_term"]
-                if generic_search_term in result.get("name", ""):
-                    chunk.append(result)
-                elif generic_search_term in result.get("topic", ""):
-                    chunk.append(result)
-                elif generic_search_term in result.get("canonical_alias", ""):
-                    chunk.append(result)
-            else:
+            if _matches_room_entry(result, search_filter):
                 chunk.append(result)
 
         yield concurrently_execute(handle_room, rooms_to_scan, 10)
@@ -291,7 +282,15 @@ class RoomListHandler(BaseHandler):
                                     search_filter=None):
         res = yield self.hs.get_replication_layer().get_public_rooms(
             server_name, limit=limit, since_token=since_token,
+            search_filter=search_filter,
         )
+
+        if search_filter:
+            res["chunk"] = [
+                entry
+                for entry in dict(res.get("chunk", []))
+                if _matches_room_entry(entry, search_filter)
+            ]
 
         defer.returnValue(res)
 
@@ -329,3 +328,18 @@ class RoomListNextBatch(namedtuple("RoomListNextBatch", (
         return self._replace(
             **kwds
         )
+
+
+def _matches_room_entry(room_entry, search_filter):
+    if search_filter and search_filter.get("generic_search_term", None):
+        generic_search_term = search_filter["generic_search_term"]
+        if generic_search_term in room_entry.get("name", ""):
+            return True
+        elif generic_search_term in room_entry.get("topic", ""):
+            return True
+        elif generic_search_term in room_entry.get("canonical_alias", ""):
+            return True
+    else:
+        return True
+
+    return False
