@@ -361,12 +361,12 @@ class RoomListNextBatch(namedtuple("RoomListNextBatch", (
 
 def _matches_room_entry(room_entry, search_filter):
     if search_filter and search_filter.get("generic_search_term", None):
-        generic_search_term = search_filter["generic_search_term"]
-        if generic_search_term in room_entry.get("name", ""):
+        generic_search_term = search_filter["generic_search_term"].upper()
+        if generic_search_term in room_entry.get("name", "").upper():
             return True
-        elif generic_search_term in room_entry.get("topic", ""):
+        elif generic_search_term in room_entry.get("topic", "").upper():
             return True
-        elif generic_search_term in room_entry.get("canonical_alias", ""):
+        elif generic_search_term in room_entry.get("canonical_alias", "").upper():
             return True
     else:
         return True
