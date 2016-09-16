@@ -393,6 +393,8 @@ class EventFederationStore(SQLBaseStore):
 
     def _delete_old_forward_extrem_cache(self):
         def _delete_old_forward_extrem_cache_txn(txn):
+            # Delete entries older than a month, while making sure we don't delete
+            # the only entries for a room.
             sql = ("""
                 DELETE FROM stream_ordering_to_exterm
                 WHERE
