@@ -38,8 +38,14 @@ class RoomListHandler(BaseHandler):
     def __init__(self, hs):
         super(RoomListHandler, self).__init__(hs)
         self.response_cache = ResponseCache(hs)
+        self.remote_response_cache = ResponseCache(hs, timeout_ms=30 * 1000)
 
-    def get_local_public_room_list(self, limit=None, since_token=None):
+    def get_local_public_room_list(self, limit=None, since_token=None,
+                                   search_filter=None):
+        if search_filter:
+            # We explicitly don't bother caching searches.
+            return self._get_public_room_list(limit, since_token, search_filter)
+
         result = self.response_cache.get((limit, since_token))
         if not result:
             result = self.response_cache.set(
@@ -49,7 +55,8 @@ class RoomListHandler(BaseHandler):
         return result
 
     @defer.inlineCallbacks
-    def _get_public_room_list(self, limit=None, since_token=None):
+    def _get_public_room_list(self, limit=None, since_token=None,
+                              search_filter=None):
         if since_token and since_token != "END":
             since_token = RoomListNextBatch.from_token(since_token)
         else:
@@ -115,22 +122,18 @@ class RoomListHandler(BaseHandler):
                 sorted_rooms = sorted_rooms[:since_token.current_limit]
                 sorted_rooms.reverse()
 
-        new_limit = None
-        if limit:
-            if sorted_rooms[limit:]:
-                new_limit = limit
-                if since_token:
-                    if since_token.direction_is_forward:
-                        new_limit += since_token.current_limit
-                    else:
-                        new_limit = since_token.current_limit - new_limit
-                        new_limit = max(0, new_limit)
-            sorted_rooms = sorted_rooms[:limit]
+        rooms_to_scan = sorted_rooms
+        if limit and not search_filter:
+            rooms_to_scan = sorted_rooms[:limit + 1]
 
         chunk = []
 
         @defer.inlineCallbacks
         def handle_room(room_id):
+            if limit and len(chunk) > limit + 1:
+                # We've already got enough, so lets just drop it.
+                return
+
             num_joined_users = rooms_to_num_joined[room_id]
             if num_joined_users == 0:
                 return
@@ -210,11 +213,36 @@ class RoomListHandler(BaseHandler):
                 if avatar_url:
                     result["avatar_url"] = avatar_url
 
-            chunk.append(result)
+            if _matches_room_entry(result, search_filter):
+                chunk.append(result)
 
-        yield concurrently_execute(handle_room, sorted_rooms, 10)
+        yield concurrently_execute(handle_room, rooms_to_scan, 10)
 
         chunk.sort(key=lambda e: (-e["num_joined_members"], e["room_id"]))
+
+        # Work out the new limit of the batch for pagination, or None if we
+        # know there are no more results that would be returned.
+        new_limit = None
+        if chunk and (not limit or len(chunk) > limit):
+            if limit:
+                chunk = chunk[:limit]
+
+            addition = 1
+            if since_token:
+                addition += since_token.current_limit
+
+            if not since_token or since_token.direction_is_forward:
+                last_room_id = chunk[-1]["room_id"]
+            else:
+                last_room_id = chunk[0]["room_id"]
+                addition *= -1
+
+            try:
+                new_limit = sorted_rooms.index(last_room_id) + addition
+                if new_limit >= len(sorted_rooms):
+                    new_limit = None
+            except ValueError:
+                pass
 
         results = {
             "chunk": chunk,
@@ -253,12 +281,47 @@ class RoomListHandler(BaseHandler):
         defer.returnValue(results)
 
     @defer.inlineCallbacks
-    def get_remote_public_room_list(self, server_name, limit=None, since_token=None):
-        res = yield self.hs.get_replication_layer().get_public_rooms(
+    def get_remote_public_room_list(self, server_name, limit=None, since_token=None,
+                                    search_filter=None):
+        if search_filter:
+            # We currently don't support searching across federation, so we have
+            # to do it manually without pagination
+            limit = None
+            since_token = None
+
+        res = yield self._get_remote_list_cached(
             server_name, limit=limit, since_token=since_token,
         )
 
+        if search_filter:
+            res = {"chunk": [
+                entry
+                for entry in list(res.get("chunk", []))
+                if _matches_room_entry(entry, search_filter)
+            ]}
+
         defer.returnValue(res)
+
+    def _get_remote_list_cached(self, server_name, limit=None, since_token=None,
+                                search_filter=None):
+        repl_layer = self.hs.get_replication_layer()
+        if search_filter:
+            # We can't cache when asking for search
+            return repl_layer.get_public_rooms(
+                server_name, limit=limit, since_token=since_token,
+                search_filter=search_filter,
+            )
+
+        result = self.remote_response_cache.get((server_name, limit, since_token))
+        if not result:
+            result = self.remote_response_cache.set(
+                (server_name, limit, since_token),
+                repl_layer.get_public_rooms(
+                    server_name, limit=limit, since_token=since_token,
+                    search_filter=search_filter,
+                )
+            )
+        return result
 
 
 class RoomListNextBatch(namedtuple("RoomListNextBatch", (
@@ -294,3 +357,18 @@ class RoomListNextBatch(namedtuple("RoomListNextBatch", (
         return self._replace(
             **kwds
         )
+
+
+def _matches_room_entry(room_entry, search_filter):
+    if search_filter and search_filter.get("generic_search_term", None):
+        generic_search_term = search_filter["generic_search_term"]
+        if generic_search_term in room_entry.get("name", ""):
+            return True
+        elif generic_search_term in room_entry.get("topic", ""):
+            return True
+        elif generic_search_term in room_entry.get("canonical_alias", ""):
+            return True
+    else:
+        return True
+
+    return False

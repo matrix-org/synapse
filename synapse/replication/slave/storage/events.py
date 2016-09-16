@@ -62,6 +62,7 @@ class SlavedEventStore(BaseSlavedStore):
         )
 
         self.stream_ordering_month_ago = 0
+        self._stream_order_on_start = self.get_room_max_stream_ordering()
 
     # Cached functions can't be accessed through a class instance so we need
     # to reach inside the __dict__ to extract them.

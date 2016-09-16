@@ -718,11 +718,14 @@ class FederationClient(FederationBase):
 
         raise RuntimeError("Failed to send to any server.")
 
-    def get_public_rooms(self, destination, limit=None, since_token=None):
+    def get_public_rooms(self, destination, limit=None, since_token=None,
+                         search_filter=None):
         if destination == self.server_name:
             return
 
-        return self.transport_layer.get_public_rooms(destination, limit, since_token)
+        return self.transport_layer.get_public_rooms(
+            destination, limit, since_token, search_filter
+        )
 
     @defer.inlineCallbacks
     def query_auth(self, destination, room_id, event_id, local_auth):
