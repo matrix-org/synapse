@@ -238,9 +238,12 @@ class RoomListHandler(BaseHandler):
                 addition *= -1
 
             try:
-                new_limit = sorted_rooms.index(last_room_id) + addition
-                if new_limit >= len(sorted_rooms):
+                if sorted_rooms.index(last_room_id) == len(sorted_rooms):
                     new_limit = None
+                else:
+                    new_limit = sorted_rooms.index(last_room_id) + addition
+                    if new_limit >= len(sorted_rooms):
+                        new_limit = len(sorted_rooms)
             except ValueError:
                 pass
 
