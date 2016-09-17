@@ -51,7 +51,7 @@ import sys
 import logging
 import gc
 
-logger = logging.getLogger("synapse.app.federation_reader")
+logger = logging.getLogger("synapse.app.client_reader")
 
 
 class ClientReaderSlavedStore(
