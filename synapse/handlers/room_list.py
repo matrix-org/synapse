@@ -140,7 +140,7 @@ class RoomListHandler(BaseHandler):
         chunk = []
         if limit and not search_filter:
             step = limit + 1
-            for i in xrange(0 , len(rooms_to_scan), step):
+            for i in xrange(0, len(rooms_to_scan), step):
                 # We iterate here because the vast majority of cases we'll stop
                 # at first iteration, but occaisonally _generate_room_entry
                 # won't append to the chunk and so we need to loop again.
