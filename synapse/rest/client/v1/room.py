@@ -307,7 +307,7 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
         server = parse_string(request, "server", default=None)
 
         try:
-            yield self.auth.get_user_by_req(request)
+            yield self.auth.get_user_by_req(request, allow_guest=True)
         except AuthError as e:
             # We allow people to not be authed if they're just looking at our
             # room list, but require auth when we proxy the request.
@@ -339,7 +339,7 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield self.auth.get_user_by_req(request)
+        yield self.auth.get_user_by_req(request, allow_guest=True)
 
         server = parse_string(request, "server", default=None)
         content = parse_json_object_from_request(request)
