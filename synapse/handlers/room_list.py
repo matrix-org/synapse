@@ -135,7 +135,7 @@ class RoomListHandler(BaseHandler):
                 rooms_to_scan = rooms_to_scan[:since_token.current_limit]
                 rooms_to_scan.reverse()
 
-        # If there's not search filter just limit the range since we'll
+        # If there's no search filter just limit the range since we'll
         # return the vast majority of things.
         if limit and not search_filter:
             rooms_to_scan = rooms_to_scan[:limit + 1]
