@@ -1,5 +1,5 @@
-Changes in synapse v0.18.0-rc1 (2016-09-16)
-===========================================
+Changes in synapse v0.18.0 (2016-09-19)
+=======================================
 
 The release includes major changes to the state storage database schemas, which
 significantly reduce database size. Synapse will attempt to upgrade the current
@@ -8,6 +8,19 @@ degradation of performance while this upgrade is in progress, therefore you may
 want to consider migrating to using Postgres before upgrading very large SQLite
 daabases
 
+
+Changes:
+
+* Make public room search case insensitive (PR #1127)
+
+
+Bug fixes:
+
+* Fix and clean up publicRooms pagination (PR #1129)
+
+
+Changes in synapse v0.18.0-rc1 (2016-09-16)
+===========================================
 
 Features:
 
