@@ -135,21 +135,34 @@ class RoomListHandler(BaseHandler):
                 rooms_to_scan = rooms_to_scan[:since_token.current_limit]
                 rooms_to_scan.reverse()
 
-        # If there's no search filter just limit the range since we'll
-        # return the vast majority of things.
-        if limit and not search_filter:
-            rooms_to_scan = rooms_to_scan[:limit + 1]
-
         # Actually generate the entries. _generate_room_entry will append to
         # chunk but will stop if len(chunk) > limit
         chunk = []
-        yield concurrently_execute(
-            lambda r: self._generate_room_entry(
-                r, rooms_to_num_joined[r],
-                chunk, limit, search_filter
-            ),
-            rooms_to_scan, 10
-        )
+        if limit and not search_filter:
+            step = limit + 1
+            for i in xrange(0, len(rooms_to_scan), step):
+                # We iterate here because the vast majority of cases we'll stop
+                # at first iteration, but occaisonally _generate_room_entry
+                # won't append to the chunk and so we need to loop again.
+                # We don't want to scan over the entire range either as that
+                # would potentially waste a lot of work.
+                yield concurrently_execute(
+                    lambda r: self._generate_room_entry(
+                        r, rooms_to_num_joined[r],
+                        chunk, limit, search_filter
+                    ),
+                    rooms_to_scan[i:i + step], 10
+                )
+                if len(chunk) >= limit + 1:
+                    break
+        else:
+            yield concurrently_execute(
+                lambda r: self._generate_room_entry(
+                    r, rooms_to_num_joined[r],
+                    chunk, limit, search_filter
+                ),
+                rooms_to_scan, 5
+            )
 
         chunk.sort(key=lambda e: (-e["num_joined_members"], e["room_id"]))
 
