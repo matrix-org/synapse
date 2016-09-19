@@ -305,7 +305,7 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 'kind': 'event_match',
                 'key': 'type',
                 'pattern': 'm.room.encrypted',
-                '_id': '_message',
+                '_id': '_encrypted',
             }
         ],
         'actions': [
@@ -345,7 +345,7 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 'kind': 'event_match',
                 'key': 'type',
                 'pattern': 'm.room.encrypted',
-                '_id': '_message',
+                '_id': '_encrypted',
             }
         ],
         'actions': [
