@@ -832,11 +832,13 @@ class FederationHandler(BaseHandler):
 
         new_pdu = event
 
-        message_handler = self.hs.get_handlers().message_handler
-        destinations = yield message_handler.get_joined_hosts_for_room_from_state(
-            context
+        users_in_room = yield self.store.get_joined_users_from_context(event, context)
+
+        destinations = set(
+            get_domain_from_id(user_id) for user_id in users_in_room
+            if not self.hs.is_mine_id(user_id)
         )
-        destinations = set(destinations)
+
         destinations.discard(origin)
 
         logger.debug(
@@ -1055,11 +1057,12 @@ class FederationHandler(BaseHandler):
 
         new_pdu = event
 
-        message_handler = self.hs.get_handlers().message_handler
-        destinations = yield message_handler.get_joined_hosts_for_room_from_state(
-            context
+        users_in_room = yield self.store.get_joined_users_from_context(event, context)
+
+        destinations = set(
+            get_domain_from_id(user_id) for user_id in users_in_room
+            if not self.hs.is_mine_id(user_id)
         )
-        destinations = set(destinations)
         destinations.discard(origin)
 
         logger.debug(
@@ -1582,10 +1585,12 @@ class FederationHandler(BaseHandler):
                 current_state = set(e.event_id for e in auth_events.values())
                 different_auth = event_auth_events - current_state
 
+                context.current_state_ids = dict(context.current_state_ids)
                 context.current_state_ids.update({
                     k: a.event_id for k, a in auth_events.items()
                     if k != event_key
                 })
+                context.prev_state_ids = dict(context.prev_state_ids)
                 context.prev_state_ids.update({
                     k: a.event_id for k, a in auth_events.items()
                 })
@@ -1667,10 +1672,12 @@ class FederationHandler(BaseHandler):
                 # 4. Look at rejects and their proofs.
                 # TODO.
 
+                context.current_state_ids = dict(context.current_state_ids)
                 context.current_state_ids.update({
                     k: a.event_id for k, a in auth_events.items()
                     if k != event_key
                 })
+                context.prev_state_ids = dict(context.prev_state_ids)
                 context.prev_state_ids.update({
                     k: a.event_id for k, a in auth_events.items()
                 })

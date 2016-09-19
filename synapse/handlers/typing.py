@@ -187,6 +187,7 @@ class TypingHandler(object):
                         "user_id": user_id,
                         "typing": typing,
                     },
+                    key=(room_id, user_id),
                 ))
 
         yield preserve_context_over_deferred(
@@ -199,7 +200,14 @@ class TypingHandler(object):
         user_id = content["user_id"]
 
         # Check that the string is a valid user id
-        UserID.from_string(user_id)
+        user = UserID.from_string(user_id)
+
+        if user.domain != origin:
+            logger.info(
+                "Got typing update from %r with bad 'user_id': %r",
+                origin, user_id,
+            )
+            return
 
         users = yield self.state.get_current_user_in_room(room_id)
         domains = set(get_domain_from_id(u) for u in users)

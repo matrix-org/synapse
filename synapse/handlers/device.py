@@ -58,7 +58,7 @@ class DeviceHandler(BaseHandler):
         attempts = 0
         while attempts < 5:
             try:
-                device_id = stringutils.random_string_with_symbols(16)
+                device_id = stringutils.random_string(10).upper()
                 yield self.store.store_device(
                     user_id=user_id,
                     device_id=device_id,

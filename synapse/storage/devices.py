@@ -54,8 +54,12 @@ class DeviceStore(SQLBaseStore):
                 or_ignore=ignore_if_known,
             )
         except Exception as e:
-            logger.error("store_device with device_id=%s failed: %s",
-                         device_id, e)
+            logger.error("store_device with device_id=%s(%r) user_id=%s(%r)"
+                         " display_name=%s(%r) failed: %s",
+                         type(device_id).__name__, device_id,
+                         type(user_id).__name__, user_id,
+                         type(initial_device_display_name).__name__,
+                         initial_device_display_name, e)
             raise StoreError(500, "Problem storing device.")
 
     def get_device(self, user_id, device_id):

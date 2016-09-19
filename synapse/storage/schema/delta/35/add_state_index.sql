@@ -11,10 +11,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-*/
+ */
 
-/** Using CREATE INDEX directly is deprecated in favour of using background
- * update see synapse/storage/schema/delta/33/access_tokens_device_index.sql
- * and synapse/storage/registration.py for an example using
- * "access_tokens_device_index" **/
-CREATE INDEX events_room_stream on events(room_id, stream_ordering);
+
+ALTER TABLE background_updates ADD COLUMN depends_on TEXT;
+
+INSERT into background_updates (update_name, progress_json, depends_on)
+    VALUES ('state_group_state_type_index', '{}', 'state_group_state_deduplication');

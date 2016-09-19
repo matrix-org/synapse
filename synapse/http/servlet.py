@@ -41,9 +41,13 @@ def parse_integer(request, name, default=None, required=False):
         SynapseError: if the parameter is absent and required, or if the
             parameter is present and not an integer.
     """
-    if name in request.args:
+    return parse_integer_from_args(request.args, name, default, required)
+
+
+def parse_integer_from_args(args, name, default=None, required=False):
+    if name in args:
         try:
-            return int(request.args[name][0])
+            return int(args[name][0])
         except:
             message = "Query parameter %r must be an integer" % (name,)
             raise SynapseError(400, message)
@@ -116,9 +120,15 @@ def parse_string(request, name, default=None, required=False,
             parameter is present, must be one of a list of allowed values and
             is not one of those allowed values.
     """
+    return parse_string_from_args(
+        request.args, name, default, required, allowed_values, param_type,
+    )
 
-    if name in request.args:
-        value = request.args[name][0]
+
+def parse_string_from_args(args, name, default=None, required=False,
+                           allowed_values=None, param_type="string"):
+    if name in args:
+        value = args[name][0]
         if allowed_values is not None and value not in allowed_values:
             message = "Query parameter %r must be one of [%s]" % (
                 name, ", ".join(repr(v) for v in allowed_values)

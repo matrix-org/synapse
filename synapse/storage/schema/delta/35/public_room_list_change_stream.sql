@@ -11,10 +11,23 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-*/
+ */
 
-/** Using CREATE INDEX directly is deprecated in favour of using background
- * update see synapse/storage/schema/delta/33/access_tokens_device_index.sql
- * and synapse/storage/registration.py for an example using
- * "access_tokens_device_index" **/
-CREATE INDEX events_room_stream on events(room_id, stream_ordering);
+
+CREATE TABLE public_room_list_stream (
+    stream_id BIGINT NOT NULL,
+    room_id TEXT NOT NULL,
+    visibility BOOLEAN NOT NULL
+);
+
+INSERT INTO public_room_list_stream (stream_id, room_id, visibility)
+    SELECT 1, room_id, is_public FROM rooms
+    WHERE is_public = CAST(1 AS BOOLEAN);
+
+CREATE INDEX public_room_list_stream_idx on public_room_list_stream(
+    stream_id
+);
+
+CREATE INDEX public_room_list_stream_rm_idx on public_room_list_stream(
+    room_id, stream_id
+);

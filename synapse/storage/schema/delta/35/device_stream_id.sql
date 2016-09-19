@@ -11,10 +11,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-*/
+ */
 
-/** Using CREATE INDEX directly is deprecated in favour of using background
- * update see synapse/storage/schema/delta/33/access_tokens_device_index.sql
- * and synapse/storage/registration.py for an example using
- * "access_tokens_device_index" **/
-CREATE INDEX events_room_stream on events(room_id, stream_ordering);
+CREATE TABLE device_max_stream_id (
+    stream_id BIGINT NOT NULL
+);
+
+INSERT INTO device_max_stream_id (stream_id)
+    SELECT COALESCE(MAX(stream_id), 0) FROM device_inbox;

@@ -176,12 +176,41 @@ class ApplicationServicesHandler(object):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def get_3pe_protocols(self):
+    def get_3pe_protocols(self, only_protocol=None):
         services = yield self.store.get_app_services()
         protocols = {}
+
+        # Collect up all the individual protocol responses out of the ASes
         for s in services:
             for p in s.protocols:
-                protocols[p] = yield self.appservice_api.get_3pe_protocol(s, p)
+                if only_protocol is not None and p != only_protocol:
+                    continue
+
+                if p not in protocols:
+                    protocols[p] = []
+
+                info = yield self.appservice_api.get_3pe_protocol(s, p)
+
+                if info is not None:
+                    protocols[p].append(info)
+
+        def _merge_instances(infos):
+            if not infos:
+                return {}
+
+            # Merge the 'instances' lists of multiple results, but just take
+            # the other fields from the first as they ought to be identical
+            # copy the result so as not to corrupt the cached one
+            combined = dict(infos[0])
+            combined["instances"] = list(combined["instances"])
+
+            for info in infos[1:]:
+                combined["instances"].extend(info["instances"])
+
+            return combined
+
+        for p in protocols.keys():
+            protocols[p] = _merge_instances(protocols[p])
 
         defer.returnValue(protocols)
 

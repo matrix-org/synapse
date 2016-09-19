@@ -133,10 +133,12 @@ class BackgroundUpdateStore(SQLBaseStore):
             updates = yield self._simple_select_list(
                 "background_updates",
                 keyvalues=None,
-                retcols=("update_name",),
+                retcols=("update_name", "depends_on"),
             )
+            in_flight = set(update["update_name"] for update in updates)
             for update in updates:
-                self._background_update_queue.append(update['update_name'])
+                if update["depends_on"] not in in_flight:
+                    self._background_update_queue.append(update['update_name'])
 
         if not self._background_update_queue:
             # no work left to do
@@ -217,7 +219,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         self._background_update_handlers[update_name] = update_handler
 
     def register_background_index_update(self, update_name, index_name,
-                                         table, columns):
+                                         table, columns, where_clause=None):
         """Helper for store classes to do a background index addition
 
         To use:
@@ -241,14 +243,20 @@ class BackgroundUpdateStore(SQLBaseStore):
             conc = True
         else:
             conc = False
+            # We don't use partial indices on SQLite as it wasn't introduced
+            # until 3.8, and wheezy has 3.7
+            where_clause = None
 
-        sql = "CREATE INDEX %(conc)s %(name)s ON %(table)s (%(columns)s)" \
-              % {
-                  "conc": "CONCURRENTLY" if conc else "",
-                  "name": index_name,
-                  "table": table,
-                  "columns": ", ".join(columns),
-              }
+        sql = (
+            "CREATE INDEX %(conc)s %(name)s ON %(table)s (%(columns)s)"
+            " %(where_clause)s"
+        ) % {
+            "conc": "CONCURRENTLY" if conc else "",
+            "name": index_name,
+            "table": table,
+            "columns": ", ".join(columns),
+            "where_clause": "WHERE " + where_clause if where_clause else ""
+        }
 
         def create_index_concurrently(conn):
             conn.rollback()

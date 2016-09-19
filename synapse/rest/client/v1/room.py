@@ -22,8 +22,10 @@ from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.filtering import Filter
 from synapse.types import UserID, RoomID, RoomAlias
-from synapse.events.utils import serialize_event
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.events.utils import serialize_event, format_event_for_client_v2
+from synapse.http.servlet import (
+    parse_json_object_from_request, parse_string, parse_integer
+)
 
 import logging
 import urllib
@@ -120,6 +122,8 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_type, state_key):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+        format = parse_string(request, "format", default="content",
+                              allowed_values=["content", "event"])
 
         msg_handler = self.handlers.message_handler
         data = yield msg_handler.get_room_data(
@@ -134,7 +138,12 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
             raise SynapseError(
                 404, "Event not found.", errcode=Codes.NOT_FOUND
             )
-        defer.returnValue((200, data.get_dict()["content"]))
+
+        if format == "event":
+            event = format_event_for_client_v2(data.get_dict())
+            defer.returnValue((200, event))
+        elif format == "content":
+            defer.returnValue((200, data.get_dict()["content"]))
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_type, state_key, txn_id=None):
@@ -295,15 +304,64 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
+        server = parse_string(request, "server", default=None)
+
         try:
-            yield self.auth.get_user_by_req(request)
-        except AuthError:
-            # This endpoint isn't authed, but its useful to know who's hitting
-            # it if they *do* supply an access token
-            pass
+            yield self.auth.get_user_by_req(request, allow_guest=True)
+        except AuthError as e:
+            # We allow people to not be authed if they're just looking at our
+            # room list, but require auth when we proxy the request.
+            # In both cases we call the auth function, as that has the side
+            # effect of logging who issued this request if an access token was
+            # provided.
+            if server:
+                raise e
+            else:
+                pass
+
+        limit = parse_integer(request, "limit", 0)
+        since_token = parse_string(request, "since", None)
 
         handler = self.hs.get_room_list_handler()
-        data = yield handler.get_aggregated_public_room_list()
+        if server:
+            data = yield handler.get_remote_public_room_list(
+                server,
+                limit=limit,
+                since_token=since_token,
+            )
+        else:
+            data = yield handler.get_local_public_room_list(
+                limit=limit,
+                since_token=since_token,
+            )
+
+        defer.returnValue((200, data))
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        yield self.auth.get_user_by_req(request, allow_guest=True)
+
+        server = parse_string(request, "server", default=None)
+        content = parse_json_object_from_request(request)
+
+        limit = int(content.get("limit", 100))
+        since_token = content.get("since", None)
+        search_filter = content.get("filter", None)
+
+        handler = self.hs.get_room_list_handler()
+        if server:
+            data = yield handler.get_remote_public_room_list(
+                server,
+                limit=limit,
+                since_token=since_token,
+                search_filter=search_filter,
+            )
+        else:
+            data = yield handler.get_local_public_room_list(
+                limit=limit,
+                since_token=since_token,
+                search_filter=search_filter,
+            )
 
         defer.returnValue((200, data))
 

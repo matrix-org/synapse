@@ -52,6 +52,11 @@ bump_active_time_counter = metrics.register_counter("bump_active_time")
 
 get_updates_counter = metrics.register_counter("get_updates", labels=["type"])
 
+notify_reason_counter = metrics.register_counter("notify_reason", labels=["reason"])
+state_transition_counter = metrics.register_counter(
+    "state_transition", labels=["from", "to"]
+)
+
 
 # If a user was last active in the last LAST_ACTIVE_GRANULARITY, consider them
 # "currently_active"
@@ -212,7 +217,7 @@ class PresenceHandler(object):
         is some spurious presence changes that will self-correct.
         """
         logger.info(
-            "Performing _on_shutdown. Persiting %d unpersisted changes",
+            "Performing _on_shutdown. Persisting %d unpersisted changes",
             len(self.user_to_current_state)
         )
 
@@ -229,7 +234,7 @@ class PresenceHandler(object):
         may stack up and slow down shutdown times.
         """
         logger.info(
-            "Performing _persist_unpersisted_changes. Persiting %d unpersisted changes",
+            "Performing _persist_unpersisted_changes. Persisting %d unpersisted changes",
             len(self.unpersisted_users_changes)
         )
 
@@ -259,6 +264,12 @@ class PresenceHandler(object):
 
             to_notify = {}  # Changes we want to notify everyone about
             to_federation_ping = {}  # These need sending keep-alives
+
+            # Only bother handling the last presence change for each user
+            new_states_dict = {}
+            for new_state in new_states:
+                new_states_dict[new_state.user_id] = new_state
+            new_state = new_states_dict.values()
 
             for new_state in new_states:
                 user_id = new_state.user_id
@@ -614,18 +625,8 @@ class PresenceHandler(object):
         Args:
             hosts_to_states (dict): Mapping `server_name` -> `[UserPresenceState]`
         """
-        now = self.clock.time_msec()
         for host, states in hosts_to_states.items():
-            self.federation.send_edu(
-                destination=host,
-                edu_type="m.presence",
-                content={
-                    "push": [
-                        _format_user_presence_state(state, now)
-                        for state in states
-                    ]
-                }
-            )
+            self.federation.send_presence(host, states)
 
     @defer.inlineCallbacks
     def incoming_presence(self, origin, content):
@@ -643,6 +644,13 @@ class PresenceHandler(object):
                 logger.info(
                     "Got presence update from %r with no 'user_id': %r",
                     origin, push,
+                )
+                continue
+
+            if get_domain_from_id(user_id) != origin:
+                logger.info(
+                    "Got presence update from %r with bad 'user_id': %r",
+                    origin, user_id,
                 )
                 continue
 
@@ -705,13 +713,13 @@ class PresenceHandler(object):
             defer.returnValue([
                 {
                     "type": "m.presence",
-                    "content": _format_user_presence_state(state, now),
+                    "content": format_user_presence_state(state, now),
                 }
                 for state in updates
             ])
         else:
             defer.returnValue([
-                _format_user_presence_state(state, now) for state in updates
+                format_user_presence_state(state, now) for state in updates
             ])
 
     @defer.inlineCallbacks
@@ -939,33 +947,38 @@ class PresenceHandler(object):
 def should_notify(old_state, new_state):
     """Decides if a presence state change should be sent to interested parties.
     """
+    if old_state == new_state:
+        return False
+
     if old_state.status_msg != new_state.status_msg:
+        notify_reason_counter.inc("status_msg_change")
+        return True
+
+    if old_state.state != new_state.state:
+        notify_reason_counter.inc("state_change")
+        state_transition_counter.inc(old_state.state, new_state.state)
         return True
 
     if old_state.state == PresenceState.ONLINE:
-        if new_state.state != PresenceState.ONLINE:
-            # Always notify for online -> anything
-            return True
-
         if new_state.currently_active != old_state.currently_active:
+            notify_reason_counter.inc("current_active_change")
             return True
 
         if new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
             # Only notify about last active bumps if we're not currently acive
-            if not (old_state.currently_active and new_state.currently_active):
+            if not new_state.currently_active:
+                notify_reason_counter.inc("last_active_change_online")
                 return True
 
     elif new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
         # Always notify for a transition where last active gets bumped.
-        return True
-
-    if old_state.state != new_state.state:
+        notify_reason_counter.inc("last_active_change_not_online")
         return True
 
     return False
 
 
-def _format_user_presence_state(state, now):
+def format_user_presence_state(state, now):
     """Convert UserPresenceState to a format that can be sent down to clients
     and to other servers.
     """
@@ -1078,7 +1091,7 @@ class PresenceEventSource(object):
         defer.returnValue(([
             {
                 "type": "m.presence",
-                "content": _format_user_presence_state(s, now),
+                "content": format_user_presence_state(s, now),
             }
             for s in updates.values()
             if include_offline or s.state != PresenceState.OFFLINE

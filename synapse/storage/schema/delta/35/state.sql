@@ -11,10 +11,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-*/
+ */
 
-/** Using CREATE INDEX directly is deprecated in favour of using background
- * update see synapse/storage/schema/delta/33/access_tokens_device_index.sql
- * and synapse/storage/registration.py for an example using
- * "access_tokens_device_index" **/
-CREATE INDEX events_room_stream on events(room_id, stream_ordering);
+CREATE TABLE state_group_edges(
+    state_group BIGINT NOT NULL,
+    prev_state_group BIGINT NOT NULL
+);
+
+CREATE INDEX state_group_edges_idx ON state_group_edges(state_group);
+CREATE INDEX state_group_edges_prev_idx ON state_group_edges(prev_state_group);

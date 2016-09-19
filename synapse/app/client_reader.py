@@ -20,14 +20,18 @@ from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.http.site import SynapseSite
+from synapse.http.server import JsonResource
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.replication.slave.storage._base import BaseSlavedStore
+from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.keys import SlavedKeyStore
 from synapse.replication.slave.storage.room import RoomStore
-from synapse.replication.slave.storage.transactions import TransactionStore
 from synapse.replication.slave.storage.directory import DirectoryStore
+from synapse.replication.slave.storage.registration import SlavedRegistrationStore
+from synapse.rest.client.v1.room import PublicRoomListRestServlet
 from synapse.server import HomeServer
+from synapse.storage.client_ips import ClientIpStore
 from synapse.storage.engines import create_engine
 from synapse.util.async import sleep
 from synapse.util.httpresourcetree import create_resource_tree
@@ -35,8 +39,6 @@ from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
-from synapse.api.urls import FEDERATION_PREFIX
-from synapse.federation.transport.server import TransportLayerServer
 from synapse.crypto import context_factory
 
 
@@ -49,21 +51,23 @@ import sys
 import logging
 import gc
 
-logger = logging.getLogger("synapse.app.federation_reader")
+logger = logging.getLogger("synapse.app.client_reader")
 
 
-class FederationReaderSlavedStore(
+class ClientReaderSlavedStore(
     SlavedEventStore,
     SlavedKeyStore,
     RoomStore,
     DirectoryStore,
-    TransactionStore,
+    SlavedApplicationServiceStore,
+    SlavedRegistrationStore,
     BaseSlavedStore,
+    ClientIpStore,  # After BaseSlavedStore because the constructor is different
 ):
     pass
 
 
-class FederationReaderServer(HomeServer):
+class ClientReaderServer(HomeServer):
     def get_db_conn(self, run_new_connection=True):
         # Any param beginning with cp_ is a parameter for adbapi, and should
         # not be passed to the database engine.
@@ -79,7 +83,7 @@ class FederationReaderServer(HomeServer):
 
     def setup(self):
         logger.info("Setting up.")
-        self.datastore = FederationReaderSlavedStore(self.get_db_conn(), self)
+        self.datastore = ClientReaderSlavedStore(self.get_db_conn(), self)
         logger.info("Finished setting up.")
 
     def _listen_http(self, listener_config):
@@ -91,9 +95,14 @@ class FederationReaderServer(HomeServer):
             for name in res["names"]:
                 if name == "metrics":
                     resources[METRICS_PREFIX] = MetricsResource(self)
-                elif name == "federation":
+                elif name == "client":
+                    resource = JsonResource(self, canonical_json=False)
+                    PublicRoomListRestServlet(self).register(resource)
                     resources.update({
-                        FEDERATION_PREFIX: TransportLayerServer(self),
+                        "/_matrix/client/r0": resource,
+                        "/_matrix/client/unstable": resource,
+                        "/_matrix/client/v2_alpha": resource,
+                        "/_matrix/client/api/v1": resource,
                     })
 
         root_resource = create_resource_tree(resources, Resource())
@@ -107,7 +116,7 @@ class FederationReaderServer(HomeServer):
             ),
             interface=bind_address
         )
-        logger.info("Synapse federation reader now listening on port %d", port)
+        logger.info("Synapse client reader now listening on port %d", port)
 
     def start_listening(self, listeners):
         for listener in listeners:
@@ -146,13 +155,13 @@ class FederationReaderServer(HomeServer):
 def start(config_options):
     try:
         config = HomeServerConfig.load_config(
-            "Synapse federation reader", config_options
+            "Synapse client reader", config_options
         )
     except ConfigError as e:
         sys.stderr.write("\n" + e.message + "\n")
         sys.exit(1)
 
-    assert config.worker_app == "synapse.app.federation_reader"
+    assert config.worker_app == "synapse.app.client_reader"
 
     setup_logging(config.worker_log_config, config.worker_log_file)
 
@@ -160,7 +169,7 @@ def start(config_options):
 
     tls_server_context_factory = context_factory.ServerContextFactory(config)
 
-    ss = FederationReaderServer(
+    ss = ClientReaderServer(
         config.server_name,
         db_config=config.database_config,
         tls_server_context_factory=tls_server_context_factory,
@@ -190,7 +199,7 @@ def start(config_options):
 
     if config.worker_daemonize:
         daemon = Daemonize(
-            app="synapse-federation-reader",
+            app="synapse-client-reader",
             pid=config.worker_pid_file,
             action=run,
             auto_close_fds=False,
