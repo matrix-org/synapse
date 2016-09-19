@@ -115,134 +115,76 @@ class RoomListHandler(BaseHandler):
         sorted_entries = sorted(rooms_to_order_value.items(), key=lambda e: e[1])
         sorted_rooms = [room_id for room_id, _ in sorted_entries]
 
+        # `sorted_rooms` should now be a list of all public room ids that is
+        # stable across pagination. Therefore, we can use indices into this
+        # list as our pagination tokens.
+
+        # Filter out rooms that we don't want to return
+        rooms_to_scan = [
+            r for r in sorted_rooms
+            if r not in newly_unpublished and rooms_to_num_joined[room_id] > 0
+        ]
+
         if since_token:
+            # Filter out rooms we've already returned previously
+            # `since_token.current_limit` is the index of the last room we
+            # sent down, so we exclude it and everything before/after it.
             if since_token.direction_is_forward:
-                sorted_rooms = sorted_rooms[since_token.current_limit:]
+                rooms_to_scan = rooms_to_scan[since_token.current_limit + 1:]
             else:
-                sorted_rooms = sorted_rooms[:since_token.current_limit]
-                sorted_rooms.reverse()
+                rooms_to_scan = rooms_to_scan[:since_token.current_limit]
+                rooms_to_scan.reverse()
 
-        rooms_to_scan = sorted_rooms
-        if limit and not search_filter:
-            rooms_to_scan = sorted_rooms[:limit + 1]
-
+        # Actually generate the entries. _generate_room_entry will append to
+        # chunk but will stop if len(chunk) > limit
         chunk = []
-
-        @defer.inlineCallbacks
-        def handle_room(room_id):
-            if limit and len(chunk) > limit + 1:
-                # We've already got enough, so lets just drop it.
-                return
-
-            num_joined_users = rooms_to_num_joined[room_id]
-            if num_joined_users == 0:
-                return
-
-            if room_id in newly_unpublished:
-                return
-
-            result = {
-                "room_id": room_id,
-                "num_joined_members": num_joined_users,
-            }
-
-            current_state_ids = yield self.state_handler.get_current_state_ids(room_id)
-
-            event_map = yield self.store.get_events([
-                event_id for key, event_id in current_state_ids.items()
-                if key[0] in (
-                    EventTypes.JoinRules,
-                    EventTypes.Name,
-                    EventTypes.Topic,
-                    EventTypes.CanonicalAlias,
-                    EventTypes.RoomHistoryVisibility,
-                    EventTypes.GuestAccess,
-                    "m.room.avatar",
+        if limit and not search_filter:
+            step = limit + 1
+            for i in xrange(0, len(rooms_to_scan), step):
+                # We iterate here because the vast majority of cases we'll stop
+                # at first iteration, but occaisonally _generate_room_entry
+                # won't append to the chunk and so we need to loop again.
+                # We don't want to scan over the entire range either as that
+                # would potentially waste a lot of work.
+                yield concurrently_execute(
+                    lambda r: self._generate_room_entry(
+                        r, rooms_to_num_joined[r],
+                        chunk, limit, search_filter
+                    ),
+                    rooms_to_scan[i:i + step], 10
                 )
-            ])
-
-            current_state = {
-                (ev.type, ev.state_key): ev
-                for ev in event_map.values()
-            }
-
-            # Double check that this is actually a public room.
-            join_rules_event = current_state.get((EventTypes.JoinRules, ""))
-            if join_rules_event:
-                join_rule = join_rules_event.content.get("join_rule", None)
-                if join_rule and join_rule != JoinRules.PUBLIC:
-                    defer.returnValue(None)
-
-            aliases = yield self.store.get_aliases_for_room(room_id)
-            if aliases:
-                result["aliases"] = aliases
-
-            name_event = yield current_state.get((EventTypes.Name, ""))
-            if name_event:
-                name = name_event.content.get("name", None)
-                if name:
-                    result["name"] = name
-
-            topic_event = current_state.get((EventTypes.Topic, ""))
-            if topic_event:
-                topic = topic_event.content.get("topic", None)
-                if topic:
-                    result["topic"] = topic
-
-            canonical_event = current_state.get((EventTypes.CanonicalAlias, ""))
-            if canonical_event:
-                canonical_alias = canonical_event.content.get("alias", None)
-                if canonical_alias:
-                    result["canonical_alias"] = canonical_alias
-
-            visibility_event = current_state.get((EventTypes.RoomHistoryVisibility, ""))
-            visibility = None
-            if visibility_event:
-                visibility = visibility_event.content.get("history_visibility", None)
-            result["world_readable"] = visibility == "world_readable"
-
-            guest_event = current_state.get((EventTypes.GuestAccess, ""))
-            guest = None
-            if guest_event:
-                guest = guest_event.content.get("guest_access", None)
-            result["guest_can_join"] = guest == "can_join"
-
-            avatar_event = current_state.get(("m.room.avatar", ""))
-            if avatar_event:
-                avatar_url = avatar_event.content.get("url", None)
-                if avatar_url:
-                    result["avatar_url"] = avatar_url
-
-            if _matches_room_entry(result, search_filter):
-                chunk.append(result)
-
-        yield concurrently_execute(handle_room, rooms_to_scan, 10)
+                if len(chunk) >= limit + 1:
+                    break
+        else:
+            yield concurrently_execute(
+                lambda r: self._generate_room_entry(
+                    r, rooms_to_num_joined[r],
+                    chunk, limit, search_filter
+                ),
+                rooms_to_scan, 5
+            )
 
         chunk.sort(key=lambda e: (-e["num_joined_members"], e["room_id"]))
 
         # Work out the new limit of the batch for pagination, or None if we
         # know there are no more results that would be returned.
+        # i.e., [since_token.current_limit..new_limit] is the batch of rooms
+        # we've returned (or the reverse if we paginated backwards)
+        # We tried to pull out limit + 1 rooms above, so if we have <= limit
+        # then we know there are no more results to return
         new_limit = None
         if chunk and (not limit or len(chunk) > limit):
-            if limit:
-                chunk = chunk[:limit]
-
-            addition = 1
-            if since_token:
-                addition += since_token.current_limit
 
             if not since_token or since_token.direction_is_forward:
+                if limit:
+                    chunk = chunk[:limit]
                 last_room_id = chunk[-1]["room_id"]
             else:
+                if limit:
+                    chunk = chunk[-limit:]
                 last_room_id = chunk[0]["room_id"]
-                addition *= -1
 
-            try:
-                new_limit = sorted_rooms.index(last_room_id) + addition
-                if new_limit >= len(sorted_rooms):
-                    new_limit = None
-            except ValueError:
-                pass
+            new_limit = sorted_rooms.index(last_room_id)
 
         results = {
             "chunk": chunk,
@@ -252,7 +194,7 @@ class RoomListHandler(BaseHandler):
             results["new_rooms"] = bool(newly_visible)
 
         if not since_token or since_token.direction_is_forward:
-            if new_limit:
+            if new_limit is not None:
                 results["next_batch"] = RoomListNextBatch(
                     stream_ordering=stream_token,
                     public_room_stream_id=public_room_stream_id,
@@ -263,9 +205,10 @@ class RoomListHandler(BaseHandler):
             if since_token:
                 results["prev_batch"] = since_token.copy_and_replace(
                     direction_is_forward=False,
+                    current_limit=since_token.current_limit + 1,
                 ).to_token()
         else:
-            if new_limit:
+            if new_limit is not None:
                 results["prev_batch"] = RoomListNextBatch(
                     stream_ordering=stream_token,
                     public_room_stream_id=public_room_stream_id,
@@ -276,9 +219,92 @@ class RoomListHandler(BaseHandler):
             if since_token:
                 results["next_batch"] = since_token.copy_and_replace(
                     direction_is_forward=True,
+                    current_limit=since_token.current_limit - 1,
                 ).to_token()
 
         defer.returnValue(results)
+
+    @defer.inlineCallbacks
+    def _generate_room_entry(self, room_id, num_joined_users, chunk, limit,
+                             search_filter):
+        if limit and len(chunk) > limit + 1:
+            # We've already got enough, so lets just drop it.
+            return
+
+        result = {
+            "room_id": room_id,
+            "num_joined_members": num_joined_users,
+        }
+
+        current_state_ids = yield self.state_handler.get_current_state_ids(room_id)
+
+        event_map = yield self.store.get_events([
+            event_id for key, event_id in current_state_ids.items()
+            if key[0] in (
+                EventTypes.JoinRules,
+                EventTypes.Name,
+                EventTypes.Topic,
+                EventTypes.CanonicalAlias,
+                EventTypes.RoomHistoryVisibility,
+                EventTypes.GuestAccess,
+                "m.room.avatar",
+            )
+        ])
+
+        current_state = {
+            (ev.type, ev.state_key): ev
+            for ev in event_map.values()
+        }
+
+        # Double check that this is actually a public room.
+        join_rules_event = current_state.get((EventTypes.JoinRules, ""))
+        if join_rules_event:
+            join_rule = join_rules_event.content.get("join_rule", None)
+            if join_rule and join_rule != JoinRules.PUBLIC:
+                defer.returnValue(None)
+
+        aliases = yield self.store.get_aliases_for_room(room_id)
+        if aliases:
+            result["aliases"] = aliases
+
+        name_event = yield current_state.get((EventTypes.Name, ""))
+        if name_event:
+            name = name_event.content.get("name", None)
+            if name:
+                result["name"] = name
+
+        topic_event = current_state.get((EventTypes.Topic, ""))
+        if topic_event:
+            topic = topic_event.content.get("topic", None)
+            if topic:
+                result["topic"] = topic
+
+        canonical_event = current_state.get((EventTypes.CanonicalAlias, ""))
+        if canonical_event:
+            canonical_alias = canonical_event.content.get("alias", None)
+            if canonical_alias:
+                result["canonical_alias"] = canonical_alias
+
+        visibility_event = current_state.get((EventTypes.RoomHistoryVisibility, ""))
+        visibility = None
+        if visibility_event:
+            visibility = visibility_event.content.get("history_visibility", None)
+        result["world_readable"] = visibility == "world_readable"
+
+        guest_event = current_state.get((EventTypes.GuestAccess, ""))
+        guest = None
+        if guest_event:
+            guest = guest_event.content.get("guest_access", None)
+        result["guest_can_join"] = guest == "can_join"
+
+        avatar_event = current_state.get(("m.room.avatar", ""))
+        if avatar_event:
+            avatar_url = avatar_event.content.get("url", None)
+            if avatar_url:
+                result["avatar_url"] = avatar_url
+
+        if _matches_room_entry(result, search_filter):
+            chunk.append(result)
 
     @defer.inlineCallbacks
     def get_remote_public_room_list(self, server_name, limit=None, since_token=None,
@@ -361,12 +387,12 @@ class RoomListNextBatch(namedtuple("RoomListNextBatch", (
 
 def _matches_room_entry(room_entry, search_filter):
     if search_filter and search_filter.get("generic_search_term", None):
-        generic_search_term = search_filter["generic_search_term"]
-        if generic_search_term in room_entry.get("name", ""):
+        generic_search_term = search_filter["generic_search_term"].upper()
+        if generic_search_term in room_entry.get("name", "").upper():
             return True
-        elif generic_search_term in room_entry.get("topic", ""):
+        elif generic_search_term in room_entry.get("topic", "").upper():
             return True
-        elif generic_search_term in room_entry.get("canonical_alias", ""):
+        elif generic_search_term in room_entry.get("canonical_alias", "").upper():
             return True
     else:
         return True
