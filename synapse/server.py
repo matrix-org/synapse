@@ -43,6 +43,7 @@ from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import TypingHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
+from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier
@@ -98,6 +99,7 @@ class HomeServer(object):
         'e2e_keys_handler',
         'event_handler',
         'event_stream_handler',
+        'initial_sync_handler',
         'application_service_api',
         'application_service_scheduler',
         'application_service_handler',
@@ -227,6 +229,9 @@ class HomeServer(object):
 
     def build_event_stream_handler(self):
         return EventStreamHandler(self)
+
+    def build_initial_sync_handler(self):
+        return InitialSyncHandler(self)
 
     def build_event_sources(self):
         return EventSources(self)
