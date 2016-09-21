@@ -125,6 +125,8 @@ class RoomListHandler(BaseHandler):
             if r not in newly_unpublished and rooms_to_num_joined[room_id] > 0
         ]
 
+        total_room_count = len(rooms_to_scan)
+
         if since_token:
             # Filter out rooms we've already returned previously
             # `since_token.current_limit` is the index of the last room we
@@ -188,6 +190,7 @@ class RoomListHandler(BaseHandler):
 
         results = {
             "chunk": chunk,
+            "total_room_count_estimate": total_room_count,
         }
 
         if since_token:
