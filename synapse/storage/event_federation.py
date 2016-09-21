@@ -399,7 +399,7 @@ class EventFederationStore(SQLBaseStore):
                 DELETE FROM stream_ordering_to_exterm
                 WHERE
                 room_id IN (
-                    SELECT room_id AS stream_ordering
+                    SELECT room_id
                     FROM stream_ordering_to_exterm
                     WHERE stream_ordering > ?
                 ) AND stream_ordering < ?
