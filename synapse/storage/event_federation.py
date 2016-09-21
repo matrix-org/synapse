@@ -398,12 +398,11 @@ class EventFederationStore(SQLBaseStore):
             sql = ("""
                 DELETE FROM stream_ordering_to_exterm
                 WHERE
-                (
-                    SELECT max(stream_ordering) AS stream_ordering
+                room_id IN (
+                    SELECT room_id AS stream_ordering
                     FROM stream_ordering_to_exterm
-                    WHERE room_id = stream_ordering_to_exterm.room_id
-                ) > ?
-                AND stream_ordering < ?
+                    WHERE stream_ordering > ?
+                ) AND stream_ordering < ?
             """)
             txn.execute(
                 sql,
