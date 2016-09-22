@@ -72,7 +72,7 @@ class Auth(object):
         auth_events = {
             (e.type, e.state_key): e for e in auth_events.values()
         }
-        self.check(event, auth_events=auth_events, do_sig_check=False)
+        self.check(event, auth_events=auth_events, do_sig_check=do_sig_check)
 
     def check(self, event, auth_events, do_sig_check=True):
         """ Checks if this event is correctly authed.
@@ -91,11 +91,28 @@ class Auth(object):
             if not hasattr(event, "room_id"):
                 raise AuthError(500, "Event has no room_id: %s" % event)
 
-            sender_domain = get_domain_from_id(event.sender)
+            if do_sig_check:
+                sender_domain = get_domain_from_id(event.sender)
+                event_id_domain = get_domain_from_id(event.event_id)
 
-            # Check the sender's domain has signed the event
-            if do_sig_check and not event.signatures.get(sender_domain):
-                raise AuthError(403, "Event not signed by sending server")
+                is_invite_via_3pid = (
+                    event.type == EventTypes.Member
+                    and event.membership == Membership.INVITE
+                    and "third_party_invite" in event.content
+                )
+
+                # Check the sender's domain has signed the event
+                if not event.signatures.get(sender_domain):
+                    # We allow invites via 3pid to have a sender from a different
+                    # HS, as the sender must match the sender of the original
+                    # 3pid invite. This is checked further down with the
+                    # other dedicated membership checks.
+                    if not is_invite_via_3pid:
+                        raise AuthError(403, "Event not signed by sender's server")
+
+                # Check the event_id's domain has signed the event
+                if not event.signatures.get(event_id_domain):
+                    raise AuthError(403, "Event not signed by sending server")
 
             if auth_events is None:
                 # Oh, we don't know what the state of the room was, so we
@@ -489,6 +506,9 @@ class Auth(object):
             (EventTypes.ThirdPartyInvite, token,)
         )
         if not invite_event:
+            return False
+
+        if invite_event.sender != event.sender:
             return False
 
         if event.user_id != invite_event.user_id:
