@@ -91,23 +91,24 @@ class Auth(object):
             if not hasattr(event, "room_id"):
                 raise AuthError(500, "Event has no room_id: %s" % event)
 
-            sender_domain = get_domain_from_id(event.sender)
-            event_id_domain = get_domain_from_id(event.event_id)
+            if do_sig_check:
+                sender_domain = get_domain_from_id(event.sender)
+                event_id_domain = get_domain_from_id(event.event_id)
 
-            is_invite_via_3pid = (
-                event.type == EventTypes.Member
-                and event.membership == Membership.INVITE
-                and "third_party_invite" in event.content
-            )
+                is_invite_via_3pid = (
+                    event.type == EventTypes.Member
+                    and event.membership == Membership.INVITE
+                    and "third_party_invite" in event.content
+                )
 
-            # Check the sender's domain has signed the event
-            if do_sig_check and not event.signatures.get(sender_domain):
-                if not is_invite_via_3pid:
-                    raise AuthError(403, "Event not signed by sender's server")
+                # Check the sender's domain has signed the event
+                if not event.signatures.get(sender_domain):
+                    if not is_invite_via_3pid:
+                        raise AuthError(403, "Event not signed by sender's server")
 
-            # Check the event_id's domain has signed the event
-            if do_sig_check and not event.signatures.get(event_id_domain):
-                raise AuthError(403, "Event not signed by sending server")
+                # Check the event_id's domain has signed the event
+                if not event.signatures.get(event_id_domain):
+                    raise AuthError(403, "Event not signed by sending server")
 
             if auth_events is None:
                 # Oh, we don't know what the state of the room was, so we

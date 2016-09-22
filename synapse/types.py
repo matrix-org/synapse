@@ -56,7 +56,7 @@ def get_domain_from_id(string):
     try:
         return string.split(":", 1)[1]
     except IndexError:
-        raise SynapseError(400, "Invalid ID: %r", string)
+        raise SynapseError(400, "Invalid ID: %r" % (string,))
 
 
 class DomainSpecificString(
