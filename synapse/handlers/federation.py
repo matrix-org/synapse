@@ -1930,6 +1930,9 @@ class FederationHandler(BaseHandler):
                 "Could not find invite event for third_party_invite: %r",
                 event_dict
             )
+            # We don't discard here as this is not the appropriate place to do
+            # auth checks. If we need the invite and don't have it then the
+            # auth check code will explode appropriately.
 
         builder = self.event_builder_factory.new(event_dict)
         EventValidator().validate_new(builder)

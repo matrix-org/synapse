@@ -103,6 +103,9 @@ class Auth(object):
 
                 # Check the sender's domain has signed the event
                 if not event.signatures.get(sender_domain):
+                    # We allow invites via 3pid to have a sender from a differnt
+                    # HS, as the sender must match the sender of the original
+                    # 3pid invite. This is checked further down.
                     if not is_invite_via_3pid:
                         raise AuthError(403, "Event not signed by sender's server")
 
