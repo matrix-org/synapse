@@ -53,7 +53,7 @@ class TypingHandler(object):
         self.hs = hs
 
         self.clock = hs.get_clock()
-        self.wheel_timer = WheelTimer()
+        self.wheel_timer = WheelTimer(bucket_size=5000)
 
         self.federation = hs.get_replication_layer()
 
@@ -76,7 +76,7 @@ class TypingHandler(object):
         )
 
     def _handle_timeouts(self):
-        logger.info("Handling typing timeout")
+        logger.info("Checking for typing timeouts")
 
         now = self.clock.time_msec()
 
@@ -134,12 +134,6 @@ class TypingHandler(object):
             now=now,
             obj=member,
             then=now + timeout,
-        )
-
-        self.wheel_timer.insert(
-            now=now,
-            obj=member,
-            then=now + FEDERATION_PING_INTERVAL,
         )
 
         if was_present:
@@ -208,6 +202,14 @@ class TypingHandler(object):
     def _push_remote(self, member, typing):
         users = yield self.state.get_current_user_in_room(member.room_id)
         self._member_last_federation_poke[member] = self.clock.time_msec()
+
+        now = self.clock.time_msec()
+        self.wheel_timer.insert(
+            now=now,
+            obj=member,
+            then=now + FEDERATION_PING_INTERVAL,
+        )
+
         for domain in set(get_domain_from_id(u) for u in users):
             if domain != self.server_name:
                 self.federation.send_edu(
