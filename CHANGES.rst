@@ -6,7 +6,7 @@ significantly reduce database size. Synapse will attempt to upgrade the current
 data in the background. Servers with large SQLite database may experience
 degradation of performance while this upgrade is in progress, therefore you may
 want to consider migrating to using Postgres before upgrading very large SQLite
-daabases
+databases
 
 
 Changes:
