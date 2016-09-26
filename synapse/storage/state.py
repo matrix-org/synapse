@@ -389,14 +389,16 @@ class StateStore(SQLBaseStore):
                     if next_group:
                         group_tree.append(next_group)
 
+                # sqlite lets us mix aggregate & non-aggregate columns in
+                # a grouped select - for details, see:
+                # http://marc.info/?l=sqlite-users&m=141460824410980&w=2
+                # As a result, we can avoid a self-join to populate
+                # event_id, which empirically speeds things up by 25x.
                 sql = ("""
-                    SELECT type, state_key, event_id FROM state_groups_state
-                    INNER JOIN (
-                        SELECT type, state_key, max(state_group) as state_group
-                        FROM state_groups_state
-                        WHERE state_group IN (%s) %s
-                        GROUP BY type, state_key
-                    ) USING (type, state_key, state_group);
+                    SELECT type, state_key, event_id, max(state_group) as state_group
+                    FROM state_groups_state
+                    WHERE state_group IN (%s) %s
+                    GROUP BY type, state_key;
                 """) % (",".join("?" for _ in group_tree), where_clause,)
 
                 args = list(group_tree)
