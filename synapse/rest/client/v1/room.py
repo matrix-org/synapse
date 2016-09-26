@@ -705,12 +705,15 @@ class RoomTypingRestServlet(ClientV1RestServlet):
 
         yield self.presence_handler.bump_presence_active_time(requester.user)
 
+        # Limit timeout to stop people from setting silly typing timeouts.
+        timeout = min(content.get("timeout", 30000), 120000)
+
         if content["typing"]:
             yield self.typing_handler.started_typing(
                 target_user=target_user,
                 auth_user=requester.user,
                 room_id=room_id,
-                timeout=content.get("timeout", 30000),
+                timeout=timeout,
             )
         else:
             yield self.typing_handler.stopped_typing(

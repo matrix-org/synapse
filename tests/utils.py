@@ -220,6 +220,7 @@ class MockClock(object):
         # list of lists of [absolute_time, callback, expired] in no particular
         # order
         self.timers = []
+        self.loopers = []
 
     def time(self):
         return self.now
@@ -240,7 +241,7 @@ class MockClock(object):
         return t
 
     def looping_call(self, function, interval):
-        pass
+        self.loopers.append([function, interval / 1000., self.now])
 
     def cancel_call_later(self, timer, ignore_errs=False):
         if timer[2]:
@@ -268,6 +269,12 @@ class MockClock(object):
                 callback()
             else:
                 self.timers.append(t)
+
+        for looped in self.loopers:
+            func, interval, last = looped
+            if last + interval < self.now:
+                func()
+                looped[2] = self.now
 
     def advance_time_msec(self, ms):
         self.advance_time(ms / 1000.)
