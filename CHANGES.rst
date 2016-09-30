@@ -15,6 +15,8 @@ Changes:
 Bug fixes:
 
 * Fix 3pid invites when server is already in the room (PR #1136)
+* Fix upgrading with SQLite taking lots of CPU for a few days
+  after upgrade (PR #1144)
 * Fix upgrading from very old database versions (PR #1145)
 * Fix port script to work with recently added tables (PR #1146)
 
