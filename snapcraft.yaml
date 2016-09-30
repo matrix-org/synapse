@@ -11,6 +11,7 @@ apps:
     plugs: [home, network, network-bind]
   register-new-matrix-user:
     command: register_new_matrix_user
+    plugs: [home]
   homeserver:
     command: python -m synapse.app.homeserver
     plugs: [home]
