@@ -1,5 +1,5 @@
 name: synapse
-version: "0.17.1"
+version: master
 summary: Matrix reference homeserver
 description: |
   Matrix is an ambitious new ecosystem for open federated Instant Messaging and VoIP.
@@ -8,15 +8,19 @@ confinement: strict
 apps:
   synctl:
     command: synctl
-    plugs: [network, network-bind]
+    plugs: [home, network, network-bind]
   register-new-matrix-user:
     command: register_new_matrix_user
   homeserver:
-    command: python -m synapse.app.homeserver
+    command: sh -c \"cd $SNAP_USER_DATA; python -m synapse.app.homeserver\"
+    plugs: [home]
 
 parts:
   synapse:
     source: .
     plugin: python
     python-version: python2
+    python-packages:
+      - Twisted>=15.1.0
     build-packages: [libffi-dev, libssl-dev]
+    stage-packages: [python-zope.interface, python-bcrypt]
