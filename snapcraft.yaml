@@ -12,7 +12,7 @@ apps:
   register-new-matrix-user:
     command: register_new_matrix_user
   homeserver:
-    command: sh -c \"cd $SNAP_USER_DATA; python -m synapse.app.homeserver\"
+    command: python -m synapse.app.homeserver
     plugs: [home]
 
 parts:
