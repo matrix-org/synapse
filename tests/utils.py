@@ -52,6 +52,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.server_name = name
         config.trusted_third_party_id_servers = []
         config.room_invite_state_types = []
+        config.password_providers = []
 
     config.use_frozen_dicts = True
     config.database_config = {"name": "sqlite3"}

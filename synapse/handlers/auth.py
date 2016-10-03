@@ -20,7 +20,6 @@ from synapse.api.constants import LoginType
 from synapse.types import UserID
 from synapse.api.errors import AuthError, LoginError, Codes, StoreError, SynapseError
 from synapse.util.async import run_on_reactor
-from synapse.config.ldap import LDAPMode
 
 from twisted.web.client import PartialDownloadError
 
@@ -28,13 +27,6 @@ import logging
 import bcrypt
 import pymacaroons
 import simplejson
-
-try:
-    import ldap3
-    import ldap3.core.exceptions
-except ImportError:
-    ldap3 = None
-    pass
 
 import synapse.util.stringutils as stringutils
 
@@ -61,21 +53,14 @@ class AuthHandler(BaseHandler):
         self.sessions = {}
         self.INVALID_TOKEN_HTTP_STATUS = 401
 
-        self.ldap_enabled = hs.config.ldap_enabled
-        if self.ldap_enabled:
-            if not ldap3:
-                raise RuntimeError(
-                    'Missing ldap3 library. This is required for LDAP Authentication.'
-                )
-            self.ldap_mode = hs.config.ldap_mode
-            self.ldap_uri = hs.config.ldap_uri
-            self.ldap_start_tls = hs.config.ldap_start_tls
-            self.ldap_base = hs.config.ldap_base
-            self.ldap_attributes = hs.config.ldap_attributes
-            if self.ldap_mode == LDAPMode.SEARCH:
-                self.ldap_bind_dn = hs.config.ldap_bind_dn
-                self.ldap_bind_password = hs.config.ldap_bind_password
-                self.ldap_filter = hs.config.ldap_filter
+        account_handler = _AccountHandler(
+            hs, check_user_exists=self.check_user_exists
+        )
+
+        self.password_providers = [
+            module(config=config, account_handler=account_handler)
+            for module, config in hs.config.password_providers
+        ]
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.device_handler = hs.get_device_handler()
@@ -477,9 +462,10 @@ class AuthHandler(BaseHandler):
         Raises:
             LoginError if the password was incorrect
         """
-        valid_ldap = yield self._check_ldap_password(user_id, password)
-        if valid_ldap:
-            defer.returnValue(user_id)
+        for provider in self.password_providers:
+            is_valid = yield provider.check_password(user_id, password)
+            if is_valid:
+                defer.returnValue(user_id)
 
         result = yield self._check_local_password(user_id, password)
         defer.returnValue(result)
@@ -504,275 +490,6 @@ class AuthHandler(BaseHandler):
             logger.warn("Failed password login for user %s", user_id)
             raise LoginError(403, "", errcode=Codes.FORBIDDEN)
         defer.returnValue(user_id)
-
-    def _ldap_simple_bind(self, server, localpart, password):
-        """ Attempt a simple bind with the credentials
-            given by the user against the LDAP server.
-
-            Returns True, LDAP3Connection
-                if the bind was successful
-            Returns False, None
-                if an error occured
-        """
-
-        try:
-            # bind with the the local users ldap credentials
-            bind_dn = "{prop}={value},{base}".format(
-                prop=self.ldap_attributes['uid'],
-                value=localpart,
-                base=self.ldap_base
-            )
-            conn = ldap3.Connection(server, bind_dn, password)
-            logger.debug(
-                "Established LDAP connection in simple bind mode: %s",
-                conn
-            )
-
-            if self.ldap_start_tls:
-                conn.start_tls()
-                logger.debug(
-                    "Upgraded LDAP connection in simple bind mode through StartTLS: %s",
-                    conn
-                )
-
-            if conn.bind():
-                # GOOD: bind okay
-                logger.debug("LDAP Bind successful in simple bind mode.")
-                return True, conn
-
-            # BAD: bind failed
-            logger.info(
-                "Binding against LDAP failed for '%s' failed: %s",
-                localpart, conn.result['description']
-            )
-            conn.unbind()
-            return False, None
-
-        except ldap3.core.exceptions.LDAPException as e:
-            logger.warn("Error during LDAP authentication: %s", e)
-            return False, None
-
-    def _ldap_authenticated_search(self, server, localpart, password):
-        """ Attempt to login with the preconfigured bind_dn
-            and then continue searching and filtering within
-            the base_dn
-
-            Returns (True, LDAP3Connection)
-                if a single matching DN within the base was found
-                that matched the filter expression, and with which
-                a successful bind was achieved
-
-                The LDAP3Connection returned is the instance that was used to
-                verify the password not the one using the configured bind_dn.
-            Returns (False, None)
-                if an error occured
-        """
-
-        try:
-            conn = ldap3.Connection(
-                server,
-                self.ldap_bind_dn,
-                self.ldap_bind_password
-            )
-            logger.debug(
-                "Established LDAP connection in search mode: %s",
-                conn
-            )
-
-            if self.ldap_start_tls:
-                conn.start_tls()
-                logger.debug(
-                    "Upgraded LDAP connection in search mode through StartTLS: %s",
-                    conn
-                )
-
-            if not conn.bind():
-                logger.warn(
-                    "Binding against LDAP with `bind_dn` failed: %s",
-                    conn.result['description']
-                )
-                conn.unbind()
-                return False, None
-
-            # construct search_filter like (uid=localpart)
-            query = "({prop}={value})".format(
-                prop=self.ldap_attributes['uid'],
-                value=localpart
-            )
-            if self.ldap_filter:
-                # combine with the AND expression
-                query = "(&{query}{filter})".format(
-                    query=query,
-                    filter=self.ldap_filter
-                )
-            logger.debug(
-                "LDAP search filter: %s",
-                query
-            )
-            conn.search(
-                search_base=self.ldap_base,
-                search_filter=query
-            )
-
-            if len(conn.response) == 1:
-                # GOOD: found exactly one result
-                user_dn = conn.response[0]['dn']
-                logger.debug('LDAP search found dn: %s', user_dn)
-
-                # unbind and simple bind with user_dn to verify the password
-                # Note: do not use rebind(), for some reason it did not verify
-                #       the password for me!
-                conn.unbind()
-                return self._ldap_simple_bind(server, localpart, password)
-            else:
-                # BAD: found 0 or > 1 results, abort!
-                if len(conn.response) == 0:
-                    logger.info(
-                        "LDAP search returned no results for '%s'",
-                        localpart
-                    )
-                else:
-                    logger.info(
-                        "LDAP search returned too many (%s) results for '%s'",
-                        len(conn.response), localpart
-                    )
-                conn.unbind()
-                return False, None
-
-        except ldap3.core.exceptions.LDAPException as e:
-            logger.warn("Error during LDAP authentication: %s", e)
-            return False, None
-
-    @defer.inlineCallbacks
-    def _check_ldap_password(self, user_id, password):
-        """ Attempt to authenticate a user against an LDAP Server
-            and register an account if none exists.
-
-            Returns:
-                True if authentication against LDAP was successful
-        """
-
-        if not ldap3 or not self.ldap_enabled:
-            defer.returnValue(False)
-
-        localpart = UserID.from_string(user_id).localpart
-
-        try:
-            server = ldap3.Server(self.ldap_uri)
-            logger.debug(
-                "Attempting LDAP connection with %s",
-                self.ldap_uri
-            )
-
-            if self.ldap_mode == LDAPMode.SIMPLE:
-                result, conn = self._ldap_simple_bind(
-                    server=server, localpart=localpart, password=password
-                )
-                logger.debug(
-                    'LDAP authentication method simple bind returned: %s (conn: %s)',
-                    result,
-                    conn
-                )
-                if not result:
-                    defer.returnValue(False)
-            elif self.ldap_mode == LDAPMode.SEARCH:
-                result, conn = self._ldap_authenticated_search(
-                    server=server, localpart=localpart, password=password
-                )
-                logger.debug(
-                    'LDAP auth method authenticated search returned: %s (conn: %s)',
-                    result,
-                    conn
-                )
-                if not result:
-                    defer.returnValue(False)
-            else:
-                raise RuntimeError(
-                    'Invalid LDAP mode specified: {mode}'.format(
-                        mode=self.ldap_mode
-                    )
-                )
-
-            try:
-                logger.info(
-                    "User authenticated against LDAP server: %s",
-                    conn
-                )
-            except NameError:
-                logger.warn("Authentication method yielded no LDAP connection, aborting!")
-                defer.returnValue(False)
-
-            # check if user with user_id exists
-            if (yield self.check_user_exists(user_id)):
-                # exists, authentication complete
-                conn.unbind()
-                defer.returnValue(True)
-
-            else:
-                # does not exist, fetch metadata for account creation from
-                # existing ldap connection
-                query = "({prop}={value})".format(
-                    prop=self.ldap_attributes['uid'],
-                    value=localpart
-                )
-
-                if self.ldap_mode == LDAPMode.SEARCH and self.ldap_filter:
-                    query = "(&{filter}{user_filter})".format(
-                        filter=query,
-                        user_filter=self.ldap_filter
-                    )
-                logger.debug(
-                    "ldap registration filter: %s",
-                    query
-                )
-
-                conn.search(
-                    search_base=self.ldap_base,
-                    search_filter=query,
-                    attributes=[
-                        self.ldap_attributes['name'],
-                        self.ldap_attributes['mail']
-                    ]
-                )
-
-                if len(conn.response) == 1:
-                    attrs = conn.response[0]['attributes']
-                    mail = attrs[self.ldap_attributes['mail']][0]
-                    name = attrs[self.ldap_attributes['name']][0]
-
-                    # create account
-                    registration_handler = self.hs.get_handlers().registration_handler
-                    user_id, access_token = (
-                        yield registration_handler.register(localpart=localpart)
-                    )
-
-                    # TODO: bind email, set displayname with data from ldap directory
-
-                    logger.info(
-                        "Registration based on LDAP data was successful: %d: %s (%s, %)",
-                        user_id,
-                        localpart,
-                        name,
-                        mail
-                    )
-
-                    defer.returnValue(True)
-                else:
-                    if len(conn.response) == 0:
-                        logger.warn("LDAP registration failed, no result.")
-                    else:
-                        logger.warn(
-                            "LDAP registration failed, too many results (%s)",
-                            len(conn.response)
-                        )
-
-                    defer.returnValue(False)
-
-            defer.returnValue(False)
-
-        except ldap3.core.exceptions.LDAPException as e:
-            logger.warn("Error during ldap authentication: %s", e)
-            defer.returnValue(False)
 
     @defer.inlineCallbacks
     def issue_access_token(self, user_id, device_id=None):
@@ -911,3 +628,30 @@ class AuthHandler(BaseHandler):
                                  stored_hash.encode('utf-8')) == stored_hash
         else:
             return False
+
+
+class _AccountHandler(object):
+    """A proxy object that gets passed to password auth providers so they
+    can register new users etc if necessary.
+    """
+    def __init__(self, hs, check_user_exists):
+        self.hs = hs
+
+        self._check_user_exists = check_user_exists
+
+    def check_user_exists(self, user_id):
+        """Check if user exissts.
+
+        Returns:
+            Deferred(bool)
+        """
+        return self._check_user_exists(user_id)
+
+    def register(self, localpart):
+        """Registers a new user with given localpart
+
+        Returns:
+            Deferred: a 2-tuple of (user_id, access_token)
+        """
+        reg = self.hs.get_handlers().registration_handler
+        return reg.register(localpart=localpart)
