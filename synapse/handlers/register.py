@@ -19,7 +19,6 @@ import urllib
 
 from twisted.internet import defer
 
-import synapse.types
 from synapse.api.errors import (
     AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError
 )
@@ -370,7 +369,7 @@ class RegistrationHandler(BaseHandler):
         defer.returnValue(data)
 
     @defer.inlineCallbacks
-    def get_or_create_user(self, localpart, displayname, duration_in_ms,
+    def get_or_create_user(self, requester, localpart, displayname, duration_in_ms,
                            password_hash=None):
         """Creates a new user if the user does not exist,
         else revokes all previous access tokens and generates a new one.
@@ -417,9 +416,8 @@ class RegistrationHandler(BaseHandler):
         if displayname is not None:
             logger.info("setting user display name: %s -> %s", user_id, displayname)
             profile_handler = self.hs.get_handlers().profile_handler
-            requester = synapse.types.create_requester(user)
             yield profile_handler.set_displayname(
-                user, requester, displayname
+                user, requester, displayname, by_admin=True,
             )
 
         defer.returnValue((user_id, token))
