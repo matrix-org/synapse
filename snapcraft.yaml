@@ -7,7 +7,7 @@ confinement: strict
 
 apps:
   synctl:
-    command: synctl
+    command: env SQLITE_TMPDIR=/tmp synctl
     plugs: [home, network, network-bind]
   register-new-matrix-user:
     command: register_new_matrix_user
