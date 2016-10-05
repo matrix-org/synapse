@@ -3,6 +3,8 @@ version: master
 summary: Matrix reference homeserver
 description: |
   Matrix is an ambitious new ecosystem for open federated Instant Messaging and VoIP.
+
+grade: devel
 confinement: strict
 
 apps:
