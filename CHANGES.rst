@@ -1,3 +1,32 @@
+Changes in synapse v0.18.1 (2016-10-0)
+======================================
+
+No changes since v0.18.1-rc1
+
+
+Changes in synapse v0.18.1-rc1 (2016-09-30)
+===========================================
+
+Features:
+
+* Add total_room_count_estimate to ``/publicRooms`` (PR #1133)
+
+
+Changes:
+
+* Time out typing over federation (PR #1140)
+* Restructure LDAP authentication (PR #1153)
+
+
+Bug fixes:
+
+* Fix 3pid invites when server is already in the room (PR #1136)
+* Fix upgrading with SQLite taking lots of CPU for a few days
+  after upgrade (PR #1144)
+* Fix upgrading from very old database versions (PR #1145)
+* Fix port script to work with recently added tables (PR #1146)
+
+
 Changes in synapse v0.18.0 (2016-09-19)
 =======================================
 
