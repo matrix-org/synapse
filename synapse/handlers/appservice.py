@@ -59,7 +59,7 @@ class ApplicationServicesHandler(object):
         Args:
             current_id(int): The current maximum ID.
         """
-        services = yield self.store.get_app_services()
+        services = self.store.get_app_services()
         if not services or not self.notify_appservices:
             return
 
@@ -142,7 +142,7 @@ class ApplicationServicesHandler(object):
             association can be found.
         """
         room_alias_str = room_alias.to_string()
-        services = yield self.store.get_app_services()
+        services = self.store.get_app_services()
         alias_query_services = [
             s for s in services if (
                 s.is_interested_in_alias(room_alias_str)
@@ -177,7 +177,7 @@ class ApplicationServicesHandler(object):
 
     @defer.inlineCallbacks
     def get_3pe_protocols(self, only_protocol=None):
-        services = yield self.store.get_app_services()
+        services = self.store.get_app_services()
         protocols = {}
 
         # Collect up all the individual protocol responses out of the ASes
@@ -224,7 +224,7 @@ class ApplicationServicesHandler(object):
             list<ApplicationService>: A list of services interested in this
             event based on the service regex.
         """
-        services = yield self.store.get_app_services()
+        services = self.store.get_app_services()
         interested_list = [
             s for s in services if (
                 yield s.is_interested(event, self.store)
@@ -232,23 +232,21 @@ class ApplicationServicesHandler(object):
         ]
         defer.returnValue(interested_list)
 
-    @defer.inlineCallbacks
     def _get_services_for_user(self, user_id):
-        services = yield self.store.get_app_services()
+        services = self.store.get_app_services()
         interested_list = [
             s for s in services if (
                 s.is_interested_in_user(user_id)
             )
         ]
-        defer.returnValue(interested_list)
+        return defer.succeed(interested_list)
 
-    @defer.inlineCallbacks
     def _get_services_for_3pn(self, protocol):
-        services = yield self.store.get_app_services()
+        services = self.store.get_app_services()
         interested_list = [
             s for s in services if s.is_interested_in_protocol(protocol)
         ]
-        defer.returnValue(interested_list)
+        return defer.succeed(interested_list)
 
     @defer.inlineCallbacks
     def _is_unknown_user(self, user_id):
@@ -264,7 +262,7 @@ class ApplicationServicesHandler(object):
             return
 
         # user not found; could be the AS though, so check.
-        services = yield self.store.get_app_services()
+        services = self.store.get_app_services()
         service_list = [s for s in services if s.sender == user_id]
         defer.returnValue(len(service_list) == 0)
 

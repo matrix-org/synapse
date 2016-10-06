@@ -391,7 +391,7 @@ class CreateUserRestServlet(ClientV1RestServlet):
         user_json = parse_json_object_from_request(request)
 
         access_token = get_access_token_from_request(request)
-        app_service = yield self.store.get_app_service_by_token(
+        app_service = self.store.get_app_service_by_token(
             access_token
         )
         if not app_service:

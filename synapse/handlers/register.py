@@ -194,7 +194,7 @@ class RegistrationHandler(BaseHandler):
     def appservice_register(self, user_localpart, as_token):
         user = UserID(user_localpart, self.hs.hostname)
         user_id = user.to_string()
-        service = yield self.store.get_app_service_by_token(as_token)
+        service = self.store.get_app_service_by_token(as_token)
         if not service:
             raise AuthError(403, "Invalid application service token.")
         if not service.is_interested_in_user(user_id):
@@ -305,11 +305,10 @@ class RegistrationHandler(BaseHandler):
             # XXX: This should be a deferred list, shouldn't it?
             yield identity_handler.bind_threepid(c, user_id)
 
-    @defer.inlineCallbacks
     def check_user_id_not_appservice_exclusive(self, user_id, allowed_appservice=None):
         # valid user IDs must not clash with any user ID namespaces claimed by
         # application services.
-        services = yield self.store.get_app_services()
+        services = self.store.get_app_services()
         interested_services = [
             s for s in services
             if s.is_interested_in_user(user_id)

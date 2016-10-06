@@ -288,13 +288,12 @@ class DirectoryHandler(BaseHandler):
             result = yield as_handler.query_room_alias_exists(room_alias)
         defer.returnValue(result)
 
-    @defer.inlineCallbacks
     def can_modify_alias(self, alias, user_id=None):
         # Any application service "interested" in an alias they are regexing on
         # can modify the alias.
         # Users can only modify the alias if ALL the interested services have
         # non-exclusive locks on the alias (or there are no interested services)
-        services = yield self.store.get_app_services()
+        services = self.store.get_app_services()
         interested_services = [
             s for s in services if s.is_interested_in_alias(alias.to_string())
         ]
@@ -302,14 +301,12 @@ class DirectoryHandler(BaseHandler):
         for service in interested_services:
             if user_id == service.sender:
                 # this user IS the app service so they can do whatever they like
-                defer.returnValue(True)
-                return
+                return defer.succeed(True)
             elif service.is_exclusive_alias(alias.to_string()):
                 # another service has an exclusive lock on this alias.
-                defer.returnValue(False)
-                return
+                return defer.succeed(False)
         # either no interested services, or no service with an exclusive lock
-        defer.returnValue(True)
+        return defer.succeed(True)
 
     @defer.inlineCallbacks
     def _user_can_delete_alias(self, alias, user_id):

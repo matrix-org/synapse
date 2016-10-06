@@ -19,7 +19,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
 
         self.appservice = None
         self.auth = Mock(get_appservice_by_req=Mock(
-            side_effect=lambda x: defer.succeed(self.appservice))
+            side_effect=lambda x: self.appservice)
         )
 
         self.auth_result = (False, None, None, None)
