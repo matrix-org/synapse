@@ -19,7 +19,7 @@ from . import V2AlphaRestTestCase
 
 from synapse.rest.client.v2_alpha import filter
 
-from synapse.api.errors import StoreError
+from synapse.api.errors import StoreError, Codes
 
 
 class FilterTestCase(V2AlphaRestTestCase):
@@ -82,11 +82,20 @@ class FilterTestCase(V2AlphaRestTestCase):
         (code, response) = yield self.mock_resource.trigger_get(
             "/user/%s/filter/2" % (self.USER_ID)
         )
-        self.assertEquals(404, code)
+        self.assertEquals(400, code)
 
     @defer.inlineCallbacks
     def test_get_filter_no_user(self):
         (code, response) = yield self.mock_resource.trigger_get(
             "/user/%s/filter/0" % (self.USER_ID)
         )
-        self.assertEquals(404, code)
+        self.assertEquals(400, code)
+        self.assertEquals(response['errcode'], Codes.FORBIDDEN)
+
+    @defer.inlineCallbacks
+    def test_get_filter_missing_id(self):
+        (code, response) = yield self.mock_resource.trigger_get(
+            "/user/%s/filter/0" % (self.USER_ID)
+        )
+        self.assertEquals(400, code)
+        self.assertEquals(response['errcode'], Codes.NOT_FOUND)

@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, SynapseError
+from synapse.api.errors import AuthError, SynapseError, StoreError, Codes
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import UserID
 
@@ -45,7 +45,7 @@ class GetFilterRestServlet(RestServlet):
             raise AuthError(403, "Cannot get filters for other users")
 
         if not self.hs.is_mine(target_user):
-            raise SynapseError(400, "Can only get filters for local users")
+            raise AuthError(403, "Can only get filters for local users")
 
         try:
             filter_id = int(filter_id)
@@ -59,8 +59,8 @@ class GetFilterRestServlet(RestServlet):
             )
 
             defer.returnValue((200, filter.get_filter_json()))
-        except KeyError:
-            raise SynapseError(400, "No such filter")
+        except (KeyError, StoreError):
+            raise SynapseError(400, "No such filter", errcode=Codes.NOT_FOUND)
 
 
 class CreateFilterRestServlet(RestServlet):
