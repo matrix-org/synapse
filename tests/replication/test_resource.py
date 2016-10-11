@@ -120,7 +120,7 @@ class ReplicationResourceCase(unittest.TestCase):
             self.hs.clock.advance_time_msec(1)
             code, body = yield get
             self.assertEquals(code, 200)
-            self.assertEquals(body, {})
+            self.assertEquals(body.get("rows", []), [])
         test_timeout.__name__ = "test_timeout_%s" % (stream)
         return test_timeout
 
@@ -195,7 +195,6 @@ class ReplicationResourceCase(unittest.TestCase):
             self.assertIn("field_names", stream)
             field_names = stream["field_names"]
             self.assertIn("rows", stream)
-            self.assertTrue(stream["rows"])
             for row in stream["rows"]:
                 self.assertEquals(
                     len(row), len(field_names),

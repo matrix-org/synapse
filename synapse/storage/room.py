@@ -320,6 +320,9 @@ class RoomStore(SQLBaseStore):
             txn.execute(sql, (prev_id, current_id, limit,))
             return txn.fetchall()
 
+        if prev_id == current_id:
+            return defer.succeed([])
+
         return self.runInteraction(
             "get_all_new_public_rooms", get_all_new_public_rooms
         )
