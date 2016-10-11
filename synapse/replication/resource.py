@@ -238,7 +238,7 @@ class ReplicationResource(Resource):
         request_backfill = request_streams.get("backfill")
 
         if request_events is not None or request_backfill is not None:
-            if request_backfill is None:
+            if request_events is None:
                 request_events = current_token.events
             if request_backfill is None:
                 request_backfill = current_token.backfill
