@@ -17,6 +17,7 @@ import logging
 
 from twisted.internet import defer
 
+from synapse.api import constants
 from synapse.http import servlet
 from ._base import client_v2_patterns
 
@@ -58,6 +59,7 @@ class DeviceRestServlet(servlet.RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
+        self.auth_handler = hs.get_auth_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, device_id):
@@ -70,11 +72,15 @@ class DeviceRestServlet(servlet.RestServlet):
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, device_id):
-        # XXX: it's not completely obvious we want to expose this endpoint.
-        # It allows the client to delete access tokens, which feels like a
-        # thing which merits extra auth. But if we want to do the interactive-
-        # auth dance, we should really make it possible to delete more than one
-        # device at a time.
+        body = servlet.parse_json_object_from_request(request)
+
+        authed, result, params, _ = yield self.auth_handler.check_auth([
+            [constants.LoginType.PASSWORD],
+        ], body, self.hs.get_ip_from_request(request))
+
+        if not authed:
+            defer.returnValue((401, result))
+
         requester = yield self.auth.get_user_by_req(request)
         yield self.device_handler.delete_device(
             requester.user.to_string(),
