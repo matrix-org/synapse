@@ -37,7 +37,7 @@ class ApplicationServiceStore(SQLBaseStore):
         )
 
     def get_app_services(self):
-        return defer.succeed(self.services_cache)
+        return self.services_cache
 
     def get_app_service_by_user_id(self, user_id):
         """Retrieve an application service from their user ID.
@@ -54,8 +54,8 @@ class ApplicationServiceStore(SQLBaseStore):
         """
         for service in self.services_cache:
             if service.sender == user_id:
-                return defer.succeed(service)
-        return defer.succeed(None)
+                return service
+        return None
 
     def get_app_service_by_token(self, token):
         """Get the application service with the given appservice token.
@@ -67,8 +67,8 @@ class ApplicationServiceStore(SQLBaseStore):
         """
         for service in self.services_cache:
             if service.token == token:
-                return defer.succeed(service)
-        return defer.succeed(None)
+                return service
+        return None
 
     def get_app_service_rooms(self, service):
         """Get a list of RoomsForUser for this application service.
@@ -163,7 +163,7 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
             ["as_id"]
         )
         # NB: This assumes this class is linked with ApplicationServiceStore
-        as_list = yield self.get_app_services()
+        as_list = self.get_app_services()
         services = []
 
         for res in results:

@@ -267,10 +267,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
         from synapse.handlers.typing import RoomMember
         member = RoomMember(self.room_id, self.u_apple.to_string())
         self.handler._member_typing_until[member] = 1002000
-        self.handler._member_typing_timer[member] = (
-            self.clock.call_later(1002, lambda: 0)
-        )
-        self.handler._room_typing[self.room_id] = set((self.u_apple.to_string(),))
+        self.handler._room_typing[self.room_id] = set([self.u_apple.to_string()])
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 
@@ -330,7 +327,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
             },
         }])
 
-        self.clock.advance_time(11)
+        self.clock.advance_time(16)
 
         self.on_new_event.assert_has_calls([
             call('typing_key', 2, rooms=[self.room_id]),

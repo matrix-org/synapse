@@ -39,6 +39,7 @@ BOOLEAN_COLUMNS = {
     "event_edges": ["is_state"],
     "presence_list": ["accepted"],
     "presence_stream": ["currently_active"],
+    "public_room_list_stream": ["visibility"],
 }
 
 
@@ -71,6 +72,14 @@ APPEND_ONLY_TABLES = [
     "event_to_state_groups",
     "rejections",
     "event_search",
+    "presence_stream",
+    "push_rules_stream",
+    "current_state_resets",
+    "ex_outlier_stream",
+    "cache_invalidation_stream",
+    "public_room_list_stream",
+    "state_group_edges",
+    "stream_ordering_to_exterm",
 ]
 
 

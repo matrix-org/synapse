@@ -55,8 +55,14 @@ class BaseHandler(object):
 
     def ratelimit(self, requester):
         time_now = self.clock.time()
+        user_id = requester.user.to_string()
+
+        app_service = self.store.get_app_service_by_user_id(user_id)
+        if app_service is not None:
+            return  # do not ratelimit app service senders
+
         allowed, time_allowed = self.ratelimiter.send_message(
-            requester.user.to_string(), time_now,
+            user_id, time_now,
             msg_rate_hz=self.hs.config.rc_messages_per_second,
             burst_count=self.hs.config.rc_message_burst_count,
         )

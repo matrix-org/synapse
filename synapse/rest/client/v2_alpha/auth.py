@@ -77,8 +77,10 @@ SUCCESS_TEMPLATE = """
     user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
 <link rel="stylesheet" href="/_matrix/static/client/register/style.css">
 <script>
-if (window.onAuthDone != undefined) {
+if (window.onAuthDone) {
     window.onAuthDone();
+} else if (window.opener && window.opener.postMessage) {
+     window.opener.postMessage("authDone", "*");
 }
 </script>
 </head>

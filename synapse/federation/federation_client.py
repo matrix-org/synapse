@@ -136,9 +136,7 @@ class FederationClient(FederationBase):
 
         sent_edus_counter.inc()
 
-        # TODO, add errback, etc.
         self._transaction_queue.enqueue_edu(edu, key=key)
-        return defer.succeed(None)
 
     @log_function
     def send_device_messages(self, destination):
