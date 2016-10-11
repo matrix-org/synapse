@@ -150,14 +150,25 @@ class AuthHandler(BaseHandler):
         # check auth type currently being presented
         errordict = {}
         if 'type' in authdict:
-            if authdict['type'] not in self.checkers:
+            login_type = authdict['type']
+            if login_type not in self.checkers:
                 raise LoginError(400, "", Codes.UNRECOGNIZED)
             try:
-                result = yield self.checkers[authdict['type']](authdict, clientip)
+                result = yield self.checkers[login_type](authdict, clientip)
                 if result:
-                    creds[authdict['type']] = result
+                    creds[login_type] = result
                     self._save_session(session)
             except LoginError, e:
+                if login_type == LoginType.EMAIL_IDENTITY:
+                    # riot used to have a bug where it would request a new
+                    # validation token (thus sending a new email) each time it
+                    # got a 401 with a 'flows' field.
+                    # (https://github.com/vector-im/vector-web/issues/2447).
+                    #
+                    # Grandfather in the old behaviour for now to avoid
+                    # breaking old riot deployments.
+                    raise e
+
                 # this step failed. Merge the error dict into the response
                 # so that the client can have another go.
                 errordict = e.error_dict()
