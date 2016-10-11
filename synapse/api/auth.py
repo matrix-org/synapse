@@ -653,7 +653,7 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def _get_appservice_user_id(self, request):
-        app_service = yield self.store.get_app_service_by_token(
+        app_service = self.store.get_app_service_by_token(
             get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
@@ -855,13 +855,12 @@ class Auth(object):
         }
         defer.returnValue(user_info)
 
-    @defer.inlineCallbacks
     def get_appservice_by_req(self, request):
         try:
             token = get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
-            service = yield self.store.get_app_service_by_token(token)
+            service = self.store.get_app_service_by_token(token)
             if not service:
                 logger.warn("Unrecognised appservice access token: %s" % (token,))
                 raise AuthError(
@@ -870,7 +869,7 @@ class Auth(object):
                     errcode=Codes.UNKNOWN_TOKEN
                 )
             request.authenticated_entity = service.sender
-            defer.returnValue(service)
+            return defer.succeed(service)
         except KeyError:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token."

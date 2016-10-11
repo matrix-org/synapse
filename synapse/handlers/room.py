@@ -437,7 +437,7 @@ class RoomEventSource(object):
             logger.warn("Stream has topological part!!!! %r", from_key)
             from_key = "s%s" % (from_token.stream,)
 
-        app_service = yield self.store.get_app_service_by_user_id(
+        app_service = self.store.get_app_service_by_user_id(
             user.to_string()
         )
         if app_service:

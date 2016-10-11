@@ -17,7 +17,7 @@ from twisted.internet import defer
 from .. import unittest
 
 from synapse.handlers.register import RegistrationHandler
-from synapse.types import UserID
+from synapse.types import UserID, create_requester
 
 from tests.utils import setup_test_homeserver
 
@@ -57,8 +57,9 @@ class RegistrationTestCase(unittest.TestCase):
         local_part = "someone"
         display_name = "someone"
         user_id = "@someone:test"
+        requester = create_requester("@as:test")
         result_user_id, result_token = yield self.handler.get_or_create_user(
-            local_part, display_name, duration_ms)
+            requester, local_part, display_name, duration_ms)
         self.assertEquals(result_user_id, user_id)
         self.assertEquals(result_token, 'secret')
 
@@ -74,7 +75,8 @@ class RegistrationTestCase(unittest.TestCase):
         local_part = "frank"
         display_name = "Frank"
         user_id = "@frank:test"
+        requester = create_requester("@as:test")
         result_user_id, result_token = yield self.handler.get_or_create_user(
-            local_part, display_name, duration_ms)
+            requester, local_part, display_name, duration_ms)
         self.assertEquals(result_user_id, user_id)
         self.assertEquals(result_token, 'secret')

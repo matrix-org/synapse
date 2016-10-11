@@ -788,7 +788,7 @@ class SyncHandler(object):
 
         assert since_token
 
-        app_service = yield self.store.get_app_service_by_user_id(user_id)
+        app_service = self.store.get_app_service_by_user_id(user_id)
         if app_service:
             rooms = yield self.store.get_app_service_rooms(app_service)
             joined_room_ids = set(r.room_id for r in rooms)
