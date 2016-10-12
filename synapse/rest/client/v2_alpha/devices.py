@@ -17,7 +17,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api import constants
+from synapse.api import constants, errors
 from synapse.http import servlet
 from ._base import client_v2_patterns
 
@@ -72,7 +72,16 @@ class DeviceRestServlet(servlet.RestServlet):
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, device_id):
-        body = servlet.parse_json_object_from_request(request)
+        try:
+            body = servlet.parse_json_object_from_request(request)
+
+        except errors.SynapseError as e:
+            if e.errcode == errors.Codes.NOT_JSON:
+                # deal with older clients which didn't pass a JSON dict
+                # the same as those that pass an empty dict
+                body = {}
+            else:
+                raise
 
         authed, result, params, _ = yield self.auth_handler.check_auth([
             [constants.LoginType.PASSWORD],
