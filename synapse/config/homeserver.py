@@ -30,7 +30,7 @@ from .saml2 import SAML2Config
 from .cas import CasConfig
 from .password import PasswordConfig
 from .jwt import JWTConfig
-from .ldap import LDAPConfig
+from .password_auth_providers import PasswordAuthProviderConfig
 from .emailconfig import EmailConfig
 from .workers import WorkerConfig
 
@@ -39,8 +39,8 @@ class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
                        VoipConfig, RegistrationConfig, MetricsConfig, ApiConfig,
                        AppServiceConfig, KeyConfig, SAML2Config, CasConfig,
-                       JWTConfig, LDAPConfig, PasswordConfig, EmailConfig,
-                       WorkerConfig,):
+                       JWTConfig, PasswordConfig, EmailConfig,
+                       WorkerConfig, PasswordAuthProviderConfig,):
     pass
 
 
