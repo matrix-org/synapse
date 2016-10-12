@@ -105,9 +105,10 @@ class TlsConfig(Config):
         # synapse is using.
         #
         # Homeservers are permitted to cache the list of TLS fingerprints
-        # returned in the key responses. It may be necessary to publish the
-        # fingerprints of a new certificate and wait for the caches on other
-        # servers to expire before deploying it.
+        # returned in the key responses up to the "valid_until_ts" returned in
+        # key. It may be necessary to publish the fingerprints of a new
+        # certificate and wait until the "valid_until_ts" of the previous key
+        # responses have passed before deploying it.
         tls_fingerprints: []
         # tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
         """ % locals()
