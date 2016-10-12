@@ -46,9 +46,12 @@ class LocalKey(Resource):
                     "expired_ts": # integer posix timestamp when the key expired.
                     "key": # base64 encoded NACL verification key.
                 }
-            }
-            "tls_fingerprints": # Fingerprints of the TLS certs this server uses.
-                - {"sha256": "..."}
+            },
+            "tls_fingerprints": [ # Fingerprints of the TLS certs this server uses.
+                {
+                    "sha256": # base64 encoded sha256 fingerprint of the X509 cert
+                },
+            ],
             "signatures": {
                 "this.server.example.com": {
                    "algorithm:version": # NACL signature for this server

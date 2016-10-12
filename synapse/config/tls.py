@@ -109,7 +109,7 @@ class TlsConfig(Config):
         # fingerprints of a new certificate and wait for the caches on other
         # servers to expire before deploying it.
         tls_fingerprints: []
-        #- {"sha256": "<base64_encoded_sha256_fingerprint>"}
+        # tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
         """ % locals()
 
     def read_tls_certificate(self, cert_path):
