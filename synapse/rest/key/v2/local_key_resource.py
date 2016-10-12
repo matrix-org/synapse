@@ -19,8 +19,6 @@ from synapse.http.server import respond_with_json_bytes
 from signedjson.sign import sign_json
 from unpaddedbase64 import encode_base64
 from canonicaljson import encode_canonical_json
-from hashlib import sha256
-from OpenSSL import crypto
 import logging
 
 
@@ -48,8 +46,12 @@ class LocalKey(Resource):
                     "expired_ts": # integer posix timestamp when the key expired.
                     "key": # base64 encoded NACL verification key.
                 }
-            }
-            "tls_certificate": # base64 ASN.1 DER encoded X.509 tls cert.
+            },
+            "tls_fingerprints": [ # Fingerprints of the TLS certs this server uses.
+                {
+                    "sha256": # base64 encoded sha256 fingerprint of the X509 cert
+                },
+            ],
             "signatures": {
                 "this.server.example.com": {
                    "algorithm:version": # NACL signature for this server
@@ -90,21 +92,14 @@ class LocalKey(Resource):
                 u"expired_ts": key.expired,
             }
 
-        x509_certificate_bytes = crypto.dump_certificate(
-            crypto.FILETYPE_ASN1,
-            self.config.tls_certificate
-        )
-
-        sha256_fingerprint = sha256(x509_certificate_bytes).digest()
+        tls_fingerprints = self.config.tls_fingerprints
 
         json_object = {
             u"valid_until_ts": self.valid_until_ts,
             u"server_name": self.config.server_name,
             u"verify_keys": verify_keys,
             u"old_verify_keys": old_verify_keys,
-            u"tls_fingerprints": [{
-                u"sha256": encode_base64(sha256_fingerprint),
-            }]
+            u"tls_fingerprints": tls_fingerprints,
         }
         for key in self.config.signing_key:
             json_object = sign_json(
