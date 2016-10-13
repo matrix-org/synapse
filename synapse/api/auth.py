@@ -1001,16 +1001,6 @@ class Auth(object):
                         403,
                         "You are not allowed to set others state"
                     )
-                else:
-                    sender_domain = UserID.from_string(
-                        event.user_id
-                    ).domain
-
-                    if sender_domain != event.state_key:
-                        raise AuthError(
-                            403,
-                            "You are not allowed to set others state"
-                        )
 
         return True
 

@@ -19,6 +19,9 @@ from OpenSSL import crypto
 import subprocess
 import os
 
+from hashlib import sha256
+from unpaddedbase64 import encode_base64
+
 GENERATE_DH_PARAMS = False
 
 
@@ -41,6 +44,19 @@ class TlsConfig(Config):
         self.tls_dh_params_path = self.check_file(
             config.get("tls_dh_params_path"), "tls_dh_params"
         )
+
+        self.tls_fingerprints = config["tls_fingerprints"]
+
+        # Check that our own certificate is included in the list of fingerprints
+        # and include it if it is not.
+        x509_certificate_bytes = crypto.dump_certificate(
+            crypto.FILETYPE_ASN1,
+            self.tls_certificate
+        )
+        sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
+        sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
+        if sha256_fingerprint not in sha256_fingerprints:
+            self.tls_fingerprints.append({u"sha256": sha256_fingerprint})
 
         # This config option applies to non-federation HTTP clients
         # (e.g. for talking to recaptcha, identity servers, and such)
@@ -73,6 +89,28 @@ class TlsConfig(Config):
 
         # Don't bind to the https port
         no_tls: False
+
+        # List of allowed TLS fingerprints for this server to publish along
+        # with the signing keys for this server. Other matrix servers that
+        # make HTTPS requests to this server will check that the TLS
+        # certificates returned by this server match one of the fingerprints.
+        #
+        # Synapse automatically adds its the fingerprint of its own certificate
+        # to the list. So if federation traffic is handle directly by synapse
+        # then no modification to the list is required.
+        #
+        # If synapse is run behind a load balancer that handles the TLS then it
+        # will be necessary to add the fingerprints of the certificates used by
+        # the loadbalancers to this list if they are different to the one
+        # synapse is using.
+        #
+        # Homeservers are permitted to cache the list of TLS fingerprints
+        # returned in the key responses up to the "valid_until_ts" returned in
+        # key. It may be necessary to publish the fingerprints of a new
+        # certificate and wait until the "valid_until_ts" of the previous key
+        # responses have passed before deploying it.
+        tls_fingerprints: []
+        # tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
         """ % locals()
 
     def read_tls_certificate(self, cert_path):
