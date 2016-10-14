@@ -458,27 +458,17 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
 
     @defer.inlineCallbacks
     def get_user_id_by_threepid(self, medium, address):
-        def f(txn):
-            sql = (
-                "SELECT user_id"
-                " FROM user_threepids"
-                " WHERE medium = ? AND LOWER(address) = LOWER(?)"
-            )
-            txn.execute(sql, (medium, address))
-            row = txn.fetchone()
-            if not row:
-                return None
-            if txn.rowcount > 1:
-                raise StoreError(500, "More than one row matched")
-            return {
-                "user_id": row[0]
-            }
-
-        res = yield self.runInteraction(
-            "get_user_id_by_threepid", f
+        ret = yield self._simple_select_one(
+            "user_threepids",
+            {
+                "medium": medium,
+                "address": address
+            },
+            ['user_id'], True, 'get_user_id_by_threepid'
         )
-
-        defer.returnValue(res)
+        if ret:
+            defer.returnValue(ret['user_id'])
+        defer.returnValue(None)
 
     def user_delete_threepids(self, user_id):
         return self._simple_delete(
