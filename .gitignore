@@ -24,10 +24,10 @@ homeserver*.yaml
 .coverage
 htmlcov
 
-demo/*.db
-demo/*.log
-demo/*.log.*
-demo/*.pid
+demo/*/*.db
+demo/*/*.log
+demo/*/*.log.*
+demo/*/*.pid
 demo/media_store.*
 demo/etc
 

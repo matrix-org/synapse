@@ -328,7 +328,7 @@ class Mailer(object):
         return messagevars
 
     @defer.inlineCallbacks
-    def make_summary_text(self, notifs_by_room, state_by_room,
+    def make_summary_text(self, notifs_by_room, room_state_ids,
                           notif_events, user_id, reason):
         if len(notifs_by_room) == 1:
             # Only one room has new stuff
@@ -338,14 +338,18 @@ class Mailer(object):
             # want the generated-from-names one here otherwise we'll
             # end up with, "new message from Bob in the Bob room"
             room_name = yield calculate_room_name(
-                self.store, state_by_room[room_id], user_id, fallback_to_members=False
+                self.store, room_state_ids[room_id], user_id, fallback_to_members=False
             )
 
-            my_member_event = state_by_room[room_id][("m.room.member", user_id)]
+            my_member_event_id = room_state_ids[room_id][("m.room.member", user_id)]
+            my_member_event = yield self.store.get_event(my_member_event_id)
             if my_member_event.content["membership"] == "invite":
-                inviter_member_event = state_by_room[room_id][
+                inviter_member_event_id = room_state_ids[room_id][
                     ("m.room.member", my_member_event.sender)
                 ]
+                inviter_member_event = yield self.store.get_event(
+                    inviter_member_event_id
+                )
                 inviter_name = name_from_member_event(inviter_member_event)
 
                 if room_name is None:
@@ -364,8 +368,11 @@ class Mailer(object):
             if len(notifs_by_room[room_id]) == 1:
                 # There is just the one notification, so give some detail
                 event = notif_events[notifs_by_room[room_id][0]["event_id"]]
-                if ("m.room.member", event.sender) in state_by_room[room_id]:
-                    state_event = state_by_room[room_id][("m.room.member", event.sender)]
+                if ("m.room.member", event.sender) in room_state_ids[room_id]:
+                    state_event_id = room_state_ids[room_id][
+                        ("m.room.member", event.sender)
+                    ]
+                    state_event = yield self.get_event(state_event_id)
                     sender_name = name_from_member_event(state_event)
 
                 if sender_name is not None and room_name is not None:
@@ -395,11 +402,13 @@ class Mailer(object):
                         for n in notifs_by_room[room_id]
                     ]))
 
+                    member_events = yield self.store.get_events([
+                        room_state_ids[room_id][("m.room.member", s)]
+                        for s in sender_ids
+                    ])
+
                     defer.returnValue(MESSAGES_FROM_PERSON % {
-                        "person": descriptor_from_member_events([
-                            state_by_room[room_id][("m.room.member", s)]
-                            for s in sender_ids
-                        ]),
+                        "person": descriptor_from_member_events(member_events.values()),
                         "app": self.app_name,
                     })
         else:
@@ -419,11 +428,13 @@ class Mailer(object):
                     for n in notifs_by_room[reason['room_id']]
                 ]))
 
+                member_events = yield self.store.get_events([
+                    room_state_ids[room_id][("m.room.member", s)]
+                    for s in sender_ids
+                ])
+
                 defer.returnValue(MESSAGES_FROM_PERSON_AND_OTHERS % {
-                    "person": descriptor_from_member_events([
-                        state_by_room[reason['room_id']][("m.room.member", s)]
-                        for s in sender_ids
-                    ]),
+                    "person": descriptor_from_member_events(member_events.values()),
                     "app": self.app_name,
                 })
 

@@ -197,7 +197,7 @@ class PusherServer(HomeServer):
                     yield start_pusher(user_id, app_id, pushkey)
 
             stream = results.get("events")
-            if stream:
+            if stream and stream["rows"]:
                 min_stream_id = stream["rows"][0][0]
                 max_stream_id = stream["position"]
                 preserve_fn(pusher_pool.on_new_notifications)(
@@ -205,7 +205,7 @@ class PusherServer(HomeServer):
                 )
 
             stream = results.get("receipts")
-            if stream:
+            if stream and stream["rows"]:
                 rows = stream["rows"]
                 affected_room_ids = set(row[1] for row in rows)
                 min_stream_id = rows[0][0]
