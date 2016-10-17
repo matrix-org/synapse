@@ -113,6 +113,9 @@ class DataStore(RoomMemberStore, RoomStore,
         self._device_inbox_id_gen = StreamIdGenerator(
             db_conn, "device_max_stream_id", "stream_id"
         )
+        self._public_room_id_gen = StreamIdGenerator(
+            db_conn, "public_room_list_stream", "stream_id"
+        )
 
         self._transaction_id_gen = IdGenerator(db_conn, "sent_transactions", "id")
         self._state_groups_id_gen = IdGenerator(db_conn, "state_groups", "id")
@@ -218,6 +221,8 @@ class DataStore(RoomMemberStore, RoomStore,
         self.find_stream_orderings_looping_call = self._clock.looping_call(
             self._find_stream_orderings_for_times, 60 * 60 * 1000
         )
+
+        self._stream_order_on_start = self.get_room_max_stream_ordering()
 
         super(DataStore, self).__init__(hs)
 

@@ -42,6 +42,7 @@ The current available worker applications are:
  * synapse.app.appservice - handles output traffic to Application Services
  * synapse.app.federation_reader - handles receiving federation traffic (including public_rooms API)
  * synapse.app.media_repository - handles the media repository.
+ * synapse.app.client_reader - handles client API endpoints like /publicRooms
 
 Each worker configuration file inherits the configuration of the main homeserver
 configuration file.  You can then override configuration specific to that worker,

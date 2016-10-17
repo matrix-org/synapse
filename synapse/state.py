@@ -26,6 +26,7 @@ from synapse.events.snapshot import EventContext
 from synapse.util.async import Linearizer
 
 from collections import namedtuple
+from frozendict import frozendict
 
 import logging
 import hashlib
@@ -58,11 +59,11 @@ class _StateCacheEntry(object):
     __slots__ = ["state", "state_group", "state_id", "prev_group", "delta_ids"]
 
     def __init__(self, state, state_group, prev_group=None, delta_ids=None):
-        self.state = state
+        self.state = frozendict(state)
         self.state_group = state_group
 
         self.prev_group = prev_group
-        self.delta_ids = delta_ids
+        self.delta_ids = frozendict(delta_ids) if delta_ids is not None else None
 
         # The `state_id` is a unique ID we generate that can be used as ID for
         # this collection of state. Usually this would be the same as the
@@ -156,8 +157,9 @@ class StateHandler(object):
         defer.returnValue(state)
 
     @defer.inlineCallbacks
-    def get_current_user_in_room(self, room_id):
-        latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
+    def get_current_user_in_room(self, room_id, latest_event_ids=None):
+        if not latest_event_ids:
+            latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
         entry = yield self.resolve_state_groups(room_id, latest_event_ids)
         joined_users = yield self.store.get_joined_users_from_state(
             room_id, entry.state_id, entry.state
@@ -237,13 +239,7 @@ class StateHandler(object):
         context.prev_state_ids = curr_state
         if event.is_state():
             context.state_group = self.store.get_next_state_group()
-        else:
-            if entry.state_group is None:
-                entry.state_group = self.store.get_next_state_group()
-                entry.state_id = entry.state_group
-            context.state_group = entry.state_group
 
-        if event.is_state():
             key = (event.type, event.state_key)
             if key in context.prev_state_ids:
                 replaces = context.prev_state_ids[key]
@@ -255,10 +251,15 @@ class StateHandler(object):
             context.prev_group = entry.prev_group
             context.delta_ids = entry.delta_ids
             if context.delta_ids is not None:
+                context.delta_ids = dict(context.delta_ids)
                 context.delta_ids[key] = event.event_id
         else:
-            context.current_state_ids = context.prev_state_ids
+            if entry.state_group is None:
+                entry.state_group = self.store.get_next_state_group()
+                entry.state_id = entry.state_group
 
+            context.state_group = entry.state_group
+            context.current_state_ids = context.prev_state_ids
             context.prev_group = entry.prev_group
             context.delta_ids = entry.delta_ids
 

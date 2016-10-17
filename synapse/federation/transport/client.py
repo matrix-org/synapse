@@ -248,12 +248,22 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def get_public_rooms(self, remote_server):
+    def get_public_rooms(self, remote_server, limit, since_token,
+                         search_filter=None):
         path = PREFIX + "/publicRooms"
+
+        args = {}
+        if limit:
+            args["limit"] = [str(limit)]
+        if since_token:
+            args["since"] = [since_token]
+
+        # TODO(erikj): Actually send the search_filter across federation.
 
         response = yield self.client.get_json(
             destination=remote_server,
             path=path,
+            args=args,
         )
 
         defer.returnValue(response)

@@ -23,7 +23,9 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.filtering import Filter
 from synapse.types import UserID, RoomID, RoomAlias
 from synapse.events.utils import serialize_event, format_event_for_client_v2
-from synapse.http.servlet import parse_json_object_from_request, parse_string
+from synapse.http.servlet import (
+    parse_json_object_from_request, parse_string, parse_integer
+)
 
 import logging
 import urllib
@@ -305,7 +307,7 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
         server = parse_string(request, "server", default=None)
 
         try:
-            yield self.auth.get_user_by_req(request)
+            yield self.auth.get_user_by_req(request, allow_guest=True)
         except AuthError as e:
             # We allow people to not be authed if they're just looking at our
             # room list, but require auth when we proxy the request.
@@ -317,11 +319,49 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
             else:
                 pass
 
+        limit = parse_integer(request, "limit", 0)
+        since_token = parse_string(request, "since", None)
+
         handler = self.hs.get_room_list_handler()
         if server:
-            data = yield handler.get_remote_public_room_list(server)
+            data = yield handler.get_remote_public_room_list(
+                server,
+                limit=limit,
+                since_token=since_token,
+            )
         else:
-            data = yield handler.get_aggregated_public_room_list()
+            data = yield handler.get_local_public_room_list(
+                limit=limit,
+                since_token=since_token,
+            )
+
+        defer.returnValue((200, data))
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        yield self.auth.get_user_by_req(request, allow_guest=True)
+
+        server = parse_string(request, "server", default=None)
+        content = parse_json_object_from_request(request)
+
+        limit = int(content.get("limit", 100))
+        since_token = content.get("since", None)
+        search_filter = content.get("filter", None)
+
+        handler = self.hs.get_room_list_handler()
+        if server:
+            data = yield handler.get_remote_public_room_list(
+                server,
+                limit=limit,
+                since_token=since_token,
+                search_filter=search_filter,
+            )
+        else:
+            data = yield handler.get_local_public_room_list(
+                limit=limit,
+                since_token=since_token,
+                search_filter=search_filter,
+            )
 
         defer.returnValue((200, data))
 
@@ -416,13 +456,13 @@ class RoomInitialSyncRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(RoomInitialSyncRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.initial_sync_handler = hs.get_initial_sync_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         pagination_config = PaginationConfig.from_request(request)
-        content = yield self.handlers.message_handler.room_initial_sync(
+        content = yield self.initial_sync_handler.room_initial_sync(
             room_id=room_id,
             requester=requester,
             pagin_config=pagination_config,
@@ -665,12 +705,15 @@ class RoomTypingRestServlet(ClientV1RestServlet):
 
         yield self.presence_handler.bump_presence_active_time(requester.user)
 
+        # Limit timeout to stop people from setting silly typing timeouts.
+        timeout = min(content.get("timeout", 30000), 120000)
+
         if content["typing"]:
             yield self.typing_handler.started_typing(
                 target_user=target_user,
                 auth_user=requester.user,
                 room_id=room_id,
-                timeout=content.get("timeout", 30000),
+                timeout=timeout,
             )
         else:
             yield self.typing_handler.stopped_typing(

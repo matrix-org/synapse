@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from synapse.storage.prepare_database import get_statements
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.engines import PostgresEngine
 
 import logging
 

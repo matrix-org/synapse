@@ -31,33 +31,21 @@ class CreateUserServletTestCase(unittest.TestCase):
         )
         self.request.args = {}
 
-        self.appservice = None
-        self.auth = Mock(get_appservice_by_req=Mock(
-            side_effect=lambda x: defer.succeed(self.appservice))
-        )
-
-        self.auth_result = (False, None, None, None)
-        self.auth_handler = Mock(
-            check_auth=Mock(side_effect=lambda x, y, z: self.auth_result),
-            get_session_data=Mock(return_value=None)
-        )
         self.registration_handler = Mock()
-        self.identity_handler = Mock()
-        self.login_handler = Mock()
 
-        # do the dance to hook it up to the hs global
-        self.handlers = Mock(
-            auth_handler=self.auth_handler,
+        self.appservice = Mock(sender="@as:test")
+        self.datastore = Mock(
+            get_app_service_by_token=Mock(return_value=self.appservice)
+        )
+
+        # do the dance to hook things up to the hs global
+        handlers = Mock(
             registration_handler=self.registration_handler,
-            identity_handler=self.identity_handler,
-            login_handler=self.login_handler
         )
         self.hs = Mock()
-        self.hs.hostname = "supergbig~testing~thing.com"
-        self.hs.get_auth = Mock(return_value=self.auth)
-        self.hs.get_handlers = Mock(return_value=self.handlers)
-        self.hs.config.enable_registration = True
-        # init the thing we're testing
+        self.hs.hostname = "superbig~testing~thing.com"
+        self.hs.get_datastore = Mock(return_value=self.datastore)
+        self.hs.get_handlers = Mock(return_value=handlers)
         self.servlet = CreateUserRestServlet(self.hs)
 
     @defer.inlineCallbacks

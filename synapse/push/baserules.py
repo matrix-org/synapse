@@ -263,6 +263,8 @@ BASE_APPEND_UNDERRIDE_RULES = [
             }
         ]
     },
+    # XXX: once m.direct is standardised everywhere, we should use it to detect
+    # a DM from the user's perspective rather than this heuristic.
     {
         'rule_id': 'global/underride/.m.rule.room_one_to_one',
         'conditions': [
@@ -289,6 +291,34 @@ BASE_APPEND_UNDERRIDE_RULES = [
             }
         ]
     },
+    # XXX: this is going to fire for events which aren't m.room.messages
+    # but are encrypted (e.g. m.call.*)...
+    {
+        'rule_id': 'global/underride/.m.rule.encrypted_room_one_to_one',
+        'conditions': [
+            {
+                'kind': 'room_member_count',
+                'is': '2',
+                '_id': 'member_count',
+            },
+            {
+                'kind': 'event_match',
+                'key': 'type',
+                'pattern': 'm.room.encrypted',
+                '_id': '_encrypted',
+            }
+        ],
+        'actions': [
+            'notify',
+            {
+                'set_tweak': 'sound',
+                'value': 'default'
+            }, {
+                'set_tweak': 'highlight',
+                'value': False
+            }
+        ]
+    },
     {
         'rule_id': 'global/underride/.m.rule.message',
         'conditions': [
@@ -297,6 +327,25 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 'key': 'type',
                 'pattern': 'm.room.message',
                 '_id': '_message',
+            }
+        ],
+        'actions': [
+            'notify', {
+                'set_tweak': 'highlight',
+                'value': False
+            }
+        ]
+    },
+    # XXX: this is going to fire for events which aren't m.room.messages
+    # but are encrypted (e.g. m.call.*)...
+    {
+        'rule_id': 'global/underride/.m.rule.encrypted',
+        'conditions': [
+            {
+                'kind': 'event_match',
+                'key': 'type',
+                'pattern': 'm.room.encrypted',
+                '_id': '_encrypted',
             }
         ],
         'actions': [

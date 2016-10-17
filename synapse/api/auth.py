@@ -72,7 +72,7 @@ class Auth(object):
         auth_events = {
             (e.type, e.state_key): e for e in auth_events.values()
         }
-        self.check(event, auth_events=auth_events, do_sig_check=False)
+        self.check(event, auth_events=auth_events, do_sig_check=do_sig_check)
 
     def check(self, event, auth_events, do_sig_check=True):
         """ Checks if this event is correctly authed.
@@ -91,11 +91,28 @@ class Auth(object):
             if not hasattr(event, "room_id"):
                 raise AuthError(500, "Event has no room_id: %s" % event)
 
-            sender_domain = get_domain_from_id(event.sender)
+            if do_sig_check:
+                sender_domain = get_domain_from_id(event.sender)
+                event_id_domain = get_domain_from_id(event.event_id)
 
-            # Check the sender's domain has signed the event
-            if do_sig_check and not event.signatures.get(sender_domain):
-                raise AuthError(403, "Event not signed by sending server")
+                is_invite_via_3pid = (
+                    event.type == EventTypes.Member
+                    and event.membership == Membership.INVITE
+                    and "third_party_invite" in event.content
+                )
+
+                # Check the sender's domain has signed the event
+                if not event.signatures.get(sender_domain):
+                    # We allow invites via 3pid to have a sender from a different
+                    # HS, as the sender must match the sender of the original
+                    # 3pid invite. This is checked further down with the
+                    # other dedicated membership checks.
+                    if not is_invite_via_3pid:
+                        raise AuthError(403, "Event not signed by sender's server")
+
+                # Check the event_id's domain has signed the event
+                if not event.signatures.get(event_id_domain):
+                    raise AuthError(403, "Event not signed by sending server")
 
             if auth_events is None:
                 # Oh, we don't know what the state of the room was, so we
@@ -491,6 +508,9 @@ class Auth(object):
         if not invite_event:
             return False
 
+        if invite_event.sender != event.sender:
+            return False
+
         if event.user_id != invite_event.user_id:
             return False
 
@@ -633,7 +653,7 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def _get_appservice_user_id(self, request):
-        app_service = yield self.store.get_app_service_by_token(
+        app_service = self.store.get_app_service_by_token(
             get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
@@ -835,13 +855,12 @@ class Auth(object):
         }
         defer.returnValue(user_info)
 
-    @defer.inlineCallbacks
     def get_appservice_by_req(self, request):
         try:
             token = get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
-            service = yield self.store.get_app_service_by_token(token)
+            service = self.store.get_app_service_by_token(token)
             if not service:
                 logger.warn("Unrecognised appservice access token: %s" % (token,))
                 raise AuthError(
@@ -850,7 +869,7 @@ class Auth(object):
                     errcode=Codes.UNKNOWN_TOKEN
                 )
             request.authenticated_entity = service.sender
-            defer.returnValue(service)
+            return defer.succeed(service)
         except KeyError:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token."
@@ -982,16 +1001,6 @@ class Auth(object):
                         403,
                         "You are not allowed to set others state"
                     )
-                else:
-                    sender_domain = UserID.from_string(
-                        event.user_id
-                    ).domain
-
-                    if sender_domain != event.state_key:
-                        raise AuthError(
-                            403,
-                            "You are not allowed to set others state"
-                        )
 
         return True
 

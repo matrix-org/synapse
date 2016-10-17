@@ -105,9 +105,6 @@ class RoomTypingTestCase(RestTestCase):
         # Need another user to make notifications actually work
         yield self.join(self.room_id, user="@jim:red")
 
-    def tearDown(self):
-        self.hs.get_typing_handler().tearDown()
-
     @defer.inlineCallbacks
     def test_set_typing(self):
         (code, _) = yield self.mock_resource.trigger(
@@ -147,7 +144,7 @@ class RoomTypingTestCase(RestTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 1)
 
-        self.clock.advance_time(31)
+        self.clock.advance_time(36)
 
         self.assertEquals(self.event_source.get_current_key(), 2)
 
