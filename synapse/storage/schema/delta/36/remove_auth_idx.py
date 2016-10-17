@@ -36,8 +36,6 @@ DROP INDEX IF EXISTS transactions_have_ref;
 -- and is used incredibly rarely.
 DROP INDEX IF EXISTS events_order_topo_stream_room;
 
--- TODO: Drop event_auth stuff.
-
 DROP INDEX IF EXISTS event_search_ev_idx;
 """
 
