@@ -372,7 +372,7 @@ class Mailer(object):
                     state_event_id = room_state_ids[room_id][
                         ("m.room.member", event.sender)
                     ]
-                    state_event = yield self.get_event(state_event_id)
+                    state_event = yield self.store.get_event(state_event_id)
                     sender_name = name_from_member_event(state_event)
 
                 if sender_name is not None and room_name is not None:
