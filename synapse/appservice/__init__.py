@@ -81,7 +81,7 @@ class ApplicationService(object):
     NS_LIST = [NS_USERS, NS_ALIASES, NS_ROOMS]
 
     def __init__(self, token, url=None, namespaces=None, hs_token=None,
-                 sender=None, id=None, protocols=None):
+                 sender=None, id=None, protocols=None, rate_limited=True):
         self.token = token
         self.url = url
         self.hs_token = hs_token
@@ -94,6 +94,8 @@ class ApplicationService(object):
             self.protocols = set(protocols)
         else:
             self.protocols = set()
+
+        self.rate_limited = rate_limited
 
     def _check_namespaces(self, namespaces):
         # Sanity check that it is of the form:
@@ -233,6 +235,9 @@ class ApplicationService(object):
 
     def is_exclusive_room(self, room_id):
         return self._is_exclusive(ApplicationService.NS_ROOMS, room_id)
+
+    def is_rate_limited(self):
+        return self.rate_limited
 
     def __str__(self):
         return "ApplicationService: %s" % (self.__dict__,)
