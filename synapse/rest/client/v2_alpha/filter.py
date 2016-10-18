@@ -74,6 +74,7 @@ class CreateFilterRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, user_id):
+
         target_user = UserID.from_string(user_id)
         requester = yield self.auth.get_user_by_req(request)
 
@@ -81,10 +82,9 @@ class CreateFilterRestServlet(RestServlet):
             raise AuthError(403, "Cannot create filters for other users")
 
         if not self.hs.is_mine(target_user):
-            raise SynapseError(400, "Can only create filters for local users")
+            raise AuthError(403, "Can only create filters for local users")
 
         content = parse_json_object_from_request(request)
-
         filter_id = yield self.filtering.add_user_filter(
             user_localpart=target_user.localpart,
             user_filter=content,
