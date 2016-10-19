@@ -139,7 +139,7 @@ def register_process_collector():
             "cpu_system_seconds_total", lambda: float(stats["stime"]) / TICKS_PER_SEC
         )
         process_metrics.register_callback(
-            "cpu_seconds_total", lambda: (float(stats["utime"]) + float(stats["stime"])) / TICKS_PER_SEC
+            "cpu_seconds_total", lambda: (float(stats["utime"] + stats["stime"])) / TICKS_PER_SEC
         )
 
         process_metrics.register_callback(
