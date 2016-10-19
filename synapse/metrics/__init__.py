@@ -113,6 +113,7 @@ def render_all():
 # process resource usage
 
 TICKS_PER_SEC = 100
+BYTES_PER_PAGE = 4096
 
 rusage = None
 stats = None
@@ -186,6 +187,13 @@ process_metrics.register_callback(
 )
 process_metrics.register_callback(
     "cpu_seconds_total", lambda: (float(stats[11]) + float(stats[12])) / TICKS_PER_SEC
+)
+
+process_metrics.register_callback(
+    "virtual_memory_bytes", lambda: int(stats[20])
+)
+process_metrics.register_callback(
+    "resident_memory_bytes", lambda: int(stats[21]) * BYTES_PER_PAGE
 )
 
 reactor_metrics = get_metrics_for("reactor")
