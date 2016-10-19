@@ -52,6 +52,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.util.logcontext import LoggingContext
 from synapse.metrics import register_memory_metrics, get_metrics_for
+from synapse.metrics.process_collector import register_process_collector
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.replication.resource import ReplicationResource, REPLICATION_PREFIX
 from synapse.federation.transport.server import TransportLayerServer
@@ -337,6 +338,7 @@ def setup(config_options):
         hs.get_replication_layer().start_get_pdu_cache()
 
         register_memory_metrics(hs)
+        register_process_collector()
 
     reactor.callWhenRunning(start)
 

@@ -13,14 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Because otherwise 'resource' collides with synapse.metrics.resource
-from __future__ import absolute_import
-
 import logging
-from resource import getrusage, RUSAGE_SELF
 import functools
-import os
-import stat
 import time
 import gc
 
@@ -112,141 +106,6 @@ def render_all():
 
     return "\n".join(strs)
 
-
-# Now register some standard process-wide state metrics, to give indications of
-# process resource usage
-
-TICKS_PER_SEC = 100
-BYTES_PER_PAGE = 4096
-
-HAVE_PROC_STAT = os.path.exists("/proc/stat")
-HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
-HAVE_PROC_SELF_LIMITS = os.path.exists("/proc/self/limits")
-HAVE_PROC_SELF_FDS = os.path.exists("/proc/self/fds")
-
-rusage = None
-stats = None
-fd_counts = None
-
-# In order to report process_start_time_seconds we need to know the machine's
-# boot time, because the value in /proc/self/stat is relative to this
-boot_time = None
-if HAVE_PROC_STAT:
-    with open("/proc/stat") as _procstat:
-        for line in _procstat:
-            if line.startswith("btime "):
-                boot_time = int(line.split()[1])
-
-TYPES = {
-    stat.S_IFSOCK: "SOCK",
-    stat.S_IFLNK: "LNK",
-    stat.S_IFREG: "REG",
-    stat.S_IFBLK: "BLK",
-    stat.S_IFDIR: "DIR",
-    stat.S_IFCHR: "CHR",
-    stat.S_IFIFO: "FIFO",
-}
-
-
-def update_resource_metrics():
-    global rusage
-    rusage = getrusage(RUSAGE_SELF)
-
-    if HAVE_PROC_SELF_STAT:
-        global stats
-        with open("/proc/self/stat") as s:
-            line = s.read()
-            # line is PID (command) more stats go here ...
-            stats = line.split(") ", 1)[1].split(" ")
-
-    global fd_counts
-    fd_counts = _process_fds()
-
-
-def _process_fds():
-    counts = {(k,): 0 for k in TYPES.values()}
-    counts[("other",)] = 0
-
-    # Not every OS will have a /proc/self/fd directory
-    if not HAVE_PROC_SELF_FDS:
-        return counts
-
-    for fd in os.listdir("/proc/self/fd"):
-        try:
-            s = os.stat("/proc/self/fd/%s" % (fd))
-            fmt = stat.S_IFMT(s.st_mode)
-            if fmt in TYPES:
-                t = TYPES[fmt]
-            else:
-                t = "other"
-
-            counts[(t,)] += 1
-        except OSError:
-            # the dirh itself used by listdir() is usually missing by now
-            pass
-
-    return counts
-
-
-# Legacy synapse-invented metric names
-
-resource_metrics = get_metrics_for("process.resource")
-
-resource_metrics.register_collector(update_resource_metrics)
-
-# msecs
-resource_metrics.register_callback("utime", lambda: rusage.ru_utime * 1000)
-resource_metrics.register_callback("stime", lambda: rusage.ru_stime * 1000)
-
-# kilobytes
-resource_metrics.register_callback("maxrss", lambda: rusage.ru_maxrss * 1024)
-
-get_metrics_for("process").register_callback("fds", _process_fds, labels=["type"])
-
-# New prometheus-standard metric names
-
-process_metrics = get_metrics_for("process")
-
-if HAVE_PROC_SELF_STAT:
-    process_metrics.register_callback(
-        "cpu_user_seconds_total", lambda: float(stats[11]) / TICKS_PER_SEC
-    )
-    process_metrics.register_callback(
-        "cpu_system_seconds_total", lambda: float(stats[12]) / TICKS_PER_SEC
-    )
-    process_metrics.register_callback(
-        "cpu_seconds_total", lambda: (float(stats[11]) + float(stats[12])) / TICKS_PER_SEC
-    )
-
-    process_metrics.register_callback(
-        "virtual_memory_bytes", lambda: int(stats[20])
-    )
-    process_metrics.register_callback(
-        "resident_memory_bytes", lambda: int(stats[21]) * BYTES_PER_PAGE
-    )
-
-    process_metrics.register_callback(
-        "start_time_seconds", lambda: boot_time + int(stats[19]) / TICKS_PER_SEC
-    )
-
-if HAVE_PROC_SELF_FDS:
-    process_metrics.register_callback(
-        "open_fds", lambda: sum(fd_counts.values())
-    )
-
-if HAVE_PROC_SELF_LIMITS:
-    def _get_max_fds():
-        with open("/proc/self/limits") as limits:
-            for line in limits:
-                if not line.startswith("Max open files "):
-                    continue
-                # Line is  Max open files  $SOFT  $HARD
-                return int(line.split()[3])
-        return None
-
-    process_metrics.register_callback(
-        "max_fds", lambda: _get_max_fds()
-    )
 
 reactor_metrics = get_metrics_for("reactor")
 tick_time = reactor_metrics.register_distribution("tick_time")
