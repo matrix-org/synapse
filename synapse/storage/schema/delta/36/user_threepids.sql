@@ -13,4 +13,11 @@
  * limitations under the License.
  */
 
-CREATE INDEX user_threepids_medium_address on user_threepids (medium, LOWER(address));
+/*
+ * Update any email addresses that were stored with mixed case into all
+ * lowercase
+ */
+UPDATE user_threepids SET address = LOWER(address) where medium = 'email';
+
+/* Add an index for the select we do on passwored reset */
+CREATE INDEX user_threepids_medium_address on user_threepids (medium, address);
