@@ -98,9 +98,9 @@ class CallbackMetric(BaseMetric):
         value = self.callback()
 
         if self.is_scalar():
-            return ["%s %d" % (self.name, value)]
+            return ["%s %.12g" % (self.name, value)]
 
-        return ["%s%s %d" % (self.name, self._render_key(k), value[k])
+        return ["%s%s %.12g" % (self.name, self._render_key(k), value[k])
                 for k in sorted(value.keys())]
 
 
