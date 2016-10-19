@@ -118,6 +118,7 @@ BYTES_PER_PAGE = 4096
 HAVE_PROC_STAT = os.path.exists("/proc/stat")
 HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 HAVE_PROC_SELF_LIMITS = os.path.exists("/proc/self/limits")
+HAVE_PROC_SELF_FDS = os.path.exists("/proc/self/fds")
 
 rusage = None
 stats = None
@@ -162,7 +163,7 @@ def _process_fds():
     counts[("other",)] = 0
 
     # Not every OS will have a /proc/self/fd directory
-    if not os.path.exists("/proc/self/fd"):
+    if not HAVE_PROC_SELF_FDS:
         return counts
 
     for fd in os.listdir("/proc/self/fd"):
@@ -217,11 +218,12 @@ if HAVE_PROC_SELF_STAT:
     )
 
     process_metrics.register_callback(
-        "open_fds", lambda: sum(fd_counts.values())
+        "start_time_seconds", lambda: boot_time + int(stats[19]) / TICKS_PER_SEC
     )
 
+if HAVE_PROC_SELF_FDS:
     process_metrics.register_callback(
-        "start_time_seconds", lambda: boot_time + int(stats[19]) / TICKS_PER_SEC
+        "open_fds", lambda: sum(fd_counts.values())
     )
 
 if HAVE_PROC_SELF_LIMITS:
