@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, SynapseError, LimitExceededError
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
@@ -237,6 +237,18 @@ class MessageHandler(BaseHandler):
             raise SynapseError(
                 500,
                 "Tried to send member event through non-member codepath"
+            )
+
+        time_now = self.clock.time()
+        allowed, time_allowed = self.ratelimiter.send_message(
+            event.sender, time_now,
+            msg_rate_hz=self.hs.config.rc_messages_per_second,
+            burst_count=self.hs.config.rc_message_burst_count,
+            update=False,
+        )
+        if not allowed:
+            raise LimitExceededError(
+                retry_after_ms=int(1000 * (time_allowed - time_now)),
             )
 
         user = UserID.from_string(event.sender)
