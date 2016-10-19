@@ -85,7 +85,6 @@ class LoggingTransaction(object):
         sql_logger.debug("[SQL] {%s} %s", self.name, sql)
 
         sql = self.database_engine.convert_param_style(sql)
-
         if args:
             try:
                 sql_logger.debug(

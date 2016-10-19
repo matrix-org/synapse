@@ -189,7 +189,7 @@ class MockHttpResource(HttpServer):
                     )
                     defer.returnValue((code, response))
                 except CodeMessageException as e:
-                    defer.returnValue((e.code, cs_error(e.msg)))
+                    defer.returnValue((e.code, cs_error(e.msg, code=e.errcode)))
 
         raise KeyError("No event can handle %s" % path)
 
