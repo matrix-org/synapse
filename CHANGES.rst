@@ -1,4 +1,31 @@
-Changes in synapse v0.18.1 (2016-10-0)
+Changes in synapse v0.18.2-rc1 (2016-10-17)
+===========================================
+
+Changes:
+
+* Remove redundant event_auth index (PR #1113)
+* Reduce DB hits for replication (PR #1141)
+* Implement pluggable password auth (PR #1155)
+* Remove rate limiting from app service senders and fix get_or_create_user
+  requester, thanks to Patrik Oldsberg (PR #1157)
+* window.postmessage for Interactive Auth fallback (PR #1159)
+* Use sys.executable instead of hardcoded python, thanks to Pedro Larroy
+  (PR #1162)
+* Add config option for adding additional TLS fingerprints (PR #1167)
+* User-interactive auth on delete device (PR #1168)
+
+
+Bug fixes:
+
+* Fix not being allowed to set your own state_key, thanks to Patrik Oldsberg
+  (PR #1150)
+* Fix interactive auth to return 401 from for incorrect password (PR #1160,
+  #1166)
+* Fix email push notifs being dropped (PR #1169)
+
+
+
+Changes in synapse v0.18.1 (2016-10-05)
 ======================================
 
 No changes since v0.18.1-rc1
