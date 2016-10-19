@@ -41,9 +41,18 @@ TYPES = {
     stat.S_IFIFO: "FIFO",
 }
 
+# Field indexes from /proc/self/stat, taken from the proc(5) manpage
+STAT_FIELDS = {
+    "utime": 14,
+    "stime": 15,
+    "starttime": 22,
+    "vsize": 23,
+    "rss": 24,
+}
+
 
 rusage = None
-stats = None
+stats = {}
 fd_counts = None
 
 # In order to report process_start_time_seconds we need to know the
@@ -66,7 +75,12 @@ def update_resource_metrics():
         with open("/proc/self/stat") as s:
             line = s.read()
             # line is PID (command) more stats go here ...
-            stats = line.split(") ", 1)[1].split(" ")
+            raw_stats = line.split(") ", 1)[1].split(" ")
+
+            for (name, index) in STAT_FIELDS.iteritems():
+                # subtract 3 from the index, because proc(5) is 1-based, and
+                # we've lost the first two fields in PID and COMMAND above
+                stats[name] = int(raw_stats[index - 3])
 
     global fd_counts
     fd_counts = _process_fds()
@@ -119,24 +133,24 @@ def register_process_collector():
 
     if HAVE_PROC_SELF_STAT:
         process_metrics.register_callback(
-            "cpu_user_seconds_total", lambda: float(stats[11]) / TICKS_PER_SEC
+            "cpu_user_seconds_total", lambda: float(stats["utime"]) / TICKS_PER_SEC
         )
         process_metrics.register_callback(
-            "cpu_system_seconds_total", lambda: float(stats[12]) / TICKS_PER_SEC
+            "cpu_system_seconds_total", lambda: float(stats["stime"]) / TICKS_PER_SEC
         )
         process_metrics.register_callback(
-            "cpu_seconds_total", lambda: (float(stats[11]) + float(stats[12])) / TICKS_PER_SEC
-        )
-
-        process_metrics.register_callback(
-            "virtual_memory_bytes", lambda: int(stats[20])
-        )
-        process_metrics.register_callback(
-            "resident_memory_bytes", lambda: int(stats[21]) * BYTES_PER_PAGE
+            "cpu_seconds_total", lambda: (float(stats["utime"]) + float(stats["stime"])) / TICKS_PER_SEC
         )
 
         process_metrics.register_callback(
-            "start_time_seconds", lambda: boot_time + int(stats[19]) / TICKS_PER_SEC
+            "virtual_memory_bytes", lambda: int(stats["vsize"])
+        )
+        process_metrics.register_callback(
+            "resident_memory_bytes", lambda: int(stats["rss"]) * BYTES_PER_PAGE
+        )
+
+        process_metrics.register_callback(
+            "start_time_seconds", lambda: boot_time + int(stats["starttime"]) / TICKS_PER_SEC
         )
 
     if HAVE_PROC_SELF_FD:
