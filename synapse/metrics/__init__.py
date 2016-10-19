@@ -119,6 +119,17 @@ rusage = None
 stats = None
 fd_counts = None
 
+# In order to report process_start_time_seconds we need to know the machine's
+# boot time, because the value in /proc/self/stat is relative to this
+boot_time = None
+try:
+    with open("/proc/stat") as _procstat:
+        for line in _procstat:
+            if line.startswith("btime "):
+                boot_time = int(line.split()[1])
+except IOError:
+    pass
+
 TYPES = {
     stat.S_IFSOCK: "SOCK",
     stat.S_IFLNK: "LNK",
@@ -216,6 +227,10 @@ def _get_max_fds():
 
 process_metrics.register_callback(
     "max_fds", lambda: _get_max_fds()
+)
+
+process_metrics.register_callback(
+    "start_time_seconds", lambda: boot_time + int(stats[19]) / TICKS_PER_SEC
 )
 
 reactor_metrics = get_metrics_for("reactor")
