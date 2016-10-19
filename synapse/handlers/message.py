@@ -239,6 +239,9 @@ class MessageHandler(BaseHandler):
                 "Tried to send member event through non-member codepath"
             )
 
+        # We check here if we are currently being rate limited, so that we
+        # don't do unnecessary work. We check again just before we actually
+        # send the event.
         time_now = self.clock.time()
         allowed, time_allowed = self.ratelimiter.send_message(
             event.sender, time_now,
