@@ -112,12 +112,20 @@ def render_all():
 # Now register some standard process-wide state metrics, to give indications of
 # process resource usage
 
-rusage = None
+TICKS_PER_SEC = 100
 
+rusage = None
+stats = None
 
 def update_resource_metrics():
     global rusage
     rusage = getrusage(RUSAGE_SELF)
+
+    global stats
+    with open("/proc/self/stat") as s:
+        line = s.read()
+        # line is PID (command) more stats go here ...
+        stats = line.split(") ", 1)[1].split(" ")
 
 ## Legacy synapse-invented metric names
 
@@ -171,13 +179,13 @@ get_metrics_for("process").register_callback("fds", _process_fds, labels=["type"
 process_metrics = get_metrics_for("process");
 
 process_metrics.register_callback(
-    "cpu_user_seconds_total", lambda: rusage.ru_utime
+    "cpu_user_seconds_total", lambda: float(stats[11]) / TICKS_PER_SEC
 )
 process_metrics.register_callback(
-    "cpu_system_seconds_total", lambda: rusage.ru_stime
+    "cpu_system_seconds_total", lambda: float(stats[12]) / TICKS_PER_SEC
 )
 process_metrics.register_callback(
-    "cpu_seconds_total", lambda: rusage.ru_utime + rusage.ru_stime
+    "cpu_seconds_total", lambda: (float(stats[11]) + float(stats[12])) / TICKS_PER_SEC
 )
 
 reactor_metrics = get_metrics_for("reactor")
