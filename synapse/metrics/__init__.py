@@ -117,6 +117,17 @@ BYTES_PER_PAGE = 4096
 
 rusage = None
 stats = None
+fd_counts = None
+
+TYPES = {
+    stat.S_IFSOCK: "SOCK",
+    stat.S_IFLNK: "LNK",
+    stat.S_IFREG: "REG",
+    stat.S_IFBLK: "BLK",
+    stat.S_IFDIR: "DIR",
+    stat.S_IFCHR: "CHR",
+    stat.S_IFIFO: "FIFO",
+}
 
 def update_resource_metrics():
     global rusage
@@ -128,26 +139,8 @@ def update_resource_metrics():
         # line is PID (command) more stats go here ...
         stats = line.split(") ", 1)[1].split(" ")
 
-## Legacy synapse-invented metric names
-
-resource_metrics = get_metrics_for("process.resource")
-
-# msecs
-resource_metrics.register_callback("utime", lambda: rusage.ru_utime * 1000)
-resource_metrics.register_callback("stime", lambda: rusage.ru_stime * 1000)
-
-# kilobytes
-resource_metrics.register_callback("maxrss", lambda: rusage.ru_maxrss * 1024)
-
-TYPES = {
-    stat.S_IFSOCK: "SOCK",
-    stat.S_IFLNK: "LNK",
-    stat.S_IFREG: "REG",
-    stat.S_IFBLK: "BLK",
-    stat.S_IFDIR: "DIR",
-    stat.S_IFCHR: "CHR",
-    stat.S_IFIFO: "FIFO",
-}
+    global fd_counts
+    fd_counts = _process_fds()
 
 
 def _process_fds():
@@ -174,6 +167,18 @@ def _process_fds():
 
     return counts
 
+
+## Legacy synapse-invented metric names
+
+resource_metrics = get_metrics_for("process.resource")
+
+# msecs
+resource_metrics.register_callback("utime", lambda: rusage.ru_utime * 1000)
+resource_metrics.register_callback("stime", lambda: rusage.ru_stime * 1000)
+
+# kilobytes
+resource_metrics.register_callback("maxrss", lambda: rusage.ru_maxrss * 1024)
+
 get_metrics_for("process").register_callback("fds", _process_fds, labels=["type"])
 
 ## New prometheus-standard metric names
@@ -194,6 +199,10 @@ process_metrics.register_callback(
 )
 process_metrics.register_callback(
     "resident_memory_bytes", lambda: int(stats[21]) * BYTES_PER_PAGE
+)
+
+process_metrics.register_callback(
+    "open_fds", lambda: sum(fd_counts.values())
 )
 
 reactor_metrics = get_metrics_for("reactor")
