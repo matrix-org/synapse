@@ -205,6 +205,19 @@ process_metrics.register_callback(
     "open_fds", lambda: sum(fd_counts.values())
 )
 
+def _get_max_fds():
+    with open("/proc/self/limits") as limits:
+        for line in limits:
+            if not line.startswith("Max open files "):
+                continue
+            # Line is  Max open files  $SOFT  $HARD
+            return int(line.split()[3])
+    return None
+
+process_metrics.register_callback(
+    "max_fds", lambda: _get_max_fds()
+)
+
 reactor_metrics = get_metrics_for("reactor")
 tick_time = reactor_metrics.register_distribution("tick_time")
 pending_calls_metric = reactor_metrics.register_distribution("pending_calls")
