@@ -119,6 +119,8 @@ def update_resource_metrics():
     global rusage
     rusage = getrusage(RUSAGE_SELF)
 
+## Legacy synapse-invented metric names
+
 resource_metrics = get_metrics_for("process.resource")
 
 # msecs
@@ -164,6 +166,19 @@ def _process_fds():
     return counts
 
 get_metrics_for("process").register_callback("fds", _process_fds, labels=["type"])
+
+## New prometheus-standard metric names
+process_metrics = get_metrics_for("process");
+
+process_metrics.register_callback(
+    "cpu_user_seconds_total", lambda: rusage.ru_utime
+)
+process_metrics.register_callback(
+    "cpu_system_seconds_total", lambda: rusage.ru_stime
+)
+process_metrics.register_callback(
+    "cpu_seconds_total", lambda: rusage.ru_utime + rusage.ru_stime
+)
 
 reactor_metrics = get_metrics_for("reactor")
 tick_time = reactor_metrics.register_distribution("tick_time")
