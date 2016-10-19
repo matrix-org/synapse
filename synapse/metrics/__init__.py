@@ -143,6 +143,7 @@ TYPES = {
     stat.S_IFIFO: "FIFO",
 }
 
+
 def update_resource_metrics():
     global rusage
     rusage = getrusage(RUSAGE_SELF)
@@ -183,7 +184,7 @@ def _process_fds():
     return counts
 
 
-## Legacy synapse-invented metric names
+# Legacy synapse-invented metric names
 
 resource_metrics = get_metrics_for("process.resource")
 
@@ -196,8 +197,9 @@ resource_metrics.register_callback("maxrss", lambda: rusage.ru_maxrss * 1024)
 
 get_metrics_for("process").register_callback("fds", _process_fds, labels=["type"])
 
-## New prometheus-standard metric names
-process_metrics = get_metrics_for("process");
+# New prometheus-standard metric names
+
+process_metrics = get_metrics_for("process")
 
 if HAVE_PROC_SELF_STAT:
     process_metrics.register_callback(
