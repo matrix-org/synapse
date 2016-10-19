@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 all_metrics = []
+all_collectors = []
 
 
 class Metrics(object):
@@ -45,6 +46,9 @@ class Metrics(object):
 
     def __init__(self, name):
         self.name_prefix = name
+
+    def register_collector(self, func):
+        all_collectors.append(func)
 
     def _register(self, metric_class, name, *args, **kwargs):
         full_name = "%s_%s" % (self.name_prefix, name)
@@ -94,8 +98,8 @@ def get_metrics_for(pkg_name):
 def render_all():
     strs = []
 
-    # TODO(paul): Internal hack
-    update_resource_metrics()
+    for collector in all_collectors:
+        collector()
 
     for metric in all_metrics:
         try:
@@ -187,6 +191,8 @@ def _process_fds():
 # Legacy synapse-invented metric names
 
 resource_metrics = get_metrics_for("process.resource")
+
+resource_metrics.register_collector(update_resource_metrics)
 
 # msecs
 resource_metrics.register_callback("utime", lambda: rusage.ru_utime * 1000)
