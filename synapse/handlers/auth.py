@@ -611,6 +611,18 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def add_threepid(self, user_id, medium, address, validated_at):
+        # 'Canonicalise' email addresses down to lower case.
+        # We've now moving towards the Home Server being the entity that
+        # is responsible for validating threepids used for resetting passwords
+        # on accounts, so in future Synapse will gain knowledge of specific
+        # types (mediums) of threepid. For now, we still use the existing
+        # infrastructure, but this is the start of synapse gaining knowledge
+        # of specific types of threepid (and fixes the fact that checking
+        # for the presenc eof an email address during password reset was
+        # case sensitive).
+        if medium == 'email':
+            address = address.lower()
+
         yield self.store.user_add_threepid(
             user_id, medium, address, validated_at,
             self.hs.get_clock().time_msec()
