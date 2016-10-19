@@ -133,29 +133,36 @@ def register_process_collector():
 
     if HAVE_PROC_SELF_STAT:
         process_metrics.register_callback(
-            "cpu_user_seconds_total", lambda: float(stats["utime"]) / TICKS_PER_SEC
+            "cpu_user_seconds_total",
+            lambda: float(stats["utime"]) / TICKS_PER_SEC
         )
         process_metrics.register_callback(
-            "cpu_system_seconds_total", lambda: float(stats["stime"]) / TICKS_PER_SEC
+            "cpu_system_seconds_total",
+            lambda: float(stats["stime"]) / TICKS_PER_SEC
         )
         process_metrics.register_callback(
-            "cpu_seconds_total", lambda: (float(stats["utime"] + stats["stime"])) / TICKS_PER_SEC
-        )
-
-        process_metrics.register_callback(
-            "virtual_memory_bytes", lambda: int(stats["vsize"])
-        )
-        process_metrics.register_callback(
-            "resident_memory_bytes", lambda: int(stats["rss"]) * BYTES_PER_PAGE
+            "cpu_seconds_total",
+            lambda: (float(stats["utime"] + stats["stime"])) / TICKS_PER_SEC
         )
 
         process_metrics.register_callback(
-            "start_time_seconds", lambda: boot_time + int(stats["starttime"]) / TICKS_PER_SEC
+            "virtual_memory_bytes",
+            lambda: int(stats["vsize"])
+        )
+        process_metrics.register_callback(
+            "resident_memory_bytes",
+            lambda: int(stats["rss"]) * BYTES_PER_PAGE
+        )
+
+        process_metrics.register_callback(
+            "start_time_seconds",
+            lambda: boot_time + int(stats["starttime"]) / TICKS_PER_SEC
         )
 
     if HAVE_PROC_SELF_FD:
         process_metrics.register_callback(
-            "open_fds", lambda: sum(fd_counts.values())
+            "open_fds",
+            lambda: sum(fd_counts.values())
         )
 
     if HAVE_PROC_SELF_LIMITS:
@@ -169,5 +176,6 @@ def register_process_collector():
             return None
 
         process_metrics.register_callback(
-            "max_fds", lambda: _get_max_fds()
+            "max_fds",
+            lambda: _get_max_fds()
         )
