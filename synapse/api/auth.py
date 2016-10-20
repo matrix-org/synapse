@@ -606,7 +606,9 @@ class Auth(object):
             user_id, as_user = yield self._get_appservice_user_id(request)
             if user_id:
                 request.authenticated_entity = user_id
-                defer.returnValue(synapse.types.create_requester(user_id, as_user=as_user))
+                defer.returnValue(
+                    synapse.types.create_requester(user_id, as_user=as_user)
+                )
 
             access_token = get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
