@@ -646,7 +646,8 @@ class Auth(object):
             request.authenticated_entity = user.to_string()
 
             defer.returnValue(synapse.types.create_requester(
-                user, token_id, is_guest, device_id, app_service=app_service))
+                user, token_id, is_guest, device_id, app_service=app_service)
+            )
         except KeyError:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",
