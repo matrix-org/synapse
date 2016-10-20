@@ -65,14 +65,9 @@ class BaseHandler(object):
         if app_service is not None:
             return  # do not ratelimit app service senders
 
-        should_rate_limit = True
-
-        for service in self.store.get_app_services():
-            if service.is_interested_in_user(user_id):
-                should_rate_limit = service.is_rate_limited()
-                break
-
-        if not should_rate_limit:
+        if requester.as_user and not requester.as_user.is_rate_limited():
+            # do not ratelimit users of which a non-rate-limited AS is
+            # acting on behalf
             return
 
         allowed, time_allowed = self.ratelimiter.send_message(
