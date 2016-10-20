@@ -18,8 +18,9 @@ from synapse.api.errors import SynapseError
 from collections import namedtuple
 
 
-Requester = namedtuple("Requester",
-                       ["user", "access_token_id", "is_guest", "device_id", "app_service"])
+Requester = namedtuple("Requester", [
+    "user", "access_token_id", "is_guest", "device_id", "app_service",
+])
 """
 Represents the user making a request
 
