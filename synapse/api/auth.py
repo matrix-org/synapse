@@ -603,11 +603,11 @@ class Auth(object):
         """
         # Can optionally look elsewhere in the request (e.g. headers)
         try:
-            user_id, as_user = yield self._get_appservice_user_id(request)
+            user_id, app_service = yield self._get_appservice_user_id(request)
             if user_id:
                 request.authenticated_entity = user_id
                 defer.returnValue(
-                    synapse.types.create_requester(user_id, as_user=as_user)
+                    synapse.types.create_requester(user_id, app_service=app_service)
                 )
 
             access_token = get_access_token_from_request(
@@ -646,7 +646,7 @@ class Auth(object):
             request.authenticated_entity = user.to_string()
 
             defer.returnValue(synapse.types.create_requester(
-                user, token_id, is_guest, device_id, as_user=as_user))
+                user, token_id, is_guest, device_id, app_service=app_service))
         except KeyError:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",
