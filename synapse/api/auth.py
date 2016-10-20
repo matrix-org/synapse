@@ -603,10 +603,12 @@ class Auth(object):
         """
         # Can optionally look elsewhere in the request (e.g. headers)
         try:
-            user_id = yield self._get_appservice_user_id(request)
+            user_id, app_service = yield self._get_appservice_user_id(request)
             if user_id:
                 request.authenticated_entity = user_id
-                defer.returnValue(synapse.types.create_requester(user_id))
+                defer.returnValue(
+                    synapse.types.create_requester(user_id, app_service=app_service)
+                )
 
             access_token = get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
@@ -644,7 +646,8 @@ class Auth(object):
             request.authenticated_entity = user.to_string()
 
             defer.returnValue(synapse.types.create_requester(
-                user, token_id, is_guest, device_id))
+                user, token_id, is_guest, device_id, app_service=app_service)
+            )
         except KeyError:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",
@@ -659,14 +662,14 @@ class Auth(object):
             )
         )
         if app_service is None:
-            defer.returnValue(None)
+            defer.returnValue((None, None))
 
         if "user_id" not in request.args:
-            defer.returnValue(app_service.sender)
+            defer.returnValue((app_service.sender, app_service))
 
         user_id = request.args["user_id"][0]
         if app_service.sender == user_id:
-            defer.returnValue(app_service.sender)
+            defer.returnValue((app_service.sender, app_service))
 
         if not app_service.is_interested_in_user(user_id):
             raise AuthError(
@@ -678,7 +681,7 @@ class Auth(object):
                 403,
                 "Application service has not registered this user"
             )
-        defer.returnValue(user_id)
+        defer.returnValue((user_id, app_service))
 
     @defer.inlineCallbacks
     def get_user_by_access_token(self, token, rights="access"):

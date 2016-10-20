@@ -57,9 +57,15 @@ class BaseHandler(object):
         time_now = self.clock.time()
         user_id = requester.user.to_string()
 
+        # The AS user itself is never rate limited.
         app_service = self.store.get_app_service_by_user_id(user_id)
         if app_service is not None:
             return  # do not ratelimit app service senders
+
+        # Disable rate limiting of users belonging to any AS that is configured
+        # not to be rate limited in its registration file (rate_limited: true|false).
+        if requester.app_service and not requester.app_service.is_rate_limited():
+            return
 
         allowed, time_allowed = self.ratelimiter.send_message(
             user_id, time_now,
