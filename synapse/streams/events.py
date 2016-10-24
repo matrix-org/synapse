@@ -41,13 +41,39 @@ class EventSources(object):
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def get_current_token(self, direction='f'):
+    def get_current_token(self):
         push_rules_key, _ = self.store.get_push_rules_stream_token()
         to_device_key = self.store.get_to_device_stream_token()
 
         token = StreamToken(
             room_key=(
-                yield self.sources["room"].get_current_key(direction)
+                yield self.sources["room"].get_current_key()
+            ),
+            presence_key=(
+                yield self.sources["presence"].get_current_key()
+            ),
+            typing_key=(
+                yield self.sources["typing"].get_current_key()
+            ),
+            receipt_key=(
+                yield self.sources["receipt"].get_current_key()
+            ),
+            account_data_key=(
+                yield self.sources["account_data"].get_current_key()
+            ),
+            push_rules_key=push_rules_key,
+            to_device_key=to_device_key,
+        )
+        defer.returnValue(token)
+
+    @defer.inlineCallbacks
+    def get_current_token_for_room(self, room_id):
+        push_rules_key, _ = self.store.get_push_rules_stream_token()
+        to_device_key = self.store.get_to_device_stream_token()
+
+        token = StreamToken(
+            room_key=(
+                yield self.sources["room"].get_current_key_for_room(room_id)
             ),
             presence_key=(
                 yield self.sources["presence"].get_current_key()
