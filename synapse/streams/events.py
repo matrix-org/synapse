@@ -73,7 +73,7 @@ class EventSources(object):
 
         token = StreamToken(
             room_key=(
-                yield self.sources["room"].get_current_key()
+                yield self.sources["room"].get_current_key_for_room(room_id)
             ),
             presence_key=(
                 yield self.sources["presence"].get_current_key()
