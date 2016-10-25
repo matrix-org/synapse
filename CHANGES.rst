@@ -3,10 +3,10 @@ Changes in synapse v0.18.2-rc2 (2016-10-25)
 
 Changes:
 
-* Clarify Error codes for GET /filter/, thanks to Alexander Maznev (PR #1164)
+* Clarify error codes for GET /filter/, thanks to Alexander Maznev (PR #1164)
 * Make password reset email field case insensitive (PR #1170)
 * Reduce redundant database work in email pusher (PR #1174)
-* Allow Configurable Rate Limiting Per AS (PR #1175)
+* Allow configurable rate limiting per AS (PR #1175)
 * Check whether to ratelimit sooner to avoid work (PR #1176)
 * Standardise prometheus metrics (PR #1177)
 
