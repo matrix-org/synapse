@@ -180,3 +180,17 @@ class ProfileHandler(BaseHandler):
                     "Failed to update join event for room %s - %s",
                     j.room_id, str(e.message)
                 )
+
+    def get_full_profile_for_user(self, user_id):
+        return self.store.get_full_profile(user_id)
+
+    def get_persona_profile_for_user(self, user_id, persona):
+        return self.store.get_persona_profile(user_id, persona)
+
+    def get_profile_key_for_user(self, user_id, persona, key):
+        return self.store.get_profile_key(user_id, persona, key)
+
+    def update_profile_key(self, user_id, persona, key, content):
+        return self.store.update_profile_key(
+            user_id, persona, key, content
+        )
