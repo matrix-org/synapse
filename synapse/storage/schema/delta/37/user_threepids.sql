@@ -24,31 +24,23 @@
  SET medium = 'email_old'
  WHERE medium = 'email'
     AND address IN (
-         -- `user_last_seen` maps user_ids to the last time we saw them
-         WITH user_last_seen AS (
-             SELECT user_id, max(last_seen) AS ts FROM user_ips GROUP BY user_id
-         ),
-         -- `duplicate_addresses` is a table of all the email addresses that
-         -- appear multiple times and the most recently we saw any of their users
-         duplicate_addresses AS (
-             SELECT lower(u1.address) AS address, max(ts.ts) AS max_ts
-             FROM user_threepids AS u1
-             INNER JOIN user_threepids AS u2 ON u1.medium = u2.medium AND lower(u1.address) = lower(u2.address) AND u1.address != u2.address
-             INNER JOIN user_last_seen as ts ON ts.user_id = u1.user_id
-             WHERE u1.medium = 'email' AND u2.medium = 'email'
-             GROUP BY lower(u1.address)
-         )
          -- We select all the addresses that are linked to the user_id that is NOT
-         -- the most recently seen.
+         -- the most recently created.
          SELECT u.address
          FROM
              user_threepids AS u,
-             duplicate_addresses,
-             user_last_seen AS ts
+             -- `duplicate_addresses` is a table of all the email addresses that
+             -- appear multiple times and when the binding was created
+             (
+                 SELECT lower(u1.address) AS address, max(u1.added_at) AS max_ts
+                 FROM user_threepids AS u1
+                 INNER JOIN user_threepids AS u2 ON u1.medium = u2.medium AND lower(u1.address) = lower(u2.address) AND u1.address != u2.address
+                 WHERE u1.medium = 'email' AND u2.medium = 'email'
+                 GROUP BY lower(u1.address)
+             ) AS duplicate_addresses
          WHERE
              lower(u.address) = duplicate_addresses.address
-             AND u.user_id = ts.user_id
-             AND ts.ts != max_ts  -- NOT the most recently used
+             AND u.added_at != max_ts  -- NOT the most recently created
      );
 
 
