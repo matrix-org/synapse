@@ -1,3 +1,12 @@
+Changes in synapse v0.18.2-rc4 (2016-10-27)
+===========================================
+
+Bug fixes:
+
+* Fix ``user_threepids`` schema delta, which in some instances prevented
+  startup after upgrade (PR #1183)
+
+
 Changes in synapse v0.18.2-rc3 (2016-10-27)
 ===========================================
 
