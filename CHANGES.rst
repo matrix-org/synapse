@@ -1,4 +1,4 @@
-Changes in synapse v0.18.2-rc2 (2016-10-25)
+Changes in synapse v0.18.2-rc3 (2016-10-27)
 ===========================================
 
 Changes:
@@ -15,6 +15,12 @@ Bug fixes:
 
 * Fix incredibly slow back pagination query (PR #1178)
 * Fix infinite typing bug (PR #1179)
+
+
+Changes in synapse v0.18.2-rc2 (2016-10-25)
+===========================================
+
+(This release did not include the changes advertised and was identical to RC1)
 
 
 Changes in synapse v0.18.2-rc1 (2016-10-17)
