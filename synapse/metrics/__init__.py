@@ -24,6 +24,7 @@ from .metric import (
     CounterMetric, CallbackMetric, DistributionMetric, CacheMetric,
     MemoryUsageMetric,
 )
+from .process_collector import register_process_collector
 
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,9 @@ class Metrics(object):
 
     def __init__(self, name):
         self.name_prefix = name
+
+    def make_subspace(self, name):
+        return Metrics("%s_%s" % (self.name_prefix, name))
 
     def register_collector(self, func):
         all_collectors.append(func)
@@ -117,6 +121,8 @@ gc_unreachable = reactor_metrics.register_counter("gc_unreachable", labels=["gen
 reactor_metrics.register_callback(
     "gc_counts", lambda: {(i,): v for i, v in enumerate(gc.get_count())}, labels=["gen"]
 )
+
+register_process_collector(get_metrics_for("process"))
 
 
 def runUntilCurrentTimer(func):
