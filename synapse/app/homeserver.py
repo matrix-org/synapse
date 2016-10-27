@@ -338,7 +338,7 @@ def setup(config_options):
         hs.get_replication_layer().start_get_pdu_cache()
 
         register_memory_metrics(hs)
-        register_process_collector()
+        register_process_collector(get_metrics_for("process"))
 
     reactor.callWhenRunning(start)
 

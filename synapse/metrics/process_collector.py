@@ -20,8 +20,6 @@ import os
 import stat
 from resource import getrusage, RUSAGE_SELF
 
-from synapse.metrics import get_metrics_for
-
 
 TICKS_PER_SEC = 100
 BYTES_PER_PAGE = 4096
@@ -111,10 +109,10 @@ def _process_fds():
     return counts
 
 
-def register_process_collector():
+def register_process_collector(process_metrics):
     # Legacy synapse-invented metric names
 
-    resource_metrics = get_metrics_for("process.resource")
+    resource_metrics = process_metrics.make_subspace("resource")
 
     resource_metrics.register_collector(update_resource_metrics)
 
@@ -125,11 +123,9 @@ def register_process_collector():
     # kilobytes
     resource_metrics.register_callback("maxrss", lambda: rusage.ru_maxrss * 1024)
 
-    get_metrics_for("process").register_callback("fds", _process_fds, labels=["type"])
+    process_metrics.register_callback("fds", _process_fds, labels=["type"])
 
     # New prometheus-standard metric names
-
-    process_metrics = get_metrics_for("process")
 
     if HAVE_PROC_SELF_STAT:
         process_metrics.register_callback(
