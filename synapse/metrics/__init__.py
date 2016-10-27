@@ -41,6 +41,9 @@ class Metrics(object):
     def __init__(self, name):
         self.name_prefix = name
 
+    def make_subspace(self, name):
+        return Metrics("%s_%s" % (self.name_prefix, name))
+
     def register_collector(self, func):
         all_collectors.append(func)
 
