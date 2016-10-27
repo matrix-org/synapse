@@ -3,6 +3,7 @@ Changes in synapse v0.18.2-rc3 (2016-10-27)
 
 Changes:
 
+* Allow clients to supply access tokens as headers (PR #1098)
 * Clarify error codes for GET /filter/, thanks to Alexander Maznev (PR #1164)
 * Make password reset email field case insensitive (PR #1170)
 * Reduce redundant database work in email pusher (PR #1174)
