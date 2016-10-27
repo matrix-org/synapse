@@ -219,7 +219,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
                     "user_id": self.u_onion.to_string(),
                     "typing": True,
                 }
-            )
+            ),
+            federation_auth=True,
         )
 
         self.on_new_event.assert_has_calls([

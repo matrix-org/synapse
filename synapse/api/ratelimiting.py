@@ -23,7 +23,7 @@ class Ratelimiter(object):
     def __init__(self):
         self.message_counts = collections.OrderedDict()
 
-    def send_message(self, user_id, time_now_s, msg_rate_hz, burst_count):
+    def send_message(self, user_id, time_now_s, msg_rate_hz, burst_count, update=True):
         """Can the user send a message?
         Args:
             user_id: The user sending a message.
@@ -32,12 +32,15 @@ class Ratelimiter(object):
                 second.
             burst_count: How many messages the user can send before being
                 limited.
+            update (bool): Whether to update the message rates or not. This is
+                useful to check if a message would be allowed to be sent before
+                its ready to be actually sent.
         Returns:
             A pair of a bool indicating if they can send a message now and a
                 time in seconds of when they can next send a message.
         """
         self.prune_message_counts(time_now_s)
-        message_count, time_start, _ignored = self.message_counts.pop(
+        message_count, time_start, _ignored = self.message_counts.get(
             user_id, (0., time_now_s, None),
         )
         time_delta = time_now_s - time_start
@@ -52,9 +55,10 @@ class Ratelimiter(object):
             allowed = True
             message_count += 1
 
-        self.message_counts[user_id] = (
-            message_count, time_start, msg_rate_hz
-        )
+        if update:
+            self.message_counts[user_id] = (
+                message_count, time_start, msg_rate_hz
+            )
 
         if msg_rate_hz > 0:
             time_allowed = (

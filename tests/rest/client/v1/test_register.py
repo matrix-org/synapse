@@ -17,6 +17,7 @@ from synapse.rest.client.v1.register import CreateUserRestServlet
 from twisted.internet import defer
 from mock import Mock
 from tests import unittest
+from tests.utils import mock_getRawHeaders
 import json
 
 
@@ -30,6 +31,7 @@ class CreateUserServletTestCase(unittest.TestCase):
             path='/_matrix/client/api/v1/createUser'
         )
         self.request.args = {}
+        self.request.requestHeaders.getRawHeaders = mock_getRawHeaders()
 
         self.registration_handler = Mock()
 

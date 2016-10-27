@@ -110,6 +110,11 @@ def _load_appservice(hostname, as_info, config_filename):
     user = UserID(localpart, hostname)
     user_id = user.to_string()
 
+    # Rate limiting for users of this AS is on by default (excludes sender)
+    rate_limited = True
+    if isinstance(as_info.get("rate_limited"), bool):
+        rate_limited = as_info.get("rate_limited")
+
     # namespace checks
     if not isinstance(as_info.get("namespaces"), dict):
         raise KeyError("Requires 'namespaces' object.")
@@ -155,4 +160,5 @@ def _load_appservice(hostname, as_info, config_filename):
         sender=user_id,
         id=as_info["id"],
         protocols=protocols,
+        rate_limited=rate_limited
     )

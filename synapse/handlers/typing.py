@@ -88,7 +88,7 @@ class TypingHandler(object):
                 continue
 
             until = self._member_typing_until.get(member, None)
-            if not until or until < now:
+            if not until or until <= now:
                 logger.info("Timing out typing for: %s", member.user_id)
                 preserve_fn(self._stopped_typing)(member)
                 continue
@@ -97,11 +97,19 @@ class TypingHandler(object):
             # user.
             if self.hs.is_mine_id(member.user_id):
                 last_fed_poke = self._member_last_federation_poke.get(member, None)
-                if not last_fed_poke or last_fed_poke + FEDERATION_PING_INTERVAL < now:
+                if not last_fed_poke or last_fed_poke + FEDERATION_PING_INTERVAL <= now:
                     preserve_fn(self._push_remote)(
                         member=member,
                         typing=True
                     )
+
+            # Add a paranoia timer to ensure that we always have a timer for
+            # each person typing.
+            self.wheel_timer.insert(
+                now=now,
+                obj=member,
+                then=now + 60 * 1000,
+            )
 
     def is_typing(self, member):
         return member.user_id in self._room_typing.get(member.room_id, [])

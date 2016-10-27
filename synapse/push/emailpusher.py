@@ -150,6 +150,10 @@ class EmailPusher(object):
 
         soonest_due_at = None
 
+        if not unprocessed:
+            yield self.save_last_stream_ordering_and_success(self.max_stream_ordering)
+            return
+
         for push_action in unprocessed:
             received_at = push_action['received_ts']
             if received_at is None:
