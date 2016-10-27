@@ -578,6 +578,19 @@ class FederationVersionServlet(BaseFederationServlet):
         }))
 
 
+class FederationProfileServlet(BaseFederationServlet):
+    # This matches all three of:
+    #  - /profile/@foo:bar/
+    #  - /profile/@foo:bar/default/
+    #  - /profile/@foo:bar/default/m.displayname
+    PATH = "/profile/(?P<user_id>[^/]+)/((?P<persona>[^/]+)/(?P<key>[^/]+)?)?$"
+
+    @defer.inlineCallbacks
+    def on_GET(self, origin, content, query, user_id, persona, key):
+        profile = yield self.handler.on_profile_request(user_id, persona, key)
+        defer.returnValue((200, profile))
+
+
 SERVLET_CLASSES = (
     FederationSendServlet,
     FederationPullServlet,
@@ -602,6 +615,7 @@ SERVLET_CLASSES = (
     OpenIdUserInfo,
     PublicRoomList,
     FederationVersionServlet,
+    FederationProfileServlet,
 )
 
 

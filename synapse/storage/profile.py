@@ -74,7 +74,7 @@ class ProfileStore(SQLBaseStore):
             content = ujson.loads(row["content"])
             personas.setdefault(
                 row["persona"], {"rows": {}}
-            )["entries"][row["key"]] = content
+            )["rows"][row["key"]] = content
 
         defer.returnValue(profile)
 

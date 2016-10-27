@@ -442,6 +442,17 @@ class FederationServer(FederationBase):
             "events": [ev.get_pdu_json(time_now) for ev in missing_events],
         })
 
+    def on_profile_request(self, user_id, persona, key):
+        if not self.hs.is_mine_id(user_id):
+            raise SynapseError(400, "Not a local user")
+
+        if key is not None:
+            return self.store.get_profile_key(user_id, persona, key)
+        elif persona is not None:
+            return self.store.get_persona_profile(user_id, persona)
+        else:
+            return self.store.get_full_profile(user_id)
+
     @log_function
     def on_openid_userinfo(self, token):
         ts_now_ms = self._clock.time_msec()

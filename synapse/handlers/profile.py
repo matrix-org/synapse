@@ -182,15 +182,27 @@ class ProfileHandler(BaseHandler):
                 )
 
     def get_full_profile_for_user(self, user_id):
-        return self.store.get_full_profile(user_id)
+        if self.hs.is_mine_id(user_id):
+            return self.store.get_full_profile(user_id)
+        else:
+            return self.federation.get_profile(user_id)
 
     def get_persona_profile_for_user(self, user_id, persona):
-        return self.store.get_persona_profile(user_id, persona)
+        if self.hs.is_mine_id(user_id):
+            return self.store.get_persona_profile(user_id, persona)
+        else:
+            return self.federation.get_profile(user_id, persona)
 
     def get_profile_key_for_user(self, user_id, persona, key):
-        return self.store.get_profile_key(user_id, persona, key)
+        if self.hs.is_mine_id(user_id):
+            return self.store.get_profile_key(user_id, persona, key)
+        else:
+            return self.federation.get_profile(user_id, persona, key)
 
     def update_profile_key(self, user_id, persona, key, content):
-        return self.store.update_profile_key(
-            user_id, persona, key, content
-        )
+        if self.hs.is_mine_id(user_id):
+            return self.store.update_profile_key(
+                user_id, persona, key, content
+            )
+        else:
+            raise AuthError("Cannot set a remote profile")
