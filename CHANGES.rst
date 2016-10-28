@@ -1,3 +1,10 @@
+Changes in synapse v0.18.2-rc5 (2016-10-28)
+===========================================
+
+Bug fixes:
+
+* Fix prometheus process metrics in worker processes (PR #1184)
+
 Changes in synapse v0.18.2-rc4 (2016-10-27)
 ===========================================
 
