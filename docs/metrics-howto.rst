@@ -23,3 +23,37 @@ How to monitor Synapse metrics using Prometheus
       static_configs:
         - targets:
             "my.server.here:9092"
+
+Standard Metric Names
+---------------------
+
+As of synapse version 0.18.2, the format of the process-wide metrics has been
+changed to fit prometheus standard naming conventions. Additionally the units
+have been changed to seconds, from miliseconds.
+
+================================== =============================
+New name                           Old name
+---------------------------------- -----------------------------
+process_cpu_user_seconds_total     process_resource_utime / 1000
+process_cpu_system_seconds_total   process_resource_stime / 1000
+process_open_fds (no 'type' label) process_fds
+================================== =============================
+
+The python-specific counts of garbage collector performance have been renamed.
+
+=========================== ======================
+New name                    Old name
+--------------------------- ----------------------
+python_gc_time              reactor_gc_time      
+python_gc_unreachable_total reactor_gc_unreachable
+python_gc_counts            reactor_gc_counts
+=========================== ======================
+
+The twisted-specific reactor metrics have been renamed.
+
+==================================== =================
+New name                             Old name
+------------------------------------ -----------------
+python_twisted_reactor_pending_calls reactor_tick_time
+python_twisted_reactor_tick_time     reactor_tick_time
+==================================== =================
