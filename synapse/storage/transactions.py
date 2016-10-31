@@ -62,7 +62,7 @@ class TransactionStore(SQLBaseStore):
         self.last_transaction = {}
 
         reactor.addSystemEventTrigger("before", "shutdown", self._persist_in_mem_txns)
-        self._clock.looping_call(self._persist_in_mem_txns, 1000)
+        self._clock.looping_call(self._persist_in_mem_txns, 10 * 1000)
 
         self._clock.looping_call(self._cleanup_transactions, 30 * 60 * 1000)
 
