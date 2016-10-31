@@ -22,42 +22,64 @@ import ujson
 
 class ProfileStore(SQLBaseStore):
     def create_profile(self, user_localpart):
-        return self._simple_insert(
-            table="profiles",
-            values={"user_id": user_localpart},
-            desc="create_profile",
+        return defer.succeed(None)
+
+    @defer.inlineCallbacks
+    def get_profile_displayname(self, user_id):
+        profile = yield self.get_profile_key(
+            user_id, "default", "m.display_name"
         )
 
-    def get_profile_displayname(self, user_localpart):
-        return self._simple_select_one_onecol(
-            table="profiles",
-            keyvalues={"user_id": user_localpart},
-            retcol="displayname",
-            desc="get_profile_displayname",
+        if profile:
+            try:
+                display_name = profile["rows"][0]["display_name"]
+            except (KeyError, IndexError):
+                display_name = None
+        else:
+            display_name = None
+
+        defer.returnValue(display_name)
+
+    def set_profile_displayname(self, user_id, new_displayname):
+        if new_displayname:
+            content = {"rows": [{
+                "display_name": new_displayname
+            }]}
+        else:
+            # TODO: Delete in this case
+            content = {}
+
+        return self.update_profile_key(
+            user_id, "default", "m.display_name", content
         )
 
-    def set_profile_displayname(self, user_localpart, new_displayname):
-        return self._simple_update_one(
-            table="profiles",
-            keyvalues={"user_id": user_localpart},
-            updatevalues={"displayname": new_displayname},
-            desc="set_profile_displayname",
+    @defer.inlineCallbacks
+    def get_profile_avatar_url(self, user_id):
+        profile = yield self.get_profile_key(
+            user_id, "default", "m.avatar_url"
         )
 
-    def get_profile_avatar_url(self, user_localpart):
-        return self._simple_select_one_onecol(
-            table="profiles",
-            keyvalues={"user_id": user_localpart},
-            retcol="avatar_url",
-            desc="get_profile_avatar_url",
-        )
+        if profile:
+            try:
+                avatar_url = profile["rows"][0]["avatar_url"]
+            except (KeyError, IndexError):
+                avatar_url = None
+        else:
+            avatar_url = None
 
-    def set_profile_avatar_url(self, user_localpart, new_avatar_url):
-        return self._simple_update_one(
-            table="profiles",
-            keyvalues={"user_id": user_localpart},
-            updatevalues={"avatar_url": new_avatar_url},
-            desc="set_profile_avatar_url",
+        defer.returnValue(avatar_url)
+
+    def set_profile_avatar_url(self, user_id, new_avatar_url):
+        if new_avatar_url:
+            content = {"rows": [{
+                "avatar_url": new_avatar_url
+            }]}
+        else:
+            # TODO: Delete in this case
+            content = {}
+
+        return self.update_profile_key(
+            user_id, "default", "m.avatar_url", content
         )
 
     @defer.inlineCallbacks

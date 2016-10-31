@@ -17,7 +17,6 @@
 from tests import unittest
 from twisted.internet import defer
 
-from synapse.storage.profile import ProfileStore
 from synapse.types import UserID
 
 from tests.utils import setup_test_homeserver
@@ -29,36 +28,28 @@ class ProfileStoreTestCase(unittest.TestCase):
     def setUp(self):
         hs = yield setup_test_homeserver()
 
-        self.store = ProfileStore(hs)
+        self.store = hs.get_datastore()
 
         self.u_frank = UserID.from_string("@frank:test")
 
     @defer.inlineCallbacks
     def test_displayname(self):
-        yield self.store.create_profile(
-            self.u_frank.localpart
-        )
-
         yield self.store.set_profile_displayname(
-            self.u_frank.localpart, "Frank"
+            self.u_frank.to_string(), "Frank"
         )
 
         self.assertEquals(
             "Frank",
-            (yield self.store.get_profile_displayname(self.u_frank.localpart))
+            (yield self.store.get_profile_displayname(self.u_frank.to_string()))
         )
 
     @defer.inlineCallbacks
     def test_avatar_url(self):
-        yield self.store.create_profile(
-            self.u_frank.localpart
-        )
-
         yield self.store.set_profile_avatar_url(
-            self.u_frank.localpart, "http://my.site/here"
+            self.u_frank.to_string(), "http://my.site/here"
         )
 
         self.assertEquals(
             "http://my.site/here",
-            (yield self.store.get_profile_avatar_url(self.u_frank.localpart))
+            (yield self.store.get_profile_avatar_url(self.u_frank.to_string()))
         )

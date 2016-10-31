@@ -39,11 +39,11 @@ class ProfileHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_displayname(self, target_user):
         if self.hs.is_mine(target_user):
-            displayname = yield self.store.get_profile_displayname(
-                target_user.localpart
+            display_name = yield self.store.get_profile_displayname(
+                target_user.to_string(),
             )
 
-            defer.returnValue(displayname)
+            defer.returnValue(display_name)
         else:
             try:
                 result = yield self.federation.make_query(
@@ -78,19 +78,7 @@ class ProfileHandler(BaseHandler):
             new_displayname = None
 
         yield self.store.set_profile_displayname(
-            target_user.localpart, new_displayname
-        )
-
-        if new_displayname:
-            content = {"rows": [{
-                "display_name": new_displayname
-            }]}
-        else:
-            # TODO: Delete in this case
-            content = {}
-
-        yield self.store.update_profile_key(
-            target_user.to_string(), "default", "m.display_name", content
+            target_user.to_string(), new_displayname
         )
 
         yield self._update_join_states(requester)
@@ -99,7 +87,7 @@ class ProfileHandler(BaseHandler):
     def get_avatar_url(self, target_user):
         if self.hs.is_mine(target_user):
             avatar_url = yield self.store.get_profile_avatar_url(
-                target_user.localpart
+                target_user.to_string(),
             )
 
             defer.returnValue(avatar_url)
@@ -133,19 +121,7 @@ class ProfileHandler(BaseHandler):
             raise AuthError(400, "Cannot set another user's avatar_url")
 
         yield self.store.set_profile_avatar_url(
-            target_user.localpart, new_avatar_url
-        )
-
-        if new_avatar_url:
-            content = {"rows": [{
-                "url": new_avatar_url
-            }]}
-        else:
-            # TODO: Delete in this case
-            content = {}
-
-        yield self.store.update_profile_key(
-            target_user.to_string(), "default", "m.avatar_url", content
+            target_user.to_string(), new_avatar_url
         )
 
         yield self._update_join_states(requester)
@@ -161,13 +137,13 @@ class ProfileHandler(BaseHandler):
         response = {}
 
         if just_field is None or just_field == "displayname":
-            response["displayname"] = yield self.store.get_profile_displayname(
-                user.localpart
+            response["displayname"] = yield self.get_displayname(
+                user
             )
 
         if just_field is None or just_field == "avatar_url":
-            response["avatar_url"] = yield self.store.get_profile_avatar_url(
-                user.localpart
+            response["avatar_url"] = yield self.get_avatar_url(
+                user
             )
 
         defer.returnValue(response)
