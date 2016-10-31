@@ -81,6 +81,18 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, new_displayname
         )
 
+        if new_displayname:
+            content = {"rows": [{
+                "display_name": new_displayname
+            }]}
+        else:
+            # TODO: Delete in this case
+            content = {}
+
+        yield self.store.update_profile_key(
+            target_user.to_string(), "default", "m.display_name", content
+        )
+
         yield self._update_join_states(requester)
 
     @defer.inlineCallbacks
@@ -122,6 +134,18 @@ class ProfileHandler(BaseHandler):
 
         yield self.store.set_profile_avatar_url(
             target_user.localpart, new_avatar_url
+        )
+
+        if new_avatar_url:
+            content = {"rows": [{
+                "url": new_avatar_url
+            }]}
+        else:
+            # TODO: Delete in this case
+            content = {}
+
+        yield self.store.update_profile_key(
+            target_user.to_string(), "default", "m.avatar_url", content
         )
 
         yield self._update_join_states(requester)
