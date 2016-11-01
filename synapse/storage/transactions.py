@@ -46,6 +46,11 @@ class TransactionStore(SQLBaseStore):
     """A collection of queries for handling PDUs.
     """
 
+    def __init__(self, hs):
+        super(TransactionStore, self).__init__(hs)
+
+        self._clock.looping_call(self._cleanup_transactions, 30 * 60 * 1000)
+
     def get_received_txn_response(self, transaction_id, origin):
         """For an incoming transaction from a given origin, check if we have
         already responded to it. If so, return the response code and response
@@ -234,3 +239,12 @@ class TransactionStore(SQLBaseStore):
 
         txn.execute(query, (self._clock.time_msec(),))
         return self.cursor_to_dict(txn)
+
+    def _cleanup_transactions(self):
+        now = self._clock.time_msec()
+        month_ago = now - 30 * 24 * 60 * 60 * 1000
+
+        def _cleanup_transactions_txn(txn):
+            txn.execute("DELETE FROM received_transactions WHERE ts < ?", (month_ago,))
+
+        return self.runInteraction("_cleanup_transactions", _cleanup_transactions_txn)
