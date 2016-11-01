@@ -111,7 +111,7 @@ class ProfileStore(SQLBaseStore):
             retcols=("key", "content",),
         )
 
-        persona = {"rows": {
+        persona = {"properties": {
             row["key"]: ujson.loads(row["content"])
             for row in rows
         }}
