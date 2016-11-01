@@ -603,7 +603,6 @@ class EventsStore(SQLBaseStore):
                 "rejections",
                 "redactions",
                 "room_memberships",
-                "state_events",
                 "topics"
             ):
                 txn.executemany(

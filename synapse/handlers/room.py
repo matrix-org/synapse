@@ -437,7 +437,7 @@ class RoomEventSource(object):
             logger.warn("Stream has topological part!!!! %r", from_key)
             from_key = "s%s" % (from_token.stream,)
 
-        app_service = yield self.store.get_app_service_by_user_id(
+        app_service = self.store.get_app_service_by_user_id(
             user.to_string()
         )
         if app_service:
@@ -475,8 +475,11 @@ class RoomEventSource(object):
 
         defer.returnValue((events, end_key))
 
-    def get_current_key(self, direction='f'):
-        return self.store.get_room_events_max_id(direction)
+    def get_current_key(self):
+        return self.store.get_room_events_max_id()
+
+    def get_current_key_for_room(self, room_id):
+        return self.store.get_room_events_max_id(room_id)
 
     @defer.inlineCallbacks
     def get_pagination_rows(self, user, config, key):

@@ -24,7 +24,7 @@ import subprocess
 import sys
 import yaml
 
-SYNAPSE = ["python", "-B", "-m", "synapse.app.homeserver"]
+SYNAPSE = [sys.executable, "-B", "-m", "synapse.app.homeserver"]
 
 GREEN = "\x1b[1;32m"
 RED = "\x1b[1;31m"

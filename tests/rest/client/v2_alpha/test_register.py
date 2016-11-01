@@ -3,6 +3,7 @@ from synapse.api.errors import SynapseError
 from twisted.internet import defer
 from mock import Mock
 from tests import unittest
+from tests.utils import mock_getRawHeaders
 import json
 
 
@@ -16,10 +17,11 @@ class RegisterRestServletTestCase(unittest.TestCase):
             path='/_matrix/api/v2_alpha/register'
         )
         self.request.args = {}
+        self.request.requestHeaders.getRawHeaders = mock_getRawHeaders()
 
         self.appservice = None
         self.auth = Mock(get_appservice_by_req=Mock(
-            side_effect=lambda x: defer.succeed(self.appservice))
+            side_effect=lambda x: self.appservice)
         )
 
         self.auth_result = (False, None, None, None)

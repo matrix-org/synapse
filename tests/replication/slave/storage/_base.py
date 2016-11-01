@@ -42,7 +42,8 @@ class BaseSlavedStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def replicate(self):
         streams = self.slaved_store.stream_positions()
-        result = yield self.replication.replicate(streams, 100)
+        writer = yield self.replication.replicate(streams, 100)
+        result = writer.finish()
         yield self.slaved_store.process_replication(result)
 
     @defer.inlineCallbacks

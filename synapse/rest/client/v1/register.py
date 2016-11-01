@@ -22,6 +22,7 @@ from synapse.api.auth import get_access_token_from_request
 from .base import ClientV1RestServlet, client_path_patterns
 import synapse.util.stringutils as stringutils
 from synapse.http.servlet import parse_json_object_from_request
+from synapse.types import create_requester
 
 from synapse.util.async import run_on_reactor
 
@@ -391,15 +392,16 @@ class CreateUserRestServlet(ClientV1RestServlet):
         user_json = parse_json_object_from_request(request)
 
         access_token = get_access_token_from_request(request)
-        app_service = yield self.store.get_app_service_by_token(
+        app_service = self.store.get_app_service_by_token(
             access_token
         )
         if not app_service:
             raise SynapseError(403, "Invalid application service token.")
 
-        logger.debug("creating user: %s", user_json)
+        requester = create_requester(app_service.sender)
 
-        response = yield self._do_create(user_json)
+        logger.debug("creating user: %s", user_json)
+        response = yield self._do_create(requester, user_json)
 
         defer.returnValue((200, response))
 
@@ -407,7 +409,7 @@ class CreateUserRestServlet(ClientV1RestServlet):
         return 403, {}
 
     @defer.inlineCallbacks
-    def _do_create(self, user_json):
+    def _do_create(self, requester, user_json):
         yield run_on_reactor()
 
         if "localpart" not in user_json:
@@ -433,6 +435,7 @@ class CreateUserRestServlet(ClientV1RestServlet):
 
         handler = self.handlers.registration_handler
         user_id, token = yield handler.get_or_create_user(
+            requester=requester,
             localpart=localpart,
             displayname=displayname,
             duration_in_ms=(duration_seconds * 1000),

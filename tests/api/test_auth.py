@@ -20,7 +20,7 @@ from mock import Mock
 from synapse.api.auth import Auth
 from synapse.api.errors import AuthError
 from synapse.types import UserID
-from tests.utils import setup_test_homeserver
+from tests.utils import setup_test_homeserver, mock_getRawHeaders
 
 import pymacaroons
 
@@ -51,7 +51,7 @@ class AuthTestCase(unittest.TestCase):
 
         request = Mock(args={})
         request.args["access_token"] = [self.test_token]
-        request.requestHeaders.getRawHeaders = Mock(return_value=[""])
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = yield self.auth.get_user_by_req(request)
         self.assertEquals(requester.user.to_string(), self.test_user)
 
@@ -61,7 +61,7 @@ class AuthTestCase(unittest.TestCase):
 
         request = Mock(args={})
         request.args["access_token"] = [self.test_token]
-        request.requestHeaders.getRawHeaders = Mock(return_value=[""])
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
         self.failureResultOf(d, AuthError)
 
@@ -74,7 +74,7 @@ class AuthTestCase(unittest.TestCase):
         self.store.get_user_by_access_token = Mock(return_value=user_info)
 
         request = Mock(args={})
-        request.requestHeaders.getRawHeaders = Mock(return_value=[""])
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
         self.failureResultOf(d, AuthError)
 
@@ -86,7 +86,7 @@ class AuthTestCase(unittest.TestCase):
 
         request = Mock(args={})
         request.args["access_token"] = [self.test_token]
-        request.requestHeaders.getRawHeaders = Mock(return_value=[""])
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = yield self.auth.get_user_by_req(request)
         self.assertEquals(requester.user.to_string(), self.test_user)
 
@@ -96,7 +96,7 @@ class AuthTestCase(unittest.TestCase):
 
         request = Mock(args={})
         request.args["access_token"] = [self.test_token]
-        request.requestHeaders.getRawHeaders = Mock(return_value=[""])
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
         self.failureResultOf(d, AuthError)
 
@@ -106,7 +106,7 @@ class AuthTestCase(unittest.TestCase):
         self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
-        request.requestHeaders.getRawHeaders = Mock(return_value=[""])
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
         self.failureResultOf(d, AuthError)
 
@@ -121,7 +121,7 @@ class AuthTestCase(unittest.TestCase):
         request = Mock(args={})
         request.args["access_token"] = [self.test_token]
         request.args["user_id"] = [masquerading_user_id]
-        request.requestHeaders.getRawHeaders = Mock(return_value=[""])
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = yield self.auth.get_user_by_req(request)
         self.assertEquals(requester.user.to_string(), masquerading_user_id)
 
@@ -135,7 +135,7 @@ class AuthTestCase(unittest.TestCase):
         request = Mock(args={})
         request.args["access_token"] = [self.test_token]
         request.args["user_id"] = [masquerading_user_id]
-        request.requestHeaders.getRawHeaders = Mock(return_value=[""])
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
         self.failureResultOf(d, AuthError)
 

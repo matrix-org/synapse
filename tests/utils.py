@@ -52,6 +52,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.server_name = name
         config.trusted_third_party_id_servers = []
         config.room_invite_state_types = []
+        config.password_providers = []
 
     config.use_frozen_dicts = True
     config.database_config = {"name": "sqlite3"}
@@ -115,6 +116,15 @@ def get_mock_call_args(pattern_func, mock_func):
     return getcallargs(pattern_func, *invoked_args, **invoked_kargs)
 
 
+def mock_getRawHeaders(headers=None):
+    headers = headers if headers is not None else {}
+
+    def getRawHeaders(name, default=None):
+        return headers.get(name, default)
+
+    return getRawHeaders
+
+
 # This is a mock /resource/ not an entire server
 class MockHttpResource(HttpServer):
 
@@ -127,7 +137,7 @@ class MockHttpResource(HttpServer):
 
     @patch('twisted.web.http.Request')
     @defer.inlineCallbacks
-    def trigger(self, http_method, path, content, mock_request):
+    def trigger(self, http_method, path, content, mock_request, federation_auth=False):
         """ Fire an HTTP event.
 
         Args:
@@ -155,9 +165,10 @@ class MockHttpResource(HttpServer):
 
         mock_request.getClientIP.return_value = "-"
 
-        mock_request.requestHeaders.getRawHeaders.return_value = [
-            "X-Matrix origin=test,key=,sig="
-        ]
+        headers = {}
+        if federation_auth:
+            headers["Authorization"] = ["X-Matrix origin=test,key=,sig="]
+        mock_request.requestHeaders.getRawHeaders = mock_getRawHeaders(headers)
 
         # return the right path if the event requires it
         mock_request.path = path
@@ -188,7 +199,7 @@ class MockHttpResource(HttpServer):
                     )
                     defer.returnValue((code, response))
                 except CodeMessageException as e:
-                    defer.returnValue((e.code, cs_error(e.msg)))
+                    defer.returnValue((e.code, cs_error(e.msg, code=e.errcode)))
 
         raise KeyError("No event can handle %s" % path)
 

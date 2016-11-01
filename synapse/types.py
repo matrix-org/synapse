@@ -18,8 +18,9 @@ from synapse.api.errors import SynapseError
 from collections import namedtuple
 
 
-Requester = namedtuple("Requester",
-                       ["user", "access_token_id", "is_guest", "device_id"])
+Requester = namedtuple("Requester", [
+    "user", "access_token_id", "is_guest", "device_id", "app_service",
+])
 """
 Represents the user making a request
 
@@ -29,11 +30,12 @@ Attributes:
         request, or None if it came via the appservice API or similar
     is_guest (bool):  True if the user making this request is a guest user
     device_id (str|None):  device_id which was set at authentication time
+    app_service (ApplicationService|None):  the AS requesting on behalf of the user
 """
 
 
 def create_requester(user_id, access_token_id=None, is_guest=False,
-                     device_id=None):
+                     device_id=None, app_service=None):
     """
     Create a new ``Requester`` object
 
@@ -43,13 +45,14 @@ def create_requester(user_id, access_token_id=None, is_guest=False,
             request, or None if it came via the appservice API or similar
         is_guest (bool):  True if the user making this request is a guest user
         device_id (str|None):  device_id which was set at authentication time
+        app_service (ApplicationService|None):  the AS requesting on behalf of the user
 
     Returns:
         Requester
     """
     if not isinstance(user_id, UserID):
         user_id = UserID.from_string(user_id)
-    return Requester(user_id, access_token_id, is_guest, device_id)
+    return Requester(user_id, access_token_id, is_guest, device_id, app_service)
 
 
 def get_domain_from_id(string):

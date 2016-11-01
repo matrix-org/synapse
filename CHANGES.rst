@@ -1,4 +1,80 @@
-Changes in synapse v0.18.1 (2016-10-0)
+Changes in synapse v0.18.2 (2016-11-01)
+=======================================
+
+No changes since v0.18.2-rc5
+
+
+Changes in synapse v0.18.2-rc5 (2016-10-28)
+===========================================
+
+Bug fixes:
+
+* Fix prometheus process metrics in worker processes (PR #1184)
+
+
+Changes in synapse v0.18.2-rc4 (2016-10-27)
+===========================================
+
+Bug fixes:
+
+* Fix ``user_threepids`` schema delta, which in some instances prevented
+  startup after upgrade (PR #1183)
+
+
+Changes in synapse v0.18.2-rc3 (2016-10-27)
+===========================================
+
+Changes:
+
+* Allow clients to supply access tokens as headers (PR #1098)
+* Clarify error codes for GET /filter/, thanks to Alexander Maznev (PR #1164)
+* Make password reset email field case insensitive (PR #1170)
+* Reduce redundant database work in email pusher (PR #1174)
+* Allow configurable rate limiting per AS (PR #1175)
+* Check whether to ratelimit sooner to avoid work (PR #1176)
+* Standardise prometheus metrics (PR #1177)
+
+
+Bug fixes:
+
+* Fix incredibly slow back pagination query (PR #1178)
+* Fix infinite typing bug (PR #1179)
+
+
+Changes in synapse v0.18.2-rc2 (2016-10-25)
+===========================================
+
+(This release did not include the changes advertised and was identical to RC1)
+
+
+Changes in synapse v0.18.2-rc1 (2016-10-17)
+===========================================
+
+Changes:
+
+* Remove redundant event_auth index (PR #1113)
+* Reduce DB hits for replication (PR #1141)
+* Implement pluggable password auth (PR #1155)
+* Remove rate limiting from app service senders and fix get_or_create_user
+  requester, thanks to Patrik Oldsberg (PR #1157)
+* window.postmessage for Interactive Auth fallback (PR #1159)
+* Use sys.executable instead of hardcoded python, thanks to Pedro Larroy
+  (PR #1162)
+* Add config option for adding additional TLS fingerprints (PR #1167)
+* User-interactive auth on delete device (PR #1168)
+
+
+Bug fixes:
+
+* Fix not being allowed to set your own state_key, thanks to Patrik Oldsberg
+  (PR #1150)
+* Fix interactive auth to return 401 from for incorrect password (PR #1160,
+  #1166)
+* Fix email push notifs being dropped (PR #1169)
+
+
+
+Changes in synapse v0.18.1 (2016-10-05)
 ======================================
 
 No changes since v0.18.1-rc1
