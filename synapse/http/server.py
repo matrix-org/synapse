@@ -392,15 +392,28 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
     request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
 
     if send_cors:
-        request.setHeader("Access-Control-Allow-Origin", "*")
-        request.setHeader("Access-Control-Allow-Methods",
-                          "GET, POST, PUT, DELETE, OPTIONS")
-        request.setHeader("Access-Control-Allow-Headers",
-                          "Origin, X-Requested-With, Content-Type, Accept")
+        set_cors_headers(request)
 
     request.write(json_bytes)
     finish_request(request)
     return NOT_DONE_YET
+
+
+def set_cors_headers(request):
+    """Set the CORs headers so that javascript running in a web browsers can
+    use this API
+
+    Args:
+        request (twisted.web.http.Request): The http request to add CORs to.
+    """
+    request.setHeader("Access-Control-Allow-Origin", "*")
+    request.setHeader(
+        "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS"
+    )
+    request.setHeader(
+        "Access-Control-Allow-Headers",
+        "Origin, X-Requested-With, Content-Type, Accept"
+    )
 
 
 def finish_request(request):

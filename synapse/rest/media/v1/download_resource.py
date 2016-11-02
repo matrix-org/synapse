@@ -15,7 +15,7 @@
 
 from ._base import parse_media_id, respond_with_file, respond_404
 from twisted.web.resource import Resource
-from synapse.http.server import request_handler
+from synapse.http.server import request_handler, set_cors_headers
 
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
@@ -45,6 +45,7 @@ class DownloadResource(Resource):
     @request_handler()
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
+        set_cors_headers(request)
         request.setHeader(
             "Content-Security-Policy",
             "default-src 'none';"
