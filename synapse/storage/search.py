@@ -151,13 +151,13 @@ class SearchStore(BackgroundUpdateStore):
             conn.set_session(autocommit=True)
             c = conn.cursor()
 
-            # We create with NULLS FIRST so that when we search *backwards*
-            # we get the ones with non null origin_server_ts *first*
             c.execute(
                 "CREATE INDEX CONCURRENTLY event_search_fts_idx_gist"
                 " ON event_search USING GIST (vector)"
             )
+
             c.execute("DROP INDEX event_search_fts_idx")
+
             conn.set_session(autocommit=False)
 
         if isinstance(self.database_engine, PostgresEngine):
