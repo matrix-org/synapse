@@ -1,3 +1,26 @@
+Changes in synapse v0.18.2 (2016-11-01)
+=======================================
+
+No changes since v0.18.2-rc5
+
+
+Changes in synapse v0.18.2-rc5 (2016-10-28)
+===========================================
+
+Bug fixes:
+
+* Fix prometheus process metrics in worker processes (PR #1184)
+
+
+Changes in synapse v0.18.2-rc4 (2016-10-27)
+===========================================
+
+Bug fixes:
+
+* Fix ``user_threepids`` schema delta, which in some instances prevented
+  startup after upgrade (PR #1183)
+
+
 Changes in synapse v0.18.2-rc3 (2016-10-27)
 ===========================================
 
