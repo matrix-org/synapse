@@ -13,12 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Because otherwise 'resource' collides with synapse.metrics.resource
-from __future__ import absolute_import
-
 import os
 import stat
-from resource import getrusage, RUSAGE_SELF
 
 
 TICKS_PER_SEC = 100
@@ -49,7 +45,6 @@ STAT_FIELDS = {
 }
 
 
-rusage = None
 stats = {}
 fd_counts = None
 
@@ -65,9 +60,6 @@ if HAVE_PROC_STAT:
 
 
 def update_resource_metrics():
-    global rusage
-    rusage = getrusage(RUSAGE_SELF)
-
     if HAVE_PROC_SELF_STAT:
         global stats
         with open("/proc/self/stat") as s:
