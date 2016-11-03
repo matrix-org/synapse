@@ -51,9 +51,9 @@ python_gc_counts            reactor_gc_counts
 
 The twisted-specific reactor metrics have been renamed.
 
-==================================== =================
+==================================== =====================
 New name                             Old name
------------------------------------- -----------------
-python_twisted_reactor_pending_calls reactor_tick_time
+------------------------------------ ---------------------
+python_twisted_reactor_pending_calls reactor_pending_calls
 python_twisted_reactor_tick_time     reactor_tick_time
-==================================== =================
+==================================== =====================
