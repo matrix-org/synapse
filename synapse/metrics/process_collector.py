@@ -110,22 +110,7 @@ def _process_fds():
 
 
 def register_process_collector(process_metrics):
-    # Legacy synapse-invented metric names
-
-    resource_metrics = process_metrics.make_subspace("resource")
-
-    resource_metrics.register_collector(update_resource_metrics)
-
-    # msecs
-    resource_metrics.register_callback("utime", lambda: rusage.ru_utime * 1000)
-    resource_metrics.register_callback("stime", lambda: rusage.ru_stime * 1000)
-
-    # kilobytes
-    resource_metrics.register_callback("maxrss", lambda: rusage.ru_maxrss * 1024)
-
-    process_metrics.register_callback("fds", _process_fds, labels=["type"])
-
-    # New prometheus-standard metric names
+    process_metrics.register_collector(update_resource_metrics)
 
     if HAVE_PROC_SELF_STAT:
         process_metrics.register_callback(
