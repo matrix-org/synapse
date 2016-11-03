@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import os
-import stat
 
 
 TICKS_PER_SEC = 100
@@ -24,16 +23,6 @@ HAVE_PROC_STAT = os.path.exists("/proc/stat")
 HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 HAVE_PROC_SELF_LIMITS = os.path.exists("/proc/self/limits")
 HAVE_PROC_SELF_FD = os.path.exists("/proc/self/fd")
-
-TYPES = {
-    stat.S_IFSOCK: "SOCK",
-    stat.S_IFLNK: "LNK",
-    stat.S_IFREG: "REG",
-    stat.S_IFBLK: "BLK",
-    stat.S_IFDIR: "DIR",
-    stat.S_IFCHR: "CHR",
-    stat.S_IFIFO: "FIFO",
-}
 
 # Field indexes from /proc/self/stat, taken from the proc(5) manpage
 STAT_FIELDS = {
@@ -46,7 +35,6 @@ STAT_FIELDS = {
 
 
 stats = {}
-fd_counts = None
 
 # In order to report process_start_time_seconds we need to know the
 # machine's boot time, because the value in /proc/self/stat is relative to
@@ -72,33 +60,13 @@ def update_resource_metrics():
                 # we've lost the first two fields in PID and COMMAND above
                 stats[name] = int(raw_stats[index - 3])
 
-    global fd_counts
-    fd_counts = _process_fds()
 
-
-def _process_fds():
-    counts = {(k,): 0 for k in TYPES.values()}
-    counts[("other",)] = 0
-
+def _count_fds():
     # Not every OS will have a /proc/self/fd directory
     if not HAVE_PROC_SELF_FD:
-        return counts
+        return 0
 
-    for fd in os.listdir("/proc/self/fd"):
-        try:
-            s = os.stat("/proc/self/fd/%s" % (fd))
-            fmt = stat.S_IFMT(s.st_mode)
-            if fmt in TYPES:
-                t = TYPES[fmt]
-            else:
-                t = "other"
-
-            counts[(t,)] += 1
-        except OSError:
-            # the dirh itself used by listdir() is usually missing by now
-            pass
-
-    return counts
+    return len(os.listdir("/proc/self/fd"))
 
 
 def register_process_collector(process_metrics):
@@ -135,7 +103,7 @@ def register_process_collector(process_metrics):
     if HAVE_PROC_SELF_FD:
         process_metrics.register_callback(
             "open_fds",
-            lambda: sum(fd_counts.values())
+            lambda: _count_fds()
         )
 
     if HAVE_PROC_SELF_LIMITS:
