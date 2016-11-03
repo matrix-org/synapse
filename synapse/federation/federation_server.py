@@ -443,6 +443,14 @@ class FederationServer(FederationBase):
         })
 
     def on_profile_request(self, user_id, persona, key):
+        """Handle a /profile/ request. Persona and key parameters are optional.
+
+        Args:
+            user_id (str)
+            persona (str): Optional if `key` not also set. Returns only info from
+                the given persona.
+            key (str): Optional. Returns only the given `key`.
+        """
         if not self.hs.is_mine_id(user_id):
             raise SynapseError(400, "Not a local user")
 

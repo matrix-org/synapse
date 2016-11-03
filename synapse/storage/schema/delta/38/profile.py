@@ -24,9 +24,9 @@ CREATE_TABLE = """
 CREATE TABLE profiles_extended (
     stream_id BIGINT NOT NULL,
     user_id TEXT NOT NULL,
-    persona TEXT NOT NULL,
-    key TEXT NOT NULL,
-    content TEXT NOT NULL
+    persona TEXT NOT NULL,  -- Which persona this field is in, e.g. `default`
+    key TEXT NOT NULL,  -- the key of this field, e.g. `m.display_name`
+    content TEXT NOT NULL  -- JSON encoded content of the key
 );
 
 CREATE INDEX profiles_extended_tuple ON profiles_extended(
@@ -34,7 +34,7 @@ CREATE INDEX profiles_extended_tuple ON profiles_extended(
 );
 """
 
-UPDATE_DISPLAY_NAME = """
+POSTGRES_UPDATE_DISPLAY_NAME = """
 INSERT INTO profiles_extended (stream_id, user_id, persona, key, content)
 SELECT
     1,
@@ -44,7 +44,7 @@ SELECT
 FROM profiles WHERE displayname IS NOT NULL
 """
 
-UPDATE_AVATAR_URL = """
+POSTGRES_UPDATE_AVATAR_URL = """
 INSERT INTO profiles_extended (stream_id, user_id, persona, key, content)
 SELECT
     1,
@@ -62,8 +62,8 @@ def run_create(cur, database_engine, *args, **kwargs):
 
 def run_upgrade(cur, database_engine, config, *args, **kwargs):
     if isinstance(database_engine, PostgresEngine):
-        cur.execute(UPDATE_DISPLAY_NAME, (config.server_name,))
-        cur.execute(UPDATE_AVATAR_URL, (config.server_name,))
+        cur.execute(POSTGRES_UPDATE_DISPLAY_NAME, (config.server_name,))
+        cur.execute(POSTGRES_UPDATE_AVATAR_URL, (config.server_name,))
     else:
         cur.execute(
             "SELECT user_id, displayname FROM profiles WHERE displayname IS NOT NULL"
