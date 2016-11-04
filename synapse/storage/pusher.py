@@ -137,6 +137,7 @@ class PusherStore(SQLBaseStore):
 
     @cachedInlineCallbacks(num_args=1, max_entries=15000)
     def get_if_user_has_pusher(self, user_id):
+        # This only exists for the cachedList decorator
         raise NotImplementedError()
 
     @cachedList(cached_method_name="get_if_user_has_pusher",
