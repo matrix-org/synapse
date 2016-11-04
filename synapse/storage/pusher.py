@@ -137,17 +137,8 @@ class PusherStore(SQLBaseStore):
 
     @cachedInlineCallbacks(num_args=1, max_entries=15000)
     def get_if_user_has_pusher(self, user_id):
-        result = yield self._simple_select_many_batch(
-            table='pushers',
-            keyvalues={
-                'user_name': 'user_id',
-            },
-            retcol='user_name',
-            desc='get_if_user_has_pusher',
-            allow_none=True,
-        )
-
-        defer.returnValue(bool(result))
+        # This only exists for the cachedList decorator
+        raise NotImplementedError()
 
     @cachedList(cached_method_name="get_if_user_has_pusher",
                 list_name="user_ids", num_args=1, inlineCallbacks=True)
