@@ -245,7 +245,7 @@ class LdapAuthProvider(object):
 
             # BAD: bind failed
             logger.info(
-                "Binding against LDAP failed for '%s' failed: %s",
+                "Binding against LDAP for '%s' failed: %s",
                 bind_dn, conn.result['description']
             )
             conn.unbind()
