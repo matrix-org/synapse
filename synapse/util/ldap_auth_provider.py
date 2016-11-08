@@ -236,7 +236,8 @@ class LdapAuthProvider(object):
                 value=localpart,
                 base=self.ldap_base
             )
-            conn = ldap3.Connection(server, bind_dn, password)
+            conn = ldap3.Connection(server, bind_dn, password,
+                                    authentication=ldap3.AUTH_SIMPLE)
             logger.debug(
                 "Established LDAP connection in simple bind mode: %s",
                 conn
