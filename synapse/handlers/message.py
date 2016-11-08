@@ -34,6 +34,7 @@ from ._base import BaseHandler
 from canonicaljson import encode_canonical_json
 
 import logging
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -414,6 +415,20 @@ class MessageHandler(BaseHandler):
             latest_ret = yield self.store.get_latest_event_ids_and_hashes_in_room(
                 builder.room_id,
             )
+
+            # We want to limit the max number of prev events we point to in our
+            # new event
+            if len(latest_ret) > 10:
+                # Sort by reverse depth, so we point to the most recent.
+                latest_ret.sort(key=lambda a: -a[2])
+                new_latest_ret = latest_ret[:5]
+
+                # We also randomly point to some of the older events, to make
+                # sure that we don't completely ignore the older events.
+                if latest_ret[5:]:
+                    sample_size = min(5, len(latest_ret[5:]))
+                    new_latest_ret.extend(random.sample(latest_ret[5:], sample_size))
+                latest_ret = new_latest_ret
 
             if latest_ret:
                 depth = max([d for _, _, d in latest_ret]) + 1
