@@ -425,7 +425,9 @@ class MessageHandler(BaseHandler):
 
                 # We also randomly point to some of the older events, to make
                 # sure that we don't completely ignore the older events.
-                new_latest_ret.extend(random.sample(latest_ret, 5))
+                if latest_ret[5:]:
+                    sample_size = min(5, len(latest_ret[5:]))
+                    new_latest_ret.extend(random.sample(latest_ret[5:], sample_size))
                 latest_ret = new_latest_ret
 
             if latest_ret:
