@@ -219,6 +219,42 @@ class LdapAuthProvider(object):
 
         return ldap_config
 
+    def _ldap_bind(self, server, bind_dn, password):
+        """ Attempt a simple bind with the given dn against the LDAP server.
+
+            Returns True, LDAP3Connection
+                if the bind was successful
+            Returns False, None
+                if an error occured
+        """
+
+        try:
+            conn = ldap3.Connection(server, bind_dn, password)
+            logger.debug("Established LDAP connection: %s", conn)
+            if self.ldap_start_tls:
+                conn.start_tls()
+                logger.debug(
+                    "Upgraded LDAP connection through StartTLS: %s",
+                    conn
+                )
+
+            if conn.bind():
+                # GOOD: bind okay
+                logger.debug("LDAP Bind successful.")
+                return True, conn
+
+            # BAD: bind failed
+            logger.info(
+                "Binding against LDAP for '%s' failed: %s",
+                bind_dn, conn.result['description']
+            )
+            conn.unbind()
+            return False, None
+
+        except ldap3.core.exceptions.LDAPException as e:
+            logger.warn("Error during LDAP authentication: %s", e)
+            return False, None
+
     def _ldap_simple_bind(self, server, localpart, password):
         """ Attempt a simple bind with the credentials
             given by the user against the LDAP server.
@@ -229,42 +265,16 @@ class LdapAuthProvider(object):
                 if an error occured
         """
 
-        try:
-            # bind with the the local users ldap credentials
-            bind_dn = "{prop}={value},{base}".format(
-                prop=self.ldap_attributes['uid'],
-                value=localpart,
-                base=self.ldap_base
-            )
-            conn = ldap3.Connection(server, bind_dn, password)
-            logger.debug(
-                "Established LDAP connection in simple bind mode: %s",
-                conn
-            )
+        logger.info("Simple bind against LDAP for '%s'.", localpart)
 
-            if self.ldap_start_tls:
-                conn.start_tls()
-                logger.debug(
-                    "Upgraded LDAP connection in simple bind mode through StartTLS: %s",
-                    conn
-                )
+        # bind with the the local users ldap credentials
+        bind_dn = "{prop}={value},{base}".format(
+            prop=self.ldap_attributes['uid'],
+            value=localpart,
+            base=self.ldap_base
+        )
 
-            if conn.bind():
-                # GOOD: bind okay
-                logger.debug("LDAP Bind successful in simple bind mode.")
-                return True, conn
-
-            # BAD: bind failed
-            logger.info(
-                "Binding against LDAP failed for '%s' failed: %s",
-                localpart, conn.result['description']
-            )
-            conn.unbind()
-            return False, None
-
-        except ldap3.core.exceptions.LDAPException as e:
-            logger.warn("Error during LDAP authentication: %s", e)
-            return False, None
+        return self._ldap_bind(server, bind_dn, password)
 
     def _ldap_authenticated_search(self, server, localpart, password):
         """ Attempt to login with the preconfigured bind_dn
@@ -283,29 +293,18 @@ class LdapAuthProvider(object):
         """
 
         try:
-            conn = ldap3.Connection(
+            logger.info("Search bind against LDAP for '%s'.", localpart)
+
+            success, conn = self._ldap_bind(
                 server,
                 self.ldap_bind_dn,
                 self.ldap_bind_password
             )
-            logger.debug(
-                "Established LDAP connection in search mode: %s",
-                conn
-            )
-
-            if self.ldap_start_tls:
-                conn.start_tls()
-                logger.debug(
-                    "Upgraded LDAP connection in search mode through StartTLS: %s",
-                    conn
-                )
-
-            if not conn.bind():
+            if not success:
                 logger.warn(
                     "Binding against LDAP with `bind_dn` failed: %s",
                     conn.result['description']
                 )
-                conn.unbind()
                 return False, None
 
             # construct search_filter like (uid=localpart)
@@ -337,7 +336,7 @@ class LdapAuthProvider(object):
                 # Note: do not use rebind(), for some reason it did not verify
                 #       the password for me!
                 conn.unbind()
-                return self._ldap_simple_bind(server, localpart, password)
+                return self._ldap_bind(server, user_dn, password)
             else:
                 # BAD: found 0 or > 1 results, abort!
                 if len(conn.response) == 0:
