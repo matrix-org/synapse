@@ -1,3 +1,16 @@
+Changes in synapse v0.18.3 (2016-11-08)
+=======================================
+
+SECURITY UPDATE
+
+Explicitly require authentication when using LDAP3. This is the default on
+versions of ``ldap3`` above 1.0, but some distributions will package an older
+version.
+
+If you are using LDAP3 login and have a version of ``ldap3`` older than 1.0 it
+is **CRITICAL to updgrade**.
+
+
 Changes in synapse v0.18.2 (2016-11-01)
 =======================================
 
