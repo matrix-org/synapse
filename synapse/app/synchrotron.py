@@ -446,6 +446,8 @@ def start(config_options):
 
     setup_logging(config.worker_log_config, config.worker_log_file)
 
+    synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
+
     database_engine = create_engine(config.database_config)
 
     ss = SynchrotronServer(

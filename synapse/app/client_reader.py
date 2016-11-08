@@ -41,6 +41,8 @@ from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
 from synapse.crypto import context_factory
 
+from synapse import events
+
 
 from twisted.internet import reactor, defer
 from twisted.web.resource import Resource
@@ -164,6 +166,8 @@ def start(config_options):
     assert config.worker_app == "synapse.app.client_reader"
 
     setup_logging(config.worker_log_config, config.worker_log_file)
+
+    events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     database_engine = create_engine(config.database_config)
 
