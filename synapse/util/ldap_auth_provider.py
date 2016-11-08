@@ -219,7 +219,7 @@ class LdapAuthProvider(object):
 
         return ldap_config
 
-    def _ldap_internal_bind(self, server, bind_dn, password):
+    def _ldap_bind(self, server, bind_dn, password):
         """ Attempt a simple bind with the given dn against the LDAP server.
 
             Returns True, LDAP3Connection
@@ -274,7 +274,7 @@ class LdapAuthProvider(object):
             base=self.ldap_base
         )
 
-        return self._ldap_internal_bind(server, bind_dn, password)
+        return self._ldap_bind(server, bind_dn, password)
 
     def _ldap_authenticated_search(self, server, localpart, password):
         """ Attempt to login with the preconfigured bind_dn
@@ -295,7 +295,7 @@ class LdapAuthProvider(object):
         try:
             logger.info("Search bind against LDAP for '%s'.", localpart)
 
-            success, conn = self._ldap_internal_bind(
+            success, conn = self._ldap_bind(
                 server,
                 self.ldap_bind_dn,
                 self.ldap_bind_password
@@ -336,7 +336,7 @@ class LdapAuthProvider(object):
                 # Note: do not use rebind(), for some reason it did not verify
                 #       the password for me!
                 conn.unbind()
-                return self._ldap_internal_bind(server, user_dn, password)
+                return self._ldap_bind(server, user_dn, password)
             else:
                 # BAD: found 0 or > 1 results, abort!
                 if len(conn.response) == 0:
