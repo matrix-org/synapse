@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from ._base import Config, ConfigError
 
 import importlib
 
@@ -39,7 +39,12 @@ class PasswordAuthProviderConfig(Config):
             module = importlib.import_module(module)
             provider_class = getattr(module, clz)
 
-            provider_config = provider_class.parse_config(provider["config"])
+            try:
+                provider_config = provider_class.parse_config(provider["config"])
+            except Exception as e:
+                raise ConfigError(
+                    "Failed to parse config for %r: %r" % (provider['module'], e)
+                )
             self.password_providers.append((provider_class, provider_config))
 
     def default_config(self, **kwargs):
