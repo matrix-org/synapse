@@ -22,57 +22,35 @@ from synapse.api.auth import get_access_token_from_request
 logger = logging.getLogger(__name__)
 
 
-# FIXME: elsewhere we use FooStore to indicate something in the storage layer...
-class HttpTransactionStore(object):
+class HttpTransactionCache(object):
 
     def __init__(self):
-        # { key : (txn_id, response) }
+        # { key : (txn_id, response_deferred) }
         self.transactions = {}
 
-    def get_response(self, key, txn_id):
-        """Retrieve a response for this request.
-
-        Args:
-            key (str): A transaction-independent key for this request. Usually
-                this is a combination of the path (without the transaction id)
-                and the user's access token.
-            txn_id (str): The transaction ID for this request
-        Returns:
-            A tuple of (HTTP response code, response content) or None.
-        """
+    def _get_response(self, key, txn_id):
         try:
-            logger.debug("get_response TxnId: %s", txn_id)
-            (last_txn_id, response) = self.transactions[key]
+            (last_txn_id, response_deferred) = self.transactions[key]
             if txn_id == last_txn_id:
                 logger.info("get_response: Returning a response for %s", txn_id)
-                return response
+                return response_deferred
         except KeyError:
             pass
         return None
 
-    def store_response(self, key, txn_id, response):
-        """Stores an HTTP response tuple.
+    def _store_response(self, key, txn_id, response_deferred):
+        self.transactions[key] = (txn_id, response_deferred)
 
-        Args:
-            key (str): A transaction-independent key for this request. Usually
-                this is a combination of the path (without the transaction id)
-                and the user's access token.
-            txn_id (str): The transaction ID for this request.
-            response (tuple): A tuple of (HTTP response code, response content)
-        """
-        logger.debug("store_response TxnId: %s", txn_id)
-        self.transactions[key] = (txn_id, response)
-
-    def store_client_transaction(self, request, txn_id, response):
-        """Stores the request/response pair of an HTTP transaction.
+    def store_client_transaction(self, request, txn_id, response_deferred):
+        """Stores the request/Promise<response> pair of an HTTP transaction.
 
         Args:
             request (twisted.web.http.Request): The twisted HTTP request. This
             request must have the transaction ID as the last path segment.
-            response (tuple): A tuple of (response code, response dict)
+            response_deferred (Promise<tuple>): A tuple of (response code, response dict)
             txn_id (str): The transaction ID for this request.
         """
-        self.store_response(self._get_key(request), txn_id, response)
+        self._store_response(self._get_key(request), txn_id, response_deferred)
 
     def get_client_transaction(self, request, txn_id):
         """Retrieves a stored response if there was one.
@@ -82,14 +60,14 @@ class HttpTransactionStore(object):
             request must have the transaction ID as the last path segment.
             txn_id (str): The transaction ID for this request.
         Returns:
-            The response tuple.
+            Promise: Resolves to the response tuple.
         Raises:
             KeyError if the transaction was not found.
         """
-        response = self.get_response(self._get_key(request), txn_id)
-        if response is None:
+        response_deferred = self._get_response(self._get_key(request), txn_id)
+        if response_deferred is None:
             raise KeyError("Transaction not found.")
-        return response
+        return response_deferred
 
     def _get_key(self, request):
         token = get_access_token_from_request(request)

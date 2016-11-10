@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from synapse.http import servlet
 from synapse.http.servlet import parse_json_object_from_request
-from synapse.rest.client.v1.transactions import HttpTransactionStore
+from synapse.rest.client.v1.transactions import HttpTransactionCache
 
 from ._base import client_v2_patterns
 
@@ -40,18 +40,25 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         super(SendToDeviceRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.txns = HttpTransactionStore()
+        self.txns = HttpTransactionCache()
         self.device_message_handler = hs.get_device_message_handler()
 
     @defer.inlineCallbacks
     def on_PUT(self, request, message_type, txn_id):
         try:
-            defer.returnValue(
-                self.txns.get_client_transaction(request, txn_id)
-            )
+            res_deferred = self.txns.get_client_transaction(request, txn_id)
+            res = yield res_deferred
+            defer.returnValue(res)
         except KeyError:
             pass
+        
+        res_deferred = self._put(request, message_type, txn_id)
+        self.txns.store_client_transaction(request, txn_id, res_deferred)
+        res = yield res_deferred
+        defer.returnValue(res)
 
+    @defer.inlineCallbacks
+    def _put(self, request, message_type, txn_id):
         requester = yield self.auth.get_user_by_req(request)
 
         content = parse_json_object_from_request(request)
@@ -63,7 +70,6 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         )
 
         response = (200, {})
-        self.txns.store_client_transaction(request, txn_id, response)
         defer.returnValue(response)
 
 

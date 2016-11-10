@@ -18,7 +18,7 @@
 
 from synapse.http.servlet import RestServlet
 from synapse.api.urls import CLIENT_PREFIX
-from .transactions import HttpTransactionStore
+from .transactions import HttpTransactionCache
 import re
 
 import logging
@@ -59,4 +59,4 @@ class ClientV1RestServlet(RestServlet):
         self.hs = hs
         self.builder_factory = hs.get_event_builder_factory()
         self.auth = hs.get_v1auth()
-        self.txns = HttpTransactionStore()
+        self.txns = HttpTransactionCache()

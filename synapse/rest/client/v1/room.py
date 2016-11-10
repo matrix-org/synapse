@@ -56,15 +56,15 @@ class RoomCreateRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, txn_id):
         try:
-            defer.returnValue(
-                self.txns.get_client_transaction(request, txn_id)
-            )
+            res_deferred = self.txns.get_client_transaction(request, txn_id)
+            res = yield res_deferred
+            defer.returnValue(res)
         except KeyError:
             pass
 
-        response = yield self.on_POST(request)
-
-        self.txns.store_client_transaction(request, txn_id, response)
+        res_deferred = self.on_POST(request)
+        self.txns.store_client_transaction(request, txn_id, res_deferred)
+        response = yield res_deferred
         defer.returnValue(response)
 
     @defer.inlineCallbacks
@@ -217,15 +217,15 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_type, txn_id):
         try:
-            defer.returnValue(
-                self.txns.get_client_transaction(request, txn_id)
-            )
+            res_deferred = self.txns.get_client_transaction(request, txn_id)
+            res = yield res_deferred
+            defer.returnValue(res)
         except KeyError:
             pass
-
-        response = yield self.on_POST(request, room_id, event_type, txn_id)
-
-        self.txns.store_client_transaction(request, txn_id, response)
+        
+        res_deferred = self.on_POST(request, room_id, event_type, txn_id)
+        self.txns.store_client_transaction(request, txn_id, res_deferred)
+        response = yield res_deferred
         defer.returnValue(response)
 
 
@@ -286,15 +286,15 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, room_identifier, txn_id):
         try:
-            defer.returnValue(
-                self.txns.get_client_transaction(request, txn_id)
-            )
+            res_deferred = self.txns.get_client_transaction(request, txn_id)
+            res = yield res_deferred
+            defer.returnValue(res)
         except KeyError:
             pass
-
-        response = yield self.on_POST(request, room_identifier, txn_id)
-
-        self.txns.store_client_transaction(request, txn_id, response)
+            
+        res_deferred = self.on_POST(request, room_identifier, txn_id)
+        self.txns.store_client_transaction(request, txn_id, res_deferred)
+        response = yield res_deferred
         defer.returnValue(response)
 
 
@@ -540,17 +540,15 @@ class RoomForgetRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, txn_id):
         try:
-            defer.returnValue(
-                self.txns.get_client_transaction(request, txn_id)
-            )
+            res_deferred = self.txns.get_client_transaction(request, txn_id)
+            res = yield res_deferred
+            defer.returnValue(res)
         except KeyError:
             pass
-
-        response = yield self.on_POST(
-            request, room_id, txn_id
-        )
-
-        self.txns.store_client_transaction(request, txn_id, response)
+        
+        res_deferred = self.on_POST(request, room_id, txn_id)
+        self.txns.store_client_transaction(request, txn_id, res_deferred)
+        response = yield res_deferred
         defer.returnValue(response)
 
 
@@ -626,17 +624,15 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, membership_action, txn_id):
         try:
-            defer.returnValue(
-                self.txns.get_client_transaction(request, txn_id)
-            )
+            res_deferred = self.txns.get_client_transaction(request, txn_id)
+            res = yield res_deferred
+            defer.returnValue(res)
         except KeyError:
             pass
 
-        response = yield self.on_POST(
-            request, room_id, membership_action, txn_id
-        )
-
-        self.txns.store_client_transaction(request, txn_id, response)
+        res_deferred = self.on_POST(request, room_id, membership_action, txn_id)
+        self.txns.store_client_transaction(request, txn_id, res_deferred)
+        response = yield res_deferred
         defer.returnValue(response)
 
 
@@ -672,15 +668,15 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_id, txn_id):
         try:
-            defer.returnValue(
-                self.txns.get_client_transaction(request, txn_id)
-            )
+            res_deferred = self.txns.get_client_transaction(request, txn_id)
+            res = yield res_deferred
+            defer.returnValue(res)
         except KeyError:
             pass
 
-        response = yield self.on_POST(request, room_id, event_id, txn_id)
-
-        self.txns.store_client_transaction(request, txn_id, response)
+        res_deferred = self.on_POST(request, room_id, event_id, txn_id)
+        self.txns.store_client_transaction(request, txn_id, res_deferred)
+        response = yield res_deferred
         defer.returnValue(response)
 
 
