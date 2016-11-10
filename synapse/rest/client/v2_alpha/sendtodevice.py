@@ -51,7 +51,7 @@ class SendToDeviceRestServlet(servlet.RestServlet):
             defer.returnValue(res)
         except KeyError:
             pass
-        
+
         res_deferred = self._put(request, message_type, txn_id)
         self.txns.store_client_transaction(request, txn_id, res_deferred)
         res = yield res_deferred

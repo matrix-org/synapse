@@ -222,7 +222,7 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
             defer.returnValue(res)
         except KeyError:
             pass
-        
+
         res_deferred = self.on_POST(request, room_id, event_type, txn_id)
         self.txns.store_client_transaction(request, txn_id, res_deferred)
         response = yield res_deferred
@@ -291,7 +291,7 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
             defer.returnValue(res)
         except KeyError:
             pass
-            
+
         res_deferred = self.on_POST(request, room_identifier, txn_id)
         self.txns.store_client_transaction(request, txn_id, res_deferred)
         response = yield res_deferred
@@ -545,7 +545,7 @@ class RoomForgetRestServlet(ClientV1RestServlet):
             defer.returnValue(res)
         except KeyError:
             pass
-        
+
         res_deferred = self.on_POST(request, room_id, txn_id)
         self.txns.store_client_transaction(request, txn_id, res_deferred)
         response = yield res_deferred
