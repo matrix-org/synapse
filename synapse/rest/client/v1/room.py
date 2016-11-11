@@ -633,7 +633,9 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         except KeyError:
             pass
 
-        res_deferred = ObservableDeferred(self.on_POST(request, room_id, membership_action, txn_id))
+        res_deferred = ObservableDeferred(
+            self.on_POST(request, room_id, membership_action, txn_id)
+        )
         self.txns.store_client_transaction(request, txn_id, res_deferred)
         response = yield res_deferred.observe()
         defer.returnValue(response)
