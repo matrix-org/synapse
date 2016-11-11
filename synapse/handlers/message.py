@@ -50,6 +50,8 @@ class MessageHandler(BaseHandler):
 
         self.pagination_lock = ReadWriteLock()
 
+        # We arbitrarily limit concurrent event creation for a room to 5.
+        # This is to stop us from diverging history *too* much.
         self.limiter = Limiter(max_count=5)
 
     @defer.inlineCallbacks
