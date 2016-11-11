@@ -22,6 +22,7 @@ from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.filtering import Filter
 from synapse.types import UserID, RoomID, RoomAlias
+from synapse.util.async import ObservableDeferred
 from synapse.events.utils import serialize_event, format_event_for_client_v2
 from synapse.http.servlet import (
     parse_json_object_from_request, parse_string, parse_integer
@@ -57,14 +58,14 @@ class RoomCreateRestServlet(ClientV1RestServlet):
     def on_PUT(self, request, txn_id):
         try:
             res_deferred = self.txns.get_client_transaction(request, txn_id)
-            res = yield res_deferred
+            res = yield res_deferred.observe()
             defer.returnValue(res)
         except KeyError:
             pass
 
-        res_deferred = self.on_POST(request)
+        res_deferred = ObservableDeferred(self.on_POST(request))
         self.txns.store_client_transaction(request, txn_id, res_deferred)
-        response = yield res_deferred
+        response = yield res_deferred.observe()
         defer.returnValue(response)
 
     @defer.inlineCallbacks
@@ -218,14 +219,14 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
     def on_PUT(self, request, room_id, event_type, txn_id):
         try:
             res_deferred = self.txns.get_client_transaction(request, txn_id)
-            res = yield res_deferred
+            res = yield res_deferred.observe()
             defer.returnValue(res)
         except KeyError:
             pass
 
-        res_deferred = self.on_POST(request, room_id, event_type, txn_id)
+        res_deferred = ObservableDeferred(self.on_POST(request, room_id, event_type, txn_id))
         self.txns.store_client_transaction(request, txn_id, res_deferred)
-        response = yield res_deferred
+        response = yield res_deferred.observe()
         defer.returnValue(response)
 
 
@@ -287,14 +288,14 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
     def on_PUT(self, request, room_identifier, txn_id):
         try:
             res_deferred = self.txns.get_client_transaction(request, txn_id)
-            res = yield res_deferred
+            res = yield res_deferred.observe()
             defer.returnValue(res)
         except KeyError:
             pass
 
-        res_deferred = self.on_POST(request, room_identifier, txn_id)
+        res_deferred = ObservableDeferred(self.on_POST(request, room_identifier, txn_id))
         self.txns.store_client_transaction(request, txn_id, res_deferred)
-        response = yield res_deferred
+        response = yield res_deferred.observe()
         defer.returnValue(response)
 
 
@@ -541,14 +542,14 @@ class RoomForgetRestServlet(ClientV1RestServlet):
     def on_PUT(self, request, room_id, txn_id):
         try:
             res_deferred = self.txns.get_client_transaction(request, txn_id)
-            res = yield res_deferred
+            res = yield res_deferred.observe()
             defer.returnValue(res)
         except KeyError:
             pass
 
-        res_deferred = self.on_POST(request, room_id, txn_id)
+        res_deferred = ObservableDeferred(self.on_POST(request, room_id, txn_id))
         self.txns.store_client_transaction(request, txn_id, res_deferred)
-        response = yield res_deferred
+        response = yield res_deferred.observe()
         defer.returnValue(response)
 
 
@@ -624,15 +625,15 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, membership_action, txn_id):
         try:
-            res_deferred = self.txns.get_client_transaction(request, txn_id)
-            res = yield res_deferred
+            res_deferred = ObservableDeferred(self.txns.get_client_transaction(request, txn_id))
+            res = yield res_deferred.observe()
             defer.returnValue(res)
         except KeyError:
             pass
 
-        res_deferred = self.on_POST(request, room_id, membership_action, txn_id)
+        res_deferred = ObservableDeffself.on_POST(request, room_id, membership_action, txn_id)
         self.txns.store_client_transaction(request, txn_id, res_deferred)
-        response = yield res_deferred
+        response = yield res_deferred.observe()
         defer.returnValue(response)
 
 
@@ -669,14 +670,14 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
     def on_PUT(self, request, room_id, event_id, txn_id):
         try:
             res_deferred = self.txns.get_client_transaction(request, txn_id)
-            res = yield res_deferred
+            res = yield res_deferred.observe()
             defer.returnValue(res)
         except KeyError:
             pass
 
-        res_deferred = self.on_POST(request, room_id, event_id, txn_id)
+        res_deferred = ObservableDeferred(self.on_POST(request, room_id, event_id, txn_id))
         self.txns.store_client_transaction(request, txn_id, res_deferred)
-        response = yield res_deferred
+        response = yield res_deferred.observe()
         defer.returnValue(response)
 
 

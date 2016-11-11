@@ -25,32 +25,32 @@ logger = logging.getLogger(__name__)
 class HttpTransactionCache(object):
 
     def __init__(self):
-        # { key : (txn_id, response_deferred) }
+        # { key : (txn_id, res_observ_defer) }
         self.transactions = {}
 
     def _get_response(self, key, txn_id):
         try:
-            (last_txn_id, response_deferred) = self.transactions[key]
+            (last_txn_id, res_observ_defer) = self.transactions[key]
             if txn_id == last_txn_id:
                 logger.info("get_response: Returning a response for %s", txn_id)
-                return response_deferred
+                return res_observ_defer
         except KeyError:
             pass
         return None
 
-    def _store_response(self, key, txn_id, response_deferred):
-        self.transactions[key] = (txn_id, response_deferred)
+    def _store_response(self, key, txn_id, res_observ_defer):
+        self.transactions[key] = (txn_id, res_observ_defer)
 
-    def store_client_transaction(self, request, txn_id, response_deferred):
+    def store_client_transaction(self, request, txn_id, res_observ_defer):
         """Stores the request/Promise<response> pair of an HTTP transaction.
 
         Args:
             request (twisted.web.http.Request): The twisted HTTP request. This
             request must have the transaction ID as the last path segment.
-            response_deferred (Promise<tuple>): A tuple of (response code, response dict)
+            res_observ_defer (Promise<tuple>): A tuple of (response code, response dict)
             txn_id (str): The transaction ID for this request.
         """
-        self._store_response(self._get_key(request), txn_id, response_deferred)
+        self._store_response(self._get_key(request), txn_id, res_observ_defer)
 
     def get_client_transaction(self, request, txn_id):
         """Retrieves a stored response if there was one.
@@ -64,10 +64,10 @@ class HttpTransactionCache(object):
         Raises:
             KeyError if the transaction was not found.
         """
-        response_deferred = self._get_response(self._get_key(request), txn_id)
-        if response_deferred is None:
+        res_observ_defer = self._get_response(self._get_key(request), txn_id)
+        if res_observ_defer is None:
             raise KeyError("Transaction not found.")
-        return response_deferred
+        return res_observ_defer
 
     def _get_key(self, request):
         token = get_access_token_from_request(request)
