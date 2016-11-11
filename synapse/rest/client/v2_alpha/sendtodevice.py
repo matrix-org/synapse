@@ -20,6 +20,7 @@ from twisted.internet import defer
 from synapse.http import servlet
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.rest.client.v1.transactions import HttpTransactionCache
+from synapse.util.async import ObservableDeferred
 
 from ._base import client_v2_patterns
 
@@ -47,14 +48,14 @@ class SendToDeviceRestServlet(servlet.RestServlet):
     def on_PUT(self, request, message_type, txn_id):
         try:
             res_deferred = self.txns.get_client_transaction(request, txn_id)
-            res = yield res_deferred
+            res = yield res_deferred.observe()
             defer.returnValue(res)
         except KeyError:
             pass
 
-        res_deferred = self._put(request, message_type, txn_id)
+        res_deferred = ObservableDeferred(self._put(request, message_type, txn_id))
         self.txns.store_client_transaction(request, txn_id, res_deferred)
-        res = yield res_deferred
+        res = yield res_deferred.observe()
         defer.returnValue(res)
 
     @defer.inlineCallbacks
