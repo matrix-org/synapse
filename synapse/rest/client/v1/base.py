@@ -18,7 +18,8 @@
 
 from synapse.http.servlet import RestServlet
 from synapse.api.urls import CLIENT_PREFIX
-from .transactions import HttpTransactionCache
+from synapse.rest.client.transactions import HttpTransactionCache
+
 import re
 
 import logging
