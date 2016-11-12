@@ -64,11 +64,12 @@ class Config(object):
         if isinstance(value, int) or isinstance(value, long):
             return value
         second = 1000
-        hour = 60 * 60 * second
+        minute = 60 * second
+        hour = 60 * minute
         day = 24 * hour
         week = 7 * day
         year = 365 * day
-        sizes = {"s": second, "h": hour, "d": day, "w": week, "y": year}
+        sizes = {"s": second, "m": minute, "h": hour, "d": day, "w": week, "y": year}
         size = 1
         suffix = value[-1]
         if suffix in sizes:
