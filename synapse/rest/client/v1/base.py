@@ -60,4 +60,4 @@ class ClientV1RestServlet(RestServlet):
         self.hs = hs
         self.builder_factory = hs.get_event_builder_factory()
         self.auth = hs.get_v1auth()
-        self.txns = HttpTransactionCache()
+        self.txns = HttpTransactionCache(hs.get_clock())

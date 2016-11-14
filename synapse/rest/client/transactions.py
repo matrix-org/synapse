@@ -41,12 +41,19 @@ def get_transaction_key(request):
     return request.path + "/" + token
 
 
+CLEANUP_PERIOD_MS = 1000 * 60 * 30  # 30 mins
+
+
 class HttpTransactionCache(object):
 
-    def __init__(self):
+    def __init__(self, clock):
+        self.clock = clock
         self.transactions = {
-            # $txn_key: ObservableDeferred<(res_code, res_json_body)>
+            # $txn_key: (ObservableDeferred<(res_code, res_json_body)>, timestamp)
         }
+        # Try to clean entries every 30 mins. This means entries will exist
+        # for at *LEAST* 30 mins, and at *MOST* 60 mins.
+        self.cleaner = self.clock.looping_call(self._cleanup, CLEANUP_PERIOD_MS)
 
     def fetch_or_execute_request(self, request, fn, *args, **kwargs):
         """A helper function for fetch_or_execute which extracts
@@ -74,11 +81,18 @@ class HttpTransactionCache(object):
             Deferred which resolves to a tuple of (response_code, response_dict).
         """
         try:
-            return self.transactions[txn_key].observe()
-        except KeyError:
+            return self.transactions[txn_key][0].observe()
+        except (KeyError, IndexError):
             pass  # execute the function instead.
 
         deferred = fn(*args, **kwargs)
         observable = ObservableDeferred(deferred)
-        self.transactions[txn_key] = observable
+        self.transactions[txn_key] = (observable, self.clock.time_msec())
         return observable.observe()
+
+    def _cleanup(self):
+        now = self.clock.time_msec()
+        for key in self.transactions.keys():
+            ts = self.transactions[key][1]
+            if now > (ts + CLEANUP_PERIOD_MS):  # after cleanup period
+                del self.transactions[key]
