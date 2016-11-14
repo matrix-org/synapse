@@ -67,19 +67,18 @@ class HttpTransactionCache(object):
             txn_key (str): A key to ensure idempotency should fetch_or_execute be
             called again at a later point in time.
             fn (function): A function which returns a tuple of
-            (response_code, response_dict)d
+            (response_code, response_dict).
             *args: Arguments to pass to fn.
             **kwargs: Keyword arguments to pass to fn.
         Returns:
-            synapse.util.async.ObservableDeferred which resolves to a tuple
-            of (response_code, response_dict).
+            Deferred which resolves to a tuple of (response_code, response_dict).
         """
         try:
-            return self.transactions[txn_key]
+            return self.transactions[txn_key].observe()
         except KeyError:
             pass  # execute the function instead.
 
         deferred = fn(*args, **kwargs)
         observable = ObservableDeferred(deferred)
         self.transactions[txn_key] = observable
-        return observable
+        return observable.observe()

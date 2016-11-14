@@ -43,13 +43,10 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         self.txns = HttpTransactionCache()
         self.device_message_handler = hs.get_device_message_handler()
 
-    @defer.inlineCallbacks
     def on_PUT(self, request, message_type, txn_id):
-        observable = self.txns.fetch_or_execute_request(
+        return self.txns.fetch_or_execute_request(
             request, self._put, request, message_type, txn_id
         )
-        res = yield observable.observe()
-        defer.returnValue(res)
 
     @defer.inlineCallbacks
     def _put(self, request, message_type, txn_id):

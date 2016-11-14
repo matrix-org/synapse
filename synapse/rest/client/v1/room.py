@@ -53,13 +53,10 @@ class RoomCreateRestServlet(ClientV1RestServlet):
                                    client_path_patterns("/createRoom(?:/.*)?$"),
                                    self.on_OPTIONS)
 
-    @defer.inlineCallbacks
     def on_PUT(self, request, txn_id):
-        observable = self.txns.fetch_or_execute_request(
+        return self.txns.fetch_or_execute_request(
             request, self.on_POST, request
         )
-        res = yield observable.observe()
-        defer.returnValue(res)
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -208,13 +205,10 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
     def on_GET(self, request, room_id, event_type, txn_id):
         return (200, "Not implemented")
 
-    @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_type, txn_id):
-        observable = self.txns.fetch_or_execute_request(
+        return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, event_type, txn_id
         )
-        res = yield observable.observe()
-        defer.returnValue(res)
 
 
 # TODO: Needs unit testing for room ID + alias joins
@@ -271,13 +265,10 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
 
         defer.returnValue((200, {"room_id": room_id}))
 
-    @defer.inlineCallbacks
     def on_PUT(self, request, room_identifier, txn_id):
-        observable = self.txns.fetch_or_execute_request(
+        return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_identifier, txn_id
         )
-        res = yield observable.observe()
-        defer.returnValue(res)
 
 
 # TODO: Needs unit testing
@@ -519,13 +510,10 @@ class RoomForgetRestServlet(ClientV1RestServlet):
 
         defer.returnValue((200, {}))
 
-    @defer.inlineCallbacks
     def on_PUT(self, request, room_id, txn_id):
-        observable = self.txns.fetch_or_execute_request(
+        return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, txn_id
         )
-        res = yield observable.observe()
-        defer.returnValue(res)
 
 
 # TODO: Needs unit testing
@@ -597,13 +585,10 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 return False
         return True
 
-    @defer.inlineCallbacks
     def on_PUT(self, request, room_id, membership_action, txn_id):
-        observable = self.txns.fetch_or_execute_request(
+        return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, membership_action, txn_id
         )
-        res = yield observable.observe()
-        defer.returnValue(res)
 
 
 class RoomRedactEventRestServlet(ClientV1RestServlet):
@@ -635,13 +620,10 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
 
         defer.returnValue((200, {"event_id": event.event_id}))
 
-    @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_id, txn_id):
-        observable = self.txns.fetch_or_execute_request(
+        return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, event_id, txn_id
         )
-        res = yield observable.observe()
-        defer.returnValue(res)
 
 
 class RoomTypingRestServlet(ClientV1RestServlet):
