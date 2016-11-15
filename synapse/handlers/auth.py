@@ -61,6 +61,8 @@ class AuthHandler(BaseHandler):
             for module, config in hs.config.password_providers
         ]
 
+        logger.info("Extra password_providers: %r", self.password_providers)
+
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.device_handler = hs.get_device_handler()
 
