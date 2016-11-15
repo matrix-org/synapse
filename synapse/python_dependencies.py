@@ -49,8 +49,8 @@ CONDITIONAL_REQUIREMENTS = {
         "Jinja2>=2.8": ["Jinja2>=2.8"],
         "bleach>=1.4.2": ["bleach>=1.4.2"],
     },
-    "ldap": {
-        "ldap3>=1.0": ["ldap3>=1.0"],
+    "matrix-synapse-ldap3": {
+        "matrix-synapse-ldap3>=0.1": ["ldap_auth_provider"],
     },
     "psutil": {
         "psutil>=2.0.0": ["psutil>=2.0.0"],

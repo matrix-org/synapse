@@ -27,17 +27,23 @@ class PasswordAuthProviderConfig(Config):
         ldap_config = config.get("ldap_config", {})
         self.ldap_enabled = ldap_config.get("enabled", False)
         if self.ldap_enabled:
-            from synapse.util.ldap_auth_provider import LdapAuthProvider
+            from ldap_auth_provider import LdapAuthProvider
             parsed_config = LdapAuthProvider.parse_config(ldap_config)
             self.password_providers.append((LdapAuthProvider, parsed_config))
 
         providers = config.get("password_providers", [])
         for provider in providers:
-            # We need to import the module, and then pick the class out of
-            # that, so we split based on the last dot.
-            module, clz = provider['module'].rsplit(".", 1)
-            module = importlib.import_module(module)
-            provider_class = getattr(module, clz)
+            # This is for backwards compat when the ldap auth provider resided
+            # in this package.
+            if provider['module'] == "synapse.util.ldap_auth_provider.LdapAuthProvider":
+                from ldap_auth_provider import LdapAuthProvider
+                provider_class = LdapAuthProvider
+            else:
+                # We need to import the module, and then pick the class out of
+                # that, so we split based on the last dot.
+                module, clz = provider['module'].rsplit(".", 1)
+                module = importlib.import_module(module)
+                provider_class = getattr(module, clz)
 
             try:
                 provider_config = provider_class.parse_config(provider["config"])
@@ -50,7 +56,7 @@ class PasswordAuthProviderConfig(Config):
     def default_config(self, **kwargs):
         return """\
         # password_providers:
-        #     - module: "synapse.util.ldap_auth_provider.LdapAuthProvider"
+        #     - module: "ldap_auth_provider.LdapAuthProvider"
         #       config:
         #         enabled: true
         #         uri: "ldap://ldap.example.com:389"
