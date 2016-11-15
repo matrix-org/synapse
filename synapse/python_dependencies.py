@@ -69,6 +69,7 @@ def requirements(config=None, include_conditional=False):
 def github_link(project, version, egg):
     return "https://github.com/%s/tarball/%s/#egg=%s" % (project, version, egg)
 
+
 DEPENDENCY_LINKS = {
 }
 
@@ -155,6 +156,7 @@ def list_requirements():
         if not is_linked:
             result.append(requirement)
     return result
+
 
 if __name__ == "__main__":
     import sys
