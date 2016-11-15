@@ -653,7 +653,10 @@ class StateStore(SQLBaseStore):
                 else:
                     state_dict = results[group]
 
-                state_dict.update(group_state_dict)
+                state_dict.update({
+                    (intern_string(k[0]), intern_string(k[1])): v
+                    for k, v in group_state_dict.items()
+                })
 
                 self._state_group_cache.update(
                     cache_seq_num,
