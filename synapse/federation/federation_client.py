@@ -111,19 +111,19 @@ class FederationClient(FederationBase):
 
         sent_pdus_destination_dist.inc_by(len(destinations))
 
-        logger.debug("[%s] transaction_layer.enqueue_pdu... ", pdu.event_id)
+        logger.debug("[%s] transaction_layer.send_pdu... ", pdu.event_id)
 
         # TODO, add errback, etc.
-        self._transaction_queue.enqueue_pdu(pdu, destinations, order)
+        self._transaction_queue.send_pdu(pdu, destinations, order)
 
         logger.debug(
-            "[%s] transaction_layer.enqueue_pdu... done",
+            "[%s] transaction_layer.send_pdu... done",
             pdu.event_id
         )
 
     def send_presence(self, destination, states):
         if destination != self.server_name:
-            self._transaction_queue.enqueue_presence(destination, states)
+            self._transaction_queue.send_presence(destination, states)
 
     @log_function
     def send_edu(self, destination, edu_type, content, key=None):
@@ -136,17 +136,17 @@ class FederationClient(FederationBase):
 
         sent_edus_counter.inc()
 
-        self._transaction_queue.enqueue_edu(edu, key=key)
+        self._transaction_queue.send_edu(edu, key=key)
 
     @log_function
     def send_device_messages(self, destination):
         """Sends the device messages in the local database to the remote
         destination"""
-        self._transaction_queue.enqueue_device_messages(destination)
+        self._transaction_queue.send_device_messages(destination)
 
     @log_function
     def send_failure(self, failure, destination):
-        self._transaction_queue.enqueue_failure(failure, destination)
+        self._transaction_queue.send_failure(failure, destination)
         return defer.succeed(None)
 
     @log_function
