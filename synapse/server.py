@@ -32,6 +32,8 @@ from synapse.appservice.scheduler import ApplicationServiceScheduler
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.federation import initialize_http_replication
+from synapse.federation.transport.client import TransportLayerClient
+from synapse.federation.transaction_queue import TransactionQueue
 from synapse.handlers import Handlers
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler
@@ -124,6 +126,8 @@ class HomeServer(object):
         'http_client_context_factory',
         'simple_http_client',
         'media_repository',
+        'federation_transport_client',
+        'federation_sender',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -264,6 +268,12 @@ class HomeServer(object):
 
     def build_media_repository(self):
         return MediaRepository(self)
+
+    def build_federation_transport_client(self):
+        return TransportLayerClient(self)
+
+    def build_federation_sender(self):
+        return TransactionQueue(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
