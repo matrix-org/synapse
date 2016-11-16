@@ -71,6 +71,7 @@ class FederationHandler(BaseHandler):
 
         self.store = hs.get_datastore()
         self.replication_layer = hs.get_replication_layer()
+        self.federation_sender = hs.get_federation_sender()
         self.state_handler = hs.get_state_handler()
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
@@ -94,7 +95,7 @@ class FederationHandler(BaseHandler):
             processing.
         """
 
-        return self.replication_layer.send_pdu(event, destinations)
+        return self.federation_sender.send_pdu(event, destinations)
 
     @log_function
     @defer.inlineCallbacks
@@ -847,7 +848,7 @@ class FederationHandler(BaseHandler):
             event.signatures,
         )
 
-        self.replication_layer.send_pdu(new_pdu, destinations)
+        self.federation_sender.send_pdu(new_pdu, destinations)
 
         state_ids = context.prev_state_ids.values()
         auth_chain = yield self.store.get_auth_chain(set(
@@ -1071,7 +1072,7 @@ class FederationHandler(BaseHandler):
             event.signatures,
         )
 
-        self.replication_layer.send_pdu(new_pdu, destinations)
+        self.federation_sender.send_pdu(new_pdu, destinations)
 
         defer.returnValue(None)
 

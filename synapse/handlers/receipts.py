@@ -33,8 +33,8 @@ class ReceiptsHandler(BaseHandler):
         self.server_name = hs.config.server_name
         self.store = hs.get_datastore()
         self.hs = hs
-        self.federation = hs.get_replication_layer()
-        self.federation.register_edu_handler(
+        self.federation = hs.get_federation_sender()
+        hs.get_replication_layer().register_edu_handler(
             "m.receipt", self._received_remote_receipt
         )
         self.clock = self.hs.get_clock()
