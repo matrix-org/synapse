@@ -95,6 +95,8 @@ class TransactionQueue(object):
         # HACK to get unique tx id
         self._next_txn_id = int(self.clock.time_msec())
 
+        self._order = 1
+
     def can_send_to(self, destination):
         """Can we send messages to the given server?
 
@@ -115,10 +117,13 @@ class TransactionQueue(object):
         else:
             return not destination.startswith("localhost")
 
-    def send_pdu(self, pdu, destinations, order):
+    def send_pdu(self, pdu, destinations):
         # We loop through all destinations to see whether we already have
         # a transaction in progress. If we do, stick it in the pending_pdus
         # table and we'll get back to it later.
+
+        order = self._order
+        self._order += 1
 
         destinations = set(destinations)
         destinations = set(
@@ -140,6 +145,9 @@ class TransactionQueue(object):
             )
 
     def send_presence(self, destination, states):
+        if not self.can_send_to(destination):
+            return
+
         self.pending_presence_by_dest.setdefault(destination, {}).update({
             state.user_id: state for state in states
         })
@@ -148,8 +156,13 @@ class TransactionQueue(object):
             self._attempt_new_transaction, destination
         )
 
-    def send_edu(self, edu, key=None):
-        destination = edu.destination
+    def send_edu(self, destination, edu_type, content, key=None):
+        edu = Edu(
+            origin=self.server_name,
+            destination=destination,
+            edu_type=edu_type,
+            content=content,
+        )
 
         if not self.can_send_to(destination):
             return

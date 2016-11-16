@@ -106,15 +106,12 @@ class FederationClient(FederationBase):
             Deferred: Completes when we have successfully processed the PDU
             and replicated it to any interested remote home servers.
         """
-        order = self._order
-        self._order += 1
-
         sent_pdus_destination_dist.inc_by(len(destinations))
 
         logger.debug("[%s] transaction_layer.send_pdu... ", pdu.event_id)
 
         # TODO, add errback, etc.
-        self._transaction_queue.send_pdu(pdu, destinations, order)
+        self._transaction_queue.send_pdu(pdu, destinations)
 
         logger.debug(
             "[%s] transaction_layer.send_pdu... done",
@@ -127,16 +124,7 @@ class FederationClient(FederationBase):
 
     @log_function
     def send_edu(self, destination, edu_type, content, key=None):
-        edu = Edu(
-            origin=self.server_name,
-            destination=destination,
-            edu_type=edu_type,
-            content=content,
-        )
-
-        sent_edus_counter.inc()
-
-        self._transaction_queue.send_edu(edu, key=key)
+        self._transaction_queue.send_edu(destination, edu_type, content, key=key)
 
     @log_function
     def send_device_messages(self, destination):

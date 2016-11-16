@@ -68,8 +68,6 @@ class ReplicationLayer(FederationClient, FederationServer):
         self.transaction_actions = TransactionActions(self.store)
         self._transaction_queue = TransactionQueue(hs, transport_layer)
 
-        self._order = 0
-
         self.hs = hs
 
         super(ReplicationLayer, self).__init__(hs)
