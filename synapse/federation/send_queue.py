@@ -13,11 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .units import Edu
 
 from blist import sorteddict
+import ujson
+
+
+PRESENCE_TYPE = "p"
+KEYED_EDU_TYPE = "k"
+EDU_TYPE = "e"
+FAILURE_TYPE = "f"
 
 
 class FederationRemoteSendQueue(object):
+
     def __init__(self, hs):
         self.clock = hs.get_clock()
 
@@ -68,12 +77,12 @@ class FederationRemoteSendQueue(object):
         for key in keys[:i]:
             del self.presence_changed[key]
 
-        user_ids = set()
-        for _, states in self.presence_changed.values():
-            user_ids.update(s.user_id for s in user_ids)
+        user_ids = set(
+            user_id for uids in self.presence_changed.values() for _, user_id in uids
+        )
 
         to_del = [user_id for user_id in self.presence_map if user_id not in user_ids]
-        for user_id in self.to_del:
+        for user_id in to_del:
             del self.presence_map[user_id]
 
         # Delete things out of keyed edus
@@ -102,47 +111,77 @@ class FederationRemoteSendQueue(object):
         for key in keys[:i]:
             del self.failures[key]
 
-    def send_edu(self, edu, key=None):
+    def send_edu(self, destination, edu_type, content, key=None):
         pos = self._next_pos()
 
+        edu = Edu(
+            origin=self.server_name,
+            destination=destination,
+            edu_type=edu_type,
+            content=content,
+        )
+
         if key:
-            self.keyed_edu[(edu.destination, key)] = edu
-            self.keyed_edu_changed[pos] = (edu.destination, key)
+            self.keyed_edu[(destination, key)] = edu
+            self.keyed_edu_changed[pos] = (destination, key)
         else:
             self.edus[pos] = edu
 
     def send_presence(self, destination, states):
         pos = self._next_pos()
 
-        self.presence_map.presence_map.update({
+        self.presence_map.update({
             state.user_id: state
             for state in states
         })
 
-        self.presence_changed[pos] = (destination, [
-            state.user_id for state in states
-        ])
+        self.presence_changed[pos] = [
+            (destination, state.user_id) for state in states
+        ]
 
     def send_failure(self, failure, destination):
         pos = self._next_pos()
 
-        self.failures[pos] = (destination, failure)
+        self.failures[pos] = (destination, str(failure))
+
+    def send_pdu(self, pdu, destinations):
+        # This gets sent down a separate path
+        pass
 
     def notify_new_device_message(self, destination):
         # TODO
         pass
 
-    def get_replication_rows(self, token):
+    def get_current_token(self):
+        return self.pos - 1
+
+    def get_replication_rows(self, token, limit):
+        # TODO: Handle limit.
+
+        # To handle restarts where we wrap around
+        if token > self.pos:
+            token = -1
+
         rows = []
+
+        # There should be only one reader, so lets delete everything its
+        # acknowledged its seen.
+        self._clear_queue_before_pos(token)
 
         # Fetch changed presence
         keys = self.presence_changed.keys()
         i = keys.bisect_right(token)
-        dest_user_ids = set((k, self.presence_changed[k]) for k in keys[i:])
+        dest_user_ids = set(
+            (pos, dest_user_id)
+            for pos in keys[i:]
+            for dest_user_id in self.presence_changed[pos]
+        )
 
-        for (key, (dest, user_ids)) in dest_user_ids:
-            for user_id in user_ids:
-                rows.append((key, dest, "p", self.presence_map[user_id]))
+        for (key, (dest, user_id)) in dest_user_ids:
+            rows.append((key, PRESENCE_TYPE, ujson.dumps({
+                "destination": dest,
+                "state": self.presence_map[user_id].as_dict(),
+            })))
 
         # Fetch changes keyed edus
         keys = self.keyed_edu_changed.keys()
@@ -150,7 +189,12 @@ class FederationRemoteSendQueue(object):
         keyed_edus = set((k, self.keyed_edu_changed[k]) for k in keys[i:])
 
         for (pos, edu_key) in keyed_edus:
-            rows.append((pos, edu_key, "k", self.keyed_edu[edu_key]))
+            rows.append(
+                (pos, KEYED_EDU_TYPE, ujson.dumps({
+                    "key": edu_key,
+                    "edu": self.keyed_edu[edu_key].get_dict(),
+                }))
+            )
 
         # Fetch changed edus
         keys = self.edus.keys()
@@ -158,7 +202,7 @@ class FederationRemoteSendQueue(object):
         edus = set((k, self.edus[k]) for k in keys[i:])
 
         for (pos, edu) in edus:
-            rows.append((pos, edu.destination, "e", edu))
+            rows.append((pos, EDU_TYPE, ujson.dumps(edu.get_dict())))
 
         # Fetch changed failures
         keys = self.failures.keys()
@@ -166,7 +210,10 @@ class FederationRemoteSendQueue(object):
         failures = set((k, self.failures[k]) for k in keys[i:])
 
         for (pos, (destination, failure)) in failures:
-            rows.append((pos, destination, "f", failure))
+            rows.append((pos, None, FAILURE_TYPE, ujson.dumps({
+                "destination": destination,
+                "failure": failure,
+            })))
 
         # Sort rows based on pos
         rows.sort()
