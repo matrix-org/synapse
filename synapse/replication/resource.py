@@ -453,7 +453,7 @@ class ReplicationResource(Resource):
             )
             upto_token = _position_from_rows(to_device_rows, current_position)
             writer.write_header_and_rows("to_device", to_device_rows, (
-                "position", "user_id", "device_id", "message_json"
+                "position", "entity",
             ), position=upto_token)
 
     @defer.inlineCallbacks

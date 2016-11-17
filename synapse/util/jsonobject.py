@@ -76,15 +76,26 @@ class JsonEncodedObject(object):
         d.update(self.unrecognized_keys)
         return d
 
+    def get_internal_dict(self):
+        d = {
+            k: _encode(v, internal=True) for (k, v) in self.__dict__.items()
+            if k in self.valid_keys
+        }
+        d.update(self.unrecognized_keys)
+        return d
+
     def __str__(self):
         return "(%s, %s)" % (self.__class__.__name__, repr(self.__dict__))
 
 
-def _encode(obj):
+def _encode(obj, internal=False):
     if type(obj) is list:
-        return [_encode(o) for o in obj]
+        return [_encode(o, internal=internal) for o in obj]
 
     if isinstance(obj, JsonEncodedObject):
-        return obj.get_dict()
+        if internal:
+            return obj.get_internal_dict()
+        else:
+            return obj.get_dict()
 
     return obj

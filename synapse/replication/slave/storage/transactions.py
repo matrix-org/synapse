@@ -25,8 +25,8 @@ class TransactionStore(BaseSlavedStore):
     ].orig
     _get_destination_retry_timings = DataStore._get_destination_retry_timings.__func__
 
-    def prep_send_transaction(self, transaction_id, destination, origin_server_ts):
-        return []
+    prep_send_transaction = DataStore.prep_send_transaction.__func__
+    delivered_txn = DataStore.delivered_txn.__func__
 
     # For now, don't record the destination rety timings
     def set_destination_retry_timings(*args, **kwargs):
