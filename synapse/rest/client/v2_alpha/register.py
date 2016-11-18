@@ -180,7 +180,6 @@ class RegisterRestServlet(RestServlet):
             logger.warn("Ignoring initial_device_display_name without password")
             del body['initial_device_display_name']
 
-
         session_id = self.auth_handler.get_session_id(body)
         registered_user_id = None
         if session_id:
