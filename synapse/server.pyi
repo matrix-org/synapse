@@ -27,3 +27,6 @@ class HomeServer(object):
 
     def get_state_handler(self) -> synapse.state.StateHandler:
         pass
+
+    def get_aggregation_handler(self) -> synapse.handlers.aggregation.AggregationHandler:
+        pass

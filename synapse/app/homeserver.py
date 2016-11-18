@@ -335,6 +335,7 @@ def setup(config_options):
         hs.get_datastore().start_profiling()
         hs.get_datastore().start_doing_background_updates()
         hs.get_replication_layer().start_get_pdu_cache()
+        hs.get_aggregation_handler().run_aggregation_events()
 
         register_memory_metrics(hs)
 

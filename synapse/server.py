@@ -55,6 +55,8 @@ from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
 
+from synapse.handlers.aggregation import AggregationHandler
+
 logger = logging.getLogger(__name__)
 
 
@@ -124,6 +126,7 @@ class HomeServer(object):
         'http_client_context_factory',
         'simple_http_client',
         'media_repository',
+        'aggregation_handler'
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -268,6 +271,8 @@ class HomeServer(object):
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
 
+    def build_aggregation_handler(self):
+        return AggregationHandler(self)
 
 def _make_dependency_method(depname):
     def _get(hs):

@@ -26,6 +26,7 @@ from .admin import AdminHandler
 from .identity import IdentityHandler
 from .receipts import ReceiptsHandler
 from .search import SearchHandler
+from .aggregation import AggregationHandler
 
 
 class Handlers(object):
@@ -60,3 +61,4 @@ class Handlers(object):
         self.identity_handler = IdentityHandler(hs)
         self.search_handler = SearchHandler(hs)
         self.room_context_handler = RoomContextHandler(hs)
+        self.aggregation_handler = AggregationHandler(hs)

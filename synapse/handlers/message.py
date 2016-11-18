@@ -574,6 +574,10 @@ class MessageHandler(BaseHandler):
             event, context
         )
 
+        # try:
+        self.hs.get_aggregation_handler().on_new_event(event, context)
+        # except Exception:
+
         (event_stream_id, max_stream_id) = yield self.store.persist_event(
             event, context=context
         )
