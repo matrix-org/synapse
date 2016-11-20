@@ -8,6 +8,8 @@ import json
 from itertools import groupby
 from collections import defaultdict
 
+logger = logging.getLogger(__name__)
+
 AGGREGATION_TYPE = 'm.room._aggregation'
 PRUNE_AGGREGATION_EVENTS = False
 
@@ -91,7 +93,6 @@ class AggregationTask:
 
     def content_for_aggregate_append(self, group, target):
         aggregate_entries = []
-        # import pdb; pdb.set_trace()
         for event in group:
             event_content = event['content']
             try:
@@ -228,7 +229,8 @@ class AggregationHandler(BaseHandler):
             if not len(events_for_aggregation):
                 continue
             task = yield self.get_task_for_event(entry['room_id'], entry['type'])
-            # import pdb; pdb.set_trace()
+            if not task:
+                continue
             task.run(events_for_aggregation)
 
     def get_aggregation_key(self, event):
@@ -274,7 +276,12 @@ class AggregationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_task_for_event(self, room_id, aggregation_event_name):
-        aggregation_info = (yield self.store.get_aggregation_tasks(room_id, aggregation_event_name))[0]
+        try:
+            aggregation_info = (yield self.store.get_aggregation_tasks(room_id, aggregation_event_name))[0]
+        except IndexError:
+            logger.warn('Could not find task for (room_id, aggregation_event_type): (%s, %s)',
+                room_id, aggregation_event_name)
+            defer.returnValue(None)
         defer.returnValue(AggregationTask(
             self.store,
             aggregation_info['room_id'],

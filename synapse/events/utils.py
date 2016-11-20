@@ -157,6 +157,9 @@ def serialize_event(e, time_now_ms, as_client_event=True,
             event_format=event_format
         )
 
+    if "aggregation_data" in e.__dict__:
+        d["aggregation_data"] = e.aggregation_data
+
     if token_id is not None:
         if token_id == getattr(e.internal_metadata, "token_id", None):
             txn_id = getattr(e.internal_metadata, "txn_id", None)

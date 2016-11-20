@@ -839,15 +839,20 @@ class EventsStore(SQLBaseStore):
                 "SELECT "
                 " e.event_id as event_id, "
                 " r.redacts as redacts,"
-                " rej.event_id as rejects "
+                " rej.event_id as rejects, "
+                " agg.event_name as aggregation_event_type,"
+                " agg.aggregation_data as aggregation_data,"
+                " agg.latest_event_id as latest_aggregation_event_id "
                 " FROM events as e"
                 " LEFT JOIN rejections as rej USING (event_id)"
                 " LEFT JOIN redactions as r ON e.event_id = r.redacts"
+                " LEFT JOIN aggregation_entries AS agg ON e.event_id = agg.target_id"
                 " WHERE e.event_id IN (%s)"
             ) % (",".join(["?"] * len(ev_map)),)
 
             txn.execute(sql, ev_map.keys())
             rows = self.cursor_to_dict(txn)
+            rows = self._fold_aggregation_data(rows)
             for row in rows:
                 event = ev_map[row["event_id"]]
                 if not row["rejects"] and not row["redacts"]:
@@ -1093,6 +1098,7 @@ class EventsStore(SQLBaseStore):
             [
                 preserve_fn(self._get_event_from_row)(
                     row["internal_metadata"], row["json"], row["redacts"],
+                    aggregation_data=row["aggregation_data"],
                     rejected_reason=row["rejects"],
                 )
                 for row in rows
@@ -1104,6 +1110,32 @@ class EventsStore(SQLBaseStore):
             e.event.event_id: e
             for e in res if e
         })
+
+    # Aggregation_entries contains an entry per (aggregation_event_type, target_id)
+    # This means that on a JOIN the same event row will be returned once per corresponding
+    # aggregation entry, fold the aggregation_entries into a single key-value namespaced
+    # JSONB
+    def _fold_aggregation_data(self, rows):
+        rows_dict = {}
+        for row in rows:
+            try:
+                aggregation_data = row.pop('aggregation_data')
+                latest_event_id = row.pop('latest_aggregation_event_id')
+                aggregation_event_type = row.pop('aggregation_event_type')
+                aggregation_data = { 'aggregation_event_type': {
+                        'aggregation_data': aggregation_data,
+                        'latest_event_id': latest_event_id
+                    }
+                }
+                unified_row = rows_dict.get(row['event_id'])
+                if unified_row:
+                    unified_row['aggregation_data'].update(aggregation_data)
+                else:
+                    row['aggregation_data'] = aggregation_data
+                    rows_dict[row['event_id']] = row
+            except KeyError:
+                rows_dict[row['event_id']] = row
+        return rows_dict.values()
 
     def _fetch_event_rows(self, txn, events):
         rows = []
@@ -1119,20 +1151,24 @@ class EventsStore(SQLBaseStore):
                 " e.internal_metadata,"
                 " e.json,"
                 " r.redacts as redacts,"
-                " rej.event_id as rejects "
+                " rej.event_id as rejects,"
+                " agg.event_name as aggregation_event_type,"
+                " agg.aggregation_data as aggregation_data,"
+                " agg.latest_event_id as latest_aggregation_event_id "
                 " FROM event_json as e"
                 " LEFT JOIN rejections as rej USING (event_id)"
                 " LEFT JOIN redactions as r ON e.event_id = r.redacts"
+                " LEFT JOIN aggregation_entries AS agg ON e.event_id = agg.target_id"
                 " WHERE e.event_id IN (%s)"
             ) % (",".join(["?"] * len(evs)),)
 
             txn.execute(sql, evs)
             rows.extend(self.cursor_to_dict(txn))
-
+        rows = self._fold_aggregation_data(rows)
         return rows
 
     @defer.inlineCallbacks
-    def _get_event_from_row(self, internal_metadata, js, redacted,
+    def _get_event_from_row(self, internal_metadata, js, redacted, aggregation_data=None,
                             rejected_reason=None):
         with Measure(self._clock, "_get_event_from_row"):
             d = json.loads(js)
@@ -1149,6 +1185,7 @@ class EventsStore(SQLBaseStore):
             original_ev = FrozenEvent(
                 d,
                 internal_metadata_dict=internal_metadata,
+                aggregation_data=aggregation_data,
                 rejected_reason=rejected_reason,
             )
 

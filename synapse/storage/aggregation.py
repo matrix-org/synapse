@@ -50,24 +50,6 @@ class AggregationStore(background_updates.BackgroundUpdateStore):
         )
         defer.returnValue(result)
 
-    # @defer.inlineCallbacks
-    # def replace_aggregate_entry(self, room_id, target_id, event_name, aggregate_entry):
-    #     sql = '''
-    #         INSERT INTO aggregation_entries(room_id, target_id)
-    #             VALUES(%s, %s)
-    #             ON CONFLICT DO NOTHING;
-    #         UPDATE aggregation_entries
-    #             SET aggregation_data=jsonb_set(
-    #                 aggregation_data, '{{{event_name}}}', %s
-    #             )
-    #             WHERE target_id=%s'''.format(event_name=event_name)
-    #     params = (room_id, json.dumps(aggregate_entry), target_id)
-    #     return self.runInteraction(
-    #         'replace_aggrregate_entry',
-    #         self._simple_run_txn,
-    #         sql, params,
-    #     )
-
     def replace_aggregate_entry(self, room_id, target_id, event_name, latest_event_id, aggregate_entry):
         sql = '''
             INSERT INTO aggregation_entries(
@@ -104,35 +86,6 @@ class AggregationStore(background_updates.BackgroundUpdateStore):
             import traceback, sys
             traceback.print_exc(file=sys.stdout)
         return cls.cursor_to_dict(txn)
-
-    # def append_aggregate_entries(self, room_id, target_id, event_name, aggregate_entries):
-    #     sql = '''
-    #         INSERT INTO aggregation_entries(room_id, target_id)
-    #             VALUES(%s, %s)
-    #             ON CONFLICT DO NOTHING;
-    #         UPDATE aggregation_entries
-    #             SET aggregation_data=jsonb_set(
-    #                 aggregation_data,
-    #                 '{{{event_name}}}',
-    #                 to_jsonb(
-    #                     ARRAY(SELECT jsonb_array_elements_text(
-    #                         aggregation_data->'{event_name}'
-    #                     )) || %s::text[]
-    #                 )
-    #             )
-    #             WHERE target_id=%s
-    #         '''.format(event_name=event_name)
-    #     params = (
-    #         room_id,
-    #         target_id,
-    #         [json.dumps(entry) for entry in aggregate_entries],
-    #         target_id
-    #     )
-    #     return self.runInteraction(
-    #         'append_aggregate_entries',
-    #         self._simple_run_txn,
-    #         sql, params,
-    #     )
 
     def append_aggregate_entries(self, room_id, target_id, event_name, latest_event_id, aggregate_entries):
         sql = '''

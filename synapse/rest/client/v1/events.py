@@ -96,7 +96,6 @@ class EventRestServlet(ClientV1RestServlet):
         else:
             defer.returnValue((404, "Event not found."))
 
-
 def register_servlets(hs, http_server):
     EventStreamRestServlet(hs).register(http_server)
     EventRestServlet(hs).register(http_server)

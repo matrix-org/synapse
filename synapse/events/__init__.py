@@ -56,7 +56,7 @@ def _event_dict_property(key):
 
 class EventBase(object):
     def __init__(self, event_dict, signatures={}, unsigned={},
-                 internal_metadata_dict={}, rejected_reason=None):
+                 internal_metadata_dict={}, aggregation_data=None, rejected_reason=None):
         self.signatures = signatures
         self.unsigned = unsigned
         self.rejected_reason = rejected_reason
@@ -66,6 +66,7 @@ class EventBase(object):
         self.internal_metadata = _EventInternalMetadata(
             internal_metadata_dict
         )
+        self.aggregation_data = aggregation_data
 
     auth_events = _event_dict_property("auth_events")
     depth = _event_dict_property("depth")
@@ -132,9 +133,8 @@ class EventBase(object):
 
 
 class FrozenEvent(EventBase):
-    def __init__(self, event_dict, internal_metadata_dict={}, rejected_reason=None):
+    def __init__(self, event_dict, internal_metadata_dict={}, aggregation_data=None, rejected_reason=None):
         event_dict = dict(event_dict)
-
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
@@ -159,6 +159,7 @@ class FrozenEvent(EventBase):
             unsigned=unsigned,
             internal_metadata_dict=internal_metadata_dict,
             rejected_reason=rejected_reason,
+            aggregation_data=aggregation_data,
         )
 
     @staticmethod
