@@ -72,6 +72,8 @@ class FederationRemoteSendQueue(object):
 
         # EVERYTHING IS SAD. In particular, python only makes new scopes when
         # we make a new function, so we need to make a new function so the inner
+        # lambda binds to the queue rather than to the name of the queue which
+        # changes. ARGH.
         def register(name, queue):
             metrics.register_callback(
                 queue_name + "_size",
