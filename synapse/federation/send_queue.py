@@ -158,10 +158,6 @@ class FederationRemoteSendQueue(object):
 
         self.failures[pos] = (destination, str(failure))
 
-    def send_pdu(self, pdu, destinations):
-        # This gets sent down a separate path
-        pass
-
     def send_device_messages(self, destination):
         pos = self._next_pos()
         self.device_messages[pos] = destination

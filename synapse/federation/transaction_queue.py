@@ -19,6 +19,7 @@ from twisted.internet import defer
 from .persistence import TransactionActions
 from .units import Transaction, Edu
 
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import HttpResponseException
 from synapse.util.async import run_on_reactor
 from synapse.util.logcontext import preserve_context_over_fn
@@ -153,13 +154,17 @@ class TransactionQueue(object):
                         event.room_id, latest_event_ids=[event.event_id],
                     )
 
-                    destinations = [
+                    destinations = set(
                         get_domain_from_id(user_id) for user_id in users_in_room
-                    ]
+                    )
+
+                    if event.type == EventTypes.Member:
+                        if event.content["membership"] == Membership.JOIN:
+                            destinations.add(get_domain_from_id(event.state_key))
 
                     logger.debug("Sending %s to %r", event, destinations)
 
-                    self.send_pdu(event, destinations)
+                    self._send_pdu(event, destinations)
 
                 yield self.store.update_federation_out_pos(
                     "events", next_token
@@ -168,7 +173,7 @@ class TransactionQueue(object):
         finally:
             self._is_processing = False
 
-    def send_pdu(self, pdu, destinations):
+    def _send_pdu(self, pdu, destinations):
         # We loop through all destinations to see whether we already have
         # a transaction in progress. If we do, stick it in the pending_pdus
         # table and we'll get back to it later.
