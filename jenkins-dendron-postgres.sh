@@ -22,3 +22,4 @@ export SYNAPSE_CACHE_FACTOR=1
     --federation-reader \
     --client-reader \
     --appservice \
+    --federation-sender \
