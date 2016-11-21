@@ -187,6 +187,9 @@ class SlavedEventStore(BaseSlavedStore):
 
     get_all_new_events_stream = DataStore.get_all_new_events_stream.__func__
 
+    get_federation_out_pos = DataStore.get_federation_out_pos.__func__
+    update_federation_out_pos = DataStore.update_federation_out_pos.__func__
+
     def stream_positions(self):
         result = super(SlavedEventStore, self).stream_positions()
         result["events"] = self._stream_id_gen.get_current_token()
