@@ -17,7 +17,11 @@
 from .. import unittest
 
 from synapse.events import FrozenEvent
-from synapse.events.utils import prune_event
+from synapse.events.utils import prune_event, serialize_event
+
+
+def MockEvent(**kwargs):
+    return FrozenEvent(kwargs)
 
 
 class PruneEventTestCase(unittest.TestCase):
@@ -118,11 +122,41 @@ class PruneEventTestCase(unittest.TestCase):
 
 class SerializeEventTestCase(unittest.TestCase):
 
+    def serialize(self, ev, fields):
+        return serialize_event(ev, 1924354, event_fields=fields)
+
     def test_event_fields_works_with_keys(self):
-        pass
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    sender="@alice:localhost",
+                    room_id="!foo:bar"
+                ),
+                ["room_id"]
+            ),
+            {
+                "room_id": "!foo:bar",
+            }
+        )
 
     def test_event_fields_works_with_nested_keys(self):
-        pass
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    sender="@alice:localhost",
+                    room_id="!foo:bar",
+                    content={
+                        "body": "A message",
+                    },
+                ),
+                ["content.body"]
+            ),
+            {
+                "content": {
+                    "body": "A message",
+                }
+            }
+        )
 
     def test_event_fields_works_with_dot_keys(self):
         pass

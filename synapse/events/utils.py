@@ -16,6 +16,8 @@
 from synapse.api.constants import EventTypes
 from . import EventBase
 
+from frozendict import frozendict
+
 import re
 
 # Split strings on "." but not "\." This uses a negative lookbehind assertion for '\'
@@ -130,7 +132,7 @@ def _copy_field(src, dst, field):
     key_to_move = field.pop(-1)
     sub_dict = src
     for sub_field in field:  # e.g. sub_field => "content"
-        if sub_field in sub_dict and type(sub_dict[sub_field]) == dict:
+        if sub_field in sub_dict and type(sub_dict[sub_field]) == frozendict:
             sub_dict = sub_dict[sub_field]
         else:
             return
