@@ -70,6 +70,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
             database_engine=create_engine(config.database_config),
             get_db_conn=db_pool.get_db_conn,
             room_list_handler=object(),
+            tls_server_context_factory=Mock(),
             **kargs
         )
         hs.setup()
@@ -79,6 +80,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
             version_string="Synapse/tests",
             database_engine=create_engine(config.database_config),
             room_list_handler=object(),
+            tls_server_context_factory=Mock(),
             **kargs
         )
 
