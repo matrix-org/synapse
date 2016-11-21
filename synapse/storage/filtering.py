@@ -16,6 +16,7 @@
 from twisted.internet import defer
 
 from ._base import SQLBaseStore
+from synapse.api.errors import SynapseError, Codes
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 import simplejson as json
@@ -24,6 +25,13 @@ import simplejson as json
 class FilteringStore(SQLBaseStore):
     @cachedInlineCallbacks(num_args=2)
     def get_user_filter(self, user_localpart, filter_id):
+        # filter_id is BIGINT UNSIGNED, so if it isn't a number, fail
+        # with a coherent error message rather than 500 M_UNKNOWN.
+        try:
+            int(filter_id)
+        except ValueError:
+            raise SynapseError(400, "Invalid filter ID", Codes.INVALID_PARAM)
+
         def_json = yield self._simple_select_one_onecol(
             table="user_filters",
             keyvalues={
