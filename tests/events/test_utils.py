@@ -114,3 +114,24 @@ class PruneEventTestCase(unittest.TestCase):
                 'unsigned': {},
             }
         )
+
+
+class SerializeEventTestCase(unittest.TestCase):
+
+    def test_event_fields_works_with_keys(self):
+        pass
+
+    def test_event_fields_works_with_nested_keys(self):
+        pass
+
+    def test_event_fields_works_with_dot_keys(self):
+        pass
+
+    def test_event_fields_works_with_nested_dot_keys(self):
+        pass
+
+    def test_event_fields_nops_with_unknown_keys(self):
+        pass
+
+    def test_event_fields_nops_with_non_dict_keys(self):
+        pass

@@ -18,7 +18,6 @@ from synapse.types import UserID, RoomID
 from twisted.internet import defer
 
 import ujson as json
-import re
 
 
 class Filtering(object):
@@ -81,7 +80,7 @@ class Filtering(object):
                 # Don't allow '\\' in event field filters. This makes matching
                 # events a lot easier as we can then use a negative lookbehind
                 # assertion to split '\.' If we allowed \\ then it would
-                # incorrectly split '\\.'
+                # incorrectly split '\\.' See synapse.events.utils.serialize_event
                 if r'\\' in field:
                     raise SynapseError(
                         400, r'The escape character \ cannot itself be escaped'
@@ -168,11 +167,6 @@ class FilterCollection(object):
         self.include_leave = filter_json.get("room", {}).get(
             "include_leave", False
         )
-        self._event_fields = filter_json.get("event_fields", [])
-        # Negative lookbehind assertion for '\'
-        # (?<!stuff) matches if the current position in the string is not preceded
-        # by a match for 'stuff'.
-        self._split_field_regex = re.compile(r'(?<!\\)\.')
 
     def __repr__(self):
         return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
@@ -206,54 +200,6 @@ class FilterCollection(object):
 
     def filter_room_account_data(self, events):
         return self._room_account_data.filter(self._room_filter.filter(events))
-
-    def filter_event_fields(self, event):
-        """Remove fields from an event in accordance with the 'event_fields' of a filter.
-
-        If there are no event fields specified then all fields are included.
-        The entries may include '.' charaters to indicate sub-fields.
-        So ['content.body'] will include the 'body' field of the 'content' object.
-        A literal '.' character in a field name may be escaped using a '\'.
-
-        Args:
-            event(dict): The raw event to filter
-        Returns:
-            dict: The same event with some fields missing, if required.
-        """
-        for field in self._event_fields:
-            self.filter_field(event, field)
-        return event
-
-    def filter_field(self, dictionary, field):
-        """Filter the given field from the given dictionary.
-
-        Args:
-            dictionary(dict): The dictionary to remove the field from.
-            field(str): The key to remove.
-        Returns:
-            dict: The same dictionary with the field removed.
-        """
-        # "content.body.thing\.with\.dots" => ["content", "body", "thing\.with\.dots"]
-        sub_fields = self._split_field_regex.split(field)
-        # remove escaping so we can use the right key names when deleting
-        sub_fields = [f.replace(r'\.', r'.') for f in sub_fields]
-
-        # common case e.g. 'origin_server_ts'
-        if len(sub_fields) == 1:
-            dictionary.pop(sub_fields[0], None)
-        # nested field e.g. 'content.body'
-        elif len(sub_fields) > 1:
-            # Pop the last field as that's the key to delete and we need the
-            # parent dict in order to remove the key. Drill down to the right dict.
-            key_to_delete = sub_fields.pop(-1)
-            sub_dict = dictionary
-            for sub_field in sub_fields:
-                if sub_field in sub_dict and type(sub_dict[sub_field]) == dict:
-                    sub_dict = sub_dict[sub_field]
-                else:
-                    return dictionary
-            sub_dict.pop(key_to_delete, None)
-        return dictionary
 
 
 class Filter(object):
