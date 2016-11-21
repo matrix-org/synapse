@@ -1122,7 +1122,7 @@ class EventsStore(SQLBaseStore):
                 aggregation_data = row.pop('aggregation_data')
                 latest_event_id = row.pop('latest_aggregation_event_id')
                 aggregation_event_type = row.pop('aggregation_event_type')
-                aggregation_data = { 'aggregation_event_type': {
+                aggregation_data = { aggregation_event_type: {
                         'aggregation_data': aggregation_data,
                         'latest_event_id': latest_event_id
                     }
