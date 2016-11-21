@@ -159,13 +159,79 @@ class SerializeEventTestCase(unittest.TestCase):
         )
 
     def test_event_fields_works_with_dot_keys(self):
-        pass
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    sender="@alice:localhost",
+                    room_id="!foo:bar",
+                    content={
+                        "key.with.dots": {},
+                    },
+                ),
+                ["content.key\.with\.dots"]
+            ),
+            {
+                "content": {
+                    "key.with.dots": {},
+                }
+            }
+        )
 
     def test_event_fields_works_with_nested_dot_keys(self):
-        pass
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    sender="@alice:localhost",
+                    room_id="!foo:bar",
+                    content={
+                        "not_me": 1,
+                        "nested.dot.key": {
+                            "leaf.key": 42,
+                            "not_me_either": 1,
+                        },
+                    },
+                ),
+                ["content.nested\.dot\.key.leaf\.key"]
+            ),
+            {
+                "content": {
+                    "nested.dot.key": {
+                        "leaf.key": 42,
+                    },
+                }
+            }
+        )
 
     def test_event_fields_nops_with_unknown_keys(self):
-        pass
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    sender="@alice:localhost",
+                    room_id="!foo:bar",
+                    content={
+                        "foo": "bar",
+                    },
+                ),
+                ["content.foo", "content.notexists"]
+            ),
+            {
+                "content": {
+                    "foo": "bar",
+                }
+            }
+        )
 
     def test_event_fields_nops_with_non_dict_keys(self):
-        pass
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    sender="@alice:localhost",
+                    room_id="!foo:bar",
+                    content={
+                        "foo": ["I", "am", "an", "array"],
+                    },
+                ),
+                ["content.foo.am"]
+            ),
+            {}
+        )
