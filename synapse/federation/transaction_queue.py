@@ -131,6 +131,9 @@ class TransactionQueue(object):
 
     @defer.inlineCallbacks
     def notify_new_events(self, current_id):
+        """This gets called when we have some new events we might want to
+        send out to other servers.
+        """
         self._last_poked_id = max(current_id, self._last_poked_id)
 
         if self._is_processing:
