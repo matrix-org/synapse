@@ -17,6 +17,7 @@ from synapse.http.servlet import parse_integer, parse_string
 from synapse.http.server import request_handler, finish_request
 from synapse.replication.pusher_resource import PusherResource
 from synapse.replication.presence_resource import PresenceResource
+from synapse.replication.expire_cache import ExpireCacheResource
 from synapse.api.errors import SynapseError
 
 from twisted.web.resource import Resource
@@ -124,6 +125,7 @@ class ReplicationResource(Resource):
 
         self.putChild("remove_pushers", PusherResource(hs))
         self.putChild("syncing_users", PresenceResource(hs))
+        self.putChild("expire_cache", ExpireCacheResource(hs))
 
     def render_GET(self, request):
         self._async_render_GET(request)

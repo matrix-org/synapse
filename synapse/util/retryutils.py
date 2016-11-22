@@ -121,12 +121,6 @@ class RetryDestinationLimiter(object):
         pass
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        def err(failure):
-            logger.exception(
-                "Failed to store set_destination_retry_timings",
-                failure.value
-            )
-
         valid_err_code = False
         if exc_type is not None and issubclass(exc_type, CodeMessageException):
             valid_err_code = 0 <= exc_val.code < 500
@@ -151,6 +145,15 @@ class RetryDestinationLimiter(object):
 
             retry_last_ts = int(self.clock.time_msec())
 
-        self.store.set_destination_retry_timings(
-            self.destination, retry_last_ts, self.retry_interval
-        ).addErrback(err)
+        @defer.inlineCallbacks
+        def store_retry_timings():
+            try:
+                yield self.store.set_destination_retry_timings(
+                    self.destination, retry_last_ts, self.retry_interval
+                )
+            except:
+                logger.exception(
+                    "Failed to store set_destination_retry_timings",
+                )
+
+        store_retry_timings()
