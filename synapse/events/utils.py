@@ -229,7 +229,7 @@ def format_event_for_client_v2_without_room_id(d):
 
 def serialize_event(e, time_now_ms, as_client_event=True,
                     event_format=format_event_for_client_v1,
-                    token_id=None, event_fields=None):
+                    token_id=None, only_event_fields=None):
     # FIXME(erikj): To handle the case of presence events and the like
     if not isinstance(e, EventBase):
         return e
@@ -258,7 +258,8 @@ def serialize_event(e, time_now_ms, as_client_event=True,
     if as_client_event:
         d = event_format(d)
 
-    if isinstance(event_fields, list):
-        d = only_fields(d, event_fields)
+    if (isinstance(only_event_fields, list) and
+            all(isinstance(f, basestring) for f in only_event_fields)):
+        d = only_fields(d, only_event_fields)
 
     return d

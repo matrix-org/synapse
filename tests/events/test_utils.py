@@ -123,7 +123,7 @@ class PruneEventTestCase(unittest.TestCase):
 class SerializeEventTestCase(unittest.TestCase):
 
     def serialize(self, ev, fields):
-        return serialize_event(ev, 1924354, event_fields=fields)
+        return serialize_event(ev, 1479807801915, only_event_fields=fields)
 
     def test_event_fields_works_with_keys(self):
         self.assertEquals(
@@ -234,4 +234,59 @@ class SerializeEventTestCase(unittest.TestCase):
                 ["content.foo.am"]
             ),
             {}
+        )
+
+    def test_event_fields_nops_with_array_keys(self):
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    sender="@alice:localhost",
+                    room_id="!foo:bar",
+                    content={
+                        "foo": ["I", "am", "an", "array"],
+                    },
+                ),
+                ["content.foo.1"]
+            ),
+            {}
+        )
+
+    def test_event_fields_all_fields_if_empty(self):
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    room_id="!foo:bar",
+                    content={
+                        "foo": "bar",
+                    },
+                ),
+                []
+            ),
+            {
+                "room_id": "!foo:bar",
+                "content": {
+                    "foo": "bar",
+                },
+                "unsigned": {}
+            }
+        )
+
+    def test_event_fields_fail_if_fields_not_str(self):
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    room_id="!foo:bar",
+                    content={
+                        "foo": "bar",
+                    },
+                ),
+                ["room_id", 4]
+            ),
+            {
+                "room_id": "!foo:bar",
+                "content": {
+                    "foo": "bar",
+                },
+                "unsigned": {}
+            }
         )
