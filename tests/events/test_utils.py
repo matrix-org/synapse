@@ -17,7 +17,11 @@
 from .. import unittest
 
 from synapse.events import FrozenEvent
-from synapse.events.utils import prune_event
+from synapse.events.utils import prune_event, serialize_event
+
+
+def MockEvent(**kwargs):
+    return FrozenEvent(kwargs)
 
 
 class PruneEventTestCase(unittest.TestCase):
@@ -114,3 +118,167 @@ class PruneEventTestCase(unittest.TestCase):
                 'unsigned': {},
             }
         )
+
+
+class SerializeEventTestCase(unittest.TestCase):
+
+    def serialize(self, ev, fields):
+        return serialize_event(ev, 1479807801915, only_event_fields=fields)
+
+    def test_event_fields_works_with_keys(self):
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    sender="@alice:localhost",
+                    room_id="!foo:bar"
+                ),
+                ["room_id"]
+            ),
+            {
+                "room_id": "!foo:bar",
+            }
+        )
+
+    def test_event_fields_works_with_nested_keys(self):
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    sender="@alice:localhost",
+                    room_id="!foo:bar",
+                    content={
+                        "body": "A message",
+                    },
+                ),
+                ["content.body"]
+            ),
+            {
+                "content": {
+                    "body": "A message",
+                }
+            }
+        )
+
+    def test_event_fields_works_with_dot_keys(self):
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    sender="@alice:localhost",
+                    room_id="!foo:bar",
+                    content={
+                        "key.with.dots": {},
+                    },
+                ),
+                ["content.key\.with\.dots"]
+            ),
+            {
+                "content": {
+                    "key.with.dots": {},
+                }
+            }
+        )
+
+    def test_event_fields_works_with_nested_dot_keys(self):
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    sender="@alice:localhost",
+                    room_id="!foo:bar",
+                    content={
+                        "not_me": 1,
+                        "nested.dot.key": {
+                            "leaf.key": 42,
+                            "not_me_either": 1,
+                        },
+                    },
+                ),
+                ["content.nested\.dot\.key.leaf\.key"]
+            ),
+            {
+                "content": {
+                    "nested.dot.key": {
+                        "leaf.key": 42,
+                    },
+                }
+            }
+        )
+
+    def test_event_fields_nops_with_unknown_keys(self):
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    sender="@alice:localhost",
+                    room_id="!foo:bar",
+                    content={
+                        "foo": "bar",
+                    },
+                ),
+                ["content.foo", "content.notexists"]
+            ),
+            {
+                "content": {
+                    "foo": "bar",
+                }
+            }
+        )
+
+    def test_event_fields_nops_with_non_dict_keys(self):
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    sender="@alice:localhost",
+                    room_id="!foo:bar",
+                    content={
+                        "foo": ["I", "am", "an", "array"],
+                    },
+                ),
+                ["content.foo.am"]
+            ),
+            {}
+        )
+
+    def test_event_fields_nops_with_array_keys(self):
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    sender="@alice:localhost",
+                    room_id="!foo:bar",
+                    content={
+                        "foo": ["I", "am", "an", "array"],
+                    },
+                ),
+                ["content.foo.1"]
+            ),
+            {}
+        )
+
+    def test_event_fields_all_fields_if_empty(self):
+        self.assertEquals(
+            self.serialize(
+                MockEvent(
+                    room_id="!foo:bar",
+                    content={
+                        "foo": "bar",
+                    },
+                ),
+                []
+            ),
+            {
+                "room_id": "!foo:bar",
+                "content": {
+                    "foo": "bar",
+                },
+                "unsigned": {}
+            }
+        )
+
+    def test_event_fields_fail_if_fields_not_str(self):
+        with self.assertRaises(TypeError):
+            self.serialize(
+                MockEvent(
+                    room_id="!foo:bar",
+                    content={
+                        "foo": "bar",
+                    },
+                ),
+                ["room_id", 4]
+            )

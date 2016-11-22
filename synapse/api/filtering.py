@@ -71,6 +71,21 @@ class Filtering(object):
                 if key in user_filter_json["room"]:
                     self._check_definition(user_filter_json["room"][key])
 
+        if "event_fields" in user_filter_json:
+            if type(user_filter_json["event_fields"]) != list:
+                raise SynapseError(400, "event_fields must be a list of strings")
+            for field in user_filter_json["event_fields"]:
+                if not isinstance(field, basestring):
+                    raise SynapseError(400, "Event field must be a string")
+                # Don't allow '\\' in event field filters. This makes matching
+                # events a lot easier as we can then use a negative lookbehind
+                # assertion to split '\.' If we allowed \\ then it would
+                # incorrectly split '\\.' See synapse.events.utils.serialize_event
+                if r'\\' in field:
+                    raise SynapseError(
+                        400, r'The escape character \ cannot itself be escaped'
+                    )
+
     def _check_definition_room_lists(self, definition):
         """Check that "rooms" and "not_rooms" are lists of room ids if they
         are present
@@ -152,6 +167,7 @@ class FilterCollection(object):
         self.include_leave = filter_json.get("room", {}).get(
             "include_leave", False
         )
+        self.event_fields = filter_json.get("event_fields", [])
 
     def __repr__(self):
         return "<FilterCollection %s>" % (json.dumps(self._filter_json),)

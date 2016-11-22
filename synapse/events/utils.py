@@ -16,6 +16,17 @@
 from synapse.api.constants import EventTypes
 from . import EventBase
 
+from frozendict import frozendict
+
+import re
+
+# Split strings on "." but not "\." This uses a negative lookbehind assertion for '\'
+# (?<!stuff) matches if the current position in the string is not preceded
+# by a match for 'stuff'.
+# TODO: This is fast, but fails to handle "foo\\.bar" which should be treated as
+#       the literal fields "foo\" and "bar" but will instead be treated as "foo\\.bar"
+SPLIT_FIELD_REGEX = re.compile(r'(?<!\\)\.')
+
 
 def prune_event(event):
     """ Returns a pruned version of the given event, which removes all keys we
@@ -97,6 +108,83 @@ def prune_event(event):
     )
 
 
+def _copy_field(src, dst, field):
+    """Copy the field in 'src' to 'dst'.
+
+    For example, if src={"foo":{"bar":5}} and dst={}, and field=["foo","bar"]
+    then dst={"foo":{"bar":5}}.
+
+    Args:
+        src(dict): The dict to read from.
+        dst(dict): The dict to modify.
+        field(list<str>): List of keys to drill down to in 'src'.
+    """
+    if len(field) == 0:  # this should be impossible
+        return
+    if len(field) == 1:  # common case e.g. 'origin_server_ts'
+        if field[0] in src:
+            dst[field[0]] = src[field[0]]
+        return
+
+    # Else is a nested field e.g. 'content.body'
+    # Pop the last field as that's the key to move across and we need the
+    # parent dict in order to access the data. Drill down to the right dict.
+    key_to_move = field.pop(-1)
+    sub_dict = src
+    for sub_field in field:  # e.g. sub_field => "content"
+        if sub_field in sub_dict and type(sub_dict[sub_field]) in [dict, frozendict]:
+            sub_dict = sub_dict[sub_field]
+        else:
+            return
+
+    if key_to_move not in sub_dict:
+        return
+
+    # Insert the key into the output dictionary, creating nested objects
+    # as required. We couldn't do this any earlier or else we'd need to delete
+    # the empty objects if the key didn't exist.
+    sub_out_dict = dst
+    for sub_field in field:
+        sub_out_dict = sub_out_dict.setdefault(sub_field, {})
+    sub_out_dict[key_to_move] = sub_dict[key_to_move]
+
+
+def only_fields(dictionary, fields):
+    """Return a new dict with only the fields in 'dictionary' which are present
+    in 'fields'.
+
+    If there are no event fields specified then all fields are included.
+    The entries may include '.' charaters to indicate sub-fields.
+    So ['content.body'] will include the 'body' field of the 'content' object.
+    A literal '.' character in a field name may be escaped using a '\'.
+
+    Args:
+        dictionary(dict): The dictionary to read from.
+        fields(list<str>): A list of fields to copy over. Only shallow refs are
+        taken.
+    Returns:
+        dict: A new dictionary with only the given fields. If fields was empty,
+        the same dictionary is returned.
+    """
+    if len(fields) == 0:
+        return dictionary
+
+    # for each field, convert it:
+    # ["content.body.thing\.with\.dots"] => [["content", "body", "thing\.with\.dots"]]
+    split_fields = [SPLIT_FIELD_REGEX.split(f) for f in fields]
+
+    # for each element of the output array of arrays:
+    # remove escaping so we can use the right key names.
+    split_fields[:] = [
+        [f.replace(r'\.', r'.') for f in field_array] for field_array in split_fields
+    ]
+
+    output = {}
+    for field_array in split_fields:
+        _copy_field(dictionary, output, field_array)
+    return output
+
+
 def format_event_raw(d):
     return d
 
@@ -137,7 +225,7 @@ def format_event_for_client_v2_without_room_id(d):
 
 def serialize_event(e, time_now_ms, as_client_event=True,
                     event_format=format_event_for_client_v1,
-                    token_id=None):
+                    token_id=None, only_event_fields=None):
     # FIXME(erikj): To handle the case of presence events and the like
     if not isinstance(e, EventBase):
         return e
@@ -164,6 +252,12 @@ def serialize_event(e, time_now_ms, as_client_event=True,
                 d["unsigned"]["transaction_id"] = txn_id
 
     if as_client_event:
-        return event_format(d)
-    else:
-        return d
+        d = event_format(d)
+
+    if only_event_fields:
+        if (not isinstance(only_event_fields, list) or
+                not all(isinstance(f, basestring) for f in only_event_fields)):
+            raise TypeError("only_event_fields must be a list of strings")
+        d = only_fields(d, only_event_fields)
+
+    return d
