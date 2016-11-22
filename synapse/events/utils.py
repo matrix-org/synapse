@@ -258,7 +258,7 @@ def serialize_event(e, time_now_ms, as_client_event=True,
     if as_client_event:
         d = event_format(d)
 
-    if (isinstance(only_event_fields, list) and
+    if (only_event_fields and isinstance(only_event_fields, list) and
             all(isinstance(f, basestring) for f in only_event_fields)):
         d = only_fields(d, only_event_fields)
 

@@ -167,6 +167,7 @@ class FilterCollection(object):
         self.include_leave = filter_json.get("room", {}).get(
             "include_leave", False
         )
+        self.event_fields = filter_json.get("event_fields", [])
 
     def __repr__(self):
         return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
