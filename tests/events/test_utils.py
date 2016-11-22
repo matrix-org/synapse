@@ -272,7 +272,7 @@ class SerializeEventTestCase(unittest.TestCase):
         )
 
     def test_event_fields_fail_if_fields_not_str(self):
-        self.assertEquals(
+        with self.assertRaises(TypeError):
             self.serialize(
                 MockEvent(
                     room_id="!foo:bar",
@@ -281,12 +281,4 @@ class SerializeEventTestCase(unittest.TestCase):
                     },
                 ),
                 ["room_id", 4]
-            ),
-            {
-                "room_id": "!foo:bar",
-                "content": {
-                    "foo": "bar",
-                },
-                "unsigned": {}
-            }
-        )
+            )
