@@ -53,19 +53,10 @@ class RoomCreateRestServlet(ClientV1RestServlet):
                                    client_path_patterns("/createRoom(?:/.*)?$"),
                                    self.on_OPTIONS)
 
-    @defer.inlineCallbacks
     def on_PUT(self, request, txn_id):
-        try:
-            defer.returnValue(
-                self.txns.get_client_transaction(request, txn_id)
-            )
-        except KeyError:
-            pass
-
-        response = yield self.on_POST(request)
-
-        self.txns.store_client_transaction(request, txn_id, response)
-        defer.returnValue(response)
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request
+        )
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -214,19 +205,10 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
     def on_GET(self, request, room_id, event_type, txn_id):
         return (200, "Not implemented")
 
-    @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_type, txn_id):
-        try:
-            defer.returnValue(
-                self.txns.get_client_transaction(request, txn_id)
-            )
-        except KeyError:
-            pass
-
-        response = yield self.on_POST(request, room_id, event_type, txn_id)
-
-        self.txns.store_client_transaction(request, txn_id, response)
-        defer.returnValue(response)
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request, room_id, event_type, txn_id
+        )
 
 
 # TODO: Needs unit testing for room ID + alias joins
@@ -283,19 +265,10 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
 
         defer.returnValue((200, {"room_id": room_id}))
 
-    @defer.inlineCallbacks
     def on_PUT(self, request, room_identifier, txn_id):
-        try:
-            defer.returnValue(
-                self.txns.get_client_transaction(request, txn_id)
-            )
-        except KeyError:
-            pass
-
-        response = yield self.on_POST(request, room_identifier, txn_id)
-
-        self.txns.store_client_transaction(request, txn_id, response)
-        defer.returnValue(response)
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request, room_identifier, txn_id
+        )
 
 
 # TODO: Needs unit testing
@@ -537,21 +510,10 @@ class RoomForgetRestServlet(ClientV1RestServlet):
 
         defer.returnValue((200, {}))
 
-    @defer.inlineCallbacks
     def on_PUT(self, request, room_id, txn_id):
-        try:
-            defer.returnValue(
-                self.txns.get_client_transaction(request, txn_id)
-            )
-        except KeyError:
-            pass
-
-        response = yield self.on_POST(
-            request, room_id, txn_id
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request, room_id, txn_id
         )
-
-        self.txns.store_client_transaction(request, txn_id, response)
-        defer.returnValue(response)
 
 
 # TODO: Needs unit testing
@@ -623,21 +585,10 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 return False
         return True
 
-    @defer.inlineCallbacks
     def on_PUT(self, request, room_id, membership_action, txn_id):
-        try:
-            defer.returnValue(
-                self.txns.get_client_transaction(request, txn_id)
-            )
-        except KeyError:
-            pass
-
-        response = yield self.on_POST(
-            request, room_id, membership_action, txn_id
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request, room_id, membership_action, txn_id
         )
-
-        self.txns.store_client_transaction(request, txn_id, response)
-        defer.returnValue(response)
 
 
 class RoomRedactEventRestServlet(ClientV1RestServlet):
@@ -669,19 +620,10 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
 
         defer.returnValue((200, {"event_id": event.event_id}))
 
-    @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_id, txn_id):
-        try:
-            defer.returnValue(
-                self.txns.get_client_transaction(request, txn_id)
-            )
-        except KeyError:
-            pass
-
-        response = yield self.on_POST(request, room_id, event_id, txn_id)
-
-        self.txns.store_client_transaction(request, txn_id, response)
-        defer.returnValue(response)
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request, room_id, event_id, txn_id
+        )
 
 
 class RoomTypingRestServlet(ClientV1RestServlet):

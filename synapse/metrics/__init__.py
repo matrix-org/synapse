@@ -111,18 +111,20 @@ def render_all():
     return "\n".join(strs)
 
 
-reactor_metrics = get_metrics_for("reactor")
-tick_time = reactor_metrics.register_distribution("tick_time")
-pending_calls_metric = reactor_metrics.register_distribution("pending_calls")
+register_process_collector(get_metrics_for("process"))
 
-gc_time = reactor_metrics.register_distribution("gc_time", labels=["gen"])
-gc_unreachable = reactor_metrics.register_counter("gc_unreachable", labels=["gen"])
 
-reactor_metrics.register_callback(
+python_metrics = get_metrics_for("python")
+
+gc_time = python_metrics.register_distribution("gc_time", labels=["gen"])
+gc_unreachable = python_metrics.register_counter("gc_unreachable_total", labels=["gen"])
+python_metrics.register_callback(
     "gc_counts", lambda: {(i,): v for i, v in enumerate(gc.get_count())}, labels=["gen"]
 )
 
-register_process_collector(get_metrics_for("process"))
+reactor_metrics = get_metrics_for("python.twisted.reactor")
+tick_time = reactor_metrics.register_distribution("tick_time")
+pending_calls_metric = reactor_metrics.register_distribution("pending_calls")
 
 
 def runUntilCurrentTimer(func):

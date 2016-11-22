@@ -17,7 +17,7 @@
 from ._base import parse_media_id, respond_404, respond_with_file
 from twisted.web.resource import Resource
 from synapse.http.servlet import parse_string, parse_integer
-from synapse.http.server import request_handler
+from synapse.http.server import request_handler, set_cors_headers
 
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
@@ -48,6 +48,7 @@ class ThumbnailResource(Resource):
     @request_handler()
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
+        set_cors_headers(request)
         server_name, media_id, _ = parse_media_id(request)
         width = parse_integer(request, "width")
         height = parse_integer(request, "height")

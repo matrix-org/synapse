@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 37
+SCHEMA_VERSION = 38
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 

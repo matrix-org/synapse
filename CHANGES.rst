@@ -1,3 +1,31 @@
+Changes in synapse v0.18.4 (2016-11-22)
+=======================================
+
+Bug fixes:
+
+* Add workaround for buggy clients that the fail to register (PR #1632)
+
+
+Changes in synapse v0.18.4-rc1 (2016-11-14)
+===========================================
+
+Changes:
+
+* Various database efficiency improvements (PR #1188, #1192)
+* Update default config to blacklist more internal IPs, thanks to Euan Kemp (PR
+  #1198)
+* Allow specifying duration in minutes in config, thanks to Daniel Dent (PR
+  #1625)
+
+
+Bug fixes:
+
+* Fix media repo to set CORs headers on responses (PR #1190)
+* Fix registration to not error on non-ascii passwords (PR #1191)
+* Fix create event code to limit the number of prev_events (PR #1615)
+* Fix bug in transaction ID deduplication (PR #1624)
+
+
 Changes in synapse v0.18.3 (2016-11-08)
 =======================================
 

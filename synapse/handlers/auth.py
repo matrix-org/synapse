@@ -653,7 +653,7 @@ class AuthHandler(BaseHandler):
         Returns:
             Hashed password (str).
         """
-        return bcrypt.hashpw(password + self.hs.config.password_pepper,
+        return bcrypt.hashpw(password.encode('utf8') + self.hs.config.password_pepper,
                              bcrypt.gensalt(self.bcrypt_rounds))
 
     def validate_hash(self, password, stored_hash):

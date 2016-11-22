@@ -169,6 +169,17 @@ class RegisterRestServlet(RestServlet):
 
         guest_access_token = body.get("guest_access_token", None)
 
+        if (
+            'initial_device_display_name' in body and
+            'password' not in body
+        ):
+            # ignore 'initial_device_display_name' if sent without
+            # a password to work around a client bug where it sent
+            # the 'initial_device_display_name' param alone, wiping out
+            # the original registration params
+            logger.warn("Ignoring initial_device_display_name without password")
+            del body['initial_device_display_name']
+
         session_id = self.auth_handler.get_session_id(body)
         registered_user_id = None
         if session_id:
