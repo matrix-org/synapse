@@ -132,7 +132,7 @@ def _copy_field(src, dst, field):
     key_to_move = field.pop(-1)
     sub_dict = src
     for sub_field in field:  # e.g. sub_field => "content"
-        if sub_field in sub_dict and type(sub_dict[sub_field]) == frozendict:
+        if sub_field in sub_dict and type(sub_dict[sub_field]) in [dict, frozendict]:
             sub_dict = sub_dict[sub_field]
         else:
             return
