@@ -1,3 +1,11 @@
+Changes in synapse v0.18.4 (2016-11-22)
+=======================================
+
+Bug fixes:
+
+* Add workaround for buggy clients that the fail to register (PR #1632)
+
+
 Changes in synapse v0.18.4-rc1 (2016-11-14)
 ===========================================
 
