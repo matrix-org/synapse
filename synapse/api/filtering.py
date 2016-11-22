@@ -202,6 +202,26 @@ class FilterCollection(object):
     def filter_room_account_data(self, events):
         return self._room_account_data.filter(self._room_filter.filter(events))
 
+    def blocks_all_presence(self):
+        return (
+            self._presence_filter.filters_all_types() or
+            self._presence_filter.filters_all_senders()
+        )
+
+    def blocks_all_room_ephemeral(self):
+        return (
+            self._room_ephemeral_filter.filters_all_types() or
+            self._room_ephemeral_filter.filters_all_senders() or
+            self._room_ephemeral_filter.filters_all_rooms()
+        )
+
+    def blocks_all_room_timeline(self):
+        return (
+            self._room_timeline_filter.filters_all_types() or
+            self._room_timeline_filter.filters_all_senders() or
+            self._room_timeline_filter.filters_all_rooms()
+        )
+
 
 class Filter(object):
     def __init__(self, filter_json):
@@ -217,6 +237,15 @@ class Filter(object):
         self.not_senders = self.filter_json.get("not_senders", [])
 
         self.contains_url = self.filter_json.get("contains_url", None)
+
+    def filters_all_types(self):
+        return "*" in self.not_types
+
+    def filters_all_senders(self):
+        return "*" in self.not_senders
+
+    def filters_all_rooms(self):
+        return "*" in self.not_rooms
 
     def check(self, event):
         """Checks whether the filter matches the given event.
