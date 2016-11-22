@@ -14,7 +14,6 @@
 # limitations under the License.
 
 from ._base import SQLBaseStore
-from synapse.storage.engines import PostgresEngine
 from synapse.util.caches.descriptors import cached
 
 from twisted.internet import defer
