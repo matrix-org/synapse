@@ -96,7 +96,9 @@ class EventPushActionsStore(SQLBaseStore):
                 topological_ordering, stream_ordering
             )
 
-            # First get number of notifications
+            # First get number of notifications.
+            # We don't need to put a notif=1 clause as all rows always have
+            # notif=1
             sql = (
                 "SELECT count(*)"
                 " FROM event_push_actions ea"
