@@ -37,6 +37,13 @@ class UserPresenceState(namedtuple("UserPresenceState",
     status_msg (str): User set status message.
     """
 
+    def as_dict(self):
+        return dict(self._asdict())
+
+    @staticmethod
+    def from_dict(d):
+        return UserPresenceState(**d)
+
     def copy_and_replace(self, **kwargs):
         return self._replace(**kwargs)
 

@@ -80,22 +80,6 @@ class FederationHandler(BaseHandler):
         # When joining a room we need to queue any events for that room up
         self.room_queues = {}
 
-    def handle_new_event(self, event, destinations):
-        """ Takes in an event from the client to server side, that has already
-        been authed and handled by the state module, and sends it to any
-        remote home servers that may be interested.
-
-        Args:
-            event: The event to send
-            destinations: A list of destinations to send it to
-
-        Returns:
-            Deferred: Resolved when it has successfully been queued for
-            processing.
-        """
-
-        return self.replication_layer.send_pdu(event, destinations)
-
     @log_function
     @defer.inlineCallbacks
     def on_receive_pdu(self, origin, pdu, state=None, auth_chain=None):
@@ -830,25 +814,6 @@ class FederationHandler(BaseHandler):
                 user = UserID.from_string(event.state_key)
                 yield user_joined_room(self.distributor, user, event.room_id)
 
-        new_pdu = event
-
-        users_in_room = yield self.store.get_joined_users_from_context(event, context)
-
-        destinations = set(
-            get_domain_from_id(user_id) for user_id in users_in_room
-            if not self.hs.is_mine_id(user_id)
-        )
-
-        destinations.discard(origin)
-
-        logger.debug(
-            "on_send_join_request: Sending event: %s, signatures: %s",
-            event.event_id,
-            event.signatures,
-        )
-
-        self.replication_layer.send_pdu(new_pdu, destinations)
-
         state_ids = context.prev_state_ids.values()
         auth_chain = yield self.store.get_auth_chain(set(
             [event.event_id] + state_ids
@@ -1054,24 +1019,6 @@ class FederationHandler(BaseHandler):
             self.notifier.on_new_room_event(
                 event, event_stream_id, max_stream_id, extra_users=extra_users
             )
-
-        new_pdu = event
-
-        users_in_room = yield self.store.get_joined_users_from_context(event, context)
-
-        destinations = set(
-            get_domain_from_id(user_id) for user_id in users_in_room
-            if not self.hs.is_mine_id(user_id)
-        )
-        destinations.discard(origin)
-
-        logger.debug(
-            "on_send_leave_request: Sending event: %s, signatures: %s",
-            event.event_id,
-            event.signatures,
-        )
-
-        self.replication_layer.send_pdu(new_pdu, destinations)
 
         defer.returnValue(None)
 

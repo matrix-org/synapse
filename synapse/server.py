@@ -32,6 +32,9 @@ from synapse.appservice.scheduler import ApplicationServiceScheduler
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.federation import initialize_http_replication
+from synapse.federation.send_queue import FederationRemoteSendQueue
+from synapse.federation.transport.client import TransportLayerClient
+from synapse.federation.transaction_queue import TransactionQueue
 from synapse.handlers import Handlers
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler
@@ -44,6 +47,7 @@ from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import TypingHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
+from synapse.handlers.receipts import ReceiptsHandler
 from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier
@@ -124,6 +128,9 @@ class HomeServer(object):
         'http_client_context_factory',
         'simple_http_client',
         'media_repository',
+        'federation_transport_client',
+        'federation_sender',
+        'receipts_handler',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -265,8 +272,29 @@ class HomeServer(object):
     def build_media_repository(self):
         return MediaRepository(self)
 
+    def build_federation_transport_client(self):
+        return TransportLayerClient(self)
+
+    def build_federation_sender(self):
+        if self.should_send_federation():
+            return TransactionQueue(self)
+        elif not self.config.worker_app:
+            return FederationRemoteSendQueue(self)
+        else:
+            raise Exception("Workers cannot send federation traffic")
+
+    def build_receipts_handler(self):
+        return ReceiptsHandler(self)
+
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
+
+    def should_send_federation(self):
+        "Should this server be sending federation traffic directly?"
+        return self.config.send_federation and (
+            not self.config.worker_app
+            or self.config.worker_app == "synapse.app.federation_sender"
+        )
 
 
 def _make_dependency_method(depname):
