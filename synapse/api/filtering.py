@@ -71,6 +71,21 @@ class Filtering(object):
                 if key in user_filter_json["room"]:
                     self._check_definition(user_filter_json["room"][key])
 
+        if "event_fields" in user_filter_json:
+            if type(user_filter_json["event_fields"]) != list:
+                raise SynapseError(400, "event_fields must be a list of strings")
+            for field in user_filter_json["event_fields"]:
+                if not isinstance(field, basestring):
+                    raise SynapseError(400, "Event field must be a string")
+                # Don't allow '\\' in event field filters. This makes matching
+                # events a lot easier as we can then use a negative lookbehind
+                # assertion to split '\.' If we allowed \\ then it would
+                # incorrectly split '\\.' See synapse.events.utils.serialize_event
+                if r'\\' in field:
+                    raise SynapseError(
+                        400, r'The escape character \ cannot itself be escaped'
+                    )
+
     def _check_definition_room_lists(self, definition):
         """Check that "rooms" and "not_rooms" are lists of room ids if they
         are present
@@ -152,6 +167,7 @@ class FilterCollection(object):
         self.include_leave = filter_json.get("room", {}).get(
             "include_leave", False
         )
+        self.event_fields = filter_json.get("event_fields", [])
 
     def __repr__(self):
         return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
@@ -186,6 +202,26 @@ class FilterCollection(object):
     def filter_room_account_data(self, events):
         return self._room_account_data.filter(self._room_filter.filter(events))
 
+    def blocks_all_presence(self):
+        return (
+            self._presence_filter.filters_all_types() or
+            self._presence_filter.filters_all_senders()
+        )
+
+    def blocks_all_room_ephemeral(self):
+        return (
+            self._room_ephemeral_filter.filters_all_types() or
+            self._room_ephemeral_filter.filters_all_senders() or
+            self._room_ephemeral_filter.filters_all_rooms()
+        )
+
+    def blocks_all_room_timeline(self):
+        return (
+            self._room_timeline_filter.filters_all_types() or
+            self._room_timeline_filter.filters_all_senders() or
+            self._room_timeline_filter.filters_all_rooms()
+        )
+
 
 class Filter(object):
     def __init__(self, filter_json):
@@ -201,6 +237,15 @@ class Filter(object):
         self.not_senders = self.filter_json.get("not_senders", [])
 
         self.contains_url = self.filter_json.get("contains_url", None)
+
+    def filters_all_types(self):
+        return "*" in self.not_types
+
+    def filters_all_senders(self):
+        return "*" in self.not_senders
+
+    def filters_all_rooms(self):
+        return "*" in self.not_rooms
 
     def check(self, event):
         """Checks whether the filter matches the given event.
