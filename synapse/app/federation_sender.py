@@ -235,7 +235,10 @@ class FederationSenderHandler(object):
     @defer.inlineCallbacks
     def stream_positions(self):
         stream_id = yield self.store.get_federation_out_pos("federation")
-        defer.returnValue({"federation": stream_id})
+        defer.returnValue({
+            "federation": stream_id,
+            "federation_ack": stream_id,
+        })
 
     @defer.inlineCallbacks
     def process_replication(self, result):
