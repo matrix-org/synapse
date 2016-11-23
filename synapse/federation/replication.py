@@ -64,7 +64,6 @@ class ReplicationLayer(FederationClient, FederationServer):
         self._clock = hs.get_clock()
 
         self.transaction_actions = TransactionActions(self.store)
-        self._transaction_queue = hs.get_federation_sender()
 
         self.hs = hs
 

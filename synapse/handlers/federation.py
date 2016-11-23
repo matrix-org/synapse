@@ -71,7 +71,6 @@ class FederationHandler(BaseHandler):
 
         self.store = hs.get_datastore()
         self.replication_layer = hs.get_replication_layer()
-        self.federation_sender = hs.get_federation_sender()
         self.state_handler = hs.get_state_handler()
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()

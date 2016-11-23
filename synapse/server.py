@@ -47,6 +47,7 @@ from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import TypingHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
+from synapse.handlers.receipts import ReceiptsHandler
 from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier
@@ -129,6 +130,7 @@ class HomeServer(object):
         'media_repository',
         'federation_transport_client',
         'federation_sender',
+        'receipts_handler',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -280,6 +282,9 @@ class HomeServer(object):
             return FederationRemoteSendQueue(self)
         else:
             raise Exception("Workers cannot send federation traffic")
+
+    def build_receipts_handler(self):
+        return ReceiptsHandler(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
