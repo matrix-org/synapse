@@ -237,6 +237,9 @@ class FederationSenderHandler(object):
         stream_id = yield self.store.get_federation_out_pos("federation")
         defer.returnValue({
             "federation": stream_id,
+
+            # Ack stuff we've "processed", this should only be called from
+            # one process.
             "federation_ack": stream_id,
         })
 
