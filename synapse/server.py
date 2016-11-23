@@ -274,13 +274,22 @@ class HomeServer(object):
         return TransportLayerClient(self)
 
     def build_federation_sender(self):
-        if self.config.send_federation:
+        if self.should_send_federation():
             return TransactionQueue(self)
-        else:
+        elif not self.config.worker_app:
             return FederationRemoteSendQueue(self)
+        else:
+            raise Exception("Workers cannot send federation traffic")
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
+
+    def should_send_federation(self):
+        "Should this server be sending federation traffic directly?"
+        return self.config.send_federation and (
+            not self.config.worker_app
+            or self.config.worker_app == "synapse.app.federation_sender"
+        )
 
 
 def _make_dependency_method(depname):
