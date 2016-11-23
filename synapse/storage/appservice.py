@@ -39,6 +39,14 @@ class ApplicationServiceStore(SQLBaseStore):
     def get_app_services(self):
         return self.services_cache
 
+    def get_if_app_services_interested_in_user(self, user_id):
+        """Check if the user is one associated with an app service
+        """
+        for service in self.services_cache:
+            if service.is_interested_in_user(user_id):
+                return True
+        return False
+
     def get_app_service_by_user_id(self, user_id):
         """Retrieve an application service from their user ID.
 

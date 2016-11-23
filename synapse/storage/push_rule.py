@@ -156,12 +156,20 @@ class PushRuleStore(SQLBaseStore):
             event=event,
         )
 
-        local_users_in_room = set(u for u in users_in_room if self.hs.is_mine_id(u))
+        # We ignore app service users for now. This is so that we don't fill
+        # up the `get_if_users_have_pushers` cache with AS entries that we
+        # know don't have pushers, nor even read receipts.
+        local_users_in_room = set(
+            u for u in users_in_room
+            if self.hs.is_mine_id(u)
+            and not self.get_if_app_services_interested_in_user(u)
+        )
 
         # users in the room who have pushers need to get push rules run because
         # that's how their pushers work
         if_users_with_pushers = yield self.get_if_users_have_pushers(
-            local_users_in_room, on_invalidate=cache_context.invalidate,
+            local_users_in_room,
+            on_invalidate=cache_context.invalidate,
         )
         user_ids = set(
             uid for uid, have_pusher in if_users_with_pushers.items() if have_pusher
