@@ -164,7 +164,9 @@ class AuthHandler(BaseHandler):
             if len(set(f) - set(creds.keys())) == 0:
                 # it's very useful to know what args are stored, but this can
                 # include the password in the case of registering, so only log
-                # the keys.
+                # the keys (confusingly, clientdict may contain a password
+                # param, creds is just what the user authed as for UI auth
+                # and is not sensitive).
                 logger.info(
                     "Auth completed with creds: %r. Client dict has keys: %r",
                     creds, clientdict.keys()
