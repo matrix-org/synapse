@@ -123,7 +123,7 @@ class RetryDestinationLimiter(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         valid_err_code = False
         if exc_type is not None and issubclass(exc_type, CodeMessageException):
-            valid_err_code = valid_err_code != 429 and 0 <= exc_val.code < 500
+            valid_err_code = exc_val.code != 429 and 0 <= exc_val.code < 500
 
         if exc_type is None or valid_err_code:
             # We connected successfully.
