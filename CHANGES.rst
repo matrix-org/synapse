@@ -1,3 +1,10 @@
+Changes in synapse v0.18.5-rc2 (2016-11-24)
+===========================================
+
+Bug fixes:
+
+* Don't send old events over federation, fixes bug in -rc1.
+
 Changes in synapse v0.18.5-rc1 (2016-11-24)
 ===========================================
 
