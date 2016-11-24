@@ -1,3 +1,18 @@
+Changes in synapse v0.18.5-rc1 (2016-11-24)
+===========================================
+
+Features:
+
+* Implement "event_fields" in filters (PR #1638)
+
+Changes:
+
+* Use external ldap auth pacakge (PR #1628)
+* Split out federation transaction sending to a worker (PR #1635)
+* Fail with a coherent error message if `/sync?filter=` is invalid (PR #1636)
+* More efficient notif count queries (PR #1644)
+
+
 Changes in synapse v0.18.4 (2016-11-22)
 =======================================
 
