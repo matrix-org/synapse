@@ -39,6 +39,9 @@ AuthEventTypes = (
     EventTypes.ThirdPartyInvite,
 )
 
+# guests always get this device id.
+GUEST_DEVICE_ID = "guest_device"
+
 
 class Auth(object):
     """
@@ -728,7 +731,8 @@ class Auth(object):
                     "user": user,
                     "is_guest": True,
                     "token_id": None,
-                    "device_id": None,
+                    # all guests get the same device id
+                    "device_id": GUEST_DEVICE_ID,
                 }
             elif rights == "delete_pusher":
                 # We don't store these tokens in the database
