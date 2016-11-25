@@ -51,17 +51,6 @@ class Auth(object):
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
-        # Docs for these currently lives at
-        # github.com/matrix-org/matrix-doc/blob/master/drafts/macaroons_caveats.rst
-        # In addition, we have type == delete_pusher which grants access only to
-        # delete pushers.
-        self._KNOWN_CAVEAT_PREFIXES = set([
-            "gen = ",
-            "guest = ",
-            "type = ",
-            "time < ",
-            "user_id = ",
-        ])
 
     @defer.inlineCallbacks
     def check_from_context(self, event, context, do_sig_check=True):
@@ -801,11 +790,17 @@ class Auth(object):
             type_string(str): The kind of token required (e.g. "access", "refresh",
                               "delete_pusher")
             verify_expiry(bool): Whether to verify whether the macaroon has expired.
-                This should really always be True, but no clients currently implement
-                token refresh, so we can't enforce expiry yet.
+                This should really always be True, but there exist access tokens
+                in the wild which expire when they should not, so we can't
+                enforce expiry yet.
             user_id (str): The user_id required
         """
         v = pymacaroons.Verifier()
+
+        # the verifier runs a test for every caveat on the macaroon, to check
+        # that it is met for the current request. Each caveat must match at
+        # least one of the predicates specified by satisfy_exact or
+        # specify_general.
         v.satisfy_exact("gen = 1")
         v.satisfy_exact("type = " + type_string)
         v.satisfy_exact("user_id = %s" % user_id)
@@ -817,10 +812,6 @@ class Auth(object):
 
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 
-        v = pymacaroons.Verifier()
-        v.satisfy_general(self._verify_recognizes_caveats)
-        v.verify(macaroon, self.hs.config.macaroon_secret_key)
-
     def _verify_expiry(self, caveat):
         prefix = "time < "
         if not caveat.startswith(prefix):
@@ -828,15 +819,6 @@ class Auth(object):
         expiry = int(caveat[len(prefix):])
         now = self.hs.get_clock().time_msec()
         return now < expiry
-
-    def _verify_recognizes_caveats(self, caveat):
-        first_space = caveat.find(" ")
-        if first_space < 0:
-            return False
-        second_space = caveat.find(" ", first_space + 1)
-        if second_space < 0:
-            return False
-        return caveat[:second_space + 1] in self._KNOWN_CAVEAT_PREFIXES
 
     @defer.inlineCallbacks
     def _look_up_user_by_access_token(self, token):
