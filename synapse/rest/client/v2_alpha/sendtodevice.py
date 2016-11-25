@@ -50,7 +50,7 @@ class SendToDeviceRestServlet(servlet.RestServlet):
 
     @defer.inlineCallbacks
     def _put(self, request, message_type, txn_id):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
 
         content = parse_json_object_from_request(request)
 

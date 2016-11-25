@@ -65,7 +65,7 @@ class KeyUploadServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, device_id):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
 
@@ -150,7 +150,7 @@ class KeyQueryServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, user_id, device_id):
-        yield self.auth.get_user_by_req(request)
+        yield self.auth.get_user_by_req(request, allow_guest=True)
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
         result = yield self.e2e_keys_handler.query_devices(body, timeout)
@@ -158,7 +158,7 @@ class KeyQueryServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id, device_id):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         timeout = parse_integer(request, "timeout", 10 * 1000)
         auth_user_id = requester.user.to_string()
         user_id = user_id if user_id else auth_user_id
@@ -204,7 +204,7 @@ class OneTimeKeyServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id, device_id, algorithm):
-        yield self.auth.get_user_by_req(request)
+        yield self.auth.get_user_by_req(request, allow_guest=True)
         timeout = parse_integer(request, "timeout", 10 * 1000)
         result = yield self.e2e_keys_handler.claim_one_time_keys(
             {"one_time_keys": {user_id: {device_id: algorithm}}},
@@ -214,7 +214,7 @@ class OneTimeKeyServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, user_id, device_id, algorithm):
-        yield self.auth.get_user_by_req(request)
+        yield self.auth.get_user_by_req(request, allow_guest=True)
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
         result = yield self.e2e_keys_handler.claim_one_time_keys(
