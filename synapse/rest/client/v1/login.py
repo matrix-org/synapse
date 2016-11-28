@@ -137,16 +137,13 @@ class LoginRestServlet(ClientV1RestServlet):
             password=login_submission["password"],
         )
         device_id = yield self._register_device(user_id, login_submission)
-        access_token, refresh_token = (
-            yield auth_handler.get_login_tuple_for_user_id(
-                user_id, device_id,
-                login_submission.get("initial_device_display_name")
-            )
+        access_token = yield auth_handler.get_access_token_for_user_id(
+            user_id, device_id,
+            login_submission.get("initial_device_display_name"),
         )
         result = {
             "user_id": user_id,  # may have changed
             "access_token": access_token,
-            "refresh_token": refresh_token,
             "home_server": self.hs.hostname,
             "device_id": device_id,
         }
@@ -161,16 +158,13 @@ class LoginRestServlet(ClientV1RestServlet):
             yield auth_handler.validate_short_term_login_token_and_get_user_id(token)
         )
         device_id = yield self._register_device(user_id, login_submission)
-        access_token, refresh_token = (
-            yield auth_handler.get_login_tuple_for_user_id(
-                user_id, device_id,
-                login_submission.get("initial_device_display_name")
-            )
+        access_token = yield auth_handler.get_access_token_for_user_id(
+            user_id, device_id,
+            login_submission.get("initial_device_display_name"),
         )
         result = {
             "user_id": user_id,  # may have changed
             "access_token": access_token,
-            "refresh_token": refresh_token,
             "home_server": self.hs.hostname,
             "device_id": device_id,
         }
@@ -207,16 +201,14 @@ class LoginRestServlet(ClientV1RestServlet):
             device_id = yield self._register_device(
                 registered_user_id, login_submission
             )
-            access_token, refresh_token = (
-                yield auth_handler.get_login_tuple_for_user_id(
-                    registered_user_id, device_id,
-                    login_submission.get("initial_device_display_name")
-                )
+            access_token = yield auth_handler.get_access_token_for_user_id(
+                registered_user_id, device_id,
+                login_submission.get("initial_device_display_name"),
             )
+
             result = {
                 "user_id": registered_user_id,
                 "access_token": access_token,
-                "refresh_token": refresh_token,
                 "home_server": self.hs.hostname,
             }
         else:
