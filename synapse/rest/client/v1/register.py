@@ -384,7 +384,6 @@ class CreateUserRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(CreateUserRestServlet, self).__init__(hs)
         self.store = hs.get_datastore()
-        self.direct_user_creation_max_duration = hs.config.user_creation_max_duration
         self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
@@ -418,18 +417,8 @@ class CreateUserRestServlet(ClientV1RestServlet):
         if "displayname" not in user_json:
             raise SynapseError(400, "Expected 'displayname' key.")
 
-        if "duration_seconds" not in user_json:
-            raise SynapseError(400, "Expected 'duration_seconds' key.")
-
         localpart = user_json["localpart"].encode("utf-8")
         displayname = user_json["displayname"].encode("utf-8")
-        duration_seconds = 0
-        try:
-            duration_seconds = int(user_json["duration_seconds"])
-        except ValueError:
-            raise SynapseError(400, "Failed to parse 'duration_seconds'")
-        if duration_seconds > self.direct_user_creation_max_duration:
-            duration_seconds = self.direct_user_creation_max_duration
         password_hash = user_json["password_hash"].encode("utf-8") \
             if user_json.get("password_hash") else None
 
@@ -438,7 +427,6 @@ class CreateUserRestServlet(ClientV1RestServlet):
             requester=requester,
             localpart=localpart,
             displayname=displayname,
-            duration_in_ms=(duration_seconds * 1000),
             password_hash=password_hash
         )
 

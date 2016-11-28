@@ -53,13 +53,12 @@ class RegistrationTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_user_is_created_and_logged_in_if_doesnt_exist(self):
-        duration_ms = 200
         local_part = "someone"
         display_name = "someone"
         user_id = "@someone:test"
         requester = create_requester("@as:test")
         result_user_id, result_token = yield self.handler.get_or_create_user(
-            requester, local_part, display_name, duration_ms)
+            requester, local_part, display_name)
         self.assertEquals(result_user_id, user_id)
         self.assertEquals(result_token, 'secret')
 
@@ -71,12 +70,11 @@ class RegistrationTestCase(unittest.TestCase):
             user_id=frank.to_string(),
             token="jkv;g498752-43gj['eamb!-5",
             password_hash=None)
-        duration_ms = 200
         local_part = "frank"
         display_name = "Frank"
         user_id = "@frank:test"
         requester = create_requester("@as:test")
         result_user_id, result_token = yield self.handler.get_or_create_user(
-            requester, local_part, display_name, duration_ms)
+            requester, local_part, display_name)
         self.assertEquals(result_user_id, user_id)
         self.assertEquals(result_token, 'secret')

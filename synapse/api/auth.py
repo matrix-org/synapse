@@ -810,6 +810,10 @@ class Auth(object):
         else:
             v.satisfy_general(lambda c: c.startswith("time < "))
 
+        # access_tokens and refresh_tokens include a nonce for uniqueness: any
+        # value is acceptable
+        v.satisfy_general(lambda c: c.startswith("nonce = "))
+
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 
     def _verify_expiry(self, caveat):
