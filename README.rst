@@ -11,7 +11,7 @@ VoIP.  The basics you need to know to get up and running are:
   like ``#matrix:matrix.org`` or ``#test:localhost:8448``.
 
 - Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
-  you will normally refer to yourself and others using a third party identifier 
+  you will normally refer to yourself and others using a third party identifier
   (3PID): email address, phone number, etc rather than manipulating Matrix user IDs)
 
 The overall architecture is::
@@ -156,8 +156,8 @@ In case of problems, please see the _Troubleshooting section below.
 Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
 above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
 
-Also, Martin Giess has created an auto-deployment process with vagrant/ansible, 
-tested with VirtualBox/AWS/DigitalOcean - see https://github.com/EMnify/matrix-synapse-auto-deploy 
+Also, Martin Giess has created an auto-deployment process with vagrant/ansible,
+tested with VirtualBox/AWS/DigitalOcean - see https://github.com/EMnify/matrix-synapse-auto-deploy
 for details.
 
 To set up your homeserver, run (in your virtualenv, as before)::
@@ -427,7 +427,7 @@ to install using pip and a virtualenv::
 
     virtualenv env
     source env/bin/activate
-    python synapse/python_dependencies.py | xargs -n1 pip install
+    python synapse/python_dependencies.py | xargs pip install
     pip install setuptools_trial mock
 
 This will run a process of downloading and installing all the needed
@@ -605,8 +605,8 @@ First calculate the hash of the new password:
 
     $ source ~/.synapse/bin/activate
     $ ./scripts/hash_password
-    Password: 
-    Confirm password: 
+    Password:
+    Confirm password:
     $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 Then update the `users` table in the database:
@@ -650,4 +650,3 @@ matrix.org on.  The default setting is currently 0.1, which is probably
 around a ~700MB footprint.  You can dial it down further to 0.02 if
 desired, which targets roughly ~512MB.  Conversely you can dial it up if
 you need performance for lots of users and have a box with a lot of RAM.
-
