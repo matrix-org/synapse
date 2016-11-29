@@ -15,6 +15,7 @@
 
 from twisted.internet import defer
 
+import synapse
 from synapse.api.auth import get_access_token_from_request, has_access_token
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
@@ -100,20 +101,20 @@ class RegisterRestServlet(RestServlet):
     def on_POST(self, request):
         yield run_on_reactor()
 
+        body = parse_json_object_from_request(request)
+
         kind = "user"
         if "kind" in request.args:
             kind = request.args["kind"][0]
 
         if kind == "guest":
-            ret = yield self._do_guest_registration()
+            ret = yield self._do_guest_registration(body)
             defer.returnValue(ret)
             return
         elif kind != "user":
             raise UnrecognizedRequestError(
                 "Do not understand membership kind: %s" % (kind,)
             )
-
-        body = parse_json_object_from_request(request)
 
         # we do basic sanity checks here because the auth layer will store these
         # in sessions. Pull out the username/password provided to us.
@@ -421,13 +422,22 @@ class RegisterRestServlet(RestServlet):
         )
 
     @defer.inlineCallbacks
-    def _do_guest_registration(self):
+    def _do_guest_registration(self, params):
         if not self.hs.config.allow_guest_access:
             defer.returnValue((403, "Guest access is disabled"))
         user_id, _ = yield self.registration_handler.register(
             generate_token=False,
             make_guest=True
         )
+
+        # we don't allow guests to specify their own device_id, because
+        # we have nowhere to store it.
+        device_id = synapse.api.auth.GUEST_DEVICE_ID
+        initial_display_name = params.get("initial_device_display_name")
+        self.device_handler.check_device_registered(
+            user_id, device_id, initial_display_name
+        )
+
         access_token = self.auth_handler.generate_access_token(
             user_id, ["guest = true"]
         )
@@ -435,6 +445,7 @@ class RegisterRestServlet(RestServlet):
         # so long as we don't return a refresh_token here.
         defer.returnValue((200, {
             "user_id": user_id,
+            "device_id": device_id,
             "access_token": access_token,
             "home_server": self.hs.hostname,
         }))

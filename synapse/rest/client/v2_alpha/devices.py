@@ -39,7 +39,7 @@ class DevicesRestServlet(servlet.RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         devices = yield self.device_handler.get_devices_by_user(
             requester.user.to_string()
         )
@@ -63,7 +63,7 @@ class DeviceRestServlet(servlet.RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, device_id):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         device = yield self.device_handler.get_device(
             requester.user.to_string(),
             device_id,
@@ -99,7 +99,7 @@ class DeviceRestServlet(servlet.RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, device_id):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
 
         body = servlet.parse_json_object_from_request(request)
         yield self.device_handler.update_device(
