@@ -17,9 +17,6 @@
 from tests import unittest
 from twisted.internet import defer
 
-from synapse.api.errors import StoreError
-from synapse.util import stringutils
-
 from tests.utils import setup_test_homeserver
 
 
