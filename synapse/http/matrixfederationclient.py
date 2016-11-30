@@ -294,7 +294,7 @@ class MatrixFederationHttpClient(object):
             # We need to update the transactions table to say it was sent?
             c_type = response.headers.getRawHeaders("Content-Type")
 
-            if "application/json" not in c_type:
+            if c_type and "application/json" not in c_type.pop():
                 raise RuntimeError(
                     "Content-Type not application/json"
                 )
@@ -344,7 +344,7 @@ class MatrixFederationHttpClient(object):
             # We need to update the transactions table to say it was sent?
             c_type = response.headers.getRawHeaders("Content-Type")
 
-            if "application/json" not in c_type:
+            if c_type and "application/json" not in c_type.pop():
                 raise RuntimeError(
                     "Content-Type not application/json"
                 )
@@ -402,7 +402,7 @@ class MatrixFederationHttpClient(object):
             # We need to update the transactions table to say it was sent?
             c_type = response.headers.getRawHeaders("Content-Type")
 
-            if "application/json" not in c_type:
+            if c_type and "application/json" not in c_type.pop():
                 raise RuntimeError(
                     "Content-Type not application/json"
                 )
