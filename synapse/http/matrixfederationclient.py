@@ -33,6 +33,7 @@ from synapse.api.errors import (
 
 from signedjson.sign import sign_json
 
+import cgi
 import simplejson as json
 import logging
 import random
@@ -292,12 +293,7 @@ class MatrixFederationHttpClient(object):
 
         if 200 <= response.code < 300:
             # We need to update the transactions table to say it was sent?
-            c_type = response.headers.getRawHeaders("Content-Type")
-
-            if "application/json" not in c_type:
-                raise RuntimeError(
-                    "Content-Type not application/json"
-                )
+            check_content_type_is_json(response.headers)
 
         body = yield preserve_context_over_fn(readBody, response)
         defer.returnValue(json.loads(body))
@@ -342,12 +338,7 @@ class MatrixFederationHttpClient(object):
 
         if 200 <= response.code < 300:
             # We need to update the transactions table to say it was sent?
-            c_type = response.headers.getRawHeaders("Content-Type")
-
-            if "application/json" not in c_type:
-                raise RuntimeError(
-                    "Content-Type not application/json"
-                )
+            check_content_type_is_json(response.headers)
 
         body = yield preserve_context_over_fn(readBody, response)
 
@@ -400,12 +391,7 @@ class MatrixFederationHttpClient(object):
 
         if 200 <= response.code < 300:
             # We need to update the transactions table to say it was sent?
-            c_type = response.headers.getRawHeaders("Content-Type")
-
-            if "application/json" not in c_type:
-                raise RuntimeError(
-                    "Content-Type not application/json"
-                )
+            check_content_type_is_json(response.headers)
 
         body = yield preserve_context_over_fn(readBody, response)
 
@@ -525,3 +511,29 @@ def _flatten_response_never_received(e):
         )
     else:
         return "%s: %s" % (type(e).__name__, e.message,)
+
+
+def check_content_type_is_json(headers):
+    """
+    Check that a set of HTTP headers have a Content-Type header, and that it
+    is application/json.
+
+    Args:
+        headers (twisted.web.http_headers.Headers): headers to check
+
+    Raises:
+        RuntimeError if the
+
+    """
+    c_type = headers.getRawHeaders("Content-Type")
+    if c_type is None:
+        raise RuntimeError(
+            "No Content-Type header"
+        )
+
+    c_type = c_type[0]  # only the first header
+    val, options = cgi.parse_header(c_type)
+    if val != "application/json":
+        raise RuntimeError(
+            "Content-Type not application/json: was '%s'" % c_type
+        )
