@@ -15,8 +15,8 @@
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, StoreError, SynapseError
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.api.errors import AuthError
+from synapse.http.servlet import RestServlet
 
 from ._base import client_v2_patterns
 
@@ -30,30 +30,10 @@ class TokenRefreshRestServlet(RestServlet):
 
     def __init__(self, hs):
         super(TokenRefreshRestServlet, self).__init__()
-        self.hs = hs
-        self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        body = parse_json_object_from_request(request)
-        try:
-            old_refresh_token = body["refresh_token"]
-            auth_handler = self.hs.get_auth_handler()
-            refresh_result = yield self.store.exchange_refresh_token(
-                old_refresh_token, auth_handler.generate_refresh_token
-            )
-            (user_id, new_refresh_token, device_id) = refresh_result
-            new_access_token = yield auth_handler.issue_access_token(
-                user_id, device_id
-            )
-            defer.returnValue((200, {
-                "access_token": new_access_token,
-                "refresh_token": new_refresh_token,
-            }))
-        except KeyError:
-            raise SynapseError(400, "Missing required key 'refresh_token'.")
-        except StoreError:
-            raise AuthError(403, "Did not recognize refresh token")
+        raise AuthError(403, "tokenrefresh is no longer supported.")
 
 
 def register_servlets(hs, http_server):

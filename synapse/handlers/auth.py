@@ -539,16 +539,6 @@ class AuthHandler(BaseHandler):
             macaroon.add_first_party_caveat(caveat)
         return macaroon.serialize()
 
-    def generate_refresh_token(self, user_id):
-        m = self._generate_base_macaroon(user_id)
-        m.add_first_party_caveat("type = refresh")
-        # Important to add a nonce, because otherwise every refresh token for a
-        # user will be the same.
-        m.add_first_party_caveat("nonce = %s" % (
-            stringutils.random_string_with_symbols(16),
-        ))
-        return m.serialize()
-
     def generate_short_term_login_token(self, user_id, duration_in_ms=(2 * 60 * 1000)):
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = login")

@@ -440,8 +440,6 @@ class RegisterRestServlet(RestServlet):
         access_token = self.auth_handler.generate_access_token(
             user_id, ["guest = true"]
         )
-        # XXX the "guest" caveat is not copied by /tokenrefresh. That's ok
-        # so long as we don't return a refresh_token here.
         defer.returnValue((200, {
             "user_id": user_id,
             "device_id": device_id,

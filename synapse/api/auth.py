@@ -791,7 +791,7 @@ class Auth(object):
 
         Args:
             macaroon(pymacaroons.Macaroon): The macaroon to validate
-            type_string(str): The kind of token required (e.g. "access", "refresh",
+            type_string(str): The kind of token required (e.g. "access",
                               "delete_pusher")
             verify_expiry(bool): Whether to verify whether the macaroon has expired.
             user_id (str): The user_id required
@@ -820,8 +820,7 @@ class Auth(object):
         else:
             v.satisfy_general(lambda c: c.startswith("time < "))
 
-        # access_tokens and refresh_tokens include a nonce for uniqueness: any
-        # value is acceptable
+        # access_tokens include a nonce for uniqueness: any value is acceptable
         v.satisfy_general(lambda c: c.startswith("nonce = "))
 
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
