@@ -61,14 +61,14 @@ class AuthTestCase(unittest.TestCase):
         def verify_type(caveat):
             return caveat == "type = access"
 
-        def verify_expiry(caveat):
-            return caveat == "time < 8600000"
+        def verify_nonce(caveat):
+            return caveat.startswith("nonce =")
 
         v = pymacaroons.Verifier()
         v.satisfy_general(verify_gen)
         v.satisfy_general(verify_user)
         v.satisfy_general(verify_type)
-        v.satisfy_general(verify_expiry)
+        v.satisfy_general(verify_nonce)
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 
     def test_short_term_login_token_gives_user_id(self):

@@ -794,9 +794,6 @@ class Auth(object):
             type_string(str): The kind of token required (e.g. "access", "refresh",
                               "delete_pusher")
             verify_expiry(bool): Whether to verify whether the macaroon has expired.
-                This should really always be True, but there exist access tokens
-                in the wild which expire when they should not, so we can't
-                enforce expiry yet.
             user_id (str): The user_id required
         """
         v = pymacaroons.Verifier()
@@ -809,10 +806,23 @@ class Auth(object):
         v.satisfy_exact("type = " + type_string)
         v.satisfy_exact("user_id = %s" % user_id)
         v.satisfy_exact("guest = true")
+
+        # verify_expiry should really always be True, but there exist access
+        # tokens in the wild which expire when they should not, so we can't
+        # enforce expiry yet (so we have to allow any caveat starting with
+        # 'time < ' in access tokens).
+        #
+        # On the other hand, short-term login tokens (as used by CAS login, for
+        # example) have an expiry time which we do want to enforce.
+
         if verify_expiry:
             v.satisfy_general(self._verify_expiry)
         else:
             v.satisfy_general(lambda c: c.startswith("time < "))
+
+        # access_tokens and refresh_tokens include a nonce for uniqueness: any
+        # value is acceptable
+        v.satisfy_general(lambda c: c.startswith("nonce = "))
 
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 

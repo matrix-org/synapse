@@ -538,14 +538,15 @@ class AuthHandler(BaseHandler):
                                                    device_id)
         defer.returnValue(refresh_token)
 
-    def generate_access_token(self, user_id, extra_caveats=None,
-                              duration_in_ms=(60 * 60 * 1000)):
+    def generate_access_token(self, user_id, extra_caveats=None):
         extra_caveats = extra_caveats or []
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = access")
-        now = self.hs.get_clock().time_msec()
-        expiry = now + duration_in_ms
-        macaroon.add_first_party_caveat("time < %d" % (expiry,))
+        # Include a nonce, to make sure that each login gets a different
+        # access token.
+        macaroon.add_first_party_caveat("nonce = %s" % (
+            stringutils.random_string_with_symbols(16),
+        ))
         for caveat in extra_caveats:
             macaroon.add_first_party_caveat(caveat)
         return macaroon.serialize()
