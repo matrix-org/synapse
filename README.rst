@@ -180,8 +180,8 @@ old key cached. If you update the signing key, you should change the name of the
 key in the <server name>.signing.key file (the second word) to something different.
 
 By default, registration of new users is disabled. You can either enable
-registration in the config by specifying ``enable_registration: true``
-(it is then recommended to also set up CAPTCHA - see docs/CAPTCHA_SETUP), or
+registration in the config by specifying ``enable_registration: true`` (it is
+then recommended to also set up CAPTCHA - see `<docs/CAPTCHA_SETUP.rst>`_), or
 you can use the command line to register new users::
 
     $ source ~/.synapse/bin/activate
