@@ -374,8 +374,7 @@ class RegisterRestServlet(RestServlet):
     def _create_registration_details(self, user_id, params):
         """Complete registration of newly-registered user
 
-        Allocates device_id if one was not given; also creates access_token
-        and refresh_token.
+        Allocates device_id if one was not given; also creates access_token.
 
         Args:
             (str) user_id: full canonical @user:id
