@@ -67,8 +67,8 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.registration_handler.appservice_register = Mock(
             return_value=user_id
         )
-        self.auth_handler.get_login_tuple_for_user_id = Mock(
-            return_value=(token, "kermits_refresh_token")
+        self.auth_handler.get_access_token_for_user_id = Mock(
+            return_value=token
         )
 
         (code, result) = yield self.servlet.on_POST(self.request)
@@ -76,11 +76,9 @@ class RegisterRestServletTestCase(unittest.TestCase):
         det_data = {
             "user_id": user_id,
             "access_token": token,
-            "refresh_token": "kermits_refresh_token",
             "home_server": self.hs.hostname
         }
         self.assertDictContainsSubset(det_data, result)
-        self.assertIn("refresh_token", result)
 
     @defer.inlineCallbacks
     def test_POST_appservice_registration_invalid(self):
@@ -126,8 +124,8 @@ class RegisterRestServletTestCase(unittest.TestCase):
             "password": "monkey"
         }, None)
         self.registration_handler.register = Mock(return_value=(user_id, None))
-        self.auth_handler.get_login_tuple_for_user_id = Mock(
-            return_value=(token, "kermits_refresh_token")
+        self.auth_handler.get_access_token_for_user_id = Mock(
+            return_value=token
         )
         self.device_handler.check_device_registered = \
             Mock(return_value=device_id)
@@ -137,12 +135,10 @@ class RegisterRestServletTestCase(unittest.TestCase):
         det_data = {
             "user_id": user_id,
             "access_token": token,
-            "refresh_token": "kermits_refresh_token",
             "home_server": self.hs.hostname,
             "device_id": device_id,
         }
         self.assertDictContainsSubset(det_data, result)
-        self.assertIn("refresh_token", result)
         self.auth_handler.get_login_tuple_for_user_id(
             user_id, device_id=device_id, initial_device_display_name=None)
 

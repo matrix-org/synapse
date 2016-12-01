@@ -380,12 +380,10 @@ class AuthHandler(BaseHandler):
         return self._check_password(user_id, password)
 
     @defer.inlineCallbacks
-    def get_login_tuple_for_user_id(self, user_id, device_id=None,
-                                    initial_display_name=None):
+    def get_access_token_for_user_id(self, user_id, device_id=None,
+                                     initial_display_name=None):
         """
-        Gets login tuple for the user with the given user ID.
-
-        Creates a new access/refresh token for the user.
+        Creates a new access token for the user with the given user ID.
 
         The user is assumed to have been authenticated by some other
         machanism (e.g. CAS), and the user_id converted to the canonical case.
@@ -400,16 +398,13 @@ class AuthHandler(BaseHandler):
             initial_display_name (str): display name to associate with the
                device if it needs re-registering
         Returns:
-            A tuple of:
               The access token for the user's session.
-              The refresh token for the user's session.
         Raises:
             StoreError if there was a problem storing the token.
             LoginError if there was an authentication problem.
         """
         logger.info("Logging in user %s on device %s", user_id, device_id)
         access_token = yield self.issue_access_token(user_id, device_id)
-        refresh_token = yield self.issue_refresh_token(user_id, device_id)
 
         # the device *should* have been registered before we got here; however,
         # it's possible we raced against a DELETE operation. The thing we
@@ -420,7 +415,7 @@ class AuthHandler(BaseHandler):
                 user_id, device_id, initial_display_name
             )
 
-        defer.returnValue((access_token, refresh_token))
+        defer.returnValue(access_token)
 
     @defer.inlineCallbacks
     def check_user_exists(self, user_id):
@@ -531,13 +526,6 @@ class AuthHandler(BaseHandler):
                                                   device_id)
         defer.returnValue(access_token)
 
-    @defer.inlineCallbacks
-    def issue_refresh_token(self, user_id, device_id=None):
-        refresh_token = self.generate_refresh_token(user_id)
-        yield self.store.add_refresh_token_to_user(user_id, refresh_token,
-                                                   device_id)
-        defer.returnValue(refresh_token)
-
     def generate_access_token(self, user_id, extra_caveats=None):
         extra_caveats = extra_caveats or []
         macaroon = self._generate_base_macaroon(user_id)
@@ -550,16 +538,6 @@ class AuthHandler(BaseHandler):
         for caveat in extra_caveats:
             macaroon.add_first_party_caveat(caveat)
         return macaroon.serialize()
-
-    def generate_refresh_token(self, user_id):
-        m = self._generate_base_macaroon(user_id)
-        m.add_first_party_caveat("type = refresh")
-        # Important to add a nonce, because otherwise every refresh token for a
-        # user will be the same.
-        m.add_first_party_caveat("nonce = %s" % (
-            stringutils.random_string_with_symbols(16),
-        ))
-        return m.serialize()
 
     def generate_short_term_login_token(self, user_id, duration_in_ms=(2 * 60 * 1000)):
         macaroon = self._generate_base_macaroon(user_id)
