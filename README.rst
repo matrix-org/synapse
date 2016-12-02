@@ -483,69 +483,74 @@ versions of synapse.
 Setting up Federation
 =====================
 
-In order for other homeservers to send messages to your server, it will need to
-be publicly visible on the internet, and they will need to know its host name.
-You have two choices here, which will influence the form of your Matrix user
-IDs:
+Federation is the process by which users on different servers can participate
+in the same room. For this to work, those other servers must be able to contact
+yours to send messages.
 
-1) Use the machine's own hostname as available on public DNS in the form of
-   its A records. This is easier to set up initially, perhaps for
-   testing, but lacks the flexibility of SRV.
+As explained in `Configuring synapse`_, the ``server_name`` in your
+``homeserver.yaml`` file determines the way that other servers will reach
+yours. By default, they will treat it as a hostname and try to connect to
+port 8448. This is easy to set up and will work with the default configuration,
+provided you set the ``server_name`` to match your machine's public DNS
+hostname.
 
-2) Set up a SRV record for your domain name. This requires you create a SRV
-   record in DNS, but gives the flexibility to run the server on your own
-   choice of TCP port, on a machine that might not be the same name as the
-   domain name.
+For a more flexible conversation, you can set up a DNS SRV record. This allows
+you to run your server on a machine that might not have the same name as your
+domain name. For example, you might want to run your server at
+``synapse.example.com``, but have your Matrix user-ids look like
+``@user:example.com``. (A SRV record also allows you to change the port from
+the default 8448. However, if you are thinking of using a reverse-proxy, be
+sure to read `Reverse-proxying the federation port`_ first.)
 
-For the first form, simply pass the required hostname (of the machine) as the
---server-name parameter::
+To use a SRV record, first create your SRV record and publish it in DNS. This
+should have the format ``_matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port>
+<synapse.server.name>``. The DNS record should then look something like::
+
+    $ dig -t srv _matrix._tcp.example.com
+    _matrix._tcp.example.com. 3600    IN      SRV     10 0 8448 synapse.example.com.
+
+You can then configure your homeserver to use ``<yourdomain.com>`` as the domain in
+its user-ids, by setting ``server_name``::
 
     python -m synapse.app.homeserver \
-        --server-name machine.my.domain.name \
+        --server-name <yourdomain.com> \
         --config-path homeserver.yaml \
         --generate-config
     python -m synapse.app.homeserver --config-path homeserver.yaml
 
-Alternatively, you can run ``synctl start`` to guide you through the process.
-
-For the second form, first create your SRV record and publish it in DNS. This
-needs to be named _matrix._tcp.YOURDOMAIN, and point at at least one hostname
-and port where the server is running.  (At the current time synapse does not
-support clustering multiple servers into a single logical homeserver).  The DNS
-record would then look something like::
-
-    $ dig -t srv _matrix._tcp.machine.my.domain.name
-    _matrix._tcp    IN      SRV     10 0 8448 machine.my.domain.name.
-
-
-At this point, you should then run the homeserver with the hostname of this
-SRV record, as that is the name other machines will expect it to have::
-
-    python -m synapse.app.homeserver \
-        --server-name YOURDOMAIN \
-        --config-path homeserver.yaml \
-        --generate-config
-    python -m synapse.app.homeserver --config-path homeserver.yaml
-
-
-If you've already generated the config file, you need to edit the "server_name"
-in you  ```homeserver.yaml``` file. If you've already started Synapse and a
+If you've already generated the config file, you need to edit the ``server_name``
+in your ``homeserver.yaml`` file. If you've already started Synapse and a
 database has been created, you will have to recreate the database.
 
-You may additionally want to pass one or more "-v" options, in order to
-increase the verbosity of logging output; at least for initial testing.
+If all goes well, you should be able to connect to your server with a client,
+and then join a room via federation. (Try ``#matrix-dev:matrix.org`` as a first
+step. "Matrix HQ"'s sheer size and activity level tends to make even the
+largest boxes pause for thought.)
+
+Troubleshooting
+---------------
+The typical failure mode with federation is that when you try to join a room,
+it is rejected with "401: Unauthorized". Generally this means that other
+servers in the room couldn't access yours. (Joining a room over federation is a
+complicated dance which requires connections in both directions).
+
+So, things to check are:
+
+* If you are trying to use a reverse-proxy, read `Reverse-proxying the
+  federation port`_.
+* If you are not using a SRV record, check that your ``server_name`` (the part
+  of your user-id after the ``:``) matches your hostname, and that port 8448 on
+  that hostname is reachable from outside your network.
+* If you *are* using a SRV record, check that it matches your ``server_name``
+  (it should be ``_matrix._tcp.<server_name>``), and that the port and hostname
+  it specifies are reachable from outside your network.
 
 Running a Demo Federation of Synapses
 -------------------------------------
 
 If you want to get up and running quickly with a trio of homeservers in a
-private federation (``localhost:8080``, ``localhost:8081`` and
-``localhost:8082``) which you can then access through the webclient running at
-http://localhost:8080. Simply run::
-
-    demo/start.sh
-
-This is mainly useful just for development purposes.
+private federation, there is a script in the ``demo`` directory. This is mainly
+useful just for development purposes. See `<demo/README>`_.
 
 
 Using PostgreSQL
