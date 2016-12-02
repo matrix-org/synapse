@@ -11,7 +11,7 @@ VoIP.  The basics you need to know to get up and running are:
   like ``#matrix:matrix.org`` or ``#test:localhost:8448``.
 
 - Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
-  you will normally refer to yourself and others using a third party identifier 
+  you will normally refer to yourself and others using a third party identifier
   (3PID): email address, phone number, etc rather than manipulating Matrix user IDs)
 
 The overall architecture is::
@@ -25,6 +25,7 @@ bridge at irc://irc.freenode.net/matrix.
 
 Synapse is currently in rapid development, but as of version 0.5 we believe it
 is sufficiently stable to be run as an internet-facing service for real usage!
+
 
 About Matrix
 ============
@@ -86,6 +87,7 @@ report any bugs via https://matrix.org/jira.
 Thanks for using Matrix!
 
 [1] End-to-end encryption is currently in development - see https://matrix.org/git/olm
+
 
 Synapse Installation
 ====================
@@ -156,8 +158,8 @@ In case of problems, please see the _Troubleshooting section below.
 Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
 above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
 
-Also, Martin Giess has created an auto-deployment process with vagrant/ansible, 
-tested with VirtualBox/AWS/DigitalOcean - see https://github.com/EMnify/matrix-synapse-auto-deploy 
+Also, Martin Giess has created an auto-deployment process with vagrant/ansible,
+tested with VirtualBox/AWS/DigitalOcean - see https://github.com/EMnify/matrix-synapse-auto-deploy
 for details.
 
 To set up your homeserver, run (in your virtualenv, as before)::
@@ -195,6 +197,7 @@ you can use the command line to register new users::
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server.  See docs/turn-howto.rst for details.
 
+
 Running Synapse
 ===============
 
@@ -204,6 +207,42 @@ run (e.g. ``~/.synapse``), and::
     cd ~/.synapse
     source ./bin/activate
     synctl start
+
+
+Running The Demo Web Client
+===========================
+
+The homeserver runs a web client by default at https://localhost:8448/.
+
+If this is the first time you have used the client from that browser (it uses
+HTML5 local storage to remember its config), you will need to log in to your
+account. If you don't yet have an account, because you've just started the
+homeserver for the first time, then you'll need to register one.
+
+Registering A New Account
+-------------------------
+
+Your new user name will be formed partly from the hostname your server is
+running as, and partly from a localpart you specify when you create the
+account. Your name will take the form of::
+
+    @localpart:my.domain.here
+         (pronounced "at localpart on my dot domain dot here")
+
+Specify your desired localpart in the topmost box of the "Register for an
+account" form, and click the "Register" button. Hostnames can contain ports if
+required due to lack of SRV records (e.g. @matthew:localhost:8448 on an
+internal synapse sandbox running on localhost).
+
+If registration fails, you may need to enable it in the homeserver (see
+`Synapse Installation`_ above)
+
+Logging In To An Existing Account
+---------------------------------
+
+Just enter the ``@localpart:my.domain.here`` Matrix user ID and password into
+the form and click the Login button.
+
 
 Security Note
 =============
@@ -220,24 +259,6 @@ server on the same domain.
 See https://github.com/vector-im/vector-web/issues/1977 and
 https://developer.github.com/changes/2014-04-25-user-content-security for more details.
 
-Using PostgreSQL
-================
-
-As of Synapse 0.9, `PostgreSQL <http://www.postgresql.org>`_ is supported as an
-alternative to the `SQLite <http://sqlite.org/>`_ database that Synapse has
-traditionally used for convenience and simplicity.
-
-The advantages of Postgres include:
-
-* significant performance improvements due to the superior threading and
-  caching model, smarter query optimiser
-* allowing the DB to be run on separate hardware
-* allowing basic active/backup high-availability with a "hot spare" synapse
-  pointing at the same DB master, as well as enabling DB replication in
-  synapse itself.
-
-For information on how to install and use PostgreSQL, please see
-`docs/postgres.rst <docs/postgres.rst>`_.
 
 Platform Specific Instructions
 ==============================
@@ -340,6 +361,7 @@ Troubleshooting:
   you do, you may need to create a symlink to ``libsodium.a`` so ``ld`` can find
   it: ``ln -s /usr/local/lib/libsodium.a /usr/lib/libsodium.a``
 
+
 Troubleshooting
 ===============
 
@@ -413,37 +435,6 @@ you will need to explicitly call Python2.7 - either running as::
 
 ...or by editing synctl with the correct python executable.
 
-Synapse Development
-===================
-
-To check out a synapse for development, clone the git repo into a working
-directory of your choice::
-
-    git clone https://github.com/matrix-org/synapse.git
-    cd synapse
-
-Synapse has a number of external dependencies, that are easiest
-to install using pip and a virtualenv::
-
-    virtualenv env
-    source env/bin/activate
-    python synapse/python_dependencies.py | xargs -n1 pip install
-    pip install setuptools_trial mock
-
-This will run a process of downloading and installing all the needed
-dependencies into a virtual env.
-
-Once this is done, you may wish to run Synapse's unit tests, to
-check that everything is installed as it should be::
-
-    python setup.py test
-
-This should end with a 'PASSED' result::
-
-    Ran 143 tests in 0.601s
-
-    PASSED (successes=143)
-
 
 Upgrading an existing Synapse
 =============================
@@ -453,6 +444,7 @@ Please check these instructions as upgrading may require extra steps for some
 versions of synapse.
 
 .. _UPGRADE.rst: UPGRADE.rst
+
 
 Setting up Federation
 =====================
@@ -521,41 +513,26 @@ http://localhost:8080. Simply run::
 
 This is mainly useful just for development purposes.
 
-Running The Demo Web Client
-===========================
 
-The homeserver runs a web client by default at https://localhost:8448/.
+Using PostgreSQL
+================
 
-If this is the first time you have used the client from that browser (it uses
-HTML5 local storage to remember its config), you will need to log in to your
-account. If you don't yet have an account, because you've just started the
-homeserver for the first time, then you'll need to register one.
+As of Synapse 0.9, `PostgreSQL <http://www.postgresql.org>`_ is supported as an
+alternative to the `SQLite <http://sqlite.org/>`_ database that Synapse has
+traditionally used for convenience and simplicity.
 
+The advantages of Postgres include:
 
-Registering A New Account
--------------------------
+* significant performance improvements due to the superior threading and
+  caching model, smarter query optimiser
+* allowing the DB to be run on separate hardware
+* allowing basic active/backup high-availability with a "hot spare" synapse
+  pointing at the same DB master, as well as enabling DB replication in
+  synapse itself.
 
-Your new user name will be formed partly from the hostname your server is
-running as, and partly from a localpart you specify when you create the
-account. Your name will take the form of::
+For information on how to install and use PostgreSQL, please see
+`docs/postgres.rst <docs/postgres.rst>`_.
 
-    @localpart:my.domain.here
-         (pronounced "at localpart on my dot domain dot here")
-
-Specify your desired localpart in the topmost box of the "Register for an
-account" form, and click the "Register" button. Hostnames can contain ports if
-required due to lack of SRV records (e.g. @matthew:localhost:8448 on an
-internal synapse sandbox running on localhost).
-
-If registration fails, you may need to enable it in the homeserver (see
-`Synapse Installation`_ above)
-
-
-Logging In To An Existing Account
----------------------------------
-
-Just enter the ``@localpart:my.domain.here`` Matrix user ID and password into
-the form and click the Login button.
 
 Identity Servers
 ================
@@ -605,8 +582,8 @@ First calculate the hash of the new password:
 
     $ source ~/.synapse/bin/activate
     $ ./scripts/hash_password
-    Password: 
-    Confirm password: 
+    Password:
+    Confirm password:
     $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 Then update the `users` table in the database:
@@ -614,11 +591,44 @@ Then update the `users` table in the database:
     UPDATE users SET password_hash='$2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
         WHERE name='@test:test.com';
 
+
 Where's the spec?!
 ==================
 
 The source of the matrix spec lives at https://github.com/matrix-org/matrix-doc.
 A recent HTML snapshot of this lives at http://matrix.org/docs/spec
+
+
+Synapse Development
+===================
+
+To check out a synapse for development, clone the git repo into a working
+directory of your choice::
+
+    git clone https://github.com/matrix-org/synapse.git
+    cd synapse
+
+Synapse has a number of external dependencies, that are easiest
+to install using pip and a virtualenv::
+
+    virtualenv env
+    source env/bin/activate
+    python synapse/python_dependencies.py | xargs -n1 pip install
+    pip install setuptools_trial mock
+
+This will run a process of downloading and installing all the needed
+dependencies into a virtual env.
+
+Once this is done, you may wish to run Synapse's unit tests, to
+check that everything is installed as it should be::
+
+    python setup.py test
+
+This should end with a 'PASSED' result::
+
+    Ran 143 tests in 0.601s
+
+    PASSED (successes=143)
 
 
 Building Internal API Documentation
@@ -635,7 +645,6 @@ Building internal API documentation::
     python setup.py build_sphinx
 
 
-
 Help!! Synapse eats all my RAM!
 ===============================
 
@@ -650,4 +659,3 @@ matrix.org on.  The default setting is currently 0.1, which is probably
 around a ~700MB footprint.  You can dial it down further to 0.02 if
 desired, which targets roughly ~512MB.  Conversely you can dial it up if
 you need performance for lots of users and have a box with a lot of RAM.
-
