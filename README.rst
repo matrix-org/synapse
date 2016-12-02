@@ -571,21 +571,28 @@ For information on how to install and use PostgreSQL, please see
 Identity Servers
 ================
 
-The job of authenticating 3PIDs and tracking which 3PIDs are associated with a
-given Matrix user is very security-sensitive, as there is obvious risk of spam
-if it is too easy to sign up for Matrix accounts or harvest 3PID data.
-Meanwhile the job of publishing the end-to-end encryption public keys for
-Matrix users is also very security-sensitive for similar reasons.
+Identity servers have the job of mapping email addresses and other 3rd Party
+IDs (3PIDs) to Matrix user IDs, as well as verifying the ownership of 3PIDs
+before creating that mapping.
 
-Therefore the role of managing trusted identity in the Matrix ecosystem is
-farmed out to a cluster of known trusted ecosystem partners, who run 'Matrix
-Identity Servers' such as ``sydent``, whose role is purely to authenticate and
-track 3PID logins and publish end-user public keys.
+This process is very security-sensitive, as there is obvious risk of spam if it
+is too easy to sign up for Matrix accounts or harvest 3PID data. In the longer
+term, we hope to create a decentralised system to manage it (`matrix-doc #712
+<https://github.com/matrix-org/matrix-doc/issues/712>`_), but in the meantime,
+the role of managing trusted identity in the Matrix ecosystem is farmed out to
+a cluster of known trusted ecosystem partners, who run 'Matrix Identity
+Servers' such as `Sydent <https://github.com/matrix-org/sydent>`_, whose role
+is purely to authenticate and track 3PID logins and publish end-user public
+keys.
 
-It's currently early days for identity servers as Matrix is not yet using 3PIDs
-as the primary means of identity and E2E encryption is not complete. As such,
-we are running a single identity server (https://matrix.org) at the current
-time.
+You can host your own copy of Sydent, but this will prevent you reaching other
+users in the Matrix ecosystem via their email address, and prevent them finding
+you. We therefore recommend that you use one of the centralised identity servers
+at ``https://matrix.org`` or ``https://vector.im`` for now.
+
+To reiterate: the Identity server will only be used if you choose to associate
+an email address with your account, or send an invite to another user via their
+email address.
 
 
 URL Previews
