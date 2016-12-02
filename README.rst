@@ -67,17 +67,6 @@ hosted by someone else (e.g. matrix.org) - there is no single point of control
 or mandatory service provider in Matrix, unlike WhatsApp, Facebook, Hangouts,
 etc.
 
-Synapse ships with two basic demo Matrix clients: webclient (a basic group chat
-web client demo implemented in AngularJS) and cmdclient (a basic Python
-command line utility which lets you easily see what the JSON APIs are up to).
-
-Meanwhile, iOS and Android SDKs and clients are available from:
-
-- https://github.com/matrix-org/matrix-ios-sdk
-- https://github.com/matrix-org/matrix-ios-kit
-- https://github.com/matrix-org/matrix-ios-console
-- https://github.com/matrix-org/matrix-android-sdk
-
 We'd like to invite you to join #matrix:matrix.org (via
 https://matrix.org/docs/projects/try-matrix-now), run a homeserver, take a look
 at the Matrix spec at https://matrix.org/docs/spec and API docs at
@@ -209,39 +198,36 @@ run (e.g. ``~/.synapse``), and::
     synctl start
 
 
-Running The Demo Web Client
-===========================
+Connecting to Synapse from a client
+===================================
 
-The homeserver runs a web client by default at https://localhost:8448/.
+The easiest way to try out your new Synapse installation is by connecting to it
+from a web client. We recommend the one at http://riot.im/app. You will need to
+specify a "Custom server" when you log on or register: set this to
+``https://localhost:8448`` - remember to specify the port (``:8448``) unless
+you changed the configuration. (Leave the identity server as the default - see
+`Identity servers`_.)
 
-If this is the first time you have used the client from that browser (it uses
-HTML5 local storage to remember its config), you will need to log in to your
-account. If you don't yet have an account, because you've just started the
-homeserver for the first time, then you'll need to register one.
+If all goes well you should at least be able to log in, create a room, and
+start sending messages.
 
-Registering A New Account
--------------------------
+(The homeserver runs a web client by default at https://localhost:8448/, though
+as of the time of writing it is somewhat outdated and not really recommended -
+https://github.com/matrix-org/synapse/issues/1527).
 
-Your new user name will be formed partly from the hostname your server is
-running as, and partly from a localpart you specify when you create the
-account. Your name will take the form of::
+Registering a new user from a client
+------------------------------------
+
+Your new user name will be formed partly from the ``server_name`` (see
+`Configuring synapse`_), and partly from a localpart you specify when you
+create the account. Your name will take the form of::
 
     @localpart:my.domain.here
-         (pronounced "at localpart on my dot domain dot here")
 
-Specify your desired localpart in the topmost box of the "Register for an
-account" form, and click the "Register" button. Hostnames can contain ports if
-required due to lack of SRV records (e.g. @matthew:localhost:8448 on an
-internal synapse sandbox running on localhost).
+(pronounced "at localpart on my dot domain dot here").
 
-If registration fails, you may need to enable it in the homeserver (see
-`Synapse Installation`_ above)
-
-Logging In To An Existing Account
----------------------------------
-
-Just enter the ``@localpart:my.domain.here`` Matrix user ID and password into
-the form and click the Login button.
+As when logging in, you will need to specify a "Custom server".  Specify your
+desired ``localpart`` in the 'User name' box.
 
 
 Security Note
