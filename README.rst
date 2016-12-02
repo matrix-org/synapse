@@ -20,8 +20,8 @@ The overall architecture is::
              https://somewhere.org/_matrix      https://elsewhere.net/_matrix
 
 ``#matrix:matrix.org`` is the official support room for Matrix, and can be
-accessed by any client from https://matrix.org/blog/try-matrix-now or via IRC
-bridge at irc://irc.freenode.net/matrix.
+accessed by any client from https://matrix.org/docs/projects/try-matrix-now or
+via IRC bridge at irc://irc.freenode.net/matrix.
 
 Synapse is currently in rapid development, but as of version 0.5 we believe it
 is sufficiently stable to be run as an internet-facing service for real usage!
@@ -79,10 +79,10 @@ Meanwhile, iOS and Android SDKs and clients are available from:
 - https://github.com/matrix-org/matrix-android-sdk
 
 We'd like to invite you to join #matrix:matrix.org (via
-https://matrix.org/blog/try-matrix-now), run a homeserver, take a look at the
-Matrix spec at https://matrix.org/docs/spec and API docs at
+https://matrix.org/docs/projects/try-matrix-now), run a homeserver, take a look
+at the Matrix spec at https://matrix.org/docs/spec and API docs at
 https://matrix.org/docs/api, experiment with the APIs and the demo clients, and
-report any bugs via https://matrix.org/jira.
+report any bugs via github.
 
 Thanks for using Matrix!
 
@@ -153,7 +153,7 @@ This installs synapse, along with the libraries it uses, into a virtual
 environment under ``~/.synapse``.  Feel free to pick a different directory
 if you prefer.
 
-In case of problems, please see the _Troubleshooting section below.
+In case of problems, please see the _`Troubleshooting` section below.
 
 Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
 above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
@@ -195,7 +195,7 @@ you can use the command line to register new users::
     Success!
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server.  See docs/turn-howto.rst for details.
+a TURN server.  See `<docs/turn-howto.rst>`_ for details.
 
 
 Running Synapse
@@ -247,8 +247,9 @@ the form and click the Login button.
 Security Note
 =============
 
-Matrix serves raw user generated data in some APIs - specifically the content
-repository endpoints: http://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-media-r0-download-servername-mediaid
+Matrix serves raw user generated data in some APIs - specifically the `content
+repository endpoints <http://matrix.org/docs/spec/client_server/latest.html#get-matrix-media-r0-download-servername-mediaid>`_.
+
 Whilst we have tried to mitigate against possible XSS attacks (e.g.
 https://github.com/matrix-org/synapse/pull/1021) we recommend running
 matrix homeservers on a dedicated domain name, to limit any malicious user generated
@@ -268,7 +269,7 @@ Debian
 
 Matrix provides official Debian packages via apt from http://matrix.org/packages/debian/.
 Note that these packages do not include a client - choose one from
-https://matrix.org/blog/try-matrix-now/ (or build your own with one of our SDKs :)
+https://matrix.org/docs/projects/try-matrix-now/ (or build your own with one of our SDKs :)
 
 Fedora
 ------
