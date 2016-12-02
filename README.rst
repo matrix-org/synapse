@@ -53,10 +53,10 @@ generation of fully open and interoperable messaging and VoIP apps for the
 internet.
 
 Synapse is a reference "homeserver" implementation of Matrix from the core
-development team at matrix.org, written in Python/Twisted for clarity and
-simplicity.  It is intended to showcase the concept of Matrix and let folks see
-the spec in the context of a codebase and let you run your own homeserver and
-generally help bootstrap the ecosystem.
+development team at matrix.org, written in Python/Twisted.  It is intended to
+showcase the concept of Matrix and let folks see the spec in the context of a
+codebase and let you run your own homeserver and generally help bootstrap the
+ecosystem.
 
 In Matrix, every user runs one or more Matrix clients, which connect through to
 a Matrix homeserver. The homeserver stores all their personal chat history and
@@ -69,13 +69,13 @@ etc.
 
 We'd like to invite you to join #matrix:matrix.org (via
 https://matrix.org/docs/projects/try-matrix-now), run a homeserver, take a look
-at the Matrix spec at https://matrix.org/docs/spec and API docs at
-https://matrix.org/docs/api, experiment with the APIs and the demo clients, and
-report any bugs via github.
+at the `Matrix spec <https://matrix.org/docs/spec>`_, and experiment with the
+`APIs <https://matrix.org/docs/api>`_ and `Client SDKs
+<http://matrix.org/docs/projects/try-matrix-now.html#client-sdks>`_.
 
 Thanks for using Matrix!
 
-[1] End-to-end encryption is currently in beta.
+[1] End-to-end encryption is currently in beta: `blog post <https://matrix.org/blog/2016/11/21/matrixs-olm-end-to-end-encryption-security-assessment-released-and-implemented-cross-platform-on-riot-at-last>`.
 
 
 Synapse Installation
@@ -172,24 +172,33 @@ set this to the hostname of your server. For a more production-ready setup, you
 will probably want to specify your domain (``example.com``) rather than a
 matrix-specific hostname here (in the same way that your email address is
 probably ``user@example.com`` rather than ``user@email.example.com``) - but
-doing so may require more advanced setup - see `Setting up Federation`_.
+doing so may require more advanced setup - see `Setting up
+Federation`_. Beware that the server name cannot be changed later.
 
 This command will generate you a config file that you can then customise, but it will
 also generate a set of keys for you. These keys will allow your Home Server to
 identify itself to other Home Servers, so don't lose or delete them. It would be
-wise to back them up somewhere safe. If, for whatever reason, you do need to
+wise to back them up somewhere safe. (If, for whatever reason, you do need to
 change your Home Server's keys, you may find that other Home Servers have the
 old key cached. If you update the signing key, you should change the name of the
-key in the ``<server name>.signing.key`` file (the second word) to something different.
+key in the ``<server name>.signing.key`` file (the second word) to something
+different. See `the spec`__ for more information on key management.)
 
-The default configuration exposes two TCP ports: 8008 and 8448. Port 8008 is
+.. __: `key_management`_
+
+The default configuration exposes two HTTP ports: 8008 and 8448. Port 8008 is
 configured without TLS; it is not recommended this be exposed outside your
 local network. Port 8448 is configured to use TLS with a self-signed
-certificate. This is fine for testing with but you will almost certainly want
-to use another certificate for production purposes. You can do so by changing
+certificate. This is fine for testing with but, to avoid your clients
+complaining about the certificate, you will almost certainly want to use
+another certificate for production purposes. (Note that a self-signed
+certificate is fine for `Federation`_). You can do so by changing
 ``tls_certificate_path``, ``tls_private_key_path`` and ``tls_dh_params_path``
 in ``homeserver.yaml``; alternatively, you can use a reverse-proxy, but be sure
 to read `Using a reverse proxy with Synapse`_ when doing so.
+
+Apart from port 8448 using TLS, both ports are the same in the default
+configuration.
 
 Registering a user
 ------------------
@@ -200,7 +209,7 @@ commandline script.
 
 .. __: `client-user-reg`_
 
-To get started, is easiest to use the command line to register new users::
+To get started, it is easiest to use the command line to register new users::
 
     $ source ~/.synapse/bin/activate
     $ synctl start # if not already running
@@ -239,11 +248,11 @@ Connecting to Synapse from a client
 ===================================
 
 The easiest way to try out your new Synapse installation is by connecting to it
-from a web client. We recommend the one at http://riot.im/app. You will need to
-specify a "Custom server" when you log on or register: set this to
-``https://localhost:8448`` - remember to specify the port (``:8448``) unless
-you changed the configuration. (Leave the identity server as the default - see
-`Identity servers`_.)
+from a web client. The easiest option is probably the one at
+http://riot.im/app. You will need to specify a "Custom server" when you log on
+or register: set this to ``https://localhost:8448`` - remember to specify the
+port (``:8448``) unless you changed the configuration. (Leave the identity
+server as the default - see `Identity servers`_.)
 
 If all goes well you should at least be able to log in, create a room, and
 start sending messages.
@@ -268,9 +277,9 @@ Your new user name will be formed partly from the ``server_name`` (see
 `Configuring synapse`_), and partly from a localpart you specify when you
 create the account. Your name will take the form of::
 
-    @localpart:my.domain.here
+    @localpart:my.domain.name
 
-(pronounced "at localpart on my dot domain dot here").
+(pronounced "at localpart on my dot domain dot name").
 
 As when logging in, you will need to specify a "Custom server".  Specify your
 desired ``localpart`` in the 'User name' box.
@@ -494,7 +503,7 @@ port 8448. This is easy to set up and will work with the default configuration,
 provided you set the ``server_name`` to match your machine's public DNS
 hostname.
 
-For a more flexible conversation, you can set up a DNS SRV record. This allows
+For a more flexible configuration, you can set up a DNS SRV record. This allows
 you to run your server on a machine that might not have the same name as your
 domain name. For example, you might want to run your server at
 ``synapse.example.com``, but have your Matrix user-ids look like
@@ -522,10 +531,12 @@ If you've already generated the config file, you need to edit the ``server_name`
 in your ``homeserver.yaml`` file. If you've already started Synapse and a
 database has been created, you will have to recreate the database.
 
-If all goes well, you should be able to connect to your server with a client,
+If all goes well, you should be able to `connect to your server with a client`__,
 and then join a room via federation. (Try ``#matrix-dev:matrix.org`` as a first
 step. "Matrix HQ"'s sheer size and activity level tends to make even the
 largest boxes pause for thought.)
+
+.. __: `Connecting to Synapse from a client`_
 
 Troubleshooting
 ---------------
@@ -587,9 +598,9 @@ Matrix clients without needing to run Synapse with root privileges.
 
 The most important thing to know here is that Matrix clients and other Matrix
 servers do not necessarily need to connect to your server via the same
-port. Indeed, clients will use port 443 by default, whereas other servers
-default to port 8448. Where these are different, we refer to the 'client port'
-and the 'federation port'.
+port. Indeed, clients will use port 443 by default, whereas servers default to
+port 8448. Where these are different, we refer to the 'client port' and the
+'federation port'.
 
 The next most important thing to know is that using a reverse-proxy on the
 federation port has a number of pitfalls. It is possible, but be sure to read
@@ -626,9 +637,10 @@ There are two issues to consider before using a reverse-proxy on the federation
 port:
 
 * Due to the way SSL certificates are managed in the Matrix federation protocol
-  (see `spec <https://matrix.org/docs/spec/server_server/unstable.html#retrieving-server-keys>`_),
-  Synapse needs to be configured with the path to the SSL certificate, *even if
-  you do not terminate SSL at Synapse*.
+  (see `spec`__), Synapse needs to be configured with the path to the SSL
+  certificate, *even if you do not terminate SSL at Synapse*.
+
+  .. __: `key_management`_
 
 * Synapse does not currently support SNI on the federation protocol
   (`bug #1491 <https://github.com/matrix-org/synapse/issues/1491>`_), which
@@ -652,8 +664,12 @@ caveats, you will need to do the following:
   certificate file used by your reverse-proxy, and set ``no_tls`` to ``True``.
   (``tls_private_key_path`` will be ignored if ``no_tls`` is ``True``.)
 
-* In your reverse-proxy configuration, if there are other virtual hosts on the
-  same port, make sure that Synapse is the default.
+* In your reverse-proxy configuration:
+
+  * If there are other virtual hosts on the same port, make sure that the
+    *default* one uses the certificate configured above.
+
+  * Forward ``/_matrix`` to Synapse.
 
 * If your reverse-proxy is not listening on port 8448, publish a SRV record to
   tell other servers how to find you. See `Setting up Federation`_.
@@ -678,6 +694,9 @@ Identity Servers
 Identity servers have the job of mapping email addresses and other 3rd Party
 IDs (3PIDs) to Matrix user IDs, as well as verifying the ownership of 3PIDs
 before creating that mapping.
+
+**They are not where accounts or credentials are stored - these live on home
+servers. Identity Servers are just for mapping 3rd party IDs to matrix IDs.**
 
 This process is very security-sensitive, as there is obvious risk of spam if it
 is too easy to sign up for Matrix accounts or harvest 3PID data. In the longer
@@ -797,3 +816,6 @@ matrix.org on.  The default setting is currently 0.1, which is probably
 around a ~700MB footprint.  You can dial it down further to 0.02 if
 desired, which targets roughly ~512MB.  Conversely you can dial it up if
 you need performance for lots of users and have a box with a lot of RAM.
+
+
+.. _`key_management`: https://matrix.org/docs/spec/server_server/unstable.html#retrieving-server-keys
