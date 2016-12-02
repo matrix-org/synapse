@@ -86,7 +86,7 @@ report any bugs via github.
 
 Thanks for using Matrix!
 
-[1] End-to-end encryption is currently in development - see https://matrix.org/git/olm
+[1] End-to-end encryption is currently in beta.
 
 
 Synapse Installation
@@ -591,13 +591,6 @@ Then update the `users` table in the database:
 
     UPDATE users SET password_hash='$2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
         WHERE name='@test:test.com';
-
-
-Where's the spec?!
-==================
-
-The source of the matrix spec lives at https://github.com/matrix-org/matrix-doc.
-A recent HTML snapshot of this lives at http://matrix.org/docs/spec
 
 
 Synapse Development
