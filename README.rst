@@ -558,14 +558,14 @@ time.
 URL Previews
 ============
 
-Synapse 0.15.0 introduces an experimental new API for previewing URLs at
-/_matrix/media/r0/preview_url.  This is disabled by default.  To turn it on
-you must enable the `url_preview_enabled: True` config parameter and explicitly
-specify the IP ranges that Synapse is not allowed to spider for previewing in
-the `url_preview_ip_range_blacklist` configuration parameter.  This is critical
-from a security perspective to stop arbitrary Matrix users spidering 'internal'
-URLs on your network.  At the very least we recommend that your loopback and
-RFC1918 IP addresses are blacklisted.
+Synapse 0.15.0 introduces a new API for previewing URLs at
+``/_matrix/media/r0/preview_url``.  This is disabled by default.  To turn it on
+you must enable the ``url_preview_enabled: True`` config parameter and
+explicitly specify the IP ranges that Synapse is not allowed to spider for
+previewing in the ``url_preview_ip_range_blacklist`` configuration parameter.
+This is critical from a security perspective to stop arbitrary Matrix users
+spidering 'internal' URLs on your network.  At the very least we recommend that
+your loopback and RFC1918 IP addresses are blacklisted.
 
 This also requires the optional lxml and netaddr python dependencies to be
 installed.
@@ -579,7 +579,7 @@ server, they can request a password-reset token via clients such as Vector.
 
 A manual password reset can be done via direct database access as follows.
 
-First calculate the hash of the new password:
+First calculate the hash of the new password::
 
     $ source ~/.synapse/bin/activate
     $ ./scripts/hash_password
@@ -587,7 +587,7 @@ First calculate the hash of the new password:
     Confirm password:
     $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-Then update the `users` table in the database:
+Then update the `users` table in the database::
 
     UPDATE users SET password_hash='$2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
         WHERE name='@test:test.com';
