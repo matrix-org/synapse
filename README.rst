@@ -20,11 +20,12 @@ The overall architecture is::
              https://somewhere.org/_matrix      https://elsewhere.net/_matrix
 
 ``#matrix:matrix.org`` is the official support room for Matrix, and can be
-accessed by any client from https://matrix.org/blog/try-matrix-now or via IRC
-bridge at irc://irc.freenode.net/matrix.
+accessed by any client from https://matrix.org/docs/projects/try-matrix-now or
+via IRC bridge at irc://irc.freenode.net/matrix.
 
 Synapse is currently in rapid development, but as of version 0.5 we believe it
 is sufficiently stable to be run as an internet-facing service for real usage!
+
 
 About Matrix
 ============
@@ -52,10 +53,10 @@ generation of fully open and interoperable messaging and VoIP apps for the
 internet.
 
 Synapse is a reference "homeserver" implementation of Matrix from the core
-development team at matrix.org, written in Python/Twisted for clarity and
-simplicity.  It is intended to showcase the concept of Matrix and let folks see
-the spec in the context of a codebase and let you run your own homeserver and
-generally help bootstrap the ecosystem.
+development team at matrix.org, written in Python/Twisted.  It is intended to
+showcase the concept of Matrix and let folks see the spec in the context of a
+codebase and let you run your own homeserver and generally help bootstrap the
+ecosystem.
 
 In Matrix, every user runs one or more Matrix clients, which connect through to
 a Matrix homeserver. The homeserver stores all their personal chat history and
@@ -66,26 +67,16 @@ hosted by someone else (e.g. matrix.org) - there is no single point of control
 or mandatory service provider in Matrix, unlike WhatsApp, Facebook, Hangouts,
 etc.
 
-Synapse ships with two basic demo Matrix clients: webclient (a basic group chat
-web client demo implemented in AngularJS) and cmdclient (a basic Python
-command line utility which lets you easily see what the JSON APIs are up to).
-
-Meanwhile, iOS and Android SDKs and clients are available from:
-
-- https://github.com/matrix-org/matrix-ios-sdk
-- https://github.com/matrix-org/matrix-ios-kit
-- https://github.com/matrix-org/matrix-ios-console
-- https://github.com/matrix-org/matrix-android-sdk
-
 We'd like to invite you to join #matrix:matrix.org (via
-https://matrix.org/blog/try-matrix-now), run a homeserver, take a look at the
-Matrix spec at https://matrix.org/docs/spec and API docs at
-https://matrix.org/docs/api, experiment with the APIs and the demo clients, and
-report any bugs via https://matrix.org/jira.
+https://matrix.org/docs/projects/try-matrix-now), run a homeserver, take a look
+at the `Matrix spec <https://matrix.org/docs/spec>`_, and experiment with the
+`APIs <https://matrix.org/docs/api>`_ and `Client SDKs
+<http://matrix.org/docs/projects/try-matrix-now.html#client-sdks>`_.
 
 Thanks for using Matrix!
 
-[1] End-to-end encryption is currently in development - see https://matrix.org/git/olm
+[1] End-to-end encryption is currently in beta: `blog post <https://matrix.org/blog/2016/11/21/matrixs-olm-end-to-end-encryption-security-assessment-released-and-implemented-cross-platform-on-riot-at-last>`.
+
 
 Synapse Installation
 ====================
@@ -151,7 +142,7 @@ This installs synapse, along with the libraries it uses, into a virtual
 environment under ``~/.synapse``.  Feel free to pick a different directory
 if you prefer.
 
-In case of problems, please see the _Troubleshooting section below.
+In case of problems, please see the _`Troubleshooting` section below.
 
 Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
 above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
@@ -160,29 +151,65 @@ Also, Martin Giess has created an auto-deployment process with vagrant/ansible,
 tested with VirtualBox/AWS/DigitalOcean - see https://github.com/EMnify/matrix-synapse-auto-deploy
 for details.
 
-To set up your homeserver, run (in your virtualenv, as before)::
+Configuring synapse
+-------------------
+
+Before you can start Synapse, you will need to generate a configuration
+file. To do this, run (in your virtualenv, as before)::
 
     cd ~/.synapse
     python -m synapse.app.homeserver \
-        --server-name machine.my.domain.name \
+        --server-name my.domain.name \
         --config-path homeserver.yaml \
         --generate-config \
         --report-stats=[yes|no]
 
-...substituting your host and domain name as appropriate.
+... substituting an appropriate value for ``--server-name``. The server name
+determines the "domain" part of user-ids for users on your server: these will
+all be of the format ``@user:my.domain.name``. It also determines how other
+matrix servers will reach yours for `Federation`_. For a test configuration,
+set this to the hostname of your server. For a more production-ready setup, you
+will probably want to specify your domain (``example.com``) rather than a
+matrix-specific hostname here (in the same way that your email address is
+probably ``user@example.com`` rather than ``user@email.example.com``) - but
+doing so may require more advanced setup - see `Setting up
+Federation`_. Beware that the server name cannot be changed later.
 
-This will generate you a config file that you can then customise, but it will
+This command will generate you a config file that you can then customise, but it will
 also generate a set of keys for you. These keys will allow your Home Server to
 identify itself to other Home Servers, so don't lose or delete them. It would be
-wise to back them up somewhere safe. If, for whatever reason, you do need to
+wise to back them up somewhere safe. (If, for whatever reason, you do need to
 change your Home Server's keys, you may find that other Home Servers have the
 old key cached. If you update the signing key, you should change the name of the
-key in the <server name>.signing.key file (the second word) to something different.
+key in the ``<server name>.signing.key`` file (the second word) to something
+different. See `the spec`__ for more information on key management.)
 
-By default, registration of new users is disabled. You can either enable
-registration in the config by specifying ``enable_registration: true``
-(it is then recommended to also set up CAPTCHA - see docs/CAPTCHA_SETUP), or
-you can use the command line to register new users::
+.. __: `key_management`_
+
+The default configuration exposes two HTTP ports: 8008 and 8448. Port 8008 is
+configured without TLS; it is not recommended this be exposed outside your
+local network. Port 8448 is configured to use TLS with a self-signed
+certificate. This is fine for testing with but, to avoid your clients
+complaining about the certificate, you will almost certainly want to use
+another certificate for production purposes. (Note that a self-signed
+certificate is fine for `Federation`_). You can do so by changing
+``tls_certificate_path``, ``tls_private_key_path`` and ``tls_dh_params_path``
+in ``homeserver.yaml``; alternatively, you can use a reverse-proxy, but be sure
+to read `Using a reverse proxy with Synapse`_ when doing so.
+
+Apart from port 8448 using TLS, both ports are the same in the default
+configuration.
+
+Registering a user
+------------------
+
+You will need at least one user on your server in order to use a Matrix
+client. Users can be registered either `via a Matrix client`__, or via a
+commandline script.
+
+.. __: `client-user-reg`_
+
+To get started, it is easiest to use the command line to register new users::
 
     $ source ~/.synapse/bin/activate
     $ synctl start # if not already running
@@ -192,8 +219,19 @@ you can use the command line to register new users::
     Confirm password:
     Success!
 
+This process uses a setting ``registration_shared_secret`` in
+``homeserver.yaml``, which is shared between Synapse itself and the
+``register_new_matrix_user`` script. It doesn't matter what it is (a random
+value is generated by ``--generate-config``), but it should be kept secret, as
+anyone with knowledge of it can register users on your server even if
+``enable_registration`` is ``false``.
+
+Setting up a TURN server
+------------------------
+
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server.  See docs/turn-howto.rst for details.
+a TURN server.  See `<docs/turn-howto.rst>`_ for details.
+
 
 Running Synapse
 ===============
@@ -205,11 +243,54 @@ run (e.g. ``~/.synapse``), and::
     source ./bin/activate
     synctl start
 
+
+Connecting to Synapse from a client
+===================================
+
+The easiest way to try out your new Synapse installation is by connecting to it
+from a web client. The easiest option is probably the one at
+http://riot.im/app. You will need to specify a "Custom server" when you log on
+or register: set this to ``https://localhost:8448`` - remember to specify the
+port (``:8448``) unless you changed the configuration. (Leave the identity
+server as the default - see `Identity servers`_.)
+
+If all goes well you should at least be able to log in, create a room, and
+start sending messages.
+
+(The homeserver runs a web client by default at https://localhost:8448/, though
+as of the time of writing it is somewhat outdated and not really recommended -
+https://github.com/matrix-org/synapse/issues/1527).
+
+.. _`client-user-reg`:
+
+Registering a new user from a client
+------------------------------------
+
+By default, registration of new users via Matrix clients is disabled. To enable
+it, specify ``enable_registration: true`` in ``homeserver.yaml``. (It is then
+recommended to also set up CAPTCHA - see `<docs/CAPTCHA_SETUP.rst>`_.)
+
+Once ``enable_registration`` is set to ``true``, it is possible to register a
+user via `riot.im <https://riot.im/app/#/register>`_ or other Matrix clients.
+
+Your new user name will be formed partly from the ``server_name`` (see
+`Configuring synapse`_), and partly from a localpart you specify when you
+create the account. Your name will take the form of::
+
+    @localpart:my.domain.name
+
+(pronounced "at localpart on my dot domain dot name").
+
+As when logging in, you will need to specify a "Custom server".  Specify your
+desired ``localpart`` in the 'User name' box.
+
+
 Security Note
 =============
 
-Matrix serves raw user generated data in some APIs - specifically the content
-repository endpoints: http://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-media-r0-download-servername-mediaid
+Matrix serves raw user generated data in some APIs - specifically the `content
+repository endpoints <http://matrix.org/docs/spec/client_server/latest.html#get-matrix-media-r0-download-servername-mediaid>`_.
+
 Whilst we have tried to mitigate against possible XSS attacks (e.g.
 https://github.com/matrix-org/synapse/pull/1021) we recommend running
 matrix homeservers on a dedicated domain name, to limit any malicious user generated
@@ -220,24 +301,6 @@ server on the same domain.
 See https://github.com/vector-im/vector-web/issues/1977 and
 https://developer.github.com/changes/2014-04-25-user-content-security for more details.
 
-Using PostgreSQL
-================
-
-As of Synapse 0.9, `PostgreSQL <http://www.postgresql.org>`_ is supported as an
-alternative to the `SQLite <http://sqlite.org/>`_ database that Synapse has
-traditionally used for convenience and simplicity.
-
-The advantages of Postgres include:
-
-* significant performance improvements due to the superior threading and
-  caching model, smarter query optimiser
-* allowing the DB to be run on separate hardware
-* allowing basic active/backup high-availability with a "hot spare" synapse
-  pointing at the same DB master, as well as enabling DB replication in
-  synapse itself.
-
-For information on how to install and use PostgreSQL, please see
-`docs/postgres.rst <docs/postgres.rst>`_.
 
 Platform Specific Instructions
 ==============================
@@ -247,7 +310,7 @@ Debian
 
 Matrix provides official Debian packages via apt from http://matrix.org/packages/debian/.
 Note that these packages do not include a client - choose one from
-https://matrix.org/blog/try-matrix-now/ (or build your own with one of our SDKs :)
+https://matrix.org/docs/projects/try-matrix-now/ (or build your own with one of our SDKs :)
 
 Fedora
 ------
@@ -340,6 +403,7 @@ Troubleshooting:
   you do, you may need to create a symlink to ``libsodium.a`` so ``ld`` can find
   it: ``ln -s /usr/local/lib/libsodium.a /usr/lib/libsodium.a``
 
+
 Troubleshooting
 ===============
 
@@ -413,6 +477,285 @@ you will need to explicitly call Python2.7 - either running as::
 
 ...or by editing synctl with the correct python executable.
 
+
+Upgrading an existing Synapse
+=============================
+
+The instructions for upgrading synapse are in `UPGRADE.rst`_.
+Please check these instructions as upgrading may require extra steps for some
+versions of synapse.
+
+.. _UPGRADE.rst: UPGRADE.rst
+
+.. _federation:
+
+Setting up Federation
+=====================
+
+Federation is the process by which users on different servers can participate
+in the same room. For this to work, those other servers must be able to contact
+yours to send messages.
+
+As explained in `Configuring synapse`_, the ``server_name`` in your
+``homeserver.yaml`` file determines the way that other servers will reach
+yours. By default, they will treat it as a hostname and try to connect to
+port 8448. This is easy to set up and will work with the default configuration,
+provided you set the ``server_name`` to match your machine's public DNS
+hostname.
+
+For a more flexible configuration, you can set up a DNS SRV record. This allows
+you to run your server on a machine that might not have the same name as your
+domain name. For example, you might want to run your server at
+``synapse.example.com``, but have your Matrix user-ids look like
+``@user:example.com``. (A SRV record also allows you to change the port from
+the default 8448. However, if you are thinking of using a reverse-proxy, be
+sure to read `Reverse-proxying the federation port`_ first.)
+
+To use a SRV record, first create your SRV record and publish it in DNS. This
+should have the format ``_matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port>
+<synapse.server.name>``. The DNS record should then look something like::
+
+    $ dig -t srv _matrix._tcp.example.com
+    _matrix._tcp.example.com. 3600    IN      SRV     10 0 8448 synapse.example.com.
+
+You can then configure your homeserver to use ``<yourdomain.com>`` as the domain in
+its user-ids, by setting ``server_name``::
+
+    python -m synapse.app.homeserver \
+        --server-name <yourdomain.com> \
+        --config-path homeserver.yaml \
+        --generate-config
+    python -m synapse.app.homeserver --config-path homeserver.yaml
+
+If you've already generated the config file, you need to edit the ``server_name``
+in your ``homeserver.yaml`` file. If you've already started Synapse and a
+database has been created, you will have to recreate the database.
+
+If all goes well, you should be able to `connect to your server with a client`__,
+and then join a room via federation. (Try ``#matrix-dev:matrix.org`` as a first
+step. "Matrix HQ"'s sheer size and activity level tends to make even the
+largest boxes pause for thought.)
+
+.. __: `Connecting to Synapse from a client`_
+
+Troubleshooting
+---------------
+The typical failure mode with federation is that when you try to join a room,
+it is rejected with "401: Unauthorized". Generally this means that other
+servers in the room couldn't access yours. (Joining a room over federation is a
+complicated dance which requires connections in both directions).
+
+So, things to check are:
+
+* If you are trying to use a reverse-proxy, read `Reverse-proxying the
+  federation port`_.
+* If you are not using a SRV record, check that your ``server_name`` (the part
+  of your user-id after the ``:``) matches your hostname, and that port 8448 on
+  that hostname is reachable from outside your network.
+* If you *are* using a SRV record, check that it matches your ``server_name``
+  (it should be ``_matrix._tcp.<server_name>``), and that the port and hostname
+  it specifies are reachable from outside your network.
+
+Running a Demo Federation of Synapses
+-------------------------------------
+
+If you want to get up and running quickly with a trio of homeservers in a
+private federation, there is a script in the ``demo`` directory. This is mainly
+useful just for development purposes. See `<demo/README>`_.
+
+
+Using PostgreSQL
+================
+
+As of Synapse 0.9, `PostgreSQL <http://www.postgresql.org>`_ is supported as an
+alternative to the `SQLite <http://sqlite.org/>`_ database that Synapse has
+traditionally used for convenience and simplicity.
+
+The advantages of Postgres include:
+
+* significant performance improvements due to the superior threading and
+  caching model, smarter query optimiser
+* allowing the DB to be run on separate hardware
+* allowing basic active/backup high-availability with a "hot spare" synapse
+  pointing at the same DB master, as well as enabling DB replication in
+  synapse itself.
+
+For information on how to install and use PostgreSQL, please see
+`docs/postgres.rst <docs/postgres.rst>`_.
+
+
+.. _reverse-proxy:
+
+Using a reverse proxy with Synapse
+==================================
+
+It is possible to put a reverse proxy such as
+`nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
+`Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_ or
+`HAProxy <http://www.haproxy.org/>`_ in front of Synapse. One advantage of
+doing so is that it means that you can expose the default https port (443) to
+Matrix clients without needing to run Synapse with root privileges.
+
+The most important thing to know here is that Matrix clients and other Matrix
+servers do not necessarily need to connect to your server via the same
+port. Indeed, clients will use port 443 by default, whereas servers default to
+port 8448. Where these are different, we refer to the 'client port' and the
+'federation port'.
+
+The next most important thing to know is that using a reverse-proxy on the
+federation port has a number of pitfalls. It is possible, but be sure to read
+`Reverse-proxying the federation port`_.
+
+The recommended setup is therefore to configure your reverse-proxy on port 443
+for client connections, but to also expose port 8448 for server-server
+connections. All the Matrix endpoints begin ``/_matrix``, so an example nginx
+configuration might look like::
+
+  server {
+      listen 443 ssl;
+      listen [::]:443 ssl;
+      server_name matrix.example.com;
+
+      location /_matrix {
+          proxy_pass http://localhost:8008;
+          proxy_set_header X-Forwarded-For $remote_addr;
+      }
+  }
+
+You will also want to set ``bind_address: 127.0.0.1`` and ``x_forwarded: true``
+for port 8008 in ``homeserver.yaml`` to ensure that client IP addresses are
+recorded correctly.
+
+Having done so, you can then use ``https://matrix.example.com`` (instead of
+``https://matrix.example.com:8448``) as the "Custom server" when `Connecting to
+Synapse from a client`_.
+
+Reverse-proxying the federation port
+------------------------------------
+
+There are two issues to consider before using a reverse-proxy on the federation
+port:
+
+* Due to the way SSL certificates are managed in the Matrix federation protocol
+  (see `spec`__), Synapse needs to be configured with the path to the SSL
+  certificate, *even if you do not terminate SSL at Synapse*.
+
+  .. __: `key_management`_
+
+* Synapse does not currently support SNI on the federation protocol
+  (`bug #1491 <https://github.com/matrix-org/synapse/issues/1491>`_), which
+  means that using name-based virtual hosting is unreliable.
+
+Furthermore, a number of the normal reasons for using a reverse-proxy do not
+apply:
+
+* Other servers will connect on port 8448 by default, so there is no need to
+  listen on port 443 (for federation, at least), which avoids the need for root
+  privileges and virtual hosting.
+
+* A self-signed SSL certificate is fine for federation, so there is no need to
+  automate renewals. (The certificate generated by ``--generate-config`` is
+  valid for 10 years.)
+
+If you want to set up a reverse-proxy on the federation port despite these
+caveats, you will need to do the following:
+
+* In ``homeserver.yaml``, set ``tls_certificate_path`` to the path to the SSL
+  certificate file used by your reverse-proxy, and set ``no_tls`` to ``True``.
+  (``tls_private_key_path`` will be ignored if ``no_tls`` is ``True``.)
+
+* In your reverse-proxy configuration:
+
+  * If there are other virtual hosts on the same port, make sure that the
+    *default* one uses the certificate configured above.
+
+  * Forward ``/_matrix`` to Synapse.
+
+* If your reverse-proxy is not listening on port 8448, publish a SRV record to
+  tell other servers how to find you. See `Setting up Federation`_.
+
+When updating the SSL certificate, just update the file pointed to by
+``tls_certificate_path``: there is no need to restart synapse. (You may like to
+use a symbolic link to help make this process atomic.)
+
+The most common mistake when setting up federation is not to tell Synapse about
+your SSL certificate. To check it, you can visit
+``https://matrix.org/federationtester/api/report?server_name=<your_server_name>``.
+Unfortunately, there is no UI for this yet, but, you should see
+``"MatchingTLSFingerprint": true``. If not, check that
+``Certificates[0].SHA256Fingerprint`` (the fingerprint of the certificate
+presented by your reverse-proxy) matches ``Keys.tls_fingerprints[0].sha256``
+(the fingerprint of the certificate Synapse is using).
+
+
+Identity Servers
+================
+
+Identity servers have the job of mapping email addresses and other 3rd Party
+IDs (3PIDs) to Matrix user IDs, as well as verifying the ownership of 3PIDs
+before creating that mapping.
+
+**They are not where accounts or credentials are stored - these live on home
+servers. Identity Servers are just for mapping 3rd party IDs to matrix IDs.**
+
+This process is very security-sensitive, as there is obvious risk of spam if it
+is too easy to sign up for Matrix accounts or harvest 3PID data. In the longer
+term, we hope to create a decentralised system to manage it (`matrix-doc #712
+<https://github.com/matrix-org/matrix-doc/issues/712>`_), but in the meantime,
+the role of managing trusted identity in the Matrix ecosystem is farmed out to
+a cluster of known trusted ecosystem partners, who run 'Matrix Identity
+Servers' such as `Sydent <https://github.com/matrix-org/sydent>`_, whose role
+is purely to authenticate and track 3PID logins and publish end-user public
+keys.
+
+You can host your own copy of Sydent, but this will prevent you reaching other
+users in the Matrix ecosystem via their email address, and prevent them finding
+you. We therefore recommend that you use one of the centralised identity servers
+at ``https://matrix.org`` or ``https://vector.im`` for now.
+
+To reiterate: the Identity server will only be used if you choose to associate
+an email address with your account, or send an invite to another user via their
+email address.
+
+
+URL Previews
+============
+
+Synapse 0.15.0 introduces a new API for previewing URLs at
+``/_matrix/media/r0/preview_url``.  This is disabled by default.  To turn it on
+you must enable the ``url_preview_enabled: True`` config parameter and
+explicitly specify the IP ranges that Synapse is not allowed to spider for
+previewing in the ``url_preview_ip_range_blacklist`` configuration parameter.
+This is critical from a security perspective to stop arbitrary Matrix users
+spidering 'internal' URLs on your network.  At the very least we recommend that
+your loopback and RFC1918 IP addresses are blacklisted.
+
+This also requires the optional lxml and netaddr python dependencies to be
+installed.
+
+
+Password reset
+==============
+
+If a user has registered an email address to their account using an identity
+server, they can request a password-reset token via clients such as Vector.
+
+A manual password reset can be done via direct database access as follows.
+
+First calculate the hash of the new password::
+
+    $ source ~/.synapse/bin/activate
+    $ ./scripts/hash_password
+    Password:
+    Confirm password:
+    $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+Then update the `users` table in the database::
+
+    UPDATE users SET password_hash='$2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+        WHERE name='@test:test.com';
+
+
 Synapse Development
 ===================
 
@@ -427,7 +770,7 @@ to install using pip and a virtualenv::
 
     virtualenv env
     source env/bin/activate
-    python synapse/python_dependencies.py | xargs pip install
+    python synapse/python_dependencies.py | xargs -n1 pip install
     pip install setuptools_trial mock
 
 This will run a process of downloading and installing all the needed
@@ -445,182 +788,6 @@ This should end with a 'PASSED' result::
     PASSED (successes=143)
 
 
-Upgrading an existing Synapse
-=============================
-
-The instructions for upgrading synapse are in `UPGRADE.rst`_.
-Please check these instructions as upgrading may require extra steps for some
-versions of synapse.
-
-.. _UPGRADE.rst: UPGRADE.rst
-
-Setting up Federation
-=====================
-
-In order for other homeservers to send messages to your server, it will need to
-be publicly visible on the internet, and they will need to know its host name.
-You have two choices here, which will influence the form of your Matrix user
-IDs:
-
-1) Use the machine's own hostname as available on public DNS in the form of
-   its A records. This is easier to set up initially, perhaps for
-   testing, but lacks the flexibility of SRV.
-
-2) Set up a SRV record for your domain name. This requires you create a SRV
-   record in DNS, but gives the flexibility to run the server on your own
-   choice of TCP port, on a machine that might not be the same name as the
-   domain name.
-
-For the first form, simply pass the required hostname (of the machine) as the
---server-name parameter::
-
-    python -m synapse.app.homeserver \
-        --server-name machine.my.domain.name \
-        --config-path homeserver.yaml \
-        --generate-config
-    python -m synapse.app.homeserver --config-path homeserver.yaml
-
-Alternatively, you can run ``synctl start`` to guide you through the process.
-
-For the second form, first create your SRV record and publish it in DNS. This
-needs to be named _matrix._tcp.YOURDOMAIN, and point at at least one hostname
-and port where the server is running.  (At the current time synapse does not
-support clustering multiple servers into a single logical homeserver).  The DNS
-record would then look something like::
-
-    $ dig -t srv _matrix._tcp.machine.my.domain.name
-    _matrix._tcp    IN      SRV     10 0 8448 machine.my.domain.name.
-
-
-At this point, you should then run the homeserver with the hostname of this
-SRV record, as that is the name other machines will expect it to have::
-
-    python -m synapse.app.homeserver \
-        --server-name YOURDOMAIN \
-        --config-path homeserver.yaml \
-        --generate-config
-    python -m synapse.app.homeserver --config-path homeserver.yaml
-
-
-If you've already generated the config file, you need to edit the "server_name"
-in you  ```homeserver.yaml``` file. If you've already started Synapse and a
-database has been created, you will have to recreate the database.
-
-You may additionally want to pass one or more "-v" options, in order to
-increase the verbosity of logging output; at least for initial testing.
-
-Running a Demo Federation of Synapses
--------------------------------------
-
-If you want to get up and running quickly with a trio of homeservers in a
-private federation (``localhost:8080``, ``localhost:8081`` and
-``localhost:8082``) which you can then access through the webclient running at
-http://localhost:8080. Simply run::
-
-    demo/start.sh
-
-This is mainly useful just for development purposes.
-
-Running The Demo Web Client
-===========================
-
-The homeserver runs a web client by default at https://localhost:8448/.
-
-If this is the first time you have used the client from that browser (it uses
-HTML5 local storage to remember its config), you will need to log in to your
-account. If you don't yet have an account, because you've just started the
-homeserver for the first time, then you'll need to register one.
-
-
-Registering A New Account
--------------------------
-
-Your new user name will be formed partly from the hostname your server is
-running as, and partly from a localpart you specify when you create the
-account. Your name will take the form of::
-
-    @localpart:my.domain.here
-         (pronounced "at localpart on my dot domain dot here")
-
-Specify your desired localpart in the topmost box of the "Register for an
-account" form, and click the "Register" button. Hostnames can contain ports if
-required due to lack of SRV records (e.g. @matthew:localhost:8448 on an
-internal synapse sandbox running on localhost).
-
-If registration fails, you may need to enable it in the homeserver (see
-`Synapse Installation`_ above)
-
-
-Logging In To An Existing Account
----------------------------------
-
-Just enter the ``@localpart:my.domain.here`` Matrix user ID and password into
-the form and click the Login button.
-
-Identity Servers
-================
-
-The job of authenticating 3PIDs and tracking which 3PIDs are associated with a
-given Matrix user is very security-sensitive, as there is obvious risk of spam
-if it is too easy to sign up for Matrix accounts or harvest 3PID data.
-Meanwhile the job of publishing the end-to-end encryption public keys for
-Matrix users is also very security-sensitive for similar reasons.
-
-Therefore the role of managing trusted identity in the Matrix ecosystem is
-farmed out to a cluster of known trusted ecosystem partners, who run 'Matrix
-Identity Servers' such as ``sydent``, whose role is purely to authenticate and
-track 3PID logins and publish end-user public keys.
-
-It's currently early days for identity servers as Matrix is not yet using 3PIDs
-as the primary means of identity and E2E encryption is not complete. As such,
-we are running a single identity server (https://matrix.org) at the current
-time.
-
-
-URL Previews
-============
-
-Synapse 0.15.0 introduces an experimental new API for previewing URLs at
-/_matrix/media/r0/preview_url.  This is disabled by default.  To turn it on
-you must enable the `url_preview_enabled: True` config parameter and explicitly
-specify the IP ranges that Synapse is not allowed to spider for previewing in
-the `url_preview_ip_range_blacklist` configuration parameter.  This is critical
-from a security perspective to stop arbitrary Matrix users spidering 'internal'
-URLs on your network.  At the very least we recommend that your loopback and
-RFC1918 IP addresses are blacklisted.
-
-This also requires the optional lxml and netaddr python dependencies to be
-installed.
-
-
-Password reset
-==============
-
-If a user has registered an email address to their account using an identity
-server, they can request a password-reset token via clients such as Vector.
-
-A manual password reset can be done via direct database access as follows.
-
-First calculate the hash of the new password:
-
-    $ source ~/.synapse/bin/activate
-    $ ./scripts/hash_password
-    Password:
-    Confirm password:
-    $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-Then update the `users` table in the database:
-
-    UPDATE users SET password_hash='$2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-        WHERE name='@test:test.com';
-
-Where's the spec?!
-==================
-
-The source of the matrix spec lives at https://github.com/matrix-org/matrix-doc.
-A recent HTML snapshot of this lives at http://matrix.org/docs/spec
-
-
 Building Internal API Documentation
 ===================================
 
@@ -633,7 +800,6 @@ sphinxcontrib-napoleon::
 Building internal API documentation::
 
     python setup.py build_sphinx
-
 
 
 Help!! Synapse eats all my RAM!
@@ -650,3 +816,6 @@ matrix.org on.  The default setting is currently 0.1, which is probably
 around a ~700MB footprint.  You can dial it down further to 0.02 if
 desired, which targets roughly ~512MB.  Conversely you can dial it up if
 you need performance for lots of users and have a box with a lot of RAM.
+
+
+.. _`key_management`: https://matrix.org/docs/spec/server_server/unstable.html#retrieving-server-keys
