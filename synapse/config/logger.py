@@ -50,6 +50,7 @@ handlers:
   console:
     class: logging.StreamHandler
     formatter: precise
+    filters: [context]
 
 loggers:
     synapse:
