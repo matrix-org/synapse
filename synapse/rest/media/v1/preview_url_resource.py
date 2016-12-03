@@ -543,5 +543,5 @@ def summarize_paragraphs(text_nodes, min_size=200, max_size=500):
 
         # We always add an ellipsis because at the very least
         # we chopped mid paragraph.
-        description = new_desc.strip() + "…"
+        description = new_desc.strip() + u"…"
     return description if description else None
