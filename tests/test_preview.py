@@ -79,7 +79,7 @@ class PreviewTestCase(unittest.TestCase):
             u" third largest north of the Arctic Circle (following Murmansk and Norilsk)."
             u" Most of Tromsø, including the city centre, is located on the island of"
             u" Tromsøya, 350 kilometres (217 mi) north of the Arctic Circle. In 2012,"
-            u" Tromsøya had a population of 36,088. Substantial parts of the…"
+            u" Tromsøya had a population of 36,088. Substantial parts of the urban…"
         )
 
     def test_short_summarize(self):
@@ -137,7 +137,7 @@ class PreviewTestCase(unittest.TestCase):
             u" (2015) 72,066, but with an annual influx of students it has over 75,000"
             u" most of the year. The city centre of Tromsø contains the highest number"
             u" of old wooden houses in Northern Norway, the oldest house dating from"
-            u" 1789. The Arctic Cathedral, a modern church…"
+            u" 1789. The Arctic Cathedral, a modern church from…"
         )
 
 
