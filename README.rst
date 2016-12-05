@@ -131,6 +131,10 @@ Installing prerequisites on openSUSE::
     sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
                    python-devel libffi-devel libopenssl-devel libjpeg62-devel
 
+Installing prerequisites on OpenBSD::
+    doas pkg_add python libffi py-pip py-setuptools sqlite3 py-virtualenv \
+                 libxslt
+
 To install the synapse homeserver run::
 
     virtualenv -p python2.7 ~/.synapse
@@ -363,6 +367,36 @@ Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Mo
 
  - Ports: ``cd /usr/ports/net/py-matrix-synapse && make install clean``
  - Packages: ``pkg install py27-matrix-synapse``
+
+
+OpenBSD
+-------
+
+There is currently no port for OpenBSD. Additionally, OpenBSD's security
+settings require a slightly more difficult installation process.
+
+1) Ensure that you have the Bourne Again Shell (``bash``) installed. The Korn
+   Shell (``ksh``), which is OpenBSD's default shell, does not support the
+   ``source`` command necessary to activate the python virtualenv to be set up
+   later.
+2) Create a new directory in ``/usr/local`` called ``_synapse``. Also, create a
+   new user called ``_synapse`` and set that directory as the new user's home.
+   This is required because, by default, OpenBSD only allows binaries which need
+   write and execute permissions on the same memory space to be run from
+   ``/usr/local``.
+3) ``su`` to the new ``_synapse`` user and change to their home directory.
+4) Create a new virtualenv: ``virtualenv -p python2.7 ~/.synapse``
+5) Start a ``bash`` shell
+6) Source the virtualenv configuration located at
+   ``/usr/local/_synapse/.synapse/bin/activate``
+7) Optionally, use ``pip`` to install ``lxml``, which Synapse needs to parse
+   webpages for their titles.
+8) Use ``pip`` to install this repository: ``pip install
+   https://github.com/matrix-org/synapse/tarball/master``
+9) Optionally, change ``_synapse``'s shell to ``/bin/false`` to reduce the
+   chance of a compromised Synapse server being used to take over your box.
+
+After this, you may proceed with the rest of the install directions.
 
 NixOS
 -----
