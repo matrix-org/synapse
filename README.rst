@@ -75,7 +75,7 @@ at the `Matrix spec <https://matrix.org/docs/spec>`_, and experiment with the
 
 Thanks for using Matrix!
 
-[1] End-to-end encryption is currently in beta: `blog post <https://matrix.org/blog/2016/11/21/matrixs-olm-end-to-end-encryption-security-assessment-released-and-implemented-cross-platform-on-riot-at-last>`.
+[1] End-to-end encryption is currently in beta: `blog post <https://matrix.org/blog/2016/11/21/matrixs-olm-end-to-end-encryption-security-assessment-released-and-implemented-cross-platform-on-riot-at-last>`_.
 
 
 Synapse Installation
