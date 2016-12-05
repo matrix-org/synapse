@@ -44,16 +44,19 @@ class RoomCreationHandler(BaseHandler):
             "join_rules": JoinRules.INVITE,
             "history_visibility": "shared",
             "original_invitees_have_ops": False,
+            "guest_can_join": True,
         },
         RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
             "join_rules": JoinRules.INVITE,
             "history_visibility": "shared",
             "original_invitees_have_ops": True,
+            "guest_can_join": True,
         },
         RoomCreationPreset.PUBLIC_CHAT: {
             "join_rules": JoinRules.PUBLIC,
             "history_visibility": "shared",
             "original_invitees_have_ops": False,
+            "guest_can_join": False,
         },
     }
 
@@ -335,6 +338,13 @@ class RoomCreationHandler(BaseHandler):
                 etype=EventTypes.RoomHistoryVisibility,
                 content={"history_visibility": config["history_visibility"]}
             )
+
+        if config["guest_can_join"]:
+            if (EventTypes.GuestAccess, '') not in initial_state:
+                yield send(
+                    etype=EventTypes.GuestAccess,
+                    content={"guest_access": "can_join"}
+                )
 
         for (etype, state_key), content in initial_state.items():
             yield send(
