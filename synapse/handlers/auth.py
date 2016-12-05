@@ -162,7 +162,15 @@ class AuthHandler(BaseHandler):
 
         for f in flows:
             if len(set(f) - set(creds.keys())) == 0:
-                logger.info("Auth completed with creds: %r", creds)
+                # it's very useful to know what args are stored, but this can
+                # include the password in the case of registering, so only log
+                # the keys (confusingly, clientdict may contain a password
+                # param, creds is just what the user authed as for UI auth
+                # and is not sensitive).
+                logger.info(
+                    "Auth completed with creds: %r. Client dict has keys: %r",
+                    creds, clientdict.keys()
+                )
                 defer.returnValue((True, creds, clientdict, session['id']))
 
         ret = self._auth_dict_for_flows(flows, session)
