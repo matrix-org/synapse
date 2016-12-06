@@ -677,31 +677,28 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def get_user_by_access_token(self, token, rights="access"):
-        """ Get a registered user's ID.
+        """ Validate access token and get user_id from it
 
         Args:
             token (str): The access token to get the user by.
+            rights (str): The operation being performed; the access token must
+                allow this.
         Returns:
             dict : dict that includes the user and the ID of their access token.
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
         try:
-            ret = yield self.get_user_from_macaroon(token, rights)
-        except AuthError:
-            # TODO(daniel): Remove this fallback when all existing access tokens
-            # have been re-issued as macaroons.
-            if self.hs.config.expire_access_token:
-                raise
-            ret = yield self._look_up_user_by_access_token(token)
+            macaroon = pymacaroons.Macaroon.deserialize(token)
+        except Exception: # deserialize can throw more-or-less anything
+            # doesn't look like a macaroon: treat it as an opaque token which
+            # must be in the database.
+            # TODO: it would be nice to get rid of this, but apparently some
+            # people use access tokens which aren't macaroons
+            r = yield self._look_up_user_by_access_token(token)
+            defer.returnValue(r)
 
-        defer.returnValue(ret)
-
-    @defer.inlineCallbacks
-    def get_user_from_macaroon(self, macaroon_str, rights="access"):
         try:
-            macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
-
             user_id = self.get_user_id_from_macaroon(macaroon)
             user = UserID.from_string(user_id)
 
@@ -716,6 +713,30 @@ class Auth(object):
                     guest = True
 
             if guest:
+                # Guest access tokens are not stored in the database (there can
+                # only be one access token per guest, anyway).
+                #
+                # In order to prevent guest access tokens being used as regular
+                # user access tokens (and hence getting around the invalidation
+                # process), we look up the user id and check that it is indeed
+                # a guest user.
+                #
+                # It would of course be much easier to store guest access
+                # tokens in the database as well, but that would break existing
+                # guest tokens.
+                stored_user = yield self.store.get_user_by_id(user_id)
+                if not stored_user:
+                    raise AuthError(
+                        self.TOKEN_NOT_FOUND_HTTP_STATUS,
+                        "Unknown user_id %s" % user_id,
+                        errcode=Codes.UNKNOWN_TOKEN
+                    )
+                if not stored_user["is_guest"]:
+                    raise AuthError(
+                        self.TOKEN_NOT_FOUND_HTTP_STATUS,
+                        "Guest access token used for regular user",
+                        errcode=Codes.UNKNOWN_TOKEN
+                    )
                 ret = {
                     "user": user,
                     "is_guest": True,
@@ -743,7 +764,7 @@ class Auth(object):
                 #     macaroon. They probably should be.
                 # TODO: build the dictionary from the macaroon once the
                 # above are fixed
-                ret = yield self._look_up_user_by_access_token(macaroon_str)
+                ret = yield self._look_up_user_by_access_token(token)
                 if ret["user"] != user:
                     logger.error(
                         "Macaroon user (%s) != DB user (%s)",
