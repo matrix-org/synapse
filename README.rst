@@ -375,10 +375,6 @@ OpenBSD
 There is currently no port for OpenBSD. Additionally, OpenBSD's security
 settings require a slightly more difficult installation process.
 
-1) Ensure that you have the Bourne Again Shell (``bash``) installed. The Korn
-   Shell (``ksh``), which is OpenBSD's default shell, does not support the
-   ``source`` command necessary to activate the python virtualenv to be set up
-   later.
 2) Create a new directory in ``/usr/local`` called ``_synapse``. Also, create a
    new user called ``_synapse`` and set that directory as the new user's home.
    This is required because, by default, OpenBSD only allows binaries which need
@@ -386,9 +382,9 @@ settings require a slightly more difficult installation process.
    ``/usr/local``.
 3) ``su`` to the new ``_synapse`` user and change to their home directory.
 4) Create a new virtualenv: ``virtualenv -p python2.7 ~/.synapse``
-5) Start a ``bash`` shell
 6) Source the virtualenv configuration located at
-   ``/usr/local/_synapse/.synapse/bin/activate``
+   ``/usr/local/_synapse/.synapse/bin/activate``. This is done in ``ksh`` by
+   using the ``.`` command, rather than ``bash``'s ``source``.
 7) Optionally, use ``pip`` to install ``lxml``, which Synapse needs to parse
    webpages for their titles.
 8) Use ``pip`` to install this repository: ``pip install
