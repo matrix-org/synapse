@@ -339,3 +339,15 @@ class DirectoryHandler(BaseHandler):
         yield self.auth.check_can_change_room_list(room_id, requester.user)
 
         yield self.store.set_room_is_public(room_id, visibility == "public")
+
+    @defer.inlineCallbacks
+    def edit_published_appservice_room_list(self, appservice_id, network_id,
+                                            room_id, visibility):
+        """Edit the appservice/network specific public room list.
+        """
+        if visibility not in ["public", "private"]:
+            raise SynapseError(400, "Invalid visibility setting")
+
+        yield self.store.set_room_is_public_appservice(
+            room_id, appservice_id, network_id, visibility == "public"
+        )

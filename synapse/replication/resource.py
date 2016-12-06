@@ -475,7 +475,7 @@ class ReplicationResource(Resource):
             )
             upto_token = _position_from_rows(public_rooms_rows, current_position)
             writer.write_header_and_rows("public_rooms", public_rooms_rows, (
-                "position", "room_id", "visibility"
+                "position", "room_id", "visibility", "appservice_id", "network_id",
             ), position=upto_token)
 
     def federation(self, writer, current_token, limit, request_streams, federation_ack):

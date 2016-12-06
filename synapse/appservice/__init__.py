@@ -89,6 +89,9 @@ class ApplicationService(object):
         self.namespaces = self._check_namespaces(namespaces)
         self.id = id
 
+        if "|" in self.id:
+            raise Exception("application service ID cannot contain '|' character")
+
         # .protocols is a publicly visible field
         if protocols:
             self.protocols = set(protocols)

@@ -655,12 +655,15 @@ class FederationClient(FederationBase):
         raise RuntimeError("Failed to send to any server.")
 
     def get_public_rooms(self, destination, limit=None, since_token=None,
-                         search_filter=None):
+                         search_filter=None, include_all_networks=False,
+                         third_party_instance_id=None):
         if destination == self.server_name:
             return
 
         return self.transport_layer.get_public_rooms(
-            destination, limit, since_token, search_filter
+            destination, limit, since_token, search_filter,
+            include_all_networks=include_all_networks,
+            third_party_instance_id=third_party_instance_id,
         )
 
     @defer.inlineCallbacks

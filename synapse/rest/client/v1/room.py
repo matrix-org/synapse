@@ -21,7 +21,7 @@ from synapse.api.errors import SynapseError, Codes, AuthError
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.filtering import Filter
-from synapse.types import UserID, RoomID, RoomAlias
+from synapse.types import UserID, RoomID, RoomAlias, ThirdPartyInstanceID
 from synapse.events.utils import serialize_event, format_event_for_client_v2
 from synapse.http.servlet import (
     parse_json_object_from_request, parse_string, parse_integer
@@ -321,6 +321,20 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
         since_token = content.get("since", None)
         search_filter = content.get("filter", None)
 
+        include_all_networks = content.get("include_all_networks", False)
+        third_party_instance_id = content.get("third_party_instance_id", None)
+
+        if include_all_networks:
+            network_tuple = None
+            if third_party_instance_id is not None:
+                raise SynapseError(
+                    400, "Can't use include_all_networks with an explicit network"
+                )
+        elif third_party_instance_id is None:
+            network_tuple = ThirdPartyInstanceID(None, None)
+        else:
+            network_tuple = ThirdPartyInstanceID.from_string(third_party_instance_id)
+
         handler = self.hs.get_room_list_handler()
         if server:
             data = yield handler.get_remote_public_room_list(
@@ -328,12 +342,15 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
                 limit=limit,
                 since_token=since_token,
                 search_filter=search_filter,
+                include_all_networks=include_all_networks,
+                third_party_instance_id=third_party_instance_id,
             )
         else:
             data = yield handler.get_local_public_room_list(
                 limit=limit,
                 since_token=since_token,
                 search_filter=search_filter,
+                network_tuple=network_tuple,
             )
 
         defer.returnValue((200, data))
