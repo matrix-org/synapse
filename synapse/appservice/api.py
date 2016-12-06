@@ -179,7 +179,6 @@ class ApplicationServiceApi(SimpleHttpClient):
                     defer.returnValue(None)
 
                 for instance in info.get("instances", []):
-                    instance["appservice_id"] = service.id
                     network_id = instance.get("network_id", None)
                     if network_id is not None:
                         instance["network_id"] = ThirdPartyInstanceID(
