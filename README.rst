@@ -375,21 +375,21 @@ OpenBSD
 There is currently no port for OpenBSD. Additionally, OpenBSD's security
 settings require a slightly more difficult installation process.
 
-2) Create a new directory in ``/usr/local`` called ``_synapse``. Also, create a
+1) Create a new directory in ``/usr/local`` called ``_synapse``. Also, create a
    new user called ``_synapse`` and set that directory as the new user's home.
    This is required because, by default, OpenBSD only allows binaries which need
    write and execute permissions on the same memory space to be run from
    ``/usr/local``.
-3) ``su`` to the new ``_synapse`` user and change to their home directory.
-4) Create a new virtualenv: ``virtualenv -p python2.7 ~/.synapse``
-6) Source the virtualenv configuration located at
+2) ``su`` to the new ``_synapse`` user and change to their home directory.
+3) Create a new virtualenv: ``virtualenv -p python2.7 ~/.synapse``
+4) Source the virtualenv configuration located at
    ``/usr/local/_synapse/.synapse/bin/activate``. This is done in ``ksh`` by
    using the ``.`` command, rather than ``bash``'s ``source``.
-7) Optionally, use ``pip`` to install ``lxml``, which Synapse needs to parse
+5) Optionally, use ``pip`` to install ``lxml``, which Synapse needs to parse
    webpages for their titles.
-8) Use ``pip`` to install this repository: ``pip install
+6) Use ``pip`` to install this repository: ``pip install
    https://github.com/matrix-org/synapse/tarball/master``
-9) Optionally, change ``_synapse``'s shell to ``/bin/false`` to reduce the
+7) Optionally, change ``_synapse``'s shell to ``/bin/false`` to reduce the
    chance of a compromised Synapse server being used to take over your box.
 
 After this, you may proceed with the rest of the install directions.
