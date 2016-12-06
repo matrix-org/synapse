@@ -2,6 +2,9 @@ sudo: false
 language: python
 python: 2.7
 
+# tell travis to cache ~/.cache/pip
+cache: pip
+
 env:
   - TOX_ENV=packaging
   - TOX_ENV=pep8
