@@ -690,7 +690,7 @@ class Auth(object):
         """
         try:
             macaroon = pymacaroons.Macaroon.deserialize(token)
-        except Exception: # deserialize can throw more-or-less anything
+        except Exception:  # deserialize can throw more-or-less anything
             # doesn't look like a macaroon: treat it as an opaque token which
             # must be in the database.
             # TODO: it would be nice to get rid of this, but apparently some
