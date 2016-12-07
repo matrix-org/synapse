@@ -63,7 +63,8 @@ class RoomListHandler(BaseHandler):
                 Setting to None returns all public rooms across all lists.
         """
         if search_filter or network_tuple is not (None, None):
-            # We explicitly don't bother caching searches.
+            # We explicitly don't bother caching searches or requests for
+            # appservice specific lists.
             return self._get_public_room_list(
                 limit, since_token, search_filter, network_tuple=network_tuple,
             )

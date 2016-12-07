@@ -343,7 +343,14 @@ class DirectoryHandler(BaseHandler):
     @defer.inlineCallbacks
     def edit_published_appservice_room_list(self, appservice_id, network_id,
                                             room_id, visibility):
-        """Edit the appservice/network specific public room list.
+        """Add or remove a room from the appservice/network specific public
+        room list.
+
+        Args:
+            appservice_id (str): ID of the appservice that owns the list
+            network_id (str): The ID of the network the list is associated with
+            room_id (str)
+            visibility (str): either "public" or "private"
         """
         if visibility not in ["public", "private"]:
             raise SynapseError(400, "Invalid visibility setting")
