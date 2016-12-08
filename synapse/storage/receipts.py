@@ -405,7 +405,7 @@ class ReceiptsStore(SQLBaseStore):
             room_id, receipt_type, user_id, event_ids, data
         )
 
-        max_persisted_id = self._stream_id_gen.get_current_token()
+        max_persisted_id = self._receipts_id_gen.get_current_token()
 
         defer.returnValue((stream_id, max_persisted_id))
 
