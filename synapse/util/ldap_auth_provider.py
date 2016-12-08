@@ -237,13 +237,14 @@ class LdapAuthProvider(object):
                 base=self.ldap_base
             )
             conn = ldap3.Connection(server, bind_dn, password,
-                                    authentication=ldap3.AUTH_SIMPLE)
+                                    authentication=ldap3.SIMPLE)
             logger.debug(
                 "Established LDAP connection in simple bind mode: %s",
                 conn
             )
 
             if self.ldap_start_tls:
+                conn.bind()
                 conn.start_tls()
                 logger.debug(
                     "Upgraded LDAP connection in simple bind mode through StartTLS: %s",
@@ -295,6 +296,7 @@ class LdapAuthProvider(object):
             )
 
             if self.ldap_start_tls:
+                conn.bind()
                 conn.start_tls()
                 logger.debug(
                     "Upgraded LDAP connection in search mode through StartTLS: %s",
