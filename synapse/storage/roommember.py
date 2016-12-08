@@ -409,7 +409,7 @@ class RoomMemberStore(SQLBaseStore):
             table="room_memberships",
             column="event_id",
             iterable=member_event_ids,
-            retcols=['user_id'],
+            retcols=['user_id', 'display_name', 'avatar_url'],
             keyvalues={
                 "membership": Membership.JOIN,
             },
@@ -417,11 +417,21 @@ class RoomMemberStore(SQLBaseStore):
             desc="_get_joined_users_from_context",
         )
 
-        users_in_room = set(row["user_id"] for row in rows)
+        users_in_room = {
+            row["user_id"]: {
+                "display_name": row["display_name"],
+                "avatar_url": row["avatar_url"],
+            }
+            for row in rows
+        }
+
         if event is not None and event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
                 if event.event_id in member_event_ids:
-                    users_in_room.add(event.state_key)
+                    users_in_room[event.state_key] = {
+                        "display_name": event.content.get("displayname", None),
+                        "avatar_url": event.content.get("avatar_url", None),
+                    }
 
         defer.returnValue(users_in_room)
 
