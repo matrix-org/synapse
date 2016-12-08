@@ -100,7 +100,7 @@ class ReceiptsHandler(BaseHandler):
 
             if not res:
                 # res will be None if this read receipt is 'old'
-                defer.returnValue(False)
+                continue
 
             stream_id, max_persisted_id = res
 
@@ -108,6 +108,10 @@ class ReceiptsHandler(BaseHandler):
                 min_batch_id = stream_id
             if max_batch_id is None or max_persisted_id > max_batch_id:
                 max_batch_id = max_persisted_id
+
+        if min_batch_id is None:
+            # no new receipts
+            defer.returnValue(False)
 
         affected_room_ids = list(set([r["room_id"] for r in receipts]))
 
