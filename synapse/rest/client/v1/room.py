@@ -369,6 +369,24 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
         }))
 
 
+class JoinedRoomMemberListRestServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/joined_members$")
+
+    def __init__(self, hs):
+        super(JoinedRoomMemberListRestServlet, self).__init__(hs)
+        self.state = hs.get_state_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id):
+        yield self.auth.get_user_by_req(request)
+
+        users_with_profile = yield self.state.get_current_user_in_room(room_id)
+
+        defer.returnValue((200, {
+            "joined": users_with_profile
+        }))
+
+
 # TODO: Needs better unit testing
 class RoomMessageListRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/messages$")
@@ -692,6 +710,22 @@ class SearchRestServlet(ClientV1RestServlet):
         defer.returnValue((200, results))
 
 
+class JoinedRoomsRestServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/joined_rooms$")
+
+    def __init__(self, hs):
+        super(JoinedRoomsRestServlet, self).__init__(hs)
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+
+        rooms = yield self.store.get_rooms_for_user(requester.user.to_string())
+        room_ids = set(r.room_id for r in rooms)  # Ensure they're unique.
+        defer.returnValue((200, {"joined_rooms": list(room_ids)}))
+
+
 def register_txn_path(servlet, regex_string, http_server, with_get=False):
     """Registers a transaction-based path.
 
@@ -727,6 +761,7 @@ def register_servlets(hs, http_server):
     RoomStateEventRestServlet(hs).register(http_server)
     RoomCreateRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
+    JoinedRoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
     RoomForgetRestServlet(hs).register(http_server)
@@ -738,4 +773,5 @@ def register_servlets(hs, http_server):
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     SearchRestServlet(hs).register(http_server)
+    JoinedRoomsRestServlet(hs).register(http_server)
     RoomEventContext(hs).register(http_server)

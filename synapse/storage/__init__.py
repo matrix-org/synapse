@@ -222,6 +222,7 @@ class DataStore(RoomMemberStore, RoomStore,
         )
 
         self._stream_order_on_start = self.get_room_max_stream_ordering()
+        self._min_stream_order_on_start = self.get_room_min_stream_ordering()
 
         super(DataStore, self).__init__(hs)
 
