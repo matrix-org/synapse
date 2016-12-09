@@ -510,6 +510,7 @@ class SyncHandler(object):
         Returns:
             Deferred(SyncResult)
         """
+        logger.info("Calculating sync response for %r", sync_config.user)
 
         # NB: The now_token gets changed by some of the generate_sync_* methods,
         # this is due to some of the underlying streams not supporting the ability

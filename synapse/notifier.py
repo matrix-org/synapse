@@ -294,14 +294,7 @@ class Notifier(object):
 
         result = None
         if timeout:
-            # Will be set to a _NotificationListener that we'll be waiting on.
-            # Allows us to cancel it.
-            listener = None
-
-            def timed_out():
-                if listener:
-                    listener.deferred.cancel()
-            timer = self.clock.call_later(timeout / 1000., timed_out)
+            end_time = self.clock.time_msec() + timeout
 
             prev_token = from_token
             while not result:
@@ -312,6 +305,10 @@ class Notifier(object):
                     if result:
                         break
 
+                    now = self.clock.time_msec()
+                    if end_time <= now:
+                        break
+
                     # Now we wait for the _NotifierUserStream to be told there
                     # is a new token.
                     # We need to supply the token we supplied to callback so
@@ -319,11 +316,12 @@ class Notifier(object):
                     prev_token = current_token
                     listener = user_stream.new_listener(prev_token)
                     with PreserveLoggingContext():
-                        yield listener.deferred
+                        yield self.clock.time_bound_deferred(
+                            listener.deferred,
+                            time_out=(end_time - now) / 1000.
+                        )
                 except defer.CancelledError:
                     break
-
-            self.clock.cancel_call_later(timer, ignore_errs=True)
         else:
             current_token = user_stream.current_token
             result = yield callback(from_token, current_token)
