@@ -17,6 +17,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError
 
+from synapse.util import DeferredTimedOutError
 from synapse.util.logutils import log_function
 from synapse.util.async import ObservableDeferred
 from synapse.util.logcontext import PreserveLoggingContext, preserve_fn
@@ -320,6 +321,8 @@ class Notifier(object):
                             listener.deferred,
                             time_out=(end_time - now) / 1000.
                         )
+                except DeferredTimedOutError:
+                    break
                 except defer.CancelledError:
                     break
         else:
@@ -490,22 +493,27 @@ class Notifier(object):
         """
         listener = _NotificationListener(None)
 
-        def timed_out():
-            listener.deferred.cancel()
+        end_time = self.clock.time_msec() + timeout
 
-        timer = self.clock.call_later(timeout / 1000., timed_out)
         while True:
             listener.deferred = self.replication_deferred.observe()
             result = yield callback()
             if result:
                 break
 
-            try:
-                with PreserveLoggingContext():
-                    yield listener.deferred
-            except defer.CancelledError:
+            now = self.clock.time_msec()
+            if end_time <= now:
                 break
 
-        self.clock.cancel_call_later(timer, ignore_errs=True)
+            try:
+                with PreserveLoggingContext():
+                    yield self.clock.time_bound_deferred(
+                        listener.deferred,
+                        time_out=(end_time - now) / 1000.
+                    )
+            except DeferredTimedOutError:
+                break
+            except defer.CancelledError:
+                break
 
         defer.returnValue(result)
