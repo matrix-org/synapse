@@ -16,6 +16,7 @@
 import ujson as json
 import logging
 
+import twisted.internet.error
 from canonicaljson import encode_canonical_json
 from twisted.internet import defer
 
@@ -110,6 +111,11 @@ class E2eKeysHandler(object):
             except NotRetryingDestination as e:
                 failures[destination] = {
                     "status": 503, "message": "Not ready for retry",
+                }
+            except Exception as e:
+                # include ConnectionRefused and other errors
+                failures[destination] = {
+                    "status": 503, "message": e.message
                 }
 
         yield preserve_context_over_deferred(defer.gatherResults([
@@ -221,6 +227,11 @@ class E2eKeysHandler(object):
             except NotRetryingDestination as e:
                 failures[destination] = {
                     "status": 503, "message": "Not ready for retry",
+                }
+            except Exception as e:
+                # include ConnectionRefused and other errors
+                failures[destination] = {
+                    "status": 503, "message": e.message
                 }
 
         yield preserve_context_over_deferred(defer.gatherResults([
