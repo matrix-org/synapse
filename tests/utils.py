@@ -294,6 +294,10 @@ class MockClock(object):
     def advance_time_msec(self, ms):
         self.advance_time(ms / 1000.)
 
+    def time_bound_deferred(self, d, *args, **kwargs):
+        # We don't bother timing things out for now.
+        return d
+
 
 class SQLiteMemoryDbPool(ConnectionPool, object):
     def __init__(self):
