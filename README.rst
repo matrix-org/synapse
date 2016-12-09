@@ -788,7 +788,7 @@ dependencies into a virtual env.
 Once this is done, you may wish to run Synapse's unit tests, to
 check that everything is installed as it should be::
 
-    PYTHONPATH="" trial tests
+    PYTHONPATH="." trial tests
 
 This should end with a 'PASSED' result::
 
