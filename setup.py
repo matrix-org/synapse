@@ -16,8 +16,11 @@
 
 import glob
 import os
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Command
 import sys
+
+
+here = os.path.abspath(os.path.dirname(__file__))
 
 
 # Some notes on `setup.py test`:
@@ -45,10 +48,19 @@ import sys
 #
 # [1]: http://tox.readthedocs.io/en/2.5.0/example/basic.html#integration-with-setup-py-test-command
 # [2]: https://pypi.python.org/pypi/setuptools_trial
+class TestCommand(Command):
+    user_options = []
 
+    def initialize_options(self):
+        pass
 
-here = os.path.abspath(os.path.dirname(__file__))
+    def finalize_options(self):
+        pass
 
+    def run(self):
+        print ("""Synapse's tests cannot be run via setup.py. To run them, try:
+     PYTHONPATH="." trial tests
+""")
 
 def read_file(path_segments):
     """Read a file from the package. Takes a list of strings to join to
@@ -81,4 +93,5 @@ setup(
     zip_safe=False,
     long_description=long_description,
     scripts=["synctl"] + glob.glob("scripts/*"),
+    cmdclass={'test': TestCommand},
 )
