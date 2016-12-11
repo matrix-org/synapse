@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet.endpoints import SSL4ClientEndpoint, TCP4ClientEndpoint
+from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
 from twisted.internet import defer
 from twisted.internet.error import ConnectError
 from twisted.names import client, dns
@@ -58,11 +58,11 @@ def matrix_federation_endpoint(reactor, destination, ssl_context_factory=None,
         endpoint_kw_args.update(timeout=timeout)
 
     if ssl_context_factory is None:
-        transport_endpoint = TCP4ClientEndpoint
+        transport_endpoint = HostnameEndpoint
         default_port = 8008
     else:
-        transport_endpoint = SSL4ClientEndpoint
-        endpoint_kw_args.update(sslContextFactory=ssl_context_factory)
+        def transport_endpoint(reactor, host, port):
+            return wrapClientTLS(ssl_context_factory, HostnameEndpoint(reactor, host, port))
         default_port = 8448
 
     if port is None:
