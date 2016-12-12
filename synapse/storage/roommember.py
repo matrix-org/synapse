@@ -534,7 +534,7 @@ class RoomMemberStore(SQLBaseStore):
                 txn, _MEMBERSHIP_PROFILE_UPDATE_NAME, progress
             )
 
-            return len(to_update)
+            return len(rows)
 
         result = yield self.runInteraction(
             _MEMBERSHIP_PROFILE_UPDATE_NAME, add_membership_profile_txn
