@@ -88,7 +88,12 @@ System requirements:
 - Python 2.7
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
-Synapse is written in python but some of the libraries is uses are written in
+Installing from source
+----------------------
+(Prebuilt packages are available for some platforms - see `Platform-Specific
+Instructions`_.)
+
+Synapse is written in python but some of the libraries it uses are written in
 C. So before we can install synapse itself we need a working C compiler and the
 header files for python C extensions.
 
@@ -302,7 +307,7 @@ See https://github.com/vector-im/vector-web/issues/1977 and
 https://developer.github.com/changes/2014-04-25-user-content-security for more details.
 
 
-Platform Specific Instructions
+Platform-Specific Instructions
 ==============================
 
 Debian
@@ -759,6 +764,10 @@ Then update the `users` table in the database::
 Synapse Development
 ===================
 
+Before setting up a development environment for synapse, make sure you have the
+system dependencies (such as the python header files) installed - see
+`Installing from source`_.
+
 To check out a synapse for development, clone the git repo into a working
 directory of your choice::
 
@@ -770,8 +779,8 @@ to install using pip and a virtualenv::
 
     virtualenv env
     source env/bin/activate
-    python synapse/python_dependencies.py | xargs -n1 pip install
-    pip install setuptools_trial mock
+    python synapse/python_dependencies.py | xargs pip install
+    pip install lxml mock
 
 This will run a process of downloading and installing all the needed
 dependencies into a virtual env.
@@ -779,7 +788,7 @@ dependencies into a virtual env.
 Once this is done, you may wish to run Synapse's unit tests, to
 check that everything is installed as it should be::
 
-    python setup.py test
+    PYTHONPATH="." trial tests
 
 This should end with a 'PASSED' result::
 
