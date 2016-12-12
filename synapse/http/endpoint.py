@@ -61,8 +61,10 @@ def matrix_federation_endpoint(reactor, destination, ssl_context_factory=None,
         transport_endpoint = HostnameEndpoint
         default_port = 8008
     else:
-        def transport_endpoint(reactor, host, port):
-            return wrapClientTLS(ssl_context_factory, HostnameEndpoint(reactor, host, port))
+        def transport_endpoint(reactor, host, port, timeout):
+            return wrapClientTLS(
+                ssl_context_factory,
+                HostnameEndpoint(reactor, host, port, timeout=timeout))
         default_port = 8448
 
     if port is None:
@@ -80,7 +82,7 @@ class SpiderEndpoint(object):
     Implements twisted.internet.interfaces.IStreamClientEndpoint.
     """
     def __init__(self, reactor, host, port, blacklist, whitelist,
-                 endpoint=TCP4ClientEndpoint, endpoint_kw_args={}):
+                 endpoint=HostnameEndpoint, endpoint_kw_args={}):
         self.reactor = reactor
         self.host = host
         self.port = port
@@ -118,7 +120,7 @@ class SRVClientEndpoint(object):
     """
 
     def __init__(self, reactor, service, domain, protocol="tcp",
-                 default_port=None, endpoint=TCP4ClientEndpoint,
+                 default_port=None, endpoint=HostnameEndpoint,
                  endpoint_kw_args={}):
         self.reactor = reactor
         self.service_name = "_%s._%s.%s" % (service, protocol, domain)
