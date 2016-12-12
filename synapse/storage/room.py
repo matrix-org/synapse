@@ -16,6 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+from synapse.util.caches.descriptors import cached
 
 from ._base import SQLBaseStore
 from .engines import PostgresEngine, Sqlite3Engine
@@ -346,6 +347,7 @@ class RoomStore(SQLBaseStore):
     def get_current_public_room_stream_id(self):
         return self._public_room_id_gen.get_current_token()
 
+    @cached(num_args=2, max_entries=100)
     def get_public_room_ids_at_stream_id(self, stream_id, network_tuple):
         """Get pulbic rooms for a particular list, or across all lists.
 
