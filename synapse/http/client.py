@@ -405,7 +405,6 @@ class SpiderEndpointFactory(object):
         )
 
 
-
 class SpiderHttpClient(SimpleHttpClient):
     """
     Separate HTTP client for spidering arbitrary URLs.
