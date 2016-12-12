@@ -94,10 +94,6 @@ class KeyUploadServlet(RestServlet):
 
 class KeyQueryServlet(RestServlet):
     """
-    GET /keys/query/<user_id> HTTP/1.1
-
-    GET /keys/query/<user_id>/<device_id> HTTP/1.1
-
     POST /keys/query HTTP/1.1
     Content-Type: application/json
     {
@@ -131,11 +127,7 @@ class KeyQueryServlet(RestServlet):
     """
 
     PATTERNS = client_v2_patterns(
-        "/keys/query(?:"
-        "/(?P<user_id>[^/]*)(?:"
-        "/(?P<device_id>[^/]*)"
-        ")?"
-        ")?",
+        "/keys/query$",
         releases=()
     )
 
@@ -149,31 +141,16 @@ class KeyQueryServlet(RestServlet):
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
     @defer.inlineCallbacks
-    def on_POST(self, request, user_id, device_id):
+    def on_POST(self, request):
         yield self.auth.get_user_by_req(request, allow_guest=True)
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
         result = yield self.e2e_keys_handler.query_devices(body, timeout)
         defer.returnValue((200, result))
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id, device_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
-        timeout = parse_integer(request, "timeout", 10 * 1000)
-        auth_user_id = requester.user.to_string()
-        user_id = user_id if user_id else auth_user_id
-        device_ids = [device_id] if device_id else []
-        result = yield self.e2e_keys_handler.query_devices(
-            {"device_keys": {user_id: device_ids}},
-            timeout,
-        )
-        defer.returnValue((200, result))
-
 
 class OneTimeKeyServlet(RestServlet):
     """
-    GET /keys/claim/<user-id>/<device-id>/<algorithm> HTTP/1.1
-
     POST /keys/claim HTTP/1.1
     {
       "one_time_keys": {
@@ -191,9 +168,7 @@ class OneTimeKeyServlet(RestServlet):
 
     """
     PATTERNS = client_v2_patterns(
-        "/keys/claim(?:/?|(?:/"
-        "(?P<user_id>[^/]*)/(?P<device_id>[^/]*)/(?P<algorithm>[^/]*)"
-        ")?)",
+        "/keys/claim$",
         releases=()
     )
 
@@ -203,17 +178,7 @@ class OneTimeKeyServlet(RestServlet):
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
     @defer.inlineCallbacks
-    def on_GET(self, request, user_id, device_id, algorithm):
-        yield self.auth.get_user_by_req(request, allow_guest=True)
-        timeout = parse_integer(request, "timeout", 10 * 1000)
-        result = yield self.e2e_keys_handler.claim_one_time_keys(
-            {"one_time_keys": {user_id: {device_id: algorithm}}},
-            timeout,
-        )
-        defer.returnValue((200, result))
-
-    @defer.inlineCallbacks
-    def on_POST(self, request, user_id, device_id, algorithm):
+    def on_POST(self, request):
         yield self.auth.get_user_by_req(request, allow_guest=True)
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
