@@ -16,7 +16,6 @@
 import ujson as json
 import logging
 
-import twisted.internet.error
 from canonicaljson import encode_canonical_json
 from twisted.internet import defer
 
