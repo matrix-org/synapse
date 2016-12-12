@@ -143,6 +143,18 @@ class RoomStore(SQLBaseStore):
     def set_room_is_public_appservice(self, room_id, appservice_id, network_id,
                                       is_public):
         """Edit the appservice/network specific public room list.
+
+        Each appservice can have a number of published room lists associated
+        with them, keyed off of an appservice defined `network_id`, which
+        basically represents a single instance of a bridge to a third party
+        network.
+
+        Args:
+            room_id (str)
+            appservice_id (str)
+            network_id (str)
+            is_public (bool): Whether to publish or unpublish the room from the
+                list.
         """
         def set_room_is_public_appservice_txn(txn, next_id):
             if is_public:
