@@ -111,6 +111,11 @@ class E2eKeysHandler(object):
                 failures[destination] = {
                     "status": 503, "message": "Not ready for retry",
                 }
+            except Exception as e:
+                # include ConnectionRefused and other errors
+                failures[destination] = {
+                    "status": 503, "message": e.message
+                }
 
         yield preserve_context_over_deferred(defer.gatherResults([
             preserve_fn(do_remote_query)(destination)
@@ -221,6 +226,11 @@ class E2eKeysHandler(object):
             except NotRetryingDestination as e:
                 failures[destination] = {
                     "status": 503, "message": "Not ready for retry",
+                }
+            except Exception as e:
+                # include ConnectionRefused and other errors
+                failures[destination] = {
+                    "status": 503, "message": e.message
                 }
 
         yield preserve_context_over_deferred(defer.gatherResults([
