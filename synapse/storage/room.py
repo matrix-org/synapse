@@ -138,6 +138,7 @@ class RoomStore(SQLBaseStore):
                 "set_room_is_public",
                 set_room_is_public_txn, next_id,
             )
+        self.hs.get_notifier().on_new_replication_data()
 
     @defer.inlineCallbacks
     def set_room_is_public_appservice(self, room_id, appservice_id, network_id,
@@ -164,7 +165,7 @@ class RoomStore(SQLBaseStore):
                         table="appservice_room_list",
                         values={
                             "appservice_id": appservice_id,
-                            "network_id": "network_id",
+                            "network_id": network_id,
                             "room_id": room_id
                         },
                     )
@@ -217,6 +218,7 @@ class RoomStore(SQLBaseStore):
                 "set_room_is_public_appservice",
                 set_room_is_public_appservice_txn, next_id,
             )
+        self.hs.get_notifier().on_new_replication_data()
 
     def get_public_room_ids(self):
         return self._simple_select_onecol(
