@@ -20,9 +20,11 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import JsonResource
 from synapse.http.servlet import (
     parse_json_object_from_request, parse_integer_from_args, parse_string_from_args,
+    parse_boolean_from_args,
 )
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.versionstring import get_version_string
+from synapse.types import ThirdPartyInstanceID
 
 import functools
 import logging
@@ -558,8 +560,23 @@ class PublicRoomList(BaseFederationServlet):
     def on_GET(self, origin, content, query):
         limit = parse_integer_from_args(query, "limit", 0)
         since_token = parse_string_from_args(query, "since", None)
+        include_all_networks = parse_boolean_from_args(
+            query, "include_all_networks", False
+        )
+        third_party_instance_id = parse_string_from_args(
+            query, "third_party_instance_id", None
+        )
+
+        if include_all_networks:
+            network_tuple = None
+        elif third_party_instance_id:
+            network_tuple = ThirdPartyInstanceID.from_string(third_party_instance_id)
+        else:
+            network_tuple = ThirdPartyInstanceID(None, None)
+
         data = yield self.room_list_handler.get_local_public_room_list(
-            limit, since_token
+            limit, since_token,
+            network_tuple=network_tuple
         )
         defer.returnValue((200, data))
 

@@ -22,6 +22,7 @@ from synapse.api.constants import (
 )
 from synapse.util.async import concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
+from synapse.types import ThirdPartyInstanceID
 
 from collections import namedtuple
 from unpaddedbase64 import encode_base64, decode_base64
@@ -34,6 +35,10 @@ logger = logging.getLogger(__name__)
 REMOTE_ROOM_LIST_POLL_INTERVAL = 60 * 1000
 
 
+# This is used to indicate we should only return rooms published to the main list.
+EMTPY_THIRD_PARTY_ID = ThirdPartyInstanceID(None, None)
+
+
 class RoomListHandler(BaseHandler):
     def __init__(self, hs):
         super(RoomListHandler, self).__init__(hs)
@@ -41,10 +46,28 @@ class RoomListHandler(BaseHandler):
         self.remote_response_cache = ResponseCache(hs, timeout_ms=30 * 1000)
 
     def get_local_public_room_list(self, limit=None, since_token=None,
-                                   search_filter=None):
-        if search_filter:
-            # We explicitly don't bother caching searches.
-            return self._get_public_room_list(limit, since_token, search_filter)
+                                   search_filter=None,
+                                   network_tuple=EMTPY_THIRD_PARTY_ID,):
+        """Generate a local public room list.
+
+        There are multiple different lists: the main one plus one per third
+        party network. A client can ask for a specific list or to return all.
+
+        Args:
+            limit (int)
+            since_token (str)
+            search_filter (dict)
+            network_tuple (ThirdPartyInstanceID): Which public list to use.
+                This can be (None, None) to indicate the main list, or a particular
+                appservice and network id to use an appservice specific one.
+                Setting to None returns all public rooms across all lists.
+        """
+        if search_filter or network_tuple is not (None, None):
+            # We explicitly don't bother caching searches or requests for
+            # appservice specific lists.
+            return self._get_public_room_list(
+                limit, since_token, search_filter, network_tuple=network_tuple,
+            )
 
         result = self.response_cache.get((limit, since_token))
         if not result:
@@ -56,7 +79,8 @@ class RoomListHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _get_public_room_list(self, limit=None, since_token=None,
-                              search_filter=None):
+                              search_filter=None,
+                              network_tuple=EMTPY_THIRD_PARTY_ID,):
         if since_token and since_token != "END":
             since_token = RoomListNextBatch.from_token(since_token)
         else:
@@ -73,14 +97,15 @@ class RoomListHandler(BaseHandler):
             current_public_id = yield self.store.get_current_public_room_stream_id()
             public_room_stream_id = since_token.public_room_stream_id
             newly_visible, newly_unpublished = yield self.store.get_public_room_changes(
-                public_room_stream_id, current_public_id
+                public_room_stream_id, current_public_id,
+                network_tuple=network_tuple,
             )
         else:
             stream_token = yield self.store.get_room_max_stream_ordering()
             public_room_stream_id = yield self.store.get_current_public_room_stream_id()
 
         room_ids = yield self.store.get_public_room_ids_at_stream_id(
-            public_room_stream_id
+            public_room_stream_id, network_tuple=network_tuple,
         )
 
         # We want to return rooms in a particular order: the number of joined
@@ -311,7 +336,8 @@ class RoomListHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_remote_public_room_list(self, server_name, limit=None, since_token=None,
-                                    search_filter=None):
+                                    search_filter=None, include_all_networks=False,
+                                    third_party_instance_id=None,):
         if search_filter:
             # We currently don't support searching across federation, so we have
             # to do it manually without pagination
@@ -320,6 +346,8 @@ class RoomListHandler(BaseHandler):
 
         res = yield self._get_remote_list_cached(
             server_name, limit=limit, since_token=since_token,
+            include_all_networks=include_all_networks,
+            third_party_instance_id=third_party_instance_id,
         )
 
         if search_filter:
@@ -332,22 +360,30 @@ class RoomListHandler(BaseHandler):
         defer.returnValue(res)
 
     def _get_remote_list_cached(self, server_name, limit=None, since_token=None,
-                                search_filter=None):
+                                search_filter=None, include_all_networks=False,
+                                third_party_instance_id=None,):
         repl_layer = self.hs.get_replication_layer()
         if search_filter:
             # We can't cache when asking for search
             return repl_layer.get_public_rooms(
                 server_name, limit=limit, since_token=since_token,
-                search_filter=search_filter,
+                search_filter=search_filter, include_all_networks=include_all_networks,
+                third_party_instance_id=third_party_instance_id,
             )
 
-        result = self.remote_response_cache.get((server_name, limit, since_token))
+        key = (
+            server_name, limit, since_token, include_all_networks,
+            third_party_instance_id,
+        )
+        result = self.remote_response_cache.get(key)
         if not result:
             result = self.remote_response_cache.set(
-                (server_name, limit, since_token),
+                key,
                 repl_layer.get_public_rooms(
                     server_name, limit=limit, since_token=since_token,
                     search_filter=search_filter,
+                    include_all_networks=include_all_networks,
+                    third_party_instance_id=third_party_instance_id,
                 )
             )
         return result

@@ -19,6 +19,7 @@ from synapse.api.errors import CodeMessageException
 from synapse.http.client import SimpleHttpClient
 from synapse.events.utils import serialize_event
 from synapse.util.caches.response_cache import ResponseCache
+from synapse.types import ThirdPartyInstanceID
 
 import logging
 import urllib
@@ -176,6 +177,13 @@ class ApplicationServiceApi(SimpleHttpClient):
                     logger.warning("query_3pe_protocol to %s did not return a"
                                    " valid result", uri)
                     defer.returnValue(None)
+
+                for instance in info.get("instances", []):
+                    network_id = instance.get("network_id", None)
+                    if network_id is not None:
+                        instance["instance_id"] = ThirdPartyInstanceID(
+                            service.id, network_id,
+                        ).to_string()
 
                 defer.returnValue(info)
             except Exception as ex:

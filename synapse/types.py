@@ -274,3 +274,37 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
             return "t%d-%d" % (self.topological, self.stream)
         else:
             return "s%d" % (self.stream,)
+
+
+class ThirdPartyInstanceID(
+        namedtuple("ThirdPartyInstanceID", ("appservice_id", "network_id"))
+):
+    # Deny iteration because it will bite you if you try to create a singleton
+    # set by:
+    #    users = set(user)
+    def __iter__(self):
+        raise ValueError("Attempted to iterate a %s" % (type(self).__name__,))
+
+    # Because this class is a namedtuple of strings, it is deeply immutable.
+    def __copy__(self):
+        return self
+
+    def __deepcopy__(self, memo):
+        return self
+
+    @classmethod
+    def from_string(cls, s):
+        bits = s.split("|", 2)
+        if len(bits) != 2:
+            raise SynapseError(400, "Invalid ID %r" % (s,))
+
+        return cls(appservice_id=bits[0], network_id=bits[1])
+
+    def to_string(self):
+        return "%s|%s" % (self.appservice_id, self.network_id,)
+
+    __str__ = to_string
+
+    @classmethod
+    def create(cls, appservice_id, network_id,):
+        return cls(appservice_id=appservice_id, network_id=network_id)

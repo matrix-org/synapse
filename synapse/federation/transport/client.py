@@ -249,10 +249,15 @@ class TransportLayerClient(object):
     @defer.inlineCallbacks
     @log_function
     def get_public_rooms(self, remote_server, limit, since_token,
-                         search_filter=None):
+                         search_filter=None, include_all_networks=False,
+                         third_party_instance_id=None):
         path = PREFIX + "/publicRooms"
 
-        args = {}
+        args = {
+            "include_all_networks": "true" if include_all_networks else "false",
+        }
+        if third_party_instance_id:
+            args["third_party_instance_id"] = third_party_instance_id,
         if limit:
             args["limit"] = [str(limit)]
         if since_token:

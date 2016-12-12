@@ -78,12 +78,16 @@ def parse_boolean(request, name, default=None, required=False):
             parameter is present and not one of "true" or "false".
     """
 
-    if name in request.args:
+    return parse_boolean_from_args(request.args, name, default, required)
+
+
+def parse_boolean_from_args(args, name, default=None, required=False):
+    if name in args:
         try:
             return {
                 "true": True,
                 "false": False,
-            }[request.args[name][0]]
+            }[args[name][0]]
         except:
             message = (
                 "Boolean query parameter %r must be one of"
