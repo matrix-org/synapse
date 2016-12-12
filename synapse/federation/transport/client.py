@@ -396,3 +396,13 @@ class TransportLayerClient(object):
         )
 
         defer.returnValue(content)
+
+    def get_profile(self, destination, user_id, persona=None, key=None):
+        if key:
+            path = PREFIX + "/profile/%s/%s/%s" % (user_id, persona, key)
+        elif persona:
+            path = PREFIX + "/profile/%s/%s/" % (user_id, persona)
+        else:
+            path = PREFIX + "/profile/%s/" % (user_id,)
+
+        return self.client.get_json(destination, path)

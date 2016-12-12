@@ -25,7 +25,6 @@ from synapse.util.async import concurrently_execute
 from synapse.push.presentable_names import (
     calculate_room_name, name_from_member_event, descriptor_from_member_events
 )
-from synapse.types import UserID
 from synapse.api.errors import StoreError
 from synapse.api.constants import EventTypes
 from synapse.visibility import filter_events_for_client
@@ -130,7 +129,7 @@ class Mailer(object):
 
         try:
             user_display_name = yield self.store.get_profile_displayname(
-                UserID.from_string(user_id).localpart
+                user_id
             )
             if user_display_name is None:
                 user_display_name = user_id

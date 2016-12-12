@@ -13,45 +13,159 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
 from ._base import SQLBaseStore
+
+import ujson
 
 
 class ProfileStore(SQLBaseStore):
     def create_profile(self, user_localpart):
-        return self._simple_insert(
-            table="profiles",
-            values={"user_id": user_localpart},
-            desc="create_profile",
+        return defer.succeed(None)
+
+    @defer.inlineCallbacks
+    def get_profile_displayname(self, user_id):
+        profile = yield self.get_profile_key(
+            user_id, "default", "m.display_name"
         )
 
-    def get_profile_displayname(self, user_localpart):
-        return self._simple_select_one_onecol(
-            table="profiles",
-            keyvalues={"user_id": user_localpart},
-            retcol="displayname",
-            desc="get_profile_displayname",
+        if profile:
+            try:
+                display_name = profile["rows"][0]["display_name"]
+            except (KeyError, IndexError):
+                display_name = None
+        else:
+            display_name = None
+
+        defer.returnValue(display_name)
+
+    def set_profile_displayname(self, user_id, new_displayname):
+        if new_displayname:
+            content = {"rows": [{
+                "display_name": new_displayname
+            }]}
+        else:
+            # TODO: Delete in this case
+            content = {}
+
+        return self.update_profile_key(
+            user_id, "default", "m.display_name", content
         )
 
-    def set_profile_displayname(self, user_localpart, new_displayname):
-        return self._simple_update_one(
-            table="profiles",
-            keyvalues={"user_id": user_localpart},
-            updatevalues={"displayname": new_displayname},
-            desc="set_profile_displayname",
+    @defer.inlineCallbacks
+    def get_profile_avatar_url(self, user_id):
+        profile = yield self.get_profile_key(
+            user_id, "default", "m.avatar_url"
         )
 
-    def get_profile_avatar_url(self, user_localpart):
-        return self._simple_select_one_onecol(
-            table="profiles",
-            keyvalues={"user_id": user_localpart},
-            retcol="avatar_url",
-            desc="get_profile_avatar_url",
+        if profile:
+            try:
+                avatar_url = profile["rows"][0]["avatar_url"]
+            except (KeyError, IndexError):
+                avatar_url = None
+        else:
+            avatar_url = None
+
+        defer.returnValue(avatar_url)
+
+    def set_profile_avatar_url(self, user_id, new_avatar_url):
+        if new_avatar_url:
+            content = {"rows": [{
+                "avatar_url": new_avatar_url
+            }]}
+        else:
+            # TODO: Delete in this case
+            content = {}
+
+        return self.update_profile_key(
+            user_id, "default", "m.avatar_url", content
         )
 
-    def set_profile_avatar_url(self, user_localpart, new_avatar_url):
-        return self._simple_update_one(
-            table="profiles",
-            keyvalues={"user_id": user_localpart},
-            updatevalues={"avatar_url": new_avatar_url},
-            desc="set_profile_avatar_url",
+    @defer.inlineCallbacks
+    def get_full_profile(self, user_id):
+        rows = yield self._simple_select_list(
+            table="profiles_extended",
+            keyvalues={"user_id": user_id},
+            retcols=("persona", "key", "content",),
         )
+
+        personas = {}
+        profile = {"personas": personas}
+        for row in rows:
+            content = ujson.loads(row["content"])
+            personas.setdefault(
+                row["persona"], {"rows": {}}
+            )["rows"][row["key"]] = content
+
+        defer.returnValue(profile)
+
+    @defer.inlineCallbacks
+    def get_persona_profile(self, user_id, persona):
+        rows = yield self._simple_select_list(
+            table="profiles_extended",
+            keyvalues={
+                "user_id": user_id,
+                "persona": persona,
+            },
+            retcols=("key", "content",),
+        )
+
+        persona = {"properties": {
+            row["key"]: ujson.loads(row["content"])
+            for row in rows
+        }}
+
+        defer.returnValue(persona)
+
+    @defer.inlineCallbacks
+    def get_profile_key(self, user_id, persona, key):
+        content_json = yield self._simple_select_one_onecol(
+            table="profiles_extended",
+            keyvalues={
+                "user_id": user_id,
+                "persona": persona,
+                "key": key,
+            },
+            retcol="content",
+            allow_none=True,
+        )
+
+        if content_json:
+            content = ujson.loads(content_json)
+        else:
+            content = None
+
+        defer.returnValue(content)
+
+    def update_profile_key(self, user_id, persona, key, content):
+        content_json = ujson.dumps(content)
+
+        def _update_profile_key_txn(txn, stream_id):
+            self._simple_delete_txn(
+                txn,
+                table="profiles_extended",
+                keyvalues={
+                    "user_id": user_id,
+                    "persona": persona,
+                    "key": key,
+                }
+            )
+
+            self._simple_insert_txn(
+                txn,
+                table="profiles_extended",
+                values={
+                    "stream_id": stream_id,
+                    "user_id": user_id,
+                    "persona": persona,
+                    "key": key,
+                    "content": content_json,
+                }
+            )
+
+        with self._profiles_id_gen.get_next() as stream_id:
+            return self.runInteraction(
+                "update_profile_key", _update_profile_key_txn,
+                stream_id,
+            )

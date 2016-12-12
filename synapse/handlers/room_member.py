@@ -245,8 +245,14 @@ class RoomMemberHandler(BaseHandler):
                 content["membership"] = Membership.JOIN
 
                 profile = self.hs.get_handlers().profile_handler
-                content["displayname"] = yield profile.get_displayname(target)
-                content["avatar_url"] = yield profile.get_avatar_url(target)
+
+                display_name = yield profile.get_displayname(target)
+                if display_name:
+                    content["displayname"] = display_name
+
+                avatar_url = yield profile.get_avatar_url(target)
+                if avatar_url:
+                    content["avatar_url"] = avatar_url
 
                 if requester.is_guest:
                     content["kind"] = "guest"

@@ -39,11 +39,11 @@ class ProfileHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_displayname(self, target_user):
         if self.hs.is_mine(target_user):
-            displayname = yield self.store.get_profile_displayname(
-                target_user.localpart
+            display_name = yield self.store.get_profile_displayname(
+                target_user.to_string(),
             )
 
-            defer.returnValue(displayname)
+            defer.returnValue(display_name)
         else:
             try:
                 result = yield self.federation.make_query(
@@ -78,7 +78,7 @@ class ProfileHandler(BaseHandler):
             new_displayname = None
 
         yield self.store.set_profile_displayname(
-            target_user.localpart, new_displayname
+            target_user.to_string(), new_displayname
         )
 
         yield self._update_join_states(requester)
@@ -87,7 +87,7 @@ class ProfileHandler(BaseHandler):
     def get_avatar_url(self, target_user):
         if self.hs.is_mine(target_user):
             avatar_url = yield self.store.get_profile_avatar_url(
-                target_user.localpart
+                target_user.to_string(),
             )
 
             defer.returnValue(avatar_url)
@@ -121,7 +121,7 @@ class ProfileHandler(BaseHandler):
             raise AuthError(400, "Cannot set another user's avatar_url")
 
         yield self.store.set_profile_avatar_url(
-            target_user.localpart, new_avatar_url
+            target_user.to_string(), new_avatar_url
         )
 
         yield self._update_join_states(requester)
@@ -137,13 +137,13 @@ class ProfileHandler(BaseHandler):
         response = {}
 
         if just_field is None or just_field == "displayname":
-            response["displayname"] = yield self.store.get_profile_displayname(
-                user.localpart
+            response["displayname"] = yield self.get_displayname(
+                user
             )
 
         if just_field is None or just_field == "avatar_url":
-            response["avatar_url"] = yield self.store.get_profile_avatar_url(
-                user.localpart
+            response["avatar_url"] = yield self.get_avatar_url(
+                user
             )
 
         defer.returnValue(response)
@@ -180,3 +180,29 @@ class ProfileHandler(BaseHandler):
                     "Failed to update join event for room %s - %s",
                     j.room_id, str(e.message)
                 )
+
+    def get_full_profile_for_user(self, user_id):
+        if self.hs.is_mine_id(user_id):
+            return self.store.get_full_profile(user_id)
+        else:
+            return self.federation.get_profile(user_id)
+
+    def get_persona_profile_for_user(self, user_id, persona):
+        if self.hs.is_mine_id(user_id):
+            return self.store.get_persona_profile(user_id, persona)
+        else:
+            return self.federation.get_profile(user_id, persona)
+
+    def get_profile_key_for_user(self, user_id, persona, key):
+        if self.hs.is_mine_id(user_id):
+            return self.store.get_profile_key(user_id, persona, key)
+        else:
+            return self.federation.get_profile(user_id, persona, key)
+
+    def update_profile_key(self, user_id, persona, key, content):
+        if self.hs.is_mine_id(user_id):
+            return self.store.update_profile_key(
+                user_id, persona, key, content
+            )
+        else:
+            raise AuthError("Cannot set a remote profile")

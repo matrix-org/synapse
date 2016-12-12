@@ -816,6 +816,10 @@ class FederationClient(FederationBase):
 
         defer.returnValue(signed_events)
 
+    def get_profile(self, user_id, persona=None, key=None):
+        destination = get_domain_from_id(user_id)
+        return self.transport_layer.get_profile(destination, user_id, persona, key)
+
     def event_from_pdu_json(self, pdu_json, outlier=False):
         event = FrozenEvent(
             pdu_json
