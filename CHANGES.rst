@@ -14,7 +14,6 @@ Changes:
 * Limit the number of events that can be created on a given room concurrently
   (PR #1620)
 * Log the args that we have on UI auth completion (PR #1649)
-* Correctly handle 500's and 429 on federation (PR #1650)
 * Stop generating refresh_tokens (PR #1654)
 * Stop putting a time caveat on access tokens (PR #1656)
 * Remove unspecced GET endpoints for e2e keys (PR #1694)
@@ -22,6 +21,7 @@ Changes:
 
 Bug fixes:
 
+* Fix handling of 500 and 429's over federation (PR #1650)
 * Fix Content-Type header parsing (PR #1660)
 * Fix error when previewing sites that include unicode, thanks to kyrias (PR
   #1664)
