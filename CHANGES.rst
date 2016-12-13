@@ -1,3 +1,37 @@
+Changes in synapse v0.18.5-rc3 (2016-12-13)
+===========================================
+
+Features:
+
+* Add support for E2E for guests (PR #1653)
+* Add new API appservice specific public room list (PR #1676)
+* Add new room membership APIs (PR #1680)
+
+
+Changes:
+
+* Enable guest access for private rooms by default (PR #653)
+* Limit the number of events that can be created on a given room concurrently
+  (PR #1620)
+* Log the args that we have on UI auth completion (PR #1649)
+* Stop generating refresh_tokens (PR #1654)
+* Stop putting a time caveat on access tokens (PR #1656)
+* Remove unspecced GET endpoints for e2e keys (PR #1694)
+
+
+Bug fixes:
+
+* Fix handling of 500 and 429's over federation (PR #1650)
+* Fix Content-Type header parsing (PR #1660)
+* Fix error when previewing sites that include unicode, thanks to kyrias (PR
+  #1664)
+* Fix some cases where we drop read receipts (PR #1678)
+* Fix bug where calls to ``/sync`` didn't correctly timeout (PR #1683)
+* Fix bug where E2E key query would fail if a single remote host failed (PR
+  #1686)
+
+
+
 Changes in synapse v0.18.5-rc2 (2016-11-24)
 ===========================================
 
