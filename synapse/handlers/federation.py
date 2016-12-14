@@ -253,8 +253,9 @@ class FederationHandler(BaseHandler):
                 return False
 
         event_map = yield self.store.get_events([
-            e_id for key_to_eid in event_to_state_ids.values()
-            for key, e_id in key_to_eid
+            e_id
+            for key_to_eid in event_to_state_ids.values()
+            for key, e_id in key_to_eid.items()
             if key[0] != EventTypes.Member or check_match(key[1])
         ])
 
