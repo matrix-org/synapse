@@ -252,9 +252,12 @@ class FederationHandler(BaseHandler):
             except:
                 return False
 
+        # Parses mapping `event_id -> (type, state_key) -> state event_id`
+        # to get all state ids that we're interested in.
         event_map = yield self.store.get_events([
-            e_id for key_to_eid in event_to_state_ids.values()
-            for key, e_id in key_to_eid
+            e_id
+            for key_to_eid in event_to_state_ids.values()
+            for key, e_id in key_to_eid.items()
             if key[0] != EventTypes.Member or check_match(key[1])
         ])
 
