@@ -242,7 +242,7 @@ class DeviceInboxStore(SQLBaseStore):
             device_id(str): The recipient device_id.
             up_to_stream_id(int): Where to delete messages up to.
         Returns:
-            A deferred that resolves when the messages have been deleted.
+            A deferred that resolves to the number of messages deleted.
         """
         def delete_messages_for_device_txn(txn):
             sql = (
@@ -251,6 +251,7 @@ class DeviceInboxStore(SQLBaseStore):
                 " AND stream_id <= ?"
             )
             txn.execute(sql, (user_id, device_id, up_to_stream_id))
+            return txn.rowcount
 
         return self.runInteraction(
             "delete_messages_for_device", delete_messages_for_device_txn
