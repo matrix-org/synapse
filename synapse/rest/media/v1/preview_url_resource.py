@@ -381,7 +381,10 @@ def _calc_og(tree, media_uri):
     if 'og:title' not in og:
         # do some basic spidering of the HTML
         title = tree.xpath("(//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1]")
-        og['og:title'] = title[0].text.strip() if title else None
+        if title and title[0].text is not None:
+            og['og:title'] = title[0].text.strip()
+        else:
+            og['og:title'] = None
 
     if 'og:image' not in og:
         # TODO: extract a favicon failing all else

@@ -215,3 +215,53 @@ class PreviewUrlTestCase(unittest.TestCase):
             u"og:title": u"Foo",
             u"og:description": u"Some text."
         })
+
+    def test_missing_title(self):
+        html = u"""
+        <html>
+        <body>
+        Some text.
+        </body>
+        </html>
+        """
+
+        og = decode_and_calc_og(html, "http://example.com/test.html")
+
+        self.assertEquals(og, {
+            u"og:title": None,
+            u"og:description": u"Some text."
+        })
+
+    def test_h1_as_title(self):
+        html = u"""
+        <html>
+        <meta property="og:description" content="Some text."/>
+        <body>
+        <h1>Title</h1>
+        </body>
+        </html>
+        """
+
+        og = decode_and_calc_og(html, "http://example.com/test.html")
+
+        self.assertEquals(og, {
+            u"og:title": u"Title",
+            u"og:description": u"Some text."
+        })
+
+    def test_missing_title_and_broken_h1(self):
+        html = u"""
+        <html>
+        <body>
+        <h1><a href="foo"/></h1>
+        Some text.
+        </body>
+        </html>
+        """
+
+        og = decode_and_calc_og(html, "http://example.com/test.html")
+
+        self.assertEquals(og, {
+            u"og:title": None,
+            u"og:description": u"Some text."
+        })
