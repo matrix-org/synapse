@@ -120,6 +120,7 @@ Installing prerequisites on Mac OS X::
     xcode-select --install
     sudo easy_install pip
     sudo pip install virtualenv
+    brew install pkg-config libffi
 
 Installing prerequisites on Raspbian::
 
