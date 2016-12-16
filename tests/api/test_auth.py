@@ -12,17 +12,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from tests import unittest
+
+import pymacaroons
+from mock import Mock
 from twisted.internet import defer
 
-from mock import Mock
-
+import synapse.handlers.auth
 from synapse.api.auth import Auth
 from synapse.api.errors import AuthError
 from synapse.types import UserID
+from tests import unittest
 from tests.utils import setup_test_homeserver, mock_getRawHeaders
 
-import pymacaroons
+
+class TestHandlers(object):
+    def __init__(self, hs):
+        self.auth_handler = synapse.handlers.auth.AuthHandler(hs)
 
 
 class AuthTestCase(unittest.TestCase):
@@ -34,14 +39,17 @@ class AuthTestCase(unittest.TestCase):
 
         self.hs = yield setup_test_homeserver(handlers=None)
         self.hs.get_datastore = Mock(return_value=self.store)
+        self.hs.handlers = TestHandlers(self.hs)
         self.auth = Auth(self.hs)
 
         self.test_user = "@foo:bar"
         self.test_token = "_test_token_"
 
+        # this is overridden for the appservice tests
+        self.store.get_app_service_by_token = Mock(return_value=None)
+
     @defer.inlineCallbacks
     def test_get_user_by_req_user_valid_token(self):
-        self.store.get_app_service_by_token = Mock(return_value=None)
         user_info = {
             "name": self.test_user,
             "token_id": "ditto",
@@ -56,7 +64,6 @@ class AuthTestCase(unittest.TestCase):
         self.assertEquals(requester.user.to_string(), self.test_user)
 
     def test_get_user_by_req_user_bad_token(self):
-        self.store.get_app_service_by_token = Mock(return_value=None)
         self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
@@ -66,7 +73,6 @@ class AuthTestCase(unittest.TestCase):
         self.failureResultOf(d, AuthError)
 
     def test_get_user_by_req_user_missing_token(self):
-        self.store.get_app_service_by_token = Mock(return_value=None)
         user_info = {
             "name": self.test_user,
             "token_id": "ditto",
@@ -158,7 +164,7 @@ class AuthTestCase(unittest.TestCase):
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("type = access")
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
-        user_info = yield self.auth.get_user_from_macaroon(macaroon.serialize())
+        user_info = yield self.auth.get_user_by_access_token(macaroon.serialize())
         user = user_info["user"]
         self.assertEqual(UserID.from_string(user_id), user)
 
@@ -168,6 +174,10 @@ class AuthTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_guest_user_from_macaroon(self):
+        self.store.get_user_by_id = Mock(return_value={
+            "is_guest": True,
+        })
+
         user_id = "@baldrick:matrix.org"
         macaroon = pymacaroons.Macaroon(
             location=self.hs.config.server_name,
@@ -179,11 +189,12 @@ class AuthTestCase(unittest.TestCase):
         macaroon.add_first_party_caveat("guest = true")
         serialized = macaroon.serialize()
 
-        user_info = yield self.auth.get_user_from_macaroon(serialized)
+        user_info = yield self.auth.get_user_by_access_token(serialized)
         user = user_info["user"]
         is_guest = user_info["is_guest"]
         self.assertEqual(UserID.from_string(user_id), user)
         self.assertTrue(is_guest)
+        self.store.get_user_by_id.assert_called_with(user_id)
 
     @defer.inlineCallbacks
     def test_get_user_from_macaroon_user_db_mismatch(self):
@@ -200,7 +211,7 @@ class AuthTestCase(unittest.TestCase):
         macaroon.add_first_party_caveat("type = access")
         macaroon.add_first_party_caveat("user_id = %s" % (user,))
         with self.assertRaises(AuthError) as cm:
-            yield self.auth.get_user_from_macaroon(macaroon.serialize())
+            yield self.auth.get_user_by_access_token(macaroon.serialize())
         self.assertEqual(401, cm.exception.code)
         self.assertIn("User mismatch", cm.exception.msg)
 
@@ -220,7 +231,7 @@ class AuthTestCase(unittest.TestCase):
         macaroon.add_first_party_caveat("type = access")
 
         with self.assertRaises(AuthError) as cm:
-            yield self.auth.get_user_from_macaroon(macaroon.serialize())
+            yield self.auth.get_user_by_access_token(macaroon.serialize())
         self.assertEqual(401, cm.exception.code)
         self.assertIn("No user caveat", cm.exception.msg)
 
@@ -242,7 +253,7 @@ class AuthTestCase(unittest.TestCase):
         macaroon.add_first_party_caveat("user_id = %s" % (user,))
 
         with self.assertRaises(AuthError) as cm:
-            yield self.auth.get_user_from_macaroon(macaroon.serialize())
+            yield self.auth.get_user_by_access_token(macaroon.serialize())
         self.assertEqual(401, cm.exception.code)
         self.assertIn("Invalid macaroon", cm.exception.msg)
 
@@ -265,7 +276,7 @@ class AuthTestCase(unittest.TestCase):
         macaroon.add_first_party_caveat("cunning > fox")
 
         with self.assertRaises(AuthError) as cm:
-            yield self.auth.get_user_from_macaroon(macaroon.serialize())
+            yield self.auth.get_user_by_access_token(macaroon.serialize())
         self.assertEqual(401, cm.exception.code)
         self.assertIn("Invalid macaroon", cm.exception.msg)
 
@@ -293,12 +304,12 @@ class AuthTestCase(unittest.TestCase):
 
         self.hs.clock.now = 5000  # seconds
         self.hs.config.expire_access_token = True
-        # yield self.auth.get_user_from_macaroon(macaroon.serialize())
+        # yield self.auth.get_user_by_access_token(macaroon.serialize())
         # TODO(daniel): Turn on the check that we validate expiration, when we
         # validate expiration (and remove the above line, which will start
         # throwing).
         with self.assertRaises(AuthError) as cm:
-            yield self.auth.get_user_from_macaroon(macaroon.serialize())
+            yield self.auth.get_user_by_access_token(macaroon.serialize())
         self.assertEqual(401, cm.exception.code)
         self.assertIn("Invalid macaroon", cm.exception.msg)
 
@@ -327,6 +338,58 @@ class AuthTestCase(unittest.TestCase):
         self.hs.clock.now = 5000  # seconds
         self.hs.config.expire_access_token = True
 
-        user_info = yield self.auth.get_user_from_macaroon(macaroon.serialize())
+        user_info = yield self.auth.get_user_by_access_token(macaroon.serialize())
         user = user_info["user"]
         self.assertEqual(UserID.from_string(user_id), user)
+
+    @defer.inlineCallbacks
+    def test_cannot_use_regular_token_as_guest(self):
+        USER_ID = "@percy:matrix.org"
+        self.store.add_access_token_to_user = Mock()
+
+        token = yield self.hs.handlers.auth_handler.issue_access_token(
+            USER_ID, "DEVICE"
+        )
+        self.store.add_access_token_to_user.assert_called_with(
+            USER_ID, token, "DEVICE"
+        )
+
+        def get_user(tok):
+            if token != tok:
+                return None
+            return {
+                "name": USER_ID,
+                "is_guest": False,
+                "token_id": 1234,
+                "device_id": "DEVICE",
+            }
+        self.store.get_user_by_access_token = get_user
+        self.store.get_user_by_id = Mock(return_value={
+            "is_guest": False,
+        })
+
+        # check the token works
+        request = Mock(args={})
+        request.args["access_token"] = [token]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+        self.assertEqual(UserID.from_string(USER_ID), requester.user)
+        self.assertFalse(requester.is_guest)
+
+        # add an is_guest caveat
+        mac = pymacaroons.Macaroon.deserialize(token)
+        mac.add_first_party_caveat("guest = true")
+        guest_tok = mac.serialize()
+
+        # the token should *not* work now
+        request = Mock(args={})
+        request.args["access_token"] = [guest_tok]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+
+        with self.assertRaises(AuthError) as cm:
+            yield self.auth.get_user_by_req(request, allow_guest=True)
+
+        self.assertEqual(401, cm.exception.code)
+        self.assertEqual("Guest access token used for regular user", cm.exception.msg)
+
+        self.store.get_user_by_id.assert_called_with(USER_ID)

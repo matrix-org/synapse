@@ -39,6 +39,14 @@ class EventPushActionsStore(SQLBaseStore):
             columns=["user_id", "stream_ordering"],
         )
 
+        self.register_background_index_update(
+            "event_push_actions_highlights_index",
+            index_name="event_push_actions_highlights_index",
+            table="event_push_actions",
+            columns=["user_id", "room_id", "topological_ordering", "stream_ordering"],
+            where_clause="highlight=1"
+        )
+
     def _set_push_actions_for_event_and_users_txn(self, txn, event, tuples):
         """
         Args:
@@ -88,8 +96,11 @@ class EventPushActionsStore(SQLBaseStore):
                 topological_ordering, stream_ordering
             )
 
+            # First get number of notifications.
+            # We don't need to put a notif=1 clause as all rows always have
+            # notif=1
             sql = (
-                "SELECT sum(notif), sum(highlight)"
+                "SELECT count(*)"
                 " FROM event_push_actions ea"
                 " WHERE"
                 " user_id = ?"
@@ -99,13 +110,27 @@ class EventPushActionsStore(SQLBaseStore):
 
             txn.execute(sql, (user_id, room_id))
             row = txn.fetchone()
-            if row:
-                return {
-                    "notify_count": row[0] or 0,
-                    "highlight_count": row[1] or 0,
-                }
-            else:
-                return {"notify_count": 0, "highlight_count": 0}
+            notify_count = row[0] if row else 0
+
+            # Now get the number of highlights
+            sql = (
+                "SELECT count(*)"
+                " FROM event_push_actions ea"
+                " WHERE"
+                " highlight = 1"
+                " AND user_id = ?"
+                " AND room_id = ?"
+                " AND %s"
+            ) % (lower_bound(token, self.database_engine, inclusive=False),)
+
+            txn.execute(sql, (user_id, room_id))
+            row = txn.fetchone()
+            highlight_count = row[0] if row else 0
+
+            return {
+                "notify_count": notify_count,
+                "highlight_count": highlight_count,
+            }
 
         ret = yield self.runInteraction(
             "get_unread_event_push_actions_by_room",

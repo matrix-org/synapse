@@ -18,7 +18,6 @@ from twisted.internet import defer
 
 from .federation_base import FederationBase
 from synapse.api.constants import Membership
-from .units import Edu
 
 from synapse.api.errors import (
     CodeMessageException, HttpResponseException, SynapseError,
@@ -44,10 +43,6 @@ logger = logging.getLogger(__name__)
 
 # synapse.federation.federation_client is a silly name
 metrics = synapse.metrics.get_metrics_for("synapse.federation.client")
-
-sent_pdus_destination_dist = metrics.register_distribution("sent_pdu_destinations")
-
-sent_edus_counter = metrics.register_counter("sent_edus")
 
 sent_queries_counter = metrics.register_counter("sent_queries", labels=["type"])
 
@@ -91,63 +86,6 @@ class FederationClient(FederationBase):
         )
 
         self._get_pdu_cache.start()
-
-    @log_function
-    def send_pdu(self, pdu, destinations):
-        """Informs the replication layer about a new PDU generated within the
-        home server that should be transmitted to others.
-
-        TODO: Figure out when we should actually resolve the deferred.
-
-        Args:
-            pdu (Pdu): The new Pdu.
-
-        Returns:
-            Deferred: Completes when we have successfully processed the PDU
-            and replicated it to any interested remote home servers.
-        """
-        order = self._order
-        self._order += 1
-
-        sent_pdus_destination_dist.inc_by(len(destinations))
-
-        logger.debug("[%s] transaction_layer.enqueue_pdu... ", pdu.event_id)
-
-        # TODO, add errback, etc.
-        self._transaction_queue.enqueue_pdu(pdu, destinations, order)
-
-        logger.debug(
-            "[%s] transaction_layer.enqueue_pdu... done",
-            pdu.event_id
-        )
-
-    def send_presence(self, destination, states):
-        if destination != self.server_name:
-            self._transaction_queue.enqueue_presence(destination, states)
-
-    @log_function
-    def send_edu(self, destination, edu_type, content, key=None):
-        edu = Edu(
-            origin=self.server_name,
-            destination=destination,
-            edu_type=edu_type,
-            content=content,
-        )
-
-        sent_edus_counter.inc()
-
-        self._transaction_queue.enqueue_edu(edu, key=key)
-
-    @log_function
-    def send_device_messages(self, destination):
-        """Sends the device messages in the local database to the remote
-        destination"""
-        self._transaction_queue.enqueue_device_messages(destination)
-
-    @log_function
-    def send_failure(self, failure, destination):
-        self._transaction_queue.enqueue_failure(failure, destination)
-        return defer.succeed(None)
 
     @log_function
     def make_query(self, destination, query_type, args,
@@ -717,12 +655,15 @@ class FederationClient(FederationBase):
         raise RuntimeError("Failed to send to any server.")
 
     def get_public_rooms(self, destination, limit=None, since_token=None,
-                         search_filter=None):
+                         search_filter=None, include_all_networks=False,
+                         third_party_instance_id=None):
         if destination == self.server_name:
             return
 
         return self.transport_layer.get_public_rooms(
-            destination, limit, since_token, search_filter
+            destination, limit, since_token, search_filter,
+            include_all_networks=include_all_networks,
+            third_party_instance_id=third_party_instance_id,
         )
 
     @defer.inlineCallbacks

@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 def register_servlets(hs, http_server):
     ClientDirectoryServer(hs).register(http_server)
     ClientDirectoryListServer(hs).register(http_server)
+    ClientAppserviceDirectoryListServer(hs).register(http_server)
 
 
 class ClientDirectoryServer(ClientV1RestServlet):
@@ -181,6 +182,39 @@ class ClientDirectoryListServer(ClientV1RestServlet):
 
         yield self.handlers.directory_handler.edit_published_room_list(
             requester, room_id, "private",
+        )
+
+        defer.returnValue((200, {}))
+
+
+class ClientAppserviceDirectoryListServer(ClientV1RestServlet):
+    PATTERNS = client_path_patterns(
+        "/directory/list/appservice/(?P<network_id>[^/]*)/(?P<room_id>[^/]*)$"
+    )
+
+    def __init__(self, hs):
+        super(ClientAppserviceDirectoryListServer, self).__init__(hs)
+        self.store = hs.get_datastore()
+        self.handlers = hs.get_handlers()
+
+    def on_PUT(self, request, network_id, room_id):
+        content = parse_json_object_from_request(request)
+        visibility = content.get("visibility", "public")
+        return self._edit(request, network_id, room_id, visibility)
+
+    def on_DELETE(self, request, network_id, room_id):
+        return self._edit(request, network_id, room_id, "private")
+
+    @defer.inlineCallbacks
+    def _edit(self, request, network_id, room_id, visibility):
+        requester = yield self.auth.get_user_by_req(request)
+        if not requester.app_service:
+            raise AuthError(
+                403, "Only appservices can edit the appservice published room list"
+            )
+
+        yield self.handlers.directory_handler.edit_published_appservice_room_list(
+            requester.app_service.id, network_id, room_id, visibility,
         )
 
         defer.returnValue((200, {}))

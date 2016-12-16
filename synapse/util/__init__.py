@@ -24,6 +24,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class DeferredTimedOutError(SynapseError):
+    def __init__(self):
+        super(SynapseError).__init__(504, "Timed out")
+
+
 def unwrapFirstError(failure):
     # defer.gatherResults and DeferredLists wrap failures.
     failure.trap(defer.FirstError)
@@ -89,7 +94,7 @@ class Clock(object):
 
         def timed_out_fn():
             try:
-                ret_deferred.errback(SynapseError(504, "Timed out"))
+                ret_deferred.errback(DeferredTimedOutError())
             except:
                 pass
 

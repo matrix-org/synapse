@@ -34,9 +34,9 @@ class DeviceMessageHandler(object):
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
-        self.federation = hs.get_replication_layer()
+        self.federation = hs.get_federation_sender()
 
-        self.federation.register_edu_handler(
+        hs.get_replication_layer().register_edu_handler(
             "m.direct_to_device", self.on_direct_to_device_edu
         )
 

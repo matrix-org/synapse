@@ -54,6 +54,7 @@ def encode_json(json_object):
     else:
         return json.dumps(json_object, ensure_ascii=False)
 
+
 # These values are used in the `enqueus_event` and `_do_fetch` methods to
 # control how we batch/bulk fetch events from the database.
 # The values are plucked out of thing air to make initial sync run faster

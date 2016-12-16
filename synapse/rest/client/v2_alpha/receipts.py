@@ -36,7 +36,7 @@ class ReceiptRestServlet(RestServlet):
         super(ReceiptRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.receipts_handler = hs.get_handlers().receipts_handler
+        self.receipts_handler = hs.get_receipts_handler()
         self.presence_handler = hs.get_presence_handler()
 
     @defer.inlineCallbacks

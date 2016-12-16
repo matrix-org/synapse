@@ -23,6 +23,45 @@ import sys
 here = os.path.abspath(os.path.dirname(__file__))
 
 
+# Some notes on `setup.py test`:
+#
+# Once upon a time we used to try to make `setup.py test` run `tox` to run the
+# tests. That's a bad idea for three reasons:
+#
+# 1: `setup.py test` is supposed to find out whether the tests work in the
+#    *current* environmentt, not whatever tox sets up.
+# 2: Empirically, trying to install tox during the test run wasn't working ("No
+#    module named virtualenv").
+# 3: The tox documentation advises against it[1].
+#
+# Even further back in time, we used to use setuptools_trial [2]. That has its
+# own set of issues: for instance, it requires installation of Twisted to build
+# an sdist (because the recommended mode of usage is to add it to
+# `setup_requires`). That in turn means that in order to successfully run tox
+# you have to have the python header files installed for whichever version of
+# python tox uses (which is python3 on recent ubuntus, for example).
+#
+# So, for now at least, we stick with what appears to be the convention among
+# Twisted projects, and don't attempt to do anything when someone runs
+# `setup.py test`; instead we direct people to run `trial` directly if they
+# care.
+#
+# [1]: http://tox.readthedocs.io/en/2.5.0/example/basic.html#integration-with-setup-py-test-command
+# [2]: https://pypi.python.org/pypi/setuptools_trial
+class TestCommand(Command):
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        print ("""Synapse's tests cannot be run via setup.py. To run them, try:
+     PYTHONPATH="." trial tests
+""")
+
 def read_file(path_segments):
     """Read a file from the package. Takes a list of strings to join to
     make the path"""
@@ -37,38 +76,6 @@ def exec_file(path_segments):
     code = read_file(path_segments)
     exec(code, result)
     return result
-
-
-class Tox(Command):
-    user_options = [('tox-args=', 'a', "Arguments to pass to tox")]
-
-    def initialize_options(self):
-        self.tox_args = None
-
-    def finalize_options(self):
-        self.test_args = []
-        self.test_suite = True
-
-    def run(self):
-        #import here, cause outside the eggs aren't loaded
-        try:
-            import tox
-        except ImportError:
-            try:
-                self.distribution.fetch_build_eggs("tox")
-                import tox
-            except:
-                raise RuntimeError(
-                    "The tests need 'tox' to run. Please install 'tox'."
-                )
-        import shlex
-        args = self.tox_args
-        if args:
-            args = shlex.split(self.tox_args)
-        else:
-            args = []
-        errno = tox.cmdline(args=args)
-        sys.exit(errno)
 
 
 version = exec_file(("synapse", "__init__.py"))["__version__"]
@@ -86,5 +93,5 @@ setup(
     zip_safe=False,
     long_description=long_description,
     scripts=["synctl"] + glob.glob("scripts/*"),
-    cmdclass={'test': Tox},
+    cmdclass={'test': TestCommand},
 )

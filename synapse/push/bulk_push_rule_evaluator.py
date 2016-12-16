@@ -87,12 +87,12 @@ class BulkPushRuleEvaluator:
         condition_cache = {}
 
         for uid, rules in self.rules_by_user.items():
-            display_name = None
-            member_ev_id = context.current_state_ids.get((EventTypes.Member, uid))
-            if member_ev_id:
-                member_ev = yield self.store.get_event(member_ev_id, allow_none=True)
-                if member_ev:
-                    display_name = member_ev.content.get("displayname", None)
+            display_name = room_members.get(uid, {}).get("display_name", None)
+            if not display_name:
+                # Handle the case where we are pushing a membership event to
+                # that user, as they might not be already joined.
+                if event.type == EventTypes.Member and event.state_key == uid:
+                    display_name = event.content.get("displayname", None)
 
             filtered = filtered_by_user[uid]
             if len(filtered) == 0:

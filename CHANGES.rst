@@ -1,3 +1,68 @@
+Changes in synapse v0.18.5 (2016-12-16)
+=======================================
+
+Bug fixes:
+
+* Fix federation /backfill returning events it shouldn't (PR #1700)
+* Fix crash in url preview (PR #1701)
+
+
+Changes in synapse v0.18.5-rc3 (2016-12-13)
+===========================================
+
+Features:
+
+* Add support for E2E for guests (PR #1653)
+* Add new API appservice specific public room list (PR #1676)
+* Add new room membership APIs (PR #1680)
+
+
+Changes:
+
+* Enable guest access for private rooms by default (PR #653)
+* Limit the number of events that can be created on a given room concurrently
+  (PR #1620)
+* Log the args that we have on UI auth completion (PR #1649)
+* Stop generating refresh_tokens (PR #1654)
+* Stop putting a time caveat on access tokens (PR #1656)
+* Remove unspecced GET endpoints for e2e keys (PR #1694)
+
+
+Bug fixes:
+
+* Fix handling of 500 and 429's over federation (PR #1650)
+* Fix Content-Type header parsing (PR #1660)
+* Fix error when previewing sites that include unicode, thanks to kyrias (PR
+  #1664)
+* Fix some cases where we drop read receipts (PR #1678)
+* Fix bug where calls to ``/sync`` didn't correctly timeout (PR #1683)
+* Fix bug where E2E key query would fail if a single remote host failed (PR
+  #1686)
+
+
+
+Changes in synapse v0.18.5-rc2 (2016-11-24)
+===========================================
+
+Bug fixes:
+
+* Don't send old events over federation, fixes bug in -rc1.
+
+Changes in synapse v0.18.5-rc1 (2016-11-24)
+===========================================
+
+Features:
+
+* Implement "event_fields" in filters (PR #1638)
+
+Changes:
+
+* Use external ldap auth pacakge (PR #1628)
+* Split out federation transaction sending to a worker (PR #1635)
+* Fail with a coherent error message if `/sync?filter=` is invalid (PR #1636)
+* More efficient notif count queries (PR #1644)
+
+
 Changes in synapse v0.18.4 (2016-11-22)
 =======================================
 

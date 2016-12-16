@@ -81,7 +81,7 @@ class RegistrationHandler(BaseHandler):
                     "User ID already taken.",
                     errcode=Codes.USER_IN_USE,
                 )
-            user_data = yield self.auth.get_user_from_macaroon(guest_access_token)
+            user_data = yield self.auth.get_user_by_access_token(guest_access_token)
             if not user_data["is_guest"] or user_data["user"].localpart != localpart:
                 raise AuthError(
                     403,
@@ -369,7 +369,7 @@ class RegistrationHandler(BaseHandler):
         defer.returnValue(data)
 
     @defer.inlineCallbacks
-    def get_or_create_user(self, requester, localpart, displayname, duration_in_ms,
+    def get_or_create_user(self, requester, localpart, displayname,
                            password_hash=None):
         """Creates a new user if the user does not exist,
         else revokes all previous access tokens and generates a new one.
@@ -399,8 +399,7 @@ class RegistrationHandler(BaseHandler):
 
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
-        token = self.auth_handler().generate_access_token(
-            user_id, None, duration_in_ms)
+        token = self.auth_handler().generate_access_token(user_id)
 
         if need_register:
             yield self.store.register(

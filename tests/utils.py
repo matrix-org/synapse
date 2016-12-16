@@ -53,6 +53,8 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.trusted_third_party_id_servers = []
         config.room_invite_state_types = []
         config.password_providers = []
+        config.worker_replication_url = ""
+        config.worker_app = None
 
     config.use_frozen_dicts = True
     config.database_config = {"name": "sqlite3"}
@@ -70,6 +72,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
             database_engine=create_engine(config.database_config),
             get_db_conn=db_pool.get_db_conn,
             room_list_handler=object(),
+            tls_server_context_factory=Mock(),
             **kargs
         )
         hs.setup()
@@ -79,6 +82,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
             version_string="Synapse/tests",
             database_engine=create_engine(config.database_config),
             room_list_handler=object(),
+            tls_server_context_factory=Mock(),
             **kargs
         )
 
@@ -289,6 +293,10 @@ class MockClock(object):
 
     def advance_time_msec(self, ms):
         self.advance_time(ms / 1000.)
+
+    def time_bound_deferred(self, d, *args, **kwargs):
+        # We don't bother timing things out for now.
+        return d
 
 
 class SQLiteMemoryDbPool(ConnectionPool, object):

@@ -103,7 +103,7 @@ class ReplicationResourceCase(unittest.TestCase):
         room_id = yield self.create_room()
         event_id = yield self.send_text_message(room_id, "Hello, World")
         get = self.get(receipts="-1")
-        yield self.hs.get_handlers().receipts_handler.received_client_receipt(
+        yield self.hs.get_receipts_handler().received_client_receipt(
             room_id, "m.read", self.user_id, event_id
         )
         code, body = yield get

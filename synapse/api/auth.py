@@ -39,6 +39,9 @@ AuthEventTypes = (
     EventTypes.ThirdPartyInvite,
 )
 
+# guests always get this device id.
+GUEST_DEVICE_ID = "guest_device"
+
 
 class Auth(object):
     """
@@ -51,17 +54,6 @@ class Auth(object):
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
-        # Docs for these currently lives at
-        # github.com/matrix-org/matrix-doc/blob/master/drafts/macaroons_caveats.rst
-        # In addition, we have type == delete_pusher which grants access only to
-        # delete pushers.
-        self._KNOWN_CAVEAT_PREFIXES = set([
-            "gen = ",
-            "guest = ",
-            "type = ",
-            "time < ",
-            "user_id = ",
-        ])
 
     @defer.inlineCallbacks
     def check_from_context(self, event, context, do_sig_check=True):
@@ -685,31 +677,28 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def get_user_by_access_token(self, token, rights="access"):
-        """ Get a registered user's ID.
+        """ Validate access token and get user_id from it
 
         Args:
             token (str): The access token to get the user by.
+            rights (str): The operation being performed; the access token must
+                allow this.
         Returns:
             dict : dict that includes the user and the ID of their access token.
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
         try:
-            ret = yield self.get_user_from_macaroon(token, rights)
-        except AuthError:
-            # TODO(daniel): Remove this fallback when all existing access tokens
-            # have been re-issued as macaroons.
-            if self.hs.config.expire_access_token:
-                raise
-            ret = yield self._look_up_user_by_access_token(token)
+            macaroon = pymacaroons.Macaroon.deserialize(token)
+        except Exception:  # deserialize can throw more-or-less anything
+            # doesn't look like a macaroon: treat it as an opaque token which
+            # must be in the database.
+            # TODO: it would be nice to get rid of this, but apparently some
+            # people use access tokens which aren't macaroons
+            r = yield self._look_up_user_by_access_token(token)
+            defer.returnValue(r)
 
-        defer.returnValue(ret)
-
-    @defer.inlineCallbacks
-    def get_user_from_macaroon(self, macaroon_str, rights="access"):
         try:
-            macaroon = pymacaroons.Macaroon.deserialize(macaroon_str)
-
             user_id = self.get_user_id_from_macaroon(macaroon)
             user = UserID.from_string(user_id)
 
@@ -724,11 +713,36 @@ class Auth(object):
                     guest = True
 
             if guest:
+                # Guest access tokens are not stored in the database (there can
+                # only be one access token per guest, anyway).
+                #
+                # In order to prevent guest access tokens being used as regular
+                # user access tokens (and hence getting around the invalidation
+                # process), we look up the user id and check that it is indeed
+                # a guest user.
+                #
+                # It would of course be much easier to store guest access
+                # tokens in the database as well, but that would break existing
+                # guest tokens.
+                stored_user = yield self.store.get_user_by_id(user_id)
+                if not stored_user:
+                    raise AuthError(
+                        self.TOKEN_NOT_FOUND_HTTP_STATUS,
+                        "Unknown user_id %s" % user_id,
+                        errcode=Codes.UNKNOWN_TOKEN
+                    )
+                if not stored_user["is_guest"]:
+                    raise AuthError(
+                        self.TOKEN_NOT_FOUND_HTTP_STATUS,
+                        "Guest access token used for regular user",
+                        errcode=Codes.UNKNOWN_TOKEN
+                    )
                 ret = {
                     "user": user,
                     "is_guest": True,
                     "token_id": None,
-                    "device_id": None,
+                    # all guests get the same device id
+                    "device_id": GUEST_DEVICE_ID,
                 }
             elif rights == "delete_pusher":
                 # We don't store these tokens in the database
@@ -750,7 +764,7 @@ class Auth(object):
                 #     macaroon. They probably should be.
                 # TODO: build the dictionary from the macaroon once the
                 # above are fixed
-                ret = yield self._look_up_user_by_access_token(macaroon_str)
+                ret = yield self._look_up_user_by_access_token(token)
                 if ret["user"] != user:
                     logger.error(
                         "Macaroon user (%s) != DB user (%s)",
@@ -798,27 +812,38 @@ class Auth(object):
 
         Args:
             macaroon(pymacaroons.Macaroon): The macaroon to validate
-            type_string(str): The kind of token required (e.g. "access", "refresh",
+            type_string(str): The kind of token required (e.g. "access",
                               "delete_pusher")
             verify_expiry(bool): Whether to verify whether the macaroon has expired.
-                This should really always be True, but no clients currently implement
-                token refresh, so we can't enforce expiry yet.
             user_id (str): The user_id required
         """
         v = pymacaroons.Verifier()
+
+        # the verifier runs a test for every caveat on the macaroon, to check
+        # that it is met for the current request. Each caveat must match at
+        # least one of the predicates specified by satisfy_exact or
+        # specify_general.
         v.satisfy_exact("gen = 1")
         v.satisfy_exact("type = " + type_string)
         v.satisfy_exact("user_id = %s" % user_id)
         v.satisfy_exact("guest = true")
+
+        # verify_expiry should really always be True, but there exist access
+        # tokens in the wild which expire when they should not, so we can't
+        # enforce expiry yet (so we have to allow any caveat starting with
+        # 'time < ' in access tokens).
+        #
+        # On the other hand, short-term login tokens (as used by CAS login, for
+        # example) have an expiry time which we do want to enforce.
+
         if verify_expiry:
             v.satisfy_general(self._verify_expiry)
         else:
             v.satisfy_general(lambda c: c.startswith("time < "))
 
-        v.verify(macaroon, self.hs.config.macaroon_secret_key)
+        # access_tokens include a nonce for uniqueness: any value is acceptable
+        v.satisfy_general(lambda c: c.startswith("nonce = "))
 
-        v = pymacaroons.Verifier()
-        v.satisfy_general(self._verify_recognizes_caveats)
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 
     def _verify_expiry(self, caveat):
@@ -828,15 +853,6 @@ class Auth(object):
         expiry = int(caveat[len(prefix):])
         now = self.hs.get_clock().time_msec()
         return now < expiry
-
-    def _verify_recognizes_caveats(self, caveat):
-        first_space = caveat.find(" ")
-        if first_space < 0:
-            return False
-        second_space = caveat.find(" ", first_space + 1)
-        if second_space < 0:
-            return False
-        return caveat[:second_space + 1] in self._KNOWN_CAVEAT_PREFIXES
 
     @defer.inlineCallbacks
     def _look_up_user_by_access_token(self, token):

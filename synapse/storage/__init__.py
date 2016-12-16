@@ -120,7 +120,6 @@ class DataStore(RoomMemberStore, RoomStore,
         self._transaction_id_gen = IdGenerator(db_conn, "sent_transactions", "id")
         self._state_groups_id_gen = IdGenerator(db_conn, "state_groups", "id")
         self._access_tokens_id_gen = IdGenerator(db_conn, "access_tokens", "id")
-        self._refresh_tokens_id_gen = IdGenerator(db_conn, "refresh_tokens", "id")
         self._event_reports_id_gen = IdGenerator(db_conn, "event_reports", "id")
         self._push_rule_id_gen = IdGenerator(db_conn, "push_rules", "id")
         self._push_rules_enable_id_gen = IdGenerator(db_conn, "push_rules_enable", "id")
@@ -223,6 +222,7 @@ class DataStore(RoomMemberStore, RoomStore,
         )
 
         self._stream_order_on_start = self.get_room_max_stream_ordering()
+        self._min_stream_order_on_start = self.get_room_min_stream_ordering()
 
         super(DataStore, self).__init__(hs)
 

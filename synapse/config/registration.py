@@ -32,7 +32,6 @@ class RegistrationConfig(Config):
             )
 
         self.registration_shared_secret = config.get("registration_shared_secret")
-        self.user_creation_max_duration = int(config["user_creation_max_duration"])
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
         self.trusted_third_party_id_servers = config["trusted_third_party_id_servers"]
@@ -54,11 +53,6 @@ class RegistrationConfig(Config):
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.
         registration_shared_secret: "%(registration_shared_secret)s"
-
-        # Sets the expiry for the short term user creation in
-        # milliseconds. For instance the bellow duration is two weeks
-        # in milliseconds.
-        user_creation_max_duration: 1209600000
 
         # Set the number of bcrypt rounds used to generate password hash.
         # Larger numbers increase the work factor needed to generate the hash.

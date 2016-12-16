@@ -21,7 +21,7 @@ from synapse.api.errors import SynapseError, Codes, AuthError
 from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.filtering import Filter
-from synapse.types import UserID, RoomID, RoomAlias
+from synapse.types import UserID, RoomID, RoomAlias, ThirdPartyInstanceID
 from synapse.events.utils import serialize_event, format_event_for_client_v2
 from synapse.http.servlet import (
     parse_json_object_from_request, parse_string, parse_integer
@@ -321,6 +321,20 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
         since_token = content.get("since", None)
         search_filter = content.get("filter", None)
 
+        include_all_networks = content.get("include_all_networks", False)
+        third_party_instance_id = content.get("third_party_instance_id", None)
+
+        if include_all_networks:
+            network_tuple = None
+            if third_party_instance_id is not None:
+                raise SynapseError(
+                    400, "Can't use include_all_networks with an explicit network"
+                )
+        elif third_party_instance_id is None:
+            network_tuple = ThirdPartyInstanceID(None, None)
+        else:
+            network_tuple = ThirdPartyInstanceID.from_string(third_party_instance_id)
+
         handler = self.hs.get_room_list_handler()
         if server:
             data = yield handler.get_remote_public_room_list(
@@ -328,12 +342,15 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
                 limit=limit,
                 since_token=since_token,
                 search_filter=search_filter,
+                include_all_networks=include_all_networks,
+                third_party_instance_id=third_party_instance_id,
             )
         else:
             data = yield handler.get_local_public_room_list(
                 limit=limit,
                 since_token=since_token,
                 search_filter=search_filter,
+                network_tuple=network_tuple,
             )
 
         defer.returnValue((200, data))
@@ -366,6 +383,24 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
 
         defer.returnValue((200, {
             "chunk": chunk
+        }))
+
+
+class JoinedRoomMemberListRestServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/joined_members$")
+
+    def __init__(self, hs):
+        super(JoinedRoomMemberListRestServlet, self).__init__(hs)
+        self.state = hs.get_state_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id):
+        yield self.auth.get_user_by_req(request)
+
+        users_with_profile = yield self.state.get_current_user_in_room(room_id)
+
+        defer.returnValue((200, {
+            "joined": users_with_profile
         }))
 
 
@@ -692,6 +727,22 @@ class SearchRestServlet(ClientV1RestServlet):
         defer.returnValue((200, results))
 
 
+class JoinedRoomsRestServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/joined_rooms$")
+
+    def __init__(self, hs):
+        super(JoinedRoomsRestServlet, self).__init__(hs)
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+
+        rooms = yield self.store.get_rooms_for_user(requester.user.to_string())
+        room_ids = set(r.room_id for r in rooms)  # Ensure they're unique.
+        defer.returnValue((200, {"joined_rooms": list(room_ids)}))
+
+
 def register_txn_path(servlet, regex_string, http_server, with_get=False):
     """Registers a transaction-based path.
 
@@ -727,6 +778,7 @@ def register_servlets(hs, http_server):
     RoomStateEventRestServlet(hs).register(http_server)
     RoomCreateRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
+    JoinedRoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
     RoomForgetRestServlet(hs).register(http_server)
@@ -738,4 +790,5 @@ def register_servlets(hs, http_server):
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     SearchRestServlet(hs).register(http_server)
+    JoinedRoomsRestServlet(hs).register(http_server)
     RoomEventContext(hs).register(http_server)

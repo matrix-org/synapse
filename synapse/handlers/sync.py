@@ -277,6 +277,7 @@ class SyncHandler(object):
         """
         with Measure(self.clock, "load_filtered_recents"):
             timeline_limit = sync_config.filter_collection.timeline_limit()
+            block_all_timeline = sync_config.filter_collection.blocks_all_room_timeline()
 
             if recents is None or newly_joined_room or timeline_limit < len(recents):
                 limited = True
@@ -293,7 +294,7 @@ class SyncHandler(object):
             else:
                 recents = []
 
-            if not limited:
+            if not limited or block_all_timeline:
                 defer.returnValue(TimelineBatch(
                     events=recents,
                     prev_batch=now_token,
@@ -509,6 +510,7 @@ class SyncHandler(object):
         Returns:
             Deferred(SyncResult)
         """
+        logger.info("Calculating sync response for %r", sync_config.user)
 
         # NB: The now_token gets changed by some of the generate_sync_* methods,
         # this is due to some of the underlying streams not supporting the ability
@@ -531,9 +533,14 @@ class SyncHandler(object):
         )
         newly_joined_rooms, newly_joined_users = res
 
-        yield self._generate_sync_entry_for_presence(
-            sync_result_builder, newly_joined_rooms, newly_joined_users
+        block_all_presence_data = (
+            since_token is None and
+            sync_config.filter_collection.blocks_all_presence()
         )
+        if not block_all_presence_data:
+            yield self._generate_sync_entry_for_presence(
+                sync_result_builder, newly_joined_rooms, newly_joined_users
+            )
 
         yield self._generate_sync_entry_for_to_device(sync_result_builder)
 
@@ -569,16 +576,20 @@ class SyncHandler(object):
             # We only delete messages when a new message comes in, but that's
             # fine so long as we delete them at some point.
 
-            logger.debug("Deleting messages up to %d", since_stream_id)
-            yield self.store.delete_messages_for_device(
+            deleted = yield self.store.delete_messages_for_device(
                 user_id, device_id, since_stream_id
             )
+            logger.info("Deleted %d to-device messages up to %d",
+                        deleted, since_stream_id)
 
-            logger.debug("Getting messages up to %d", now_token.to_device_key)
             messages, stream_id = yield self.store.get_new_messages_for_device(
                 user_id, device_id, since_stream_id, now_token.to_device_key
             )
-            logger.debug("Got messages up to %d: %r", stream_id, messages)
+
+            logger.info(
+                "Returning %d to-device messages between %d and %d (current token: %d)",
+                len(messages), since_stream_id, stream_id, now_token.to_device_key
+            )
             sync_result_builder.now_token = now_token.copy_and_replace(
                 "to_device_key", stream_id
             )
@@ -709,13 +720,20 @@ class SyncHandler(object):
             `(newly_joined_rooms, newly_joined_users)`
         """
         user_id = sync_result_builder.sync_config.user.to_string()
-
-        now_token, ephemeral_by_room = yield self.ephemeral_by_room(
-            sync_result_builder.sync_config,
-            now_token=sync_result_builder.now_token,
-            since_token=sync_result_builder.since_token,
+        block_all_room_ephemeral = (
+            sync_result_builder.since_token is None and
+            sync_result_builder.sync_config.filter_collection.blocks_all_room_ephemeral()
         )
-        sync_result_builder.now_token = now_token
+
+        if block_all_room_ephemeral:
+            ephemeral_by_room = {}
+        else:
+            now_token, ephemeral_by_room = yield self.ephemeral_by_room(
+                sync_result_builder.sync_config,
+                now_token=sync_result_builder.now_token,
+                since_token=sync_result_builder.since_token,
+            )
+            sync_result_builder.now_token = now_token
 
         ignored_account_data = yield self.store.get_global_account_data_by_type_for_user(
             "m.ignored_user_list", user_id=user_id,
