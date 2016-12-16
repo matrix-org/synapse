@@ -1,3 +1,12 @@
+Changes in synapse v0.18.5 (2016-12-16)
+=======================================
+
+Bug fixes:
+
+* Fix federation /backfill returning events it shouldn't (PR #1700)
+* Fix crash in url preview (PR #1701)
+
+
 Changes in synapse v0.18.5-rc3 (2016-12-13)
 ===========================================
 
