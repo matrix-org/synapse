@@ -62,17 +62,18 @@ class RoomListHandler(BaseHandler):
                 appservice and network id to use an appservice specific one.
                 Setting to None returns all public rooms across all lists.
         """
-        if search_filter or (network_tuple and network_tuple.appservice_id is not None):
+        if search_filter:
             # We explicitly don't bother caching searches or requests for
             # appservice specific lists.
             return self._get_public_room_list(
                 limit, since_token, search_filter, network_tuple=network_tuple,
             )
 
-        result = self.response_cache.get((limit, since_token))
+        key = (limit, since_token, network_tuple)
+        result = self.response_cache.get(key)
         if not result:
             result = self.response_cache.set(
-                (limit, since_token),
+                key,
                 self._get_public_room_list(
                     limit, since_token, network_tuple=network_tuple
                 )
