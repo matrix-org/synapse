@@ -159,6 +159,10 @@ class ServerConfig(Config):
             # This will listen on all IPv4 addresses by default.
             bind_addresses:
               - '0.0.0.0'
+              # Uncomment to listen on all IPv6 interfaces
+              # N.B: On at least Linux this will also listen on all IPv4
+              # addresses, so you will need to comment out the line above.
+              # - '::'
 
             # This is a 'http' listener, allows us to specify 'resources'.
             type: http
