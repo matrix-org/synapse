@@ -87,7 +87,7 @@ class AppserviceServer(HomeServer):
 
         root_resource = create_resource_tree(resources, Resource())
 
-        if bind_address:
+        if bind_address is not None:
             bind_addresses.append(bind_address)
 
         for address in bind_addresses:
@@ -112,7 +112,7 @@ class AppserviceServer(HomeServer):
                 bind_address = listener.get("bind_address", None)
                 bind_addresses = listener.get("bind_addresses", [])
 
-                if bind_address:
+                if bind_address is not None:
                     bind_addresses.append(bind_address)
 
                 for address in bind_addresses:
