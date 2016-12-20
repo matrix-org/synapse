@@ -483,9 +483,9 @@ class RoomMemberStore(SQLBaseStore):
 
         def add_membership_profile_txn(txn):
             sql = ("""
-                SELECT stream_ordering, event_id, room_id, content
+                SELECT stream_ordering, event_id, events.room_id, content
                 FROM events
-                INNER JOIN room_memberships USING (room_id, event_id)
+                INNER JOIN room_memberships USING (event_id)
                 WHERE ? <= stream_ordering AND stream_ordering < ?
                 AND type = 'm.room.member'
                 ORDER BY stream_ordering DESC

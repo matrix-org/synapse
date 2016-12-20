@@ -42,7 +42,7 @@ EMTPY_THIRD_PARTY_ID = ThirdPartyInstanceID(None, None)
 class RoomListHandler(BaseHandler):
     def __init__(self, hs):
         super(RoomListHandler, self).__init__(hs)
-        self.response_cache = ResponseCache(hs)
+        self.response_cache = ResponseCache(hs, timeout_ms=10 * 60 * 1000)
         self.remote_response_cache = ResponseCache(hs, timeout_ms=30 * 1000)
 
     def get_local_public_room_list(self, limit=None, since_token=None,
@@ -62,18 +62,18 @@ class RoomListHandler(BaseHandler):
                 appservice and network id to use an appservice specific one.
                 Setting to None returns all public rooms across all lists.
         """
-        if search_filter or network_tuple is not (None, None):
+        if search_filter:
             # We explicitly don't bother caching searches or requests for
             # appservice specific lists.
             return self._get_public_room_list(
                 limit, since_token, search_filter, network_tuple=network_tuple,
             )
 
-        result = self.response_cache.get((limit, since_token))
+        result = self.response_cache.get((limit, since_token, network_tuple))
         if not result:
             result = self.response_cache.set(
-                (limit, since_token),
-                self._get_public_room_list(limit, since_token)
+                (limit, since_token, network_tuple),
+                self._get_public_room_list(limit, since_token, network_tuple=network_tuple)
             )
         return result
 
