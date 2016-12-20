@@ -617,6 +617,17 @@ class AuthHandler(BaseHandler):
             self.hs.get_clock().time_msec()
         )
 
+    @defer.inlineCallbacks
+    def delete_threepid(self, user_id, medium, address):
+        # 'Canonicalise' email addresses as per above
+        if medium == 'email':
+            address = address.lower()
+
+        ret = yield self.store.user_delete_threepid(
+            user_id, medium, address,
+        )
+        defer.returnValue(ret)
+
     def _save_session(self, session):
         # TODO: Persistent storage
         logger.debug("Saving session %s", session)
