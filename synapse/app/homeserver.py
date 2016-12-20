@@ -175,7 +175,7 @@ class SynapseHomeServer(HomeServer):
 
         root_resource = create_resource_tree(resources, root_resource)
 
-        if bind_address:
+        if bind_address is not None:
             bind_addresses.append(bind_address)
 
         if tls:
@@ -215,7 +215,7 @@ class SynapseHomeServer(HomeServer):
                 bind_address = listener.get("bind_address", None)
                 bind_addresses = listener.get("bind_addresses", [])
 
-                if bind_address:
+                if bind_address is not None:
                     bind_addresses.append(bind_address)
 
                 for address in bind_addresses:
