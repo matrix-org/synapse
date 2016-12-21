@@ -607,7 +607,7 @@ class AuthHandler(BaseHandler):
         # types (mediums) of threepid. For now, we still use the existing
         # infrastructure, but this is the start of synapse gaining knowledge
         # of specific types of threepid (and fixes the fact that checking
-        # for the presenc eof an email address during password reset was
+        # for the presence of an email address during password reset was
         # case sensitive).
         if medium == 'email':
             address = address.lower()
