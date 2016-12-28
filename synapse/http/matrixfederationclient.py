@@ -61,6 +61,11 @@ MAX_LONG_RETRIES = 10
 MAX_SHORT_RETRIES = 3
 
 
+def test(conn):
+    conn.loseConnection()
+    return conn
+
+
 class MatrixFederationEndpointFactory(object):
     def __init__(self, hs):
         self.tls_server_context_factory = hs.tls_server_context_factory
@@ -88,7 +93,8 @@ class MatrixFederationHttpClient(object):
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
         pool = HTTPConnectionPool(reactor)
-        pool.maxPersistentPerHost = 10
+        pool.maxPersistentPerHost = 5
+        pool.cachedConnectionTimeout = 2 * 60
         self.agent = Agent.usingEndpointFactory(
             reactor, MatrixFederationEndpointFactory(hs), pool=pool
         )
