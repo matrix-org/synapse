@@ -232,10 +232,12 @@ class RoomMemberHandler(BaseHandler):
         is_host_in_room = yield self._is_host_in_room(current_state_ids)
 
         if effective_membership_state == Membership.JOIN:
-            if requester.is_guest and not self._can_guest_join(current_state_ids):
-                # This should be an auth check, but guests are a local concept,
-                # so don't really fit into the general auth process.
-                raise AuthError(403, "Guest access not allowed")
+            if requester.is_guest:
+                guest_can_join = yield self._can_guest_join(current_state_ids)
+                if not guest_can_join:
+                    # This should be an auth check, but guests are a local concept,
+                    # so don't really fit into the general auth process.
+                    raise AuthError(403, "Guest access not allowed")
 
             if not is_host_in_room:
                 inviter = yield self.get_inviter(target.to_string(), room_id)
