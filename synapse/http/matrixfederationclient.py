@@ -300,7 +300,7 @@ class MatrixFederationHttpClient(object):
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
-    def post_json(self, destination, path, data={}, long_retries=True,
+    def post_json(self, destination, path, data={}, long_retries=False,
                   timeout=None):
         """ Sends the specifed json data using POST
 
@@ -333,7 +333,7 @@ class MatrixFederationHttpClient(object):
             path.encode("ascii"),
             body_callback=body_callback,
             headers_dict={"Content-Type": ["application/json"]},
-            long_retries=True,
+            long_retries=long_retries,
             timeout=timeout,
         )
 
