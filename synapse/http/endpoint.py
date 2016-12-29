@@ -89,8 +89,8 @@ class _WrappingEndpointFac(object):
 
 
 class _WrappedConnection(object):
-    """Wraps a connection and calls abort on it if it hasn't seen any actio
-    for 5 minutes
+    """Wraps a connection and calls abort on it if it hasn't seen any action
+    for 2.5-3 minutes.
     """
     __slots__ = ["conn", "last_request"]
 
@@ -107,20 +107,28 @@ class _WrappedConnection(object):
     def _time_things_out_maybe(self):
         # We use a slightly shorter timeout here just in case the callLater is
         # triggered early. Paranoia ftw.
+        # TODO: Cancel the previous callLater rather than comparing time.time()?
         if time.time() - self.last_request >= 2.5 * 60:
             self.abort()
+            # Abort the underlying TLS connection. The abort() method calls
+            # loseConnection() on the underlying TLS connection which tries to
+            # shutdown the connection cleanly. We call abortConnection()
+            # since that will promptly close the underlying TCP connection.
+            self.transport.abortConnection()
 
     def request(self, request):
         self.last_request = time.time()
 
         # Time this connection out if we haven't send a request in the last
         # N minutes
+        # TODO: Cancel the previous callLater?
         reactor.callLater(3 * 60, self._time_things_out_maybe)
 
         d = self.conn.request(request)
 
         def update_request_time(res):
             self.last_request = time.time()
+            # TODO: Cancel the previous callLater?
             reactor.callLater(3 * 60, self._time_things_out_maybe)
             return res
 
