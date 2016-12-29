@@ -66,18 +66,18 @@ def matrix_federation_endpoint(reactor, destination, ssl_context_factory=None,
         default_port = 8448
 
     if port is None:
-        return _WrappingEndointFac(SRVClientEndpoint(
+        return _WrappingEndpointFac(SRVClientEndpoint(
             reactor, "matrix", domain, protocol="tcp",
             default_port=default_port, endpoint=transport_endpoint,
             endpoint_kw_args=endpoint_kw_args
         ))
     else:
-        return _WrappingEndointFac(transport_endpoint(
+        return _WrappingEndpointFac(transport_endpoint(
             reactor, domain, port, **endpoint_kw_args
         ))
 
 
-class _WrappingEndointFac(object):
+class _WrappingEndpointFac(object):
     def __init__(self, endpoint_fac):
         self.endpoint_fac = endpoint_fac
 
@@ -105,7 +105,9 @@ class _WrappedConnection(object):
         setattr(self.conn, name, value)
 
     def _time_things_out_maybe(self):
-        if time.time() - self.last_request >= 2 * 60:
+        # We use a slightly shorter timeout here just in case the callLater is
+        # triggered early. Paranoia ftw.
+        if time.time() - self.last_request >= 2.5 * 60:
             self.abort()
 
     def request(self, request):
