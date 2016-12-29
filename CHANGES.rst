@@ -1,3 +1,10 @@
+Changes in synapse v0.18.6-rc1 (2016-12-29)
+===========================================
+
+Bug fixes:
+
+* Make sure that outbound connections are closed (PR #1725)
+
 Changes in synapse v0.18.5 (2016-12-16)
 =======================================
 

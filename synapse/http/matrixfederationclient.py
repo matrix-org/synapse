@@ -88,7 +88,8 @@ class MatrixFederationHttpClient(object):
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
         pool = HTTPConnectionPool(reactor)
-        pool.maxPersistentPerHost = 10
+        pool.maxPersistentPerHost = 5
+        pool.cachedConnectionTimeout = 2 * 60
         self.agent = Agent.usingEndpointFactory(
             reactor, MatrixFederationEndpointFactory(hs), pool=pool
         )
@@ -299,7 +300,7 @@ class MatrixFederationHttpClient(object):
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
-    def post_json(self, destination, path, data={}, long_retries=True,
+    def post_json(self, destination, path, data={}, long_retries=False,
                   timeout=None):
         """ Sends the specifed json data using POST
 
@@ -332,7 +333,7 @@ class MatrixFederationHttpClient(object):
             path.encode("ascii"),
             body_callback=body_callback,
             headers_dict={"Content-Type": ["application/json"]},
-            long_retries=True,
+            long_retries=long_retries,
             timeout=timeout,
         )
 
