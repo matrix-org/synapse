@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from twisted.internet.endpoints import SSL4ClientEndpoint, TCP4ClientEndpoint
-from twisted.internet import defer, reactor, task
+from twisted.internet import defer, reactor
 from twisted.internet.error import ConnectError
 from twisted.names import client, dns
 from twisted.names.error import DNSNameError, DomainError
@@ -72,7 +72,9 @@ def matrix_federation_endpoint(reactor, destination, ssl_context_factory=None,
             endpoint_kw_args=endpoint_kw_args
         ))
     else:
-        return _WrappingEndointFac(transport_endpoint(reactor, domain, port, **endpoint_kw_args))
+        return _WrappingEndointFac(transport_endpoint(
+            reactor, domain, port, **endpoint_kw_args
+        ))
 
 
 class _WrappingEndointFac(object):

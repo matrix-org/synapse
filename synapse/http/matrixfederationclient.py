@@ -61,11 +61,6 @@ MAX_LONG_RETRIES = 10
 MAX_SHORT_RETRIES = 3
 
 
-def test(conn):
-    conn.loseConnection()
-    return conn
-
-
 class MatrixFederationEndpointFactory(object):
     def __init__(self, hs):
         self.tls_server_context_factory = hs.tls_server_context_factory
