@@ -38,6 +38,8 @@ from twisted.application import service
 from twisted.web.resource import Resource, EncodingResourceWrapper
 from twisted.web.static import File
 from twisted.web.server import GzipEncoderFactory
+from twisted.logger import globalLogBeginner, STDLibLogObserver
+
 from synapse.http.server import RootRedirect
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.media.v1.media_repository import MediaRepositoryResource
@@ -474,6 +476,16 @@ def run(hs):
 
 
 def main():
+
+    # it's critical to point twisted's internal logging somewhere, otherwise it
+    # stacks up and leaks; see: https://twistedmatrix.com/trac/ticket/8164
+    #
+    # XXX: however, routing it to python.logging is apparently a perf problem
+    # as python.logging is a blocking API - see
+    # https://twistedmatrix.com/documents/current/core/howto/logger.html
+    # filed as https://github.com/matrix-org/synapse/issues/1727
+    globalLogBeginner.beginLoggingTo([STDLibLogObserver()])
+
     with LoggingContext("main"):
         # check base requirements
         check_requirements()
