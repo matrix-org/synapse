@@ -23,6 +23,10 @@ from synapse.util import unwrapFirstError
 
 from contextlib import contextmanager
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 @defer.inlineCallbacks
 def sleep(seconds):
@@ -181,6 +185,7 @@ class Linearizer(object):
         self.key_to_defer[key] = new_defer
 
         if current_defer:
+            logger.info("Waiting to acquire linearizer lock for key %r", key)
             with PreserveLoggingContext():
                 yield current_defer
 
