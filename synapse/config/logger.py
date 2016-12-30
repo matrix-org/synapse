@@ -15,7 +15,7 @@
 
 from ._base import Config
 from synapse.util.logcontext import LoggingContextFilter
-from twisted.python.log import PythonLoggingObserver
+from twisted.logger import globalLogBeginner, STDLibLogObserver
 import logging
 import logging.config
 import yaml
@@ -180,5 +180,15 @@ def setup_logging(log_config=None, log_file=None, verbosity=None):
         with open(log_config, 'r') as f:
             logging.config.dictConfig(yaml.load(f))
 
-    observer = PythonLoggingObserver()
-    observer.start()
+    # It's critical to point twisted's internal logging somewhere, otherwise it
+    # stacks up and leaks kup to 64K object;
+    # see: https://twistedmatrix.com/trac/ticket/8164
+    #
+    # Routing to the python logging framework could be a performance problem if
+    # the handlers blocked for a long time as python.logging is a blocking API
+    # see https://twistedmatrix.com/documents/current/core/howto/logger.html
+    # filed as https://github.com/matrix-org/synapse/issues/1727
+    #
+    # However this may not be too much of a problem if we are just writing to a file.
+    observer = STDLibLogObserver()
+    globalLogBeginner.beginLoggingTo([observer])
