@@ -539,12 +539,12 @@ class FederationServer(FederationBase):
                     # If we're missing stuff, ensure we only fetch stuff one
                     # at a time.
                     logger.info(
-                        "Aquiring lock for room %r to fetch %d missing events: %r...",
+                        "Acquiring lock for room %r to fetch %d missing events: %r...",
                         pdu.room_id, len(prevs - seen), list(prevs - seen)[:5],
                     )
                     with (yield self._room_pdu_linearizer.queue(pdu.room_id)):
                         logger.info(
-                            "Aquired lock for room %r to fetch %d missing events",
+                            "Acquired lock for room %r to fetch %d missing events",
                             pdu.room_id, len(prevs - seen),
                         )
 

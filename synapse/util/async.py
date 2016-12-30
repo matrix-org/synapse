@@ -185,7 +185,7 @@ class Linearizer(object):
         self.key_to_defer[key] = new_defer
 
         if current_defer:
-            logger.info("Waiting to aquire linearizer lock for key %r", key)
+            logger.info("Waiting to acquire linearizer lock for key %r", key)
             with PreserveLoggingContext():
                 yield current_defer
 
