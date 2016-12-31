@@ -1,3 +1,13 @@
+Changes in synapse v0.18.6-rc2 (2016-12-30)
+===========================================
+
+Bug fixes:
+
+* Fix memory leak in twisted by initialising logging correctly (PR #1731)
+* Fix bug where fetching missing events took an unacceptable amount of time in
+  large rooms (PR #1734)
+
+
 Changes in synapse v0.18.6-rc1 (2016-12-29)
 ===========================================
 
