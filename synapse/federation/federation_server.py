@@ -425,6 +425,7 @@ class FederationServer(FederationBase):
                 " limit: %d, min_depth: %d",
                 earliest_events, latest_events, limit, min_depth
             )
+
             missing_events = yield self.handler.on_get_missing_events(
                 origin, room_id, earliest_events, latest_events, limit, min_depth
             )
@@ -567,6 +568,9 @@ class FederationServer(FederationBase):
                                 len(prevs - seen), pdu.room_id, list(prevs - seen)[:5]
                             )
 
+                            # XXX: we set timeout to 10s to help workaround
+                            # https://github.com/matrix-org/synapse/issues/1733
+
                             missing_events = yield self.get_missing_events(
                                 origin,
                                 pdu.room_id,
@@ -574,6 +578,7 @@ class FederationServer(FederationBase):
                                 latest_events=[pdu],
                                 limit=10,
                                 min_depth=min_depth,
+                                timeout=10000,
                             )
 
                             # We want to sort these by depth so we process them and
