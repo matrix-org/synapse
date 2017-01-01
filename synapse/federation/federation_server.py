@@ -538,7 +538,16 @@ class FederationServer(FederationBase):
                 if get_missing and prevs - seen:
                     # If we're missing stuff, ensure we only fetch stuff one
                     # at a time.
+                    logger.info(
+                        "Acquiring lock for room %r to fetch %d missing events: %r...",
+                        pdu.room_id, len(prevs - seen), list(prevs - seen)[:5],
+                    )
                     with (yield self._room_pdu_linearizer.queue(pdu.room_id)):
+                        logger.info(
+                            "Acquired lock for room %r to fetch %d missing events",
+                            pdu.room_id, len(prevs - seen),
+                        )
+
                         # We recalculate seen, since it may have changed.
                         have_seen = yield self.store.have_events(prevs)
                         seen = set(have_seen.keys())
