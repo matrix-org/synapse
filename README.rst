@@ -168,7 +168,7 @@ Before you can start Synapse, you will need to generate a configuration
 file. To do this, run (in your virtualenv, as before)::
 
     cd ~/.synapse
-    python -m synapse.app.homeserver \
+    synapse \
         --server-name my.domain.name \
         --config-path homeserver.yaml \
         --generate-config \
@@ -557,11 +557,11 @@ should have the format ``_matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port>
 You can then configure your homeserver to use ``<yourdomain.com>`` as the domain in
 its user-ids, by setting ``server_name``::
 
-    python -m synapse.app.homeserver \
+    synapse \
         --server-name <yourdomain.com> \
         --config-path homeserver.yaml \
         --generate-config
-    python -m synapse.app.homeserver --config-path homeserver.yaml
+    synapse --config-path homeserver.yaml
 
 If you've already generated the config file, you need to edit the ``server_name``
 in your ``homeserver.yaml`` file. If you've already started Synapse and a
