@@ -19,7 +19,7 @@ from twisted.internet import defer
 from .persistence import TransactionActions
 from .units import Transaction, Edu
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes
 from synapse.api.errors import HttpResponseException
 from synapse.util.async import run_on_reactor
 from synapse.util.logcontext import preserve_context_over_fn
@@ -161,9 +161,11 @@ class TransactionQueue(object):
                         get_domain_from_id(user_id) for user_id in users_in_room
                     )
 
+                    # Send all membership changes to the server that was affected.
+                    # This ensures that if the last member of a room on a server
+                    # was kicked or banned they get told about it.
                     if event.type == EventTypes.Member:
-                        if event.content["membership"] == Membership.JOIN:
-                            destinations.add(get_domain_from_id(event.state_key))
+                        destinations.add(get_domain_from_id(event.state_key))
 
                     logger.debug("Sending %s to %r", event, destinations)
 
