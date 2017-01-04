@@ -19,7 +19,6 @@ from twisted.internet import defer
 from .persistence import TransactionActions
 from .units import Transaction, Edu
 
-from synapse.api.constants import EventTypes
 from synapse.api.errors import HttpResponseException
 from synapse.util.async import run_on_reactor
 from synapse.util.logcontext import preserve_context_over_fn
@@ -153,19 +152,21 @@ class TransactionQueue(object):
                     break
 
                 for event in events:
+                    # Get the state from before the event.
+                    # We need to make sure that this is the state from before
+                    # the event and not from after it.
+                    # Otherwise if the last member on a server in a room is
+                    # banned then it won't receive the event because it won't
+                    # be in the room after the ban.
                     users_in_room = yield self.state.get_current_user_in_room(
-                        event.room_id, latest_event_ids=[event.event_id],
+                        event.room_id, latest_event_ids=[
+                            prev_id for prev_id, _ in event.prev_events
+                        ],
                     )
 
                     destinations = set(
                         get_domain_from_id(user_id) for user_id in users_in_room
                     )
-
-                    # Send all membership changes to the server that was affected.
-                    # This ensures that if the last member of a room on a server
-                    # was kicked or banned they get told about it.
-                    if event.type == EventTypes.Member:
-                        destinations.add(get_domain_from_id(event.state_key))
 
                     logger.debug("Sending %s to %r", event, destinations)
 
