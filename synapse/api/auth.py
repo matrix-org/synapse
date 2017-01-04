@@ -83,8 +83,8 @@ class Auth(object):
             if not hasattr(event, "room_id"):
                 raise AuthError(500, "Event has no room_id: %s" % event)
 
+            sender_domain = get_domain_from_id(event.sender)
             if do_sig_check:
-                sender_domain = get_domain_from_id(event.sender)
                 event_id_domain = get_domain_from_id(event.event_id)
 
                 is_invite_via_3pid = (
@@ -130,9 +130,15 @@ class Auth(object):
                     "Room %r does not exist" % (event.room_id,)
                 )
 
+            if event.room_id != creation_event.room_id:
+                raise SynapseError(
+                    403, "Event has the wrong room_id: %r != %r" % (
+                        event.room_id, creation_event.room_id
+                    )
+                )
+
             creating_domain = get_domain_from_id(event.room_id)
-            originating_domain = get_domain_from_id(event.sender)
-            if creating_domain != originating_domain:
+            if creating_domain != sender_domain:
                 if not self.can_federate(event, auth_events):
                     raise AuthError(
                         403,
@@ -331,7 +337,8 @@ class Auth(object):
             create = auth_events.get(key)
             if create and event.prev_events[0][0] == create.event_id:
                 if create.content["creator"] == event.state_key:
-                    return True
+                    if event.state_key == event.sender:
+                        return True
 
         target_user_id = event.state_key
 
