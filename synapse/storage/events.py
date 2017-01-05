@@ -1084,8 +1084,10 @@ class EventsStore(SQLBaseStore):
                     self._do_fetch
                 )
 
+        logger.info("Loading %d events", len(events))
         with PreserveLoggingContext():
             rows = yield events_d
+        logger.info("Loaded %d events (%d rows)", len(events), len(rows))
 
         if not allow_rejected:
             rows[:] = [r for r in rows if not r["rejects"]]
