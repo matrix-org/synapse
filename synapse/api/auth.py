@@ -290,6 +290,7 @@ class Auth(object):
         with Measure(self.clock, "check_host_in_room"):
             latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
 
+            logger.info("calling resolve_state_groups from check_host_in_room")
             entry = yield self.state.resolve_state_groups(
                 room_id, latest_event_ids
             )

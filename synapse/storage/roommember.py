@@ -393,8 +393,8 @@ class RoomMemberStore(SQLBaseStore):
     @cachedInlineCallbacks(num_args=2, cache_context=True)
     def _get_joined_users_from_context(self, room_id, state_group, current_state_ids,
                                        cache_context, event=None):
-        # We don't use `state_group`, its there so that we can cache based
-        # on it. However, its important that its never None, since two current_state's
+        # We don't use `state_group`, it's there so that we can cache based
+        # on it. However, it's important that it's never None, since two current_states
         # with a state_group of None are likely to be different.
         # See bulk_get_push_rules_for_room for how we work around this.
         assert state_group is not None
