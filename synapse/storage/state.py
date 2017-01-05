@@ -384,7 +384,7 @@ class StateStore(SQLBaseStore):
                     # We did this before by getting the list of group ids, and
                     # then passing that list to sqlite to get latest event for
                     # each (type, state_key). However, that was terribly slow
-                    # without the right indicies (which we can't add until
+                    # without the right indices (which we can't add until
                     # after we finish deduping state, which requires this func)
                     args = [next_group]
                     if types:
