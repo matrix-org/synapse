@@ -166,7 +166,11 @@ class Linearizer(object):
             # do some work.
 
     """
-    def __init__(self):
+    def __init__(self, name=None):
+        if name is None:
+            self.name = id(self)
+        else:
+            self.name = name
         self.key_to_defer = {}
 
     @defer.inlineCallbacks
@@ -185,15 +189,20 @@ class Linearizer(object):
         self.key_to_defer[key] = new_defer
 
         if current_defer:
-            logger.info("Waiting to acquire linearizer lock for key %r", key)
+            logger.info(
+                "Waiting to acquire linearizer lock %r for key %r", self.name, key
+            )
             with PreserveLoggingContext():
                 yield current_defer
+
+        logger.info("Acquired linearizer lock %r for key %r", self.name, key)
 
         @contextmanager
         def _ctx_manager():
             try:
                 yield
             finally:
+                logger.info("Releasing linearizer lock %r for key %r", self.name, key)
                 new_defer.callback(None)
                 current_d = self.key_to_defer.get(key)
                 if current_d is new_defer:
