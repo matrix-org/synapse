@@ -790,6 +790,10 @@ class FederationHandler(BaseHandler):
         )
 
         event.internal_metadata.outlier = False
+        # Send this event on behalf of the origin server since they may not
+        # have an up to data view of the state of the room at this event so
+        # will not know which servers to send the event to.
+        event.internal_metadata.send_on_behalf_of = origin
 
         context, event_stream_id, max_stream_id = yield self._handle_new_event(
             origin, event
