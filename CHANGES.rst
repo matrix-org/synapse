@@ -11,7 +11,7 @@ Bug fixes:
 
 Changes:
 
-* Improve logging for debugging deadlocks (PR #1766)
+* Improve logging for debugging deadlocks (PR #1766, PR #1767)
 
 Changes in synapse v0.18.6-rc2 (2016-12-30)
 ===========================================
