@@ -19,7 +19,6 @@ from twisted.internet import defer
 from .persistence import TransactionActions
 from .units import Transaction, Edu
 
-from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import HttpResponseException
 from synapse.util.async import run_on_reactor
 from synapse.util.logcontext import preserve_context_over_fn
@@ -62,6 +61,7 @@ class TransactionQueue(object):
         self.transport_layer = hs.get_federation_transport_client()
 
         self.clock = hs.get_clock()
+        self.is_mine_id = hs.is_mine_id
 
         # Is a mapping from destinations -> deferreds. Used to keep track
         # of which destinations have transactions in flight and when they are
@@ -153,17 +153,32 @@ class TransactionQueue(object):
                     break
 
                 for event in events:
+                    # Only send events for this server.
+                    send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
+                    is_mine = self.is_mine_id(event.event_id)
+                    if not is_mine and send_on_behalf_of is None:
+                        continue
+
+                    # Get the state from before the event.
+                    # We need to make sure that this is the state from before
+                    # the event and not from after it.
+                    # Otherwise if the last member on a server in a room is
+                    # banned then it won't receive the event because it won't
+                    # be in the room after the ban.
                     users_in_room = yield self.state.get_current_user_in_room(
-                        event.room_id, latest_event_ids=[event.event_id],
+                        event.room_id, latest_event_ids=[
+                            prev_id for prev_id, _ in event.prev_events
+                        ],
                     )
 
                     destinations = set(
                         get_domain_from_id(user_id) for user_id in users_in_room
                     )
-
-                    if event.type == EventTypes.Member:
-                        if event.content["membership"] == Membership.JOIN:
-                            destinations.add(get_domain_from_id(event.state_key))
+                    if send_on_behalf_of is not None:
+                        # If we are sending the event on behalf of another server
+                        # then it already has the event and there is no reason to
+                        # send the event to it.
+                        destinations.discard(send_on_behalf_of)
 
                     logger.debug("Sending %s to %r", event, destinations)
 

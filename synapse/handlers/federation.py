@@ -591,6 +591,7 @@ class FederationHandler(BaseHandler):
 
         event_ids = list(extremities.keys())
 
+        logger.info("calling resolve_state_groups in _maybe_backfill")
         states = yield preserve_context_over_deferred(defer.gatherResults([
             preserve_fn(self.state_handler.resolve_state_groups)(room_id, [e])
             for e in event_ids
@@ -790,6 +791,10 @@ class FederationHandler(BaseHandler):
         )
 
         event.internal_metadata.outlier = False
+        # Send this event on behalf of the origin server since they may not
+        # have an up to data view of the state of the room at this event so
+        # will not know which servers to send the event to.
+        event.internal_metadata.send_on_behalf_of = origin
 
         context, event_stream_id, max_stream_id = yield self._handle_new_event(
             origin, event

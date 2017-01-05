@@ -386,7 +386,7 @@ class TransportLayerClient(object):
     @defer.inlineCallbacks
     @log_function
     def get_missing_events(self, destination, room_id, earliest_events,
-                           latest_events, limit, min_depth):
+                           latest_events, limit, min_depth, timeout):
         path = PREFIX + "/get_missing_events/%s" % (room_id,)
 
         content = yield self.client.post_json(
@@ -397,7 +397,8 @@ class TransportLayerClient(object):
                 "min_depth": int(min_depth),
                 "earliest_events": earliest_events,
                 "latest_events": latest_events,
-            }
+            },
+            timeout=timeout,
         )
 
         defer.returnValue(content)
