@@ -591,7 +591,7 @@ class FederationHandler(BaseHandler):
 
         event_ids = list(extremities.keys())
 
-        logger.info("Calling resolve_state_groups in _maybe_backfill")
+        logger.info("calling resolve_state_groups in _maybe_backfill")
         states = yield preserve_context_over_deferred(defer.gatherResults([
             preserve_fn(self.state_handler.resolve_state_groups)(room_id, [e])
             for e in event_ids
