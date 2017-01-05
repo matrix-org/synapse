@@ -569,7 +569,23 @@ class FederationServer(FederationBase):
                             )
 
                             # XXX: we set timeout to 10s to help workaround
-                            # https://github.com/matrix-org/synapse/issues/1733
+                            # https://github.com/matrix-org/synapse/issues/1733.
+                            # The reason is to avoid holding the linearizer lock
+                            # whilst processing inbound /send transactions, causing
+                            # FDs to stack up and block other inbound transactions
+                            # which empirically can currently take up to 30 minutes.
+                            #
+                            # N.B. this explicitly disables retry attempts.
+                            #
+                            # N.B. this also increases our chances of falling back to
+                            # fetching fresh state for the room if the missing event
+                            # can't be found, which slightly reduces our security.
+                            # it may also increase our DAG extremity count for the room,
+                            # causing additional state resolution?  See #1760.
+                            # However, fetching state doesn't hold the linearizer lock
+                            # apparently.
+                            #
+                            # see https://github.com/matrix-org/synapse/pull/1744
 
                             missing_events = yield self.get_missing_events(
                                 origin,
