@@ -1,3 +1,10 @@
+Changes in synapse v0.18.7 (2017-01-06)
+=======================================
+
+Bug fixes:
+
+* Fix error in #PR 1764 to actually fix the nightmare #1753 bug.
+
 Changes in synapse v0.18.6 (2017-01-06)
 =======================================
 
