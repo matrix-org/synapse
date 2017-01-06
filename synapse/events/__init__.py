@@ -43,7 +43,7 @@ class _EventInternalMetadata(object):
 
         returns a str with the name of the server this event is sent on behalf of.
         """
-        return getattr(self, "send_on_behalf_of", None)
+        return getattr(self, "get_send_on_behalf_of", None)
 
 
 def _event_dict_property(key):
