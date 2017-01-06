@@ -1,3 +1,10 @@
+Changes in synapse v0.18.6 (2017-01-06)
+=======================================
+
+Bug fixes:
+
+* Fix bug when checking if a guest user is allowed to join a room (PR #1772)
+
 Changes in synapse v0.18.6-rc3 (2017-01-05)
 ===========================================
 
