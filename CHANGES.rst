@@ -1,3 +1,11 @@
+Changes in synapse v0.18.7-rc2 (2017-01-07)
+===========================================
+
+Bug fixes:
+
+* Fix error in rc1's discarding invalid inbound traffic logic that was
+  incorrectly discarding missing events
+
 Changes in synapse v0.18.7-rc1 (2017-01-06)
 ===========================================
 
@@ -5,6 +13,8 @@ Bug fixes:
 
 * Fix error in #PR 1764 to actually fix the nightmare #1753 bug.
 * Improve deadlock logging further
+* Discard inbound federation traffic from invalid domains, to immunise
+  against #1753
 
 Changes in synapse v0.18.6 (2017-01-06)
 =======================================
