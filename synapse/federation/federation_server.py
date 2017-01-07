@@ -144,6 +144,26 @@ class FederationServer(FederationBase):
         results = []
 
         for pdu in pdu_list:
+            # check that it's actually being sent from a valid destination to
+            # workaround bug #1753 in 0.18.5 and 0.18.6
+            if transaction.origin != get_domain_from_id(pdu.event_id):
+                if not (
+                    pdu.type == 'm.room.member' and
+                    pdu.content and
+                    pdu.content.get("membership", None) == 'join' and
+                    self.hs.is_mine_id(pdu.state_key)
+                ):
+                    logger.info(
+                        "Discarding PDU %s from invalid origin %s",
+                        pdu.event_id, transaction.origin
+                    )
+                    continue
+                else:
+                    logger.info(
+                        "Accepting join PDU %s from %s",
+                        pdu.event_id, transaction.origin
+                    )
+
             try:
                 yield self._handle_new_pdu(transaction.origin, pdu)
                 results.append({})
@@ -476,26 +496,6 @@ class FederationServer(FederationBase):
     @defer.inlineCallbacks
     @log_function
     def _handle_new_pdu(self, origin, pdu, get_missing=True):
-
-        # check that it's actually being sent from a valid destination to
-        # workaround bug #1753 in 0.18.5 and 0.18.6
-        if origin != get_domain_from_id(pdu.event_id):
-            if not (
-                pdu.type == 'm.room.member' and
-                pdu.content and
-                pdu.content.get("membership", None) == 'join' and
-                self.hs.is_mine_id(pdu.state_key)
-            ):
-                logger.info(
-                    "Discarding PDU %s from invalid origin %s",
-                    pdu.event_id, origin
-                )
-                return
-            else:
-                logger.info(
-                    "Accepting join PDU %s from %s",
-                    pdu.event_id, origin
-                )
 
         # We reprocess pdus when we have seen them only as outliers
         existing = yield self._get_persisted_pdu(

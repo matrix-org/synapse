@@ -1,3 +1,11 @@
+Changes in synapse v0.18.7-rc2 (2017-01-07)
+===========================================
+
+Bug fixes:
+
+* Fix error in rc1's discarding invalid inbound traffic logic that was
+  incorrectly discarding missing events
+
 Changes in synapse v0.18.7-rc1 (2017-01-06)
 ===========================================
 
