@@ -1,3 +1,9 @@
+Changes in synapse v0.18.7 (2017-01-09)
+=======================================
+
+No changes from v0.18.7-rc2
+
+
 Changes in synapse v0.18.7-rc2 (2017-01-07)
 ===========================================
 
@@ -5,6 +11,7 @@ Bug fixes:
 
 * Fix error in rc1's discarding invalid inbound traffic logic that was
   incorrectly discarding missing events
+
 
 Changes in synapse v0.18.7-rc1 (2017-01-06)
 ===========================================
@@ -16,12 +23,14 @@ Bug fixes:
 * Discard inbound federation traffic from invalid domains, to immunise
   against #1753
 
+
 Changes in synapse v0.18.6 (2017-01-06)
 =======================================
 
 Bug fixes:
 
 * Fix bug when checking if a guest user is allowed to join a room (PR #1772)
+
 
 Changes in synapse v0.18.6-rc3 (2017-01-05)
 ===========================================
@@ -37,6 +46,7 @@ Bug fixes:
 Changes:
 
 * Improve logging for debugging deadlocks (PR #1766, PR #1767)
+
 
 Changes in synapse v0.18.6-rc2 (2016-12-30)
 ===========================================
@@ -54,6 +64,7 @@ Changes in synapse v0.18.6-rc1 (2016-12-29)
 Bug fixes:
 
 * Make sure that outbound connections are closed (PR #1725)
+
 
 Changes in synapse v0.18.5 (2016-12-16)
 =======================================
