@@ -45,7 +45,7 @@ class RoomMemberHandler(BaseHandler):
     def __init__(self, hs):
         super(RoomMemberHandler, self).__init__(hs)
 
-        self.member_linearizer = Linearizer()
+        self.member_linearizer = Linearizer(name="member")
 
         self.clock = hs.get_clock()
 
