@@ -89,7 +89,7 @@ class RoomMemberHandler(BaseHandler):
         duplicate = yield msg_handler.deduplicate_state_event(event, context)
         if duplicate is not None:
             # Discard the new event since this membership change is a no-op.
-            return
+            defer.returnValue(duplicate)
 
         yield msg_handler.handle_new_client_event(
             requester,
@@ -119,6 +119,8 @@ class RoomMemberHandler(BaseHandler):
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
                 if prev_member_event.membership == Membership.JOIN:
                     user_left_room(self.distributor, target, room_id)
+
+        defer.returnValue(event)
 
     @defer.inlineCallbacks
     def remote_join(self, remote_room_hosts, room_id, user, content):
@@ -187,6 +189,7 @@ class RoomMemberHandler(BaseHandler):
             ratelimit=True,
             content=None,
     ):
+        content_specified = bool(content)
         if content is None:
             content = {}
 
@@ -229,6 +232,12 @@ class RoomMemberHandler(BaseHandler):
                     errcode=Codes.BAD_STATE
                 )
 
+            same_content = content == old_state.content
+            same_membership = old_membership == effective_membership_state
+            same_sender = requester.user.to_string() == old_state.sender
+            if same_sender and same_membership and same_content:
+                defer.returnValue(old_state)
+
         is_host_in_room = yield self._is_host_in_room(current_state_ids)
 
         if effective_membership_state == Membership.JOIN:
@@ -247,8 +256,9 @@ class RoomMemberHandler(BaseHandler):
                 content["membership"] = Membership.JOIN
 
                 profile = self.hs.get_handlers().profile_handler
-                content["displayname"] = yield profile.get_displayname(target)
-                content["avatar_url"] = yield profile.get_avatar_url(target)
+                if not content_specified:
+                    content["displayname"] = yield profile.get_displayname(target)
+                    content["avatar_url"] = yield profile.get_avatar_url(target)
 
                 if requester.is_guest:
                     content["kind"] = "guest"
@@ -290,7 +300,7 @@ class RoomMemberHandler(BaseHandler):
 
                         defer.returnValue({})
 
-        yield self._local_membership_update(
+        res = yield self._local_membership_update(
             requester=requester,
             target=target,
             room_id=room_id,
@@ -300,6 +310,7 @@ class RoomMemberHandler(BaseHandler):
             prev_event_ids=latest_event_ids,
             content=content,
         )
+        defer.returnValue(res)
 
     @defer.inlineCallbacks
     def send_membership_event(

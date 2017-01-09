@@ -152,23 +152,29 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
         if state_key is not None:
             event_dict["state_key"] = state_key
 
-        msg_handler = self.handlers.message_handler
-        event, context = yield msg_handler.create_event(
-            event_dict,
-            token_id=requester.access_token_id,
-            txn_id=txn_id,
-        )
-
         if event_type == EventTypes.Member:
-            yield self.handlers.room_member_handler.send_membership_event(
+            membership = content.get("membership", None)
+            event = yield self.handlers.room_member_handler.update_membership(
                 requester,
-                event,
-                context,
+                target=UserID.from_string(state_key),
+                room_id=room_id,
+                action=membership,
+                content=content,
             )
         else:
+            msg_handler = self.handlers.message_handler
+            event, context = yield msg_handler.create_event(
+                event_dict,
+                token_id=requester.access_token_id,
+                txn_id=txn_id,
+            )
+
             yield msg_handler.send_nonmember_event(requester, event, context)
 
-        defer.returnValue((200, {"event_id": event.event_id}))
+        ret = {}
+        if event:
+            ret = {"event_id": event.event_id}
+        defer.returnValue((200, ret))
 
 
 # TODO: Needs unit testing for generic events + feedback
