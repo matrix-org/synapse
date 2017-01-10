@@ -189,7 +189,8 @@ class DataStore(RoomMemberStore, RoomStore,
             db_conn, "device_inbox",
             entity_column="user_id",
             stream_column="stream_id",
-            max_value=max_device_inbox_id
+            max_value=max_device_inbox_id,
+            limit=1000,
         )
         self._device_inbox_stream_cache = StreamChangeCache(
             "DeviceInboxStreamChangeCache", min_device_inbox_id,
@@ -202,6 +203,7 @@ class DataStore(RoomMemberStore, RoomStore,
             entity_column="destination",
             stream_column="stream_id",
             max_value=max_device_inbox_id,
+            limit=1000,
         )
         self._device_federation_outbox_stream_cache = StreamChangeCache(
             "DeviceFederationOutboxStreamChangeCache", min_device_outbox_id,
