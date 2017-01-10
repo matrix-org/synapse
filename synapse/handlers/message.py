@@ -279,7 +279,7 @@ class MessageHandler(BaseHandler):
 
         if event.type == EventTypes.Message:
             presence = self.hs.get_presence_handler()
-            yield presence.bump_presence_active_time(user)
+            preserve_fn(presence.bump_presence_active_time)(user)
 
     @defer.inlineCallbacks
     def deduplicate_state_event(self, event, context):
