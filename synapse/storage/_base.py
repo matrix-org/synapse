@@ -838,18 +838,19 @@ class SQLBaseStore(object):
         return txn.execute(sql, keyvalues.values())
 
     def _get_cache_dict(self, db_conn, table, entity_column, stream_column,
-                        max_value):
+                        max_value, limit=100000):
         # Fetch a mapping of room_id -> max stream position for "recent" rooms.
         # It doesn't really matter how many we get, the StreamChangeCache will
         # do the right thing to ensure it respects the max size of cache.
         sql = (
             "SELECT %(entity)s, MAX(%(stream)s) FROM %(table)s"
-            " WHERE %(stream)s > ? - 100000"
+            " WHERE %(stream)s > ? - %(limit)s"
             " GROUP BY %(entity)s"
         ) % {
             "table": table,
             "entity": entity_column,
             "stream": stream_column,
+            "limit": limit,
         }
 
         sql = self.database_engine.convert_param_style(sql)
