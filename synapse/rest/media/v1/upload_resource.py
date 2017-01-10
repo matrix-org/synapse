@@ -97,6 +97,8 @@ class UploadResource(Resource):
             content_length, requester.user
         )
 
+        logger.info("Uploaded content with URI %r", content_uri)
+
         respond_with_json(
             request, 200, {"content_uri": content_uri}, send_cors=True
         )
