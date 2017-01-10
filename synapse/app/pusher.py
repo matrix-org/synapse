@@ -146,17 +146,6 @@ class PusherServer(HomeServer):
                 ),
                 interface=address
             )
-        else:
-            reactor.listenTCP(
-                port,
-                SynapseSite(
-                    "synapse.access.http.%s" % (site_tag,),
-                    site_tag,
-                    listener_config,
-                    root_resource,
-                ),
-                interface=bind_address
-            )
 
         logger.info("Synapse pusher now listening on port %d", port)
 
