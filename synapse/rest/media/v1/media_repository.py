@@ -98,6 +98,8 @@ class MediaRepository(object):
         with open(fname, "wb") as f:
             f.write(content)
 
+        logger.info("Stored local media in file %r", fname)
+
         yield self.store.store_local_media(
             media_id=media_id,
             media_type=media_type,
@@ -189,6 +191,8 @@ class MediaRepository(object):
                         upload_name = None
             else:
                 upload_name = None
+
+            logger.info("Stored remote media in file %r", fname)
 
             yield self.store.store_cached_remote_media(
                 origin=server_name,

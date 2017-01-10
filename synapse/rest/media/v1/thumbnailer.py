@@ -16,6 +16,10 @@
 import PIL.Image as Image
 from io import BytesIO
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class Thumbnailer(object):
 
@@ -86,4 +90,5 @@ class Thumbnailer(object):
         output_bytes = output_bytes_io.getvalue()
         with open(output_path, "wb") as output_file:
             output_file.write(output_bytes)
+        logger.info("Stored thumbnail in file %r", output_path)
         return len(output_bytes)
