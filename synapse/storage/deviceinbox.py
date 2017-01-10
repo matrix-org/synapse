@@ -392,6 +392,7 @@ class DeviceInboxStore(BackgroundUpdateStore):
             txn.execute(
                 "DROP INDEX IF EXISTS device_inbox_stream_id"
             )
+            txn.close()
 
         yield self.runWithConnection(reindex_txn)
 
