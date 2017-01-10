@@ -192,8 +192,11 @@ class Linearizer(object):
             logger.info(
                 "Waiting to acquire linearizer lock %r for key %r", self.name, key
             )
-            with PreserveLoggingContext():
-                yield current_defer
+            try:
+                with PreserveLoggingContext():
+                    yield current_defer
+            except:
+                logger.exception("Unexpected exception in Linearizer")
 
         logger.info("Acquired linearizer lock %r for key %r", self.name, key)
 
