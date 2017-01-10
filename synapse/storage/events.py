@@ -617,7 +617,6 @@ class EventsStore(SQLBaseStore):
                     [(ev.event_id,) for ev, _ in events_and_contexts]
                 )
 
-
         self._simple_insert_many_txn(
             txn,
             table="event_json",
