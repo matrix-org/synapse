@@ -61,7 +61,7 @@ class MediaRepository(object):
         self.dynamic_thumbnails = hs.config.dynamic_thumbnails
         self.thumbnail_requirements = hs.config.thumbnail_requirements
 
-        self.remote_media_linearizer = Linearizer()
+        self.remote_media_linearizer = Linearizer(name="media_remote")
 
         self.recently_accessed_remotes = set()
 

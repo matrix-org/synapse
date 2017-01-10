@@ -89,7 +89,7 @@ class StateHandler(object):
 
         # dict of set of event_ids -> _StateCacheEntry.
         self._state_cache = None
-        self.resolve_linearizer = Linearizer()
+        self.resolve_linearizer = Linearizer(name="state_resolve_lock")
 
     def start_caching(self):
         logger.debug("start_caching")
