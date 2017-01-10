@@ -69,11 +69,14 @@ class RoomListHandler(BaseHandler):
                 limit, since_token, search_filter, network_tuple=network_tuple,
             )
 
-        result = self.response_cache.get((limit, since_token, network_tuple))
+        key = (limit, since_token, network_tuple)
+        result = self.response_cache.get(key)
         if not result:
             result = self.response_cache.set(
-                (limit, since_token, network_tuple),
-                self._get_public_room_list(limit, since_token, network_tuple=network_tuple)
+                key,
+                self._get_public_room_list(
+                    limit, since_token, network_tuple=network_tuple
+                )
             )
         return result
 

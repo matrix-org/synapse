@@ -607,7 +607,7 @@ class AuthHandler(BaseHandler):
         # types (mediums) of threepid. For now, we still use the existing
         # infrastructure, but this is the start of synapse gaining knowledge
         # of specific types of threepid (and fixes the fact that checking
-        # for the presenc eof an email address during password reset was
+        # for the presence of an email address during password reset was
         # case sensitive).
         if medium == 'email':
             address = address.lower()
@@ -616,6 +616,17 @@ class AuthHandler(BaseHandler):
             user_id, medium, address, validated_at,
             self.hs.get_clock().time_msec()
         )
+
+    @defer.inlineCallbacks
+    def delete_threepid(self, user_id, medium, address):
+        # 'Canonicalise' email addresses as per above
+        if medium == 'email':
+            address = address.lower()
+
+        ret = yield self.store.user_delete_threepid(
+            user_id, medium, address,
+        )
+        defer.returnValue(ret)
 
     def _save_session(self, session):
         # TODO: Persistent storage
@@ -656,8 +667,8 @@ class AuthHandler(BaseHandler):
             Whether self.hash(password) == stored_hash (bool).
         """
         if stored_hash:
-            return bcrypt.hashpw(password + self.hs.config.password_pepper,
-                                 stored_hash.encode('utf-8')) == stored_hash
+            return bcrypt.hashpw(password.encode('utf8') + self.hs.config.password_pepper,
+                                 stored_hash.encode('utf8')) == stored_hash
         else:
             return False
 

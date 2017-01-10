@@ -658,7 +658,7 @@ configuration might look like::
       }
   }
 
-You will also want to set ``bind_address: 127.0.0.1`` and ``x_forwarded: true``
+You will also want to set ``bind_addresses: ['127.0.0.1']`` and ``x_forwarded: true``
 for port 8008 in ``homeserver.yaml`` to ensure that client IP addresses are
 recorded correctly.
 

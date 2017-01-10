@@ -155,9 +155,14 @@ class ServerConfig(Config):
             # The port to listen for HTTPS requests on.
             port: %(bind_port)s
 
-            # Local interface to listen on.
-            # The empty string will cause synapse to listen on all interfaces.
-            bind_address: ''
+            # Local addresses to listen on.
+            # This will listen on all IPv4 addresses by default.
+            bind_addresses:
+              - '0.0.0.0'
+              # Uncomment to listen on all IPv6 interfaces
+              # N.B: On at least Linux this will also listen on all IPv4
+              # addresses, so you will need to comment out the line above.
+              # - '::'
 
             # This is a 'http' listener, allows us to specify 'resources'.
             type: http
@@ -188,7 +193,7 @@ class ServerConfig(Config):
           # For when matrix traffic passes through loadbalancer that unwraps TLS.
           - port: %(unsecure_port)s
             tls: false
-            bind_address: ''
+            bind_addresses: ['0.0.0.0']
             type: http
 
             x_forwarded: false

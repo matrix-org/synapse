@@ -52,8 +52,8 @@ class FederationServer(FederationBase):
 
         self.auth = hs.get_auth()
 
-        self._room_pdu_linearizer = Linearizer()
-        self._server_linearizer = Linearizer()
+        self._room_pdu_linearizer = Linearizer("fed_room_pdu")
+        self._server_linearizer = Linearizer("fed_server")
 
         # We cache responses to state queries, as they take a while and often
         # come in waves.
