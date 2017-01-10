@@ -43,7 +43,7 @@ class ServerConfig(Config):
         self.listeners = config.get("listeners", [])
 
         for listener in self.listeners:
-            bind_address = listener.get("bind_address", None)
+            bind_address = listener.pop("bind_address", None)
             bind_addresses = listener.setdefault("bind_addresses", [])
 
             if bind_address:
