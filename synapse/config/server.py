@@ -42,6 +42,15 @@ class ServerConfig(Config):
 
         self.listeners = config.get("listeners", [])
 
+        for listener in self.listeners:
+            bind_address = listener.get("bind_address", None)
+            bind_addresses = listener.setdefault("bind_addresses", [])
+
+            if bind_address:
+                bind_addresses.append(bind_address)
+            elif not bind_addresses:
+                bind_addresses.append('')
+
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
 
         bind_port = config.get("bind_port")
@@ -54,7 +63,7 @@ class ServerConfig(Config):
 
             self.listeners.append({
                 "port": bind_port,
-                "bind_address": bind_host,
+                "bind_addresses": [bind_host],
                 "tls": True,
                 "type": "http",
                 "resources": [
@@ -73,7 +82,7 @@ class ServerConfig(Config):
             if unsecure_port:
                 self.listeners.append({
                     "port": unsecure_port,
-                    "bind_address": bind_host,
+                    "bind_addresses": [bind_host],
                     "tls": False,
                     "type": "http",
                     "resources": [
@@ -92,7 +101,7 @@ class ServerConfig(Config):
         if manhole:
             self.listeners.append({
                 "port": manhole,
-                "bind_address": "127.0.0.1",
+                "bind_addresses": ["127.0.0.1"],
                 "type": "manhole",
             })
 
@@ -100,7 +109,7 @@ class ServerConfig(Config):
         if metrics_port:
             self.listeners.append({
                 "port": metrics_port,
-                "bind_address": config.get("metrics_bind_host", "127.0.0.1"),
+                "bind_addresses": [config.get("metrics_bind_host", "127.0.0.1")],
                 "tls": False,
                 "type": "http",
                 "resources": [

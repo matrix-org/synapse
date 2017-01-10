@@ -87,8 +87,7 @@ class MediaRepositoryServer(HomeServer):
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]
-        bind_address = listener_config.get("bind_address", None)
-        bind_addresses = listener_config.get("bind_addresses", [])
+        bind_addresses = listener_config["bind_addresses"]
         site_tag = listener_config.get("tag", port)
         resources = {}
         for res in listener_config["resources"]:
@@ -106,9 +105,6 @@ class MediaRepositoryServer(HomeServer):
                     })
 
         root_resource = create_resource_tree(resources, Resource())
-
-        if bind_address is not None:
-            bind_addresses.append(bind_address)
 
         for address in bind_addresses:
             reactor.listenTCP(
@@ -129,11 +125,7 @@ class MediaRepositoryServer(HomeServer):
             if listener["type"] == "http":
                 self._listen_http(listener)
             elif listener["type"] == "manhole":
-                bind_address = listener.get("bind_address", None)
-                bind_addresses = listener.get("bind_addresses", [])
-
-                if bind_address is not None:
-                    bind_addresses.append(bind_address)
+                bind_addresses = listener["bind_addresses"]
 
                 for address in bind_addresses:
                     reactor.listenTCP(
