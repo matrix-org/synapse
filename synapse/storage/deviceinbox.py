@@ -388,14 +388,10 @@ class DeviceInboxStore(BackgroundUpdateStore):
     @defer.inlineCallbacks
     def _background_drop_index_device_inbox(self, progress, batch_size):
         def reindex_txn(conn):
-            conn.set_session(autocommit=True)
-            try:
-                txn = conn.cursor()
-                txn.execute(
-                    "DROP INDEX IF EXISTS device_inbox_stream_id"
-                )
-            finally:
-                conn.set_session(autocommit=False)
+            txn = conn.cursor()
+            txn.execute(
+                "DROP INDEX IF EXISTS device_inbox_stream_id"
+            )
 
         yield self.runWithConnection(reindex_txn)
 
