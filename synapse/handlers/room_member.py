@@ -232,11 +232,12 @@ class RoomMemberHandler(BaseHandler):
                     errcode=Codes.BAD_STATE
                 )
 
-            same_content = content == old_state.content
-            same_membership = old_membership == effective_membership_state
-            same_sender = requester.user.to_string() == old_state.sender
-            if same_sender and same_membership and same_content:
-                defer.returnValue(old_state)
+            if old_state:
+                same_content = content == old_state.content
+                same_membership = old_membership == effective_membership_state
+                same_sender = requester.user.to_string() == old_state.sender
+                if same_sender and same_membership and same_content:
+                    defer.returnValue(old_state)
 
         is_host_in_room = yield self._is_host_in_room(current_state_ids)
 
