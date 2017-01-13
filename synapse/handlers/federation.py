@@ -1530,7 +1530,7 @@ class FederationHandler(BaseHandler):
                     (d.type, d.state_key): d for d in different_events if d
                 })
 
-                new_state, prev_state = self.state_handler.resolve_events(
+                new_state = self.state_handler.resolve_events(
                     [local_view.values(), remote_view.values()],
                     event
                 )
