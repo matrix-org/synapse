@@ -596,7 +596,7 @@ class FederationHandler(BaseHandler):
             preserve_fn(self.state_handler.resolve_state_groups)(room_id, [e])
             for e in event_ids
         ]))
-        states = dict(zip(event_ids, [s[1] for s in states]))
+        states = dict(zip(event_ids, [s.state for s in states]))
 
         state_map = yield self.store.get_events(
             [e_id for ids in states.values() for e_id in ids],

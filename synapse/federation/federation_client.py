@@ -26,7 +26,7 @@ from synapse.util import unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
-from synapse.events import FrozenEvent
+from synapse.events import FrozenEvent, builder
 import synapse.metrics
 
 from synapse.util.retryutils import get_retry_limiter, NotRetryingDestination
@@ -499,8 +499,10 @@ class FederationClient(FederationBase):
                 if "prev_state" not in pdu_dict:
                     pdu_dict["prev_state"] = []
 
+                ev = builder.EventBuilder(pdu_dict)
+
                 defer.returnValue(
-                    (destination, self.event_from_pdu_json(pdu_dict))
+                    (destination, ev)
                 )
                 break
             except CodeMessageException as e:
