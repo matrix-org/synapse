@@ -107,8 +107,7 @@ def build_resource_for_web_client(hs):
 class SynapseHomeServer(HomeServer):
     def _listener_http(self, config, listener_config):
         port = listener_config["port"]
-        bind_address = listener_config.get("bind_address", None)
-        bind_addresses = listener_config.get("bind_addresses", [])
+        bind_addresses = listener_config["bind_addresses"]
         tls = listener_config.get("tls", False)
         site_tag = listener_config.get("tag", port)
 
@@ -175,9 +174,6 @@ class SynapseHomeServer(HomeServer):
 
         root_resource = create_resource_tree(resources, root_resource)
 
-        if bind_address is not None:
-            bind_addresses.append(bind_address)
-
         if tls:
             for address in bind_addresses:
                 reactor.listenSSL(
@@ -212,11 +208,7 @@ class SynapseHomeServer(HomeServer):
             if listener["type"] == "http":
                 self._listener_http(config, listener)
             elif listener["type"] == "manhole":
-                bind_address = listener.get("bind_address", None)
-                bind_addresses = listener.get("bind_addresses", [])
-
-                if bind_address is not None:
-                    bind_addresses.append(bind_address)
+                bind_addresses = listener["bind_addresses"]
 
                 for address in bind_addresses:
                     reactor.listenTCP(
