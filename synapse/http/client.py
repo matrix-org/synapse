@@ -386,26 +386,21 @@ class SpiderEndpointFactory(object):
 
     def endpointForURI(self, uri):
         logger.info("Getting endpoint for %s", uri.toBytes())
+        
         if uri.scheme == "http":
-            return SpiderEndpoint(
-                reactor, uri.host, uri.port, self.blacklist, self.whitelist,
-                endpoint=TCP4ClientEndpoint,
-                endpoint_kw_args={
-                    'timeout': 15
-                },
-            )
+            endpoint_factory = HostnameEndpoint
         elif uri.scheme == "https":
-            tlsPolicy = self.policyForHTTPS.creatorForNetloc(uri.host, uri.port)
-            return SpiderEndpoint(
-                reactor, uri.host, uri.port, self.blacklist, self.whitelist,
-                endpoint=SSL4ClientEndpoint,
-                endpoint_kw_args={
-                    'sslContextFactory': tlsPolicy,
-                    'timeout': 15
-                },
-            )
+            tlsCreator = self.policyForHTTPS.creatorForNetloc(uri.host, uri.port)
+            def endpoint_factory(reactor, host, port, **kw):
+                return wrapClientTLS(tlsCreator, HostnameEndpoint(reactor, host, port, **kw)
         else:
             logger.warn("Can't get endpoint for unrecognised scheme %s", uri.scheme)
+            return None
+        return SpiderEndpoint(
+            reactor, uri.host, uri.port, self.blacklist, self.whitelist,
+            endpoint=endpoint_factory, endpoint_kw_args=dict(timeout=15),
+        )
+                                     
 
 
 class SpiderHttpClient(SimpleHttpClient):
