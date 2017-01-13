@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+-- turn the pre-fill startup query into a index-only scan on postgresql.
 INSERT into background_updates (update_name, progress_json)
     VALUES ('device_inbox_stream_index', '{}');
 
