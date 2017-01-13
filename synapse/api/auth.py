@@ -561,9 +561,6 @@ class Auth(object):
 
         defer.returnValue(auth_ids)
 
-    def _get_send_level(self, etype, state_key, auth_events):
-        return event_auth._get_send_level(etype, state_key, auth_events)
-
     def check_redaction(self, event, auth_events):
         """Check whether the event sender is allowed to redact the target event.
 
