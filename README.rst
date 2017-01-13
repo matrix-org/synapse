@@ -138,6 +138,7 @@ Installing prerequisites on openSUSE::
                    python-devel libffi-devel libopenssl-devel libjpeg62-devel
 
 Installing prerequisites on OpenBSD::
+
     doas pkg_add python libffi py-pip py-setuptools sqlite3 py-virtualenv \
                  libxslt
 
