@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import EventBase, FrozenEvent
+from . import EventBase, FrozenEvent, _event_dict_property
 
 from synapse.types import EventID
 
@@ -33,6 +33,10 @@ class EventBuilder(EventBase):
             unsigned=unsigned,
             internal_metadata_dict=internal_metadata_dict,
         )
+
+    event_id = _event_dict_property("event_id")
+    state_key = _event_dict_property("state_key")
+    type = _event_dict_property("type")
 
     def build(self):
         return FrozenEvent.from_event(self)

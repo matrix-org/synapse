@@ -25,10 +25,13 @@ from synapse.api.filtering import Filter
 from synapse.events import FrozenEvent
 
 user_localpart = "test_user"
-# MockEvent = namedtuple("MockEvent", "sender type room_id")
 
 
 def MockEvent(**kwargs):
+    if "event_id" not in kwargs:
+        kwargs["event_id"] = "fake_event_id"
+    if "type" not in kwargs:
+        kwargs["type"] = "fake_type"
     return FrozenEvent(kwargs)
 
 
