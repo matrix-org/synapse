@@ -284,7 +284,7 @@ class StateStore(SQLBaseStore):
             return [r[0] for r in results]
         return self.runInteraction("get_current_state_for_key", f)
 
-    @cached(num_args=2, max_entries=1000, iterable=True)
+    @cached(num_args=2, max_entries=50000, iterable=True)
     def _get_state_group_from_group(self, group, types):
         raise NotImplementedError()
 
