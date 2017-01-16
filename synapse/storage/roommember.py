@@ -391,7 +391,7 @@ class RoomMemberStore(SQLBaseStore):
         )
 
     @cachedInlineCallbacks(num_args=2, cache_context=True, iterable=True,
-                           max_entries=50000)
+                           max_entries=100000)
     def _get_joined_users_from_context(self, room_id, state_group, current_state_ids,
                                        cache_context, event=None):
         # We don't use `state_group`, it's there so that we can cache based
