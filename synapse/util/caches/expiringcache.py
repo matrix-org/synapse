@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 class ExpiringCache(object):
     def __init__(self, cache_name, clock, max_len=0, expiry_ms=0,
-                 reset_expiry_on_get=False):
+                 reset_expiry_on_get=False, iterable=False):
         """
         Args:
             cache_name (str): Name of this cache, used for logging.
@@ -36,6 +36,8 @@ class ExpiringCache(object):
                 evicted based on time.
             reset_expiry_on_get (bool): If true, will reset the expiry time for
                 an item on access. Defaults to False.
+            iterable (bool): If true, the size is calculated by summing the
+                sizes of all entries, rather than the number of entries.
 
         """
         self._cache_name = cache_name
@@ -49,7 +51,9 @@ class ExpiringCache(object):
 
         self._cache = {}
 
-        self.metrics = register_cache(cache_name, self._cache)
+        self.metrics = register_cache(cache_name, self)
+
+        self.iterable = iterable
 
     def start(self):
         if not self._expiry_ms:
@@ -66,14 +70,15 @@ class ExpiringCache(object):
         self._cache[key] = _CacheEntry(now, value)
 
         # Evict if there are now too many items
-        if self._max_len and len(self._cache.keys()) > self._max_len:
+        if self._max_len and len(self) > self._max_len:
             sorted_entries = sorted(
-                self._cache.items(),
+                self._cache.keys(),
                 key=lambda item: item[1].time,
             )
 
-            for k, _ in sorted_entries[self._max_len:]:
-                self._cache.pop(k)
+            while len(self) > self._max_len and sorted_entries:
+                key = sorted_entries.pop()
+                self._cache.pop(key)
 
     def __getitem__(self, key):
         try:
@@ -99,7 +104,7 @@ class ExpiringCache(object):
             # zero expiry time means don't expire. This should never get called
             # since we have this check in start too.
             return
-        begin_length = len(self._cache)
+        begin_length = len(self)
 
         now = self._clock.time_msec()
 
@@ -114,11 +119,14 @@ class ExpiringCache(object):
 
         logger.debug(
             "[%s] _prune_cache before: %d, after len: %d",
-            self._cache_name, begin_length, len(self._cache)
+            self._cache_name, begin_length, len(self)
         )
 
     def __len__(self):
-        return len(self._cache)
+        if self.iterable:
+            return sum(len(value.value) for value in self._cache.itervalues())
+        else:
+            return len(self._cache)
 
 
 class _CacheEntry(object):
