@@ -236,6 +236,9 @@ class MediaRepository(object):
         if t_method == "crop":
             t_len = thumbnailer.crop(t_path, t_width, t_height, t_type)
         elif t_method == "scale":
+            t_width, t_height = thumbnailer.aspect(t_width, t_height)
+            t_width = min(m_width, t_width)
+            t_height = min(m_height, t_height)
             t_len = thumbnailer.scale(t_path, t_width, t_height, t_type)
         else:
             t_len = None
