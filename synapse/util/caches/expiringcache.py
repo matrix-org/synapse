@@ -15,6 +15,7 @@
 
 from synapse.util.caches import register_cache
 
+from collections import OrderedDict
 import logging
 
 
@@ -49,7 +50,7 @@ class ExpiringCache(object):
 
         self._reset_expiry_on_get = reset_expiry_on_get
 
-        self._cache = {}
+        self._cache = OrderedDict()
 
         self.metrics = register_cache(cache_name, self)
 
@@ -70,15 +71,8 @@ class ExpiringCache(object):
         self._cache[key] = _CacheEntry(now, value)
 
         # Evict if there are now too many items
-        if self._max_len and len(self) > self._max_len:
-            sorted_entries = sorted(
-                self._cache.keys(),
-                key=lambda item: item[1].time,
-            )
-
-            while len(self) > self._max_len and sorted_entries:
-                key = sorted_entries.pop()
-                self._cache.pop(key)
+        while self._max_len and len(self) > self._max_len:
+            self._cache.popitem(last=False)
 
     def __getitem__(self, key):
         try:
