@@ -154,7 +154,6 @@ class LruCache(object):
         def cache_set_default(key, value):
             node = cache.get(key, None)
             if node is not None:
-                evict()  # As the new node may be bigger than the old node.
                 return node.value
             else:
                 add_node(key, value)
