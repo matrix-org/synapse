@@ -41,7 +41,7 @@ KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
 CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.1))
 
 
-SIZE_OF_CACHE = int(1000 * CACHE_SIZE_FACTOR)
+SIZE_OF_CACHE = int(100000 * CACHE_SIZE_FACTOR)
 EVICTION_TIMEOUT_SECONDS = 60 * 60
 
 
@@ -77,6 +77,9 @@ class _StateCacheEntry(object):
         else:
             self.state_id = _gen_state_id()
 
+    def __len__(self):
+        return len(self.state)
+
 
 class StateHandler(object):
     """ Responsible for doing state conflict resolution.
@@ -99,6 +102,7 @@ class StateHandler(object):
             clock=self.clock,
             max_len=SIZE_OF_CACHE,
             expiry_ms=EVICTION_TIMEOUT_SECONDS * 1000,
+            iterable=True,
             reset_expiry_on_get=True,
         )
 
