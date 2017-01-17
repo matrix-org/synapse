@@ -517,21 +517,19 @@ def _create_auth_events_from_maps(unconflicted_state, conflicted_state, state_ma
     return auth_events
 
 
-def _resolve_with_state(unconflicted_state, conflicted_state, auth_events,
+def _resolve_with_state(unconflicted_state_ids, conflicted_state_ds, auth_event_ids,
                         state_map):
-    new_conflicted_state = {}
-    for key, event_ids in conflicted_state.iteritems():
+    conflicted_state = {}
+    for key, event_ids in conflicted_state_ds.iteritems():
         events = [state_map[ev_id] for ev_id in event_ids if ev_id in state_map]
         if len(events) > 1:
-            new_conflicted_state[key] = events
+            conflicted_state[key] = events
         elif len(events) == 1:
-            unconflicted_state[key] = events[0].event_id
-
-    conflicted_state = new_conflicted_state
+            unconflicted_state_ids[key] = events[0].event_id
 
     auth_events = {
         key: state_map[ev_id]
-        for key, ev_id in auth_events.items()
+        for key, ev_id in auth_event_ids.items()
         if ev_id in state_map
     }
 
@@ -543,7 +541,7 @@ def _resolve_with_state(unconflicted_state, conflicted_state, auth_events,
         logger.exception("Failed to resolve state")
         raise
 
-    new_state = unconflicted_state
+    new_state = unconflicted_state_ids
     for key, event in resolved_state.iteritems():
         new_state[key] = event.event_id
 
