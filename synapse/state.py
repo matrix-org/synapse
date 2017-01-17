@@ -507,21 +507,27 @@ def _create_auth_events_from_maps(unconflicted_state, conflicted_state, state_ma
     auth_events = {}
     for event_ids in conflicted_state.itervalues():
         for event_id in event_ids:
-            keys = event_auth.auth_types_for_event(state_map[event_id])
-            for key in keys:
-                if key not in auth_events:
-                    event_id = unconflicted_state.get(key, None)
-                    if event_id:
-                        auth_events[key] = event_id
+            if event_id in state_map:
+                keys = event_auth.auth_types_for_event(state_map[event_id])
+                for key in keys:
+                    if key not in auth_events:
+                        event_id = unconflicted_state.get(key, None)
+                        if event_id:
+                            auth_events[key] = event_id
     return auth_events
 
 
 def _resolve_with_state(unconflicted_state, conflicted_state, auth_events,
                         state_map):
-    conflicted_state = {
-        key: [state_map[ev_id] for ev_id in event_ids if ev_id in state_map]
-        for key, event_ids in conflicted_state.items()
-    }
+    new_conflicted_state = {}
+    for key, event_ids in conflicted_state.iteritems():
+        events = [state_map[ev_id] for ev_id in event_ids if ev_id in state_map]
+        if len(events) > 1:
+            new_conflicted_state[key] = events
+        elif len(events) == 1:
+            unconflicted_state[key] = events[0].event_id
+
+    conflicted_state = new_conflicted_state
 
     auth_events = {
         key: state_map[ev_id]
