@@ -241,7 +241,7 @@ class CacheDecoratorTestCase(unittest.TestCase):
         callcount2 = [0]
 
         class A(object):
-            @cached(max_entries=2)
+            @cached(max_entries=20)  # HACK: This makes it 2 due to cache factor
             def func(self, key):
                 callcount[0] += 1
                 return key
@@ -255,6 +255,10 @@ class CacheDecoratorTestCase(unittest.TestCase):
         yield a.func2("foo")
         yield a.func2("foo2")
 
+        self.assertEquals(callcount[0], 2)
+        self.assertEquals(callcount2[0], 2)
+
+        yield a.func2("foo")
         self.assertEquals(callcount[0], 2)
         self.assertEquals(callcount2[0], 2)
 

@@ -56,6 +56,8 @@ class ExpiringCache(object):
 
         self.iterable = iterable
 
+        self._size_estimate = 0
+
     def start(self):
         if not self._expiry_ms:
             # Don't bother starting the loop if things never expire
@@ -70,9 +72,14 @@ class ExpiringCache(object):
         now = self._clock.time_msec()
         self._cache[key] = _CacheEntry(now, value)
 
+        if self.iterable:
+            self._size_estimate += len(value)
+
         # Evict if there are now too many items
         while self._max_len and len(self) > self._max_len:
-            self._cache.popitem(last=False)
+            _key, value = self._cache.popitem(last=False)
+            if self.iterable:
+                self._size_estimate -= len(value.value)
 
     def __getitem__(self, key):
         try:
@@ -109,7 +116,9 @@ class ExpiringCache(object):
                 keys_to_delete.add(key)
 
         for k in keys_to_delete:
-            self._cache.pop(k)
+            value = self._cache.pop(k)
+            if self.iterable:
+                self._size_estimate -= len(value.value)
 
         logger.debug(
             "[%s] _prune_cache before: %d, after len: %d",
@@ -118,7 +127,7 @@ class ExpiringCache(object):
 
     def __len__(self):
         if self.iterable:
-            return sum(len(value.value) for value in self._cache.itervalues())
+            return self._size_estimate
         else:
             return len(self._cache)
 

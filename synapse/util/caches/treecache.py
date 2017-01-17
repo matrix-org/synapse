@@ -65,10 +65,22 @@ class TreeCache(object):
         return popped
 
     def values(self):
-        return [e.value for e in self.root.values()]
+        return list(popped_to_iterator(self.root))
 
     def __len__(self):
         return self.size
+
+
+def popped_to_iterator(d):
+    if isinstance(d, dict):
+        for value_d in d.itervalues():
+            for value in popped_to_iterator(value_d):
+                yield value
+    else:
+        if isinstance(d, _Entry):
+            yield d.value
+        else:
+            yield d
 
 
 class _Entry(object):
