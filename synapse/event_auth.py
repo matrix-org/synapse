@@ -661,13 +661,13 @@ def auth_types_for_event(event):
     auth_types.append((EventTypes.Create, "", ))
 
     if event.type == EventTypes.Member:
-        e_type = event.content["membership"]
-        if e_type in [Membership.JOIN, Membership.INVITE]:
+        membership = event.content["membership"]
+        if membership in [Membership.JOIN, Membership.INVITE]:
             auth_types.append((EventTypes.JoinRules, "", ))
 
         auth_types.append((EventTypes.Member, event.state_key, ))
 
-        if e_type == Membership.INVITE:
+        if membership == Membership.INVITE:
             if "third_party_invite" in event.content:
                 key = (
                     EventTypes.ThirdPartyInvite,
