@@ -17,7 +17,7 @@ import logging
 from synapse.util.async import ObservableDeferred
 from synapse.util import unwrapFirstError
 from synapse.util.caches.lrucache import LruCache
-from synapse.util.caches.treecache import TreeCache, popped_to_iterator
+from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
 from synapse.util.logcontext import (
     PreserveLoggingContext, preserve_context_over_deferred, preserve_context_over_fn
 )
@@ -181,7 +181,7 @@ class Cache(object):
         val = self._pending_deferred_cache.pop(key, None)
         if val is not None:
             entry_dict, _ = val
-            for entry in popped_to_iterator(entry_dict):
+            for entry in iterate_tree_cache_entry(entry_dict):
                 entry.invalidate()
 
     def invalidate_all(self):
