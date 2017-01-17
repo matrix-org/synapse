@@ -25,7 +25,7 @@ from synapse.api.errors import AuthError
 from synapse.events.snapshot import EventContext
 from synapse.util.async import Linearizer
 
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 from frozendict import frozendict
 
 import logging
