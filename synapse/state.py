@@ -333,7 +333,7 @@ class StateHandler(object):
                     new_state = yield resolve_events(
                         state_groups_ids.values(),
                         state_map_factory=lambda ev_ids: self.store.get_events(
-                            ev_ids, get_prev_content=False
+                            ev_ids, get_prev_content=False, check_redacted=False,
                         ),
                     )
             else:
@@ -482,6 +482,8 @@ def _resolve_with_state_fac(unconflicted_state, conflicted_state,
         for event_id in event_ids
     )
 
+    logger.info("Asking for %d conflicted events", len(needed_events))
+
     state_map = yield state_map_factory(needed_events)
 
     auth_events = _create_auth_events_from_maps(
@@ -490,6 +492,8 @@ def _resolve_with_state_fac(unconflicted_state, conflicted_state,
 
     new_needed_events = set(auth_events.itervalues())
     new_needed_events -= needed_events
+
+    logger.info("Asking for %d auth events", len(new_needed_events))
 
     state_map_new = yield state_map_factory(new_needed_events)
     state_map.update(state_map_new)
@@ -515,13 +519,14 @@ def _create_auth_events_from_maps(unconflicted_state, conflicted_state, state_ma
 def _resolve_with_state(unconflicted_state, conflicted_state, auth_events,
                         state_map):
     conflicted_state = {
-        key: [state_map[ev_id] for ev_id in event_ids]
+        key: [state_map[ev_id] for ev_id in event_ids if ev_id in state_map]
         for key, event_ids in conflicted_state.items()
     }
 
     auth_events = {
         key: state_map[ev_id]
         for key, ev_id in auth_events.items()
+        if ev_id in state_map
     }
 
     try:
