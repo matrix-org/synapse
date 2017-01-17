@@ -178,9 +178,8 @@ class Cache(object):
         self.sequence += 1
         self.cache.del_multi(key)
 
-        val = self._pending_deferred_cache.pop(key, None)
-        if val is not None:
-            entry_dict, _ = val
+        entry_dict = self._pending_deferred_cache.pop(key, None)
+        if entry_dict is not None:
             for entry in iterate_tree_cache_entry(entry_dict):
                 entry.invalidate()
 
