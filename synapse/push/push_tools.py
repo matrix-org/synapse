@@ -52,7 +52,7 @@ def get_badge_count(store, user_id):
 def get_context_for_event(store, state_handler, ev, user_id):
     ctx = {}
 
-    room_state_ids = yield state_handler.get_current_state_ids(ev.room_id)
+    room_state_ids = yield store.get_state_ids_for_event(ev.event_id)
 
     # we no longer bother setting room_alias, and make room_name the
     # human-readable name instead, be that m.room.name, an alias or
