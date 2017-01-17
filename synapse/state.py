@@ -128,7 +128,7 @@ class StateHandler(object):
         if not latest_event_ids:
             latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
 
-        logger.info("calling resolve_state_groups from get_current_state")
+        logger.debug("calling resolve_state_groups from get_current_state")
         ret = yield self.resolve_state_groups(room_id, latest_event_ids)
         state = ret.state
 
@@ -153,7 +153,7 @@ class StateHandler(object):
         if not latest_event_ids:
             latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
 
-        logger.info("calling resolve_state_groups from get_current_state_ids")
+        logger.debug("calling resolve_state_groups from get_current_state_ids")
         ret = yield self.resolve_state_groups(room_id, latest_event_ids)
         state = ret.state
 
@@ -167,7 +167,7 @@ class StateHandler(object):
     def get_current_user_in_room(self, room_id, latest_event_ids=None):
         if not latest_event_ids:
             latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
-        logger.info("calling resolve_state_groups from get_current_user_in_room")
+        logger.debug("calling resolve_state_groups from get_current_user_in_room")
         entry = yield self.resolve_state_groups(room_id, latest_event_ids)
         joined_users = yield self.store.get_joined_users_from_state(
             room_id, entry.state_id, entry.state
@@ -231,7 +231,7 @@ class StateHandler(object):
             context.prev_state_events = []
             defer.returnValue(context)
 
-        logger.info("calling resolve_state_groups from compute_event_context")
+        logger.debug("calling resolve_state_groups from compute_event_context")
         if event.is_state():
             entry = yield self.resolve_state_groups(
                 event.room_id, [e for e, _ in event.prev_events],
