@@ -169,7 +169,7 @@ class SQLBaseStore(object):
                                       max_entries=hs.config.event_cache_size)
 
         self._state_group_cache = DictionaryCache(
-            "*stateGroupCache*", 2000 * CACHE_SIZE_FACTOR
+            "*stateGroupCache*", 100000 * CACHE_SIZE_FACTOR
         )
 
         self._event_fetch_lock = threading.Condition()
