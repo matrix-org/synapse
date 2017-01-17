@@ -453,22 +453,27 @@ def _seperate(state_sets):
     unconflicted_state = dict(state_sets[0])
     conflicted_state = {}
 
-    full_states = defaultdict(
-        set,
-        {k: set((v,)) for k, v in state_sets[0].iteritems()}
-    )
-
     for state_set in state_sets[1:]:
         for key, value in state_set.iteritems():
-            ls = full_states[key]
-            if not ls:
-                ls.add(value)
-                unconflicted_state[key] = value
-            elif value not in ls:
-                ls.add(value)
-                if len(ls) == 2:
-                    conflicted_state[key] = ls
-                    unconflicted_state.pop(key, None)
+            # Check if there is an unconflicted entry for the state key.
+            unconflicted_value = unconflicted_state.get(key)
+            if unconflicted_value is None:
+                # There isn't an unconflicted entry so check if there is a
+                # conflicted entry.
+                ls = conflicted_state.get(key)
+                if ls is None:
+                    # There wasn't a conflicted entry so haven't seen this key before.
+                    # Therefore it isn't conflicted yet.
+                    unconflicted_state[key] = value
+                else:
+                    # This key is already conflicted, add our value to the conflict set.
+                    ls.add(value)
+            elif unconflicted_value != value:
+                # If the unconflicted value is not the same as our value then we
+                # have a new conflict. So move the key from the unconflicted_state
+                # to the conflicted state.
+                conflicted_state[key] = {value, unconflicted_value}
+                unconflicted_state.pop(key, None)
 
     return unconflicted_state, conflicted_state
 
