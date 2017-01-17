@@ -128,7 +128,7 @@ class LruCacheCallbacksTestCase(unittest.TestCase):
         m = Mock()
         cache = LruCache(1)
 
-        cache.set("key", "value", [m])
+        cache.set("key", "value", callbacks=[m])
         self.assertFalse(m.called)
 
         cache.set("key", "value")
@@ -144,7 +144,7 @@ class LruCacheCallbacksTestCase(unittest.TestCase):
         m = Mock()
         cache = LruCache(1)
 
-        cache.set("key", "value", [m])
+        cache.set("key", "value", callbacks=[m])
         self.assertFalse(m.called)
 
         cache.pop("key")
@@ -163,10 +163,10 @@ class LruCacheCallbacksTestCase(unittest.TestCase):
         m4 = Mock()
         cache = LruCache(4, 2, cache_type=TreeCache)
 
-        cache.set(("a", "1"), "value", [m1])
-        cache.set(("a", "2"), "value", [m2])
-        cache.set(("b", "1"), "value", [m3])
-        cache.set(("b", "2"), "value", [m4])
+        cache.set(("a", "1"), "value", callbacks=[m1])
+        cache.set(("a", "2"), "value", callbacks=[m2])
+        cache.set(("b", "1"), "value", callbacks=[m3])
+        cache.set(("b", "2"), "value", callbacks=[m4])
 
         self.assertEquals(m1.call_count, 0)
         self.assertEquals(m2.call_count, 0)
@@ -185,8 +185,8 @@ class LruCacheCallbacksTestCase(unittest.TestCase):
         m2 = Mock()
         cache = LruCache(5)
 
-        cache.set("key1", "value", [m1])
-        cache.set("key2", "value", [m2])
+        cache.set("key1", "value", callbacks=[m1])
+        cache.set("key2", "value", callbacks=[m2])
 
         self.assertEquals(m1.call_count, 0)
         self.assertEquals(m2.call_count, 0)
@@ -202,14 +202,14 @@ class LruCacheCallbacksTestCase(unittest.TestCase):
         m3 = Mock(name="m3")
         cache = LruCache(2)
 
-        cache.set("key1", "value", [m1])
-        cache.set("key2", "value", [m2])
+        cache.set("key1", "value", callbacks=[m1])
+        cache.set("key2", "value", callbacks=[m2])
 
         self.assertEquals(m1.call_count, 0)
         self.assertEquals(m2.call_count, 0)
         self.assertEquals(m3.call_count, 0)
 
-        cache.set("key3", "value", [m3])
+        cache.set("key3", "value", callbacks=[m3])
 
         self.assertEquals(m1.call_count, 1)
         self.assertEquals(m2.call_count, 0)
@@ -227,7 +227,7 @@ class LruCacheCallbacksTestCase(unittest.TestCase):
         self.assertEquals(m2.call_count, 0)
         self.assertEquals(m3.call_count, 0)
 
-        cache.set("key1", "value", [m1])
+        cache.set("key1", "value", callbacks=[m1])
 
         self.assertEquals(m1.call_count, 1)
         self.assertEquals(m2.call_count, 0)
