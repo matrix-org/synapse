@@ -96,6 +96,11 @@ class PasswordRestServlet(RestServlet):
             threepid = result[LoginType.EMAIL_IDENTITY]
             if 'medium' not in threepid or 'address' not in threepid:
                 raise SynapseError(500, "Malformed threepid")
+            if threepid['medium'] == 'email':
+                # For emails, transform the address to lowercase.
+                # We store all email addreses as lowercase in the DB.
+                # (See add_threepid in synapse/handlers/auth.py)
+                threepid['address'] = threepid['address'].lower()
             # if using email, we must know about the email they're authing with!
             threepid_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
                 threepid['medium'], threepid['address']
