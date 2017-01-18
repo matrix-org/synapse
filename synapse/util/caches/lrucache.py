@@ -189,6 +189,8 @@ class LruCache(object):
                 for cb in node.callbacks:
                     cb()
             cache.clear()
+            if size_callback:
+                cached_cache_len[0] = 0
 
         @synchronized
         def cache_contains(key):
