@@ -22,7 +22,6 @@ from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import Measure
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
-from synapse.api.auth import AuthEventTypes
 from synapse.events.snapshot import EventContext
 from synapse.util.async import Linearizer
 
@@ -47,6 +46,8 @@ EVICTION_TIMEOUT_SECONDS = 60 * 60
 
 
 _NEXT_STATE_ID = 1
+
+POWER_KEY = (EventTypes.PowerLevels, "")
 
 
 def _gen_state_id():
@@ -332,21 +333,13 @@ class StateHandler(object):
 
             if conflicted_state:
                 logger.info("Resolving conflicted state for %r", room_id)
-                state_map = yield self.store.get_events(
-                    [e_id for st in state_groups_ids.values() for e_id in st.values()],
-                    get_prev_content=False
-                )
-                state_sets = [
-                    [state_map[e_id] for key, e_id in st.items() if e_id in state_map]
-                    for st in state_groups_ids.values()
-                ]
                 with Measure(self.clock, "state._resolve_events"):
-                    new_state, _ = resolve_events(
-                        state_sets, event_type, state_key
+                    new_state = yield resolve_events(
+                        state_groups_ids.values(),
+                        state_map_factory=lambda ev_ids: self.store.get_events(
+                            ev_ids, get_prev_content=False, check_redacted=False,
+                        ),
                     )
-                new_state = {
-                    key: e.event_id for key, e in new_state.items()
-                }
             else:
                 new_state = {
                     key: e_ids.pop() for key, e_ids in state.items()
@@ -394,13 +387,25 @@ class StateHandler(object):
         logger.info(
             "Resolving state for %s with %d groups", event.room_id, len(state_sets)
         )
+        state_set_ids = [{
+            (ev.type, ev.state_key): ev.event_id
+            for ev in st
+        } for st in state_sets]
+
+        state_map = {
+            ev.event_id: ev
+            for st in state_sets
+            for ev in st
+        }
+
         with Measure(self.clock, "state._resolve_events"):
-            if event.is_state():
-                return resolve_events(
-                    state_sets, event.type, event.state_key
-                )
-            else:
-                return resolve_events(state_sets)
+            new_state = resolve_events(state_set_ids, state_map)
+
+        new_state = {
+            key: state_map[ev_id] for key, ev_id in new_state.items()
+        }
+
+        return new_state
 
 
 def _ordered_events(events):
@@ -410,43 +415,131 @@ def _ordered_events(events):
     return sorted(events, key=key_func)
 
 
-def resolve_events(state_sets, event_type=None, state_key=""):
+def resolve_events(state_sets, state_map_factory):
     """
+    Args:
+        state_sets(list): List of dicts of (type, state_key) -> event_id,
+            which are the different state groups to resolve.
+        state_map_factory(dict|callable): If callable, then will be called
+            with a list of event_ids that are needed, and should return with
+            a Deferred of dict of event_id to event. Otherwise, should be
+            a dict from event_id to event of all events in state_sets.
+
     Returns
-        (dict[(str, str), synapse.events.FrozenEvent], list[str]): a tuple
-        (new_state, prev_states). new_state is a map from (type, state_key)
-        to event. prev_states is a list of event_ids.
+        dict[(str, str), synapse.events.FrozenEvent] is a map from
+        (type, state_key) to event.
     """
-    state = {}
-    for st in state_sets:
-        for e in st:
-            state.setdefault(
-                (e.type, e.state_key),
-                {}
-            )[e.event_id] = e
+    unconflicted_state, conflicted_state = _seperate(
+        state_sets,
+    )
 
-    unconflicted_state = {
-        k: v.values()[0] for k, v in state.items()
-        if len(v.values()) == 1
-    }
-
-    conflicted_state = {
-        k: v.values()
-        for k, v in state.items()
-        if len(v.values()) > 1
-    }
-
-    if event_type:
-        prev_states_events = conflicted_state.get(
-            (event_type, state_key), []
+    if callable(state_map_factory):
+        return _resolve_with_state_fac(
+            unconflicted_state, conflicted_state, state_map_factory
         )
-        prev_states = [s.event_id for s in prev_states_events]
-    else:
-        prev_states = []
+
+    state_map = state_map_factory
+
+    auth_events = _create_auth_events_from_maps(
+        unconflicted_state, conflicted_state, state_map
+    )
+
+    return _resolve_with_state(
+        unconflicted_state, conflicted_state, auth_events, state_map
+    )
+
+
+def _seperate(state_sets):
+    """Takes the state_sets and figures out which keys are conflicted and
+    which aren't. i.e., which have multiple different event_ids associated
+    with them in different state sets.
+    """
+    unconflicted_state = dict(state_sets[0])
+    conflicted_state = {}
+
+    for state_set in state_sets[1:]:
+        for key, value in state_set.iteritems():
+            # Check if there is an unconflicted entry for the state key.
+            unconflicted_value = unconflicted_state.get(key)
+            if unconflicted_value is None:
+                # There isn't an unconflicted entry so check if there is a
+                # conflicted entry.
+                ls = conflicted_state.get(key)
+                if ls is None:
+                    # There wasn't a conflicted entry so haven't seen this key before.
+                    # Therefore it isn't conflicted yet.
+                    unconflicted_state[key] = value
+                else:
+                    # This key is already conflicted, add our value to the conflict set.
+                    ls.add(value)
+            elif unconflicted_value != value:
+                # If the unconflicted value is not the same as our value then we
+                # have a new conflict. So move the key from the unconflicted_state
+                # to the conflicted state.
+                conflicted_state[key] = {value, unconflicted_value}
+                unconflicted_state.pop(key, None)
+
+    return unconflicted_state, conflicted_state
+
+
+@defer.inlineCallbacks
+def _resolve_with_state_fac(unconflicted_state, conflicted_state,
+                            state_map_factory):
+    needed_events = set(
+        event_id
+        for event_ids in conflicted_state.itervalues()
+        for event_id in event_ids
+    )
+
+    logger.info("Asking for %d conflicted events", len(needed_events))
+
+    state_map = yield state_map_factory(needed_events)
+
+    auth_events = _create_auth_events_from_maps(
+        unconflicted_state, conflicted_state, state_map
+    )
+
+    new_needed_events = set(auth_events.itervalues())
+    new_needed_events -= needed_events
+
+    logger.info("Asking for %d auth events", len(new_needed_events))
+
+    state_map_new = yield state_map_factory(new_needed_events)
+    state_map.update(state_map_new)
+
+    defer.returnValue(_resolve_with_state(
+        unconflicted_state, conflicted_state, auth_events, state_map
+    ))
+
+
+def _create_auth_events_from_maps(unconflicted_state, conflicted_state, state_map):
+    auth_events = {}
+    for event_ids in conflicted_state.itervalues():
+        for event_id in event_ids:
+            if event_id in state_map:
+                keys = event_auth.auth_types_for_event(state_map[event_id])
+                for key in keys:
+                    if key not in auth_events:
+                        event_id = unconflicted_state.get(key, None)
+                        if event_id:
+                            auth_events[key] = event_id
+    return auth_events
+
+
+def _resolve_with_state(unconflicted_state_ids, conflicted_state_ds, auth_event_ids,
+                        state_map):
+    conflicted_state = {}
+    for key, event_ids in conflicted_state_ds.iteritems():
+        events = [state_map[ev_id] for ev_id in event_ids if ev_id in state_map]
+        if len(events) > 1:
+            conflicted_state[key] = events
+        elif len(events) == 1:
+            unconflicted_state_ids[key] = events[0].event_id
 
     auth_events = {
-        k: e for k, e in unconflicted_state.items()
-        if k[0] in AuthEventTypes
+        key: state_map[ev_id]
+        for key, ev_id in auth_event_ids.items()
+        if ev_id in state_map
     }
 
     try:
@@ -457,10 +550,11 @@ def resolve_events(state_sets, event_type=None, state_key=""):
         logger.exception("Failed to resolve state")
         raise
 
-    new_state = unconflicted_state
-    new_state.update(resolved_state)
+    new_state = unconflicted_state_ids
+    for key, event in resolved_state.iteritems():
+        new_state[key] = event.event_id
 
-    return new_state, prev_states
+    return new_state
 
 
 def _resolve_state_events(conflicted_state, auth_events):
@@ -474,11 +568,10 @@ def _resolve_state_events(conflicted_state, auth_events):
         4. other events.
     """
     resolved_state = {}
-    power_key = (EventTypes.PowerLevels, "")
-    if power_key in conflicted_state:
-        events = conflicted_state[power_key]
+    if POWER_KEY in conflicted_state:
+        events = conflicted_state[POWER_KEY]
         logger.debug("Resolving conflicted power levels %r", events)
-        resolved_state[power_key] = _resolve_auth_events(
+        resolved_state[POWER_KEY] = _resolve_auth_events(
             events, auth_events)
 
     auth_events.update(resolved_state)
@@ -516,14 +609,26 @@ def _resolve_state_events(conflicted_state, auth_events):
 def _resolve_auth_events(events, auth_events):
     reverse = [i for i in reversed(_ordered_events(events))]
 
-    auth_events = dict(auth_events)
+    auth_keys = set(
+        key
+        for event in events
+        for key in event_auth.auth_types_for_event(event)
+    )
+
+    new_auth_events = {}
+    for key in auth_keys:
+        auth_event = auth_events.get(key, None)
+        if auth_event:
+            new_auth_events[key] = auth_event
+
+    auth_events = new_auth_events
 
     prev_event = reverse[0]
     for event in reverse[1:]:
         auth_events[(prev_event.type, prev_event.state_key)] = prev_event
         try:
             # The signatures have already been checked at this point
-            event_auth.check(event, auth_events, do_sig_check=False)
+            event_auth.check(event, auth_events, do_sig_check=False, do_size_check=False)
             prev_event = event
         except AuthError:
             return prev_event
@@ -535,7 +640,7 @@ def _resolve_normal_events(events, auth_events):
     for event in _ordered_events(events):
         try:
             # The signatures have already been checked at this point
-            event_auth.check(event, auth_events, do_sig_check=False)
+            event_auth.check(event, auth_events, do_sig_check=False, do_size_check=False)
             return event
         except AuthError:
             pass

@@ -27,7 +27,7 @@ from synapse.types import UserID, get_domain_from_id
 logger = logging.getLogger(__name__)
 
 
-def check(event, auth_events, do_sig_check=True):
+def check(event, auth_events, do_sig_check=True, do_size_check=True):
     """ Checks if this event is correctly authed.
 
     Args:
@@ -38,7 +38,8 @@ def check(event, auth_events, do_sig_check=True):
     Returns:
         True if the auth checks pass.
     """
-    _check_size_limits(event)
+    if do_size_check:
+        _check_size_limits(event)
 
     if not hasattr(event, "room_id"):
         raise AuthError(500, "Event has no room_id: %s" % event)
@@ -119,10 +120,11 @@ def check(event, auth_events, do_sig_check=True):
             )
         return True
 
-    logger.debug(
-        "Auth events: %s",
-        [a.event_id for a in auth_events.values()]
-    )
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "Auth events: %s",
+            [a.event_id for a in auth_events.values()]
+        )
 
     if event.type == EventTypes.Member:
         allowed = _is_membership_change_allowed(
@@ -639,3 +641,38 @@ def get_public_keys(invite_event):
         public_keys.append(o)
     public_keys.extend(invite_event.content.get("public_keys", []))
     return public_keys
+
+
+def auth_types_for_event(event):
+    """Given an event, return a list of (EventType, StateKey) that may be
+    needed to auth the event. The returned list may be a superset of what
+    would actually be required depending on the full state of the room.
+
+    Used to limit the number of events to fetch from the database to
+    actually auth the event.
+    """
+    if event.type == EventTypes.Create:
+        return []
+
+    auth_types = []
+
+    auth_types.append((EventTypes.PowerLevels, "", ))
+    auth_types.append((EventTypes.Member, event.user_id, ))
+    auth_types.append((EventTypes.Create, "", ))
+
+    if event.type == EventTypes.Member:
+        membership = event.content["membership"]
+        if membership in [Membership.JOIN, Membership.INVITE]:
+            auth_types.append((EventTypes.JoinRules, "", ))
+
+        auth_types.append((EventTypes.Member, event.state_key, ))
+
+        if membership == Membership.INVITE:
+            if "third_party_invite" in event.content:
+                key = (
+                    EventTypes.ThirdPartyInvite,
+                    event.content["third_party_invite"]["signed"]["token"]
+                )
+                auth_types.append(key)
+
+    return auth_types
