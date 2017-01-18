@@ -439,15 +439,23 @@ class Mailer(object):
                 })
 
     def make_room_link(self, room_id):
-        # need /beta for Universal Links to work on iOS
-        if self.app_name == "Vector":
-            return "https://vector.im/beta/#/room/%s" % (room_id,)
+        if self.hs.config.email_riot_base_url:
+            base_url = self.hs.config.email_riot_base_url
+        elif self.app_name == "Vector":
+            # need /beta for Universal Links to work on iOS
+            base_url = "https://vector.im/beta/#/room"
         else:
-            return "https://matrix.to/#/%s" % (room_id,)
+            base_url = "https://matrix.to/#"
+        return "%s/%s" % (base_url, room_id)
 
     def make_notif_link(self, notif):
-        # need /beta for Universal Links to work on iOS
-        if self.app_name == "Vector":
+        if self.hs.config.email_riot_base_url:
+            return "%s/#/room/%s/%s" % (
+                self.hs.config.email_riot_base_url,
+                notif['room_id'], notif['event_id']
+            )
+        elif self.app_name == "Vector":
+            # need /beta for Universal Links to work on iOS
             return "https://vector.im/beta/#/room/%s/%s" % (
                 notif['room_id'], notif['event_id']
             )
