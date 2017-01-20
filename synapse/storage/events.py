@@ -483,6 +483,10 @@ class EventsStore(SQLBaseStore):
                 retcols=["event_id", "type", "state_key"],
             )
 
+            # Figure out what has changed (if anything). Then we simply delete
+            # and readd the keys that have been changed.
+            # This saves us from deleting and reinserting thousands of rows for
+            # large rooms.
             existing_events = set(row["event_id"] for row in existing_state_rows)
             new_events = set(ev_id for ev_id in current_state.itervalues())
             changed_events = existing_events ^ new_events
@@ -490,14 +494,6 @@ class EventsStore(SQLBaseStore):
                 txn.executemany(
                     "DELETE FROM current_state_events WHERE event_id = ?",
                     [(ev_id,) for ev_id in changed_events],
-                )
-
-                # Add an entry to the current_state_resets table to record the point
-                # where we clobbered the current state
-                self._simple_insert_txn(
-                    txn,
-                    table="current_state_resets",
-                    values={"event_stream_ordering": max_stream_order}
                 )
 
                 events_to_insert = (new_events - existing_events)
@@ -519,6 +515,13 @@ class EventsStore(SQLBaseStore):
                     ],
                 )
 
+                # Invalidate the various caches
+
+                # Figure out the changes of membership to invalidate the
+                # `get_rooms_for_user` cache.
+                # We find out which membership events we may have deleted
+                # and which we have added, then we invlidate the caches for all
+                # those users.
                 members_changed = set(
                     row["state_key"] for row in existing_state_rows
                     if row["event_id"] in changed_events
@@ -533,6 +536,14 @@ class EventsStore(SQLBaseStore):
                     txn.call_after(self.get_rooms_for_user.invalidate, (member,))
 
                 txn.call_after(self.get_users_in_room.invalidate, (room_id,))
+
+                # Add an entry to the current_state_resets table to record the point
+                # where we clobbered the current state
+                self._simple_insert_txn(
+                    txn,
+                    table="current_state_resets",
+                    values={"event_stream_ordering": max_stream_order}
+                )
 
         for room_id, new_extrem in new_forward_extremeties.items():
             self._simple_delete_txn(
