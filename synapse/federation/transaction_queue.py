@@ -362,7 +362,7 @@ class TransactionQueue(object):
                     if not success:
                         break
         except NotRetryingDestination:
-            logger.info(
+            logger.debug(
                 "TX [%s] not ready for retry yet - "
                 "dropping transaction for now",
                 destination,

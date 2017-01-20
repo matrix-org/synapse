@@ -68,6 +68,9 @@ class EmailConfig(Config):
             self.email_notif_for_new_users = email_config.get(
                 "notif_for_new_users", True
             )
+            self.email_riot_base_url = email_config.get(
+                "riot_base_url", None
+            )
             if "app_name" in email_config:
                 self.email_app_name = email_config["app_name"]
             else:
@@ -85,6 +88,9 @@ class EmailConfig(Config):
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Enable sending emails for notification events
+        # Defining a custom URL for Riot is only needed if email notifications
+        # should contain links to a self-hosted installation of Riot; when set
+        # the "app_name" setting is ignored.
         #email:
         #   enable_notifs: false
         #   smtp_host: "localhost"
@@ -95,4 +101,5 @@ class EmailConfig(Config):
         #   notif_template_html: notif_mail.html
         #   notif_template_text: notif_mail.txt
         #   notif_for_new_users: True
+        #   riot_base_url: "http://localhost/riot"
         """

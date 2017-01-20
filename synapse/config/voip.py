@@ -19,7 +19,9 @@ class VoipConfig(Config):
 
     def read_config(self, config):
         self.turn_uris = config.get("turn_uris", [])
-        self.turn_shared_secret = config["turn_shared_secret"]
+        self.turn_shared_secret = config.get("turn_shared_secret")
+        self.turn_username = config.get("turn_username")
+        self.turn_password = config.get("turn_password")
         self.turn_user_lifetime = self.parse_duration(config["turn_user_lifetime"])
 
     def default_config(self, **kwargs):
@@ -31,6 +33,11 @@ class VoipConfig(Config):
 
         # The shared secret used to compute passwords for the TURN server
         turn_shared_secret: "YOUR_SHARED_SECRET"
+
+        # The Username and password if the TURN server needs them and
+        # does not use a token
+        #turn_username: "TURNSERVER_USERNAME"
+        #turn_password: "TURNSERVER_PASSWORD"
 
         # How long generated TURN credentials last
         turn_user_lifetime: "1h"

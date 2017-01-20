@@ -86,7 +86,11 @@ class HttpTransactionCache(object):
             pass  # execute the function instead.
 
         deferred = fn(*args, **kwargs)
-        observable = ObservableDeferred(deferred)
+
+        # We don't add an errback to the raw deferred, so we ask ObservableDeferred
+        # to swallow the error. This is fine as the error will still be reported
+        # to the observers.
+        observable = ObservableDeferred(deferred, consumeErrors=True)
         self.transactions[txn_key] = (observable, self.clock.time_msec())
         return observable.observe()
 

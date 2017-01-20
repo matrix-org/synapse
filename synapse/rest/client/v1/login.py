@@ -118,8 +118,14 @@ class LoginRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def do_password_login(self, login_submission):
         if 'medium' in login_submission and 'address' in login_submission:
+            address = login_submission['address']
+            if login_submission['medium'] == 'email':
+                # For emails, transform the address to lowercase.
+                # We store all email addreses as lowercase in the DB.
+                # (See add_threepid in synapse/handlers/auth.py)
+                address = address.lower()
             user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
-                login_submission['medium'], login_submission['address']
+                login_submission['medium'], address
             )
             if not user_id:
                 raise LoginError(403, "", errcode=Codes.FORBIDDEN)

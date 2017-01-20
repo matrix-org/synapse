@@ -18,13 +18,29 @@ import ujson
 
 from twisted.internet import defer
 
-from ._base import SQLBaseStore
+from .background_updates import BackgroundUpdateStore
 
 
 logger = logging.getLogger(__name__)
 
 
-class DeviceInboxStore(SQLBaseStore):
+class DeviceInboxStore(BackgroundUpdateStore):
+    DEVICE_INBOX_STREAM_ID = "device_inbox_stream_drop"
+
+    def __init__(self, hs):
+        super(DeviceInboxStore, self).__init__(hs)
+
+        self.register_background_index_update(
+            "device_inbox_stream_index",
+            index_name="device_inbox_stream_id_user_id",
+            table="device_inbox",
+            columns=["stream_id", "user_id"],
+        )
+
+        self.register_background_update_handler(
+            self.DEVICE_INBOX_STREAM_ID,
+            self._background_drop_index_device_inbox,
+        )
 
     @defer.inlineCallbacks
     def add_messages_to_device_inbox(self, local_messages_by_user_then_device,
@@ -368,3 +384,18 @@ class DeviceInboxStore(SQLBaseStore):
             "delete_device_msgs_for_remote",
             delete_messages_for_remote_destination_txn
         )
+
+    @defer.inlineCallbacks
+    def _background_drop_index_device_inbox(self, progress, batch_size):
+        def reindex_txn(conn):
+            txn = conn.cursor()
+            txn.execute(
+                "DROP INDEX IF EXISTS device_inbox_stream_id"
+            )
+            txn.close()
+
+        yield self.runWithConnection(reindex_txn)
+
+        yield self._end_background_update(self.DEVICE_INBOX_STREAM_ID)
+
+        defer.returnValue(1)

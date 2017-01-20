@@ -32,18 +32,26 @@ class VoipRestServlet(ClientV1RestServlet):
 
         turnUris = self.hs.config.turn_uris
         turnSecret = self.hs.config.turn_shared_secret
+        turnUsername = self.hs.config.turn_username
+        turnPassword = self.hs.config.turn_password
         userLifetime = self.hs.config.turn_user_lifetime
-        if not turnUris or not turnSecret or not userLifetime:
+
+        if turnUris and turnSecret and userLifetime:
+            expiry = (self.hs.get_clock().time_msec() + userLifetime) / 1000
+            username = "%d:%s" % (expiry, requester.user.to_string())
+
+            mac = hmac.new(turnSecret, msg=username, digestmod=hashlib.sha1)
+            # We need to use standard padded base64 encoding here
+            # encode_base64 because we need to add the standard padding to get the
+            # same result as the TURN server.
+            password = base64.b64encode(mac.digest())
+
+        elif turnUris and turnUsername and turnPassword and userLifetime:
+            username = turnUsername
+            password = turnPassword
+
+        else:
             defer.returnValue((200, {}))
-
-        expiry = (self.hs.get_clock().time_msec() + userLifetime) / 1000
-        username = "%d:%s" % (expiry, requester.user.to_string())
-
-        mac = hmac.new(turnSecret, msg=username, digestmod=hashlib.sha1)
-        # We need to use standard padded base64 encoding here
-        # encode_base64 because we need to add the standard padding to get the
-        # same result as the TURN server.
-        password = base64.b64encode(mac.digest())
 
         defer.returnValue((200, {
             'username': username,

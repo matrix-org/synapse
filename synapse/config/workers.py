@@ -29,3 +29,13 @@ class WorkerConfig(Config):
         self.worker_log_file = config.get("worker_log_file")
         self.worker_log_config = config.get("worker_log_config")
         self.worker_replication_url = config.get("worker_replication_url")
+
+        if self.worker_listeners:
+            for listener in self.worker_listeners:
+                bind_address = listener.pop("bind_address", None)
+                bind_addresses = listener.setdefault("bind_addresses", [])
+
+                if bind_address:
+                    bind_addresses.append(bind_address)
+                elif not bind_addresses:
+                    bind_addresses.append('')
