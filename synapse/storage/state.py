@@ -232,58 +232,6 @@ class StateStore(SQLBaseStore):
 
             return count
 
-    @defer.inlineCallbacks
-    def get_current_state(self, room_id, event_type=None, state_key=""):
-        if event_type and state_key is not None:
-            result = yield self.get_current_state_for_key(
-                room_id, event_type, state_key
-            )
-            defer.returnValue(result)
-
-        def f(txn):
-            sql = (
-                "SELECT event_id FROM current_state_events"
-                " WHERE room_id = ? "
-            )
-
-            if event_type and state_key is not None:
-                sql += " AND type = ? AND state_key = ? "
-                args = (room_id, event_type, state_key)
-            elif event_type:
-                sql += " AND type = ?"
-                args = (room_id, event_type)
-            else:
-                args = (room_id, )
-
-            txn.execute(sql, args)
-            results = txn.fetchall()
-
-            return [r[0] for r in results]
-
-        event_ids = yield self.runInteraction("get_current_state", f)
-        events = yield self._get_events(event_ids, get_prev_content=False)
-        defer.returnValue(events)
-
-    @defer.inlineCallbacks
-    def get_current_state_for_key(self, room_id, event_type, state_key):
-        event_ids = yield self._get_current_state_for_key(room_id, event_type, state_key)
-        events = yield self._get_events(event_ids, get_prev_content=False)
-        defer.returnValue(events)
-
-    @cached(num_args=3)
-    def _get_current_state_for_key(self, room_id, event_type, state_key):
-        def f(txn):
-            sql = (
-                "SELECT event_id FROM current_state_events"
-                " WHERE room_id = ? AND type = ? AND state_key = ?"
-            )
-
-            args = (room_id, event_type, state_key)
-            txn.execute(sql, args)
-            results = txn.fetchall()
-            return [r[0] for r in results]
-        return self.runInteraction("get_current_state_for_key", f)
-
     @cached(num_args=2, max_entries=100000, iterable=True)
     def _get_state_group_from_group(self, group, types):
         raise NotImplementedError()

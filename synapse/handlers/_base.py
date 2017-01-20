@@ -88,9 +88,13 @@ class BaseHandler(object):
                     current_state = yield self.store.get_events(
                         context.current_state_ids.values()
                     )
-                    current_state = current_state.values()
                 else:
-                    current_state = yield self.store.get_current_state(event.room_id)
+                    current_state = yield self.state_handler.get_current_state(
+                        event.room_id
+                    )
+
+                current_state = current_state.values()
+
                 logger.info("maybe_kick_guest_users %r", current_state)
                 yield self.kick_guest_users(current_state)
 

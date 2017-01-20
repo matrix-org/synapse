@@ -119,35 +119,6 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         )
 
     @defer.inlineCallbacks
-    def test_get_current_state(self):
-        # Create the room.
-        yield self.persist(type="m.room.create", key="", creator=USER_ID)
-        yield self.replicate()
-        yield self.check(
-            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID), []
-        )
-
-        # Join the room.
-        join1 = yield self.persist(
-            type="m.room.member", key=USER_ID, membership="join",
-        )
-        yield self.replicate()
-        yield self.check(
-            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID),
-            [join1]
-        )
-
-        # Add some other user to the room.
-        join2 = yield self.persist(
-            type="m.room.member", key=USER_ID_2, membership="join",
-        )
-        yield self.replicate()
-        yield self.check(
-            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID_2),
-            [join2]
-        )
-
-    @defer.inlineCallbacks
     def test_redactions(self):
         yield self.persist(type="m.room.create", key="", creator=USER_ID)
         yield self.persist(type="m.room.member", key=USER_ID, membership="join")
