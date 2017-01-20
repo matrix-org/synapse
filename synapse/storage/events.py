@@ -363,7 +363,7 @@ class EventsStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def _calculate_new_extremeties(self, room_id, events):
-        """Caculates the new forward extremeties for a room given events to
+        """Calculates the new forward extremeties for a room given events to
         persist.
 
         Assumes that we are only persisting events for one room at a time.
