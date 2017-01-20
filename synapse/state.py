@@ -429,6 +429,9 @@ def resolve_events(state_sets, state_map_factory):
         dict[(str, str), synapse.events.FrozenEvent] is a map from
         (type, state_key) to event.
     """
+    if len(state_sets) == 1:
+        return state_sets[0]
+
     unconflicted_state, conflicted_state = _seperate(
         state_sets,
     )
