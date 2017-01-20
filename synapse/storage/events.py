@@ -279,6 +279,8 @@ class EventsStore(SQLBaseStore):
                 # We can't easily parallelize these since different chunks
                 # might contain the same event. :(
 
+                # NB: Assumes that we are only persisting events for one room
+                # at a time.
                 new_forward_extremeties = {}
                 current_state_for_room = {}
                 if not backfilled:
@@ -361,14 +363,21 @@ class EventsStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def _calculate_new_extremeties(self, room_id, events):
+        """Caculates the new forward extremeties for a room given events to
+        persist.
+
+        Assumes that we are only persisting events for one room at a time.
+        """
         latest_event_ids = yield self.get_latest_event_ids_in_room(
             room_id
         )
         new_latest_event_ids = set(latest_event_ids)
+        # First, add all the new events to the list
         new_latest_event_ids.update(
             event.event_id for event in events
             if not event.internal_metadata.is_outlier()
         )
+        # Now remove all events that are referenced by the to-be-added events
         new_latest_event_ids.difference_update(
             e_id
             for event in events
@@ -376,6 +385,8 @@ class EventsStore(SQLBaseStore):
             if not event.internal_metadata.is_outlier()
         )
 
+        # And finally remove any events that are referenced by previously added
+        # events.
         rows = yield self._simple_select_many_batch(
             table="event_edges",
             column="prev_event_id",
