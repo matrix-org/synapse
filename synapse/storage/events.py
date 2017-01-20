@@ -662,7 +662,7 @@ class EventsStore(SQLBaseStore):
 
                 # Update the event_backward_extremities table now that this
                 # event isn't an outlier any more.
-                self._update_extremeties(txn, [event])
+                self._update_backward_extremeties(txn, [event])
 
         events_and_contexts = [
             ec for ec in events_and_contexts if ec[0] not in to_remove
