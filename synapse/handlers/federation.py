@@ -1319,7 +1319,6 @@ class FederationHandler(BaseHandler):
 
         event_stream_id, max_stream_id = yield self.store.persist_event(
             event, new_event_context,
-            current_state=state,
         )
 
         defer.returnValue((event_stream_id, max_stream_id))
