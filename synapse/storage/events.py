@@ -379,7 +379,7 @@ class EventsStore(SQLBaseStore):
 
         Returns:
             2-tuple (to_delete, to_insert) where both are state dicts, i.e.
-            (type, state_key) -> event_id. `to_delete` are the entreis to
+            (type, state_key) -> event_id. `to_delete` are the entries to
             first be deleted from current_state_events, `to_insert` are entries
             to insert.
             May return None if there are no changes to be applied.
