@@ -200,11 +200,11 @@ class StateHandler(object):
                     (s.type, s.state_key): s.event_id for s in old_state
                 }
                 if event.is_state():
-                    context.current_state_events = dict(context.prev_state_ids)
+                    context.current_state_ids = dict(context.prev_state_ids)
                     key = (event.type, event.state_key)
-                    context.current_state_events[key] = event.event_id
+                    context.current_state_ids[key] = event.event_id
                 else:
-                    context.current_state_events = context.prev_state_ids
+                    context.current_state_ids = context.prev_state_ids
             else:
                 context.current_state_ids = {}
                 context.prev_state_ids = {}
