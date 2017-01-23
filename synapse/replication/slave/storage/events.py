@@ -76,9 +76,6 @@ class SlavedEventStore(BaseSlavedStore):
     get_latest_event_ids_in_room = EventFederationStore.__dict__[
         "get_latest_event_ids_in_room"
     ]
-    _get_current_state_for_key = StateStore.__dict__[
-        "_get_current_state_for_key"
-    ]
     get_invited_rooms_for_user = RoomMemberStore.__dict__[
         "get_invited_rooms_for_user"
     ]
@@ -115,8 +112,6 @@ class SlavedEventStore(BaseSlavedStore):
     )
     get_event = DataStore.get_event.__func__
     get_events = DataStore.get_events.__func__
-    get_current_state = DataStore.get_current_state.__func__
-    get_current_state_for_key = DataStore.get_current_state_for_key.__func__
     get_rooms_for_user_where_membership_is = (
         DataStore.get_rooms_for_user_where_membership_is.__func__
     )
@@ -248,7 +243,6 @@ class SlavedEventStore(BaseSlavedStore):
 
     def invalidate_caches_for_event(self, event, backfilled, reset_state):
         if reset_state:
-            self._get_current_state_for_key.invalidate_all()
             self.get_rooms_for_user.invalidate_all()
             self.get_users_in_room.invalidate((event.room_id,))
 
@@ -289,7 +283,3 @@ class SlavedEventStore(BaseSlavedStore):
         if (not event.internal_metadata.is_invite_from_remote()
                 and event.internal_metadata.is_outlier()):
             return
-
-        self._get_current_state_for_key.invalidate((
-            event.room_id, event.type, event.state_key
-        ))
