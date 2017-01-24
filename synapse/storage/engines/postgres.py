@@ -68,6 +68,3 @@ class PostgresEngine(object):
         cursor.execute("CREATE SCHEMA IF NOT EXISTS " + db_schema_name)
         cursor.execute("ALTER USER " + db_user + " SET SEARCH_PATH TO " + db_schema_name)
         cursor.close()
-
-
-
