@@ -29,6 +29,7 @@ class DeviceHandler(BaseHandler):
         super(DeviceHandler, self).__init__(hs)
 
         self.state = hs.get_state_handler()
+        self.federation = hs.get_federation_sender()
 
     @defer.inlineCallbacks
     def check_device_registered(self, user_id, device_id,

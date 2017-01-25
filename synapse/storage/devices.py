@@ -141,11 +141,11 @@ class DeviceStore(SQLBaseStore):
     def get_devices_by_remote(self, destination, from_stream_id):
         now_stream_id = self._device_list_id_gen.get_current_token()
 
-        has_changed = self._device_list_stream_cache.has_entity_changed(
+        has_changed = self._device_list_federation_stream_cache.has_entity_changed(
             destination, int(from_stream_id)
         )
         if not has_changed:
-            defer.returnValue((now_stream_id, []))
+            return (now_stream_id, [])
 
         return self.runInteraction(
             "get_devices_by_remote", self._get_devices_by_remote_txn,
@@ -165,7 +165,7 @@ class DeviceStore(SQLBaseStore):
         rows = txn.fetchall()
 
         if not rows:
-            return now_stream_id, []
+            return (now_stream_id, [])
 
         # maps (user_id, device_id) -> stream_id
         query_map = {(r[0], r[1]): r[2] for r in rows}
@@ -189,7 +189,7 @@ class DeviceStore(SQLBaseStore):
                 result = {
                     "user_id": user_id,
                     "device_id": device_id,
-                    "prev_id": prev_id,
+                    "prev_id": [prev_id] if prev_id else [],
                     "stream_id": stream_id,
                 }
 
@@ -202,28 +202,15 @@ class DeviceStore(SQLBaseStore):
                 if device_display_name:
                     result["device_display_name"] = device_display_name
 
-                results.setdefault(user_id, {})[device_id] = result
+                results.append(result)
 
-        return now_stream_id, results
+        return (now_stream_id, results)
 
     def mark_as_sent_devices_by_remote(self, destination, stream_id):
         return self.runInteraction(
             "mark_as_sent_devices_by_remote", self._mark_as_sent_devices_by_remote_txn,
             destination, stream_id,
         )
-
-    @defer.inlineCallbacks
-    def get_user_whose_devices_changed(self, from_key):
-        from_key = int(from_key)
-        changed = self._device_list_stream_cache.get_all_entities_changed(from_key)
-        if changed is not None:
-            defer.returnValue(set(changed))
-
-        sql = """
-            SELECT user_id FROM device_lists_stream WHERE stream_id > ?
-        """
-        rows = yield self._execute("get_user_whose_devices_changed", None, sql, from_key)
-        defer.returnValue(set(row["user_id"] for row in rows))
 
     def _mark_as_sent_devices_by_remote_txn(self, txn, destination, stream_id):
         sql = """
@@ -239,7 +226,20 @@ class DeviceStore(SQLBaseStore):
             UPDATE device_lists_outbound_pokes SET sent = ?
             WHERE destination = ? AND stream_id <= ?
         """
-        txn.execute(sql, (destination, True,))
+        txn.execute(sql, (True, destination, stream_id,))
+
+    @defer.inlineCallbacks
+    def get_user_whose_devices_changed(self, from_key):
+        from_key = int(from_key)
+        changed = self._device_list_stream_cache.get_all_entities_changed(from_key)
+        if changed is not None:
+            defer.returnValue(set(changed))
+
+        sql = """
+            SELECT user_id FROM device_lists_stream WHERE stream_id > ?
+        """
+        rows = yield self._execute("get_user_whose_devices_changed", None, sql, from_key)
+        defer.returnValue(set(row["user_id"] for row in rows))
 
     @defer.inlineCallbacks
     def add_device_change_to_streams(self, user_id, device_id, hosts):
