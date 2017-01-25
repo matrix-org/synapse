@@ -259,6 +259,7 @@ class E2eKeysHandler(object):
                 user_id, device_id, time_now,
                 encode_canonical_json(device_keys)
             )
+            yield self.device_handler.notify_device_update(user_id, device_id)
 
         one_time_keys = keys.get("one_time_keys", None)
         if one_time_keys:
