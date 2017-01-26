@@ -150,6 +150,14 @@ class DeviceStore(SQLBaseStore):
             allow_none=True,
         )
 
+    def mark_remote_user_device_list_as_unsubscribed(self, user_id):
+        return self._simple_delete(
+            table="device_lists_remote_extremeties",
+            keyvalues={
+                "user_id": user_id,
+            },
+        )
+
     def update_remote_device_list_cache_entry(self, user_id, device_id, content,
                                               stream_id):
         """Updates a single user's device in the cache.

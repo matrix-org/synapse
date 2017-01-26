@@ -42,6 +42,8 @@ class DeviceHandler(BaseHandler):
             "user_devices", self.on_federation_query_user_devices,
         )
 
+        hs.get_distributor().observe("user_left_room", self.user_left_room)
+
     @defer.inlineCallbacks
     def check_device_registered(self, user_id, device_id,
                                 initial_device_display_name=None):
@@ -246,7 +248,11 @@ class DeviceHandler(BaseHandler):
             logger.warning("Got device list update edu for %r from %r", user_id, origin)
             return
 
-        logger.info("Got edu: %r", edu_content)
+        rooms = yield self.store.get_rooms_for_user(user_id)
+        if not rooms:
+            # We don't share any rooms with this user. Ignore update, as we
+            # probably won't get any further updates.
+            return
 
         with (yield self._remote_edue_linearizer.queue(user_id)):
             # If the prev id matches whats in our cache table, then we don't need
@@ -287,6 +293,15 @@ class DeviceHandler(BaseHandler):
             "stream_id": stream_id,
             "devices": devices,
         })
+
+    @defer.inlineCallbacks
+    def user_left_room(self, user, room_id):
+        user_id = user.to_string()
+        rooms = yield self.store.get_rooms_for_user(user_id)
+        if not rooms:
+            # We no longer share rooms with this user, so we'll no longer
+            # receive device updates. Mark this in DB.
+            yield self.store.mark_remote_user_device_list_as_unsubscribed(user_id)
 
 
 def _update_device_from_client_ips(device, client_ips):
