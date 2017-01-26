@@ -13,18 +13,6 @@
  * limitations under the License.
  */
 
-CREATE TABLE device_list_streams_remote (
-    list_id TEXT NOT NULL,
-    origin TEXT NOT NULL,
-    user_id TEXT NOT NULL,
-    is_full BOOLEAN NOT NULL,
-    ts BIGINT NOT NULL
-);
-
-CREATE INDEX device_list_streams_remote_id_origin ON device_list_streams_remote(
-    origin, list_id, user_id
-);
-
 
 CREATE TABLE device_lists_remote_cache (
     user_id TEXT NOT NULL,
@@ -33,6 +21,14 @@ CREATE TABLE device_lists_remote_cache (
 );
 
 CREATE INDEX device_lists_remote_cache_id ON device_lists_remote_cache(user_id, device_id);
+
+
+CREATE TABLE device_lists_remote_extremeties (
+    user_id TEXT NOT NULL,
+    stream_id TEXT NOT NULL
+);
+
+CREATE INDEX device_lists_remote_extremeties_id ON device_lists_remote_extremeties(user_id, stream_id);
 
 
 CREATE TABLE device_lists_stream (
