@@ -192,6 +192,9 @@ class DeviceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def notify_device_update(self, user_id, device_ids):
+        """Notify that a user's device(s) has changed. Pokes the notifier, and
+        remote servers if the user is local.
+        """
         rooms = yield self.store.get_rooms_for_user(user_id)
         room_ids = [r.room_id for r in rooms]
 
@@ -210,12 +213,16 @@ class DeviceHandler(BaseHandler):
             "device_list_key", position, rooms=room_ids,
         )
 
-        logger.info("Sending device list update notif to: %r", hosts)
-        for host in hosts:
-            self.federation_sender.send_device_messages(host)
+        if hosts:
+            logger.info("Sending device list update notif to: %r", hosts)
+            for host in hosts:
+                self.federation_sender.send_device_messages(host)
 
     @defer.inlineCallbacks
     def get_device_list_changes(self, user_id, room_ids, from_key):
+        """For a user and their joined rooms, calculate which device updates
+        we need to return.
+        """
         room_ids = frozenset(room_ids)
 
         user_ids_changed = set()
@@ -236,11 +243,14 @@ class DeviceHandler(BaseHandler):
 
         if get_domain_from_id(user_id) != origin:
             # TODO: Raise?
+            logger.warning("Got device list update edu for %r from %r", user_id, origin)
             return
 
         logger.info("Got edu: %r", edu_content)
 
         with (yield self._remote_edue_linearizer.queue(user_id)):
+            # If the prev id matches whats in our cache table, then we don't need
+            # to resync the users device list, otherwise we do.
             resync = True
             if len(prev_ids) == 1:
                 extremity = yield self.store.get_device_list_remote_extremity(user_id)
@@ -249,6 +259,7 @@ class DeviceHandler(BaseHandler):
                     resync = False
 
             if resync:
+                # Fetch all devices for the user.
                 result = yield self.federation.query_user_devices(origin, user_id)
                 stream_id = result["stream_id"]
                 devices = result["devices"]
@@ -258,6 +269,8 @@ class DeviceHandler(BaseHandler):
                 device_ids = [device["device_id"] for device in devices]
                 yield self.notify_device_update(user_id, device_ids)
             else:
+                # Simply update the single device, since we know that is the only
+                # change (becuase of the single prev_id matching the current cache)
                 content = dict(edu_content)
                 for key in ("user_id", "device_id", "stream_id", "prev_ids"):
                     content.pop(key, None)

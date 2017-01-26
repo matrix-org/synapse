@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-
+-- Cache of remote devices.
 CREATE TABLE device_lists_remote_cache (
     user_id TEXT NOT NULL,
     device_id TEXT NOT NULL,
@@ -23,6 +23,8 @@ CREATE TABLE device_lists_remote_cache (
 CREATE INDEX device_lists_remote_cache_id ON device_lists_remote_cache(user_id, device_id);
 
 
+-- The last update we got for a user. Empty if we're not receiving updates for
+-- that user.
 CREATE TABLE device_lists_remote_extremeties (
     user_id TEXT NOT NULL,
     stream_id TEXT NOT NULL
@@ -31,6 +33,7 @@ CREATE TABLE device_lists_remote_extremeties (
 CREATE INDEX device_lists_remote_extremeties_id ON device_lists_remote_extremeties(user_id, stream_id);
 
 
+-- Stream of device lists updates. Includes both local and remotes
 CREATE TABLE device_lists_stream (
     stream_id BIGINT NOT NULL,
     user_id TEXT NOT NULL,
@@ -40,6 +43,9 @@ CREATE TABLE device_lists_stream (
 CREATE INDEX device_lists_stream_id ON device_lists_stream(stream_id, user_id);
 
 
+-- The stream of updates to send to other servers. We keep at least one row
+-- per user that was sent so that the prev_id for any new updates can be
+-- calculated
 CREATE TABLE device_lists_outbound_pokes (
     destination TEXT NOT NULL,
     stream_id BIGINT NOT NULL,

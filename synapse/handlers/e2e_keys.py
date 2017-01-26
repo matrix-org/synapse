@@ -75,7 +75,7 @@ class E2eKeysHandler(object):
             else:
                 remote_queries[user_id] = device_ids
 
-        # do the queries
+        # Firt get local devices.
         failures = {}
         results = {}
         if local_query:
@@ -84,6 +84,7 @@ class E2eKeysHandler(object):
                 if user_id in local_query:
                     results[user_id] = keys
 
+        # Now attempt to get any remote devices from our local cache.
         remote_queries_not_in_cache = {}
         if remote_queries:
             query_list = []
@@ -115,6 +116,7 @@ class E2eKeysHandler(object):
                 r = remote_queries_not_in_cache.setdefault(domain, {})
                 r[user_id] = remote_queries[user_id]
 
+        # Now fetch any devices that we don't have in our cache
         @defer.inlineCallbacks
         def do_remote_query(destination):
             destination_query = remote_queries_not_in_cache[destination]

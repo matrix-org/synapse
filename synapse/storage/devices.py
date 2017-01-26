@@ -139,6 +139,9 @@ class DeviceStore(SQLBaseStore):
         defer.returnValue({d["device_id"]: d for d in devices})
 
     def get_device_list_remote_extremity(self, user_id):
+        """Get the last stream_id we got for a user. May be None if we haven't
+        got any information for them.
+        """
         return self._simple_select_one_onecol(
             table="device_lists_remote_extremeties",
             keyvalues={"user_id": user_id},
@@ -149,6 +152,8 @@ class DeviceStore(SQLBaseStore):
 
     def update_remote_device_list_cache_entry(self, user_id, device_id, content,
                                               stream_id):
+        """Updates a single user's device in the cache.
+        """
         return self.runInteraction(
             "update_remote_device_list_cache_entry",
             self._update_remote_device_list_cache_entry_txn,
@@ -181,6 +186,8 @@ class DeviceStore(SQLBaseStore):
         )
 
     def update_remote_device_list_cache(self, user_id, devices, stream_id):
+        """Replace the cache of the remote user's devices.
+        """
         return self.runInteraction(
             "update_remote_device_list_cache",
             self._update_remote_device_list_cache_txn,
@@ -222,6 +229,11 @@ class DeviceStore(SQLBaseStore):
         )
 
     def get_devices_by_remote(self, destination, from_stream_id):
+        """Get stream of updates to send to remote servers
+
+        Returns:
+            (now_stream_id, [ { updates }, .. ])
+        """
         now_stream_id = self._device_list_id_gen.get_current_token()
 
         has_changed = self._device_list_federation_stream_cache.has_entity_changed(
@@ -290,6 +302,17 @@ class DeviceStore(SQLBaseStore):
         return (now_stream_id, results)
 
     def get_user_devices_from_cache(self, query_list):
+        """Get the devices (and keys if any) for remote users from the cache.
+
+        Args:
+            query_list(list): List of (user_id, device_ids), if device_ids is
+                falsey then return all device ids for that user.
+
+        Returns:
+            (user_ids_not_in_cache, results_map), where user_ids_not_in_cache is
+            a set of user_ids and results_map is a mapping of
+            user_id -> device_id -> device_info
+        """
         return self.runInteraction(
             "get_user_devices_from_cache", self._get_user_devices_from_cache_txn,
             query_list,
@@ -347,6 +370,11 @@ class DeviceStore(SQLBaseStore):
         return user_ids_not_in_cache, results
 
     def get_devices_with_keys_by_user(self, user_id):
+        """Get all devices (with any device keys) for a user
+
+        Returns:
+            (stream_id, devices)
+        """
         return self.runInteraction(
             "get_devices_with_keys_by_user",
             self._get_devices_with_keys_by_user_txn, user_id,
@@ -380,6 +408,8 @@ class DeviceStore(SQLBaseStore):
         return now_stream_id, []
 
     def mark_as_sent_devices_by_remote(self, destination, stream_id):
+        """Mark that updates have successfully been sent to the destination.
+        """
         return self.runInteraction(
             "mark_as_sent_devices_by_remote", self._mark_as_sent_devices_by_remote_txn,
             destination, stream_id,
@@ -403,6 +433,8 @@ class DeviceStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_user_whose_devices_changed(self, from_key):
+        """Get set of users whose devices have changed since `from_key`.
+        """
         from_key = int(from_key)
         changed = self._device_list_stream_cache.get_all_entities_changed(from_key)
         if changed is not None:
@@ -416,8 +448,9 @@ class DeviceStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def add_device_change_to_streams(self, user_id, device_ids, hosts):
-        # device_lists_stream
-        # device_lists_outbound_pokes
+        """Persist that a user's devices have been updated, and which hosts
+        (if any) should be poked.
+        """
         with self._device_list_id_gen.get_next() as stream_id:
             yield self.runInteraction(
                 "add_device_change_to_streams", self._add_device_change_txn,
