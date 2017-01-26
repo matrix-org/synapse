@@ -65,11 +65,11 @@ class EndToEndKeyStore(SQLBaseStore):
             "SELECT user_id, device_id, "
             "    d.display_name AS device_display_name, "
             "    k.key_json"
-            " FROM e2e_device_keys_json k"
-            "    %s JOIN devices d USING (user_id, device_id)"
+            " FROM devices d"
+            "    %s JOIN e2e_device_keys_json k USING (user_id, device_id)"
             " WHERE %s"
         ) % (
-            "FULL OUTER" if include_all_devices else "LEFT",
+            "LEFT" if include_all_devices else "INNER",
             " OR ".join("(" + q + ")" for q in query_clauses)
         )
 
