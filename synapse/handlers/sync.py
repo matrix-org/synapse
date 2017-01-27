@@ -144,7 +144,6 @@ class SyncHandler(object):
         self.clock = hs.get_clock()
         self.response_cache = ResponseCache(hs)
         self.state = hs.get_state_handler()
-        self.device_handler = hs.get_device_handler()
 
     def wait_for_sync_for_user(self, sync_config, since_token=None, timeout=0,
                                full_state=False):
@@ -546,15 +545,9 @@ class SyncHandler(object):
 
         yield self._generate_sync_entry_for_to_device(sync_result_builder)
 
-        if since_token and since_token.device_list_key:
-            user_id = sync_config.user.to_string()
-            rooms = yield self.store.get_rooms_for_user(user_id)
-            joined_room_ids = set(r.room_id for r in rooms)
-            device_lists = yield self.device_handler.get_device_list_changes(
-                user_id, joined_room_ids, since_token.device_list_key
-            )
-        else:
-            device_lists = []
+        device_lists = yield self._generate_sync_entry_for_device_list(
+            sync_result_builder
+        )
 
         defer.returnValue(SyncResult(
             presence=sync_result_builder.presence,
@@ -566,6 +559,28 @@ class SyncHandler(object):
             device_lists=device_lists,
             next_batch=sync_result_builder.now_token,
         ))
+
+    @defer.inlineCallbacks
+    def _generate_sync_entry_for_device_list(self, sync_result_builder):
+        user_id = sync_result_builder.sync_config.user.to_string()
+        since_token = sync_result_builder.since_token
+
+        if since_token and since_token.device_list_key:
+            rooms = yield self.store.get_rooms_for_user(user_id)
+            room_ids = set(r.room_id for r in rooms)
+
+            user_ids_changed = set()
+            changed = yield self.store.get_user_whose_devices_changed(
+                since_token.device_list_key
+            )
+            for other_user_id in changed:
+                other_rooms = yield self.store.get_rooms_for_user(other_user_id)
+                if room_ids.intersection(e.room_id for e in other_rooms):
+                    user_ids_changed.add(other_user_id)
+
+            defer.returnValue(user_ids_changed)
+        else:
+            defer.returnValue([])
 
     @defer.inlineCallbacks
     def _generate_sync_entry_for_to_device(self, sync_result_builder):
