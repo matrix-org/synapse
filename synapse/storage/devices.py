@@ -486,6 +486,8 @@ class DeviceStore(SQLBaseStore):
         defer.returnValue(stream_id)
 
     def _add_device_change_txn(self, txn, user_id, device_ids, hosts, stream_id):
+        now = self._clock.time_msec()
+
         txn.call_after(
             self._device_list_stream_cache.entity_has_changed,
             user_id, stream_id,
@@ -519,6 +521,7 @@ class DeviceStore(SQLBaseStore):
                     "user_id": user_id,
                     "device_id": device_id,
                     "sent": False,
+                    "ts": now,
                 }
                 for destination in hosts
                 for device_id in device_ids

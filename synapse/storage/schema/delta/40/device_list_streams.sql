@@ -51,7 +51,8 @@ CREATE TABLE device_lists_outbound_pokes (
     stream_id BIGINT NOT NULL,
     user_id TEXT NOT NULL,
     device_id TEXT NOT NULL,
-    sent BOOLEAN NOT NULL
+    sent BOOLEAN NOT NULL,
+    ts BIGINT NOT NULL  -- So that in future we can clear out pokes to dead servers
 );
 
 CREATE INDEX device_lists_outbound_pokes_id ON device_lists_outbound_pokes(destination, stream_id);
