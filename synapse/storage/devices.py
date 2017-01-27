@@ -260,7 +260,7 @@ class DeviceStore(SQLBaseStore):
                                    now_stream_id):
         sql = """
             SELECT user_id, device_id, max(stream_id) FROM device_lists_outbound_pokes
-            WHERE destination = ? AND stream_id > ? AND stream_id <= ? AND sent = ?
+            WHERE destination = ? AND ? < stream_id AND stream_id <= ? AND sent = ?
             GROUP BY user_id, device_id
         """
         txn.execute(
