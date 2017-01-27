@@ -26,8 +26,7 @@ logger = logging.getLogger(__name__)
 class DeviceStore(SQLBaseStore):
     @defer.inlineCallbacks
     def store_device(self, user_id, device_id,
-                     initial_device_display_name,
-                     ignore_if_known=True):
+                     initial_device_display_name):
         """Ensure the given device is known; add it to the store if not
 
         Args:
