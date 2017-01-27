@@ -259,7 +259,9 @@ class DeviceHandler(BaseHandler):
             # to resync the users device list, otherwise we do.
             resync = True
             if len(prev_ids) == 1:
-                extremity = yield self.store.get_device_list_remote_extremity(user_id)
+                extremity = yield self.store.get_device_list_last_stream_id_for_remote(
+                    user_id
+                )
                 logger.info("Extrem: %r, prev_ids: %r", extremity, prev_ids)
                 if str(extremity) == str(prev_ids[0]):
                     resync = False

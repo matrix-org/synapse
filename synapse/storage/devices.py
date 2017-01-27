@@ -137,7 +137,7 @@ class DeviceStore(SQLBaseStore):
 
         defer.returnValue({d["device_id"]: d for d in devices})
 
-    def get_device_list_remote_extremity(self, user_id):
+    def get_device_list_last_stream_id_for_remote(self, user_id):
         """Get the last stream_id we got for a user. May be None if we haven't
         got any information for them.
         """
