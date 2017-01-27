@@ -285,6 +285,8 @@ class DeviceStore(SQLBaseStore):
 
         results = []
         for user_id, user_devices in devices.iteritems():
+            # We bind literal True, as its database dependent how booleans are
+            # handled.
             txn.execute(prev_sent_id_sql, (destination, user_id, True))
             rows = txn.fetchall()
             prev_id = rows[0][0]
