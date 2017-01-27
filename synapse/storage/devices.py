@@ -150,6 +150,8 @@ class DeviceStore(SQLBaseStore):
         )
 
     def mark_remote_user_device_list_as_unsubscribed(self, user_id):
+        """Mark that we no longer track device lists for remote user.
+        """
         return self._simple_delete(
             table="device_lists_remote_extremeties",
             keyvalues={
@@ -394,7 +396,8 @@ class DeviceStore(SQLBaseStore):
             txn, [(user_id, None)], include_all_devices=True
         )
 
-        for user_id, user_devices in devices.iteritems():
+        if devices:
+            user_devices = devices[user_id]
             results = []
             for device_id, device in user_devices.iteritems():
                 result = {
