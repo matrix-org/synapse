@@ -392,7 +392,6 @@ class SynchrotronServer(HomeServer):
             user_index = stream["field_names"].index("user_id")
 
             for row in stream["rows"]:
-                logger.info("Handling device list row: %r", row)
                 position = row[position_index]
                 user_id = row[user_index]
 
