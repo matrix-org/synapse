@@ -348,6 +348,32 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
+    def query_user_devices(self, destination, user_id, timeout):
+        """Query the devices for a user id hosted on a remote server.
+
+        Response:
+            {
+              "stream_id": "...",
+              "devices": [ { ... } ]
+            }
+
+        Args:
+            destination(str): The server to query.
+            query_content(dict): The user ids to query.
+        Returns:
+            A dict containg the device keys.
+        """
+        path = PREFIX + "/user/devices/" + user_id
+
+        content = yield self.client.get_json(
+            destination=destination,
+            path=path,
+            timeout=timeout,
+        )
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    @log_function
     def claim_client_keys(self, destination, query_content, timeout):
         """Claim one-time keys for a list of devices hosted on a remote server.
 

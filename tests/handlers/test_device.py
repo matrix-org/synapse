@@ -35,51 +35,51 @@ class DeviceTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield utils.setup_test_homeserver(handlers=None)
-        self.handler = synapse.handlers.device.DeviceHandler(hs)
+        hs = yield utils.setup_test_homeserver()
+        self.handler = hs.get_device_handler()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
 
     @defer.inlineCallbacks
     def test_device_is_created_if_doesnt_exist(self):
         res = yield self.handler.check_device_registered(
-            user_id="boris",
+            user_id="@boris:foo",
             device_id="fco",
             initial_device_display_name="display name"
         )
         self.assertEqual(res, "fco")
 
-        dev = yield self.handler.store.get_device("boris", "fco")
+        dev = yield self.handler.store.get_device("@boris:foo", "fco")
         self.assertEqual(dev["display_name"], "display name")
 
     @defer.inlineCallbacks
     def test_device_is_preserved_if_exists(self):
         res1 = yield self.handler.check_device_registered(
-            user_id="boris",
+            user_id="@boris:foo",
             device_id="fco",
             initial_device_display_name="display name"
         )
         self.assertEqual(res1, "fco")
 
         res2 = yield self.handler.check_device_registered(
-            user_id="boris",
+            user_id="@boris:foo",
             device_id="fco",
             initial_device_display_name="new display name"
         )
         self.assertEqual(res2, "fco")
 
-        dev = yield self.handler.store.get_device("boris", "fco")
+        dev = yield self.handler.store.get_device("@boris:foo", "fco")
         self.assertEqual(dev["display_name"], "display name")
 
     @defer.inlineCallbacks
     def test_device_id_is_made_up_if_unspecified(self):
         device_id = yield self.handler.check_device_registered(
-            user_id="theresa",
+            user_id="@theresa:foo",
             device_id=None,
             initial_device_display_name="display"
         )
 
-        dev = yield self.handler.store.get_device("theresa", device_id)
+        dev = yield self.handler.store.get_device("@theresa:foo", device_id)
         self.assertEqual(dev["display_name"], "display")
 
     @defer.inlineCallbacks

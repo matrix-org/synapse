@@ -39,7 +39,11 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
             event_cache_size=1,
             password_providers=[],
         )
-        hs = yield setup_test_homeserver(config=config, federation_sender=Mock())
+        hs = yield setup_test_homeserver(
+            config=config,
+            federation_sender=Mock(),
+            replication_layer=Mock(),
+        )
 
         self.as_token = "token1"
         self.as_url = "some_url"
@@ -112,7 +116,11 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             event_cache_size=1,
             password_providers=[],
         )
-        hs = yield setup_test_homeserver(config=config, federation_sender=Mock())
+        hs = yield setup_test_homeserver(
+            config=config,
+            federation_sender=Mock(),
+            replication_layer=Mock(),
+        )
         self.db_pool = hs.get_db_pool()
 
         self.as_list = [
@@ -446,7 +454,8 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         hs = yield setup_test_homeserver(
             config=config,
             datastore=Mock(),
-            federation_sender=Mock()
+            federation_sender=Mock(),
+            replication_layer=Mock(),
         )
 
         ApplicationServiceStore(hs)
@@ -463,7 +472,8 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         hs = yield setup_test_homeserver(
             config=config,
             datastore=Mock(),
-            federation_sender=Mock()
+            federation_sender=Mock(),
+            replication_layer=Mock(),
         )
 
         with self.assertRaises(ConfigError) as cm:
@@ -486,7 +496,8 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         hs = yield setup_test_homeserver(
             config=config,
             datastore=Mock(),
-            federation_sender=Mock()
+            federation_sender=Mock(),
+            replication_layer=Mock(),
         )
 
         with self.assertRaises(ConfigError) as cm:

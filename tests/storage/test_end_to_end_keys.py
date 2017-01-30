@@ -35,6 +35,10 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
         now = 1470174257070
         json = '{ "key": "value" }'
 
+        yield self.store.store_device(
+            "user", "device", None
+        )
+
         yield self.store.set_e2e_device_keys(
             "user", "device", now, json)
 
@@ -70,6 +74,19 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def test_multiple_devices(self):
         now = 1470174257070
+
+        yield self.store.store_device(
+            "user1", "device1", None
+        )
+        yield self.store.store_device(
+            "user1", "device2", None
+        )
+        yield self.store.store_device(
+            "user2", "device1", None
+        )
+        yield self.store.store_device(
+            "user2", "device2", None
+        )
 
         yield self.store.set_e2e_device_keys(
             "user1", "device1", now, 'json11')
