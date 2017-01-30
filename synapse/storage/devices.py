@@ -164,6 +164,7 @@ class DeviceStore(SQLBaseStore):
             keyvalues={
                 "user_id": user_id,
             },
+            desc="mark_remote_user_device_list_as_unsubscribed",
         )
 
     def update_remote_device_list_cache_entry(self, user_id, device_id, content,
