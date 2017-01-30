@@ -564,9 +564,13 @@ class EventsStore(SQLBaseStore):
                 )
 
                 for member in members_changed:
-                    txn.call_after(self.get_rooms_for_user.invalidate, (member,))
+                    self._invalidate_cache_and_stream(
+                        txn, self.get_rooms_for_user, (member,)
+                    )
 
-                txn.call_after(self.get_users_in_room.invalidate, (room_id,))
+                self._invalidate_cache_and_stream(
+                    txn, self.get_users_in_room, (room_id,)
+                )
 
                 # Add an entry to the current_state_resets table to record the point
                 # where we clobbered the current state
