@@ -15,6 +15,7 @@
 from twisted.internet import defer
 
 from canonicaljson import encode_canonical_json
+import ujson as json
 
 from ._base import SQLBaseStore
 
@@ -59,6 +60,7 @@ class EndToEndKeyStore(SQLBaseStore):
             "set_e2e_device_keys", _set_e2e_device_keys_txn
         )
 
+    @defer.inlineCallbacks
     def get_e2e_device_keys(self, query_list, include_all_devices=False):
         """Fetch a list of device keys.
         Args:
@@ -70,12 +72,18 @@ class EndToEndKeyStore(SQLBaseStore):
             dict containing "key_json", "device_display_name".
         """
         if not query_list:
-            return {}
+            defer.returnValue({})
 
-        return self.runInteraction(
+        results = yield self.runInteraction(
             "get_e2e_device_keys", self._get_e2e_device_keys_txn,
             query_list, include_all_devices,
         )
+
+        for user_id, device_keys in results.iteritems():
+            for device_id, device_info in device_keys.iteritems():
+                device_info["keys"] = json.loads(device_info.pop("key_json"))
+
+        defer.returnValue(results)
 
     def _get_e2e_device_keys_txn(self, txn, query_list, include_all_devices):
         query_clauses = []

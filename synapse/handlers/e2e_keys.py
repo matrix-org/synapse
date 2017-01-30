@@ -194,7 +194,7 @@ class E2eKeysHandler(object):
         # "unsigned" section
         for user_id, device_keys in results.items():
             for device_id, device_info in device_keys.items():
-                r = json.loads(device_info["key_json"])
+                r = dict(device_info["keys"])
                 r["unsigned"] = {}
                 display_name = device_info["device_display_name"]
                 if display_name is not None:
