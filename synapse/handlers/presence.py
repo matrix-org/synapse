@@ -574,7 +574,7 @@ class PresenceHandler(object):
                 if not local_states:
                     continue
 
-                users = yield self.state.get_current_user_in_room(room_id)
+                users = yield self.store.get_users_in_room(room_id)
                 hosts = set(get_domain_from_id(u) for u in users)
 
                 for host in hosts:
@@ -766,7 +766,7 @@ class PresenceHandler(object):
         # don't need to send to local clients here, as that is done as part
         # of the event stream/sync.
         # TODO: Only send to servers not already in the room.
-        user_ids = yield self.state.get_current_user_in_room(room_id)
+        user_ids = yield self.store.get_users_in_room(room_id)
         if self.is_mine(user):
             state = yield self.current_state_for_user(user.to_string())
 
@@ -1069,7 +1069,7 @@ class PresenceEventSource(object):
 
                 user_ids_to_check = set()
                 for room_id in room_ids:
-                    users = yield self.state.get_current_user_in_room(room_id)
+                    users = yield self.store.get_users_in_room(room_id)
                     user_ids_to_check.update(users)
 
                 user_ids_to_check.update(friends)
