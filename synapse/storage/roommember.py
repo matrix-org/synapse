@@ -131,7 +131,7 @@ class RoomMemberStore(SQLBaseStore):
         with self._stream_id_gen.get_next() as stream_ordering:
             yield self.runInteraction("locally_reject_invite", f, stream_ordering)
 
-    @cached(max_entries=1000000, iterable=True)
+    @cached(max_entries=100000, iterable=True)
     def get_users_in_room(self, room_id):
         def f(txn):
 
