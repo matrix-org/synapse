@@ -203,7 +203,7 @@ class DeviceHandler(BaseHandler):
         hosts = set()
         if self.hs.is_mine_id(user_id):
             for room_id in room_ids:
-                users = yield self.state.get_current_user_in_room(room_id)
+                users = yield self.store.get_users_in_room(room_id)
                 hosts.update(get_domain_from_id(u) for u in users)
             hosts.discard(self.server_name)
 
