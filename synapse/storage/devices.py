@@ -164,6 +164,7 @@ class DeviceStore(SQLBaseStore):
             keyvalues={
                 "user_id": user_id,
             },
+            desc="mark_remote_user_device_list_as_unsubscribed",
         )
 
     def update_remote_device_list_cache_entry(self, user_id, device_id, content,
@@ -463,7 +464,7 @@ class DeviceStore(SQLBaseStore):
             SELECT user_id FROM device_lists_stream WHERE stream_id > ?
         """
         rows = yield self._execute("get_user_whose_devices_changed", None, sql, from_key)
-        defer.returnValue(set(row["user_id"] for row in rows))
+        defer.returnValue(set(row[0] for row in rows))
 
     def get_all_device_list_changes_for_remotes(self, from_key):
         """Return a list of `(stream_id, user_id, destination)` which is the
