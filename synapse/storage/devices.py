@@ -465,7 +465,7 @@ class DeviceStore(SQLBaseStore):
         rows = yield self._execute("get_user_whose_devices_changed", None, sql, from_key)
         defer.returnValue(set(row["user_id"] for row in rows))
 
-    def get_users_and_hosts_device_list_changes(self, from_key):
+    def get_all_device_list_changes_for_remotes(self, from_key):
         """Return a list of `(stream_id, user_id, destination)` which is the
         combined list of changes to devices, and which destinations need to be
         poked. `destination` may be None if no destinations need to be poked.
