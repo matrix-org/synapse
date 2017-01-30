@@ -37,6 +37,7 @@ class DirectoryTestCase(unittest.TestCase):
     def setUp(self):
         self.mock_federation = Mock(spec=[
             "make_query",
+            "register_edu_handler",
         ])
 
         self.query_handlers = {}

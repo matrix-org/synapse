@@ -2,15 +2,13 @@ Purge Remote Media API
 ======================
 
 The purge remote media API allows server admins to purge old cached remote
-media. 
+media.
 
 The API is::
 
-    POST /_matrix/client/r0/admin/purge_media_cache
+    POST /_matrix/client/r0/admin/purge_media_cache?before_ts=<unix_timestamp_in_ms>&access_token=<access_token>
 
-    {
-        "before_ts": <unix_timestamp_in_ms>
-    }
+    {}
 
 Which will remove all cached media that was last accessed before
 ``<unix_timestamp_in_ms>``.
