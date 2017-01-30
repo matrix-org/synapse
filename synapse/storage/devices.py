@@ -280,14 +280,14 @@ class DeviceStore(SQLBaseStore):
         prev_sent_id_sql = """
             SELECT coalesce(max(stream_id), 0) as stream_id
             FROM device_lists_outbound_pokes
-            WHERE destination = ? AND user_id = ? AND sent = ?
+            WHERE destination = ? AND user_id = ? AND stream_id <= ?
         """
 
         results = []
         for user_id, user_devices in devices.iteritems():
-            # We bind literal True, as its database dependent how booleans are
-            # handled.
-            txn.execute(prev_sent_id_sql, (destination, user_id, True))
+            # The prev_id for the first row is always the last row before
+            # `from_stream_id`
+            txn.execute(prev_sent_id_sql, (destination, user_id, from_stream_id))
             rows = txn.fetchall()
             prev_id = rows[0][0]
             for device_id, device in user_devices.iteritems():
