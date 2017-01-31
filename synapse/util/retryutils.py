@@ -134,6 +134,8 @@ class RetryDestinationLimiter(object):
             elif exc_val.code == 404 and self.backoff_on_404:
                 valid_err_code = False
             elif exc_val.code == 429:
+                # 429 is us being aggresively rate limited, so lets rate limit
+                # ourselves.
                 valid_err_code = False
             elif exc_val.code < 500:
                 valid_err_code = True
