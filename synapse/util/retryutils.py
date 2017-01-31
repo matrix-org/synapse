@@ -125,6 +125,10 @@ class RetryDestinationLimiter(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         valid_err_code = False
         if exc_type is not None and issubclass(exc_type, CodeMessageException):
+            # Some error codes are perfectly fine for some APIs, whereas other
+            # APIs may expect to never received e.g. a 404. It's important to
+            # handle 404 as some remote servers will return a 404 when the HS
+            # has been decommissioned.
             if exc_val.code < 400:
                 valid_err_code = True
             elif exc_val.code == 404 and self.backoff_on_404:
