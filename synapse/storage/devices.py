@@ -545,7 +545,7 @@ class DeviceStore(SQLBaseStore):
         (destination, user_id) tuple to ensure that the prev_ids remain correct
         if the server does come back.
         """
-        now = self._clock.time_msec()
+        yesterday = self._clock.time_msec() - 24 * 60 * 60 * 1000
 
         def _prune_txn(txn):
             select_sql = """
@@ -557,6 +557,9 @@ class DeviceStore(SQLBaseStore):
             txn.execute(select_sql)
             rows = txn.fetchall()
 
+            if not rows:
+                return
+
             delete_sql = """
                 DELETE FROM device_lists_outbound_pokes
                 WHERE ts < ? AND destination = ? AND user_id = ? AND stream_id < ?
@@ -565,10 +568,12 @@ class DeviceStore(SQLBaseStore):
             txn.executemany(
                 delete_sql,
                 (
-                    (now, row["destination"], row["user_id"], row["stream_id"])
+                    (yesterday, row[0], row[1], row[2])
                     for row in rows
                 )
             )
+
+            logger.info("Pruned %d device list outbound pokes", txn.rowcount)
 
         return self.runInteraction(
             "_prune_old_outbound_device_pokes", _prune_txn
