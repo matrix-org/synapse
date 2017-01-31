@@ -299,9 +299,6 @@ class ReplicationResource(Resource):
                 "backward_ex_outliers", res.backward_ex_outliers,
                 ("position", "event_id", "state_group"),
             )
-            writer.write_header_and_rows(
-                "state_resets", res.state_resets, ("position",),
-            )
 
     @defer.inlineCallbacks
     def presence(self, writer, current_token, request_streams):
