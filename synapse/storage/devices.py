@@ -436,15 +436,27 @@ class DeviceStore(SQLBaseStore):
         )
 
     def _mark_as_sent_devices_by_remote_txn(self, txn, destination, stream_id):
+        # First we DELETE all rows such that only the latest row for each
+        # (destination, user_id is left. We do this by selecting first and
+        # deleting.
+        sql = """
+            SELECT user_id, coalesce(max(stream_id), 0) FROM device_lists_outbound_pokes
+            WHERE destination = ? AND stream_id <= ?
+            GROUP BY user_id
+            HAVING count(*) > 1
+        """
+        txn.execute(sql, (destination, stream_id,))
+        rows = txn.fetchall()
+
         sql = """
             DELETE FROM device_lists_outbound_pokes
-            WHERE destination = ? AND stream_id < (
-                SELECT coalesce(max(stream_id), 0) FROM device_lists_outbound_pokes
-                WHERE destination = ? AND stream_id <= ?
-            )
+            WHERE destination = ? AND user_id = ? AND stream_id < ?
         """
-        txn.execute(sql, (destination, destination, stream_id,))
+        txn.executemany(
+            sql, ((destination, row[0], row[1],) for row in rows)
+        )
 
+        # Mark everything that is left as sent
         sql = """
             UPDATE device_lists_outbound_pokes SET sent = ?
             WHERE destination = ? AND stream_id <= ?
