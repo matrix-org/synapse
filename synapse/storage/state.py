@@ -49,6 +49,7 @@ class StateStore(SQLBaseStore):
 
     STATE_GROUP_DEDUPLICATION_UPDATE_NAME = "state_group_state_deduplication"
     STATE_GROUP_INDEX_UPDATE_NAME = "state_group_state_type_index"
+    CURRENT_STATE_INDEX_UPDATE_NAME = "current_state_members_idx"
 
     def __init__(self, hs):
         super(StateStore, self).__init__(hs)
@@ -59,6 +60,13 @@ class StateStore(SQLBaseStore):
         self.register_background_update_handler(
             self.STATE_GROUP_INDEX_UPDATE_NAME,
             self._background_index_state,
+        )
+        self.register_background_index_update(
+            self.CURRENT_STATE_INDEX_UPDATE_NAME,
+            index_name="current_state_events_member_index",
+            table="current_state_events",
+            columns=["state_key"],
+            where_clause="type='m.room.member'",
         )
 
     @defer.inlineCallbacks
