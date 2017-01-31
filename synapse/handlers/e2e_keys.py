@@ -194,7 +194,7 @@ class E2eKeysHandler(object):
         # "unsigned" section
         for user_id, device_keys in results.items():
             for device_id, device_info in device_keys.items():
-                r = json.loads(device_info["key_json"])
+                r = dict(device_info["keys"])
                 r["unsigned"] = {}
                 display_name = device_info["device_display_name"]
                 if display_name is not None:
@@ -287,11 +287,12 @@ class E2eKeysHandler(object):
                 device_id, user_id, time_now
             )
             # TODO: Sign the JSON with the server key
-            yield self.store.set_e2e_device_keys(
-                user_id, device_id, time_now,
-                encode_canonical_json(device_keys)
+            changed = yield self.store.set_e2e_device_keys(
+                user_id, device_id, time_now, device_keys,
             )
-            yield self.device_handler.notify_device_update(user_id, [device_id])
+            if changed:
+                # Only notify about device updates *if* the keys actually changed
+                yield self.device_handler.notify_device_update(user_id, [device_id])
 
         one_time_keys = keys.get("one_time_keys", None)
         if one_time_keys:
