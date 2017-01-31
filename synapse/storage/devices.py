@@ -552,9 +552,10 @@ class DeviceStore(SQLBaseStore):
                 SELECT destination, user_id, max(stream_id) as stream_id
                 FROM device_lists_outbound_pokes
                 GROUP BY destination, user_id
+                HAVING min(ts) < ? AND count(*) > 1
             """
 
-            txn.execute(select_sql)
+            txn.execute(select_sql, (yesterday,))
             rows = txn.fetchall()
 
             if not rows:
