@@ -245,6 +245,9 @@ class StreamStore(SQLBaseStore):
         defer.returnValue(results)
 
     def get_rooms_that_changed(self, room_ids, from_key):
+        """Given a list of rooms and a token, return rooms where there may have
+        been changes.
+        """
         from_key = RoomStreamToken.parse_stream_token(from_key).stream
         return set(
             room_id for room_id in room_ids
