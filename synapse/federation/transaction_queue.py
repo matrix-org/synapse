@@ -504,7 +504,7 @@ class TransactionQueue(object):
                     code = e.code
                     response = e.response
 
-                    if e.code == 429 or 500 <= e.code:
+                    if e.code in (401, 404, 429) or 500 <= e.code:
                         logger.info(
                             "TX [%s] {%s} got %d response",
                             destination, txn_id, code
