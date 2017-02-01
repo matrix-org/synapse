@@ -153,7 +153,7 @@ class KeyQueryServlet(RestServlet):
 
 class KeyChangesServlet(RestServlet):
     """Returns the list of changes of keys between two stream tokens (may return
-    spurious results).
+    spurious extra results, since we currently ignore the `to` param).
 
         GET /keys/changes?from=...&to=...
 
