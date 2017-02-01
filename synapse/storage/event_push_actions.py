@@ -450,8 +450,12 @@ class EventPushActionsStore(SQLBaseStore):
     def _remove_old_push_actions_before_txn(self, txn, room_id, user_id,
                                             topological_ordering):
         """
-        Purges old, stale push actions for a user and room before a given
-        topological_ordering
+        Purges old push actions for a user and room before a given
+        topological_ordering.
+
+        We however keep a months worth of highlighted notifications, so that
+        users can still get a list of recent highlights.
+
         Args:
             txn: The transcation
             room_id: Room ID to delete from
@@ -475,7 +479,8 @@ class EventPushActionsStore(SQLBaseStore):
         txn.execute(
             "DELETE FROM event_push_actions "
             " WHERE user_id = ? AND room_id = ? AND "
-            " topological_ordering < ? AND stream_ordering < ?",
+            " topological_ordering < ?"
+            " AND ((stream_ordering < ? AND highlight = 1) or highlight = 0)",
             (user_id, room_id, topological_ordering, self.stream_ordering_month_ago)
         )
 
