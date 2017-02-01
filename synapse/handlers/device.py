@@ -221,6 +221,22 @@ class DeviceHandler(BaseHandler):
                 self.federation_sender.send_device_messages(host)
 
     @defer.inlineCallbacks
+    def get_user_ids_changed(self, user_id, from_device_key):
+        rooms = yield self.store.get_rooms_for_user(user_id)
+        room_ids = set(r.room_id for r in rooms)
+
+        user_ids_changed = set()
+        changed = yield self.store.get_user_whose_devices_changed(
+            from_device_key
+        )
+        for other_user_id in changed:
+            other_rooms = yield self.store.get_rooms_for_user(other_user_id)
+            if room_ids.intersection(e.room_id for e in other_rooms):
+                user_ids_changed.add(other_user_id)
+
+        defer.returnValue(user_ids_changed)
+
+    @defer.inlineCallbacks
     def _incoming_device_list_update(self, origin, edu_content):
         user_id = edu_content["user_id"]
         device_id = edu_content["device_id"]

@@ -21,6 +21,8 @@ from synapse.api.errors import SynapseError
 from synapse.http.servlet import (
     RestServlet, parse_json_object_from_request, parse_integer
 )
+from synapse.http.servlet import parse_string
+from synapse.types import StreamToken
 from ._base import client_v2_patterns
 
 logger = logging.getLogger(__name__)
@@ -149,6 +151,52 @@ class KeyQueryServlet(RestServlet):
         defer.returnValue((200, result))
 
 
+class KeyChangesServlet(RestServlet):
+    """Returns the list of changes of keys between two stream tokens (may return
+    spurious extra results, since we currently ignore the `to` param).
+
+        GET /keys/changes?from=...&to=...
+
+        200 OK
+        { "changed": ["@foo:example.com"] }
+    """
+    PATTERNS = client_v2_patterns(
+        "/keys/changes$",
+        releases=()
+    )
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer):
+        """
+        super(KeyChangesServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.device_handler = hs.get_device_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+
+        from_token_string = parse_string(request, "from")
+
+        # We want to enforce they do pass us one, but we ignore it and return
+        # changes after the "to" as well as before.
+        parse_string(request, "to")
+
+        from_token = StreamToken.from_string(from_token_string)
+
+        user_id = requester.user.to_string()
+
+        changed = yield self.device_handler.get_user_ids_changed(
+            user_id, from_token.device_list_key,
+        )
+
+        defer.returnValue((200, {
+            "changed": changed
+        }))
+
+
 class OneTimeKeyServlet(RestServlet):
     """
     POST /keys/claim HTTP/1.1
@@ -192,4 +240,5 @@ class OneTimeKeyServlet(RestServlet):
 def register_servlets(hs, http_server):
     KeyUploadServlet(hs).register(http_server)
     KeyQueryServlet(hs).register(http_server)
+    KeyChangesServlet(hs).register(http_server)
     OneTimeKeyServlet(hs).register(http_server)

@@ -59,49 +59,6 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         [unpatch() for unpatch in self.unpatches]
 
     @defer.inlineCallbacks
-    def test_room_members(self):
-        yield self.persist(type="m.room.create", key="", creator=USER_ID)
-        yield self.replicate()
-        yield self.check("get_rooms_for_user", (USER_ID,), [])
-        yield self.check("get_users_in_room", (ROOM_ID,), [])
-
-        # Join the room.
-        join = yield self.persist(type="m.room.member", key=USER_ID, membership="join")
-        yield self.replicate()
-        yield self.check("get_rooms_for_user", (USER_ID,), [RoomsForUser(
-            room_id=ROOM_ID,
-            sender=USER_ID,
-            membership="join",
-            event_id=join.event_id,
-            stream_ordering=join.internal_metadata.stream_ordering,
-        )])
-        yield self.check("get_users_in_room", (ROOM_ID,), [USER_ID])
-
-        # Leave the room.
-        yield self.persist(type="m.room.member", key=USER_ID, membership="leave")
-        yield self.replicate()
-        yield self.check("get_rooms_for_user", (USER_ID,), [])
-        yield self.check("get_users_in_room", (ROOM_ID,), [])
-
-        # Add some other user to the room.
-        join = yield self.persist(type="m.room.member", key=USER_ID_2, membership="join")
-        yield self.replicate()
-        yield self.check("get_rooms_for_user", (USER_ID_2,), [RoomsForUser(
-            room_id=ROOM_ID,
-            sender=USER_ID,
-            membership="join",
-            event_id=join.event_id,
-            stream_ordering=join.internal_metadata.stream_ordering,
-        )])
-        yield self.check("get_users_in_room", (ROOM_ID,), [USER_ID_2])
-
-        yield self.persist(
-            type="m.room.member", key=USER_ID, membership="join",
-        )
-        yield self.replicate()
-        yield self.check("get_users_in_room", (ROOM_ID,), [USER_ID_2, USER_ID])
-
-    @defer.inlineCallbacks
     def test_get_latest_event_ids_in_room(self):
         create = yield self.persist(type="m.room.create", key="", creator=USER_ID)
         yield self.replicate()
