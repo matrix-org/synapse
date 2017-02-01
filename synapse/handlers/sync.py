@@ -130,7 +130,8 @@ class SyncResult(collections.namedtuple("SyncResult", [
             self.invited or
             self.archived or
             self.account_data or
-            self.to_device
+            self.to_device or
+            self.device_lists
         )
 
 
