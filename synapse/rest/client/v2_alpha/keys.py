@@ -152,6 +152,14 @@ class KeyQueryServlet(RestServlet):
 
 
 class KeyChangesServlet(RestServlet):
+    """Returns the list of changes of keys between two stream tokens (may return
+    spurious results).
+
+        GET /keys/changes?from=...&to=...
+
+        200 OK
+        { "changed": ["@foo:example.com"] }
+    """
     PATTERNS = client_v2_patterns(
         "/keys/changes$",
         releases=()
@@ -171,7 +179,10 @@ class KeyChangesServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
 
         from_token_string = parse_string(request, "from")
-        parse_string(request, "to")  # We want to enforce they do pass us one.
+
+        # We want to enforce they do pass us one, but we ignore it and return
+        # changes after the "to" as well as before.
+        parse_string(request, "to")
 
         from_token = StreamToken.from_string(from_token_string)
 
