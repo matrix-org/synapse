@@ -319,6 +319,7 @@ class TransactionQueue(object):
                     destination,
                     self.clock,
                     self.store,
+                    backoff_on_404=True,  # If we get a 404 the other side has gone
                 )
 
                 device_message_edus, device_stream_id, dev_list_id = (
