@@ -266,7 +266,7 @@ class RoomMemberStore(SQLBaseStore):
             " ON m.event_id = c.event_id "
             " AND m.room_id = c.room_id "
             " AND m.user_id = c.state_key"
-            " WHERE %(where)s"
+            " WHERE c.type = 'm.room.member' AND %(where)s"
         ) % {
             "where": where_clause,
         }
