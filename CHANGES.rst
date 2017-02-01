@@ -1,3 +1,51 @@
+Changes in synapse v0.19.0-rc1 (2017-02-02)
+===========================================
+
+Features:
+
+* Add support for specifying multiple bind addresses (PR #1709, #1712, #1795,
+  #1835)
+* Add /account/3pid/delete endpoint (PR #1714)
+* Add config option to configure the Riot URL used in notification emails (PR
+  #1811)
+* Add username and password config options for turn server (PR #1832)
+* Implement device lists updates over federation (PR #1857, #1861, #1864)
+* Implement /keys/changes (PR #1869, #1872)
+
+
+Changes:
+
+* IPv6 support (PR #1696))
+* Log which files we saved attachments to in the media_repository (PR #1791)
+* Linearize updates to membership via PUT /state/ to better handle multiple
+  joins (PR #1787)
+* Limit number of entries to prefill from cache on startup (PR #1792)
+* Remove full_twisted_stacktraces option (PR #1802)
+* Measure size of some caches by sum of the size of cached values (PR #1815)
+* Measure metrics of string_cache (PR #1821)
+* Reduce logging verbosity (PR #1822, #1823, #1824)
+* Don't clobber a displayname or avatar_url if provided by an m.room.member
+  event (PR #1852)
+* Better handle 401/404 response for federation /send/ (PR #1866, #1871)
+
+
+Fixes:
+
+* Fix ability to change password to a non-ascii one (PR #1711)
+* Fix push getting stuck due to looking at the wrong view of state (PR #1820)
+* Fix email address comparison to be case insensitive (PR #1827)
+* Fix occasional inconsistencies of room membership (PR #1836, #1840)
+
+
+Performance:
+
+* Don't block messages sending on bumping presence (PR #1789)
+* Change device_inbox stream index to include user (PR #1793)
+* Optimise state resolution (PR #1818)
+* Use DB cache of joined users for presence (PR #1862)
+* Add an index to make membership queries faster (PR #1867)
+
+
 Changes in synapse v0.18.7 (2017-01-09)
 =======================================
 
