@@ -223,6 +223,13 @@ class DeviceHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_user_ids_changed(self, user_id, from_token):
+        """Get list of users that have had the devices updated, or have newly
+        joined a room, that `user_id` may be interested in.
+
+        Args:
+            user_id (str)
+            from_token (StreamToken)
+        """
         rooms = yield self.store.get_rooms_for_user(user_id)
         room_ids = set(r.room_id for r in rooms)
 
