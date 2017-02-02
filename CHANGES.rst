@@ -1,3 +1,11 @@
+Changes in synapse v0.19.0-rc3 (2017-02-03)
+===========================================
+
+* Fix email push in pusher worker (PR #1875)
+* Make presence.get_new_events a bit faster (PR #1876)
+* Make /keys/changes a bit more performant (PR #1877)
+
+
 Changes in synapse v0.19.0-rc2 (2017-02-02)
 ===========================================
 
@@ -10,18 +18,19 @@ Changes in synapse v0.19.0-rc1 (2017-02-02)
 Features:
 
 * Add support for specifying multiple bind addresses (PR #1709, #1712, #1795,
-  #1835)
+  #1835). Thanks to @kyrias!
 * Add /account/3pid/delete endpoint (PR #1714)
 * Add config option to configure the Riot URL used in notification emails (PR
-  #1811)
-* Add username and password config options for turn server (PR #1832)
+  #1811). Thanks to @aperezdc!
+* Add username and password config options for turn server (PR #1832). Thanks
+  to @xsteadfastx!
 * Implement device lists updates over federation (PR #1857, #1861, #1864)
 * Implement /keys/changes (PR #1869, #1872)
 
 
 Changes:
 
-* Improve IPv6 support (PR #1696)
+* Improve IPv6 support (PR #1696). Thanks to @kyrias and @glyph!
 * Log which files we saved attachments to in the media_repository (PR #1791)
 * Linearize updates to membership via PUT /state/ to better handle multiple
   joins (PR #1787)
