@@ -479,7 +479,10 @@ class CacheListDescriptor(object):
 
 class _CacheContext(namedtuple("_CacheContext", ("cache", "key"))):
     # We rely on _CacheContext implementing __eq__ and __hash__ sensibly,
-    # which namedtuple does for us.
+    # which namedtuple does for us (i.e. two _CacheContext are the same if
+    # their caches and keys match). This is important in particular to
+    # dedupe when we add callbacks to lru cache nodes, otherwise the number
+    # of callbacks would grow.
     def invalidate(self):
         self.cache.invalidate(self.key)
 
