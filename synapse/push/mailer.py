@@ -81,7 +81,7 @@ class Mailer(object):
     def __init__(self, hs, app_name):
         self.hs = hs
         self.store = self.hs.get_datastore()
-        self.auth_handler = self.hs.get_auth_handler()
+        self.macaroon_gen = self.hs.get_macaroon_generator()
         self.state_handler = self.hs.get_state_handler()
         loader = jinja2.FileSystemLoader(self.hs.config.email_template_dir)
         self.app_name = app_name
@@ -466,7 +466,7 @@ class Mailer(object):
 
     def make_unsubscribe_link(self, user_id, app_id, email_address):
         params = {
-            "access_token": self.auth_handler.generate_delete_pusher_token(user_id),
+            "access_token": self.macaroon_gen.generate_delete_pusher_token(user_id),
             "app_id": app_id,
             "pushkey": email_address,
         }

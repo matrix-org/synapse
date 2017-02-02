@@ -34,11 +34,10 @@ class AuthTestCase(unittest.TestCase):
         self.hs = yield setup_test_homeserver(handlers=None)
         self.hs.handlers = AuthHandlers(self.hs)
         self.auth_handler = self.hs.handlers.auth_handler
+        self.macaroon_generator = self.hs.get_macaroon_generator()
 
     def test_token_is_a_macaroon(self):
-        self.hs.config.macaroon_secret_key = "this key is a huge secret"
-
-        token = self.auth_handler.generate_access_token("some_user")
+        token = self.macaroon_generator.generate_access_token("some_user")
         # Check that we can parse the thing with pymacaroons
         macaroon = pymacaroons.Macaroon.deserialize(token)
         # The most basic of sanity checks
@@ -46,10 +45,9 @@ class AuthTestCase(unittest.TestCase):
             self.fail("some_user was not in %s" % macaroon.inspect())
 
     def test_macaroon_caveats(self):
-        self.hs.config.macaroon_secret_key = "this key is a massive secret"
         self.hs.clock.now = 5000
 
-        token = self.auth_handler.generate_access_token("a_user")
+        token = self.macaroon_generator.generate_access_token("a_user")
         macaroon = pymacaroons.Macaroon.deserialize(token)
 
         def verify_gen(caveat):
@@ -74,7 +72,7 @@ class AuthTestCase(unittest.TestCase):
     def test_short_term_login_token_gives_user_id(self):
         self.hs.clock.now = 1000
 
-        token = self.auth_handler.generate_short_term_login_token(
+        token = self.macaroon_generator.generate_short_term_login_token(
             "a_user", 5000
         )
 
@@ -93,7 +91,7 @@ class AuthTestCase(unittest.TestCase):
             )
 
     def test_short_term_login_token_cannot_replace_user_id(self):
-        token = self.auth_handler.generate_short_term_login_token(
+        token = self.macaroon_generator.generate_short_term_login_token(
             "a_user", 5000
         )
         macaroon = pymacaroons.Macaroon.deserialize(token)
