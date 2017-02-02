@@ -1,4 +1,10 @@
-Changes in synapse v0.19.0-rc3 (2017-02-03)
+Changes in synapse v0.19.0-rc4 (2017-02-02)
+===========================================
+
+* Bump cache sizes for common membership queries (PR #1879)
+
+
+Changes in synapse v0.19.0-rc3 (2017-02-02)
 ===========================================
 
 * Fix email push in pusher worker (PR #1875)
