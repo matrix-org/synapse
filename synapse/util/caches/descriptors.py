@@ -478,6 +478,8 @@ class CacheListDescriptor(object):
 
 
 class _CacheContext(namedtuple("_CacheContext", ("cache", "key"))):
+    # We rely on _CacheContext implementing __eq__ and __hash__ sensibly,
+    # which namedtuple does for us.
     def invalidate(self):
         self.cache.invalidate(self.key)
 
