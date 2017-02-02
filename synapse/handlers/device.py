@@ -266,13 +266,14 @@ class DeviceHandler(BaseHandler):
                     if not prev_event_id or prev_event_id != event_id:
                         possibly_changed.add(state_key)
 
-        user_ids_changed = set()
-        for other_user_id in possibly_changed:
-            other_rooms = yield self.store.get_rooms_for_user(other_user_id)
-            if room_ids.intersection(e.room_id for e in other_rooms):
-                user_ids_changed.add(other_user_id)
+        users_who_share_room = yield self.store.get_users_who_share_room_with_user(
+            user_id
+        )
 
-        defer.returnValue(user_ids_changed)
+        # We return the intersection of users whose devices have changed (or
+        # membership has changeD) and the users who share a room with the
+        # requester
+        defer.returnValue(users_who_share_room & users_who_share_room)
 
     @defer.inlineCallbacks
     def _incoming_device_list_update(self, origin, edu_content):
