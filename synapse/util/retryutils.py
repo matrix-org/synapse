@@ -129,11 +129,13 @@ class RetryDestinationLimiter(object):
             # APIs may expect to never received e.g. a 404. It's important to
             # handle 404 as some remote servers will return a 404 when the HS
             # has been decommissioned.
+            # If we get a 401, then we should probably back off since they
+            # won't accept our requests for at least a while.
+            # 429 is us being aggresively rate limited, so lets rate limit
+            # ourselves.
             if exc_val.code == 404 and self.backoff_on_404:
                 valid_err_code = False
-            elif exc_val.code == 429:
-                # 429 is us being aggresively rate limited, so lets rate limit
-                # ourselves.
+            elif exc_val.code in (401, 429):
                 valid_err_code = False
             elif exc_val.code < 500:
                 valid_err_code = True
