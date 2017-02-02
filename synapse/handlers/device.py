@@ -17,7 +17,7 @@ from synapse.api import errors
 from synapse.api.constants import EventTypes
 from synapse.util import stringutils
 from synapse.util.async import Linearizer
-from synapse.types import get_domain_from_id
+from synapse.types import get_domain_from_id, RoomStreamToken
 from twisted.internet import defer
 from ._base import BaseHandler
 
@@ -243,15 +243,15 @@ class DeviceHandler(BaseHandler):
 
         possibly_changed = set(changed)
         for room_id in rooms_changed:
-            # Fetch (an approximation) of the current state at the time.
-            event_rows, token = yield self.store.get_recent_event_ids_for_room(
-                room_id, end_token=from_token.room_key, limit=1,
-            )
+            # Fetch  the current state at the time.
+            stream_ordering = RoomStreamToken.parse_stream_token(from_token.room_key)
 
-            if event_rows:
-                last_event_id = event_rows[-1]["event_id"]
-                prev_state_ids = yield self.store.get_state_ids_for_event(last_event_id)
-            else:
+            try:
+                event_ids = yield self.store.get_forward_extremeties_for_room(
+                    room_id, stream_ordering=stream_ordering
+                )
+                prev_state_ids = yield self.store.get_state_ids_for_events(event_ids)
+            except:
                 prev_state_ids = {}
 
             current_state_ids = yield self.state.get_current_state_ids(room_id)
