@@ -96,6 +96,7 @@ class RegisterRestServlet(RestServlet):
         self.registration_handler = hs.get_handlers().registration_handler
         self.identity_handler = hs.get_handlers().identity_handler
         self.device_handler = hs.get_device_handler()
+        self.macaroon_gen = hs.get_macaroon_generator()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -436,7 +437,7 @@ class RegisterRestServlet(RestServlet):
             user_id, device_id, initial_display_name
         )
 
-        access_token = self.auth_handler.generate_access_token(
+        access_token = self.macaroon_gen.generate_access_token(
             user_id, ["guest = true"]
         )
         defer.returnValue((200, {
