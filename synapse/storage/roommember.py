@@ -282,6 +282,8 @@ class RoomMemberStore(SQLBaseStore):
 
     @cachedInlineCallbacks(max_entries=50000, cache_context=True, iterable=True)
     def get_users_who_share_room_with_user(self, user_id, cache_context):
+        """Returns the set of users who share a room with `user_id`
+        """
         rooms = yield self.get_rooms_for_user(
             user_id, on_invalidate=cache_context.invalidate,
         )
@@ -291,7 +293,6 @@ class RoomMemberStore(SQLBaseStore):
             user_ids = yield self.get_users_in_room(
                 room.room_id, on_invalidate=cache_context.invalidate,
             )
-            logger.info("Users in room: %r %r", room.room_id, user_ids)
             user_who_share_room.update(user_ids)
 
         defer.returnValue(user_who_share_room)
