@@ -19,7 +19,6 @@ from ._base import BaseHandler
 
 import logging
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -52,5 +51,48 @@ class AdminHandler(BaseHandler):
                 },
             },
         }
+
+        defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def get_users(self):
+        """Function to reterive a list of users in users table.
+
+        Args:
+        Returns:
+            defer.Deferred: resolves to list[dict[str, Any]]
+        """
+        ret = yield self.store.get_users()
+
+        defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def get_users_paginate(self, order, start, limit):
+        """Function to reterive a paginated list of users from
+        users list. This will return a json object, which contains
+        list of users and the total number of users in users table.
+
+        Args:
+            order (str): column name to order the select by this column
+            start (int): start number to begin the query from
+            limit (int): number of rows to reterive
+        Returns:
+            defer.Deferred: resolves to json object {list[dict[str, Any]], count}
+        """
+        ret = yield self.store.get_users_paginate(order, start, limit)
+
+        defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def search_users(self, term):
+        """Function to search users list for one or more users with
+        the matched term.
+
+        Args:
+            term (str): search term
+        Returns:
+            defer.Deferred: resolves to list[dict[str, Any]]
+        """
+        ret = yield self.store.search_users(term)
 
         defer.returnValue(ret)
