@@ -15,7 +15,7 @@ Features:
 
 Changes:
 
-* IPv6 support (PR #1696))
+* Improve IPv6 support (PR #1696)
 * Log which files we saved attachments to in the media_repository (PR #1791)
 * Linearize updates to membership via PUT /state/ to better handle multiple
   joins (PR #1787)
