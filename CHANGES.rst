@@ -1,3 +1,9 @@
+Changes in synapse v0.19.0-rc2 (2017-02-02)
+===========================================
+
+* Include newly joined users in /keys/changes API (PR #1872)
+
+
 Changes in synapse v0.19.0-rc1 (2017-02-02)
 ===========================================
 
