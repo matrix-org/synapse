@@ -330,6 +330,7 @@ class CasTicketServlet(ClientV1RestServlet):
         self.cas_required_attributes = hs.config.cas_required_attributes
         self.auth_handler = hs.get_auth_handler()
         self.handlers = hs.get_handlers()
+        self.macaroon_gen = hs.get_macaroon_generator()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -368,7 +369,9 @@ class CasTicketServlet(ClientV1RestServlet):
                 yield self.handlers.registration_handler.register(localpart=user)
             )
 
-        login_token = auth_handler.generate_short_term_login_token(registered_user_id)
+        login_token = self.macaroon_gen.generate_short_term_login_token(
+            registered_user_id
+        )
         redirect_url = self.add_login_token_to_redirect_url(client_redirect_url,
                                                             login_token)
         request.redirect(redirect_url)

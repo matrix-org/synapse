@@ -193,7 +193,7 @@ class KeyChangesServlet(RestServlet):
         )
 
         defer.returnValue((200, {
-            "changed": changed
+            "changed": list(changed),
         }))
 
 

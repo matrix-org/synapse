@@ -37,7 +37,7 @@ from synapse.federation.transport.client import TransportLayerClient
 from synapse.federation.transaction_queue import TransactionQueue
 from synapse.handlers import Handlers
 from synapse.handlers.appservice import ApplicationServicesHandler
-from synapse.handlers.auth import AuthHandler
+from synapse.handlers.auth import AuthHandler, MacaroonGeneartor
 from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.device import DeviceHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
@@ -131,6 +131,7 @@ class HomeServer(object):
         'federation_transport_client',
         'federation_sender',
         'receipts_handler',
+        'macaroon_generator',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -212,6 +213,9 @@ class HomeServer(object):
 
     def build_auth_handler(self):
         return AuthHandler(self)
+
+    def build_macaroon_generator(self):
+        return MacaroonGeneartor(self)
 
     def build_device_handler(self):
         return DeviceHandler(self)
