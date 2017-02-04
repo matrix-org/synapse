@@ -52,8 +52,8 @@ class FederationServer(FederationBase):
 
         self.auth = hs.get_auth()
 
-        self._room_pdu_linearizer = Linearizer()
-        self._server_linearizer = Linearizer()
+        self._room_pdu_linearizer = Linearizer("fed_room_pdu")
+        self._server_linearizer = Linearizer("fed_server")
 
         # We cache responses to state queries, as they take a while and often
         # come in waves.
@@ -415,6 +415,9 @@ class FederationServer(FederationBase):
     @log_function
     def on_query_client_keys(self, origin, content):
         return self.on_query_request("client_keys", content)
+
+    def on_query_user_devices(self, origin, user_id):
+        return self.on_query_request("user_devices", user_id)
 
     @defer.inlineCallbacks
     @log_function

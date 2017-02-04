@@ -88,7 +88,7 @@ class RetryDestinationLimiter(object):
     def __init__(self, destination, clock, store, retry_interval,
                  min_retry_interval=10 * 60 * 1000,
                  max_retry_interval=24 * 60 * 60 * 1000,
-                 multiplier_retry_interval=5,):
+                 multiplier_retry_interval=5, backoff_on_404=False):
         """Marks the destination as "down" if an exception is thrown in the
         context, except for CodeMessageException with code < 500.
 
@@ -107,6 +107,7 @@ class RetryDestinationLimiter(object):
                 a failed request, in milliseconds.
             multiplier_retry_interval (int): The multiplier to use to increase
                 the retry interval after a failed request.
+            backoff_on_404 (bool): Back off if we get a 404
         """
         self.clock = clock
         self.store = store
@@ -116,6 +117,7 @@ class RetryDestinationLimiter(object):
         self.min_retry_interval = min_retry_interval
         self.max_retry_interval = max_retry_interval
         self.multiplier_retry_interval = multiplier_retry_interval
+        self.backoff_on_404 = backoff_on_404
 
     def __enter__(self):
         pass
@@ -123,7 +125,22 @@ class RetryDestinationLimiter(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         valid_err_code = False
         if exc_type is not None and issubclass(exc_type, CodeMessageException):
-            valid_err_code = exc_val.code != 429 and 0 <= exc_val.code < 500
+            # Some error codes are perfectly fine for some APIs, whereas other
+            # APIs may expect to never received e.g. a 404. It's important to
+            # handle 404 as some remote servers will return a 404 when the HS
+            # has been decommissioned.
+            # If we get a 401, then we should probably back off since they
+            # won't accept our requests for at least a while.
+            # 429 is us being aggresively rate limited, so lets rate limit
+            # ourselves.
+            if exc_val.code == 404 and self.backoff_on_404:
+                valid_err_code = False
+            elif exc_val.code in (401, 429):
+                valid_err_code = False
+            elif exc_val.code < 500:
+                valid_err_code = True
+            else:
+                valid_err_code = False
 
         if exc_type is None or valid_err_code:
             # We connected successfully.

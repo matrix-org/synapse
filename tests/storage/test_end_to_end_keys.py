@@ -33,7 +33,11 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def test_key_without_device_name(self):
         now = 1470174257070
-        json = '{ "key": "value" }'
+        json = {"key": "value"}
+
+        yield self.store.store_device(
+            "user", "device", None
+        )
 
         yield self.store.set_e2e_device_keys(
             "user", "device", now, json)
@@ -43,14 +47,14 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
         self.assertIn("device", res["user"])
         dev = res["user"]["device"]
         self.assertDictContainsSubset({
-            "key_json": json,
+            "keys": json,
             "device_display_name": None,
         }, dev)
 
     @defer.inlineCallbacks
     def test_get_key_with_device_name(self):
         now = 1470174257070
-        json = '{ "key": "value" }'
+        json = {"key": "value"}
 
         yield self.store.set_e2e_device_keys(
             "user", "device", now, json)
@@ -63,13 +67,26 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
         self.assertIn("device", res["user"])
         dev = res["user"]["device"]
         self.assertDictContainsSubset({
-            "key_json": json,
+            "keys": json,
             "device_display_name": "display_name",
         }, dev)
 
     @defer.inlineCallbacks
     def test_multiple_devices(self):
         now = 1470174257070
+
+        yield self.store.store_device(
+            "user1", "device1", None
+        )
+        yield self.store.store_device(
+            "user1", "device2", None
+        )
+        yield self.store.store_device(
+            "user2", "device1", None
+        )
+        yield self.store.store_device(
+            "user2", "device2", None
+        )
 
         yield self.store.set_e2e_device_keys(
             "user1", "device1", now, 'json11')

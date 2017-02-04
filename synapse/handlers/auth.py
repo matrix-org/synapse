@@ -65,6 +65,7 @@ class AuthHandler(BaseHandler):
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.device_handler = hs.get_device_handler()
+        self.macaroon_gen = hs.get_macaroon_generator()
 
     @defer.inlineCallbacks
     def check_auth(self, flows, clientdict, clientip):
@@ -529,36 +530,10 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def issue_access_token(self, user_id, device_id=None):
-        access_token = self.generate_access_token(user_id)
+        access_token = self.macaroon_gen.generate_access_token(user_id)
         yield self.store.add_access_token_to_user(user_id, access_token,
                                                   device_id)
         defer.returnValue(access_token)
-
-    def generate_access_token(self, user_id, extra_caveats=None):
-        extra_caveats = extra_caveats or []
-        macaroon = self._generate_base_macaroon(user_id)
-        macaroon.add_first_party_caveat("type = access")
-        # Include a nonce, to make sure that each login gets a different
-        # access token.
-        macaroon.add_first_party_caveat("nonce = %s" % (
-            stringutils.random_string_with_symbols(16),
-        ))
-        for caveat in extra_caveats:
-            macaroon.add_first_party_caveat(caveat)
-        return macaroon.serialize()
-
-    def generate_short_term_login_token(self, user_id, duration_in_ms=(2 * 60 * 1000)):
-        macaroon = self._generate_base_macaroon(user_id)
-        macaroon.add_first_party_caveat("type = login")
-        now = self.hs.get_clock().time_msec()
-        expiry = now + duration_in_ms
-        macaroon.add_first_party_caveat("time < %d" % (expiry,))
-        return macaroon.serialize()
-
-    def generate_delete_pusher_token(self, user_id):
-        macaroon = self._generate_base_macaroon(user_id)
-        macaroon.add_first_party_caveat("type = delete_pusher")
-        return macaroon.serialize()
 
     def validate_short_term_login_token_and_get_user_id(self, login_token):
         auth_api = self.hs.get_auth()
@@ -569,15 +544,6 @@ class AuthHandler(BaseHandler):
             return user_id
         except Exception:
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
-
-    def _generate_base_macaroon(self, user_id):
-        macaroon = pymacaroons.Macaroon(
-            location=self.hs.config.server_name,
-            identifier="key",
-            key=self.hs.config.macaroon_secret_key)
-        macaroon.add_first_party_caveat("gen = 1")
-        macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
-        return macaroon
 
     @defer.inlineCallbacks
     def set_password(self, user_id, newpassword, requester=None):
@@ -607,7 +573,7 @@ class AuthHandler(BaseHandler):
         # types (mediums) of threepid. For now, we still use the existing
         # infrastructure, but this is the start of synapse gaining knowledge
         # of specific types of threepid (and fixes the fact that checking
-        # for the presenc eof an email address during password reset was
+        # for the presence of an email address during password reset was
         # case sensitive).
         if medium == 'email':
             address = address.lower()
@@ -616,6 +582,17 @@ class AuthHandler(BaseHandler):
             user_id, medium, address, validated_at,
             self.hs.get_clock().time_msec()
         )
+
+    @defer.inlineCallbacks
+    def delete_threepid(self, user_id, medium, address):
+        # 'Canonicalise' email addresses as per above
+        if medium == 'email':
+            address = address.lower()
+
+        ret = yield self.store.user_delete_threepid(
+            user_id, medium, address,
+        )
+        defer.returnValue(ret)
 
     def _save_session(self, session):
         # TODO: Persistent storage
@@ -656,10 +633,52 @@ class AuthHandler(BaseHandler):
             Whether self.hash(password) == stored_hash (bool).
         """
         if stored_hash:
-            return bcrypt.hashpw(password + self.hs.config.password_pepper,
-                                 stored_hash.encode('utf-8')) == stored_hash
+            return bcrypt.hashpw(password.encode('utf8') + self.hs.config.password_pepper,
+                                 stored_hash.encode('utf8')) == stored_hash
         else:
             return False
+
+
+class MacaroonGeneartor(object):
+    def __init__(self, hs):
+        self.clock = hs.get_clock()
+        self.server_name = hs.config.server_name
+        self.macaroon_secret_key = hs.config.macaroon_secret_key
+
+    def generate_access_token(self, user_id, extra_caveats=None):
+        extra_caveats = extra_caveats or []
+        macaroon = self._generate_base_macaroon(user_id)
+        macaroon.add_first_party_caveat("type = access")
+        # Include a nonce, to make sure that each login gets a different
+        # access token.
+        macaroon.add_first_party_caveat("nonce = %s" % (
+            stringutils.random_string_with_symbols(16),
+        ))
+        for caveat in extra_caveats:
+            macaroon.add_first_party_caveat(caveat)
+        return macaroon.serialize()
+
+    def generate_short_term_login_token(self, user_id, duration_in_ms=(2 * 60 * 1000)):
+        macaroon = self._generate_base_macaroon(user_id)
+        macaroon.add_first_party_caveat("type = login")
+        now = self.clock.time_msec()
+        expiry = now + duration_in_ms
+        macaroon.add_first_party_caveat("time < %d" % (expiry,))
+        return macaroon.serialize()
+
+    def generate_delete_pusher_token(self, user_id):
+        macaroon = self._generate_base_macaroon(user_id)
+        macaroon.add_first_party_caveat("type = delete_pusher")
+        return macaroon.serialize()
+
+    def _generate_base_macaroon(self, user_id):
+        macaroon = pymacaroons.Macaroon(
+            location=self.server_name,
+            identifier="key",
+            key=self.macaroon_secret_key)
+        macaroon.add_first_party_caveat("gen = 1")
+        macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
+        return macaroon
 
 
 class _AccountHandler(object):

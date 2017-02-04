@@ -169,7 +169,7 @@ class SQLBaseStore(object):
                                       max_entries=hs.config.event_cache_size)
 
         self._state_group_cache = DictionaryCache(
-            "*stateGroupCache*", 2000 * CACHE_SIZE_FACTOR
+            "*stateGroupCache*", 100000 * CACHE_SIZE_FACTOR
         )
 
         self._event_fetch_lock = threading.Condition()
@@ -387,6 +387,10 @@ class SQLBaseStore(object):
         Args:
             table : string giving the table name
             values : dict of new column names and values for them
+
+        Returns:
+            bool: Whether the row was inserted or not. Only useful when
+            `or_ignore` is True
         """
         try:
             yield self.runInteraction(
@@ -398,6 +402,8 @@ class SQLBaseStore(object):
             # a cursor after we receive an error from the db.
             if not or_ignore:
                 raise
+            defer.returnValue(False)
+        defer.returnValue(True)
 
     @staticmethod
     def _simple_insert_txn(txn, table, values):
@@ -838,18 +844,19 @@ class SQLBaseStore(object):
         return txn.execute(sql, keyvalues.values())
 
     def _get_cache_dict(self, db_conn, table, entity_column, stream_column,
-                        max_value):
+                        max_value, limit=100000):
         # Fetch a mapping of room_id -> max stream position for "recent" rooms.
         # It doesn't really matter how many we get, the StreamChangeCache will
         # do the right thing to ensure it respects the max size of cache.
         sql = (
             "SELECT %(entity)s, MAX(%(stream)s) FROM %(table)s"
-            " WHERE %(stream)s > ? - 100000"
+            " WHERE %(stream)s > ? - %(limit)s"
             " GROUP BY %(entity)s"
         ) % {
             "table": table,
             "entity": entity_column,
             "stream": stream_column,
+            "limit": limit,
         }
 
         sql = self.database_engine.convert_param_style(sql)

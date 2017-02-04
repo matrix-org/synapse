@@ -21,6 +21,10 @@ from synapse.events.utils import prune_event, serialize_event
 
 
 def MockEvent(**kwargs):
+    if "event_id" not in kwargs:
+        kwargs["event_id"] = "fake_event_id"
+    if "type" not in kwargs:
+        kwargs["type"] = "fake_type"
     return FrozenEvent(kwargs)
 
 
@@ -35,9 +39,13 @@ class PruneEventTestCase(unittest.TestCase):
 
     def test_minimal(self):
         self.run_test(
-            {'type': 'A'},
             {
                 'type': 'A',
+                'event_id': '$test:domain',
+            },
+            {
+                'type': 'A',
+                'event_id': '$test:domain',
                 'content': {},
                 'signatures': {},
                 'unsigned': {},
@@ -69,10 +77,12 @@ class PruneEventTestCase(unittest.TestCase):
         self.run_test(
             {
                 'type': 'B',
+                'event_id': '$test:domain',
                 'unsigned': {'age_ts': 20},
             },
             {
                 'type': 'B',
+                'event_id': '$test:domain',
                 'content': {},
                 'signatures': {},
                 'unsigned': {'age_ts': 20},
@@ -82,10 +92,12 @@ class PruneEventTestCase(unittest.TestCase):
         self.run_test(
             {
                 'type': 'B',
+                'event_id': '$test:domain',
                 'unsigned': {'other_key': 'here'},
             },
             {
                 'type': 'B',
+                'event_id': '$test:domain',
                 'content': {},
                 'signatures': {},
                 'unsigned': {},
@@ -96,10 +108,12 @@ class PruneEventTestCase(unittest.TestCase):
         self.run_test(
             {
                 'type': 'C',
+                'event_id': '$test:domain',
                 'content': {'things': 'here'},
             },
             {
                 'type': 'C',
+                'event_id': '$test:domain',
                 'content': {},
                 'signatures': {},
                 'unsigned': {},
@@ -109,10 +123,12 @@ class PruneEventTestCase(unittest.TestCase):
         self.run_test(
             {
                 'type': 'm.room.create',
+                'event_id': '$test:domain',
                 'content': {'creator': '@2:domain', 'other_field': 'here'},
             },
             {
                 'type': 'm.room.create',
+                'event_id': '$test:domain',
                 'content': {'creator': '@2:domain'},
                 'signatures': {},
                 'unsigned': {},
@@ -255,6 +271,8 @@ class SerializeEventTestCase(unittest.TestCase):
         self.assertEquals(
             self.serialize(
                 MockEvent(
+                    type="foo",
+                    event_id="test",
                     room_id="!foo:bar",
                     content={
                         "foo": "bar",
@@ -263,6 +281,8 @@ class SerializeEventTestCase(unittest.TestCase):
                 []
             ),
             {
+                "type": "foo",
+                "event_id": "test",
                 "room_id": "!foo:bar",
                 "content": {
                     "foo": "bar",

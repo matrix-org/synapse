@@ -26,7 +26,7 @@ from synapse.util import unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
-from synapse.events import FrozenEvent
+from synapse.events import FrozenEvent, builder
 import synapse.metrics
 
 from synapse.util.retryutils import get_retry_limiter, NotRetryingDestination
@@ -124,6 +124,16 @@ class FederationClient(FederationBase):
         sent_queries_counter.inc("client_device_keys")
         return self.transport_layer.query_client_keys(
             destination, content, timeout
+        )
+
+    @log_function
+    def query_user_devices(self, destination, user_id, timeout=30000):
+        """Query the device keys for a list of user ids hosted on a remote
+        server.
+        """
+        sent_queries_counter.inc("user_devices")
+        return self.transport_layer.query_user_devices(
+            destination, user_id, timeout
         )
 
     @log_function
@@ -499,8 +509,10 @@ class FederationClient(FederationBase):
                 if "prev_state" not in pdu_dict:
                     pdu_dict["prev_state"] = []
 
+                ev = builder.EventBuilder(pdu_dict)
+
                 defer.returnValue(
-                    (destination, self.event_from_pdu_json(pdu_dict))
+                    (destination, ev)
                 )
                 break
             except CodeMessageException as e:

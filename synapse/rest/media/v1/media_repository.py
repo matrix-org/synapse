@@ -61,7 +61,7 @@ class MediaRepository(object):
         self.dynamic_thumbnails = hs.config.dynamic_thumbnails
         self.thumbnail_requirements = hs.config.thumbnail_requirements
 
-        self.remote_media_linearizer = Linearizer()
+        self.remote_media_linearizer = Linearizer(name="media_remote")
 
         self.recently_accessed_remotes = set()
 
@@ -97,6 +97,8 @@ class MediaRepository(object):
         # already been uploaded at this point.
         with open(fname, "wb") as f:
             f.write(content)
+
+        logger.info("Stored local media in file %r", fname)
 
         yield self.store.store_local_media(
             media_id=media_id,
@@ -189,6 +191,8 @@ class MediaRepository(object):
                         upload_name = None
             else:
                 upload_name = None
+
+            logger.info("Stored remote media in file %r", fname)
 
             yield self.store.store_cached_remote_media(
                 origin=server_name,

@@ -170,12 +170,16 @@ class SyncRestServlet(RestServlet):
         )
 
         archived = self.encode_archived(
-            sync_result.archived, time_now, requester.access_token_id, filter.event_fields
+            sync_result.archived, time_now, requester.access_token_id,
+            filter.event_fields,
         )
 
         response_content = {
             "account_data": {"events": sync_result.account_data},
             "to_device": {"events": sync_result.to_device},
+            "device_lists": {
+                "changed": list(sync_result.device_lists),
+            },
             "presence": self.encode_presence(
                 sync_result.presence, time_now
             ),

@@ -46,6 +46,7 @@ STREAM_NAMES = (
     ("to_device",),
     ("public_rooms",),
     ("federation",),
+    ("device_lists",),
 )
 
 
@@ -140,6 +141,7 @@ class ReplicationResource(Resource):
         caches_token = self.store.get_cache_stream_token()
         public_rooms_token = self.store.get_current_public_room_stream_id()
         federation_token = self.federation_sender.get_current_token()
+        device_list_token = self.store.get_device_stream_token()
 
         defer.returnValue(_ReplicationToken(
             room_stream_token,
@@ -155,6 +157,7 @@ class ReplicationResource(Resource):
             int(stream_token.to_device_key),
             int(public_rooms_token),
             int(federation_token),
+            int(device_list_token),
         ))
 
     @request_handler()
@@ -214,6 +217,7 @@ class ReplicationResource(Resource):
         yield self.caches(writer, current_token, limit, request_streams)
         yield self.to_device(writer, current_token, limit, request_streams)
         yield self.public_rooms(writer, current_token, limit, request_streams)
+        yield self.device_lists(writer, current_token, limit, request_streams)
         self.federation(writer, current_token, limit, request_streams, federation_ack)
         self.streams(writer, current_token, request_streams)
 
@@ -294,9 +298,6 @@ class ReplicationResource(Resource):
             writer.write_header_and_rows(
                 "backward_ex_outliers", res.backward_ex_outliers,
                 ("position", "event_id", "state_group"),
-            )
-            writer.write_header_and_rows(
-                "state_resets", res.state_resets, ("position",),
             )
 
     @defer.inlineCallbacks
@@ -495,6 +496,20 @@ class ReplicationResource(Resource):
                 "position", "type", "content",
             ), position=upto_token)
 
+    @defer.inlineCallbacks
+    def device_lists(self, writer, current_token, limit, request_streams):
+        current_position = current_token.device_lists
+
+        device_lists = request_streams.get("device_lists")
+
+        if device_lists is not None and device_lists != current_position:
+            changes = yield self.store.get_all_device_list_changes_for_remotes(
+                device_lists,
+            )
+            writer.write_header_and_rows("device_lists", changes, (
+                "position", "user_id", "destination",
+            ), position=current_position)
+
 
 class _Writer(object):
     """Writes the streams as a JSON object as the response to the request"""
@@ -527,7 +542,7 @@ class _Writer(object):
 class _ReplicationToken(collections.namedtuple("_ReplicationToken", (
     "events", "presence", "typing", "receipts", "account_data", "backfill",
     "push_rules", "pushers", "state", "caches", "to_device", "public_rooms",
-    "federation",
+    "federation", "device_lists",
 ))):
     __slots__ = []
 

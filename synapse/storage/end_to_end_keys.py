@@ -12,74 +12,111 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import collections
+from twisted.internet import defer
 
-import twisted.internet.defer
+from canonicaljson import encode_canonical_json
+import ujson as json
 
 from ._base import SQLBaseStore
 
 
 class EndToEndKeyStore(SQLBaseStore):
-    def set_e2e_device_keys(self, user_id, device_id, time_now, json_bytes):
-        return self._simple_upsert(
-            table="e2e_device_keys_json",
-            keyvalues={
-                "user_id": user_id,
-                "device_id": device_id,
-            },
-            values={
-                "ts_added_ms": time_now,
-                "key_json": json_bytes,
-            }
+    def set_e2e_device_keys(self, user_id, device_id, time_now, device_keys):
+        """Stores device keys for a device. Returns whether there was a change
+        or the keys were already in the database.
+        """
+        def _set_e2e_device_keys_txn(txn):
+            old_key_json = self._simple_select_one_onecol_txn(
+                txn,
+                table="e2e_device_keys_json",
+                keyvalues={
+                    "user_id": user_id,
+                    "device_id": device_id,
+                },
+                retcol="key_json",
+                allow_none=True,
+            )
+
+            new_key_json = encode_canonical_json(device_keys)
+            if old_key_json == new_key_json:
+                return False
+
+            self._simple_upsert_txn(
+                txn,
+                table="e2e_device_keys_json",
+                keyvalues={
+                    "user_id": user_id,
+                    "device_id": device_id,
+                },
+                values={
+                    "ts_added_ms": time_now,
+                    "key_json": new_key_json,
+                }
+            )
+
+            return True
+
+        return self.runInteraction(
+            "set_e2e_device_keys", _set_e2e_device_keys_txn
         )
 
-    def get_e2e_device_keys(self, query_list):
+    @defer.inlineCallbacks
+    def get_e2e_device_keys(self, query_list, include_all_devices=False):
         """Fetch a list of device keys.
         Args:
             query_list(list): List of pairs of user_ids and device_ids.
+            include_all_devices (bool): whether to include entries for devices
+                that don't have device keys
         Returns:
             Dict mapping from user-id to dict mapping from device_id to
             dict containing "key_json", "device_display_name".
         """
         if not query_list:
-            return {}
+            defer.returnValue({})
 
-        return self.runInteraction(
-            "get_e2e_device_keys", self._get_e2e_device_keys_txn, query_list
+        results = yield self.runInteraction(
+            "get_e2e_device_keys", self._get_e2e_device_keys_txn,
+            query_list, include_all_devices,
         )
 
-    def _get_e2e_device_keys_txn(self, txn, query_list):
+        for user_id, device_keys in results.iteritems():
+            for device_id, device_info in device_keys.iteritems():
+                device_info["keys"] = json.loads(device_info.pop("key_json"))
+
+        defer.returnValue(results)
+
+    def _get_e2e_device_keys_txn(self, txn, query_list, include_all_devices):
         query_clauses = []
         query_params = []
 
         for (user_id, device_id) in query_list:
-            query_clause = "k.user_id = ?"
+            query_clause = "user_id = ?"
             query_params.append(user_id)
 
             if device_id:
-                query_clause += " AND k.device_id = ?"
+                query_clause += " AND device_id = ?"
                 query_params.append(device_id)
 
             query_clauses.append(query_clause)
 
         sql = (
-            "SELECT k.user_id, k.device_id, "
+            "SELECT user_id, device_id, "
             "    d.display_name AS device_display_name, "
             "    k.key_json"
-            " FROM e2e_device_keys_json k"
-            "    LEFT JOIN devices d ON d.user_id = k.user_id"
-            "      AND d.device_id = k.device_id"
+            " FROM devices d"
+            "    %s JOIN e2e_device_keys_json k USING (user_id, device_id)"
             " WHERE %s"
         ) % (
+            "LEFT" if include_all_devices else "INNER",
             " OR ".join("(" + q + ")" for q in query_clauses)
         )
 
         txn.execute(sql, query_params)
         rows = self.cursor_to_dict(txn)
 
-        result = collections.defaultdict(dict)
+        result = {}
         for row in rows:
-            result[row["user_id"]][row["device_id"]] = row
+            result.setdefault(row["user_id"], {})[row["device_id"]] = row
 
         return result
 
@@ -152,7 +189,7 @@ class EndToEndKeyStore(SQLBaseStore):
             "claim_e2e_one_time_keys", _claim_e2e_one_time_keys
         )
 
-    @twisted.internet.defer.inlineCallbacks
+    @defer.inlineCallbacks
     def delete_e2e_keys_by_device(self, user_id, device_id):
         yield self._simple_delete(
             table="e2e_device_keys_json",

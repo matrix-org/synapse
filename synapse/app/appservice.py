@@ -76,7 +76,7 @@ class AppserviceServer(HomeServer):
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]
-        bind_address = listener_config.get("bind_address", "")
+        bind_addresses = listener_config["bind_addresses"]
         site_tag = listener_config.get("tag", port)
         resources = {}
         for res in listener_config["resources"]:
@@ -85,16 +85,19 @@ class AppserviceServer(HomeServer):
                     resources[METRICS_PREFIX] = MetricsResource(self)
 
         root_resource = create_resource_tree(resources, Resource())
-        reactor.listenTCP(
-            port,
-            SynapseSite(
-                "synapse.access.http.%s" % (site_tag,),
-                site_tag,
-                listener_config,
-                root_resource,
-            ),
-            interface=bind_address
-        )
+
+        for address in bind_addresses:
+            reactor.listenTCP(
+                port,
+                SynapseSite(
+                    "synapse.access.http.%s" % (site_tag,),
+                    site_tag,
+                    listener_config,
+                    root_resource,
+                ),
+                interface=address
+            )
+
         logger.info("Synapse appservice now listening on port %d", port)
 
     def start_listening(self, listeners):
@@ -102,15 +105,18 @@ class AppserviceServer(HomeServer):
             if listener["type"] == "http":
                 self._listen_http(listener)
             elif listener["type"] == "manhole":
-                reactor.listenTCP(
-                    listener["port"],
-                    manhole(
-                        username="matrix",
-                        password="rabbithole",
-                        globals={"hs": self},
-                    ),
-                    interface=listener.get("bind_address", '127.0.0.1')
-                )
+                bind_addresses = listener["bind_addresses"]
+
+                for address in bind_addresses:
+                    reactor.listenTCP(
+                        listener["port"],
+                        manhole(
+                            username="matrix",
+                            password="rabbithole",
+                            globals={"hs": self},
+                        ),
+                        interface=address
+                    )
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 

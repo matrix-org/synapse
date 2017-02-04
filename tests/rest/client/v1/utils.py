@@ -87,7 +87,10 @@ class RestTestCase(unittest.TestCase):
         (code, response) = yield self.mock_resource.trigger(
             "PUT", path, json.dumps(data)
         )
-        self.assertEquals(expect_code, code, msg=str(response))
+        self.assertEquals(
+            expect_code, code,
+            msg="Expected: %d, got: %d, resp: %r" % (expect_code, code, response)
+        )
 
         self.auth_user_id = temp_id
 

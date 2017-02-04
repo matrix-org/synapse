@@ -75,6 +75,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                 "get_received_txn_response",
                 "set_received_txn_response",
                 "get_destination_retry_timings",
+                "get_devices_by_remote",
             ]),
             state_handler=self.state_handler,
             handlers=None,
@@ -98,6 +99,8 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.datastore.get_destination_retry_timings.return_value = (
             defer.succeed(retry_timings_res)
         )
+
+        self.datastore.get_devices_by_remote.return_value = (0, [])
 
         def get_received_txn_response(*args):
             return defer.succeed(None)

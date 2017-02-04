@@ -244,6 +244,20 @@ class StreamStore(SQLBaseStore):
 
         defer.returnValue(results)
 
+    def get_rooms_that_changed(self, room_ids, from_key):
+        """Given a list of rooms and a token, return rooms where there may have
+        been changes.
+
+        Args:
+            room_ids (list)
+            from_key (str): The room_key portion of a StreamToken
+        """
+        from_key = RoomStreamToken.parse_stream_token(from_key).stream
+        return set(
+            room_id for room_id in room_ids
+            if self._events_stream_cache.has_entity_changed(room_id, from_key)
+        )
+
     @defer.inlineCallbacks
     def get_room_events_stream_for_room(self, room_id, from_key, to_key, limit=0,
                                         order='DESC'):

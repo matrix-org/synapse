@@ -378,6 +378,7 @@ class Notifier(object):
                     limit=limit,
                     is_guest=is_peeking,
                     room_ids=room_ids,
+                    explicit_room_id=explicit_room_id,
                 )
 
                 if name == "room":

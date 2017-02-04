@@ -40,8 +40,8 @@ def register_cache(name, cache):
     )
 
 
-_string_cache = LruCache(int(5000 * CACHE_SIZE_FACTOR))
-caches_by_name["string_cache"] = _string_cache
+_string_cache = LruCache(int(100000 * CACHE_SIZE_FACTOR))
+_stirng_cache_metrics = register_cache("string_cache", _string_cache)
 
 
 KNOWN_KEYS = {
@@ -69,7 +69,12 @@ KNOWN_KEYS = {
 def intern_string(string):
     """Takes a (potentially) unicode string and interns using custom cache
     """
-    return _string_cache.setdefault(string, string)
+    new_str = _string_cache.setdefault(string, string)
+    if new_str is string:
+        _stirng_cache_metrics.inc_hits()
+    else:
+        _stirng_cache_metrics.inc_misses()
+    return new_str
 
 
 def intern_dict(dictionary):

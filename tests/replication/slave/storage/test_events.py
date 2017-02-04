@@ -59,53 +59,6 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         [unpatch() for unpatch in self.unpatches]
 
     @defer.inlineCallbacks
-    def test_room_members(self):
-        create = yield self.persist(type="m.room.create", key="", creator=USER_ID)
-        yield self.replicate()
-        yield self.check("get_rooms_for_user", (USER_ID,), [])
-        yield self.check("get_users_in_room", (ROOM_ID,), [])
-
-        # Join the room.
-        join = yield self.persist(type="m.room.member", key=USER_ID, membership="join")
-        yield self.replicate()
-        yield self.check("get_rooms_for_user", (USER_ID,), [RoomsForUser(
-            room_id=ROOM_ID,
-            sender=USER_ID,
-            membership="join",
-            event_id=join.event_id,
-            stream_ordering=join.internal_metadata.stream_ordering,
-        )])
-        yield self.check("get_users_in_room", (ROOM_ID,), [USER_ID])
-
-        # Leave the room.
-        yield self.persist(type="m.room.member", key=USER_ID, membership="leave")
-        yield self.replicate()
-        yield self.check("get_rooms_for_user", (USER_ID,), [])
-        yield self.check("get_users_in_room", (ROOM_ID,), [])
-
-        # Add some other user to the room.
-        join = yield self.persist(type="m.room.member", key=USER_ID_2, membership="join")
-        yield self.replicate()
-        yield self.check("get_rooms_for_user", (USER_ID_2,), [RoomsForUser(
-            room_id=ROOM_ID,
-            sender=USER_ID,
-            membership="join",
-            event_id=join.event_id,
-            stream_ordering=join.internal_metadata.stream_ordering,
-        )])
-        yield self.check("get_users_in_room", (ROOM_ID,), [USER_ID_2])
-
-        # Join the room clobbering the state.
-        # This should remove any evidence of the other user being in the room.
-        yield self.persist(
-            type="m.room.member", key=USER_ID, membership="join",
-            reset_state=[create]
-        )
-        yield self.replicate()
-        yield self.check("get_users_in_room", (ROOM_ID,), [USER_ID])
-        yield self.check("get_rooms_for_user", (USER_ID_2,), [])
-
-    @defer.inlineCallbacks
     def test_get_latest_event_ids_in_room(self):
         create = yield self.persist(type="m.room.create", key="", creator=USER_ID)
         yield self.replicate()
@@ -120,51 +73,6 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         yield self.replicate()
         yield self.check(
             "get_latest_event_ids_in_room", (ROOM_ID,), [join.event_id]
-        )
-
-    @defer.inlineCallbacks
-    def test_get_current_state(self):
-        # Create the room.
-        create = yield self.persist(type="m.room.create", key="", creator=USER_ID)
-        yield self.replicate()
-        yield self.check(
-            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID), []
-        )
-
-        # Join the room.
-        join1 = yield self.persist(
-            type="m.room.member", key=USER_ID, membership="join",
-        )
-        yield self.replicate()
-        yield self.check(
-            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID),
-            [join1]
-        )
-
-        # Add some other user to the room.
-        join2 = yield self.persist(
-            type="m.room.member", key=USER_ID_2, membership="join",
-        )
-        yield self.replicate()
-        yield self.check(
-            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID_2),
-            [join2]
-        )
-
-        # Leave the room, then rejoin the room clobbering state.
-        yield self.persist(type="m.room.member", key=USER_ID, membership="leave")
-        join3 = yield self.persist(
-            type="m.room.member", key=USER_ID, membership="join",
-            reset_state=[create]
-        )
-        yield self.replicate()
-        yield self.check(
-            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID_2),
-            []
-        )
-        yield self.check(
-            "get_current_state_for_key", (ROOM_ID, "m.room.member", USER_ID),
-            [join3]
         )
 
     @defer.inlineCallbacks
@@ -283,6 +191,12 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         if depth is None:
             depth = self.event_id
 
+        if not prev_events:
+            latest_event_ids = yield self.master_store.get_latest_event_ids_in_room(
+                room_id
+            )
+            prev_events = [(ev_id, {}) for ev_id in latest_event_ids]
+
         event_dict = {
             "sender": sender,
             "type": type,
@@ -309,12 +223,15 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             state_ids = {
                 key: e.event_id for key, e in state.items()
             }
+            context = EventContext()
+            context.current_state_ids = state_ids
+            context.prev_state_ids = state_ids
+        elif not backfill:
+            state_handler = self.hs.get_state_handler()
+            context = yield state_handler.compute_event_context(event)
         else:
-            state_ids = None
+            context = EventContext()
 
-        context = EventContext()
-        context.current_state_ids = state_ids
-        context.prev_state_ids = state_ids
         context.push_actions = push_actions
 
         ordering = None
@@ -324,7 +241,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             )
         else:
             ordering, _ = yield self.master_store.persist_event(
-                event, context, current_state=reset_state
+                event, context,
             )
 
         if ordering:

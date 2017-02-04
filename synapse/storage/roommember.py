@@ -66,8 +66,6 @@ class RoomMemberStore(SQLBaseStore):
         )
 
         for event in events:
-            txn.call_after(self.get_rooms_for_user.invalidate, (event.state_key,))
-            txn.call_after(self.get_users_in_room.invalidate, (event.room_id,))
             txn.call_after(
                 self._membership_stream_cache.entity_has_changed,
                 event.state_key, event.internal_metadata.stream_ordering
@@ -131,7 +129,7 @@ class RoomMemberStore(SQLBaseStore):
         with self._stream_id_gen.get_next() as stream_ordering:
             yield self.runInteraction("locally_reject_invite", f, stream_ordering)
 
-    @cached(max_entries=5000)
+    @cached(max_entries=500000, iterable=True)
     def get_users_in_room(self, room_id):
         def f(txn):
 
@@ -220,7 +218,7 @@ class RoomMemberStore(SQLBaseStore):
                 " ON e.event_id = c.event_id"
                 " AND m.room_id = c.room_id"
                 " AND m.user_id = c.state_key"
-                " WHERE %s"
+                " WHERE c.type = 'm.room.member' AND %s"
             ) % (where_clause,)
 
             txn.execute(sql, args)
@@ -266,7 +264,7 @@ class RoomMemberStore(SQLBaseStore):
             " ON m.event_id = c.event_id "
             " AND m.room_id = c.room_id "
             " AND m.user_id = c.state_key"
-            " WHERE %(where)s"
+            " WHERE c.type = 'm.room.member' AND %(where)s"
         ) % {
             "where": where_clause,
         }
@@ -276,11 +274,28 @@ class RoomMemberStore(SQLBaseStore):
 
         return rows
 
-    @cached(max_entries=5000)
+    @cached(max_entries=500000, iterable=True)
     def get_rooms_for_user(self, user_id):
         return self.get_rooms_for_user_where_membership_is(
             user_id, membership_list=[Membership.JOIN],
         )
+
+    @cachedInlineCallbacks(max_entries=500000, cache_context=True, iterable=True)
+    def get_users_who_share_room_with_user(self, user_id, cache_context):
+        """Returns the set of users who share a room with `user_id`
+        """
+        rooms = yield self.get_rooms_for_user(
+            user_id, on_invalidate=cache_context.invalidate,
+        )
+
+        user_who_share_room = set()
+        for room in rooms:
+            user_ids = yield self.get_users_in_room(
+                room.room_id, on_invalidate=cache_context.invalidate,
+            )
+            user_who_share_room.update(user_ids)
+
+        defer.returnValue(user_who_share_room)
 
     def forget(self, user_id, room_id):
         """Indicate that user_id wishes to discard history for room_id."""
@@ -390,7 +405,8 @@ class RoomMemberStore(SQLBaseStore):
             room_id, state_group, state_ids,
         )
 
-    @cachedInlineCallbacks(num_args=2, cache_context=True)
+    @cachedInlineCallbacks(num_args=2, cache_context=True, iterable=True,
+                           max_entries=100000)
     def _get_joined_users_from_context(self, room_id, state_group, current_state_ids,
                                        cache_context, event=None):
         # We don't use `state_group`, it's there so that we can cache based

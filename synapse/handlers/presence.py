@@ -574,7 +574,7 @@ class PresenceHandler(object):
                 if not local_states:
                     continue
 
-                users = yield self.state.get_current_user_in_room(room_id)
+                users = yield self.store.get_users_in_room(room_id)
                 hosts = set(get_domain_from_id(u) for u in users)
 
                 for host in hosts:
@@ -766,7 +766,7 @@ class PresenceHandler(object):
         # don't need to send to local clients here, as that is done as part
         # of the event stream/sync.
         # TODO: Only send to servers not already in the room.
-        user_ids = yield self.state.get_current_user_in_room(room_id)
+        user_ids = yield self.store.get_users_in_room(room_id)
         if self.is_mine(user):
             state = yield self.current_state_for_user(user.to_string())
 
@@ -1011,7 +1011,7 @@ class PresenceEventSource(object):
     @defer.inlineCallbacks
     @log_function
     def get_new_events(self, user, from_key, room_ids=None, include_offline=True,
-                       **kwargs):
+                       explicit_room_id=None, **kwargs):
         # The process for getting presence events are:
         #  1. Get the rooms the user is in.
         #  2. Get the list of user in the rooms.
@@ -1028,22 +1028,24 @@ class PresenceEventSource(object):
             user_id = user.to_string()
             if from_key is not None:
                 from_key = int(from_key)
-            room_ids = room_ids or []
 
             presence = self.get_presence_handler()
             stream_change_cache = self.store.presence_stream_cache
 
-            if not room_ids:
-                rooms = yield self.store.get_rooms_for_user(user_id)
-                room_ids = set(e.room_id for e in rooms)
-            else:
-                room_ids = set(room_ids)
-
             max_token = self.store.get_current_presence_token()
 
             plist = yield self.store.get_presence_list_accepted(user.localpart)
-            friends = set(row["observed_user_id"] for row in plist)
-            friends.add(user_id)  # So that we receive our own presence
+            users_interested_in = set(row["observed_user_id"] for row in plist)
+            users_interested_in.add(user_id)  # So that we receive our own presence
+
+            users_who_share_room = yield self.store.get_users_who_share_room_with_user(
+                user_id
+            )
+            users_interested_in.update(users_who_share_room)
+
+            if explicit_room_id:
+                user_ids = yield self.store.get_users_in_room(explicit_room_id)
+                users_interested_in.update(user_ids)
 
             user_ids_changed = set()
             changed = None
@@ -1055,35 +1057,19 @@ class PresenceEventSource(object):
                 # work out if we share a room or they're in our presence list
                 get_updates_counter.inc("stream")
                 for other_user_id in changed:
-                    if other_user_id in friends:
+                    if other_user_id in users_interested_in:
                         user_ids_changed.add(other_user_id)
-                        continue
-                    other_rooms = yield self.store.get_rooms_for_user(other_user_id)
-                    if room_ids.intersection(e.room_id for e in other_rooms):
-                        user_ids_changed.add(other_user_id)
-                        continue
             else:
                 # Too many possible updates. Find all users we can see and check
                 # if any of them have changed.
                 get_updates_counter.inc("full")
 
-                user_ids_to_check = set()
-                for room_id in room_ids:
-                    users = yield self.state.get_current_user_in_room(room_id)
-                    user_ids_to_check.update(users)
-
-                user_ids_to_check.update(friends)
-
-                # Always include yourself. Only really matters for when the user is
-                # not in any rooms, but still.
-                user_ids_to_check.add(user_id)
-
                 if from_key:
                     user_ids_changed = stream_change_cache.get_entities_changed(
-                        user_ids_to_check, from_key,
+                        users_interested_in, from_key,
                     )
                 else:
-                    user_ids_changed = user_ids_to_check
+                    user_ids_changed = users_interested_in
 
             updates = yield presence.current_state_for_users(user_ids_changed)
 

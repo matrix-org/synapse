@@ -16,7 +16,7 @@
 from synapse.api.constants import Membership, EventTypes
 from synapse.util.async import concurrently_execute
 from synapse.util.logcontext import LoggingContext
-from synapse.util.metrics import Measure
+from synapse.util.metrics import Measure, measure_func
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.visibility import filter_events_for_client
@@ -115,6 +115,7 @@ class SyncResult(collections.namedtuple("SyncResult", [
     "invited",  # InvitedSyncResult for each invited room.
     "archived",  # ArchivedSyncResult for each archived room.
     "to_device",  # List of direct messages for the device.
+    "device_lists",  # List of user_ids whose devices have chanegd
 ])):
     __slots__ = []
 
@@ -129,7 +130,8 @@ class SyncResult(collections.namedtuple("SyncResult", [
             self.invited or
             self.archived or
             self.account_data or
-            self.to_device
+            self.to_device or
+            self.device_lists
         )
 
 
@@ -544,6 +546,10 @@ class SyncHandler(object):
 
         yield self._generate_sync_entry_for_to_device(sync_result_builder)
 
+        device_lists = yield self._generate_sync_entry_for_device_list(
+            sync_result_builder
+        )
+
         defer.returnValue(SyncResult(
             presence=sync_result_builder.presence,
             account_data=sync_result_builder.account_data,
@@ -551,8 +557,32 @@ class SyncHandler(object):
             invited=sync_result_builder.invited,
             archived=sync_result_builder.archived,
             to_device=sync_result_builder.to_device,
+            device_lists=device_lists,
             next_batch=sync_result_builder.now_token,
         ))
+
+    @measure_func("_generate_sync_entry_for_device_list")
+    @defer.inlineCallbacks
+    def _generate_sync_entry_for_device_list(self, sync_result_builder):
+        user_id = sync_result_builder.sync_config.user.to_string()
+        since_token = sync_result_builder.since_token
+
+        if since_token and since_token.device_list_key:
+            rooms = yield self.store.get_rooms_for_user(user_id)
+            room_ids = set(r.room_id for r in rooms)
+
+            user_ids_changed = set()
+            changed = yield self.store.get_user_whose_devices_changed(
+                since_token.device_list_key
+            )
+            for other_user_id in changed:
+                other_rooms = yield self.store.get_rooms_for_user(other_user_id)
+                if room_ids.intersection(e.room_id for e in other_rooms):
+                    user_ids_changed.add(other_user_id)
+
+            defer.returnValue(user_ids_changed)
+        else:
+            defer.returnValue([])
 
     @defer.inlineCallbacks
     def _generate_sync_entry_for_to_device(self, sync_result_builder):

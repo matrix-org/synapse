@@ -41,15 +41,12 @@ class RegistrationTestCase(unittest.TestCase):
             handlers=None,
             http_client=None,
             expire_access_token=True)
-        self.auth_handler = Mock(
+        self.macaroon_generator = Mock(
             generate_access_token=Mock(return_value='secret'))
+        self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
         self.hs.handlers = RegistrationHandlers(self.hs)
         self.handler = self.hs.get_handlers().registration_handler
         self.hs.get_handlers().profile_handler = Mock()
-        self.mock_handler = Mock(spec=[
-            "generate_access_token",
-        ])
-        self.hs.get_auth_handler = Mock(return_value=self.auth_handler)
 
     @defer.inlineCallbacks
     def test_user_is_created_and_logged_in_if_doesnt_exist(self):

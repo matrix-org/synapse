@@ -409,6 +409,13 @@ class FederationClientKeysQueryServlet(BaseFederationServlet):
         return self.handler.on_query_client_keys(origin, content)
 
 
+class FederationUserDevicesQueryServlet(BaseFederationServlet):
+    PATH = "/user/devices/(?P<user_id>[^/]*)"
+
+    def on_GET(self, origin, content, query, user_id):
+        return self.handler.on_query_user_devices(origin, user_id)
+
+
 class FederationClientKeysClaimServlet(BaseFederationServlet):
     PATH = "/user/keys/claim"
 
@@ -613,6 +620,7 @@ SERVLET_CLASSES = (
     FederationGetMissingEventsServlet,
     FederationEventAuthServlet,
     FederationClientKeysQueryServlet,
+    FederationUserDevicesQueryServlet,
     FederationClientKeysClaimServlet,
     FederationThirdPartyInviteExchangeServlet,
     On3pidBindServlet,

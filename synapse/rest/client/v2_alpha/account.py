@@ -96,6 +96,11 @@ class PasswordRestServlet(RestServlet):
             threepid = result[LoginType.EMAIL_IDENTITY]
             if 'medium' not in threepid or 'address' not in threepid:
                 raise SynapseError(500, "Malformed threepid")
+            if threepid['medium'] == 'email':
+                # For emails, transform the address to lowercase.
+                # We store all email addreses as lowercase in the DB.
+                # (See add_threepid in synapse/handlers/auth.py)
+                threepid['address'] = threepid['address'].lower()
             # if using email, we must know about the email they're authing with!
             threepid_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
                 threepid['medium'], threepid['address']
@@ -241,7 +246,7 @@ class ThreepidRestServlet(RestServlet):
 
         for reqd in ['medium', 'address', 'validated_at']:
             if reqd not in threepid:
-                logger.warn("Couldn't add 3pid: invalid response from ID sevrer")
+                logger.warn("Couldn't add 3pid: invalid response from ID server")
                 raise SynapseError(500, "Invalid response from ID Server")
 
         yield self.auth_handler.add_threepid(
@@ -263,9 +268,43 @@ class ThreepidRestServlet(RestServlet):
         defer.returnValue((200, {}))
 
 
+class ThreepidDeleteRestServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/account/3pid/delete$", releases=())
+
+    def __init__(self, hs):
+        super(ThreepidDeleteRestServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        yield run_on_reactor()
+
+        body = parse_json_object_from_request(request)
+
+        required = ['medium', 'address']
+        absent = []
+        for k in required:
+            if k not in body:
+                absent.append(k)
+
+        if absent:
+            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        yield self.auth_handler.delete_threepid(
+            user_id, body['medium'], body['address']
+        )
+
+        defer.returnValue((200, {}))
+
+
 def register_servlets(hs, http_server):
     PasswordRequestTokenRestServlet(hs).register(http_server)
     PasswordRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
     ThreepidRequestTokenRestServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
+    ThreepidDeleteRestServlet(hs).register(http_server)
