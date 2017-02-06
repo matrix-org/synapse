@@ -46,6 +46,7 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
     def on_PUT(self, request, user_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         user = UserID.from_string(user_id)
+        is_admin = yield self.auth.is_server_admin(requester.user)
 
         content = parse_json_object_from_request(request)
 
@@ -55,7 +56,7 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
             defer.returnValue((400, "Unable to parse name"))
 
         yield self.handlers.profile_handler.set_displayname(
-            user, requester, new_name)
+            user, requester, new_name, is_admin)
 
         defer.returnValue((200, {}))
 
@@ -88,6 +89,7 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
     def on_PUT(self, request, user_id):
         requester = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
+        is_admin = yield self.auth.is_server_admin(requester.user)
 
         content = parse_json_object_from_request(request)
         try:
@@ -96,7 +98,7 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
             defer.returnValue((400, "Unable to parse name"))
 
         yield self.handlers.profile_handler.set_avatar_url(
-            user, requester, new_name)
+            user, requester, new_name, is_admin)
 
         defer.returnValue((200, {}))
 
