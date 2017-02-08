@@ -43,9 +43,6 @@ class JoinRules(object):
 
 class LoginType(object):
     PASSWORD = u"m.login.password"
-    OAUTH = u"m.login.oauth2"
-    EMAIL_CODE = u"m.login.email.code"
-    EMAIL_URL = u"m.login.email.url"
     EMAIL_IDENTITY = u"m.login.email.identity"
     RECAPTCHA = u"m.login.recaptcha"
     DUMMY = u"m.login.dummy"
