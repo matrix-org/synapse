@@ -1,3 +1,10 @@
+Changes in synapse v0.19.1 (2017-02-09)
+=======================================
+
+* Fix bug where state was incorrectly reset in a room when synapse received an
+  event over federation that did not pass auth checks (PR #1892)
+
+
 Changes in synapse v0.19.0 (2017-02-04)
 =======================================
 
