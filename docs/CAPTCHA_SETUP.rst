@@ -25,6 +25,5 @@ Configuring IP used for auth
 The ReCaptcha API requires that the IP address of the user who solved the
 captcha is sent. If the client is connecting through a proxy or load balancer,
 it may be required to use the X-Forwarded-For (XFF) header instead of the origin
-IP address. This can be configured as an option on the home server like so::
-
-  captcha_ip_origin_is_x_forwarded: true
+IP address. This can be configured using the x_forwarded directive in the
+listeners section of the homeserver.yaml configuration file.
