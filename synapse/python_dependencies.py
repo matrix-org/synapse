@@ -24,7 +24,7 @@ REQUIREMENTS = {
     "signedjson>=1.0.0": ["signedjson>=1.0.0"],
     "pynacl==0.3.0": ["nacl==0.3.0", "nacl.bindings"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
-    "Twisted>=16.0.0": ["twisted>=16.0.0"],
+    "Twisted>=17.1.0": ["twisted>=17.1.0"],
     "pyopenssl>=0.14": ["OpenSSL>=0.14"],
     "pyyaml": ["yaml"],
     "pyasn1": ["pyasn1"],
