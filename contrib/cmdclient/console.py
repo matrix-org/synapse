@@ -32,7 +32,7 @@ import urlparse
 import nacl.signing
 import nacl.encoding
 
-from syutil.crypto.jsonsign import verify_signed_json, SignatureVerifyException
+from signedjson.sign import verify_signed_json, SignatureVerifyException
 
 CONFIG_JSON = "cmdclient_config.json"
 
