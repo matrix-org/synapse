@@ -87,6 +87,10 @@ class SynchrotronSlavedStore(
         RoomMemberStore.__dict__["who_forgot_in_room"]
     )
 
+    did_forget = (
+        RoomMemberStore.__dict__["did_forget"]
+    )
+
     # XXX: This is a bit broken because we don't persist the accepted list in a
     # way that can be replicated. This means that we don't have a way to
     # invalidate the cache correctly.
