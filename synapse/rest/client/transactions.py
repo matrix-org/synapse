@@ -81,16 +81,7 @@ class HttpTransactionCache(object):
             Deferred which resolves to a tuple of (response_code, response_dict).
         """
         try:
-            observable = self.transactions[txn_key][0]
-            if not observable.has_called() or observable.has_succeeded():
-                return observable.observe()
-            # if the request has already been called with a non-2xx status
-            # (a Twisted failure), remove it from the transaction map.
-            # This is done to ensure that we don't cache rate-limiting errors, etc.
-            res = observable.get_result()
-            if res.value.code >= 300:
-                del self.transactions[txn_key]
-                # fall through
+            return self.transactions[txn_key][0].observe()
         except (KeyError, IndexError):
             pass  # execute the function instead.
 
@@ -101,6 +92,14 @@ class HttpTransactionCache(object):
         # to the observers.
         observable = ObservableDeferred(deferred, consumeErrors=True)
         self.transactions[txn_key] = (observable, self.clock.time_msec())
+
+        # if the request fails with a Twisted failure, remove it
+        # from the transaction map. This is done to ensure that we don't
+        # cache transient errors like rate-limiting errors, etc.
+        def remove_from_map(err):
+            del self.transactions[txn_key]
+            return err
+        observable.addErrback(remove_from_map)
         return observable.observe()
 
     def _cleanup(self):
