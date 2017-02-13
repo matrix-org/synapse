@@ -15,7 +15,7 @@
 
 from ._base import SQLBaseStore
 from synapse.api.constants import PresenceState
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
 
 from collections import namedtuple
 from twisted.internet import defer
@@ -85,6 +85,9 @@ class PresenceStore(SQLBaseStore):
                 self.presence_stream_cache.entity_has_changed,
                 state.user_id, stream_id,
             )
+            self._invalidate_cache_and_stream(
+                txn, self._get_presence_for_user, (state.user_id,)
+            )
 
         # Actually insert new rows
         self._simple_insert_many_txn(
@@ -143,7 +146,12 @@ class PresenceStore(SQLBaseStore):
             "get_all_presence_updates", get_all_presence_updates_txn
         )
 
-    @defer.inlineCallbacks
+    @cached()
+    def _get_presence_for_user(self, user_id):
+        raise NotImplementedError()
+
+    @cachedList(cached_method_name="_get_presence_for_user", list_name="user_ids",
+                num_args=1, inlineCallbacks=True)
     def get_presence_for_users(self, user_ids):
         rows = yield self._simple_select_many_batch(
             table="presence_stream",
@@ -165,7 +173,7 @@ class PresenceStore(SQLBaseStore):
         for row in rows:
             row["currently_active"] = bool(row["currently_active"])
 
-        defer.returnValue([UserPresenceState(**row) for row in rows])
+        defer.returnValue({row["user_id"]: UserPresenceState(**row) for row in rows})
 
     def get_current_presence_token(self):
         return self._presence_id_gen.get_current_token()
