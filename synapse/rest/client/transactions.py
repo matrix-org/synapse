@@ -97,7 +97,7 @@ class HttpTransactionCache(object):
         # from the transaction map. This is done to ensure that we don't
         # cache transient errors like rate-limiting errors, etc.
         def remove_from_map(err):
-            del self.transactions[txn_key]
+            self.transactions.pop(txn_key, None)
             return err
         observable.addErrback(remove_from_map)
         return observable.observe()
