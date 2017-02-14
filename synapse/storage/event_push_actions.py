@@ -48,7 +48,7 @@ class EventPushActionsStore(SQLBaseStore):
         )
 
         self._doing_notif_rotation = False
-        self._clock.looping_call(self._rotate_notifs, 60 * 1000)
+        self._clock.looping_call(self._rotate_notifs, 30 * 60 * 1000)
 
     def _set_push_actions_for_event_and_users_txn(self, txn, event, tuples):
         """
@@ -594,7 +594,7 @@ class EventPushActionsStore(SQLBaseStore):
                 )
                 if caught_up:
                     break
-                yield sleep(1)
+                yield sleep(5)
         finally:
             self._doing_notif_rotation = False
 
