@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015 - 2016 OpenMarket Ltd
+# Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +26,7 @@ from ._base import client_v2_patterns
 
 import logging
 import hmac
+import phonenumbers
 from hashlib import sha1
 from synapse.util.async import run_on_reactor
 
@@ -43,7 +45,7 @@ else:
 logger = logging.getLogger(__name__)
 
 
-class RegisterRequestTokenRestServlet(RestServlet):
+class EmailRegisterRequestTokenRestServlet(RestServlet):
     PATTERNS = client_v2_patterns("/register/email/requestToken$")
 
     def __init__(self, hs):
@@ -51,7 +53,7 @@ class RegisterRequestTokenRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(RegisterRequestTokenRestServlet, self).__init__()
+        super(EmailRegisterRequestTokenRestServlet, self).__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
 
@@ -76,6 +78,55 @@ class RegisterRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestEmailToken(**body)
+        defer.returnValue((200, ret))
+
+
+class MsisdnRegisterRequestTokenRestServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/register/msisdn/requestToken$")
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(MsisdnRegisterRequestTokenRestServlet, self).__init__()
+        self.hs = hs
+        self.identity_handler = hs.get_handlers().identity_handler
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        body = parse_json_object_from_request(request)
+
+        required = [
+            'id_server', 'client_secret',
+            'country', 'phone_number',
+            'send_attempt',
+        ]
+        absent = []
+        for k in required:
+            if k not in body:
+                absent.append(k)
+
+        if len(absent) > 0:
+            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+
+        phoneNumber = None
+        try:
+            phoneNumber = phonenumbers.parse(body['phone_number'], body['country'])
+        except phonenumbers.NumberParseException:
+            raise SynapseError(400, "Unable to parse phone number")
+        msisdn = phonenumbers.format_number(
+                phoneNumber, phonenumbers.PhoneNumberFormat.E164
+        )[1:]
+
+        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+            'msisdn', msisdn
+        )
+
+        if existingUid is not None:
+            raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
+
+        ret = yield self.identity_handler.requestMsisdnToken(**body)
         defer.returnValue((200, ret))
 
 
@@ -203,12 +254,16 @@ class RegisterRestServlet(RestServlet):
         if self.hs.config.enable_registration_captcha:
             flows = [
                 [LoginType.RECAPTCHA],
-                [LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA]
+                [LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
+                [LoginType.MSISDN, LoginType.RECAPTCHA],
+                [LoginType.EMAIL_IDENTITY, LoginType.MSISDN, LoginType.RECAPTCHA],
             ]
         else:
             flows = [
                 [LoginType.DUMMY],
-                [LoginType.EMAIL_IDENTITY]
+                [LoginType.EMAIL_IDENTITY],
+                [LoginType.MSISDN],
+                [LoginType.EMAIL_IDENTITY, LoginType.MSISDN],
             ]
 
         authed, auth_result, params, session_id = yield self.auth_handler.check_auth(
@@ -449,5 +504,6 @@ class RegisterRestServlet(RestServlet):
 
 
 def register_servlets(hs, http_server):
-    RegisterRequestTokenRestServlet(hs).register(http_server)
+    EmailRegisterRequestTokenRestServlet(hs).register(http_server)
+    MsisdnRegisterRequestTokenRestServlet(hs).register(http_server)
     RegisterRestServlet(hs).register(http_server)
