@@ -26,30 +26,37 @@ import ujson as json
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_NOTIF_ACITON = ["notify", {"set_tweak": "highlight", "value": False}]
-DEFAULT_HIGHLIGHT_ACITON = [
+DEFAULT_NOTIF_ACTION = ["notify", {"set_tweak": "highlight", "value": False}]
+DEFAULT_HIGHLIGHT_ACTION = [
     "notify", {"set_tweak": "sound", "value": "default"}, {"set_tweak": "highlight"}
 ]
 
 
 def _serialize_action(actions, is_highlight):
+    """Custom serializer for actions. This allows us to "compress" common actions.
+
+    We use the fact that most users have the same actions for notifs (and for
+    highlights). We replaces these default actions with the emtpy string.
+    """
     if is_highlight:
-        if actions == DEFAULT_HIGHLIGHT_ACITON:
-            return ""
+        if actions == DEFAULT_HIGHLIGHT_ACTION:
+            return ""  # We use empty string as the column is non-NULL
     else:
-        if actions == DEFAULT_NOTIF_ACITON:
+        if actions == DEFAULT_NOTIF_ACTION:
             return ""
     return json.dumps(actions)
 
 
 def _deserialize_action(actions, is_highlight):
+    """Custom deserializer for actions. This allows us to "compress" common actions
+    """
     if actions:
         return json.loads(actions)
 
     if is_highlight:
-        return DEFAULT_HIGHLIGHT_ACITON
+        return DEFAULT_HIGHLIGHT_ACTION
     else:
-        return DEFAULT_NOTIF_ACITON
+        return DEFAULT_NOTIF_ACTION
 
 
 class EventPushActionsStore(SQLBaseStore):
