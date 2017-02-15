@@ -719,7 +719,9 @@ class RoomMemberHandler(BaseHandler):
         )
         membership = member.membership if member else None
 
-        if membership is not None and membership != Membership.LEAVE:
+        if membership is not None and membership not in [
+            Membership.LEAVE, Membership.BAN
+        ]:
             raise SynapseError(400, "User %s in room %s" % (
                 user_id, room_id
             ))
