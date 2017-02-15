@@ -93,7 +93,7 @@ class EndToEndKeyStore(SQLBaseStore):
             query_clause = "user_id = ?"
             query_params.append(user_id)
 
-            if device_id:
+            if device_id is not None:
                 query_clause += " AND device_id = ?"
                 query_params.append(device_id)
 
