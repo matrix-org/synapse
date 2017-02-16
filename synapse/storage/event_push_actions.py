@@ -15,6 +15,7 @@
 
 from ._base import SQLBaseStore
 from twisted.internet import defer
+from synapse.util.async import sleep
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.types import RoomStreamToken
 from .stream import lower_bound
@@ -25,11 +26,46 @@ import ujson as json
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_NOTIF_ACTION = ["notify", {"set_tweak": "highlight", "value": False}]
+DEFAULT_HIGHLIGHT_ACTION = [
+    "notify", {"set_tweak": "sound", "value": "default"}, {"set_tweak": "highlight"}
+]
+
+
+def _serialize_action(actions, is_highlight):
+    """Custom serializer for actions. This allows us to "compress" common actions.
+
+    We use the fact that most users have the same actions for notifs (and for
+    highlights).
+    We store these default actions as the empty string rather than the full JSON.
+    Since the empty string isn't valid JSON there is no risk of this clashing with
+    any real JSON actions
+    """
+    if is_highlight:
+        if actions == DEFAULT_HIGHLIGHT_ACTION:
+            return ""  # We use empty string as the column is non-NULL
+    else:
+        if actions == DEFAULT_NOTIF_ACTION:
+            return ""
+    return json.dumps(actions)
+
+
+def _deserialize_action(actions, is_highlight):
+    """Custom deserializer for actions. This allows us to "compress" common actions
+    """
+    if actions:
+        return json.loads(actions)
+
+    if is_highlight:
+        return DEFAULT_HIGHLIGHT_ACTION
+    else:
+        return DEFAULT_NOTIF_ACTION
+
+
 class EventPushActionsStore(SQLBaseStore):
     EPA_HIGHLIGHT_INDEX = "epa_highlight_index"
 
     def __init__(self, hs):
-        self.stream_ordering_month_ago = None
         super(EventPushActionsStore, self).__init__(hs)
 
         self.register_background_index_update(
@@ -47,6 +83,9 @@ class EventPushActionsStore(SQLBaseStore):
             where_clause="highlight=1"
         )
 
+        self._doing_notif_rotation = False
+        self._clock.looping_call(self._rotate_notifs, 30 * 60 * 1000)
+
     def _set_push_actions_for_event_and_users_txn(self, txn, event, tuples):
         """
         Args:
@@ -55,15 +94,17 @@ class EventPushActionsStore(SQLBaseStore):
         """
         values = []
         for uid, actions in tuples:
+            is_highlight = 1 if _action_has_highlight(actions) else 0
+
             values.append({
                 'room_id': event.room_id,
                 'event_id': event.event_id,
                 'user_id': uid,
-                'actions': json.dumps(actions),
+                'actions': _serialize_action(actions, is_highlight),
                 'stream_ordering': event.internal_metadata.stream_ordering,
                 'topological_ordering': event.depth,
                 'notif': 1,
-                'highlight': 1 if _action_has_highlight(actions) else 0,
+                'highlight': is_highlight,
             })
 
         for uid, __ in tuples:
@@ -77,66 +118,89 @@ class EventPushActionsStore(SQLBaseStore):
     def get_unread_event_push_actions_by_room_for_user(
             self, room_id, user_id, last_read_event_id
     ):
-        def _get_unread_event_push_actions_by_room(txn):
-            sql = (
-                "SELECT stream_ordering, topological_ordering"
-                " FROM events"
-                " WHERE room_id = ? AND event_id = ?"
-            )
-            txn.execute(
-                sql, (room_id, last_read_event_id)
-            )
-            results = txn.fetchall()
-            if len(results) == 0:
-                return {"notify_count": 0, "highlight_count": 0}
-
-            stream_ordering = results[0][0]
-            topological_ordering = results[0][1]
-            token = RoomStreamToken(
-                topological_ordering, stream_ordering
-            )
-
-            # First get number of notifications.
-            # We don't need to put a notif=1 clause as all rows always have
-            # notif=1
-            sql = (
-                "SELECT count(*)"
-                " FROM (SELECT * FROM event_push_actions"
-                " WHERE"
-                " user_id = ?"
-                " AND room_id = ?"
-                " AND %s LIMIT 100) as ea"
-            ) % (lower_bound(token, self.database_engine, inclusive=False),)
-
-            txn.execute(sql, (user_id, room_id))
-            row = txn.fetchone()
-            notify_count = row[0] if row else 0
-
-            # Now get the number of highlights
-            sql = (
-                "SELECT count(*)"
-                " FROM event_push_actions ea"
-                " WHERE"
-                " highlight = 1"
-                " AND user_id = ?"
-                " AND room_id = ?"
-                " AND %s"
-            ) % (lower_bound(token, self.database_engine, inclusive=False),)
-
-            txn.execute(sql, (user_id, room_id))
-            row = txn.fetchone()
-            highlight_count = row[0] if row else 0
-
-            return {
-                "notify_count": notify_count,
-                "highlight_count": highlight_count,
-            }
-
         ret = yield self.runInteraction(
             "get_unread_event_push_actions_by_room",
-            _get_unread_event_push_actions_by_room
+            self._get_unread_counts_by_receipt_txn,
+            room_id, user_id, last_read_event_id
         )
         defer.returnValue(ret)
+
+    def _get_unread_counts_by_receipt_txn(self, txn, room_id, user_id,
+                                          last_read_event_id):
+        sql = (
+            "SELECT stream_ordering, topological_ordering"
+            " FROM events"
+            " WHERE room_id = ? AND event_id = ?"
+        )
+        txn.execute(
+            sql, (room_id, last_read_event_id)
+        )
+        results = txn.fetchall()
+        if len(results) == 0:
+            return {"notify_count": 0, "highlight_count": 0}
+
+        stream_ordering = results[0][0]
+        topological_ordering = results[0][1]
+
+        return self._get_unread_counts_by_pos_txn(
+            txn, room_id, user_id, topological_ordering, stream_ordering
+        )
+
+    def _get_unread_counts_by_pos_txn(self, txn, room_id, user_id, topological_ordering,
+                                      stream_ordering):
+        token = RoomStreamToken(
+            topological_ordering, stream_ordering
+        )
+
+        # First get number of notifications.
+        # We don't need to put a notif=1 clause as all rows always have
+        # notif=1
+        sql = (
+            "SELECT count(*)"
+            " FROM (SELECT * FROM event_push_actions"
+            " WHERE"
+            " user_id = ?"
+            " AND room_id = ?"
+            " AND %s LIMIT 100) as ea"
+        ) % (lower_bound(token, self.database_engine, inclusive=False),)
+
+        txn.execute(sql, (user_id, room_id))
+        row = txn.fetchone()
+        notify_count = row[0] if row else 0
+
+        summary_notif_count = self._simple_select_one_onecol_txn(
+            txn,
+            table="event_push_summary",
+            keyvalues={
+                "user_id": user_id,
+                "room_id": room_id,
+            },
+            retcol="notif_count",
+            allow_none=True,
+        )
+
+        if summary_notif_count:
+            notify_count += summary_notif_count
+
+        # Now get the number of highlights
+        sql = (
+            "SELECT count(*)"
+            " FROM event_push_actions ea"
+            " WHERE"
+            " highlight = 1"
+            " AND user_id = ?"
+            " AND room_id = ?"
+            " AND %s"
+        ) % (lower_bound(token, self.database_engine, inclusive=False),)
+
+        txn.execute(sql, (user_id, room_id))
+        row = txn.fetchone()
+        highlight_count = row[0] if row else 0
+
+        return {
+            "notify_count": notify_count,
+            "highlight_count": highlight_count,
+        }
 
     @defer.inlineCallbacks
     def get_push_action_users_in_range(self, min_stream_ordering, max_stream_ordering):
@@ -176,7 +240,8 @@ class EventPushActionsStore(SQLBaseStore):
             # find rooms that have a read receipt in them and return the next
             # push actions
             sql = (
-                "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions"
+                "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,"
+                "   ep.highlight "
                 " FROM ("
                 "   SELECT room_id,"
                 "       MAX(topological_ordering) as topological_ordering,"
@@ -217,7 +282,7 @@ class EventPushActionsStore(SQLBaseStore):
         def get_no_receipt(txn):
             sql = (
                 "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,"
-                " e.received_ts"
+                "   ep.highlight "
                 " FROM event_push_actions AS ep"
                 " INNER JOIN events AS e USING (room_id, event_id)"
                 " WHERE"
@@ -246,7 +311,7 @@ class EventPushActionsStore(SQLBaseStore):
                 "event_id": row[0],
                 "room_id": row[1],
                 "stream_ordering": row[2],
-                "actions": json.loads(row[3]),
+                "actions": _deserialize_action(row[3], row[4]),
             } for row in after_read_receipt + no_read_receipt
         ]
 
@@ -285,7 +350,7 @@ class EventPushActionsStore(SQLBaseStore):
         def get_after_receipt(txn):
             sql = (
                 "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,"
-                "  e.received_ts"
+                "  ep.highlight, e.received_ts"
                 " FROM ("
                 "   SELECT room_id,"
                 "       MAX(topological_ordering) as topological_ordering,"
@@ -327,7 +392,7 @@ class EventPushActionsStore(SQLBaseStore):
         def get_no_receipt(txn):
             sql = (
                 "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,"
-                " e.received_ts"
+                "   ep.highlight, e.received_ts"
                 " FROM event_push_actions AS ep"
                 " INNER JOIN events AS e USING (room_id, event_id)"
                 " WHERE"
@@ -357,8 +422,8 @@ class EventPushActionsStore(SQLBaseStore):
                 "event_id": row[0],
                 "room_id": row[1],
                 "stream_ordering": row[2],
-                "actions": json.loads(row[3]),
-                "received_ts": row[4],
+                "actions": _deserialize_action(row[3], row[4]),
+                "received_ts": row[5],
             } for row in after_read_receipt + no_read_receipt
         ]
 
@@ -392,7 +457,7 @@ class EventPushActionsStore(SQLBaseStore):
             sql = (
                 "SELECT epa.event_id, epa.room_id,"
                 " epa.stream_ordering, epa.topological_ordering,"
-                " epa.actions, epa.profile_tag, e.received_ts"
+                " epa.actions, epa.highlight, epa.profile_tag, e.received_ts"
                 " FROM event_push_actions epa, events e"
                 " WHERE epa.event_id = e.event_id"
                 " AND epa.user_id = ? %s"
@@ -407,7 +472,7 @@ class EventPushActionsStore(SQLBaseStore):
             "get_push_actions_for_user", f
         )
         for pa in push_actions:
-            pa["actions"] = json.loads(pa["actions"])
+            pa["actions"] = _deserialize_action(pa["actions"], pa["highlight"])
         defer.returnValue(push_actions)
 
     @defer.inlineCallbacks
@@ -448,10 +513,14 @@ class EventPushActionsStore(SQLBaseStore):
         )
 
     def _remove_old_push_actions_before_txn(self, txn, room_id, user_id,
-                                            topological_ordering):
+                                            topological_ordering, stream_ordering):
         """
-        Purges old, stale push actions for a user and room before a given
-        topological_ordering
+        Purges old push actions for a user and room before a given
+        topological_ordering.
+
+        We however keep a months worth of highlighted notifications, so that
+        users can still get a list of recent highlights.
+
         Args:
             txn: The transcation
             room_id: Room ID to delete from
@@ -475,9 +544,15 @@ class EventPushActionsStore(SQLBaseStore):
         txn.execute(
             "DELETE FROM event_push_actions "
             " WHERE user_id = ? AND room_id = ? AND "
-            " topological_ordering < ? AND stream_ordering < ?",
+            " topological_ordering <= ?"
+            " AND ((stream_ordering < ? AND highlight = 1) or highlight = 0)",
             (user_id, room_id, topological_ordering, self.stream_ordering_month_ago)
         )
+
+        txn.execute("""
+            DELETE FROM event_push_summary
+            WHERE room_id = ? AND user_id = ? AND stream_ordering <= ?
+        """, (room_id, user_id, stream_ordering))
 
     @defer.inlineCallbacks
     def _find_stream_orderings_for_times(self):
@@ -494,6 +569,14 @@ class EventPushActionsStore(SQLBaseStore):
         logger.info(
             "Found stream ordering 1 month ago: it's %d",
             self.stream_ordering_month_ago
+        )
+        logger.info("Searching for stream ordering 1 day ago")
+        self.stream_ordering_day_ago = self._find_first_stream_ordering_after_ts_txn(
+            txn, self._clock.time_msec() - 24 * 60 * 60 * 1000
+        )
+        logger.info(
+            "Found stream ordering 1 day ago: it's %d",
+            self.stream_ordering_day_ago
         )
 
     def _find_first_stream_ordering_after_ts_txn(self, txn, ts):
@@ -533,6 +616,120 @@ class EventPushActionsStore(SQLBaseStore):
                 range_end = middle
 
         return range_end
+
+    @defer.inlineCallbacks
+    def _rotate_notifs(self):
+        if self._doing_notif_rotation or self.stream_ordering_day_ago is None:
+            return
+        self._doing_notif_rotation = True
+
+        try:
+            while True:
+                logger.info("Rotating notifications")
+
+                caught_up = yield self.runInteraction(
+                    "_rotate_notifs",
+                    self._rotate_notifs_txn
+                )
+                if caught_up:
+                    break
+                yield sleep(5)
+        finally:
+            self._doing_notif_rotation = False
+
+    def _rotate_notifs_txn(self, txn):
+        """Archives older notifications into event_push_summary. Returns whether
+        the archiving process has caught up or not.
+        """
+
+        # We want to make sure that we only ever do this one at a time
+        self.database_engine.lock_table(txn, "event_push_summary")
+
+        # We don't to try and rotate millions of rows at once, so we cap the
+        # maximum stream ordering we'll rotate before.
+        txn.execute("""
+            SELECT stream_ordering FROM event_push_actions
+            ORDER BY stream_ordering ASC LIMIT 1 OFFSET 50000
+        """)
+        stream_row = txn.fetchone()
+        if stream_row:
+            offset_stream_ordering, = stream_row
+            rotate_to_stream_ordering = min(
+                self.stream_ordering_day_ago, offset_stream_ordering
+            )
+            caught_up = offset_stream_ordering >= self.stream_ordering_day_ago
+        else:
+            rotate_to_stream_ordering = self.stream_ordering_day_ago
+            caught_up = True
+
+        self._rotate_notifs_before_txn(txn, rotate_to_stream_ordering)
+
+        # We have caught up iff we were limited by `stream_ordering_day_ago`
+        return caught_up
+
+    def _rotate_notifs_before_txn(self, txn, rotate_to_stream_ordering):
+        old_rotate_stream_ordering = self._simple_select_one_onecol_txn(
+            txn,
+            table="event_push_summary_stream_ordering",
+            keyvalues={},
+            retcol="stream_ordering",
+        )
+
+        # Calculate the new counts that should be upserted into event_push_summary
+        sql = """
+            SELECT user_id, room_id,
+                coalesce(old.notif_count, 0) + upd.notif_count,
+                upd.stream_ordering,
+                old.user_id
+            FROM (
+                SELECT user_id, room_id, count(*) as notif_count,
+                    max(stream_ordering) as stream_ordering
+                FROM event_push_actions
+                WHERE ? <= stream_ordering AND stream_ordering < ?
+                    AND highlight = 0
+                GROUP BY user_id, room_id
+            ) AS upd
+            LEFT JOIN event_push_summary AS old USING (user_id, room_id)
+        """
+
+        txn.execute(sql, (old_rotate_stream_ordering, rotate_to_stream_ordering,))
+        rows = txn.fetchall()
+
+        # If the `old.user_id` above is NULL then we know there isn't already an
+        # entry in the table, so we simply insert it. Otherwise we update the
+        # existing table.
+        self._simple_insert_many_txn(
+            txn,
+            table="event_push_summary",
+            values=[
+                {
+                    "user_id": row[0],
+                    "room_id": row[1],
+                    "notif_count": row[2],
+                    "stream_ordering": row[3],
+                }
+                for row in rows if row[4] is None
+            ]
+        )
+
+        txn.executemany(
+            """
+                UPDATE event_push_summary SET notif_count = ?, stream_ordering = ?
+                WHERE user_id = ? AND room_id = ?
+            """,
+            ((row[2], row[3], row[0], row[1],) for row in rows if row[4] is not None)
+        )
+
+        txn.execute(
+            "DELETE FROM event_push_actions"
+            " WHERE ? <= stream_ordering AND stream_ordering < ? AND highlight = 0",
+            (old_rotate_stream_ordering, rotate_to_stream_ordering,)
+        )
+
+        txn.execute(
+            "UPDATE event_push_summary_stream_ordering SET stream_ordering = ?",
+            (rotate_to_stream_ordering,)
+        )
 
 
 def _action_has_highlight(actions):

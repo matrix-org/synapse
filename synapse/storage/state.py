@@ -413,7 +413,19 @@ class StateStore(SQLBaseStore):
         defer.returnValue({event: event_to_state[event] for event in event_ids})
 
     @defer.inlineCallbacks
-    def get_state_ids_for_events(self, event_ids, types):
+    def get_state_ids_for_events(self, event_ids, types=None):
+        """
+        Get the state dicts corresponding to a list of events
+
+        Args:
+            event_ids(list(str)): events whose state should be returned
+            types(list[(str, str)]|None): List of (type, state_key) tuples
+                which are used to filter the state fetched. May be None, which
+                matches any key
+
+        Returns:
+            A deferred dict from event_id -> (type, state_key) -> state_event
+        """
         event_to_groups = yield self._get_state_group_for_events(
             event_ids,
         )
