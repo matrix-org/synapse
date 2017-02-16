@@ -36,7 +36,10 @@ def _serialize_action(actions, is_highlight):
     """Custom serializer for actions. This allows us to "compress" common actions.
 
     We use the fact that most users have the same actions for notifs (and for
-    highlights). We replaces these default actions with the emtpy string.
+    highlights).
+    We store these default actions as the empty string rather than the full JSON.
+    Since the empty string isn't valid JSON there is no risk of this clashing with
+    any real JSON actions
     """
     if is_highlight:
         if actions == DEFAULT_HIGHLIGHT_ACTION:
