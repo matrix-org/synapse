@@ -1,30 +1,36 @@
 How to monitor Synapse metrics using Prometheus
 ===============================================
 
-1: Install prometheus:
-  Follow instructions at http://prometheus.io/docs/introduction/install/
+1. Install prometheus:
 
-2: Enable synapse metrics:
-  Simply setting a (local) port number will enable it. Pick a port.
-  prometheus itself defaults to 9090, so starting just above that for
-  locally monitored services seems reasonable. E.g. 9092:
+   Follow instructions at http://prometheus.io/docs/introduction/install/
 
-  Add to homeserver.yaml::
+2. Enable synapse metrics:
 
-    metrics_port: 9092
+   Simply setting a (local) port number will enable it. Pick a port.
+   prometheus itself defaults to 9090, so starting just above that for
+   locally monitored services seems reasonable. E.g. 9092:
 
-  Also ensure that ``enable_metrics`` is set to ``True``.
+   Add to homeserver.yaml::
+
+     metrics_port: 9092
+
+   Also ensure that ``enable_metrics`` is set to ``True``.
   
-  Restart synapse.
+   Restart synapse.
 
-3: Add a prometheus target for synapse. It needs to set the ``metrics_path``
-   to a non-default value::
+3. Add a prometheus target for synapse.
+
+   It needs to set the ``metrics_path`` to a non-default value::
 
     - job_name: "synapse"
       metrics_path: "/_synapse/metrics"
       static_configs:
         - targets:
             "my.server.here:9092"
+
+   If your prometheus is older than 1.5.2, you will need to replace 
+   ``static_configs`` in the above with ``target_groups``.
 
 Standard Metric Names
 ---------------------
