@@ -9,11 +9,13 @@ How to monitor Synapse metrics using Prometheus
   prometheus itself defaults to 9090, so starting just above that for
   locally monitored services seems reasonable. E.g. 9092:
 
-  Add to homeserver.yaml
+  Add to homeserver.yaml::
 
     metrics_port: 9092
 
-  Restart synapse
+  Also ensure that ``enable_metrics`` is set to ``True``.
+  
+  Restart synapse.
 
 3: Add a prometheus target for synapse. It needs to set the ``metrics_path``
    to a non-default value::
