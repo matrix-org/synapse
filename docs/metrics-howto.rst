@@ -31,6 +31,8 @@ How to monitor Synapse metrics using Prometheus
 
    If your prometheus is older than 1.5.2, you will need to replace 
    ``static_configs`` in the above with ``target_groups``.
+   
+   Restart prometheus.
 
 Standard Metric Names
 ---------------------
