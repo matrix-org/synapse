@@ -356,7 +356,7 @@ class RoomCreationHandler(BaseHandler):
 
 class RoomContextHandler(BaseHandler):
     @defer.inlineCallbacks
-    def get_event_context(self, user, room_id, event_id, limit, is_guest):
+    def get_event_context(self, user, room_id, event_id, limit):
         """Retrieves events, pagination tokens and state around a given event
         in a room.
 

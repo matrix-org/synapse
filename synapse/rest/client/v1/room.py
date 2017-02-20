@@ -505,7 +505,6 @@ class RoomEventContext(ClientV1RestServlet):
             room_id,
             event_id,
             limit,
-            requester.is_guest,
         )
 
         if not results:
