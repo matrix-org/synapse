@@ -375,12 +375,15 @@ class RoomContextHandler(BaseHandler):
 
         now_token = yield self.hs.get_event_sources().get_current_token()
 
+        users = yield self.store.get_users_in_room(room_id)
+        is_peeking = user.to_string() not in users
+
         def filter_evts(events):
             return filter_events_for_client(
                 self.store,
                 user.to_string(),
                 events,
-                is_peeking=is_guest
+                is_peeking=is_peeking
             )
 
         event = yield self.store.get_event(event_id, get_prev_content=True,
