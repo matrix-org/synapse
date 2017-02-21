@@ -1,3 +1,10 @@
+Changes in synapse v0.19.2 (2017-02-20)
+=======================================
+
+* Fix bug with event visibility check in /context/ API. Thanks to Tokodomo for
+  pointing it out! (PR #1929)
+
+
 Changes in synapse v0.19.1 (2017-02-09)
 =======================================
 
