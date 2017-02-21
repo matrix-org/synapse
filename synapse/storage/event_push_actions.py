@@ -157,11 +157,11 @@ class EventPushActionsStore(SQLBaseStore):
         # notif=1
         sql = (
             "SELECT count(*)"
-            " FROM (SELECT * FROM event_push_actions"
+            " FROM event_push_actions ea"
             " WHERE"
             " user_id = ?"
             " AND room_id = ?"
-            " AND %s LIMIT 100) as ea"
+            " AND %s"
         ) % (lower_bound(token, self.database_engine, inclusive=False),)
 
         txn.execute(sql, (user_id, room_id))
