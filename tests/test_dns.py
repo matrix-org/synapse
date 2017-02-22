@@ -32,7 +32,6 @@ class DnsTestCase(unittest.TestCase):
 
         service_name = "test_service.examle.com"
         host_name = "example.com"
-        ip_address = "127.0.0.1"
 
         answer_srv = dns.RRHeader(
             type=dns.SRV,
@@ -41,15 +40,7 @@ class DnsTestCase(unittest.TestCase):
             )
         )
 
-        answer_a = dns.RRHeader(
-            type=dns.A,
-            payload=dns.Record_A(
-                address=ip_address,
-            )
-        )
-
         dns_client_mock.lookupService.return_value = ([answer_srv], None, None)
-        dns_client_mock.lookupAddress.return_value = ([answer_a], None, None)
 
         cache = {}
 
@@ -58,11 +49,10 @@ class DnsTestCase(unittest.TestCase):
         )
 
         dns_client_mock.lookupService.assert_called_once_with(service_name)
-        dns_client_mock.lookupAddress.assert_called_once_with(host_name)
 
         self.assertEquals(len(servers), 1)
         self.assertEquals(servers, cache[service_name])
-        self.assertEquals(servers[0].host, ip_address)
+        self.assertEquals(servers[0].host, host_name)
 
     @defer.inlineCallbacks
     def test_from_cache_expired_and_dns_fail(self):
