@@ -90,6 +90,13 @@ def filter_events_for_clients(store, user_tuples, events, event_id_to_state):
         if not event.is_state() and event.sender in ignore_list:
             return False
 
+        # As a very temporary measure, don't relay redaction messages to clients
+        # as it causes a thundering herd.  FIXME: this should be removed once
+        # room initialSync is optimised enough to make the herd not a problem.
+        # https://github.com/vector-im/riot-android/issues/928
+        if event.is_state() and event.type == EventTypes.Redaction:
+            return False
+
         state = event_id_to_state[event.event_id]
 
         # get the room_visibility at the time of the event.
