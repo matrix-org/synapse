@@ -474,6 +474,7 @@ class RoomInitialSyncRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
+        # raise RuntimeError("Guest access has been disabled")
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         pagination_config = PaginationConfig.from_request(request)
         content = yield self.initial_sync_handler.room_initial_sync(

@@ -327,7 +327,7 @@ class DeviceHandler(BaseHandler):
                     user_id
                 )
                 logger.info("Extrem: %r, prev_ids: %r", extremity, prev_ids)
-                if str(extremity) == str(prev_ids[0]):
+                if extremity and prev_ids[0] and int(extremity) >= int(prev_ids[0]):
                     resync = False
 
             if resync:

@@ -87,6 +87,8 @@ class EventPushActionsStore(SQLBaseStore):
         self._rotate_notif_loop = self._clock.looping_call(
             self._rotate_notifs, 30 * 60 * 1000
         )
+        self._rotate_delay = 3
+        self._rotate_count = 10000
 
     def _set_push_actions_for_event_and_users_txn(self, txn, event, tuples):
         """
@@ -629,7 +631,7 @@ class EventPushActionsStore(SQLBaseStore):
                 )
                 if caught_up:
                     break
-                yield sleep(5)
+                yield sleep(self._rotate_delay)
         finally:
             self._doing_notif_rotation = False
 
@@ -639,7 +641,7 @@ class EventPushActionsStore(SQLBaseStore):
         """
 
         # We want to make sure that we only ever do this one at a time
-        self.database_engine.lock_table(txn, "event_push_summary")
+        # self.database_engine.lock_table(txn, "event_push_summary")
 
         old_rotate_stream_ordering = self._simple_select_one_onecol_txn(
             txn,
@@ -653,9 +655,10 @@ class EventPushActionsStore(SQLBaseStore):
         txn.execute("""
             SELECT stream_ordering FROM event_push_actions
             WHERE stream_ordering > ?
-            ORDER BY stream_ordering ASC LIMIT 1 OFFSET 50000
-        """, (old_rotate_stream_ordering,))
+            ORDER BY stream_ordering ASC LIMIT 1 OFFSET ?
+        """, (old_rotate_stream_ordering, self._rotate_count))
         stream_row = txn.fetchone()
+        # stream_row = (old_rotate_stream_ordering + self._rotate_count,)
         if stream_row:
             offset_stream_ordering, = stream_row
             rotate_to_stream_ordering = min(
