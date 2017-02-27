@@ -311,6 +311,23 @@ class EventsStore(SQLBaseStore):
 
                             new_forward_extremeties[room_id] = new_latest_event_ids
 
+                            len_1 = (
+                                len(latest_event_ids) == 1
+                                and len(new_latest_event_ids) == 1
+                            )
+                            if len_1:
+                                all_single_prev_not_state = any(
+                                    len(event.prev_events) == 1
+                                    and not event.is_state()
+                                    for event, ctx in ev_ctx_rm
+                                    if not event.internal_metadata.is_outlier()
+                                    and not ctx.rejected
+                                )
+                                # Don't bother calculating state if they're just
+                                # a long chain of single ancestor non-state events.
+                                if all_single_prev_not_state:
+                                    continue
+
                             state = yield self._calculate_state_delta(
                                 room_id, ev_ctx_rm, new_latest_event_ids
                             )
