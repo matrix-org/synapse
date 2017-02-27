@@ -316,7 +316,7 @@ class EventsStore(SQLBaseStore):
                                 and len(new_latest_event_ids) == 1
                             )
                             if len_1:
-                                all_single_prev_not_state = any(
+                                all_single_prev_not_state = all(
                                     len(event.prev_events) == 1
                                     and not event.is_state()
                                     for event, ctx in ev_ctx_rm
