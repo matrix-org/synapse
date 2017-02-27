@@ -320,8 +320,6 @@ class EventsStore(SQLBaseStore):
                                     len(event.prev_events) == 1
                                     and not event.is_state()
                                     for event, ctx in ev_ctx_rm
-                                    if not event.internal_metadata.is_outlier()
-                                    and not ctx.rejected
                                 )
                                 # Don't bother calculating state if they're just
                                 # a long chain of single ancestor non-state events.
