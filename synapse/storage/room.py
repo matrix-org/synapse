@@ -35,6 +35,108 @@ OpsLevel = collections.namedtuple(
 
 
 class RoomStore(SQLBaseStore):
+    EVENT_FILES_UPDATE_NAME = "event_files"
+
+    FILE_MSGTYPES = (
+        "m.image",
+        "m.video",
+        "m.file",
+        "m.audio",
+    )
+
+    def __init__(self, hs):
+        super(RoomStore, self).__init__(hs)
+        self.register_background_update_handler(
+            self.EVENT_FILES_UPDATE_NAME, self._background_reindex_files
+        )
+
+    @defer.inlineCallbacks
+    def _background_reindex_files(self, progress, batch_size):
+        target_min_stream_id = progress["target_min_stream_id_inclusive"]
+        max_stream_id = progress["max_stream_id_exclusive"]
+        rows_inserted = progress.get("rows_inserted", 0)
+
+        def reindex_txn(txn):
+            sql = (
+                "SELECT topological_ordering, stream_ordering, event_id, room_id,"
+                " type, content FROM events"
+                " WHERE ? <= stream_ordering AND stream_ordering < ?"
+                " AND type = 'm.room.message'"
+                " AND content LIKE ?"
+                " ORDER BY stream_ordering DESC"
+                " LIMIT ?"
+            )
+
+            txn.execute(sql, (target_min_stream_id, max_stream_id, '%url%', batch_size))
+
+            rows = self.cursor_to_dict(txn)
+            if not rows:
+                return 0
+
+            min_stream_id = rows[-1]["stream_ordering"]
+
+            event_files_rows = []
+            for row in rows:
+                try:
+                    so = row["stream_ordering"]
+                    to = row["topological_ordering"]
+                    event_id = row["event_id"]
+                    room_id = row["room_id"]
+                    try:
+                        content = json.loads(row["content"])
+                    except:
+                        continue
+
+                    msgtype = content["msgtype"]
+                    if msgtype not in self.FILE_MSGTYPES:
+                        continue
+
+                    url = content["url"]
+
+                    if not isinstance(url, basestring):
+                        continue
+                    if not isinstance(msgtype, basestring):
+                        continue
+                except (KeyError, AttributeError):
+                    # If the event is missing a necessary field then
+                    # skip over it.
+                    continue
+
+                event_files_rows.append({
+                    "topological_ordering": to,
+                    "stream_ordering": so,
+                    "event_id": event_id,
+                    "room_id": room_id,
+                    "msgtype": msgtype,
+                    "url": url,
+                })
+
+            self._simple_insert_many_txn(
+                txn,
+                table="event_files",
+                values=event_files_rows,
+            )
+
+            progress = {
+                "target_min_stream_id_inclusive": target_min_stream_id,
+                "max_stream_id_exclusive": min_stream_id,
+                "rows_inserted": rows_inserted + len(event_files_rows)
+            }
+
+            self._background_update_progress_txn(
+                txn, self.EVENT_FILES_UPDATE_NAME, progress
+            )
+
+            return len(rows)
+
+        result = yield self.runInteraction(
+            self.EVENT_FILES_UPDATE_NAME, reindex_txn
+        )
+
+        if not result:
+            yield self._end_background_update(self.EVENT_FILES_UPDATE_NAME)
+
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def store_room(self, room_id, room_creator_user_id, is_public):
@@ -278,6 +380,22 @@ class RoomStore(SQLBaseStore):
             )
 
     def _store_room_message_txn(self, txn, event):
+        msgtype = event.content.get("msgtype")
+        url = event.content.get("url")
+        if msgtype in self.FILE_MSGTYPES and url:
+            self._simple_insert_txn(
+                txn,
+                table="event_files",
+                values={
+                    "topological_ordering": event.depth,
+                    "stream_ordering": event.internal_metadata.stream_ordering,
+                    "room_id": event.room_id,
+                    "event_id": event.event_id,
+                    "msgtype": msgtype,
+                    "url": url,
+                }
+            )
+
         if hasattr(event, "content") and "body" in event.content:
             self._store_event_search_txn(
                 txn, event, "content.body", event.content["body"]

@@ -56,7 +56,7 @@ class PaginationConfig(object):
 
     @classmethod
     def from_request(cls, request, raise_invalid_params=True,
-                     default_limit=None):
+                     default_limit=None, default_dir='f'):
         def get_param(name, default=None):
             lst = request.args.get(name, [])
             if len(lst) > 1:
@@ -68,7 +68,7 @@ class PaginationConfig(object):
             else:
                 return default
 
-        direction = get_param("dir", 'f')
+        direction = get_param("dir", default_dir)
         if direction not in ['f', 'b']:
             raise SynapseError(400, "'dir' parameter is invalid.")
 
