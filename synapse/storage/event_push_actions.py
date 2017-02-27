@@ -640,9 +640,6 @@ class EventPushActionsStore(SQLBaseStore):
         the archiving process has caught up or not.
         """
 
-        # We want to make sure that we only ever do this one at a time
-        # self.database_engine.lock_table(txn, "event_push_summary")
-
         old_rotate_stream_ordering = self._simple_select_one_onecol_txn(
             txn,
             table="event_push_summary_stream_ordering",
