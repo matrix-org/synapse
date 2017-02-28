@@ -17,9 +17,3 @@ export SYNAPSE_CACHE_FACTOR=1
 ./sytest/jenkins/install_and_run.sh \
     --synapse-directory $WORKSPACE \
     --dendron $WORKSPACE/dendron/bin/dendron \
-    --pusher \
-    --synchrotron \
-    --federation-reader \
-    --client-reader \
-    --appservice \
-    --federation-sender \
