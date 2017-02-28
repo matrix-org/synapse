@@ -1096,7 +1096,7 @@ class FederationHandler(BaseHandler):
                     if prev_id != event.event_id:
                         results[(event.type, event.state_key)] = prev_id
                 else:
-                    del results[(event.type, event.state_key)]
+                    results.pop((event.type, event.state_key), None)
 
             defer.returnValue(results.values())
         else:

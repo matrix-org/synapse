@@ -517,7 +517,7 @@ class DeviceStore(SQLBaseStore):
             WHERE stream_id > ?
         """
         return self._execute(
-            "get_users_and_hosts_device_list", None,
+            "get_all_device_list_changes_for_remotes", None,
             sql, from_key,
         )
 
