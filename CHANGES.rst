@@ -1,3 +1,17 @@
+Changes in synapse v0.19.2 (2017-02-20)
+=======================================
+
+* Fix bug with event visibility check in /context/ API. Thanks to Tokodomo for
+  pointing it out! (PR #1929)
+
+
+Changes in synapse v0.19.1 (2017-02-09)
+=======================================
+
+* Fix bug where state was incorrectly reset in a room when synapse received an
+  event over federation that did not pass auth checks (PR #1892)
+
+
 Changes in synapse v0.19.0 (2017-02-04)
 =======================================
 

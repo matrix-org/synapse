@@ -302,7 +302,7 @@ class EventsStore(SQLBaseStore):
                                 room_id
                             )
                             new_latest_event_ids = yield self._calculate_new_extremeties(
-                                room_id, [ev for ev, _ in ev_ctx_rm]
+                                room_id, ev_ctx_rm, latest_event_ids
                             )
 
                             if new_latest_event_ids == set(latest_event_ids):
@@ -310,6 +310,21 @@ class EventsStore(SQLBaseStore):
                                 continue
 
                             new_forward_extremeties[room_id] = new_latest_event_ids
+
+                            len_1 = (
+                                len(latest_event_ids) == 1
+                                and len(new_latest_event_ids) == 1
+                            )
+                            if len_1:
+                                all_single_prev_not_state = all(
+                                    len(event.prev_events) == 1
+                                    and not event.is_state()
+                                    for event, ctx in ev_ctx_rm
+                                )
+                                # Don't bother calculating state if they're just
+                                # a long chain of single ancestor non-state events.
+                                if all_single_prev_not_state:
+                                    continue
 
                             state = yield self._calculate_state_delta(
                                 room_id, ev_ctx_rm, new_latest_event_ids
@@ -329,27 +344,24 @@ class EventsStore(SQLBaseStore):
                 persist_event_counter.inc_by(len(chunk))
 
     @defer.inlineCallbacks
-    def _calculate_new_extremeties(self, room_id, events):
+    def _calculate_new_extremeties(self, room_id, event_contexts, latest_event_ids):
         """Calculates the new forward extremeties for a room given events to
         persist.
 
         Assumes that we are only persisting events for one room at a time.
         """
-        latest_event_ids = yield self.get_latest_event_ids_in_room(
-            room_id
-        )
         new_latest_event_ids = set(latest_event_ids)
         # First, add all the new events to the list
         new_latest_event_ids.update(
-            event.event_id for event in events
-            if not event.internal_metadata.is_outlier()
+            event.event_id for event, ctx in event_contexts
+            if not event.internal_metadata.is_outlier() and not ctx.rejected
         )
         # Now remove all events that are referenced by the to-be-added events
         new_latest_event_ids.difference_update(
             e_id
-            for event in events
+            for event, ctx in event_contexts
             for e_id, _ in event.prev_events
-            if not event.internal_metadata.is_outlier()
+            if not event.internal_metadata.is_outlier() and not ctx.rejected
         )
 
         # And finally remove any events that are referenced by previously added

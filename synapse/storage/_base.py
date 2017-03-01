@@ -18,7 +18,6 @@ from synapse.api.errors import StoreError
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.caches.dictionary_cache import DictionaryCache
 from synapse.util.caches.descriptors import Cache
-from synapse.util.caches import intern_dict
 from synapse.storage.engines import PostgresEngine
 import synapse.metrics
 
@@ -80,7 +79,13 @@ class LoggingTransaction(object):
     def executemany(self, sql, *args):
         self._do_execute(self.txn.executemany, sql, *args)
 
+    def _make_sql_one_line(self, sql):
+        "Strip newlines out of SQL so that the loggers in the DB are on one line"
+        return " ".join(l.strip() for l in sql.splitlines() if l.strip())
+
     def _do_execute(self, func, sql, *args):
+        sql = self._make_sql_one_line(sql)
+
         # TODO(paul): Maybe use 'info' and 'debug' for values?
         sql_logger.debug("[SQL] {%s} %s", self.name, sql)
 
@@ -350,9 +355,9 @@ class SQLBaseStore(object):
         Returns:
             A list of dicts where the key is the column header.
         """
-        col_headers = list(column[0] for column in cursor.description)
+        col_headers = list(intern(column[0]) for column in cursor.description)
         results = list(
-            intern_dict(dict(zip(col_headers, row))) for row in cursor.fetchall()
+            dict(zip(col_headers, row)) for row in cursor.fetchall()
         )
         return results
 

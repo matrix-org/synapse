@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from synapse.api import errors
 from synapse.api.constants import EventTypes
 from synapse.util import stringutils
@@ -246,30 +245,51 @@ class DeviceHandler(BaseHandler):
         # Then work out if any users have since joined
         rooms_changed = self.store.get_rooms_that_changed(room_ids, from_token.room_key)
 
+        stream_ordering = RoomStreamToken.parse_stream_token(
+            from_token.room_key).stream
+
         possibly_changed = set(changed)
         for room_id in rooms_changed:
-            # Fetch  the current state at the time.
-            stream_ordering = RoomStreamToken.parse_stream_token(from_token.room_key)
-
+            # Fetch the current state at the time.
             try:
                 event_ids = yield self.store.get_forward_extremeties_for_room(
                     room_id, stream_ordering=stream_ordering
                 )
-                prev_state_ids = yield self.store.get_state_ids_for_events(event_ids)
-            except:
-                prev_state_ids = {}
+            except errors.StoreError:
+                # we have purged the stream_ordering index since the stream
+                # ordering: treat it the same as a new room
+                event_ids = []
 
             current_state_ids = yield self.state.get_current_state_ids(room_id)
+
+            # special-case for an empty prev state: include all members
+            # in the changed list
+            if not event_ids:
+                for key, event_id in current_state_ids.iteritems():
+                    etype, state_key = key
+                    if etype != EventTypes.Member:
+                        continue
+                    possibly_changed.add(state_key)
+                continue
+
+            # mapping from event_id -> state_dict
+            prev_state_ids = yield self.store.get_state_ids_for_events(event_ids)
 
             # If there has been any change in membership, include them in the
             # possibly changed list. We'll check if they are joined below,
             # and we're not toooo worried about spuriously adding users.
             for key, event_id in current_state_ids.iteritems():
                 etype, state_key = key
-                if etype == EventTypes.Member:
-                    prev_event_id = prev_state_ids.get(key, None)
+                if etype != EventTypes.Member:
+                    continue
+
+                # check if this member has changed since any of the extremities
+                # at the stream_ordering, and add them to the list if so.
+                for state_dict in prev_state_ids.values():
+                    prev_event_id = state_dict.get(key, None)
                     if not prev_event_id or prev_event_id != event_id:
                         possibly_changed.add(state_key)
+                        break
 
         users_who_share_room = yield self.store.get_users_who_share_room_with_user(
             user_id

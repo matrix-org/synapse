@@ -505,7 +505,6 @@ class RoomEventContext(ClientV1RestServlet):
             room_id,
             event_id,
             limit,
-            requester.is_guest,
         )
 
         if not results:
@@ -609,6 +608,10 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 raise SynapseError(400, "Missing user_id key.")
             target = UserID.from_string(content["user_id"])
 
+        event_content = None
+        if 'reason' in content and membership_action in ['kick', 'ban']:
+            event_content = {'reason': content['reason']}
+
         yield self.handlers.room_member_handler.update_membership(
             requester=requester,
             target=target,
@@ -616,6 +619,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             action=membership_action,
             txn_id=txn_id,
             third_party_signed=content.get("third_party_signed", None),
+            content=event_content,
         )
 
         defer.returnValue((200, {}))

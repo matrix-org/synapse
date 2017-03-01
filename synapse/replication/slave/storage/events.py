@@ -85,6 +85,12 @@ class SlavedEventStore(BaseSlavedStore):
     get_unread_event_push_actions_by_room_for_user = (
         EventPushActionsStore.__dict__["get_unread_event_push_actions_by_room_for_user"]
     )
+    _get_unread_counts_by_receipt_txn = (
+        DataStore._get_unread_counts_by_receipt_txn.__func__
+    )
+    _get_unread_counts_by_pos_txn = (
+        DataStore._get_unread_counts_by_pos_txn.__func__
+    )
     _get_state_group_for_events = (
         StateStore.__dict__["_get_state_group_for_events"]
     )
