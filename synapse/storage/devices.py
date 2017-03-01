@@ -33,6 +33,13 @@ class DeviceStore(SQLBaseStore):
             self._prune_old_outbound_device_pokes, 60 * 60 * 1000
         )
 
+        self.register_background_index_update(
+            "device_inbox_stream_index",
+            index_name="device_inbox_stream_id_user_id",
+            table="device_inbox",
+            columns=["stream_id", "user_id"],
+        )
+
     @defer.inlineCallbacks
     def store_device(self, user_id, device_id,
                      initial_device_display_name):
