@@ -546,6 +546,16 @@ class DeviceStore(SQLBaseStore):
                 host, stream_id,
             )
 
+        # Delete older entries in the table, as we really only care about
+        # when the latest change happened.
+        txn.executemany(
+            """
+            DELETE FROM device_lists_stream
+            WHERE user_id = ? AND device_id = ? AND stream_id < ?
+            """,
+            [(user_id, device_id, stream_id) for device_id in device_ids]
+        )
+
         self._simple_insert_many_txn(
             txn,
             table="device_lists_stream",
