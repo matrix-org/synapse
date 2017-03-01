@@ -309,13 +309,11 @@ class AuthHandler(BaseHandler):
                 defer.returnValue(True)
         raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
 
-    @defer.inlineCallbacks
     def _check_email_identity(self, authdict, _):
-        defer.returnValue(self._check_threepid('email', authdict))
+        return self._check_threepid('email', authdict)
 
-    @defer.inlineCallbacks
     def _check_msisdn(self, authdict, _):
-        defer.returnValue(self._check_threepid('msisdn', authdict))
+        return self._check_threepid('msisdn', authdict)
 
     @defer.inlineCallbacks
     def _check_dummy_auth(self, authdict, _):
