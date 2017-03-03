@@ -16,6 +16,7 @@ from synapse.api import errors
 from synapse.api.constants import EventTypes
 from synapse.util import stringutils
 from synapse.util.async import Linearizer
+from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
 from synapse.types import get_domain_from_id, RoomStreamToken
 from twisted.internet import defer
@@ -344,7 +345,13 @@ class DeviceListEduUpdater(object):
         # Recently seen stream ids. We don't bother keeping these in the DB,
         # but they're useful to have them about to reduce the number of spurious
         # resyncs.
-        self._seen_updates = {}
+        self._seen_updates = ExpiringCache(
+            cache_name="device_update_edu",
+            clock=self.clock,
+            max_len=10000,
+            expiry_ms=30 * 60 * 1000,
+            iterable=True,
+        )
 
     @defer.inlineCallbacks
     def incoming_device_list_update(self, origin, edu_content):
@@ -412,7 +419,7 @@ class DeviceListEduUpdater(object):
                 )
 
             self._seen_updates.setdefault(user_id, set()).update(
-                [stream_id for _, stream_id, _, _ in pending_updates]
+                stream_id for _, stream_id, _, _ in pending_updates
             )
 
     @defer.inlineCallbacks
