@@ -281,6 +281,7 @@ class RegisterRestServlet(RestServlet):
             )
             # don't re-register the email address
             add_email = False
+            add_msisdn = False
         else:
             # NB: This may be from the auth handler and NOT from the POST
             if 'password' not in params:
@@ -305,6 +306,7 @@ class RegisterRestServlet(RestServlet):
             )
 
             add_email = True
+            add_msisdn = True
 
         return_dict = yield self._create_registration_details(
             registered_user_id, params
@@ -315,6 +317,13 @@ class RegisterRestServlet(RestServlet):
             yield self._register_email_threepid(
                 registered_user_id, threepid, return_dict["access_token"],
                 params.get("bind_email")
+            )
+
+        if add_msisdn and auth_result and LoginType.MSISDN in auth_result:
+            threepid = auth_result[LoginType.MSISDN]
+            yield self._register_msisdn_threepid(
+                registered_user_id, threepid, return_dict["access_token"],
+                params.get("bind_msisdn")
             )
 
         defer.returnValue((200, return_dict))
@@ -425,6 +434,44 @@ class RegisterRestServlet(RestServlet):
             )
         else:
             logger.info("bind_email not specified: not binding email")
+
+    @defer.inlineCallbacks
+    def _register_msisdn_threepid(self, user_id, threepid, token, bind_msisdn):
+        """Add aphone number as a 3pid identifier
+
+        Also optionally binds msisdn to the given user_id on the identity server
+
+        Args:
+            user_id (str): id of user
+            threepid (object): m.login.msisdn auth response
+            token (str): access_token for the user
+            bind_email (bool): true if the client requested the email to be
+                bound at the identity server
+        Returns:
+            defer.Deferred:
+        """
+        reqd = ('medium', 'address', 'validated_at')
+        if any(x not in threepid for x in reqd):
+            logger.info("Can't add incomplete 3pid")
+            defer.returnValue()
+
+        yield self.auth_handler.add_threepid(
+            user_id,
+            threepid['medium'],
+            threepid['address'],
+            threepid['validated_at'],
+        )
+
+        if bind_msisdn:
+            logger.info("bind_msisdn specified: binding")
+            logger.debug("Binding msisdn %s to %s" % (
+                threepid, user_id
+            ))
+            yield self.identity_handler.bind_threepid(
+                threepid['threepid_creds'], user_id
+            )
+        else:
+            logger.info("bind_msisdn not specified: not binding msisdn")
 
     @defer.inlineCallbacks
     def _create_registration_details(self, user_id, params):
