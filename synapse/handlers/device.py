@@ -336,7 +336,7 @@ class DeviceListEduUpdater(object):
         self.clock = hs.get_clock()
         self.device_handler = device_handler
 
-        self._remote_edue_linearizer = Linearizer(name="remote_device_list")
+        self._remote_edu_linearizer = Linearizer(name="remote_device_list")
 
         # user_id -> list of updates waiting to be handled.
         self._pending_updates = {}
@@ -380,7 +380,7 @@ class DeviceListEduUpdater(object):
     def _handle_device_updates(self, user_id):
         "Actually handle pending updates."
 
-        with (yield self._remote_edue_linearizer.queue(user_id)):
+        with (yield self._remote_edu_linearizer.queue(user_id)):
             pending_updates = self._pending_updates.pop(user_id, [])
             if not pending_updates:
                 # This can happen since we batch updates
