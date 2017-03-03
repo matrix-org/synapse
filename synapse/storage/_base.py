@@ -488,7 +488,7 @@ class SQLBaseStore(object):
             " AND ".join("%s = ?" % (k,) for k in keyvalues)
         )
         sqlargs = values.values() + keyvalues.values()
-        logger.debug(
+        sql_logger.debug(
             "[SQL] %s Args=%s",
             sql, sqlargs,
         )
@@ -506,7 +506,7 @@ class SQLBaseStore(object):
                 ", ".join(k for k in allvalues),
                 ", ".join("?" for _ in allvalues)
             )
-            logger.debug(
+            sql_logger.debug(
                 "[SQL] %s Args=%s",
                 sql, keyvalues.values(),
             )
