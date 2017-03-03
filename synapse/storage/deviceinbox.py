@@ -31,10 +31,10 @@ class DeviceInboxStore(BackgroundUpdateStore):
         super(DeviceInboxStore, self).__init__(hs)
 
         self.register_background_index_update(
-            "device_lists_stream_idx",
-            index_name="device_lists_stream_user_id",
-            table="device_lists_stream",
-            columns=["user_id", "device_id"],
+            "device_inbox_stream_index",
+            index_name="device_inbox_stream_id_user_id",
+            table="device_inbox",
+            columns=["stream_id", "user_id"],
         )
 
         self.register_background_update_handler(

@@ -34,10 +34,10 @@ class DeviceStore(SQLBaseStore):
         )
 
         self.register_background_index_update(
-            "device_inbox_stream_index",
-            index_name="device_inbox_stream_id_user_id",
-            table="device_inbox",
-            columns=["stream_id", "user_id"],
+            "device_lists_stream_idx",
+            index_name="device_lists_stream_user_id",
+            table="device_lists_stream",
+            columns=["user_id", "device_id"],
         )
 
     @defer.inlineCallbacks
