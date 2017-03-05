@@ -1,0 +1,14 @@
+Why not SDK or twisted?
+====
+
+Learning experience and I don't like Twisted (Way to big for a simple task)
+
+Configuration
+====
+
+Is done in `config.py`, most of it should be self explanatory.
+
+How to run
+=====
+
+python run.py
