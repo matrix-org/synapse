@@ -28,7 +28,8 @@ class VoipRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request)
+        allowGuest = self.hs.config.turn_allow_guest
+        requester = yield self.auth.get_user_by_req(request, allowGuest)
 
         turnUris = self.hs.config.turn_uris
         turnSecret = self.hs.config.turn_shared_secret

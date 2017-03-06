@@ -83,12 +83,16 @@ Your home server configuration file needs the following extra keys:
     to refresh credentials. The TURN REST API specification recommends
     one day (86400000).
 
+ 4. "turn_allow_guest": If this is set to True, guest users are allowed 
+    to fetch the TURN server information. By default it is set to False. 
+
 As an example, here is the relevant section of the config file for
 matrix.org::
 
     turn_uris: [ "turn:turn.matrix.org:3478?transport=udp", "turn:turn.matrix.org:3478?transport=tcp" ]
     turn_shared_secret: n0t4ctuAllymatr1Xd0TorgSshar3d5ecret4obvIousreAsons
     turn_user_lifetime: 86400000
+    turn_allow_guest: False
 
 Now, restart synapse::
 
