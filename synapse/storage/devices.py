@@ -508,7 +508,7 @@ class DeviceStore(SQLBaseStore):
             defer.returnValue(set(changed))
 
         sql = """
-            SELECT user_id FROM device_lists_stream WHERE stream_id > ?
+            SELECT DISTINCT user_id FROM device_lists_stream WHERE stream_id > ?
         """
         rows = yield self._execute("get_user_whose_devices_changed", None, sql, from_key)
         defer.returnValue(set(row[0] for row in rows))
