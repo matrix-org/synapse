@@ -78,7 +78,7 @@ ROOM_FILTER_SCHEMA = {
         "timeline": {
             "$ref": "#/definitions/room_event_filter"
         },
-        "accpount_data": {
+        "account_data": {
             "$ref": "#/definitions/room_event_filter"
         },
     }
@@ -131,7 +131,7 @@ USER_ID_ARRAY_SCHEMA = {
     "type": "array",
     "items": {
         "type": "string",
-        "pattern": "^[A-Za-z0-9_]+:[A-Za-z0-9_-\.]+$"
+        "pattern": "^@[A-Za-z0-9_]+:[A-Za-z0-9_\-\.]+$"
     }
 }
 
@@ -155,9 +155,10 @@ USER_FILTER_SCHEMA = {
         "room": {
             "$ref": "#/definitions/room_filter"
         },
-        # "event_format": {
-        #     "type": { "enum": [ "client", "federation" ] }
-        # },
+        "event_format": {
+            "type": "string",
+            "enum": ["client", "federation"]
+        },
         "event_fields": {
             "type": "array",
             "items": {
