@@ -371,7 +371,7 @@ class RegisterRestServlet(RestServlet):
         reqd = ('medium', 'address', 'validated_at')
         if any(x not in threepid for x in reqd):
             logger.info("Can't add incomplete 3pid")
-            defer.returnValue()
+            return
 
         yield self.auth_handler.add_threepid(
             user_id,
@@ -447,9 +447,7 @@ class RegisterRestServlet(RestServlet):
 
         if bind_msisdn:
             logger.info("bind_msisdn specified: binding")
-            logger.debug("Binding msisdn %s to %s" % (
-                threepid, user_id
-            ))
+            logger.debug("Binding msisdn %s to %s", threepid, user_id)
             yield self.identity_handler.bind_threepid(
                 threepid['threepid_creds'], user_id
             )

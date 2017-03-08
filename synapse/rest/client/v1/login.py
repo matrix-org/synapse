@@ -66,7 +66,7 @@ def login_id_thirdparty_from_phone(identifier):
     """
     Convert a phone login identifier type to a generic threepid identifier
     Args:
-        identifier: Login identifier dict of type 'm.id.phone'
+        identifier(dict): Login identifier dict of type 'm.id.phone'
 
     Returns: Login identifier dict of type 'm.id.threepid'
     """
