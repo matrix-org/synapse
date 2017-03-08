@@ -17,6 +17,7 @@
 import phonenumbers
 from synapse.api.errors import SynapseError
 
+
 def phone_number_to_msisdn(country, number):
     try:
         phoneNumber = phonenumbers.parse(number, country)

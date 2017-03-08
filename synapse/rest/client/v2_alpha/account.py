@@ -72,7 +72,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_request(body,[
+        assert_params_in_request(body, [
             'id_server', 'client_secret',
             'country', 'phone_number', 'send_attempt',
         ])
