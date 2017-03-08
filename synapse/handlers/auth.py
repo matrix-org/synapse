@@ -344,7 +344,7 @@ class AuthHandler(BaseHandler):
                     medium, threepid['medium'],
                 ),
                 errcode=Codes.UNAUTHORIZED
-             )
+            )
 
         threepid['threepid_creds'] = authdict['threepid_creds']
 

@@ -80,7 +80,7 @@ def login_id_thirdparty_from_phone(identifier):
     except phonenumbers.NumberParseException:
         raise SynapseError(400, "Unable to parse phone number")
     msisdn = phonenumbers.format_number(
-            phoneNumber, phonenumbers.PhoneNumberFormat.E164
+        phoneNumber, phonenumbers.PhoneNumberFormat.E164
     )[1:]
 
     return {
@@ -188,7 +188,7 @@ class LoginRestServlet(ClientV1RestServlet):
 
         # convert threepid identifiers to user IDs
         if identifier["type"] == "m.id.thirdparty":
-            if not 'medium' in identifier or not 'address' in identifier:
+            if 'medium' not in identifier or 'address' not in identifier:
                 raise SynapseError(400, "Invalid thirdparty identifier")
 
             address = identifier['address']
@@ -198,7 +198,7 @@ class LoginRestServlet(ClientV1RestServlet):
                 # (See add_threepid in synapse/handlers/auth.py)
                 address = address.lower()
             user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
-                    identifier['medium'], address
+                identifier['medium'], address
             )
             if not user_id:
                 raise LoginError(403, "", errcode=Codes.FORBIDDEN)

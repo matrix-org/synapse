@@ -116,7 +116,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         except phonenumbers.NumberParseException:
             raise SynapseError(400, "Unable to parse phone number")
         msisdn = phonenumbers.format_number(
-                phoneNumber, phonenumbers.PhoneNumberFormat.E164
+            phoneNumber, phonenumbers.PhoneNumberFormat.E164
         )[1:]
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
