@@ -262,7 +262,7 @@ class RegisterRestServlet(RestServlet):
                 "Already registered user ID %r for this session",
                 registered_user_id
             )
-            # don't re-register the email address
+            # don't re-register the threepids
             add_email = False
             add_msisdn = False
         else:
@@ -420,7 +420,7 @@ class RegisterRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def _register_msisdn_threepid(self, user_id, threepid, token, bind_msisdn):
-        """Add aphone number as a 3pid identifier
+        """Add a phone number as a 3pid identifier
 
         Also optionally binds msisdn to the given user_id on the identity server
 
