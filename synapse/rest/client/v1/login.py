@@ -43,7 +43,6 @@ def login_submission_legacy_convert(submission):
     If the input login submission is an old style object
     (ie. with top-level user / medium / address) convert it
     to a typed object.
-    Returns: Typed-object style login identifier
     """
     if "user" in submission:
         submission["identifier"] = {
