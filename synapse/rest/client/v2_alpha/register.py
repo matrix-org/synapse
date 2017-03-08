@@ -107,7 +107,9 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         )
 
         if existingUid is not None:
-            raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
+            raise SynapseError(
+                400, "Phone number is already in use", Codes.THREEPID_IN_USE
+            )
 
         ret = yield self.identity_handler.requestMsisdnToken(**body)
         defer.returnValue((200, ret))
