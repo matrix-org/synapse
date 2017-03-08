@@ -20,7 +20,9 @@ import synapse
 from synapse.api.auth import get_access_token_from_request, has_access_token
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.http.servlet import (
+    RestServlet, parse_json_object_from_request, assert_params_in_request
+)
 from synapse.util.msisdn import phone_number_to_msisdn
 
 from ._base import client_v2_patterns
@@ -61,14 +63,9 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        required = ['id_server', 'client_secret', 'email', 'send_attempt']
-        absent = []
-        for k in required:
-            if k not in body:
-                absent.append(k)
-
-        if len(absent) > 0:
-            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+        assert_params_in_request(body, [
+            'id_server', 'client_secret', 'email', 'send_attempt'
+        ])
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'email', body['email']
@@ -97,18 +94,11 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        required = [
+        assert_params_in_request(body, [
             'id_server', 'client_secret',
             'country', 'phone_number',
             'send_attempt',
-        ]
-        absent = []
-        for k in required:
-            if k not in body:
-                absent.append(k)
-
-        if len(absent) > 0:
-            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+        ])
 
         msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
 
