@@ -18,6 +18,19 @@ from synapse.api.errors import SynapseError
 
 
 def phone_number_to_msisdn(country, number):
+    """
+    Takes an ISO-3166-1 2 letter country code and phone number and
+    returns an msisdn representing the canonical version of that
+    phone number.
+    Args:
+        country (str): ISO-3166-1 2 letter country code
+        number (str): Phone number in a national or international format
+
+    Returns:
+        (str) The canonical form of the phone number, as an msisdn
+    Raises:
+            SynapseError if the number could not be parsed.
+    """
     try:
         phoneNumber = phonenumbers.parse(number, country)
     except phonenumbers.NumberParseException:
