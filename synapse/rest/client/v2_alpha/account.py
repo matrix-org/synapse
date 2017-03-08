@@ -65,6 +65,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
     def __init__(self, hs):
         super(MsisdnPasswordRequestTokenRestServlet, self).__init__()
         self.hs = hs
+        self.datastore = self.hs.get_datastore()
         self.identity_handler = hs.get_handlers().identity_handler
 
     @defer.inlineCallbacks
@@ -78,7 +79,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
 
         msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
 
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existingUid = yield self.datastore.get_user_id_by_threepid(
             'msisdn', msisdn
         )
 
@@ -97,6 +98,7 @@ class PasswordRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
+        self.datastore = self.hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -132,7 +134,7 @@ class PasswordRestServlet(RestServlet):
                 # (See add_threepid in synapse/handlers/auth.py)
                 threepid['address'] = threepid['address'].lower()
             # if using email, we must know about the email they're authing with!
-            threepid_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
+            threepid_user_id = yield self.datastore.get_user_id_by_threepid(
                 threepid['medium'], threepid['address']
             )
             if not threepid_user_id:
@@ -206,6 +208,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         self.hs = hs
         super(EmailThreepidRequestTokenRestServlet, self).__init__()
         self.identity_handler = hs.get_handlers().identity_handler
+        self.datastore = self.hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -220,7 +223,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         if absent:
             raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
 
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existingUid = yield self.datastore.get_user_id_by_threepid(
             'email', body['email']
         )
 
@@ -238,6 +241,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         self.hs = hs
         super(MsisdnThreepidRequestTokenRestServlet, self).__init__()
         self.identity_handler = hs.get_handlers().identity_handler
+        self.datastore = self.hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -257,7 +261,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
 
         msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
 
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existingUid = yield self.datastore.get_user_id_by_threepid(
             'msisdn', msisdn
         )
 
@@ -277,6 +281,7 @@ class ThreepidRestServlet(RestServlet):
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
+        self.datastore = self.hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -284,7 +289,7 @@ class ThreepidRestServlet(RestServlet):
 
         requester = yield self.auth.get_user_by_req(request)
 
-        threepids = yield self.hs.get_datastore().user_get_threepids(
+        threepids = yield self.datastore.user_get_threepids(
             requester.user.to_string()
         )
 
