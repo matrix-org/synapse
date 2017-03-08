@@ -1,3 +1,35 @@
+Changes in synapse v0.19.3-rc1 (2017-03-08)
+===========================================
+
+Features:
+
+* Add some administration functionalities. Thanks to morteza-araby! (PR #1784)
+
+
+Changes:
+
+* Reduce database table sizes (PR #1873, #1916, #1923, #1963)
+* Update contrib/ to not use syutil. Thanks to andrewshadura! (PR #1907)
+* Don't fetch current state when sending an event in common case (PR #1955)
+
+
+Bug fixes:
+
+* Fix synapse_port_db failure. Thanks to Pneumaticat! (PR #1904)
+* Fix caching to not cache error responses (PR #1913)
+* Fix APIs to make kick & ban reasons work (PR #1917)
+* Fix bugs in the /keys/changes api (PR #1921)
+* Fix bug where users couldn't forget rooms they were banned from (PR #1922)
+* Fix issue with long language values in pushers API (PR #1925)
+* Fix a race in transaction queue (PR #1930)
+* Fix dynamic thumbnailing to preserve aspect ratio. Thanks to jkolo! (PR
+#1945)
+* Fix device list update to not constantly resync (PR #1964)
+* Fix potential for huge memory usage when getting device that have
+  changed (PR #1969)
+
+
+
 Changes in synapse v0.19.2 (2017-02-20)
 =======================================
 
