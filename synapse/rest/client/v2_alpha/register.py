@@ -21,12 +21,12 @@ from synapse.api.auth import get_access_token_from_request, has_access_token
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.util.msisdn import phone_number_to_msisdn
 
 from ._base import client_v2_patterns
 
 import logging
 import hmac
-import phonenumbers
 from hashlib import sha1
 from synapse.util.async import run_on_reactor
 
@@ -110,14 +110,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         if len(absent) > 0:
             raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
 
-        phoneNumber = None
-        try:
-            phoneNumber = phonenumbers.parse(body['phone_number'], body['country'])
-        except phonenumbers.NumberParseException:
-            raise SynapseError(400, "Unable to parse phone number")
-        msisdn = phonenumbers.format_number(
-            phoneNumber, phonenumbers.PhoneNumberFormat.E164
-        )[1:]
+        msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'msisdn', msisdn

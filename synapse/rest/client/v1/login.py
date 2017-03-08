@@ -19,13 +19,13 @@ from synapse.api.errors import SynapseError, LoginError, Codes
 from synapse.types import UserID
 from synapse.http.server import finish_request
 from synapse.http.servlet import parse_json_object_from_request
+from synapse.util.msisdn import phone_number_to_msisdn
 
 from .base import ClientV1RestServlet, client_path_patterns
 
 import simplejson as json
 import urllib
 import urlparse
-import phonenumbers
 
 import logging
 from saml2 import BINDING_HTTP_POST
@@ -61,8 +61,6 @@ def login_submission_legacy_convert(submission):
         del submission["medium"]
         del submission["address"]
 
-    return submission
-
 
 def login_id_thirdparty_from_phone(identifier):
     """
@@ -74,14 +72,8 @@ def login_id_thirdparty_from_phone(identifier):
     """
     if "country" not in identifier or "number" not in identifier:
         raise SynapseError(400, "Invalid phone-type identifier")
-    phoneNumber = None
-    try:
-        phoneNumber = phonenumbers.parse(identifier["number"], identifier["country"])
-    except phonenumbers.NumberParseException:
-        raise SynapseError(400, "Unable to parse phone number")
-    msisdn = phonenumbers.format_number(
-        phoneNumber, phonenumbers.PhoneNumberFormat.E164
-    )[1:]
+
+    msisdn = phone_number_to_msisdn(identifier["country"], identifier["number"])
 
     return {
         "type": "m.id.thirdparty",
@@ -173,7 +165,7 @@ class LoginRestServlet(ClientV1RestServlet):
         if "password" not in login_submission:
             raise SynapseError(400, "Missing parameter: password")
 
-        login_submission = login_submission_legacy_convert(login_submission)
+        login_submission_legacy_convert(login_submission)
 
         if "identifier" not in login_submission:
             raise SynapseError(400, "Missing param: identifier")
@@ -182,7 +174,7 @@ class LoginRestServlet(ClientV1RestServlet):
         if "type" not in identifier:
             raise SynapseError(400, "Login identifier has no type")
 
-        # convert phone type identifiers to geberic threepids
+        # convert phone type identifiers to generic threepids
         if identifier["type"] == "m.id.phone":
             identifier = login_id_thirdparty_from_phone(identifier)
 

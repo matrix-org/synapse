@@ -321,7 +321,7 @@ class AuthHandler(BaseHandler):
         defer.returnValue(True)
 
     @defer.inlineCallbacks
-    def _check_threepid(self, medium, authdict, ):
+    def _check_threepid(self, medium, authdict):
         yield run_on_reactor()
 
         if 'threepid_creds' not in authdict:

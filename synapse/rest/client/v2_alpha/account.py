@@ -20,12 +20,11 @@ from synapse.api.constants import LoginType
 from synapse.api.errors import LoginError, SynapseError, Codes
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.util.async import run_on_reactor
+from synapse.util.msisdn import phone_number_to_msisdn
 
 from ._base import client_v2_patterns
 
 import logging
-
-import phonenumbers
 
 
 logger = logging.getLogger(__name__)
@@ -87,14 +86,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
         if absent:
             raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
 
-        phoneNumber = None
-        try:
-            phoneNumber = phonenumbers.parse(body['phone_number'], body['country'])
-        except phonenumbers.NumberParseException:
-            raise SynapseError(400, "Unable to parse phone number")
-        msisdn = phonenumbers.format_number(
-            phoneNumber, phonenumbers.PhoneNumberFormat.E164
-        )[1:]
+        msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'msisdn', msisdn
@@ -273,14 +265,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         if absent:
             raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
 
-        phoneNumber = None
-        try:
-            phoneNumber = phonenumbers.parse(body['phone_number'], body['country'])
-        except phonenumbers.NumberParseException:
-            raise SynapseError(400, "Unable to parse phone number")
-        msisdn = phonenumbers.format_number(
-            phoneNumber, phonenumbers.PhoneNumberFormat.E164
-        )[1:]
+        msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'msisdn', msisdn
