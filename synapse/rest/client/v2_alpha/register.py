@@ -372,6 +372,7 @@ class RegisterRestServlet(RestServlet):
         """
         reqd = ('medium', 'address', 'validated_at')
         if any(x not in threepid for x in reqd):
+            # This will only happen if the ID server returns a malformed response
             logger.info("Can't add incomplete 3pid")
             return
 
@@ -437,6 +438,7 @@ class RegisterRestServlet(RestServlet):
         """
         reqd = ('medium', 'address', 'validated_at')
         if any(x not in threepid for x in reqd):
+            # This will only happen if the ID server returns a malformed response
             logger.info("Can't add incomplete 3pid")
             defer.returnValue()
 
