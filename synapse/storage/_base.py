@@ -488,10 +488,6 @@ class SQLBaseStore(object):
             " AND ".join("%s = ?" % (k,) for k in keyvalues)
         )
         sqlargs = values.values() + keyvalues.values()
-        logger.debug(
-            "[SQL] %s Args=%s",
-            sql, sqlargs,
-        )
 
         txn.execute(sql, sqlargs)
         if txn.rowcount == 0:
@@ -505,10 +501,6 @@ class SQLBaseStore(object):
                 table,
                 ", ".join(k for k in allvalues),
                 ", ".join("?" for _ in allvalues)
-            )
-            logger.debug(
-                "[SQL] %s Args=%s",
-                sql, keyvalues.values(),
             )
             txn.execute(sql, allvalues.values())
 

@@ -8,6 +8,8 @@ export WORKSPACE
 export PYTHONDONTWRITEBYTECODE=yep
 export SYNAPSE_CACHE_FACTOR=1
 
+export HAPROXY_BIN=/home/haproxy/haproxy-1.6.11/haproxy
+
 ./jenkins/prepare_synapse.sh
 ./jenkins/clone.sh sytest https://github.com/matrix-org/sytest.git
 ./jenkins/clone.sh dendron https://github.com/matrix-org/dendron.git
@@ -17,3 +19,4 @@ export SYNAPSE_CACHE_FACTOR=1
 ./sytest/jenkins/install_and_run.sh \
     --synapse-directory $WORKSPACE \
     --dendron $WORKSPACE/dendron/bin/dendron \
+    --haproxy \

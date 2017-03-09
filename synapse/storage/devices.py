@@ -33,6 +33,13 @@ class DeviceStore(SQLBaseStore):
             self._prune_old_outbound_device_pokes, 60 * 60 * 1000
         )
 
+        self.register_background_index_update(
+            "device_lists_stream_idx",
+            index_name="device_lists_stream_user_id",
+            table="device_lists_stream",
+            columns=["user_id", "device_id"],
+        )
+
     @defer.inlineCallbacks
     def store_device(self, user_id, device_id,
                      initial_device_display_name):
@@ -501,7 +508,7 @@ class DeviceStore(SQLBaseStore):
             defer.returnValue(set(changed))
 
         sql = """
-            SELECT user_id FROM device_lists_stream WHERE stream_id > ?
+            SELECT DISTINCT user_id FROM device_lists_stream WHERE stream_id > ?
         """
         rows = yield self._execute("get_user_whose_devices_changed", None, sql, from_key)
         defer.returnValue(set(row[0] for row in rows))
@@ -545,6 +552,16 @@ class DeviceStore(SQLBaseStore):
                 self._device_list_federation_stream_cache.entity_has_changed,
                 host, stream_id,
             )
+
+        # Delete older entries in the table, as we really only care about
+        # when the latest change happened.
+        txn.executemany(
+            """
+            DELETE FROM device_lists_stream
+            WHERE user_id = ? AND device_id = ? AND stream_id < ?
+            """,
+            [(user_id, device_id, stream_id) for device_id in device_ids]
+        )
 
         self._simple_insert_many_txn(
             txn,
