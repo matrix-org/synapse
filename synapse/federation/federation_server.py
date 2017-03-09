@@ -165,7 +165,7 @@ class FederationServer(FederationBase):
                     )
 
             try:
-                yield self._handle_new_pdu(transaction.origin, pdu)
+                yield self._handle_received_pdu(transaction.origin, pdu)
                 results.append({})
             except FederationError as e:
                 self.send_failure(e, transaction.origin)
@@ -497,8 +497,43 @@ class FederationServer(FederationBase):
         )
 
     @defer.inlineCallbacks
+    def _handle_received_pdu(self, origin, pdu):
+        """ Process a PDU received in a federation /send/ transaction.
+
+        Args:
+            origin (str): server which sent the pdu
+            pdu (FrozenEvent): received pdu
+
+        Returns (Deferred): completes with None
+        Raises: FederationError if the signatures / hash do not match
+    """
+        # Check signature.
+        try:
+            pdu = yield self._check_sigs_and_hash(pdu)
+        except SynapseError as e:
+            raise FederationError(
+                "ERROR",
+                e.code,
+                e.msg,
+                affected=pdu.event_id,
+            )
+
+        yield self._handle_new_pdu(origin, pdu, get_missing=True)
+
+    @defer.inlineCallbacks
     @log_function
     def _handle_new_pdu(self, origin, pdu, get_missing=True):
+        """ Process a PDU received via a federation /send/ transaction, or
+        via backfill of missing prev_events
+
+        Args:
+            origin (str): server which initiated the /send/ transaction. Will
+                be used to fetch missing events or state.
+            pdu (FrozenEvent): received PDU
+            get_missing (bool): True if we should fetch missing prev_events
+
+        Returns (Deferred): completes with None
+        """
 
         # We reprocess pdus when we have seen them only as outliers
         existing = yield self._get_persisted_pdu(
@@ -517,17 +552,6 @@ class FederationServer(FederationBase):
         if already_seen:
             logger.debug("Already seen pdu %s", pdu.event_id)
             return
-
-        # Check signature.
-        try:
-            pdu = yield self._check_sigs_and_hash(pdu)
-        except SynapseError as e:
-            raise FederationError(
-                "ERROR",
-                e.code,
-                e.msg,
-                affected=pdu.event_id,
-            )
 
         state = None
 
