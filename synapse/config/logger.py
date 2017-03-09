@@ -153,14 +153,6 @@ def setup_logging(log_config=None, log_file=None, verbosity=None):
                 logger.info("Closing log file due to SIGHUP")
                 handler.doRollover()
                 logger.info("Opened new log file due to SIGHUP")
-
-            # TODO(paul): obviously this is a terrible mechanism for
-            #   stealing SIGHUP, because it means no other part of synapse
-            #   can use it instead. If we want to catch SIGHUP anywhere
-            #   else as well, I'd suggest we find a nicer way to broadcast
-            #   it around.
-            if getattr(signal, "SIGHUP"):
-                signal.signal(signal.SIGHUP, sighup)
         else:
             handler = logging.StreamHandler()
         handler.setFormatter(formatter)
@@ -169,8 +161,25 @@ def setup_logging(log_config=None, log_file=None, verbosity=None):
 
         logger.addHandler(handler)
     else:
-        with open(log_config, 'r') as f:
-            logging.config.dictConfig(yaml.load(f))
+        def load_log_config():
+            with open(log_config, 'r') as f:
+                logging.config.dictConfig(yaml.load(f))
+
+        def sighup(signum, stack):
+            # it might be better to use a file watcher or something for this.
+            logging.info("Reloading log config from %s due to SIGHUP",
+                         log_config)
+            load_log_config()
+
+        load_log_config()
+
+    # TODO(paul): obviously this is a terrible mechanism for
+    #   stealing SIGHUP, because it means no other part of synapse
+    #   can use it instead. If we want to catch SIGHUP anywhere
+    #   else as well, I'd suggest we find a nicer way to broadcast
+    #   it around.
+    if getattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, sighup)
 
     # It's critical to point twisted's internal logging somewhere, otherwise it
     # stacks up and leaks kup to 64K object;
