@@ -118,11 +118,22 @@ class LoggingConfig(Config):
                     DEFAULT_LOG_CONFIG.substitute(log_file=config["log_file"])
                 )
 
-    def setup_logging(self):
-        setup_logging(self.log_config, self.log_file, self.verbosity)
 
+def setup_logging(config, use_worker_options=False):
+    """ Set up python logging
 
-def setup_logging(log_config=None, log_file=None, verbosity=None):
+    Args:
+        config (LoggingConfig | synapse.config.workers.WorkerConfig):
+            configuration data
+
+        use_worker_options (bool): True to use 'worker_log_config' and
+            'worker_log_file' options instead of 'log_config' and 'log_file'.
+    """
+    log_config = (config.worker_log_config if use_worker_options
+                  else config.log_config)
+    log_file = (config.worker_log_file if use_worker_options
+                else config.log_file)
+
     log_format = (
         "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
         " - %(message)s"
@@ -131,9 +142,9 @@ def setup_logging(log_config=None, log_file=None, verbosity=None):
 
         level = logging.INFO
         level_for_storage = logging.INFO
-        if verbosity:
+        if config.verbosity:
             level = logging.DEBUG
-            if verbosity > 1:
+            if config.verbosity > 1:
                 level_for_storage = logging.DEBUG
 
         # FIXME: we need a logging.WARN for a -q quiet option
