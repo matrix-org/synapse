@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached, cachedList
+from synapse.util.caches.descriptors import cached, cachedList, cachedInlineCallbacks
 from synapse.util.caches import intern_string
 from synapse.storage.engines import PostgresEngine
 
@@ -68,6 +68,18 @@ class StateStore(SQLBaseStore):
             columns=["state_key"],
             where_clause="type='m.room.member'",
         )
+
+    @cachedInlineCallbacks(max_entries=100000, iterable=True)
+    def get_current_state_ids(self, room_id):
+        rows = yield self._simple_select_list(
+            table="current_state_events",
+            keyvalues={"room_id": room_id},
+            retcols=["event_id", "type", "state_key"],
+            desc="_calculate_state_delta",
+        )
+        defer.returnValue({
+            (r["type"], r["state_key"]): r["event_id"] for r in rows
+        })
 
     @defer.inlineCallbacks
     def get_state_groups_ids(self, room_id, event_ids):
