@@ -68,6 +68,7 @@ class LoggingConfig(Config):
 
     def read_config(self, config):
         self.verbosity = config.get("verbose", 0)
+        self.no_redirect_stdio = config.get("no_redirect_stdio", False)
         self.log_config = self.abspath(config.get("log_config"))
         self.log_file = self.abspath(config.get("log_file"))
 
@@ -90,6 +91,8 @@ class LoggingConfig(Config):
     def read_arguments(self, args):
         if args.verbose is not None:
             self.verbosity = args.verbose
+        if args.no_redirect_stdio is not None:
+            self.no_redirect_stdio = args.no_redirect_stdio
         if args.log_config is not None:
             self.log_config = args.log_config
         if args.log_file is not None:
@@ -108,6 +111,11 @@ class LoggingConfig(Config):
         logging_group.add_argument(
             '--log-config', dest="log_config", default=None,
             help="Python logging config file"
+        )
+        logging_group.add_argument(
+            '-n', '--no-redirect-stdio',
+            action='store_true', default=None,
+            help="Do not redirect stdout/stderr to the log"
         )
 
     def generate_files(self, config):
@@ -194,4 +202,7 @@ def setup_logging(config, use_worker_options=False):
     #
     # However this may not be too much of a problem if we are just writing to a file.
     observer = STDLibLogObserver()
-    globalLogBeginner.beginLoggingTo([observer])
+    globalLogBeginner.beginLoggingTo(
+        [observer],
+        redirectStandardIO=not config.no_redirect_stdio,
+    )
