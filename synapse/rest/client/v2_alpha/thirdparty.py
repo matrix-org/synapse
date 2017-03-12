@@ -36,8 +36,6 @@ class ThirdPartyProtocolsServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        yield self.auth.get_user_by_req(request)
-
         protocols = yield self.appservice_handler.get_3pe_protocols()
         defer.returnValue((200, protocols))
 
@@ -54,8 +52,6 @@ class ThirdPartyProtocolServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, protocol):
-        yield self.auth.get_user_by_req(request)
-
         protocols = yield self.appservice_handler.get_3pe_protocols(
             only_protocol=protocol,
         )
@@ -77,8 +73,6 @@ class ThirdPartyUserServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, protocol):
-        yield self.auth.get_user_by_req(request)
-
         fields = request.args
         fields.pop("access_token", None)
 
@@ -101,8 +95,6 @@ class ThirdPartyLocationServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, protocol):
-        yield self.auth.get_user_by_req(request)
-
         fields = request.args
         fields.pop("access_token", None)
 
