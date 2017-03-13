@@ -3,7 +3,7 @@ Changes in synapse v0.19.3-rc1 (2017-03-08)
 
 Features:
 
-* Add some administration functions. Thanks to morteza-araby! (PR #1784)
+* Add some administration functionalities. Thanks to morteza-araby! (PR #1784)
 
 
 Changes:
