@@ -45,7 +45,6 @@ handlers:
     maxBytes: 104857600
     backupCount: 10
     filters: [context]
-    level: INFO
   console:
     class: logging.StreamHandler
     formatter: precise
@@ -56,6 +55,8 @@ loggers:
         level: INFO
 
     synapse.storage.SQL:
+        # beware: increasing this to DEBUG will make synapse log sensitive
+        # information such as access tokens.
         level: INFO
 
 root:
@@ -78,10 +79,10 @@ class LoggingConfig(Config):
             os.path.join(config_dir_path, server_name + ".log.config")
         )
         return """
-        # Logging verbosity level.
+        # Logging verbosity level. Ignored if log_config is specified.
         verbose: 0
 
-        # File to write logging to
+        # File to write logging to. Ignored if log_config is specified.
         log_file: "%(log_file)s"
 
         # A yaml python logging config file
@@ -102,11 +103,12 @@ class LoggingConfig(Config):
         logging_group = parser.add_argument_group("logging")
         logging_group.add_argument(
             '-v', '--verbose', dest="verbose", action='count',
-            help="The verbosity level."
+            help="The verbosity level. Specify multiple times to increase "
+            "verbosity. (Ignored if --log-config is specified.)"
         )
         logging_group.add_argument(
             '-f', '--log-file', dest="log_file",
-            help="File to log to."
+            help="File to log to. (Ignored if --log-config is specified.)"
         )
         logging_group.add_argument(
             '--log-config', dest="log_config", default=None,
