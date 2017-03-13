@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,7 +44,6 @@ class JoinRules(object):
 class LoginType(object):
     PASSWORD = u"m.login.password"
     EMAIL_IDENTITY = u"m.login.email.identity"
-    MSISDN = u"m.login.msisdn"
     RECAPTCHA = u"m.login.recaptcha"
     DUMMY = u"m.login.dummy"
 
