@@ -236,20 +236,38 @@ class RegisterRestServlet(RestServlet):
                 assigned_user_id=registered_user_id,
             )
 
+        # Only give msisdn flows if the x_show_msisdn flag is given:
+        # this is a hack to work around the fact that clients were shipped
+        # that use fallback registration if they see any flows that they don't
+        # recognise, which means we break registration for these clients if we
+        # advertise msisdn flows. Once usage of Riot iOS <=0.3.9 and Riot
+        # Android <=0.6.9 have fallen below an acceptable threshold, this
+        # parameter should go away and we should always advertise msisdn flows.
+        show_msisdn = False
+        print body
+        if 'x_show_msisdn' in body and body['x_show_msisdn']:
+            show_msisdn = True
+
         if self.hs.config.enable_registration_captcha:
             flows = [
                 [LoginType.RECAPTCHA],
                 [LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
-                [LoginType.MSISDN, LoginType.RECAPTCHA],
-                [LoginType.EMAIL_IDENTITY, LoginType.MSISDN, LoginType.RECAPTCHA],
             ]
+            if show_msisdn:
+                flows += [
+                    [LoginType.MSISDN, LoginType.RECAPTCHA],
+                    [LoginType.MSISDN, LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
+                ]
         else:
             flows = [
                 [LoginType.DUMMY],
                 [LoginType.EMAIL_IDENTITY],
-                [LoginType.MSISDN],
-                [LoginType.EMAIL_IDENTITY, LoginType.MSISDN],
             ]
+            if show_msisdn:
+                flows += [
+                    [LoginType.MSISDN],
+                    [LoginType.MSISDN, LoginType.EMAIL_IDENTITY],
+                ]
 
         authed, auth_result, params, session_id = yield self.auth_handler.check_auth(
             flows, body, self.hs.get_ip_from_request(request)
