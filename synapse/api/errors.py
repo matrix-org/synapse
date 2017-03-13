@@ -15,6 +15,7 @@
 
 """Contains exceptions and error codes."""
 
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -50,12 +51,15 @@ class Codes(object):
 
 
 class CodeMessageException(RuntimeError):
-    """An exception with integer code and message string attributes."""
+    """An exception with integer code and message string attributes.
 
-    def __init__(self, code, msg):
-        super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
+    Attributes:
+        code (int): HTTP error code
+        response_code_message (str): HTTP reason phrase. None for the default.
+    """
+    def __init__(self, code):
+        super(CodeMessageException, self).__init__("%d" % code)
         self.code = code
-        self.msg = msg
         self.response_code_message = None
 
     def error_dict(self):
@@ -70,16 +74,43 @@ class SynapseError(CodeMessageException):
         Args:
             code (int): The integer error code (an HTTP response code)
             msg (str): The human-readable error message.
-            err (str): The error code e.g 'M_FORBIDDEN'
+            errcode (str): The synapse error code e.g 'M_FORBIDDEN'
         """
-        super(SynapseError, self).__init__(code, msg)
+        super(SynapseError, self).__init__(code)
+        self.msg = msg
         self.errcode = errcode
+
+    def __str__(self):
+        return "%d: %s %s" % (self.code, self.errcode, self.msg)
 
     def error_dict(self):
         return cs_error(
             self.msg,
             self.errcode,
         )
+
+    @classmethod
+    def from_http_response_exception(cls, err):
+        """Make a SynapseError based on an HTTPResponseException
+
+        Args:
+            err (HttpResponseException):
+
+        Returns:
+            SynapseError:
+        """
+        # try to parse the body as json, to get better errcode/msg, but
+        # default to M_UNKNOWN with the HTTP status as the error text
+        try:
+            j = json.loads(err.response)
+        except ValueError:
+            j = {}
+        errcode = j.get('errcode', Codes.UNKNOWN)
+        errmsg = j.get('error', err.response_code_message)
+
+        res = SynapseError(err.code, errmsg, errcode)
+        res.response_code_message = err.response_code_message
+        return res
 
 
 class RegistrationError(SynapseError):
@@ -243,6 +274,20 @@ class FederationError(RuntimeError):
 
 
 class HttpResponseException(CodeMessageException):
+    """
+    Represents an HTTP-level failure of an outbound request
+
+    Attributes:
+        response (str): body of response
+    """
     def __init__(self, code, msg, response):
+        """
+
+        Args:
+            code (int): HTTP status code
+            msg (str): reason phrase from HTTP response status line
+            response (str): body of response
+        """
+        super(HttpResponseException, self).__init__(code)
+        self.response_code_message = msg
         self.response = response
-        super(HttpResponseException, self).__init__(code, msg)

@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import twisted.internet.error
 
 from .upload_resource import UploadResource
 from .download_resource import DownloadResource
@@ -26,7 +27,8 @@ from .thumbnailer import Thumbnailer
 
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.util.stringutils import random_string
-from synapse.api.errors import SynapseError
+from synapse.api.errors import SynapseError, HttpResponseException, \
+    NotFoundError
 
 from twisted.internet import defer, threads
 
@@ -157,11 +159,31 @@ class MediaRepository(object):
                 try:
                     length, headers = yield self.client.get_file(
                         server_name, request_path, output_stream=f,
-                        max_size=self.max_upload_size,
+                        max_size=self.max_upload_size, args={
+                            # tell the remote server to 404 if it doesn't
+                            # recognise the server_name, to make sure we don't
+                            # end up with a routing loop.
+                            "allow_remote": "false",
+                        }
                     )
+                except twisted.internet.error.DNSLookupError as e:
+                    logger.warn("HTTP error fetching remote media %s/%s: %r",
+                                server_name, media_id, e)
+                    raise NotFoundError()
+
+                except HttpResponseException as e:
+                    logger.warn("HTTP error fetching remote media %s/%s: %s",
+                                server_name, media_id, e.response)
+                    raise SynapseError.from_http_response_exception(e)
+
                 except Exception as e:
-                    logger.warn("Failed to fetch remoted media %r", e)
-                    raise SynapseError(502, "Failed to fetch remoted media")
+                    logger.warn("Failed to fetch remote media %s/%s",
+                                server_name, media_id,
+                                exc_info=True)
+                    if isinstance(e, SynapseError):
+                        raise e
+                    else:
+                        raise SynapseError(502, "Failed to fetch remote media")
 
             media_type = headers["Content-Type"][0]
             time_now_ms = self.clock.time_msec()
