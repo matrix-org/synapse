@@ -120,6 +120,13 @@ class RoomListHandler(BaseHandler):
 
         @defer.inlineCallbacks
         def get_order_for_room(room_id):
+            # Most of the rooms won't have changed between the since token and
+            # now (especially if the since token is "now"). So, we can ask what
+            # the current users are in a room (that will hit a cache) and then
+            # check if the room has changed since the since token. (We have to
+            # do it in that order to avoid races).
+            # If things have changed then fall back to getting the current state
+            # at the since token.
             joined_users = yield self.store.get_users_in_room(room_id)
             if self.store.has_room_changed_since(room_id, stream_token):
                 latest_event_ids = yield self.store.get_forward_extremeties_for_room(
@@ -262,6 +269,9 @@ class RoomListHandler(BaseHandler):
     @defer.inlineCallbacks
     def _append_room_entry_to_chunk(self, room_id, num_joined_users, chunk, limit,
                                     search_filter):
+        """Generate the entry for a room in the public room list and append it
+        to the `chunk` if it matches the search filter
+        """
         if limit and len(chunk) > limit + 1:
             # We've already got enough, so lets just drop it.
             return
@@ -273,6 +283,8 @@ class RoomListHandler(BaseHandler):
 
     @cachedInlineCallbacks(num_args=1, cache_context=True)
     def _generate_room_entry(self, room_id, num_joined_users, cache_context):
+        """Returns the entry for a room
+        """
         result = {
             "room_id": room_id,
             "num_joined_members": num_joined_users,
