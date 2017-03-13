@@ -100,6 +100,13 @@ class ExpiringCache(object):
         except KeyError:
             return default
 
+    def setdefault(self, key, value):
+        try:
+            return self[key]
+        except KeyError:
+            self[key] = value
+            return value
+
     def _prune_cache(self):
         if not self._expiry_ms:
             # zero expiry time means don't expire. This should never get called

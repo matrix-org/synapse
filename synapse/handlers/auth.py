@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
-# Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,7 +47,6 @@ class AuthHandler(BaseHandler):
             LoginType.PASSWORD: self._check_password_auth,
             LoginType.RECAPTCHA: self._check_recaptcha,
             LoginType.EMAIL_IDENTITY: self._check_email_identity,
-            LoginType.MSISDN: self._check_msisdn,
             LoginType.DUMMY: self._check_dummy_auth,
         }
         self.bcrypt_rounds = hs.config.bcrypt_rounds
@@ -309,46 +307,30 @@ class AuthHandler(BaseHandler):
                 defer.returnValue(True)
         raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
 
+    @defer.inlineCallbacks
     def _check_email_identity(self, authdict, _):
-        return self._check_threepid('email', authdict)
-
-    def _check_msisdn(self, authdict, _):
-        return self._check_threepid('msisdn', authdict)
-
-    @defer.inlineCallbacks
-    def _check_dummy_auth(self, authdict, _):
-        yield run_on_reactor()
-        defer.returnValue(True)
-
-    @defer.inlineCallbacks
-    def _check_threepid(self, medium, authdict):
         yield run_on_reactor()
 
         if 'threepid_creds' not in authdict:
             raise LoginError(400, "Missing threepid_creds", Codes.MISSING_PARAM)
 
         threepid_creds = authdict['threepid_creds']
-
         identity_handler = self.hs.get_handlers().identity_handler
 
-        logger.info("Getting validated threepid. threepidcreds: %r", (threepid_creds,))
+        logger.info("Getting validated threepid. threepidcreds: %r" % (threepid_creds,))
         threepid = yield identity_handler.threepid_from_creds(threepid_creds)
 
         if not threepid:
             raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
 
-        if threepid['medium'] != medium:
-            raise LoginError(
-                401,
-                "Expecting threepid of type '%s', got '%s'" % (
-                    medium, threepid['medium'],
-                ),
-                errcode=Codes.UNAUTHORIZED
-            )
-
         threepid['threepid_creds'] = authdict['threepid_creds']
 
         defer.returnValue(threepid)
+
+    @defer.inlineCallbacks
+    def _check_dummy_auth(self, authdict, _):
+        yield run_on_reactor()
+        defer.returnValue(True)
 
     def _get_params_recaptcha(self):
         return {"public_key": self.hs.config.recaptcha_public_key}

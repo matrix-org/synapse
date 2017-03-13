@@ -20,6 +20,8 @@ import gc
 import logging
 import os
 import sys
+
+import synapse.config.logger
 from synapse.config._base import ConfigError
 
 from synapse.python_dependencies import (
@@ -286,7 +288,7 @@ def setup(config_options):
         # generating config files and shouldn't try to continue.
         sys.exit(0)
 
-    config.setup_logging()
+    synapse.config.logger.setup_logging(config, use_worker_options=False)
 
     # check any extra requirements we have now we have a config
     check_requirements(config)
