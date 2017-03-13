@@ -206,8 +206,7 @@ class FederationClient(FederationBase):
 
         Args:
             destinations (list): Which home servers to query
-            pdu_origin (str): The home server that originally sent the pdu.
-            event_id (str)
+            event_id (str): event to fetch
             outlier (bool): Indicates whether the PDU is an `outlier`, i.e. if
                 it's from an arbitary point in the context as opposed to part
                 of the current block of PDUs. Defaults to `False`

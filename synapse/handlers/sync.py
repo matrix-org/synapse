@@ -609,14 +609,14 @@ class SyncHandler(object):
             deleted = yield self.store.delete_messages_for_device(
                 user_id, device_id, since_stream_id
             )
-            logger.info("Deleted %d to-device messages up to %d",
-                        deleted, since_stream_id)
+            logger.debug("Deleted %d to-device messages up to %d",
+                         deleted, since_stream_id)
 
             messages, stream_id = yield self.store.get_new_messages_for_device(
                 user_id, device_id, since_stream_id, now_token.to_device_key
             )
 
-            logger.info(
+            logger.debug(
                 "Returning %d to-device messages between %d and %d (current token: %d)",
                 len(messages), since_stream_id, stream_id, now_token.to_device_key
             )
