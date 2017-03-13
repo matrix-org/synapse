@@ -45,6 +45,7 @@ class DevicesRestServlet(servlet.RestServlet):
         )
         defer.returnValue((200, {"devices": devices}))
 
+
 class DeleteDevicesRestServlet(servlet.RestServlet):
     PATTERNS = client_v2_patterns("/delete_devices", releases=[], v2_alpha=False)
 
@@ -91,6 +92,7 @@ class DeleteDevicesRestServlet(servlet.RestServlet):
                 d_id,
             )
         defer.returnValue((200, {}))
+
 
 class DeviceRestServlet(servlet.RestServlet):
     PATTERNS = client_v2_patterns("/devices/(?P<device_id>[^/]*)$",
