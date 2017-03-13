@@ -95,7 +95,7 @@ class TlsConfig(Config):
         # make HTTPS requests to this server will check that the TLS
         # certificates returned by this server match one of the fingerprints.
         #
-        # Synapse automatically adds its the fingerprint of its own certificate
+        # Synapse automatically adds the fingerprint of its own certificate
         # to the list. So if federation traffic is handle directly by synapse
         # then no modification to the list is required.
         #

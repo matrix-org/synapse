@@ -46,6 +46,12 @@ class SlavedAccountDataStore(BaseSlavedStore):
     )
 
     get_tags_for_user = TagsStore.__dict__["get_tags_for_user"]
+    get_tags_for_room = (
+        DataStore.get_tags_for_room.__func__
+    )
+    get_account_data_for_room = (
+        DataStore.get_account_data_for_room.__func__
+    )
 
     get_updated_tags = DataStore.get_updated_tags.__func__
     get_updated_account_data_for_user = (

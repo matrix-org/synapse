@@ -17,6 +17,7 @@ from ._base import BaseSlavedStore
 from ._slaved_id_tracker import SlavedIdTracker
 from synapse.storage import DataStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
+from synapse.util.caches.expiringcache import ExpiringCache
 
 
 class SlavedDeviceInboxStore(BaseSlavedStore):
@@ -32,6 +33,13 @@ class SlavedDeviceInboxStore(BaseSlavedStore):
         self._device_federation_outbox_stream_cache = StreamChangeCache(
             "DeviceFederationOutboxStreamChangeCache",
             self._device_inbox_id_gen.get_current_token()
+        )
+
+        self._last_device_delete_cache = ExpiringCache(
+            cache_name="last_device_delete_cache",
+            clock=self._clock,
+            max_len=10000,
+            expiry_ms=30 * 60 * 1000,
         )
 
     get_to_device_stream_token = DataStore.get_to_device_stream_token.__func__
