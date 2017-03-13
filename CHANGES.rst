@@ -1,3 +1,12 @@
+Changes in synapse v0.19.3-rc2 (2017-03-13)
+===========================================
+
+Bug fixes:
+
+* Fix bug in handling of incoming device list updates over federation.
+
+
+
 Changes in synapse v0.19.3-rc1 (2017-03-08)
 ===========================================
 
