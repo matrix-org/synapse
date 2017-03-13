@@ -47,13 +47,13 @@ class DevicesRestServlet(servlet.RestServlet):
 
 
 class DeleteDevicesRestServlet(servlet.RestServlet):
+    """
+    API for bulk deletion of devices. Accepts a JSON object with a devices
+    key which lists the device_ids to delete. Requires user interactive auth.
+    """
     PATTERNS = client_v2_patterns("/delete_devices", releases=[], v2_alpha=False)
 
     def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
         super(DeleteDevicesRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
@@ -64,14 +64,13 @@ class DeleteDevicesRestServlet(servlet.RestServlet):
     def on_POST(self, request):
         try:
             body = servlet.parse_json_object_from_request(request)
-
         except errors.SynapseError as e:
             if e.errcode == errors.Codes.NOT_JSON:
                 # deal with older clients which didn't pass a J*DELETESON dict
                 # the same as those that pass an empty dict
                 body = {}
             else:
-                raise
+                raise e
 
         if 'devices' not in body:
             raise errors.SynapseError(
@@ -86,11 +85,10 @@ class DeleteDevicesRestServlet(servlet.RestServlet):
             defer.returnValue((401, result))
 
         requester = yield self.auth.get_user_by_req(request)
-        for d_id in body['devices']:
-            yield self.device_handler.delete_device(
-                requester.user.to_string(),
-                d_id,
-            )
+        yield self.device_handler.delete_devices(
+            requester.user.to_string(),
+            body['devices'],
+        )
         defer.returnValue((200, {}))
 
 
