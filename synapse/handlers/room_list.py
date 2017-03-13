@@ -120,16 +120,19 @@ class RoomListHandler(BaseHandler):
 
         @defer.inlineCallbacks
         def get_order_for_room(room_id):
-            latest_event_ids = yield self.store.get_forward_extremeties_for_room(
-                room_id, stream_token
-            )
+            joined_users = yield self.store.get_users_in_room(room_id)
+            if self.store.has_room_changed_since(room_id, stream_token):
+                latest_event_ids = yield self.store.get_forward_extremeties_for_room(
+                    room_id, stream_token
+                )
 
-            if not latest_event_ids:
-                return
+                if not latest_event_ids:
+                    return
 
-            joined_users = yield self.state_handler.get_current_user_in_room(
-                room_id, latest_event_ids,
-            )
+                joined_users = yield self.state_handler.get_current_user_in_room(
+                    room_id, latest_event_ids,
+                )
+
             num_joined_users = len(joined_users)
             rooms_to_num_joined[room_id] = num_joined_users
 
