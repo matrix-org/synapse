@@ -19,6 +19,7 @@ from synapse.api.errors import SynapseError, LoginError, Codes
 from synapse.types import UserID
 from synapse.http.server import finish_request
 from synapse.http.servlet import parse_json_object_from_request
+from synapse.util.msisdn import phone_number_to_msisdn
 
 from .base import ClientV1RestServlet, client_path_patterns
 
@@ -35,6 +36,49 @@ import xml.etree.ElementTree as ET
 
 
 logger = logging.getLogger(__name__)
+
+
+def login_submission_legacy_convert(submission):
+    """
+    If the input login submission is an old style object
+    (ie. with top-level user / medium / address) convert it
+    to a typed object.
+    """
+    if "user" in submission:
+        submission["identifier"] = {
+            "type": "m.id.user",
+            "user": submission["user"],
+        }
+        del submission["user"]
+
+    if "medium" in submission and "address" in submission:
+        submission["identifier"] = {
+            "type": "m.id.thirdparty",
+            "medium": submission["medium"],
+            "address": submission["address"],
+        }
+        del submission["medium"]
+        del submission["address"]
+
+
+def login_id_thirdparty_from_phone(identifier):
+    """
+    Convert a phone login identifier type to a generic threepid identifier
+    Args:
+        identifier(dict): Login identifier dict of type 'm.id.phone'
+
+    Returns: Login identifier dict of type 'm.id.threepid'
+    """
+    if "country" not in identifier or "number" not in identifier:
+        raise SynapseError(400, "Invalid phone-type identifier")
+
+    msisdn = phone_number_to_msisdn(identifier["country"], identifier["number"])
+
+    return {
+        "type": "m.id.thirdparty",
+        "medium": "msisdn",
+        "address": msisdn,
+    }
 
 
 class LoginRestServlet(ClientV1RestServlet):
@@ -117,20 +161,52 @@ class LoginRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def do_password_login(self, login_submission):
-        if 'medium' in login_submission and 'address' in login_submission:
-            address = login_submission['address']
-            if login_submission['medium'] == 'email':
+        if "password" not in login_submission:
+            raise SynapseError(400, "Missing parameter: password")
+
+        login_submission_legacy_convert(login_submission)
+
+        if "identifier" not in login_submission:
+            raise SynapseError(400, "Missing param: identifier")
+
+        identifier = login_submission["identifier"]
+        if "type" not in identifier:
+            raise SynapseError(400, "Login identifier has no type")
+
+        # convert phone type identifiers to generic threepids
+        if identifier["type"] == "m.id.phone":
+            identifier = login_id_thirdparty_from_phone(identifier)
+
+        # convert threepid identifiers to user IDs
+        if identifier["type"] == "m.id.thirdparty":
+            if 'medium' not in identifier or 'address' not in identifier:
+                raise SynapseError(400, "Invalid thirdparty identifier")
+
+            address = identifier['address']
+            if identifier['medium'] == 'email':
                 # For emails, transform the address to lowercase.
                 # We store all email addreses as lowercase in the DB.
                 # (See add_threepid in synapse/handlers/auth.py)
                 address = address.lower()
             user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
-                login_submission['medium'], address
+                identifier['medium'], address
             )
             if not user_id:
                 raise LoginError(403, "", errcode=Codes.FORBIDDEN)
-        else:
-            user_id = login_submission['user']
+
+            identifier = {
+                "type": "m.id.user",
+                "user": user_id,
+            }
+
+        # by this point, the identifier should be an m.id.user: if it's anything
+        # else, we haven't understood it.
+        if identifier["type"] != "m.id.user":
+            raise SynapseError(400, "Unknown login identifier type")
+        if "user" not in identifier:
+            raise SynapseError(400, "User identifier is missing 'user' key")
+
+        user_id = identifier["user"]
 
         if not user_id.startswith('@'):
             user_id = UserID.create(
