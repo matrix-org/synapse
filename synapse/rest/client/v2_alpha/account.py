@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
-# Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,11 +17,8 @@ from twisted.internet import defer
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import LoginError, SynapseError, Codes
-from synapse.http.servlet import (
-    RestServlet, parse_json_object_from_request, assert_params_in_request
-)
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.util.async import run_on_reactor
-from synapse.util.msisdn import phone_number_to_msisdn
 
 from ._base import client_v2_patterns
 
@@ -32,11 +28,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class EmailPasswordRequestTokenRestServlet(RestServlet):
+class PasswordRequestTokenRestServlet(RestServlet):
     PATTERNS = client_v2_patterns("/account/password/email/requestToken$")
 
     def __init__(self, hs):
-        super(EmailPasswordRequestTokenRestServlet, self).__init__()
+        super(PasswordRequestTokenRestServlet, self).__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
 
@@ -44,9 +40,14 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_request(body, [
-            'id_server', 'client_secret', 'email', 'send_attempt'
-        ])
+        required = ['id_server', 'client_secret', 'email', 'send_attempt']
+        absent = []
+        for k in required:
+            if k not in body:
+                absent.append(k)
+
+        if absent:
+            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'email', body['email']
@@ -59,37 +60,6 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         defer.returnValue((200, ret))
 
 
-class MsisdnPasswordRequestTokenRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/password/msisdn/requestToken$")
-
-    def __init__(self, hs):
-        super(MsisdnPasswordRequestTokenRestServlet, self).__init__()
-        self.hs = hs
-        self.datastore = self.hs.get_datastore()
-        self.identity_handler = hs.get_handlers().identity_handler
-
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        body = parse_json_object_from_request(request)
-
-        assert_params_in_request(body, [
-            'id_server', 'client_secret',
-            'country', 'phone_number', 'send_attempt',
-        ])
-
-        msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
-
-        existingUid = yield self.datastore.get_user_id_by_threepid(
-            'msisdn', msisdn
-        )
-
-        if existingUid is None:
-            raise SynapseError(400, "MSISDN not found", Codes.THREEPID_NOT_FOUND)
-
-        ret = yield self.identity_handler.requestMsisdnToken(**body)
-        defer.returnValue((200, ret))
-
-
 class PasswordRestServlet(RestServlet):
     PATTERNS = client_v2_patterns("/account/password$")
 
@@ -98,7 +68,6 @@ class PasswordRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
-        self.datastore = self.hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -108,8 +77,7 @@ class PasswordRestServlet(RestServlet):
 
         authed, result, params, _ = yield self.auth_handler.check_auth([
             [LoginType.PASSWORD],
-            [LoginType.EMAIL_IDENTITY],
-            [LoginType.MSISDN],
+            [LoginType.EMAIL_IDENTITY]
         ], body, self.hs.get_ip_from_request(request))
 
         if not authed:
@@ -134,7 +102,7 @@ class PasswordRestServlet(RestServlet):
                 # (See add_threepid in synapse/handlers/auth.py)
                 threepid['address'] = threepid['address'].lower()
             # if using email, we must know about the email they're authing with!
-            threepid_user_id = yield self.datastore.get_user_id_by_threepid(
+            threepid_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
                 threepid['medium'], threepid['address']
             )
             if not threepid_user_id:
@@ -201,14 +169,13 @@ class DeactivateAccountRestServlet(RestServlet):
         defer.returnValue((200, {}))
 
 
-class EmailThreepidRequestTokenRestServlet(RestServlet):
+class ThreepidRequestTokenRestServlet(RestServlet):
     PATTERNS = client_v2_patterns("/account/3pid/email/requestToken$")
 
     def __init__(self, hs):
         self.hs = hs
-        super(EmailThreepidRequestTokenRestServlet, self).__init__()
+        super(ThreepidRequestTokenRestServlet, self).__init__()
         self.identity_handler = hs.get_handlers().identity_handler
-        self.datastore = self.hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -223,50 +190,12 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         if absent:
             raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
 
-        existingUid = yield self.datastore.get_user_id_by_threepid(
+        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'email', body['email']
         )
 
         if existingUid is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
-
-        ret = yield self.identity_handler.requestEmailToken(**body)
-        defer.returnValue((200, ret))
-
-
-class MsisdnThreepidRequestTokenRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/3pid/msisdn/requestToken$")
-
-    def __init__(self, hs):
-        self.hs = hs
-        super(MsisdnThreepidRequestTokenRestServlet, self).__init__()
-        self.identity_handler = hs.get_handlers().identity_handler
-        self.datastore = self.hs.get_datastore()
-
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        body = parse_json_object_from_request(request)
-
-        required = [
-            'id_server', 'client_secret',
-            'country', 'phone_number', 'send_attempt',
-        ]
-        absent = []
-        for k in required:
-            if k not in body:
-                absent.append(k)
-
-        if absent:
-            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
-
-        msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
-
-        existingUid = yield self.datastore.get_user_id_by_threepid(
-            'msisdn', msisdn
-        )
-
-        if existingUid is not None:
-            raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestEmailToken(**body)
         defer.returnValue((200, ret))
@@ -281,7 +210,6 @@ class ThreepidRestServlet(RestServlet):
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
-        self.datastore = self.hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -289,7 +217,7 @@ class ThreepidRestServlet(RestServlet):
 
         requester = yield self.auth.get_user_by_req(request)
 
-        threepids = yield self.datastore.user_get_threepids(
+        threepids = yield self.hs.get_datastore().user_get_threepids(
             requester.user.to_string()
         )
 
@@ -330,7 +258,7 @@ class ThreepidRestServlet(RestServlet):
 
         if 'bind' in body and body['bind']:
             logger.debug(
-                "Binding threepid %s to %s",
+                "Binding emails %s to %s",
                 threepid, user_id
             )
             yield self.identity_handler.bind_threepid(
@@ -374,11 +302,9 @@ class ThreepidDeleteRestServlet(RestServlet):
 
 
 def register_servlets(hs, http_server):
-    EmailPasswordRequestTokenRestServlet(hs).register(http_server)
-    MsisdnPasswordRequestTokenRestServlet(hs).register(http_server)
+    PasswordRequestTokenRestServlet(hs).register(http_server)
     PasswordRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
-    EmailThreepidRequestTokenRestServlet(hs).register(http_server)
-    MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
+    ThreepidRequestTokenRestServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
     ThreepidDeleteRestServlet(hs).register(http_server)
