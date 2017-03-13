@@ -68,6 +68,7 @@ class LoggingConfig(Config):
 
     def read_config(self, config):
         self.verbosity = config.get("verbose", 0)
+        self.no_redirect_stdio = config.get("no_redirect_stdio", False)
         self.log_config = self.abspath(config.get("log_config"))
         self.log_file = self.abspath(config.get("log_file"))
 
@@ -90,6 +91,8 @@ class LoggingConfig(Config):
     def read_arguments(self, args):
         if args.verbose is not None:
             self.verbosity = args.verbose
+        if args.no_redirect_stdio is not None:
+            self.no_redirect_stdio = args.no_redirect_stdio
         if args.log_config is not None:
             self.log_config = args.log_config
         if args.log_file is not None:
@@ -109,6 +112,11 @@ class LoggingConfig(Config):
             '--log-config', dest="log_config", default=None,
             help="Python logging config file"
         )
+        logging_group.add_argument(
+            '-n', '--no-redirect-stdio',
+            action='store_true', default=None,
+            help="Do not redirect stdout/stderr to the log"
+        )
 
     def generate_files(self, config):
         log_config = config.get("log_config")
@@ -118,11 +126,22 @@ class LoggingConfig(Config):
                     DEFAULT_LOG_CONFIG.substitute(log_file=config["log_file"])
                 )
 
-    def setup_logging(self):
-        setup_logging(self.log_config, self.log_file, self.verbosity)
 
+def setup_logging(config, use_worker_options=False):
+    """ Set up python logging
 
-def setup_logging(log_config=None, log_file=None, verbosity=None):
+    Args:
+        config (LoggingConfig | synapse.config.workers.WorkerConfig):
+            configuration data
+
+        use_worker_options (bool): True to use 'worker_log_config' and
+            'worker_log_file' options instead of 'log_config' and 'log_file'.
+    """
+    log_config = (config.worker_log_config if use_worker_options
+                  else config.log_config)
+    log_file = (config.worker_log_file if use_worker_options
+                else config.log_file)
+
     log_format = (
         "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
         " - %(message)s"
@@ -131,9 +150,9 @@ def setup_logging(log_config=None, log_file=None, verbosity=None):
 
         level = logging.INFO
         level_for_storage = logging.INFO
-        if verbosity:
+        if config.verbosity:
             level = logging.DEBUG
-            if verbosity > 1:
+            if config.verbosity > 1:
                 level_for_storage = logging.DEBUG
 
         # FIXME: we need a logging.WARN for a -q quiet option
@@ -192,4 +211,7 @@ def setup_logging(log_config=None, log_file=None, verbosity=None):
     #
     # However this may not be too much of a problem if we are just writing to a file.
     observer = STDLibLogObserver()
-    globalLogBeginner.beginLoggingTo([observer])
+    globalLogBeginner.beginLoggingTo(
+        [observer],
+        redirectStandardIO=not config.no_redirect_stdio,
+    )
