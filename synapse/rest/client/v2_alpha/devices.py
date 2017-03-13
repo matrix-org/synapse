@@ -45,6 +45,52 @@ class DevicesRestServlet(servlet.RestServlet):
         )
         defer.returnValue((200, {"devices": devices}))
 
+class DeleteDevicesRestServlet(servlet.RestServlet):
+    PATTERNS = client_v2_patterns("/delete_devices", releases=[], v2_alpha=False)
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(DeleteDevicesRestServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.device_handler = hs.get_device_handler()
+        self.auth_handler = hs.get_auth_handler()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        try:
+            body = servlet.parse_json_object_from_request(request)
+
+        except errors.SynapseError as e:
+            if e.errcode == errors.Codes.NOT_JSON:
+                # deal with older clients which didn't pass a J*DELETESON dict
+                # the same as those that pass an empty dict
+                body = {}
+            else:
+                raise
+
+        if 'devices' not in body:
+            raise errors.SynapseError(
+                400, "No devices supplied", errcode=errors.Codes.MISSING_PARAM
+            )
+
+        authed, result, params, _ = yield self.auth_handler.check_auth([
+            [constants.LoginType.PASSWORD],
+        ], body, self.hs.get_ip_from_request(request))
+
+        if not authed:
+            defer.returnValue((401, result))
+
+        requester = yield self.auth.get_user_by_req(request)
+        for d_id in body['devices']:
+            yield self.device_handler.delete_device(
+                requester.user.to_string(),
+                d_id,
+            )
+        defer.returnValue((200, {}))
 
 class DeviceRestServlet(servlet.RestServlet):
     PATTERNS = client_v2_patterns("/devices/(?P<device_id>[^/]*)$",
@@ -111,5 +157,6 @@ class DeviceRestServlet(servlet.RestServlet):
 
 
 def register_servlets(hs, http_server):
+    DeleteDevicesRestServlet(hs).register(http_server)
     DevicesRestServlet(hs).register(http_server)
     DeviceRestServlet(hs).register(http_server)
