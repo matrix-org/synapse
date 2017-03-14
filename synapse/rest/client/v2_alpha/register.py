@@ -244,7 +244,6 @@ class RegisterRestServlet(RestServlet):
         # Android <=0.6.9 have fallen below an acceptable threshold, this
         # parameter should go away and we should always advertise msisdn flows.
         show_msisdn = False
-        print body
         if 'x_show_msisdn' in body and body['x_show_msisdn']:
             show_msisdn = True
 
