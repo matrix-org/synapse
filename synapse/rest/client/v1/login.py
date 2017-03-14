@@ -33,6 +33,8 @@ from saml2.client import Saml2Client
 
 import xml.etree.ElementTree as ET
 
+from twisted.web.client import PartialDownloadError
+
 
 logger = logging.getLogger(__name__)
 
@@ -341,7 +343,12 @@ class CasTicketServlet(ClientV1RestServlet):
             "ticket": request.args["ticket"],
             "service": self.cas_service_url
         }
-        body = yield http_client.get_raw(uri, args)
+        try:
+            body = yield http_client.get_raw(uri, args)
+        except PartialDownloadError as pde:
+            # Twisted raises this error if the connection is closed,
+            # even if that's being used old-http style to signal end-of-data
+            body = pde.response
         result = yield self.handle_cas_response(request, body, client_redirect_url)
         defer.returnValue(result)
 
