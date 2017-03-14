@@ -253,20 +253,20 @@ class RegisterRestServlet(RestServlet):
                 [LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
             ]
             if show_msisdn:
-                flows += [
+                flows.extend([
                     [LoginType.MSISDN, LoginType.RECAPTCHA],
                     [LoginType.MSISDN, LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
-                ]
+                ])
         else:
             flows = [
                 [LoginType.DUMMY],
                 [LoginType.EMAIL_IDENTITY],
             ]
             if show_msisdn:
-                flows += [
+                flows.extend([
                     [LoginType.MSISDN],
                     [LoginType.MSISDN, LoginType.EMAIL_IDENTITY],
-                ]
+                ])
 
         authed, auth_result, params, session_id = yield self.auth_handler.check_auth(
             flows, body, self.hs.get_ip_from_request(request)
