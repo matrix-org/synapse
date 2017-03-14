@@ -94,6 +94,17 @@ class SynapseError(CodeMessageException):
     def from_http_response_exception(cls, err):
         """Make a SynapseError based on an HTTPResponseException
 
+        This is useful when a proxied request has failed, and we need to
+        decide how to map the failure onto a matrix error to send back to the
+        client.
+
+        An attempt is made to parse the body of the http response as a matrix
+        error. If that succeeds, the errcode and error message from the body
+        are used as the errcode and error message in the new synapse error.
+
+        Otherwise, the errcode is set to M_UNKNOWN, and the error message is
+        set to the reason code from the HTTP response.
+
         Args:
             err (HttpResponseException):
 
@@ -137,13 +148,11 @@ class UnrecognizedRequestError(SynapseError):
 
 class NotFoundError(SynapseError):
     """An error indicating we can't find the thing you asked for"""
-    def __init__(self, *args, **kwargs):
-        if "errcode" not in kwargs:
-            kwargs["errcode"] = Codes.NOT_FOUND
+    def __init__(self, msg="Not found", errcode=Codes.NOT_FOUND):
         super(NotFoundError, self).__init__(
             404,
-            "Not found",
-            **kwargs
+            msg,
+            errcode=errcode
         )
 
 
