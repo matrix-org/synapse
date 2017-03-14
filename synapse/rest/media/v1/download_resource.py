@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import synapse.http.servlet
 
 from ._base import parse_media_id, respond_with_file, respond_404
 from twisted.web.resource import Resource
@@ -81,6 +82,17 @@ class DownloadResource(Resource):
 
     @defer.inlineCallbacks
     def _respond_remote_file(self, request, server_name, media_id, name):
+        # don't forward requests for remote media if allow_remote is false
+        allow_remote = synapse.http.servlet.parse_boolean(
+            request, "allow_remote", default=True)
+        if not allow_remote:
+            logger.info(
+                "Rejecting request for remote media %s/%s due to allow_remote",
+                server_name, media_id,
+            )
+            respond_404(request)
+            return
+
         media_info = yield self.media_repo.get_remote_media(server_name, media_id)
 
         media_type = media_info["media_type"]
