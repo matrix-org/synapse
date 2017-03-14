@@ -55,33 +55,34 @@ class CodeMessageException(RuntimeError):
 
     Attributes:
         code (int): HTTP error code
-        response_code_message (str): HTTP reason phrase. None for the default.
+        msg (str): string describing the error
     """
-    def __init__(self, code):
-        super(CodeMessageException, self).__init__("%d" % code)
+    def __init__(self, code, msg):
+        super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
         self.code = code
-        self.response_code_message = None
+        self.msg = msg
 
     def error_dict(self):
         return cs_error(self.msg)
 
 
 class SynapseError(CodeMessageException):
-    """A base error which can be caught for all synapse events."""
+    """A base exception type for matrix errors which have an errcode and error
+    message (as well as an HTTP status code).
+
+    Attributes:
+        errcode (str): Matrix error code e.g 'M_FORBIDDEN'
+    """
     def __init__(self, code, msg, errcode=Codes.UNKNOWN):
         """Constructs a synapse error.
 
         Args:
             code (int): The integer error code (an HTTP response code)
             msg (str): The human-readable error message.
-            errcode (str): The synapse error code e.g 'M_FORBIDDEN'
+            errcode (str): The matrix error code e.g 'M_FORBIDDEN'
         """
-        super(SynapseError, self).__init__(code)
-        self.msg = msg
+        super(SynapseError, self).__init__(code, msg)
         self.errcode = errcode
-
-    def __str__(self):
-        return "%d: %s %s" % (self.code, self.errcode, self.msg)
 
     def error_dict(self):
         return cs_error(
@@ -106,10 +107,9 @@ class SynapseError(CodeMessageException):
         except ValueError:
             j = {}
         errcode = j.get('errcode', Codes.UNKNOWN)
-        errmsg = j.get('error', err.response_code_message)
+        errmsg = j.get('error', err.msg)
 
         res = SynapseError(err.code, errmsg, errcode)
-        res.response_code_message = err.response_code_message
         return res
 
 
@@ -204,7 +204,6 @@ class LimitExceededError(SynapseError):
                  errcode=Codes.LIMIT_EXCEEDED):
         super(LimitExceededError, self).__init__(code, msg, errcode)
         self.retry_after_ms = retry_after_ms
-        self.response_code_message = "Too Many Requests"
 
     def error_dict(self):
         return cs_error(
@@ -288,6 +287,5 @@ class HttpResponseException(CodeMessageException):
             msg (str): reason phrase from HTTP response status line
             response (str): body of response
         """
-        super(HttpResponseException, self).__init__(code)
-        self.response_code_message = msg
+        super(HttpResponseException, self).__init__(code, msg)
         self.response = response
