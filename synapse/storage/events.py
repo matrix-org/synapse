@@ -433,11 +433,36 @@ class EventsStore(SQLBaseStore):
         if not new_latest_event_ids:
             current_state = {}
         elif was_updated:
+            # We work out the current state by passing the state sets to the
+            # state resolution algorithm. It may ask for some events, including
+            # the events we have yet to persist, so we need a slightly more
+            # complicated event lookup function than simply looking the events
+            # up in the db.
+            events_map = {ev.event_id: ev for ev, _ in events_context}
+
+            @defer.inlineCallbacks
+            def get_events(ev_ids):
+                # We get the events by first looking at the list of events we
+                # are trying to persist, and then fetching the rest from the DB.
+                db = []
+                to_return = {}
+                for ev_id in ev_ids:
+                    ev = events_map.get(ev_id, None)
+                    if ev:
+                        to_return[ev_id] = ev
+                    else:
+                        db.append(ev_id)
+
+                if db:
+                    evs = yield self.get_events(
+                        ev_ids, get_prev_content=False, check_redacted=False,
+                    )
+                    to_return.update(evs)
+                defer.returnValue(to_return)
+
             current_state = yield resolve_events(
                 state_sets,
-                state_map_factory=lambda ev_ids: self.get_events(
-                    ev_ids, get_prev_content=False, check_redacted=False,
-                ),
+                state_map_factory=get_events,
             )
         else:
             return
