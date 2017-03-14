@@ -139,7 +139,7 @@ class Mailer(object):
 
         @defer.inlineCallbacks
         def _fetch_room_state(room_id):
-            room_state = yield self.state_handler.get_current_state_ids(room_id)
+            room_state = yield self.store.get_current_state_ids(room_id)
             state_by_room[room_id] = room_state
 
         # Run at most 3 of these at once: sync does 10 at a time but email

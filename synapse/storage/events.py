@@ -467,14 +467,9 @@ class EventsStore(SQLBaseStore):
         else:
             return
 
-        existing_state_rows = yield self._simple_select_list(
-            table="current_state_events",
-            keyvalues={"room_id": room_id},
-            retcols=["event_id", "type", "state_key"],
-            desc="_calculate_state_delta",
-        )
+        existing_state = yield self.get_current_state_ids(room_id)
 
-        existing_events = set(row["event_id"] for row in existing_state_rows)
+        existing_events = set(existing_state.itervalues())
         new_events = set(ev_id for ev_id in current_state.itervalues())
         changed_events = existing_events ^ new_events
 
@@ -482,9 +477,8 @@ class EventsStore(SQLBaseStore):
             return
 
         to_delete = {
-            (row["type"], row["state_key"]): row["event_id"]
-            for row in existing_state_rows
-            if row["event_id"] in changed_events
+            key: ev_id for key, ev_id in existing_state.iteritems()
+            if ev_id in changed_events
         }
         events_to_insert = (new_events - existing_events)
         to_insert = {
@@ -608,6 +602,10 @@ class EventsStore(SQLBaseStore):
 
                 self._invalidate_cache_and_stream(
                     txn, self.get_users_in_room, (room_id,)
+                )
+
+                self._invalidate_cache_and_stream(
+                    txn, self.get_current_state_ids, (room_id,)
                 )
 
         for room_id, new_extrem in new_forward_extremeties.items():

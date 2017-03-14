@@ -296,7 +296,7 @@ class DeviceHandler(BaseHandler):
                 # ordering: treat it the same as a new room
                 event_ids = []
 
-            current_state_ids = yield self.state.get_current_state_ids(room_id)
+            current_state_ids = yield self.store.get_current_state_ids(room_id)
 
             # special-case for an empty prev state: include all members
             # in the changed list
