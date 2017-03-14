@@ -303,7 +303,7 @@ def _filter_ruleset_with_path(ruleset, path):
         if r['rule_id'] == rule_id:
             the_rule = r
     if the_rule is None:
-        raise NotFoundError
+        raise NotFoundError()
 
     path = path[1:]
     if len(path) == 0:
