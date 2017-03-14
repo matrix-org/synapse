@@ -1,5 +1,4 @@
 # Copyright 2015, 2016 OpenMarket Ltd
-# Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,7 +37,6 @@ REQUIREMENTS = {
     "pysaml2>=3.0.0,<4.0.0": ["saml2>=3.0.0,<4.0.0"],
     "pymacaroons-pynacl": ["pymacaroons"],
     "msgpack-python>=0.3.0": ["msgpack"],
-    "phonenumbers>=8.2.0": ["phonenumbers"],
 }
 CONDITIONAL_REQUIREMENTS = {
     "web_client": {
