@@ -308,6 +308,31 @@ def preserve_context_over_deferred(deferred, context=None):
     return d
 
 
+def reset_context_after_deferred(deferred):
+    """If the deferred is incomplete, add a callback which will reset the
+    context.
+
+    This is useful when you want to fire off a deferred, but don't want to
+    wait for it to complete. (The deferred will restore the current log context
+    when it completes, so if you don't do anything, it will leak log context.)
+
+    (If this feels asymmetric, consider it this way: we are effectively forking
+    a new thread of execution. We are probably currently within a
+    ``with LoggingContext()`` block, which is supposed to have a single entry
+    and exit point. But by spawning off another deferred, we are effectively
+    adding a new exit point.)
+
+    Args:
+        deferred (defer.Deferred): deferred
+    """
+    def reset_context(result):
+        LoggingContext.set_current_context(LoggingContext.sentinel)
+        return result
+
+    if not deferred.called:
+        deferred.addBoth(reset_context)
+
+
 def preserve_fn(f):
     """Ensures that function is called with correct context and that context is
     restored after return. Useful for wrapping functions that return a deferred
