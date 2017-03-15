@@ -23,10 +23,13 @@ import signal
 import subprocess
 import sys
 import yaml
+import errno
+import time
 
 SYNAPSE = [sys.executable, "-B", "-m", "synapse.app.homeserver"]
 
 GREEN = "\x1b[1;32m"
+YELLOW = "x1b[01;33m"
 RED = "\x1b[1;31m"
 NORMAL = "\x1b[m"
 
@@ -76,8 +79,14 @@ def start_worker(app, configfile, worker_configfile):
 def stop(pidfile, app):
     if os.path.exists(pidfile):
         pid = int(open(pidfile).read())
-        os.kill(pid, signal.SIGTERM)
-        write("stopped %s" % (app,), colour=GREEN)
+        try:
+            os.kill(pid, signal.SIGTERM)
+            write("stopped %s" % (app,), colour=GREEN)
+        except OSError, err:
+            if err.errno == errno.ESRCH:
+                write("%s not running" % (app,), colour=YELLOW)
+            else:
+                write("Cannot stop %s : Operation not permitted" % (app,), colour=RED)
 
 
 Worker = collections.namedtuple("Worker", [
@@ -190,7 +199,12 @@ def main():
         if start_stop_synapse:
             stop(pidfile, "synapse.app.homeserver")
 
-        # TODO: Wait for synapse to actually shutdown before starting it again
+    # Wait for synapse to actually shutdown before starting it again
+    if action == "restart" and os.path.exists(pidfile):
+        write("Waiting to restart ...")
+        # pid_str = str(open(pidfile).read())
+        while os.path.exists(pidfile):
+            time.sleep(0.1)
 
     if action == "start" or action == "restart":
         if start_stop_synapse:
