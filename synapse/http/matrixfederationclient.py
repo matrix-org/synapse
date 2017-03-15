@@ -108,6 +108,12 @@ class MatrixFederationHttpClient(object):
                         query_bytes=b"", retry_on_dns_fail=True,
                         timeout=None, long_retries=False):
         """ Creates and sends a request to the given url
+
+        Returns:
+            Deferred: resolves with the http response object on success.
+
+            Fails with ``HTTPRequestException``: if we get an HTTP response
+            code >= 300.
         """
         headers_dict[b"User-Agent"] = [self.version_string]
         headers_dict[b"Host"] = [destination]
@@ -408,8 +414,11 @@ class MatrixFederationHttpClient(object):
             output_stream (file): File to write the response body to.
             args (dict): Optional dictionary used to create the query string.
         Returns:
-            A (int,dict) tuple of the file length and a dict of the response
-            headers.
+            Deferred: resolves with an (int,dict) tuple of the file length and
+            a dict of the response headers.
+
+            Fails with ``HTTPRequestException`` if we get an HTTP response code
+            >= 300
         """
 
         encoded_args = {}
@@ -419,7 +428,7 @@ class MatrixFederationHttpClient(object):
             encoded_args[k] = [v.encode("UTF-8") for v in vs]
 
         query_bytes = urllib.urlencode(encoded_args, True)
-        logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
+        logger.debug("Query bytes: %s Retry DNS: %s", query_bytes, retry_on_dns_fail)
 
         def body_callback(method, url_bytes, headers_dict):
             self.sign_request(destination, method, url_bytes, headers_dict)

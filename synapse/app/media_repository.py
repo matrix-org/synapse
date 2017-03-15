@@ -168,7 +168,7 @@ def start(config_options):
 
     assert config.worker_app == "synapse.app.media_repository"
 
-    setup_logging(config.worker_log_config, config.worker_log_file)
+    setup_logging(config, use_worker_options=True)
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 

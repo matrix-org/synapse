@@ -433,23 +433,43 @@ class EventsStore(SQLBaseStore):
         if not new_latest_event_ids:
             current_state = {}
         elif was_updated:
+            # We work out the current state by passing the state sets to the
+            # state resolution algorithm. It may ask for some events, including
+            # the events we have yet to persist, so we need a slightly more
+            # complicated event lookup function than simply looking the events
+            # up in the db.
+            events_map = {ev.event_id: ev for ev, _ in events_context}
+
+            @defer.inlineCallbacks
+            def get_events(ev_ids):
+                # We get the events by first looking at the list of events we
+                # are trying to persist, and then fetching the rest from the DB.
+                db = []
+                to_return = {}
+                for ev_id in ev_ids:
+                    ev = events_map.get(ev_id, None)
+                    if ev:
+                        to_return[ev_id] = ev
+                    else:
+                        db.append(ev_id)
+
+                if db:
+                    evs = yield self.get_events(
+                        ev_ids, get_prev_content=False, check_redacted=False,
+                    )
+                    to_return.update(evs)
+                defer.returnValue(to_return)
+
             current_state = yield resolve_events(
                 state_sets,
-                state_map_factory=lambda ev_ids: self.get_events(
-                    ev_ids, get_prev_content=False, check_redacted=False,
-                ),
+                state_map_factory=get_events,
             )
         else:
             return
 
-        existing_state_rows = yield self._simple_select_list(
-            table="current_state_events",
-            keyvalues={"room_id": room_id},
-            retcols=["event_id", "type", "state_key"],
-            desc="_calculate_state_delta",
-        )
+        existing_state = yield self.get_current_state_ids(room_id)
 
-        existing_events = set(row["event_id"] for row in existing_state_rows)
+        existing_events = set(existing_state.itervalues())
         new_events = set(ev_id for ev_id in current_state.itervalues())
         changed_events = existing_events ^ new_events
 
@@ -457,9 +477,8 @@ class EventsStore(SQLBaseStore):
             return
 
         to_delete = {
-            (row["type"], row["state_key"]): row["event_id"]
-            for row in existing_state_rows
-            if row["event_id"] in changed_events
+            key: ev_id for key, ev_id in existing_state.iteritems()
+            if ev_id in changed_events
         }
         events_to_insert = (new_events - existing_events)
         to_insert = {
@@ -583,6 +602,10 @@ class EventsStore(SQLBaseStore):
 
                 self._invalidate_cache_and_stream(
                     txn, self.get_users_in_room, (room_id,)
+                )
+
+                self._invalidate_cache_and_stream(
+                    txn, self.get_current_state_ids, (room_id,)
                 )
 
         for room_id, new_extrem in new_forward_extremeties.items():

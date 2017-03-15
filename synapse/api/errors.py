@@ -15,6 +15,7 @@
 
 """Contains exceptions and error codes."""
 
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -50,27 +51,35 @@ class Codes(object):
 
 
 class CodeMessageException(RuntimeError):
-    """An exception with integer code and message string attributes."""
+    """An exception with integer code and message string attributes.
 
+    Attributes:
+        code (int): HTTP error code
+        msg (str): string describing the error
+    """
     def __init__(self, code, msg):
         super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
         self.code = code
         self.msg = msg
-        self.response_code_message = None
 
     def error_dict(self):
         return cs_error(self.msg)
 
 
 class SynapseError(CodeMessageException):
-    """A base error which can be caught for all synapse events."""
+    """A base exception type for matrix errors which have an errcode and error
+    message (as well as an HTTP status code).
+
+    Attributes:
+        errcode (str): Matrix error code e.g 'M_FORBIDDEN'
+    """
     def __init__(self, code, msg, errcode=Codes.UNKNOWN):
         """Constructs a synapse error.
 
         Args:
             code (int): The integer error code (an HTTP response code)
             msg (str): The human-readable error message.
-            err (str): The error code e.g 'M_FORBIDDEN'
+            errcode (str): The matrix error code e.g 'M_FORBIDDEN'
         """
         super(SynapseError, self).__init__(code, msg)
         self.errcode = errcode
@@ -80,6 +89,39 @@ class SynapseError(CodeMessageException):
             self.msg,
             self.errcode,
         )
+
+    @classmethod
+    def from_http_response_exception(cls, err):
+        """Make a SynapseError based on an HTTPResponseException
+
+        This is useful when a proxied request has failed, and we need to
+        decide how to map the failure onto a matrix error to send back to the
+        client.
+
+        An attempt is made to parse the body of the http response as a matrix
+        error. If that succeeds, the errcode and error message from the body
+        are used as the errcode and error message in the new synapse error.
+
+        Otherwise, the errcode is set to M_UNKNOWN, and the error message is
+        set to the reason code from the HTTP response.
+
+        Args:
+            err (HttpResponseException):
+
+        Returns:
+            SynapseError:
+        """
+        # try to parse the body as json, to get better errcode/msg, but
+        # default to M_UNKNOWN with the HTTP status as the error text
+        try:
+            j = json.loads(err.response)
+        except ValueError:
+            j = {}
+        errcode = j.get('errcode', Codes.UNKNOWN)
+        errmsg = j.get('error', err.msg)
+
+        res = SynapseError(err.code, errmsg, errcode)
+        return res
 
 
 class RegistrationError(SynapseError):
@@ -106,13 +148,11 @@ class UnrecognizedRequestError(SynapseError):
 
 class NotFoundError(SynapseError):
     """An error indicating we can't find the thing you asked for"""
-    def __init__(self, *args, **kwargs):
-        if "errcode" not in kwargs:
-            kwargs["errcode"] = Codes.NOT_FOUND
+    def __init__(self, msg="Not found", errcode=Codes.NOT_FOUND):
         super(NotFoundError, self).__init__(
             404,
-            "Not found",
-            **kwargs
+            msg,
+            errcode=errcode
         )
 
 
@@ -173,7 +213,6 @@ class LimitExceededError(SynapseError):
                  errcode=Codes.LIMIT_EXCEEDED):
         super(LimitExceededError, self).__init__(code, msg, errcode)
         self.retry_after_ms = retry_after_ms
-        self.response_code_message = "Too Many Requests"
 
     def error_dict(self):
         return cs_error(
@@ -243,6 +282,19 @@ class FederationError(RuntimeError):
 
 
 class HttpResponseException(CodeMessageException):
+    """
+    Represents an HTTP-level failure of an outbound request
+
+    Attributes:
+        response (str): body of response
+    """
     def __init__(self, code, msg, response):
-        self.response = response
+        """
+
+        Args:
+            code (int): HTTP status code
+            msg (str): reason phrase from HTTP response status line
+            response (str): body of response
+        """
         super(HttpResponseException, self).__init__(code, msg)
+        self.response = response
