@@ -19,6 +19,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, AuthError
 from synapse.types import UserID
+from synapse.handlers.presence import format_user_presence_state
 from synapse.http.servlet import parse_json_object_from_request
 from .base import ClientV1RestServlet, client_path_patterns
 
@@ -33,6 +34,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(PresenceStatusRestServlet, self).__init__(hs)
         self.presence_handler = hs.get_presence_handler()
+        self.clock = hs.get_clock()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -48,6 +50,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
                 raise AuthError(403, "You are not allowed to see their presence.")
 
         state = yield self.presence_handler.get_state(target_user=user)
+        state = format_user_presence_state(state, self.clock.time_msec())
 
         defer.returnValue((200, state))
 

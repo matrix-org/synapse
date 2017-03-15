@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from synapse.api.errors import SynapseError
+from synapse.storage.presence import UserPresenceState
 from synapse.types import UserID, RoomID
 
 from twisted.internet import defer
@@ -253,19 +254,30 @@ class Filter(object):
         Returns:
             bool: True if the event matches
         """
-        sender = event.get("sender", None)
-        if not sender:
-            # Presence events have their 'sender' in content.user_id
-            content = event.get("content")
-            # account_data has been allowed to have non-dict content, so check type first
-            if isinstance(content, dict):
-                sender = content.get("user_id")
+        if isinstance(event, UserPresenceState):
+            sender = event.user_id
+            room_id = None
+            ev_type = "m.presence"
+            is_url = False
+        else:
+            sender = event.get("sender", None)
+            if not sender:
+                # Presence events have their 'sender' in content.user_id
+                content = event.get("content")
+                # account_data has been allowed to have non-dict content, so
+                # check type first
+                if isinstance(content, dict):
+                    sender = content.get("user_id")
+
+            room_id = event.get("room_id", None)
+            ev_type = event.get("type", None)
+            is_url = "url" in event.get("content", {})
 
         return self.check_fields(
-            event.get("room_id", None),
+            room_id,
             sender,
-            event.get("type", None),
-            "url" in event.get("content", {})
+            ev_type,
+            is_url,
         )
 
     def check_fields(self, room_id, sender, event_type, contains_url):
