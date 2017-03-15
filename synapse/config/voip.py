@@ -23,7 +23,7 @@ class VoipConfig(Config):
         self.turn_username = config.get("turn_username")
         self.turn_password = config.get("turn_password")
         self.turn_user_lifetime = self.parse_duration(config["turn_user_lifetime"])
-        self.turn_allow_guests = config.get("turn_allow_guests") or True
+        self.turn_allow_guests = config.get("turn_allow_guests", True)
 
     def default_config(self, **kwargs):
         return """\
