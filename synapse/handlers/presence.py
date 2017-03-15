@@ -1157,6 +1157,8 @@ def handle_timeout(state, is_mine, syncing_user_ids, now):
         # If there are have been no sync for a while (and none ongoing),
         # set presence to offline
         if user_id not in syncing_user_ids:
+            # If the user has done something recently but hasn't synced,
+            # don't set them as offline.
             sync_or_active = max(state.last_user_sync_ts, state.last_active_ts)
             if now - sync_or_active > SYNC_ONLINE_TIMEOUT:
                 state = state.copy_and_replace(
