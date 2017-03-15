@@ -29,7 +29,6 @@ from synapse.api.errors import SynapseError
 from synapse.api.constants import PresenceState
 from ._base import client_v2_patterns
 
-import copy
 import itertools
 import logging
 
