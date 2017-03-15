@@ -254,6 +254,9 @@ class Filter(object):
         Returns:
             bool: True if the event matches
         """
+        # We usually get the full "events" as dictionaries coming through,
+        # except for presence which actually gets passed around as its own
+        # namedtuple type.
         if isinstance(event, UserPresenceState):
             sender = event.user_id
             room_id = None
