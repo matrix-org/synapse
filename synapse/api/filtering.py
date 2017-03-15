@@ -265,7 +265,9 @@ class Filter(object):
         else:
             sender = event.get("sender", None)
             if not sender:
-                # Presence events have their 'sender' in content.user_id
+                # Presence events had their 'sender' in content.user_id, but are
+                # now handled above. We don't know if anything else uses this
+                # form. TODO: Check this and probably remove it.
                 content = event.get("content")
                 # account_data has been allowed to have non-dict content, so
                 # check type first
