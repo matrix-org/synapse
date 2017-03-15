@@ -808,7 +808,7 @@ directory of your choice::
 Synapse has a number of external dependencies, that are easiest
 to install using pip and a virtualenv::
 
-    virtualenv env
+    virtualenv -p python2.7 env
     source env/bin/activate
     python synapse/python_dependencies.py | xargs pip install
     pip install lxml mock
