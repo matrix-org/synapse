@@ -18,6 +18,7 @@ from twisted.internet import defer
 from synapse.http.servlet import (
     RestServlet, parse_string, parse_integer, parse_boolean
 )
+from synapse.handlers.presence import format_user_presence_state
 from synapse.handlers.sync import SyncConfig
 from synapse.types import StreamToken
 from synapse.events.utils import (
@@ -28,7 +29,6 @@ from synapse.api.errors import SynapseError
 from synapse.api.constants import PresenceState
 from ._base import client_v2_patterns
 
-import copy
 import itertools
 import logging
 
@@ -194,12 +194,18 @@ class SyncRestServlet(RestServlet):
         defer.returnValue((200, response_content))
 
     def encode_presence(self, events, time_now):
-        formatted = []
-        for event in events:
-            event = copy.deepcopy(event)
-            event['sender'] = event['content'].pop('user_id')
-            formatted.append(event)
-        return {"events": formatted}
+        return {
+            "events": [
+                {
+                    "type": "m.presence",
+                    "sender": event.user_id,
+                    "content": format_user_presence_state(
+                        event, time_now, include_user_id=False
+                    ),
+                }
+                for event in events
+            ]
+        }
 
     def encode_joined(self, rooms, time_now, token_id, event_fields):
         """
