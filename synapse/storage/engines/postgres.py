@@ -65,6 +65,5 @@ class PostgresEngine(object):
 
     def set_user_schema(self, db_conn, db_schema_name, db_user):
         cursor = db_conn.cursor()
-        cursor.execute("CREATE SCHEMA IF NOT EXISTS " + db_schema_name)
         cursor.execute("ALTER USER " + db_user + " SET SEARCH_PATH TO " + db_schema_name)
         cursor.close()
