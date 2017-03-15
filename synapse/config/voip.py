@@ -44,7 +44,7 @@ class VoipConfig(Config):
         turn_user_lifetime: "1h"
 
         # Whether guests should be allowed to use the TURN server.
-        # This is defaults to True, otherwise VoIP will be unreliable for guests.
+        # This defaults to True, otherwise VoIP will be unreliable for guests.
         # However, it does introduce a slight security risk as it allows users to
         # connect to arbitrary endpoints without having first signed up for a
         # valid account (e.g. by passing a CAPTCHA).
