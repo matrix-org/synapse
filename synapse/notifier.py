@@ -16,6 +16,7 @@
 from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError
+from synapse.handlers.presence import format_user_presence_state
 
 from synapse.util import DeferredTimedOutError
 from synapse.util.logutils import log_function
@@ -412,6 +413,15 @@ class Notifier(object):
                         new_events,
                         is_peeking=is_peeking,
                     )
+                elif name == "presence":
+                    now = self.clock.time_msec()
+                    new_events[:] = [
+                        {
+                            "type": "m.presence",
+                            "content": format_user_presence_state(event, now),
+                        }
+                        for event in new_events
+                    ]
 
                 events.extend(new_events)
                 end_token = end_token.copy_and_replace(keyname, new_key)

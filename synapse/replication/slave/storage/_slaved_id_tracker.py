@@ -27,4 +27,9 @@ class SlavedIdTracker(object):
         self._current = (max if self.step > 0 else min)(self._current, new_id)
 
     def get_current_token(self):
+        """
+
+        Returns:
+            int
+        """
         return self._current
