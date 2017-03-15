@@ -37,6 +37,10 @@ metrics = synapse.metrics.get_metrics_for(__name__)
 
 notified_events_counter = metrics.register_counter("notified_events")
 
+users_woken_by_stream_counter = metrics.register_counter(
+    "users_woken_by_stream", labels=["stream"]
+)
+
 
 # TODO(paul): Should be shared somewhere
 def count(func, l):
@@ -99,6 +103,8 @@ class _NotifierUserStream(object):
         self.last_notified_token = self.current_token
         self.last_notified_ms = time_now_ms
         noify_deferred = self.notify_deferred
+
+        users_woken_by_stream_counter.inc(stream_key)
 
         with PreserveLoggingContext():
             self.notify_deferred = ObservableDeferred(defer.Deferred())
