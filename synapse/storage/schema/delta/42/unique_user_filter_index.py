@@ -5,7 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_upgrade(cur, database_engine, *args, **kwargs):
     if isinstance(database_engine, PostgresEngine):
         select_clause = '''
         CREATE TABLE user_filters_migration AS
@@ -35,5 +35,5 @@ def run_create(cur, database_engine, *args, **kwargs):
         cur.executescript(sql)
 
 
-def run_upgrade(cur, database_engine, *args, **kwargs):
+def run_create(cur, database_engine, *args, **kwargs):
     pass
