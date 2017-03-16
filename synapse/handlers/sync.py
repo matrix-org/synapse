@@ -226,8 +226,7 @@ class SyncHandler(object):
         with Measure(self.clock, "ephemeral_by_room"):
             typing_key = since_token.typing_key if since_token else "0"
 
-            rooms = yield self.store.get_rooms_for_user(sync_config.user.to_string())
-            room_ids = [room.room_id for room in rooms]
+            room_ids = yield self.store.get_rooms_for_user(sync_config.user.to_string())
 
             typing_source = self.event_sources.sources["typing"]
             typing, typing_key = yield typing_source.get_new_events(
@@ -569,16 +568,15 @@ class SyncHandler(object):
         since_token = sync_result_builder.since_token
 
         if since_token and since_token.device_list_key:
-            rooms = yield self.store.get_rooms_for_user(user_id)
-            room_ids = set(r.room_id for r in rooms)
+            room_ids = yield self.store.get_rooms_for_user(user_id)
 
             user_ids_changed = set()
             changed = yield self.store.get_user_whose_devices_changed(
                 since_token.device_list_key
             )
             for other_user_id in changed:
-                other_rooms = yield self.store.get_rooms_for_user(other_user_id)
-                if room_ids.intersection(e.room_id for e in other_rooms):
+                other_room_ids = yield self.store.get_rooms_for_user(other_user_id)
+                if room_ids.intersection(other_room_ids):
                     user_ids_changed.add(other_user_id)
 
             defer.returnValue(user_ids_changed)
@@ -776,7 +774,7 @@ class SyncHandler(object):
                         since_token.account_data_key,
                     )
                     if not tags_by_room:
-                        logger.info("no-oping sync")
+                        logger.debug("no-oping sync")
                         defer.returnValue(([], []))
 
         ignored_account_data = yield self.store.get_global_account_data_by_type_for_user(
@@ -851,8 +849,7 @@ class SyncHandler(object):
             rooms = yield self.store.get_app_service_rooms(app_service)
             joined_room_ids = set(r.room_id for r in rooms)
         else:
-            rooms = yield self.store.get_rooms_for_user(user_id)
-            joined_room_ids = set(r.room_id for r in rooms)
+            joined_room_ids = yield self.store.get_rooms_for_user(user_id)
 
         strema_id = RoomStreamToken.parse_stream_token(since_token.room_key).stream
         for room_id in joined_room_ids:
@@ -884,8 +881,7 @@ class SyncHandler(object):
             rooms = yield self.store.get_app_service_rooms(app_service)
             joined_room_ids = set(r.room_id for r in rooms)
         else:
-            rooms = yield self.store.get_rooms_for_user(user_id)
-            joined_room_ids = set(r.room_id for r in rooms)
+            joined_room_ids = yield self.store.get_rooms_for_user(user_id)
 
         # Get a list of membership change events that have happened.
         rooms_changed = yield self.store.get_membership_changes_for_user(
