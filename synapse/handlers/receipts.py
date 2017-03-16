@@ -210,10 +210,9 @@ class ReceiptEventSource(object):
         else:
             from_key = None
 
-        rooms = yield self.store.get_rooms_for_user(user.to_string())
-        rooms = [room.room_id for room in rooms]
+        room_ids = yield self.store.get_rooms_for_user(user.to_string())
         events = yield self.store.get_linearized_receipts_for_rooms(
-            rooms,
+            room_ids,
             from_key=from_key,
             to_key=to_key,
         )

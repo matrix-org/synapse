@@ -156,11 +156,11 @@ class ProfileHandler(BaseHandler):
 
         self.ratelimit(requester)
 
-        joins = yield self.store.get_rooms_for_user(
+        room_ids = yield self.store.get_rooms_for_user(
             user.to_string(),
         )
 
-        for j in joins:
+        for room_id in room_ids:
             handler = self.hs.get_handlers().room_member_handler
             try:
                 # Assume the user isn't a guest because we don't let guests set
@@ -171,12 +171,12 @@ class ProfileHandler(BaseHandler):
                 yield handler.update_membership(
                     requester,
                     user,
-                    j.room_id,
+                    room_id,
                     "join",  # We treat a profile update like a join.
                     ratelimit=False,  # Try to hide that these events aren't atomic.
                 )
             except Exception as e:
                 logger.warn(
                     "Failed to update join event for room %s - %s",
-                    j.room_id, str(e.message)
+                    room_id, str(e.message)
                 )
