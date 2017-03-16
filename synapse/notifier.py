@@ -304,8 +304,7 @@ class Notifier(object):
         if user_stream is None:
             current_token = yield self.event_sources.get_current_token()
             if room_ids is None:
-                rooms = yield self.store.get_rooms_for_user(user_id)
-                room_ids = [room.room_id for room in rooms]
+                room_ids = yield self.store.get_rooms_for_user(user_id)
             user_stream = _NotifierUserStream(
                 user_id=user_id,
                 rooms=room_ids,
@@ -454,8 +453,7 @@ class Notifier(object):
 
     @defer.inlineCallbacks
     def _get_room_ids(self, user, explicit_room_id):
-        joined_rooms = yield self.store.get_rooms_for_user(user.to_string())
-        joined_room_ids = map(lambda r: r.room_id, joined_rooms)
+        joined_room_ids = yield self.store.get_rooms_for_user(user.to_string())
         if explicit_room_id:
             if explicit_room_id in joined_room_ids:
                 defer.returnValue(([explicit_room_id], True))

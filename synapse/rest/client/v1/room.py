@@ -749,8 +749,7 @@ class JoinedRoomsRestServlet(ClientV1RestServlet):
     def on_GET(self, request):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
 
-        rooms = yield self.store.get_rooms_for_user(requester.user.to_string())
-        room_ids = set(r.room_id for r in rooms)  # Ensure they're unique.
+        room_ids = yield self.store.get_rooms_for_user(requester.user.to_string())
         defer.returnValue((200, {"joined_rooms": list(room_ids)}))
 
 
