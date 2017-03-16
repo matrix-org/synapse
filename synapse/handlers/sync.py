@@ -764,6 +764,8 @@ class SyncHandler(object):
             )
             sync_result_builder.now_token = now_token
 
+        # We check up front if anything has changed, if it hasn't then there is
+        # no point in going futher.
         since_token = sync_result_builder.since_token
         if not sync_result_builder.full_state:
             if since_token and not ephemeral_by_room and not account_data_by_room:
@@ -830,11 +832,14 @@ class SyncHandler(object):
 
     @defer.inlineCallbacks
     def _have_rooms_changed(self, sync_result_builder):
+        """Returns whether any rooms have changed since the sync. Must be an
+        incremental sync
+        """
         user_id = sync_result_builder.sync_config.user.to_string()
         since_token = sync_result_builder.since_token
         now_token = sync_result_builder.now_token
 
-        # assert since_token
+        assert since_token
 
         # Get a list of membership change events that have happened.
         rooms_changed = yield self.store.get_membership_changes_for_user(
@@ -851,9 +856,9 @@ class SyncHandler(object):
         else:
             joined_room_ids = yield self.store.get_rooms_for_user(user_id)
 
-        strema_id = RoomStreamToken.parse_stream_token(since_token.room_key).stream
+        stream_id = RoomStreamToken.parse_stream_token(since_token.room_key).stream
         for room_id in joined_room_ids:
-            if self.store.has_room_changed_since(room_id, strema_id):
+            if self.store.has_room_changed_since(room_id, stream_id):
                 defer.returnValue(True)
         defer.returnValue(False)
 
