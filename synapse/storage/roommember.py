@@ -276,6 +276,8 @@ class RoomMemberStore(SQLBaseStore):
 
     @cachedInlineCallbacks(max_entries=500000, iterable=True)
     def get_rooms_for_user(self, user_id):
+        """Returns a set of room_ids the user is currently joined to
+        """
         rooms = yield self.get_rooms_for_user_where_membership_is(
             user_id, membership_list=[Membership.JOIN],
         )

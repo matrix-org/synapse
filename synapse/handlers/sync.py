@@ -832,8 +832,8 @@ class SyncHandler(object):
 
     @defer.inlineCallbacks
     def _have_rooms_changed(self, sync_result_builder):
-        """Returns whether any rooms have changed since the sync. Must be an
-        incremental sync
+        """Returns whether there may be any new events that should be sent down
+        the sync. Returns True if there are.
         """
         user_id = sync_result_builder.sync_config.user.to_string()
         since_token = sync_result_builder.since_token
