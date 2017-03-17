@@ -29,9 +29,21 @@ import time
 SYNAPSE = [sys.executable, "-B", "-m", "synapse.app.homeserver"]
 
 GREEN = "\x1b[1;32m"
-YELLOW = "x1b[01;33m"
+YELLOW = "\x1b[1;33m"
 RED = "\x1b[1;31m"
 NORMAL = "\x1b[m"
+
+
+def pid_running(pid):
+    try:
+        os.kill(pid, 0)
+    except OSError, err:
+        if err.errno != errno.EPERM:
+            return False
+        else:
+            return True
+    else:
+        return True
 
 
 def write(message, colour=NORMAL, stream=sys.stdout):
@@ -39,6 +51,11 @@ def write(message, colour=NORMAL, stream=sys.stdout):
         stream.write(message + "\n")
     else:
         stream.write(colour + message + NORMAL + "\n")
+
+
+def abort(message, colour=RED, stream=sys.stdout):
+    write(message, colour, stream)
+    raise SystemExit
 
 
 def start(configfile):
@@ -85,8 +102,10 @@ def stop(pidfile, app):
         except OSError, err:
             if err.errno == errno.ESRCH:
                 write("%s not running" % (app,), colour=YELLOW)
+            elif err.errno == errno.EPERM:
+                abort("Cannot stop %s : Operation not permitted" % (app,))
             else:
-                write("Cannot stop %s : Operation not permitted" % (app,), colour=RED)
+                abort("Cannot stop %s : Unknown error" % (app,))
 
 
 Worker = collections.namedtuple("Worker", [
@@ -201,9 +220,8 @@ def main():
 
     # Wait for synapse to actually shutdown before starting it again
     if action == "restart" and os.path.exists(pidfile):
-        write("Waiting to restart ...")
-        # pid_str = str(open(pidfile).read())
-        while os.path.exists(pidfile):
+        pid = int(open(pidfile).read())
+        while pid_running(pid):
             time.sleep(0.1)
 
     if action == "start" or action == "restart":
