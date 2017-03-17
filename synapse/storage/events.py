@@ -645,6 +645,10 @@ class EventsStore(SQLBaseStore):
             events_and_contexts=events_and_contexts,
         )
 
+        # Insert into the state_groups, state_groups_state, and
+        # event_to_state_groups tables.
+        self._store_mult_state_groups_txn(txn, events_and_contexts)
+
         # _store_rejected_events_txn filters out any events which were
         # rejected, and returns the filtered list.
         events_and_contexts = self._store_rejected_events_txn(
@@ -1074,10 +1078,6 @@ class EventsStore(SQLBaseStore):
                 for auth_id, _ in event.auth_events
             ],
         )
-
-        # Insert into the state_groups, state_groups_state, and
-        # event_to_state_groups tables.
-        self._store_mult_state_groups_txn(txn, events_and_contexts)
 
         # Update the event_forward_extremities, event_backward_extremities and
         # event_edges tables.
