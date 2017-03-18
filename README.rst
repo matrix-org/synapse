@@ -20,7 +20,7 @@ The overall architecture is::
              https://somewhere.org/_matrix      https://elsewhere.net/_matrix
 
 ``#matrix:matrix.org`` is the official support room for Matrix, and can be
-accessed by any client from https://matrix.org/docs/projects/try-matrix-now or
+accessed by any client from https://matrix.org/docs/projects/try-matrix-now.html or
 via IRC bridge at irc://irc.freenode.net/matrix.
 
 Synapse is currently in rapid development, but as of version 0.5 we believe it
@@ -68,7 +68,7 @@ or mandatory service provider in Matrix, unlike WhatsApp, Facebook, Hangouts,
 etc.
 
 We'd like to invite you to join #matrix:matrix.org (via
-https://matrix.org/docs/projects/try-matrix-now), run a homeserver, take a look
+https://matrix.org/docs/projects/try-matrix-now.html), run a homeserver, take a look
 at the `Matrix spec <https://matrix.org/docs/spec>`_, and experiment with the
 `APIs <https://matrix.org/docs/api>`_ and `Client SDKs
 <http://matrix.org/docs/projects/try-matrix-now.html#client-sdks>`_.
@@ -321,7 +321,7 @@ Debian
 
 Matrix provides official Debian packages via apt from http://matrix.org/packages/debian/.
 Note that these packages do not include a client - choose one from
-https://matrix.org/docs/projects/try-matrix-now/ (or build your own with one of our SDKs :)
+https://matrix.org/docs/projects/try-matrix-now.html (or build your own with one of our SDKs :)
 
 Fedora
 ------
