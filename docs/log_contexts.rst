@@ -331,7 +331,7 @@ gathered:
             result = yield defer.gatherResults([d1, d2])
 
 In this case particularly, though, option two, of using
-``logcontext.preserve.fn`` almost certainly makes more sense, so that
+``logcontext.preserve_fn`` almost certainly makes more sense, so that
 ``operation1`` and ``operation2`` are both logged against the original
 logcontext. This looks like:
 
@@ -355,7 +355,7 @@ follow for any more exotic flows. It's hard not to wonder if we could have done
 something else.
 
 We're not going to rewrite Synapse now, so the following is entirely of
-acadamic interest, but I'd like to record some thoughts on an alternative
+academic interest, but I'd like to record some thoughts on an alternative
 approach.
 
 I briefly prototyped some code following an alternative set of rules. I think
