@@ -229,6 +229,7 @@ To get started, it is easiest to use the command line to register new users::
     New user localpart: erikj
     Password:
     Confirm password:
+    Make admin [no]:
     Success!
 
 This process uses a setting ``registration_shared_secret`` in
