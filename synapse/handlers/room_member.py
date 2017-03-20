@@ -177,6 +177,18 @@ class RoomMemberHandler(BaseHandler):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
+    def get_member_event(self, target, room_id):
+        latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
+        current_state_ids = yield self.state_handler.get_current_state_ids(
+            room_id, latest_event_ids=latest_event_ids,
+        )
+        state_id = current_state_ids.get((EventTypes.Member, target.to_string()))
+        result = None
+        if state_id:
+            result = yield self.store.get_event(state_id, allow_none=True)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
     def _update_membership(
             self,
             requester,
@@ -189,7 +201,6 @@ class RoomMemberHandler(BaseHandler):
             ratelimit=True,
             content=None,
     ):
-        content_specified = bool(content)
         if content is None:
             content = {}
 
@@ -257,8 +268,9 @@ class RoomMemberHandler(BaseHandler):
                 content["membership"] = Membership.JOIN
 
                 profile = self.hs.get_handlers().profile_handler
-                if not content_specified:
+                if content.get("displayname") is None:
                     content["displayname"] = yield profile.get_displayname(target)
+                if content.get("avatar_url") is None:
                     content["avatar_url"] = yield profile.get_avatar_url(target)
 
                 if requester.is_guest:
