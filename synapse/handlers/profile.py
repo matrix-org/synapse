@@ -165,9 +165,6 @@ class ProfileHandler(BaseHandler):
             try:
                 # Assume the user isn't a guest because we don't let guests set
                 # profile or avatar data.
-                # XXX why are we recreating `requester` here for each room?
-                # what was wrong with the `requester` we were passed?
-                requester = synapse.types.create_requester(user)
                 yield handler.update_membership(
                     requester,
                     user,
