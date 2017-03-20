@@ -111,7 +111,7 @@ Installing prerequisites on ArchLinux::
 Installing prerequisites on CentOS 7::
 
     sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
-                     lcms2-devel libwebp-devel tcl-devel tk-devel \
+                     lcms2-devel libwebp-devel libsodium tcl-devel tk-devel \
                      python-virtualenv libffi-devel openssl-devel
     sudo yum groupinstall "Development Tools"
 
@@ -146,6 +146,7 @@ To install the synapse homeserver run::
 
     virtualenv -p python2.7 ~/.synapse
     source ~/.synapse/bin/activate
+    pip install --upgrade pip
     pip install --upgrade setuptools
     pip install https://github.com/matrix-org/synapse/tarball/master
 
