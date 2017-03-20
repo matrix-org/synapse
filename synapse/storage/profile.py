@@ -24,6 +24,14 @@ class ProfileStore(SQLBaseStore):
             desc="create_profile",
         )
 
+    def get_profile(self, user_localpart):
+        return self._simple_select_one(
+            table="profiles",
+            keyvalues={"user_id": user_localpart},
+            retcols=["displayname", "avatar_url"],
+            desc="get_profile",
+        )
+
     def get_profile_displayname(self, user_localpart):
         return self._simple_select_one_onecol(
             table="profiles",
