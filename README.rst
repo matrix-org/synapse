@@ -332,9 +332,8 @@ https://obs.infoserver.lv/project/monitor/matrix-synapse
 ArchLinux
 ---------
 
-The quickest way to get up and running with ArchLinux is probably with Ivan
-Shapovalov's AUR package from
-https://aur.archlinux.org/packages/matrix-synapse/, which should pull in all
+The quickest way to get up and running with ArchLinux is probably with the community package
+https://www.archlinux.org/packages/community/any/matrix-synapse/, which should pull in all
 the necessary dependencies.
 
 Alternatively, to install using pip a few changes may be needed as ArchLinux

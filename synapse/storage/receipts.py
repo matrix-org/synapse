@@ -351,6 +351,7 @@ class ReceiptsStore(SQLBaseStore):
                 room_id=room_id,
                 user_id=user_id,
                 topological_ordering=topological_ordering,
+                stream_ordering=stream_ordering,
             )
 
         return True

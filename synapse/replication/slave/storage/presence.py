@@ -18,6 +18,7 @@ from ._slaved_id_tracker import SlavedIdTracker
 
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.storage import DataStore
+from synapse.storage.presence import PresenceStore
 
 
 class SlavedPresenceStore(BaseSlavedStore):
@@ -35,7 +36,8 @@ class SlavedPresenceStore(BaseSlavedStore):
 
     _get_active_presence = DataStore._get_active_presence.__func__
     take_presence_startup_info = DataStore.take_presence_startup_info.__func__
-    get_presence_for_users = DataStore.get_presence_for_users.__func__
+    _get_presence_for_user = PresenceStore.__dict__["_get_presence_for_user"]
+    get_presence_for_users = PresenceStore.__dict__["get_presence_for_users"]
 
     def get_current_presence_token(self):
         return self._presence_id_gen.get_current_token()
