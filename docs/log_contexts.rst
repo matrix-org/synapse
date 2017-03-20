@@ -94,13 +94,13 @@ To circumvent this problem, synapse code assumes that, wherever you have a
 deferred, you will want to yield on it. To that end, whereever functions return
 a deferred, we adopt the following conventions:
 
-.. note:: Rules for functions returning deferreds:
+**Rules for functions returning deferreds:**
 
- * If the deferred is already complete, the function returns with the same
-   logcontext it started with.
- * If the deferred is incomplete, the function clears the logcontext before
-   returning; when the deferred completes, it restores the logcontext before
-   running any callbacks.
+  * If the deferred is already complete, the function returns with the same
+    logcontext it started with.
+  * If the deferred is incomplete, the function clears the logcontext before
+    returning; when the deferred completes, it restores the logcontext before
+    running any callbacks.
 
 That sounds complicated, but actually it means a lot of code (including the
 example above) "just works". There are two cases:
