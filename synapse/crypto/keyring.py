@@ -96,10 +96,11 @@ class Keyring(object):
         verify_requests = []
 
         for server_name, json_object in server_and_json:
-            logger.debug("Verifying for %s", server_name)
 
             key_ids = signature_ids(json_object, server_name)
             if not key_ids:
+                logger.warn("Request from %s: no supported signature keys",
+                            server_name)
                 deferred = defer.fail(SynapseError(
                     400,
                     "Not signed with a supported algorithm",
@@ -107,6 +108,9 @@ class Keyring(object):
                 ))
             else:
                 deferred = defer.Deferred()
+
+            logger.debug("Verifying for %s with key_ids %s",
+                         server_name, key_ids)
 
             verify_request = VerifyKeyRequest(
                 server_name, key_ids, json_object, deferred
@@ -142,6 +146,9 @@ class Keyring(object):
 
             json_object = verify_request.json_object
 
+            logger.debug("Got key %s %s:%s for server %s, verifying" % (
+                key_id, verify_key.alg, verify_key.version, server_name,
+            ))
             try:
                 verify_signed_json(json_object, server_name, verify_key)
             except:
