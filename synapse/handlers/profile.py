@@ -15,6 +15,7 @@
 
 import logging
 
+from synapse.api.constants import EventTypes
 from twisted.internet import defer
 from synapse.api.errors import SynapseError, AuthError, CodeMessageException
 from synapse.types import UserID
@@ -166,21 +167,22 @@ class ProfileHandler(BaseHandler):
 
         for room_id in room_ids:
             handler = self.hs.get_handlers().room_member_handler
-            member_event = yield handler.get_member_event(user, room_id)
+            member_event = yield self.hs.get_handlers().state_handler.get_current_state(
+                room_id=room_id,
+                event_type=EventTypes.Member,
+                state_key=user.to_string()
+            )
             # This will be populated by update_membership for missing values.
-            content = {
-
-            }
+            content = {}
             logger.info("Setting member event for " + room_id)
             if member_event:
                 member_content = member_event.content
-                # Don't overwrite custom changes to displayname
+                # Don't overwrite custom changes to displayname or avatar_url
                 if member_content.get("displayname") != old_profile.get("displayname"):
-                    logger.info("Ignoring displayname, for '%s'", member_content)
+                    logger.debug("Ignoring displayname for '%s'", user.to_string())
                     content["displayname"] = member_content.get("displayname")
-                # Don't overwrite custom changes to avatar_url
                 if member_content.get("avatar_url") != old_profile.get("avatar_url"):
-                    logger.info("Ignoring avatar_url")
+                    logger.debug("Ignoring avatar_url, for '%s'", user.to_string())
                     content["avatar_url"] = member_content.get("avatar_url")
             try:
                 # Assume the user isn't a guest because we don't let guests set
@@ -191,7 +193,7 @@ class ProfileHandler(BaseHandler):
                     room_id,
                     "join",  # We treat a profile update like a join.
                     ratelimit=False,  # Try to hide that these events aren't atomic.
-                    content=content
+                    content=content,
                 )
             except Exception as e:
                 logger.warn(
