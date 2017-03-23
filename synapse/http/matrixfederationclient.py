@@ -106,12 +106,16 @@ class MatrixFederationHttpClient(object):
     def _request(self, destination, method, path,
                  body_callback, headers_dict={}, param_bytes=b"",
                  query_bytes=b"", retry_on_dns_fail=True,
-                 timeout=None, long_retries=False, backoff_on_404=False):
+                 timeout=None, long_retries=False,
+                 ignore_backoff=False,
+                 backoff_on_404=False):
         """ Creates and sends a request to the given server
         Args:
             destination (str): The remote server to send the HTTP request to.
             method (str): HTTP method
             path (str): The HTTP path
+            ignore_backoff (bool): true to ignore the historical backoff data
+                and try the request anyway.
             backoff_on_404 (bool): Back off if we get a 404
 
         Returns:
@@ -127,6 +131,7 @@ class MatrixFederationHttpClient(object):
             self.clock,
             self._store,
             backoff_on_404=backoff_on_404,
+            ignore_backoff=ignore_backoff,
         )
 
         destination = destination.encode("ascii")
@@ -271,7 +276,9 @@ class MatrixFederationHttpClient(object):
 
     @defer.inlineCallbacks
     def put_json(self, destination, path, data={}, json_data_callback=None,
-                 long_retries=False, timeout=None, backoff_on_404=False):
+                 long_retries=False, timeout=None,
+                 ignore_backoff=False,
+                 backoff_on_404=False):
         """ Sends the specifed json data using PUT
 
         Args:
@@ -286,6 +293,8 @@ class MatrixFederationHttpClient(object):
                 retry for a short or long time.
             timeout(int): How long to try (in ms) the destination for before
                 giving up. None indicates no timeout.
+            ignore_backoff (bool): true to ignore the historical backoff data
+                and try the request anyway.
             backoff_on_404 (bool): True if we should count a 404 response as
                 a failure of the server (and should therefore back off future
                 requests)
@@ -319,6 +328,7 @@ class MatrixFederationHttpClient(object):
             headers_dict={"Content-Type": ["application/json"]},
             long_retries=long_retries,
             timeout=timeout,
+            ignore_backoff=ignore_backoff,
             backoff_on_404=backoff_on_404,
         )
 
@@ -331,7 +341,7 @@ class MatrixFederationHttpClient(object):
 
     @defer.inlineCallbacks
     def post_json(self, destination, path, data={}, long_retries=False,
-                  timeout=None):
+                  timeout=None, ignore_backoff=False):
         """ Sends the specifed json data using POST
 
         Args:
@@ -344,7 +354,8 @@ class MatrixFederationHttpClient(object):
                 retry for a short or long time.
             timeout(int): How long to try (in ms) the destination for before
                 giving up. None indicates no timeout.
-
+            ignore_backoff (bool): true to ignore the historical backoff data and
+                try the request anyway.
         Returns:
             Deferred: Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body. On a 4xx or 5xx error response a
@@ -368,6 +379,7 @@ class MatrixFederationHttpClient(object):
             headers_dict={"Content-Type": ["application/json"]},
             long_retries=long_retries,
             timeout=timeout,
+            ignore_backoff=ignore_backoff,
         )
 
         if 200 <= response.code < 300:
@@ -380,7 +392,7 @@ class MatrixFederationHttpClient(object):
 
     @defer.inlineCallbacks
     def get_json(self, destination, path, args={}, retry_on_dns_fail=True,
-                 timeout=None):
+                 timeout=None, ignore_backoff=False):
         """ GETs some json from the given host homeserver and path
 
         Args:
@@ -392,6 +404,8 @@ class MatrixFederationHttpClient(object):
             timeout (int): How long to try (in ms) the destination for before
                 giving up. None indicates no timeout and that the request will
                 be retried.
+            ignore_backoff (bool): true to ignore the historical backoff data
+                and try the request anyway.
         Returns:
             Deferred: Succeeds when we get *any* HTTP response.
 
@@ -424,6 +438,7 @@ class MatrixFederationHttpClient(object):
             body_callback=body_callback,
             retry_on_dns_fail=retry_on_dns_fail,
             timeout=timeout,
+            ignore_backoff=ignore_backoff,
         )
 
         if 200 <= response.code < 300:
@@ -436,13 +451,16 @@ class MatrixFederationHttpClient(object):
 
     @defer.inlineCallbacks
     def get_file(self, destination, path, output_stream, args={},
-                 retry_on_dns_fail=True, max_size=None):
+                 retry_on_dns_fail=True, max_size=None,
+                 ignore_backoff=False):
         """GETs a file from a given homeserver
         Args:
             destination (str): The remote server to send the HTTP request to.
             path (str): The HTTP path to GET.
             output_stream (file): File to write the response body to.
             args (dict): Optional dictionary used to create the query string.
+            ignore_backoff (bool): true to ignore the historical backoff data
+                and try the request anyway.
         Returns:
             Deferred: resolves with an (int,dict) tuple of the file length and
             a dict of the response headers.
@@ -473,7 +491,8 @@ class MatrixFederationHttpClient(object):
             path,
             query_bytes=query_bytes,
             body_callback=body_callback,
-            retry_on_dns_fail=retry_on_dns_fail
+            retry_on_dns_fail=retry_on_dns_fail,
+            ignore_backoff=ignore_backoff,
         )
 
         headers = dict(response.headers.getAllRawHeaders())
