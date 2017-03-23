@@ -19,6 +19,7 @@ from twisted.internet import defer
 
 import ujson as json
 import jsonschema
+from jsonschema import FormatChecker
 
 FILTER_SCHEMA = {
     "additionalProperties": False,
@@ -55,16 +56,10 @@ ROOM_FILTER_SCHEMA = {
     "type": "object",
     "properties": {
         "not_rooms": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
+            "$ref": "#/definitions/room_id_array"
         },
         "rooms": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
+            "$ref": "#/definitions/room_id_array"
         },
         "ephemeral": {
             "$ref": "#/definitions/room_event_filter"
@@ -110,16 +105,10 @@ ROOM_EVENT_FILTER_SCHEMA = {
             }
         },
         "rooms": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
+            "$ref": "#/definitions/room_id_array"
         },
         "not_rooms": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
+            "$ref": "#/definitions/room_id_array"
         },
         "contains_url": {
             "type": "boolean"
@@ -131,7 +120,15 @@ USER_ID_ARRAY_SCHEMA = {
     "type": "array",
     "items": {
         "type": "string",
-        "pattern": "^@[A-Za-z0-9_]+:[A-Za-z0-9_\-\.]+$"
+        "format": "matrix_user_id"
+    }
+}
+
+ROOM_ID_ARRAY_SCHEMA = {
+    "type": "array",
+    "items": {
+        "type": "string",
+        "format": "matrix_room_id"
     }
 }
 
@@ -140,6 +137,7 @@ USER_FILTER_SCHEMA = {
     "description": "schema for a Sync filter",
     "type": "object",
     "definitions": {
+        "room_id_array": ROOM_ID_ARRAY_SCHEMA,
         "user_id_array": USER_ID_ARRAY_SCHEMA,
         "filter": FILTER_SCHEMA,
         "room_filter": ROOM_FILTER_SCHEMA,
@@ -175,6 +173,16 @@ USER_FILTER_SCHEMA = {
 }
 
 
+@FormatChecker.cls_checks('matrix_room_id')
+def matrix_room_id_validator(room_id_str):
+    return RoomID.from_string(room_id_str)
+
+
+@FormatChecker.cls_checks('matrix_user_id')
+def matrix_user_id_validator(user_id_str):
+    return UserID.from_string(user_id_str)
+
+
 class Filtering(object):
 
     def __init__(self, hs):
@@ -208,7 +216,8 @@ class Filtering(object):
         # individual top-level key e.g. public_user_data. Filters are made of
         # many definitions.
         try:
-            jsonschema.validate(user_filter_json, USER_FILTER_SCHEMA)
+            jsonschema.validate(user_filter_json, USER_FILTER_SCHEMA,
+                                format_checker=FormatChecker())
         except jsonschema.ValidationError as e:
             raise SynapseError(400, e.message)
 

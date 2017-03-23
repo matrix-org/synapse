@@ -25,6 +25,8 @@ from synapse.api.filtering import Filter
 from synapse.events import FrozenEvent
 from synapse.api.errors import SynapseError
 
+import jsonschema
+
 user_localpart = "test_user"
 
 
@@ -61,7 +63,9 @@ class FilteringTestCase(unittest.TestCase):
             {"account_data": "Hello World"},
             {"event_fields": ["\\foo"]},
             {"room": {"timeline": {"limit": 0}, "state": {"not_bars": ["*"]}}},
-            {"event_format": "other"}
+            {"event_format": "other"},
+            {"room": {"not_rooms": ["#foo:pik-test"]}},
+            {"presence": {"senders": ["@bar;pik.test.com"]}}
         ]
         for filter in invalid_filters:
             with self.assertRaises(SynapseError) as check_filter_error:
@@ -76,8 +80,8 @@ class FilteringTestCase(unittest.TestCase):
                     "state": {"not_types": ["m.room.member"]},
                     "ephemeral": {"limit": 0, "not_types": ["*"]},
                     "include_leave": False,
-                    "rooms": ["#dee:pik-test"],
-                    "not_rooms": ["#gee:pik-test"],
+                    "rooms": ["!dee:pik-test"],
+                    "not_rooms": ["!gee:pik-test"],
                     "account_data": {"limit": 0, "types": ["*"]}
                 }
             },
@@ -108,7 +112,10 @@ class FilteringTestCase(unittest.TestCase):
             }
         ]
         for filter in valid_filters:
-            self.filtering.check_valid_filter(filter)
+            try:
+                self.filtering.check_valid_filter(filter)
+            except jsonschema.ValidationError as e:
+                self.fail(e)
 
     def test_limits_are_applied(self):
         # TODO

@@ -33,8 +33,8 @@ PATH_PREFIX = "/_matrix/client/v2_alpha"
 class FilterTestCase(unittest.TestCase):
 
     USER_ID = "@apple:test"
-    EXAMPLE_FILTER = {"type": ["m.*"]}
-    EXAMPLE_FILTER_JSON = '{"type": ["m.*"]}'
+    EXAMPLE_FILTER = {"room": {"timeline": {"types": ["m.room.message"]}}}
+    EXAMPLE_FILTER_JSON = '{"room": {"timeline": {"types": ["m.room.message"]}}}'
     TO_REGISTER = [filter]
 
     @defer.inlineCallbacks
