@@ -23,6 +23,7 @@ from tests.utils import (
 
 from synapse.api.filtering import Filter
 from synapse.events import FrozenEvent
+from synapse.api.errors import SynapseError
 
 user_localpart = "test_user"
 
@@ -33,7 +34,6 @@ def MockEvent(**kwargs):
     if "type" not in kwargs:
         kwargs["type"] = "fake_type"
     return FrozenEvent(kwargs)
-
 
 class FilteringTestCase(unittest.TestCase):
 
@@ -53,6 +53,22 @@ class FilteringTestCase(unittest.TestCase):
         self.filtering = hs.get_filtering()
 
         self.datastore = hs.get_datastore()
+
+    def test_errors_on_invalid_filters(self):
+        invalid_filters = [
+            { "boom": {} },
+            { "account_data": "Hello World" },
+            { "event_fields": ["\\foo"] },
+            { "room": { "timeline" : { "limit" : 0 }, "state": { "not_bars": ["*"]} } },
+        ]
+        for filter in invalid_filters:
+            with self.assertRaises(SynapseError) as check_filter_error:
+                self.filtering.check_valid_filter(filter)
+                self.assertIsInstance(check_filter_error.exception, SynapseError)
+
+    def test_limits_are_applied(self):
+        #TODO
+        pass
 
     def test_definition_types_works_with_literals(self):
         definition = {
