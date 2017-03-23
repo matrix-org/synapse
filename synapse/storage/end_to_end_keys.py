@@ -14,6 +14,8 @@
 # limitations under the License.
 from twisted.internet import defer
 
+from synapse.api.errors import SynapseError
+
 from canonicaljson import encode_canonical_json
 import ujson as json
 
@@ -150,8 +152,8 @@ class EndToEndKeyStore(SQLBaseStore):
             if key_id in existing_key_map:
                 ex_algo, ex_bytes = existing_key_map[key_id]
                 if algorithm != ex_algo or json_bytes != ex_bytes:
-                    raise Exception(
-                        "One time key with key_id %r already exists" % (key_id,)
+                    raise SynapseError(
+                        400, "One time key with key_id %r already exists" % (key_id,)
                     )
             else:
                 new_keys.append((algorithm, key_id, json_bytes))
