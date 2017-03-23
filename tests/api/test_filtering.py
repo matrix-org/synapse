@@ -23,6 +23,9 @@ from tests.utils import (
 
 from synapse.api.filtering import Filter
 from synapse.events import FrozenEvent
+from synapse.api.errors import SynapseError
+
+import jsonschema
 
 user_localpart = "test_user"
 
@@ -53,6 +56,70 @@ class FilteringTestCase(unittest.TestCase):
         self.filtering = hs.get_filtering()
 
         self.datastore = hs.get_datastore()
+
+    def test_errors_on_invalid_filters(self):
+        invalid_filters = [
+            {"boom": {}},
+            {"account_data": "Hello World"},
+            {"event_fields": ["\\foo"]},
+            {"room": {"timeline": {"limit": 0}, "state": {"not_bars": ["*"]}}},
+            {"event_format": "other"},
+            {"room": {"not_rooms": ["#foo:pik-test"]}},
+            {"presence": {"senders": ["@bar;pik.test.com"]}}
+        ]
+        for filter in invalid_filters:
+            with self.assertRaises(SynapseError) as check_filter_error:
+                self.filtering.check_valid_filter(filter)
+                self.assertIsInstance(check_filter_error.exception, SynapseError)
+
+    def test_valid_filters(self):
+        valid_filters = [
+            {
+                "room": {
+                    "timeline": {"limit": 20},
+                    "state": {"not_types": ["m.room.member"]},
+                    "ephemeral": {"limit": 0, "not_types": ["*"]},
+                    "include_leave": False,
+                    "rooms": ["!dee:pik-test"],
+                    "not_rooms": ["!gee:pik-test"],
+                    "account_data": {"limit": 0, "types": ["*"]}
+                }
+            },
+            {
+                "room": {
+                    "state": {
+                        "types": ["m.room.*"],
+                        "not_rooms": ["!726s6s6q:example.com"]
+                    },
+                    "timeline": {
+                        "limit": 10,
+                        "types": ["m.room.message"],
+                        "not_rooms": ["!726s6s6q:example.com"],
+                        "not_senders": ["@spam:example.com"]
+                    },
+                    "ephemeral": {
+                        "types": ["m.receipt", "m.typing"],
+                        "not_rooms": ["!726s6s6q:example.com"],
+                        "not_senders": ["@spam:example.com"]
+                    }
+                },
+                "presence": {
+                    "types": ["m.presence"],
+                    "not_senders": ["@alice:example.com"]
+                },
+                "event_format": "client",
+                "event_fields": ["type", "content", "sender"]
+            }
+        ]
+        for filter in valid_filters:
+            try:
+                self.filtering.check_valid_filter(filter)
+            except jsonschema.ValidationError as e:
+                self.fail(e)
+
+    def test_limits_are_applied(self):
+        # TODO
+        pass
 
     def test_definition_types_works_with_literals(self):
         definition = {
