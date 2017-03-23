@@ -134,13 +134,6 @@ def filter_events_for_clients(store, user_tuples, events, event_id_to_state):
             if prev_membership not in MEMBERSHIP_PRIORITY:
                 prev_membership = "leave"
 
-            # Always allow the user to see their own leave events, otherwise
-            # they won't see the room disappear if they reject the invite
-            if membership == "leave" and (
-                prev_membership == "join" or prev_membership == "invite"
-            ):
-                return True
-
             new_priority = MEMBERSHIP_PRIORITY.index(membership)
             old_priority = MEMBERSHIP_PRIORITY.index(prev_membership)
             if old_priority < new_priority:
