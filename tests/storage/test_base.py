@@ -89,7 +89,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_select_one_1col(self):
         self.mock_txn.rowcount = 1
-        self.mock_txn.fetchall.return_value = [("Value",)]
+        self.mock_txn.__iter__ = Mock(return_value=iter([("Value",)]))
 
         value = yield self.datastore._simple_select_one_onecol(
             table="tablename",
@@ -136,7 +136,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_select_list(self):
         self.mock_txn.rowcount = 3
-        self.mock_txn.fetchall.return_value = ((1,), (2,), (3,))
+        self.mock_txn.__iter__ = Mock(return_value=iter([(1,), (2,), (3,)]))
         self.mock_txn.description = (
             ("colA", None, None, None, None, None, None),
         )

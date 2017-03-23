@@ -373,10 +373,9 @@ class StateStore(SQLBaseStore):
                         " WHERE state_group = ? %s" % (where_clause,),
                         args
                     )
-                    rows = txn.fetchall()
                     results[group].update({
                         (typ, state_key): event_id
-                        for typ, state_key, event_id in rows
+                        for typ, state_key, event_id in txn
                         if (typ, state_key) not in results[group]
                     })
 
