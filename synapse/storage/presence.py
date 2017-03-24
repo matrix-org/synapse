@@ -86,7 +86,7 @@ class PresenceStore(SQLBaseStore):
                 state.user_id, stream_id,
             )
             txn.call_after(
-                self._get_presence_for_user, (state.user_id,)
+                self._get_presence_for_user.invalidate, (state.user_id,)
             )
 
         # Actually insert new rows
