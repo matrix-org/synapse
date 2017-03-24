@@ -37,13 +37,11 @@ NORMAL = "\x1b[m"
 def pid_running(pid):
     try:
         os.kill(pid, 0)
-    except OSError, err:
-        if err.errno != errno.EPERM:
-            return False
-        else:
-            return True
-    else:
         return True
+    except OSError, err:
+        if err.errno == errno.EPERM:
+            return True
+        return False
 
 
 def write(message, colour=NORMAL, stream=sys.stdout):
@@ -53,9 +51,9 @@ def write(message, colour=NORMAL, stream=sys.stdout):
         stream.write(colour + message + NORMAL + "\n")
 
 
-def abort(message, colour=RED, stream=sys.stdout):
+def abort(message, colour=RED, stream=sys.stderr):
     write(message, colour, stream)
-    raise SystemExit
+    sys.exit(1)
 
 
 def start(configfile):
@@ -103,9 +101,9 @@ def stop(pidfile, app):
             if err.errno == errno.ESRCH:
                 write("%s not running" % (app,), colour=YELLOW)
             elif err.errno == errno.EPERM:
-                abort("Cannot stop %s : Operation not permitted" % (app,))
+                abort("Cannot stop %s: Operation not permitted" % (app,))
             else:
-                abort("Cannot stop %s : Unknown error" % (app,))
+                abort("Cannot stop %s: Unknown error" % (app,))
 
 
 Worker = collections.namedtuple("Worker", [
@@ -219,10 +217,12 @@ def main():
             stop(pidfile, "synapse.app.homeserver")
 
     # Wait for synapse to actually shutdown before starting it again
-    if action == "restart" and os.path.exists(pidfile):
-        pid = int(open(pidfile).read())
-        while pid_running(pid):
-            time.sleep(0.1)
+    if action == "restart" and start_stop_synapse:
+        if os.path.exists(pidfile):
+            write("Waiting for process to exit before restarting...")
+            pid = int(open(pidfile).read())
+            while pid_running(pid):
+                time.sleep(0.1)
 
     if action == "start" or action == "restart":
         if start_stop_synapse:
