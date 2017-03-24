@@ -309,6 +309,7 @@ class TransactionQueue(object):
             # XXX: what's this for?
             yield run_on_reactor()
 
+            pending_pdus = []
             while True:
                 device_message_edus, device_stream_id, dev_list_id = (
                     yield self._get_new_device_messages(destination)
