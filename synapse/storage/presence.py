@@ -85,8 +85,8 @@ class PresenceStore(SQLBaseStore):
                 self.presence_stream_cache.entity_has_changed,
                 state.user_id, stream_id,
             )
-            self._invalidate_cache_and_stream(
-                txn, self._get_presence_for_user, (state.user_id,)
+            txn.call_after(
+                self._get_presence_for_user.invalidate, (state.user_id,)
             )
 
         # Actually insert new rows

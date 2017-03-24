@@ -537,7 +537,7 @@ class RegisterRestServlet(RestServlet):
         # we have nowhere to store it.
         device_id = synapse.api.auth.GUEST_DEVICE_ID
         initial_display_name = params.get("initial_device_display_name")
-        self.device_handler.check_device_registered(
+        yield self.device_handler.check_device_registered(
             user_id, device_id, initial_display_name
         )
 

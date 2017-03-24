@@ -119,7 +119,8 @@ class ProfileTestCase(unittest.TestCase):
         self.mock_federation.make_query.assert_called_with(
             destination="remote",
             query_type="profile",
-            args={"user_id": "@alice:remote", "field": "displayname"}
+            args={"user_id": "@alice:remote", "field": "displayname"},
+            ignore_backoff=True,
         )
 
     @defer.inlineCallbacks
