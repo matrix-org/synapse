@@ -167,7 +167,6 @@ class SlavedEventStore(BaseSlavedStore):
     _get_rooms_for_user_where_membership_is_txn = (
         DataStore._get_rooms_for_user_where_membership_is_txn.__func__
     )
-    _get_members_rows_txn = DataStore._get_members_rows_txn.__func__
     _get_state_for_groups = DataStore._get_state_for_groups.__func__
     _get_all_state_from_cache = DataStore._get_all_state_from_cache.__func__
     _get_events_around_txn = DataStore._get_events_around_txn.__func__
