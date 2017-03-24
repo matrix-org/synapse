@@ -63,7 +63,8 @@ def start(configfile):
 
     try:
         subprocess.check_call(args)
-        write("started synapse.app.homeserver(%r)" % (configfile,), colour=GREEN)
+        write("started synapse.app.homeserver(%r)" %
+              (configfile,), colour=GREEN)
     except subprocess.CalledProcessError as e:
         write(
             "error starting (exit code: %d); see above for logs" % e.returncode,
@@ -217,12 +218,18 @@ def main():
             stop(pidfile, "synapse.app.homeserver")
 
     # Wait for synapse to actually shutdown before starting it again
-    if action == "restart" and start_stop_synapse:
-        if os.path.exists(pidfile):
+    if action == "restart":
+        running_pids = []
+        if start_stop_synapse and os.path.exists(pidfile):
+            running_pids.append(int(open(pidfile).read()))
+        for worker in workers:
+            if os.path.exists(worker.pidfile):
+                running_pids.append(int(open(worker.pidfile).read()))
+        if len(running_pids) > 0:
             write("Waiting for process to exit before restarting...")
-            pid = int(open(pidfile).read())
-            while pid_running(pid):
-                time.sleep(0.1)
+            for running_pid in running_pids:
+                while pid_running(running_pid):
+                    time.sleep(0.2)
 
     if action == "start" or action == "restart":
         if start_stop_synapse:
