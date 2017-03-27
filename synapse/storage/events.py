@@ -439,7 +439,7 @@ class EventsStore(SQLBaseStore):
                     if ctx.current_state_ids is None:
                         raise Exception("Unknown current state")
 
-                    # If we've akready seen the state group don't bother adding
+                    # If we've already seen the state group don't bother adding
                     # it to the state sets again
                     if ctx.state_group not in state_groups:
                         state_sets.append(ctx.current_state_ids)
