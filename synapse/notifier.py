@@ -550,3 +550,6 @@ class Notifier(object):
                 break
 
         defer.returnValue(result)
+
+    def wait_once_for_replication(self):
+        return self.replication_deferred.observe()
