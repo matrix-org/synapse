@@ -489,7 +489,7 @@ class ReplicationResource(Resource):
 
         if federation is not None and federation != current_position:
             federation_rows = self.federation_sender.get_replication_rows(
-                federation, limit, federation_ack=federation_ack,
+                federation, current_position, limit, federation_ack=federation_ack,
             )
             upto_token = _position_from_rows(federation_rows, current_position)
             writer.write_header_and_rows("federation", federation_rows, (
