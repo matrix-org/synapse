@@ -29,6 +29,9 @@ class WorkerConfig(Config):
         self.worker_log_file = config.get("worker_log_file")
         self.worker_log_config = config.get("worker_log_config")
         self.worker_replication_url = config.get("worker_replication_url")
+        self.worker_replication_host = config.get("worker_replication_host", None)
+        self.worker_replication_port = config.get("worker_replication_port", None)
+        self.worker_name = config.get("worker_name", self.worker_app)
 
         if self.worker_listeners:
             for listener in self.worker_listeners:
