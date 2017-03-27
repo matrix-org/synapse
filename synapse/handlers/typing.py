@@ -293,6 +293,9 @@ class TypingHandler(object):
         rows.sort()
         return rows
 
+    def get_current_token(self):
+        return self._latest_room_serial
+
 
 class TypingNotificationEventSource(object):
     def __init__(self, hs):

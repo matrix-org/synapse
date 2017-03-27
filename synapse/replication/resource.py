@@ -504,7 +504,7 @@ class ReplicationResource(Resource):
 
         if device_lists is not None and device_lists != current_position:
             changes = yield self.store.get_all_device_list_changes_for_remotes(
-                device_lists,
+                device_lists, current_position,
             )
             writer.write_header_and_rows("device_lists", changes, (
                 "position", "user_id", "destination",
