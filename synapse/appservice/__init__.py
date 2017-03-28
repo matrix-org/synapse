@@ -133,16 +133,14 @@ class ApplicationService(object):
                     )
         return namespaces
 
-    def _matches_regex(self, test_string, namespace_key, return_obj=False):
+    def _matches_regex(self, test_string, namespace_key):
         for regex_obj in self.namespaces[namespace_key]:
             if regex_obj["regex"].match(test_string):
-                if return_obj:
-                    return regex_obj
-                return True
-        return False
+                return regex_obj
+        return None
 
     def _is_exclusive(self, ns_key, test_string):
-        regex_obj = self._matches_regex(test_string, ns_key, return_obj=True)
+        regex_obj = self._matches_regex(test_string, ns_key)
         if regex_obj:
             return regex_obj["exclusive"]
         return False
@@ -215,10 +213,10 @@ class ApplicationService(object):
         )
 
     def is_interested_in_alias(self, alias):
-        return self._matches_regex(alias, ApplicationService.NS_ALIASES)
+        return bool(self._matches_regex(alias, ApplicationService.NS_ALIASES))
 
     def is_interested_in_room(self, room_id):
-        return self._matches_regex(room_id, ApplicationService.NS_ROOMS)
+        return bool(self._matches_regex(room_id, ApplicationService.NS_ROOMS))
 
     def is_exclusive_user(self, user_id):
         return (
