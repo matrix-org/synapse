@@ -17,6 +17,7 @@ from synapse.push import PusherConfigException
 
 from twisted.internet import defer, reactor
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
+from twisted.logger import Logger
 
 import logging
 import push_rule_evaluator
@@ -26,6 +27,7 @@ from synapse.util.logcontext import LoggingContext
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
+log = Logger()
 
 
 class HttpPusher(object):
@@ -132,7 +134,7 @@ class HttpPusher(object):
                         try:
                             yield self._unsafe_process()
                         except:
-                            logger.exception("Exception processing notifs")
+                            log.failure("Exception processing notifs")
                         if self.max_stream_ordering == starting_max_ordering:
                             break
                 finally:

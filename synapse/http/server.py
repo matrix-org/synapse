@@ -28,6 +28,7 @@ from canonicaljson import (
 )
 
 from twisted.internet import defer
+from twisted.logger import Logger
 from twisted.web import server, resource
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.util import redirectTo
@@ -38,6 +39,7 @@ import urllib
 import ujson
 
 logger = logging.getLogger(__name__)
+log = Logger()
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 
@@ -131,12 +133,12 @@ def wrap_request_handler(request_handler, include_metrics=False):
                             version_string=self.version_string,
                         )
                     except:
-                        logger.exception(
-                            "Failed handle request %s.%s on %r: %r",
-                            request_handler.__module__,
-                            request_handler.__name__,
-                            self,
-                            request
+                        log.failure(
+                            "Failed handle request {m}.{n} on {s!r}: {req!r}",
+                            m=request_handler.__module__,
+                            n=request_handler.__name__,
+                            s=self,
+                            req=request,
                         )
                         respond_with_json(
                             request,
