@@ -341,7 +341,10 @@ class CacheDescriptor(_CacheDescriptorBase):
                 cache.set(cache_key, result_d, callback=invalidate_callback)
                 observer = result_d.observe()
 
-            return logcontext.make_deferred_yieldable(observer)
+            if isinstance(observer, defer.Deferred):
+                return logcontext.make_deferred_yieldable(observer)
+            else:
+                return observer
 
         wrapped.invalidate = cache.invalidate
         wrapped.invalidate_all = cache.invalidate_all
