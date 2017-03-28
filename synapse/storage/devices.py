@@ -329,6 +329,7 @@ class DeviceStore(SQLBaseStore):
             SELECT user_id, device_id, max(stream_id) FROM device_lists_outbound_pokes
             WHERE destination = ? AND ? < stream_id AND stream_id <= ? AND sent = ?
             GROUP BY user_id, device_id
+            LIMIT 20
         """
         txn.execute(
             sql, (destination, from_stream_id, now_stream_id, False)
@@ -338,6 +339,9 @@ class DeviceStore(SQLBaseStore):
         query_map = {(r[0], r[1]): r[2] for r in txn}
         if not query_map:
             return (now_stream_id, [])
+
+        if len(query_map) >= 20:
+            now_stream_id = max(stream_id for stream_id in query_map.itervalues())
 
         devices = self._get_e2e_device_keys_txn(
             txn, query_map.keys(), include_all_devices=True
