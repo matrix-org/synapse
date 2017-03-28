@@ -53,7 +53,7 @@ def would_retry(destination, clock, store):
         now = int(clock.time_msec())
 
         if retry_last_ts + retry_interval > now:
-            defer.returnValue(True)
+            defer.returnValue(False)
     defer.returnValue(True)
 
 
