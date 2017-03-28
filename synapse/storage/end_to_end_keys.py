@@ -144,14 +144,14 @@ class EndToEndKeyStore(SQLBaseStore):
         )
 
         existing_key_map = {
-            row["key_id"]: (row["algorithm"], row["key_json"]) for row in rows
+            (row["algorithm"], row["key_id"]): row["key_json"] for row in rows
         }
 
         new_keys = []  # Keys that we need to insert
         for algorithm, key_id, json_bytes in key_list:
-            if key_id in existing_key_map:
-                ex_algo, ex_bytes = existing_key_map[key_id]
-                if algorithm != ex_algo or json_bytes != ex_bytes:
+            if (algorithm, key_id) in existing_key_map:
+                ex_bytes = existing_key_map[key_id]
+                if json_bytes != ex_bytes:
                     raise SynapseError(
                         400, "One time key with key_id %r already exists" % (key_id,)
                     )
