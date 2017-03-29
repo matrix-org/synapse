@@ -189,25 +189,6 @@ def filter_events_for_clients(store, user_tuples, events, event_id_to_state):
 
 
 @defer.inlineCallbacks
-def filter_events_for_clients_context(store, user_tuples, events, event_id_to_context):
-    user_ids = set(u[0] for u in user_tuples)
-    event_id_to_state = {}
-    for event_id, context in event_id_to_context.items():
-        state = yield store.get_events([
-            e_id
-            for key, e_id in context.current_state_ids.iteritems()
-            if key == (EventTypes.RoomHistoryVisibility, "")
-            or (key[0] == EventTypes.Member and key[1] in user_ids)
-        ])
-        event_id_to_state[event_id] = state
-
-    res = yield filter_events_for_clients(
-        store, user_tuples, events, event_id_to_state
-    )
-    defer.returnValue(res)
-
-
-@defer.inlineCallbacks
 def filter_events_for_client(store, user_id, events, is_peeking=False):
     """
     Check which events a user is allowed to see

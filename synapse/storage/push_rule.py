@@ -16,6 +16,7 @@
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
 from synapse.push.baserules import list_with_base_rules
+from synapse.api.constants import EventTypes
 from twisted.internet import defer
 
 import logging
@@ -184,11 +185,23 @@ class PushRuleStore(SQLBaseStore):
             if uid in local_users_in_room:
                 user_ids.add(uid)
 
+        forgotten = yield self.who_forgot_in_room(
+            event.room_id, on_invalidate=cache_context.invalidate,
+        )
+
+        for row in forgotten:
+            user_id = row["user_id"]
+            event_id = row["event_id"]
+
+            mem_id = current_state_ids.get((EventTypes.Member, user_id), None)
+            if event_id == mem_id:
+                user_ids.discard(user_id)
+
         rules_by_user = yield self.bulk_get_push_rules(
             user_ids, on_invalidate=cache_context.invalidate,
         )
 
-        rules_by_user = {k: v for k, v in rules_by_user.items() if v is not None}
+        rules_by_user = {k: v for k, v in rules_by_user.iteritems() if v is not None}
 
         defer.returnValue(rules_by_user)
 
@@ -398,7 +411,8 @@ class PushRuleStore(SQLBaseStore):
         with self._push_rules_stream_id_gen.get_next() as ids:
             stream_id, event_stream_ordering = ids
             yield self.runInteraction(
-                "delete_push_rule", delete_push_rule_txn, stream_id, event_stream_ordering
+                "delete_push_rule", delete_push_rule_txn, stream_id,
+                event_stream_ordering,
             )
 
     @defer.inlineCallbacks
