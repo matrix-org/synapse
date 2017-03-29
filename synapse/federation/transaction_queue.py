@@ -22,7 +22,7 @@ from .units import Transaction, Edu
 from synapse.api.errors import HttpResponseException
 from synapse.util.async import run_on_reactor
 from synapse.util.logcontext import preserve_context_over_fn
-from synapse.util.retryutils import NotRetryingDestination
+from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
 from synapse.util.metrics import measure_func
 from synapse.types import get_domain_from_id
 from synapse.handlers.presence import format_user_presence_state
@@ -303,8 +303,14 @@ class TransactionQueue(object):
             )
             return
 
+        pending_pdus = []
         try:
             self.pending_transactions[destination] = 1
+
+            # This will throw if we wouldn't retry. We do this here so we fail
+            # quickly, but we will later check this again in the http client,
+            # hence why we throw the result away.
+            yield get_retry_limiter(destination, self.clock, self.store)
 
             # XXX: what's this for?
             yield run_on_reactor()
@@ -398,7 +404,7 @@ class TransactionQueue(object):
                 destination,
                 e,
             )
-            for p in pending_pdus:
+            for p, _ in pending_pdus:
                 logger.info("Failed to send event %s to %s", p.event_id,
                             destination)
         finally:
