@@ -35,29 +35,6 @@ class NotRetryingDestination(Exception):
 
 
 @defer.inlineCallbacks
-def would_retry(destination, clock, store):
-    """Check if ``get_retry_limiter`` would throw. This is purely to allow
-    things to bail early if the resulting request would not otherwise be sent
-    """
-    retry_last_ts, retry_interval = (0, 0)
-
-    retry_timings = yield store.get_destination_retry_timings(
-        destination
-    )
-
-    if retry_timings:
-        retry_last_ts, retry_interval = (
-            retry_timings["retry_last_ts"], retry_timings["retry_interval"]
-        )
-
-        now = int(clock.time_msec())
-
-        if retry_last_ts + retry_interval > now:
-            defer.returnValue(False)
-    defer.returnValue(True)
-
-
-@defer.inlineCallbacks
 def get_retry_limiter(destination, clock, store, ignore_backoff=False,
                       **kwargs):
     """For a given destination check if we have previously failed to
