@@ -127,7 +127,7 @@ class ApplicationService(object):
                     )
                 regex = regex_obj.get("regex")
                 if isinstance(regex, basestring):
-                    regex_obj["regex"] = re.compile(regex)
+                    regex_obj["regex"] = re.compile(regex)  # Pre-compile regex
                 else:
                     raise ValueError(
                         "Expected string for 'regex' in ns '%s'" % ns
