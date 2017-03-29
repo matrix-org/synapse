@@ -148,7 +148,7 @@ class DescriptorTestCase(unittest.TestCase):
             def fn(self, arg1):
                 @defer.inlineCallbacks
                 def inner_fn():
-                    yield async.sleep(0.001)
+                    yield async.run_on_reactor()
                     raise SynapseError(400, "blah")
 
                 return inner_fn()
