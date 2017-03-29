@@ -575,8 +575,7 @@ class PresenceHandler(object):
                 if not local_states:
                     continue
 
-                users = yield self.store.get_users_in_room(room_id)
-                hosts = set(get_domain_from_id(u) for u in users)
+                hosts = yield self.store.get_hosts_in_room(room_id)
 
                 for host in hosts:
                     hosts_to_states.setdefault(host, []).extend(local_states)
