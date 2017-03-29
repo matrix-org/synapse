@@ -150,10 +150,11 @@ class EndToEndKeyStore(SQLBaseStore):
         new_keys = []  # Keys that we need to insert
         for algorithm, key_id, json_bytes in key_list:
             ex_bytes = existing_key_map.get((algorithm, key_id), None)
-            if ex_bytes and json_bytes != ex_bytes:
-                raise SynapseError(
-                    400, "One time key with key_id %r already exists" % (key_id,)
-                )
+            if ex_bytes:
+                if json_bytes != ex_bytes:
+                    raise SynapseError(
+                        400, "One time key with key_id %r already exists" % (key_id,)
+                    )
             else:
                 new_keys.append((algorithm, key_id, json_bytes))
 
