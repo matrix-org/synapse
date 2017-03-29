@@ -95,15 +95,16 @@ class DescriptorTestCase(unittest.TestCase):
     def test_cache_logcontexts(self):
         """Check that logcontexts are set and restored correctly when
         using the cache."""
-        complete_lookup = [False]
+
+        complete_lookup = defer.Deferred()
 
         class Cls(object):
             @descriptors.cached()
             def fn(self, arg1):
                 @defer.inlineCallbacks
                 def inner_fn():
-                    while not complete_lookup[0]:
-                        yield async.sleep(0.001)
+                    with logcontext.PreserveLoggingContext():
+                        yield complete_lookup
                     defer.returnValue(1)
 
                 return inner_fn()
@@ -135,7 +136,7 @@ class DescriptorTestCase(unittest.TestCase):
         d2.addCallback(check_result)
 
         # let the lookup complete
-        complete_lookup[0] = True
+        complete_lookup.callback(None)
 
         return defer.gatherResults([d1, d2])
 
