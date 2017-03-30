@@ -546,6 +546,7 @@ class PresenceHandler(object):
                 updates.append(prev_state.copy_and_replace(
                     last_user_sync_ts=time_now_ms,
                 ))
+                process_presence.discard(user_id)
 
             if updates:
                 yield self._update_states(updates)
