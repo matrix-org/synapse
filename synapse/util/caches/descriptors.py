@@ -197,7 +197,6 @@ class _CacheDescriptorBase(object):
 
         arg_spec = inspect.getargspec(orig)
         all_args = arg_spec.args
-        self.arg_spec = arg_spec
 
         if "cache_context" in all_args:
             if not cache_context:
@@ -225,8 +224,16 @@ class _CacheDescriptorBase(object):
             )
 
         self.num_args = num_args
+
+        # list of the names of the args used as the cache key
         self.arg_names = all_args[1:num_args + 1]
 
+        # The arg spec of the wrapped function, see `inspect.getargspec` for
+        # the type.
+        self.arg_spec = arg_spec
+
+        # self.arg_defaults is a map of arg name to its default value for each
+        # argument that has a default value
         if arg_spec.defaults:
             self.arg_defaults = dict(zip(
                 all_args[-len(arg_spec.defaults):],
