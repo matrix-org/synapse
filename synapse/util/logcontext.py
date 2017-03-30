@@ -315,9 +315,6 @@ def preserve_context_over_deferred(deferred, context=None):
     the deferred follow the synapse logcontext rules: try
     ``make_deferred_yieldable`` instead.
     """
-    if not isinstance(deferred, defer.Deferred):
-        return deferred
-
     if context is None:
         context = LoggingContext.current_context()
     d = _PreservingContextDeferred(context)
