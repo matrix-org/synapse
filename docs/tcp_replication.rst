@@ -34,20 +34,21 @@ command, and usually the connection will be closed.
 Since the protocol is a simple line based, its possible to manually connect to
 the server using a tool like netcat. A few things should be noted when manually
 using the protocol:
- * When subscribing to a stream using ``REPLICATE``, the special token ``NOW`` can
-   be used to get all future updates. The special stream name ``ALL`` can be used
-   with ``NOW`` to subscribe to all available streams.
- * The federation stream is only available if federation sending has been
-   disabled on the main process.
- * The server will only time connections out that have sent a ``PING`` command.
-   If a ping is sent then the connection will be closed if no further commands
-   are receieved within 15s. Both the client and server protocol implementations
-   will send an initial PING on connection and ensure at least one command every
-   5s is sent (not necessarily ``PING``).
- * ``RDATA`` commands *usually* include a numeric token, however if the stream
-   has multiple rows to replicate per token the server will send multiple
-   ``RDATA`` commands, with all but the last having a token of ``batch``. See
-   the documentation on ``commands.RdataCommand`` for further details.
+
+* When subscribing to a stream using ``REPLICATE``, the special token ``NOW`` can
+  be used to get all future updates. The special stream name ``ALL`` can be used
+  with ``NOW`` to subscribe to all available streams.
+* The federation stream is only available if federation sending has been
+  disabled on the main process.
+* The server will only time connections out that have sent a ``PING`` command.
+  If a ping is sent then the connection will be closed if no further commands
+  are receieved within 15s. Both the client and server protocol implementations
+  will send an initial PING on connection and ensure at least one command every
+  5s is sent (not necessarily ``PING``).
+* ``RDATA`` commands *usually* include a numeric token, however if the stream
+  has multiple rows to replicate per token the server will send multiple
+  ``RDATA`` commands, with all but the last having a token of ``batch``. See
+  the documentation on ``commands.RdataCommand`` for further details.
 
 
 Architecture
@@ -84,19 +85,21 @@ Start up
 ~~~~~~~~
 
 When a new connection is made, the server:
- * Sends a ``SERVER`` command, which includes the identity of the server, allowing
-   the client to detect if its connected to the expected server
- * Sends a ``PING`` command as above, to enable the client to time out connections
-   promptly.
+
+* Sends a ``SERVER`` command, which includes the identity of the server, allowing
+  the client to detect if its connected to the expected server
+* Sends a ``PING`` command as above, to enable the client to time out connections
+  promptly.
 
 The client:
- * Sends a ``NAME`` command, allowing the server to associate a human friendly
-   name with the connection. This is optional.
- * Sends a ``PING`` as above
- * For each stream the client wishes to subscribe to it sends a ``REPLICATE``
-   with the stream_name and token it wants to subscribe from.
- * On receipt of a ``SERVER`` command, checks that the server name matches the
-   expected server name.
+
+* Sends a ``NAME`` command, allowing the server to associate a human friendly
+  name with the connection. This is optional.
+* Sends a ``PING`` as above
+* For each stream the client wishes to subscribe to it sends a ``REPLICATE``
+  with the stream_name and token it wants to subscribe from.
+* On receipt of a ``SERVER`` command, checks that the server name matches the
+  expected server name.
 
 
 Error handling
