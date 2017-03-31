@@ -16,22 +16,7 @@
 """This module implements the TCP replication protocol used by synapse to
 communicate between the master process and its workers (when they're enabled).
 
-The protocol is based on fire and forget, line based commands. An example flow
-would be (where '>' indicates master->worker and '<' worker->master flows)::
-
-    > SERVER example.com
-    < REPLICATE events 53
-    > RDATA events 54 ["$foo1:bar.com", ...]
-    > RDATA events 55 ["$foo4:bar.com", ...]
-
-The example shows the server accepting a new connection and sending its identity
-with the `SERVER` command, followed by the client asking to subscribe to the
-`events` stream from the token `53`. The server then periodically sends `RDATA`
-commands which have the format `RDATA <stream_name> <token> <row>`, where the
-format of `<row>` is defined by the individual streams.
-
-Error reporting happens by either the client or server sending an `ERROR`
-command, and usually the connection will be closed.
+Further details can be found in docs/tcp_replication.rst
 
 
 Structure of the module:
@@ -42,5 +27,4 @@ Structure of the module:
  * resource.py - the server classes that accepts and handle client connections
  * streams.py  - the definitons of all the valid streams
 
-Further details can be found in docs/tcp_replication.rst
 """

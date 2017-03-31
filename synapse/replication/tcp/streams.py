@@ -154,8 +154,8 @@ class Stream(object):
         True then limit is provided, otherwise it's not.
 
         Returns:
-            list(tuple): the first entry in the tuple is the token for that
-                update, and the rest of the tuple gets used to construct
+            Deferred(list(tuple)): the first entry in the tuple is the token for
+                that update, and the rest of the tuple gets used to construct
                 a ``ROW_TYPE`` instance
         """
         raise NotImplementedError()

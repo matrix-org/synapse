@@ -1,20 +1,20 @@
 TCP Replication
 ===============
 
-This describes the TCP replication protocol that replaces the HTTP protocol.
-
 Motivation
 ----------
 
-The HTTP API used long poll from the workers to the master, this has the problem
-of causing a lot of duplicate work on the server. This TCP protocol aims to
-solve.
+Previously the workers used an HTTP long poll mechanism to get updates from the
+master, which had the problem of causing a lot of duplicate work on the server.
+This TCP protocol replaces those APIs with the aim of increased efficiency.
+
+
 
 Overview
 --------
 
 The protocol is based on fire and forget, line based commands. An example flow
-would be (where '>' indicates master->worker and '<' worker->master flows)::
+would be (where '>' indicates master to worker and '<' worker to master flows)::
 
     > SERVER example.com
     < REPLICATE events 53
@@ -24,7 +24,7 @@ would be (where '>' indicates master->worker and '<' worker->master flows)::
 The example shows the server accepting a new connection and sending its identity
 with the ``SERVER`` command, followed by the client asking to subscribe to the
 ``events`` stream from the token ``53``. The server then periodically sends ``RDATA``
-commands which have the format ``RDATA <stream_name> <token> <row>```, where the
+commands which have the format ``RDATA <stream_name> <token> <row>``, where the
 format of ``<row>`` is defined by the individual streams.
 
 Error reporting happens by either the client or server sending an `ERROR`
@@ -125,7 +125,7 @@ recovers it can reconnect to the server and ask for missed messages.
 Reliability
 ~~~~~~~~~~~
 
-In general the replication stream should be consisdered an unreliable transport
+In general the replication stream should be considered an unreliable transport
 since e.g. commands are not resent if the connection disappears.
 
 The exception to that are the replication streams, i.e. RDATA commands, since

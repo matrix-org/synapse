@@ -139,7 +139,7 @@ class PusherStore(SQLBaseStore):
         """Get all the pushers that have changed between the given tokens.
 
         Returns:
-            list(tuple): each tuple consists of:
+            Deferred(list(tuple)): each tuple consists of:
                 stream_id (str)
                 user_id (str)
                 app_id (str)
