@@ -163,6 +163,8 @@ class Notifier(object):
         self.store = hs.get_datastore()
         self.pending_new_room_events = []
 
+        self.replication_callbacks = []
+
         self.clock = hs.get_clock()
         self.appservice_handler = hs.get_application_service_handler()
 
@@ -201,6 +203,12 @@ class Notifier(object):
             "users",
             lambda: len(self.user_to_user_stream),
         )
+
+    def add_replication_callback(self, cb):
+        """Add a callback that will be called when some new data is available.
+        Callback is not given any arguments.
+        """
+        self.replication_callbacks.append(cb)
 
     @preserve_fn
     def on_new_room_event(self, event, room_stream_id, max_room_stream_id,
@@ -510,6 +518,9 @@ class Notifier(object):
             self.replication_deferred = ObservableDeferred(defer.Deferred())
             deferred.callback(None)
 
+        for cb in self.replication_callbacks:
+            preserve_fn(cb)()
+
     @defer.inlineCallbacks
     def wait_for_replication(self, callback, timeout):
         """Wait for an event to happen.
@@ -550,9 +561,3 @@ class Notifier(object):
                 break
 
         defer.returnValue(result)
-
-    def wait_once_for_replication(self):
-        """Returns a deferred which resolves when there is new data for
-        replication to handle.
-        """
-        return self.replication_deferred.observe()
