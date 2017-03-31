@@ -50,14 +50,37 @@ You may be able to setup coturn via your package manager,  or set it up manually
 
        pwgen -s 64 1
 
- 5. Ensure youe firewall allows traffic into the TURN server on
-    the ports you've configured it to listen on (remember to allow
-    both TCP and UDP if you've enabled both).
+ 5. Consider your security settings.  TURN lets users request a relay
+    which will connect to arbitrary IP addresses and ports.  At the least
+    we recommend:
 
- 6. If you've configured coturn to support TLS/DTLS, generate or
+       # VoIP traffic is all UDP. There is no reason to let users connect to arbitrary TCP endpoints via the relay.
+       no-tcp-relay
+
+       # don't let the relay ever try to connect to private IP address ranges within your network (if any)
+       # given the turn server is likely behind your firewall, remember to include any privileged public IPs too.
+       denied-peer-ip=10.0.0.0-10.255.255.255
+       denied-peer-ip=192.168.0.0-192.168.255.255
+       denied-peer-ip=172.16.0.0-172.31.255.255
+
+       # special case the turn server itself so that client->TURN->TURN->client flows work
+       allowed-peer-ip=10.0.0.1
+
+       # consider whether you want to limit the quota of relayed streams per user (or total) to avoid risk of DoS.
+       user-quota=12 # 4 streams per video call, so 12 streams = 3 simultaneous relayed calls per user.
+       total-quota=1200
+
+    Ideally coturn should refuse to relay traffic which isn't SRTP;
+    see https://github.com/matrix-org/synapse/issues/2009
+
+ 6. Ensure your firewall allows traffic into the TURN server on
+    the ports you've configured it to listen on (remember to allow
+    both TCP and UDP TURN traffic)
+
+ 7. If you've configured coturn to support TLS/DTLS, generate or
     import your private key and certificate.
 
- 7. Start the turn server::
+ 8. Start the turn server::
  
        bin/turnserver -o
 
@@ -83,12 +106,19 @@ Your home server configuration file needs the following extra keys:
     to refresh credentials. The TURN REST API specification recommends
     one day (86400000).
 
+  4. "turn_allow_guests": Whether to allow guest users to use the TURN
+    server.  This is enabled by default, as otherwise VoIP will not
+    work reliably for guests.  However, it does introduce a security risk
+    as it lets guests connect to arbitrary endpoints without having gone
+    through a CAPTCHA or similar to register a real account.
+
 As an example, here is the relevant section of the config file for
 matrix.org::
 
     turn_uris: [ "turn:turn.matrix.org:3478?transport=udp", "turn:turn.matrix.org:3478?transport=tcp" ]
     turn_shared_secret: n0t4ctuAllymatr1Xd0TorgSshar3d5ecret4obvIousreAsons
     turn_user_lifetime: 86400000
+    turn_allow_guests: True
 
 Now, restart synapse::
 
