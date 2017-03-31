@@ -216,9 +216,7 @@ class StreamToken(
             return self
 
     def copy_and_replace(self, key, new_value):
-        d = self._asdict()
-        d[key] = new_value
-        return StreamToken(**d)
+        return self._replace(**{key: new_value})
 
 
 StreamToken.START = StreamToken(
