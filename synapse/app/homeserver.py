@@ -56,6 +56,7 @@ from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.metrics import register_memory_metrics, get_metrics_for
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.replication.resource import ReplicationResource, REPLICATION_PREFIX
+from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.federation.transport.server import TransportLayerServer
 
 from synapse.util.rlimit import change_resource_limit
@@ -221,6 +222,16 @@ class SynapseHomeServer(HomeServer):
                             globals={"hs": self},
                         ),
                         interface=address
+                    )
+            elif listener["type"] == "replication":
+                bind_addresses = listener["bind_addresses"]
+                for address in bind_addresses:
+                    factory = ReplicationStreamProtocolFactory(self)
+                    server_listener = reactor.listenTCP(
+                        listener["port"], factory, interface=address
+                    )
+                    reactor.addSystemEventTrigger(
+                        "before", "shutdown", server_listener.stopListening,
                     )
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
