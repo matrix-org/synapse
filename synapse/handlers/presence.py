@@ -546,12 +546,14 @@ class PresenceHandler(object):
                 updates.append(prev_state.copy_and_replace(
                     last_user_sync_ts=time_now_ms,
                 ))
+
+            if not is_syncing:
                 process_presence.discard(user_id)
 
             if updates:
                 yield self._update_states(updates)
 
-            self.external_process_last_updated_ms[process_id] = self.clock.time_msec()
+            self.external_process_last_updated_ms[process_id] = time_now_ms
 
     @defer.inlineCallbacks
     def update_external_syncs_clear(self, process_id):
