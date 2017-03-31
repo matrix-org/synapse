@@ -245,6 +245,24 @@ Setting up a TURN server
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server.  See `<docs/turn-howto.rst>`_ for details.
 
+IPv6
+----
+
+As of Synapse 0.19 we finally support IPv6, many thanks to @kyrias and @glyph
+for providing PR #1696.
+
+However, for federation to work on hosts with IPv6 DNS servers you **must**
+be running Twisted 17.1.0 or later - see https://github.com/matrix-org/synapse/issues/1002
+for details.  We can't make Synapse depend on Twisted 17.1 by default
+yet as it will break most older distributions (see https://github.com/matrix-org/synapse/pull/1909)
+so to make this work you'll have to manually depend on a newer Twisted.
+We assume that anyone wanting to use IPv6 will be comfortable manually installing a
+newer Twisted, but you'll want to do something like::
+
+    pip install Twisted>=17.1.0
+
+...in whatever environment (e.g. virtualenv) you've installed synapse within.
+
 
 Running Synapse
 ===============
