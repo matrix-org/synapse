@@ -175,3 +175,49 @@ An example of a batched set of ``RDATA`` is::
 
 In this case the client shouldn't advance their caches token until it sees the
 the last ``RDATA``.
+
+
+List of commands
+~~~~~~~~~~~~~~~~
+
+The list of valid commands, with which side can send it: server (S) or client (C):
+
+SERVER (S)
+    Sent at the start to identify which server the client is talking to
+
+RDATA (S)
+    A single update in a stream
+
+POSITION (S)
+    The position of the stream has been updated
+
+ERROR (S, C)
+    There was an error
+
+PING (S, C)
+    Sent periodically to ensure the connection is still alive
+
+NAME (C)
+    Sent at the start by client to inform the server who they are
+
+REPLICATE (C)
+    Asks the server to replicate a given stream
+
+USER_SYNC (C)
+    A user has started or stopped syncing
+
+FEDERATION_ACK (C)
+    Acknowledge receipt of some federation data
+
+REMOVE_PUSHER (C)
+    Inform the server a pusher should be removed
+
+INVALIDATE_CACHE (C)
+    Inform the server a cache should be invalidated
+
+SYNC (S, C)
+    Used exclusively in tests
+
+
+See ``synapse/replication/tcp/commands.py`` for a detailed description and the
+format of each command.
