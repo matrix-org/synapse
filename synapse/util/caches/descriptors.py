@@ -228,10 +228,6 @@ class _CacheDescriptorBase(object):
         # list of the names of the args used as the cache key
         self.arg_names = all_args[1:num_args + 1]
 
-        # The arg spec of the wrapped function, see `inspect.getargspec` for
-        # the type.
-        self.arg_spec = arg_spec
-
         # self.arg_defaults is a map of arg name to its default value for each
         # argument that has a default value
         if arg_spec.defaults:
