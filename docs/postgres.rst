@@ -112,9 +112,9 @@ script one last time, e.g. if the SQLite database is at  ``homeserver.db``
 run::
 
     synapse_port_db --sqlite-database homeserver.db \
-        --postgres-config database_config.yaml
+        --postgres-config homeserver-postgres.yaml
 
 Once that has completed, change the synapse config to point at the PostgreSQL
-database configuration file using the ``database_config`` parameter (see
-`Synapse Config`_) and restart synapse. Synapse should now be running against
+database configuration file ``homeserver-postgres.yaml`` (i.e. rename it to 
+``homeserver.yaml``) and restart synapse. Synapse should now be running against
 PostgreSQL.
