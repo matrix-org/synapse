@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from synapse.api.constants import EventTypes
+from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 from twisted.internet import defer
 
@@ -124,29 +125,23 @@ class ApplicationService(object):
                     raise ValueError(
                         "Expected bool for 'exclusive' in ns '%s'" % ns
                     )
-                if not isinstance(regex_obj.get("regex"), basestring):
+                regex = regex_obj.get("regex")
+                if isinstance(regex, basestring):
+                    regex_obj["regex"] = re.compile(regex)  # Pre-compile regex
+                else:
                     raise ValueError(
                         "Expected string for 'regex' in ns '%s'" % ns
                     )
         return namespaces
 
-    def _matches_regex(self, test_string, namespace_key, return_obj=False):
-        if not isinstance(test_string, basestring):
-            logger.error(
-                "Expected a string to test regex against, but got %s",
-                test_string
-            )
-            return False
-
+    def _matches_regex(self, test_string, namespace_key):
         for regex_obj in self.namespaces[namespace_key]:
-            if re.match(regex_obj["regex"], test_string):
-                if return_obj:
-                    return regex_obj
-                return True
-        return False
+            if regex_obj["regex"].match(test_string):
+                return regex_obj
+        return None
 
     def _is_exclusive(self, ns_key, test_string):
-        regex_obj = self._matches_regex(test_string, ns_key, return_obj=True)
+        regex_obj = self._matches_regex(test_string, ns_key)
         if regex_obj:
             return regex_obj["exclusive"]
         return False
@@ -166,7 +161,14 @@ class ApplicationService(object):
         if not store:
             defer.returnValue(False)
 
-        member_list = yield store.get_users_in_room(event.room_id)
+        does_match = yield self._matches_user_in_member_list(event.room_id, store)
+        defer.returnValue(does_match)
+
+    @cachedInlineCallbacks(num_args=1, cache_context=True)
+    def _matches_user_in_member_list(self, room_id, store, cache_context):
+        member_list = yield store.get_users_in_room(
+            room_id, on_invalidate=cache_context.invalidate
+        )
 
         # check joined member events
         for user_id in member_list:
@@ -219,10 +221,10 @@ class ApplicationService(object):
         )
 
     def is_interested_in_alias(self, alias):
-        return self._matches_regex(alias, ApplicationService.NS_ALIASES)
+        return bool(self._matches_regex(alias, ApplicationService.NS_ALIASES))
 
     def is_interested_in_room(self, room_id):
-        return self._matches_regex(room_id, ApplicationService.NS_ROOMS)
+        return bool(self._matches_regex(room_id, ApplicationService.NS_ROOMS))
 
     def is_exclusive_user(self, user_id):
         return (
