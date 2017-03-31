@@ -1,0 +1,18 @@
+VAGRANTFILE_API_VERSION = "2"
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+
+  # Box
+  config.vm.box = "ubuntu/xenial64"
+
+  config.vm.provider "virtualbox" do |v|
+    v.memory = 2048
+    v.cpus = 2
+  end
+  config.vm.network "forwarded_port", guest: 80, host: 8080
+  config.vm.network "forwarded_port", guest: 8008, host: 8008
+  config.vm.network "forwarded_port", guest: 8448, host: 8448
+  # Shared folders
+  config.vm.synced_folder ".", "/vagrant"
+  config.vm.provision "shell", path: "provision.sh", privileged: false
+end
