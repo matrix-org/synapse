@@ -108,10 +108,10 @@ Installing prerequisites on ArchLinux::
     sudo pacman -S base-devel python2 python-pip \
                    python-setuptools python-virtualenv sqlite3
 
-Installing prerequisites on CentOS 7::
+Installing prerequisites on CentOS 7 or Fedora 25::
 
     sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
-                     lcms2-devel libwebp-devel tcl-devel tk-devel \
+                     lcms2-devel libwebp-devel tcl-devel tk-devel redhat-rpm-config \
                      python-virtualenv libffi-devel openssl-devel
     sudo yum groupinstall "Development Tools"
 
