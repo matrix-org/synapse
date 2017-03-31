@@ -368,7 +368,9 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
         self.name = cmd.data
 
     def on_USER_SYNC(self, cmd):
-        self.streamer.on_user_sync(self.conn_id, cmd.user_id, cmd.is_syncing)
+        self.streamer.on_user_sync(
+            self.conn_id, cmd.user_id, cmd.is_syncing, cmd.last_sync_ms,
+        )
 
     def on_REPLICATE(self, cmd):
         stream_name = cmd.stream_name
@@ -481,8 +483,9 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         # Tell the server if we have any users currently syncing (should only
         # happen on synchrotrons)
         currently_syncing = self.handler.get_currently_syncing_users()
+        now = self.clock.time_msec()
         for user_id in currently_syncing:
-            self.send_command(UserSyncCommand(user_id, True))
+            self.send_command(UserSyncCommand(user_id, True, now))
 
         # We've now finished connecting to so inform the client handler
         self.handler.update_connection(self)

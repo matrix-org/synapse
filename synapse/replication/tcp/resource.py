@@ -220,12 +220,12 @@ class ReplicationStreamer(object):
             self.federation_sender.federation_ack(token)
 
     @measure_func("repl.on_user_sync")
-    def on_user_sync(self, conn_id, user_id, is_syncing):
+    def on_user_sync(self, conn_id, user_id, is_syncing, last_sync_ms):
         """A client has started/stopped syncing on a worker.
         """
         user_sync_counter.inc()
         self.presence_handler.update_external_syncs_row(
-            conn_id, user_id, is_syncing
+            conn_id, user_id, is_syncing, last_sync_ms,
         )
 
     @measure_func("repl.on_remove_pusher")

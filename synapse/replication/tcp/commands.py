@@ -189,29 +189,34 @@ class UserSyncCommand(Command):
     """Sent by the client to inform the server that a user has started or
     stopped syncing. Used to calculate presence on the master.
 
+    Includes a timestamp of when the last user sync was.
+
     Format::
 
-        USER_SYNC <user_id> <state>
+        USER_SYNC <user_id> <state> <last_sync_ms>
 
     Where <state> is either "start" or "stop"
     """
     NAME = "USER_SYNC"
 
-    def __init__(self, user_id, is_syncing):
+    def __init__(self, user_id, is_syncing, last_sync_ms):
         self.user_id = user_id
         self.is_syncing = is_syncing
+        self.last_sync_ms = last_sync_ms
 
     @classmethod
     def from_line(cls, line):
-        user_id, state = line.split(" ", 1)
+        user_id, state, last_sync_ms = line.split(" ", 2)
 
         if state not in ("start", "end"):
             raise Exception("Invalid USER_SYNC state %r" % (state,))
 
-        return cls(user_id, state == "start")
+        return cls(user_id, state == "start", int(last_sync_ms))
 
     def to_line(self):
-        return " ".join((self.user_id, "start" if self.is_syncing else "end"))
+        return " ".join((
+            self.user_id, "start" if self.is_syncing else "end", str(self.last_sync_ms),
+        ))
 
 
 class FederationAckCommand(Command):
