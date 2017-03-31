@@ -204,9 +204,14 @@ That doesn't follow the rules, but we can fix it by wrapping it with
 This technique works equally for external functions which return deferreds,
 or deferreds we have made ourselves.
 
-XXX: think this is what ``preserve_context_over_deferred`` is supposed to do,
-though it is broken, in that it only restores the logcontext for the duration
-of the callbacks, which doesn't comply with the logcontext rules.
+You can also use ``logcontext.make_deferred_yieldable``, which just does the
+boilerplate for you, so the above could be written:
+
+.. code:: python
+
+    def sleep(seconds):
+        return logcontext.make_deferred_yieldable(get_sleep_deferred(seconds))
+
 
 Fire-and-forget
 ---------------

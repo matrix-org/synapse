@@ -54,6 +54,7 @@ class FederationRemoteSendQueue(object):
     def __init__(self, hs):
         self.server_name = hs.hostname
         self.clock = hs.get_clock()
+        self.notifier = hs.get_notifier()
 
         self.presence_map = {}
         self.presence_changed = sorteddict()
@@ -186,6 +187,8 @@ class FederationRemoteSendQueue(object):
         else:
             self.edus[pos] = edu
 
+        self.notifier.on_new_replication_data()
+
     def send_presence(self, destination, states):
         """As per TransactionQueue"""
         pos = self._next_pos()
@@ -199,16 +202,20 @@ class FederationRemoteSendQueue(object):
             (destination, state.user_id) for state in states
         ]
 
+        self.notifier.on_new_replication_data()
+
     def send_failure(self, failure, destination):
         """As per TransactionQueue"""
         pos = self._next_pos()
 
         self.failures[pos] = (destination, str(failure))
+        self.notifier.on_new_replication_data()
 
     def send_device_messages(self, destination):
         """As per TransactionQueue"""
         pos = self._next_pos()
         self.device_messages[pos] = destination
+        self.notifier.on_new_replication_data()
 
     def get_current_token(self):
         return self.pos - 1
