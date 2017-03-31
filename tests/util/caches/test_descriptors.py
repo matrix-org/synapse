@@ -175,3 +175,41 @@ class DescriptorTestCase(unittest.TestCase):
                          logcontext.LoggingContext.sentinel)
 
         return d1
+
+    @defer.inlineCallbacks
+    def test_cache_default_args(self):
+        class Cls(object):
+            def __init__(self):
+                self.mock = mock.Mock()
+
+            @descriptors.cached()
+            def fn(self, arg1, arg2=2, arg3=3):
+                return self.mock(arg1, arg2, arg3)
+
+        obj = Cls()
+
+        obj.mock.return_value = 'fish'
+        r = yield obj.fn(1, 2, 3)
+        self.assertEqual(r, 'fish')
+        obj.mock.assert_called_once_with(1, 2, 3)
+        obj.mock.reset_mock()
+
+        # a call with same params shouldn't call the mock again
+        r = yield obj.fn(1, 2)
+        self.assertEqual(r, 'fish')
+        obj.mock.assert_not_called()
+        obj.mock.reset_mock()
+
+        # a call with different params should call the mock again
+        obj.mock.return_value = 'chips'
+        r = yield obj.fn(2, 3)
+        self.assertEqual(r, 'chips')
+        obj.mock.assert_called_once_with(2, 3, 3)
+        obj.mock.reset_mock()
+
+        # the two values should now be cached
+        r = yield obj.fn(1, 2)
+        self.assertEqual(r, 'fish')
+        r = yield obj.fn(2, 3)
+        self.assertEqual(r, 'chips')
+        obj.mock.assert_not_called()
