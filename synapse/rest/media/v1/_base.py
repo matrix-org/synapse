@@ -71,20 +71,17 @@ def respond_with_file(request, media_type, file_path,
     if os.path.isfile(file_path):
         request.setHeader(b"Content-Type", media_type.encode("UTF-8"))
         if upload_name:
-            if is_ascii(upload_name):
-                request.setHeader(
-                    b"Content-Disposition",
-                    b"inline; filename=%s" % (
-                        urllib.quote(upload_name.encode("utf-8")),
-                    ),
-                )
-            else:
-                request.setHeader(
-                    b"Content-Disposition",
-                    b"inline; filename*=utf-8''%s" % (
-                        urllib.quote(upload_name.encode("utf-8")),
-                    ),
-                )
+            # technically we should only use the crazy *=utf-8'' syntax
+            # if the filename actually contains utf-8.  but if we don't, some
+            # browsers (Chrome at some point before 57, and Firefox 52) get it
+            # get it wrong and return %20 verbatim rather than url-decoding it
+            # causing bug https://github.com/vector-im/riot-web/issues/3155
+            request.setHeader(
+                b"Content-Disposition",
+                b"inline; filename*=utf-8''%s" % (
+                    urllib.quote(upload_name.encode("utf-8")),
+                ),
+            )
 
         # cache for at least a day.
         # XXX: we might want to turn this off for data we don't want to
