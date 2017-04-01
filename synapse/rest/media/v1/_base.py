@@ -73,7 +73,7 @@ def respond_with_file(request, media_type, file_path,
         if upload_name:
             # technically we should only use the crazy *=utf-8'' syntax
             # if the filename actually contains utf-8.  but if we don't, some
-            # browsers (Chrome at some point before 57, and Firefox 52) get it
+            # browsers (Firefox 52, Safari 10, Chrome at some point < 57) get it
             # get it wrong and return %20 verbatim rather than url-decoding it
             # causing bug https://github.com/vector-im/riot-web/issues/3155
             request.setHeader(
