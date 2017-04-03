@@ -22,6 +22,7 @@ from unpaddedbase64 import encode_base64
 
 import logging
 from Queue import PriorityQueue, Empty
+import ujson as json
 
 
 logger = logging.getLogger(__name__)
@@ -58,13 +59,22 @@ class EventFederationStore(SQLBaseStore):
         results = set()
 
         base_sql = (
-            "SELECT auth_id FROM event_auth WHERE event_id IN (%s)"
+            "SELECT json FROM event_json WHERE event_id IN (%s)"
         )
 
         front = set(event_ids)
         while front:
             new_front = set()
+
+            # If we happen to have the events in our cache we may as well use
+            # them.
+            ev_map = self._get_events_from_cache(front, allow_rejected=True)
+            for entry in ev_map.itervalues():
+                new_front.update(ev_id for ev_id, _ in entry.event.auth_events)
+                front.discard(entry.event.event_id)
+
             front_list = list(front)
+
             chunks = [
                 front_list[x:x + 100]
                 for x in xrange(0, len(front), 100)
@@ -74,7 +84,9 @@ class EventFederationStore(SQLBaseStore):
                     base_sql % (",".join(["?"] * len(chunk)),),
                     chunk
                 )
-                new_front.update([r[0] for r in txn])
+                for row in txn:
+                    ev = json.loads(row[0])
+                    new_front.update(ev_id for ev_id, _ in ev["auth_events"])
 
             new_front -= results
 
