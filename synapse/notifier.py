@@ -243,10 +243,13 @@ class Notifier(object):
     def _on_new_room_event(self, event, room_stream_id, extra_users=[]):
         """Notify any user streams that are interested in this room event"""
         # poke any interested application service.
-        self.appservice_handler.notify_interested_services(room_stream_id)
+        preserve_fn(self.appservice_handler.notify_interested_services)(
+            room_stream_id)
 
         if self.federation_sender:
-            self.federation_sender.notify_new_events(room_stream_id)
+            preserve_fn(self.federation_sender.notify_new_events)(
+                room_stream_id
+            )
 
         if event.type == EventTypes.Member and event.membership == Membership.JOIN:
             self._user_joined_room(event.state_key, event.room_id)
