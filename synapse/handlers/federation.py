@@ -28,7 +28,7 @@ from synapse.api.constants import EventTypes, Membership, RejectedReason
 from synapse.events.validator import EventValidator
 from synapse.util import unwrapFirstError
 from synapse.util.logcontext import (
-    PreserveLoggingContext, preserve_fn, preserve_context_over_deferred
+    preserve_fn, preserve_context_over_deferred
 )
 from synapse.util.metrics import measure_func
 from synapse.util.logutils import log_function
@@ -394,11 +394,10 @@ class FederationHandler(BaseHandler):
             target_user = UserID.from_string(target_user_id)
             extra_users.append(target_user)
 
-        with PreserveLoggingContext():
-            self.notifier.on_new_room_event(
-                event, event_stream_id, max_stream_id,
-                extra_users=extra_users
-            )
+        self.notifier.on_new_room_event(
+            event, event_stream_id, max_stream_id,
+            extra_users=extra_users
+        )
 
         if event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
@@ -916,11 +915,10 @@ class FederationHandler(BaseHandler):
                 origin, auth_chain, state, event
             )
 
-            with PreserveLoggingContext():
-                self.notifier.on_new_room_event(
-                    event, event_stream_id, max_stream_id,
-                    extra_users=[joinee]
-                )
+            self.notifier.on_new_room_event(
+                event, event_stream_id, max_stream_id,
+                extra_users=[joinee]
+            )
 
             logger.debug("Finished joining %s to %s", joinee, room_id)
         finally:
@@ -1025,10 +1023,9 @@ class FederationHandler(BaseHandler):
             target_user = UserID.from_string(target_user_id)
             extra_users.append(target_user)
 
-        with PreserveLoggingContext():
-            self.notifier.on_new_room_event(
-                event, event_stream_id, max_stream_id, extra_users=extra_users
-            )
+        self.notifier.on_new_room_event(
+            event, event_stream_id, max_stream_id, extra_users=extra_users
+        )
 
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.JOIN:
@@ -1074,11 +1071,10 @@ class FederationHandler(BaseHandler):
         )
 
         target_user = UserID.from_string(event.state_key)
-        with PreserveLoggingContext():
-            self.notifier.on_new_room_event(
-                event, event_stream_id, max_stream_id,
-                extra_users=[target_user],
-            )
+        self.notifier.on_new_room_event(
+            event, event_stream_id, max_stream_id,
+            extra_users=[target_user],
+        )
 
         defer.returnValue(event)
 
@@ -1236,10 +1232,9 @@ class FederationHandler(BaseHandler):
             target_user = UserID.from_string(target_user_id)
             extra_users.append(target_user)
 
-        with PreserveLoggingContext():
-            self.notifier.on_new_room_event(
-                event, event_stream_id, max_stream_id, extra_users=extra_users
-            )
+        self.notifier.on_new_room_event(
+            event, event_stream_id, max_stream_id, extra_users=extra_users
+        )
 
         defer.returnValue(None)
 
