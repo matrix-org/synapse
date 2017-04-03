@@ -215,13 +215,12 @@ class Notifier(object):
         until all previous events have been persisted before notifying
         the client streams.
         """
-        with PreserveLoggingContext():
-            self.pending_new_room_events.append((
-                room_stream_id, event, extra_users
-            ))
-            self._notify_pending_new_room_events(max_room_stream_id)
+        self.pending_new_room_events.append((
+            room_stream_id, event, extra_users
+        ))
+        self._notify_pending_new_room_events(max_room_stream_id)
 
-            self.notify_replication()
+        self.notify_replication()
 
     def _notify_pending_new_room_events(self, max_room_stream_id):
         """Notify for the room events that were queued waiting for a previous
