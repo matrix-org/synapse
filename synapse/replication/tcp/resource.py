@@ -121,7 +121,10 @@ class ReplicationStreamer(object):
         is currently being executed, so that nothing gets missed
         """
         if not self.connections:
-            # Don't bother if nothing is listening
+            # Don't bother if nothing is listening. We still need to advance
+            # the stream tokens otherwise they'll fall beihind forever
+            for stream in self.streams:
+                stream.advance_current_token()
             return
 
         # If we're in the process of checking for new updates, mark that fact
