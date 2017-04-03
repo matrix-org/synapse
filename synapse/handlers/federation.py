@@ -1004,9 +1004,19 @@ class FederationHandler(BaseHandler):
         )
 
         event.internal_metadata.outlier = False
-        # Send this event on behalf of the origin server since they may not
-        # have an up to data view of the state of the room at this event so
-        # will not know which servers to send the event to.
+        # Send this event on behalf of the origin server.
+        #
+        # The reasons we have the destination server rather than the origin
+        # server send it are slightly mysterious: the origin server should have
+        # all the neccessary state once it gets the response to the send_join,
+        # so it could send the event itself if it wanted to. It may be that
+        # doing it this way reduces failure modes, or avoids certain attacks
+        # where a new server selectively tells a subset of the federation that
+        # it has joined.
+        #
+        # The fact is that, as of the current writing, Synapse doesn't send out
+        # the join event over federation after joining, and changing it now
+        # would introduce the danger of backwards-compatibility problems.
         event.internal_metadata.send_on_behalf_of = origin
 
         context, event_stream_id, max_stream_id = yield self._handle_new_event(
