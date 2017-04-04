@@ -124,7 +124,7 @@ class ReplicationStreamer(object):
             # Don't bother if nothing is listening. We still need to advance
             # the stream tokens otherwise they'll fall beihind forever
             for stream in self.streams:
-                stream.advance_current_token()
+                stream.discard_updates_and_advance()
             return
 
         # If we're in the process of checking for new updates, mark that fact
