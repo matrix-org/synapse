@@ -65,20 +65,22 @@ class SlavedReceiptsStore(BaseSlavedStore):
         result["receipts"] = self._receipts_id_gen.get_current_token()
         return result
 
-    def process_replication(self, result):
-        stream = result.get("receipts")
-        if stream:
-            self._receipts_id_gen.advance(int(stream["position"]))
-            for row in stream["rows"]:
-                position, room_id, receipt_type, user_id = row[:4]
-                self.invalidate_caches_for_receipt(room_id, receipt_type, user_id)
-                self._receipts_stream_cache.entity_has_changed(room_id, position)
-
-        return super(SlavedReceiptsStore, self).process_replication(result)
-
     def invalidate_caches_for_receipt(self, room_id, receipt_type, user_id):
         self.get_receipts_for_user.invalidate((user_id, receipt_type))
         self.get_linearized_receipts_for_room.invalidate_many((room_id,))
         self.get_last_receipt_event_id_for_user.invalidate(
             (user_id, room_id, receipt_type)
+        )
+
+    def process_replication_rows(self, stream_name, token, rows):
+        if stream_name == "receipts":
+            self._receipts_id_gen.advance(token)
+            for row in rows:
+                self.invalidate_caches_for_receipt(
+                    row.room_id, row.receipt_type, row.user_id
+                )
+                self._receipts_stream_cache.entity_has_changed(row.room_id, token)
+
+        return super(SlavedReceiptsStore, self).process_replication_rows(
+            stream_name, token, rows
         )

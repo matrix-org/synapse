@@ -132,6 +132,7 @@ class HomeServer(object):
         'federation_sender',
         'receipts_handler',
         'macaroon_generator',
+        'tcp_replication',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -289,6 +290,9 @@ class HomeServer(object):
 
     def build_receipts_handler(self):
         return ReceiptsHandler(self)
+
+    def build_tcp_replication(self):
+        raise NotImplementedError()
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
