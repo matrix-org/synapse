@@ -310,6 +310,10 @@ def preserve_context_over_fn(fn, *args, **kwargs):
 def preserve_context_over_deferred(deferred, context=None):
     """Given a deferred wrap it such that any callbacks added later to it will
     be invoked with the current context.
+
+    Deprecated: this almost certainly doesn't do want you want, ie make
+    the deferred follow the synapse logcontext rules: try
+    ``make_deferred_yieldable`` instead.
     """
     if context is None:
         context = LoggingContext.current_context()
@@ -330,12 +334,8 @@ def preserve_fn(f):
         LoggingContext.set_current_context(LoggingContext.sentinel)
         return result
 
-    # XXX: why is this here rather than inside g? surely we want to preserve
-    # the context from the time the function was called, not when it was
-    # wrapped?
-    current = LoggingContext.current_context()
-
     def g(*args, **kwargs):
+        current = LoggingContext.current_context()
         res = f(*args, **kwargs)
         if isinstance(res, defer.Deferred) and not res.called:
             # The function will have reset the context before returning, so
@@ -357,6 +357,25 @@ def preserve_fn(f):
             res.addBoth(reset_context)
         return res
     return g
+
+
+@defer.inlineCallbacks
+def make_deferred_yieldable(deferred):
+    """Given a deferred, make it follow the Synapse logcontext rules:
+
+    If the deferred has completed (or is not actually a Deferred), essentially
+    does nothing (just returns another completed deferred with the
+    result/failure).
+
+    If the deferred has not yet completed, resets the logcontext before
+    returning a deferred. Then, when the deferred completes, restores the
+    current logcontext before running callbacks/errbacks.
+
+    (This is more-or-less the opposite operation to preserve_fn.)
+    """
+    with PreserveLoggingContext():
+        r = yield deferred
+    defer.returnValue(r)
 
 
 # modules to ignore in `logcontext_tracer`

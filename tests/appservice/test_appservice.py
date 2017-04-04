@@ -19,10 +19,12 @@ from twisted.internet import defer
 from mock import Mock
 from tests import unittest
 
+import re
+
 
 def _regex(regex, exclusive=True):
     return {
-        "regex": regex,
+        "regex": re.compile(regex),
         "exclusive": exclusive
     }
 

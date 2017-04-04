@@ -210,7 +210,6 @@ class Notifier(object):
         """
         self.replication_callbacks.append(cb)
 
-    @preserve_fn
     def on_new_room_event(self, event, room_stream_id, max_room_stream_id,
                           extra_users=[]):
         """ Used by handlers to inform the notifier something has happened
@@ -224,15 +223,13 @@ class Notifier(object):
         until all previous events have been persisted before notifying
         the client streams.
         """
-        with PreserveLoggingContext():
-            self.pending_new_room_events.append((
-                room_stream_id, event, extra_users
-            ))
-            self._notify_pending_new_room_events(max_room_stream_id)
+        self.pending_new_room_events.append((
+            room_stream_id, event, extra_users
+        ))
+        self._notify_pending_new_room_events(max_room_stream_id)
 
-            self.notify_replication()
+        self.notify_replication()
 
-    @preserve_fn
     def _notify_pending_new_room_events(self, max_room_stream_id):
         """Notify for the room events that were queued waiting for a previous
         event to be persisted.
@@ -250,14 +247,16 @@ class Notifier(object):
             else:
                 self._on_new_room_event(event, room_stream_id, extra_users)
 
-    @preserve_fn
     def _on_new_room_event(self, event, room_stream_id, extra_users=[]):
         """Notify any user streams that are interested in this room event"""
         # poke any interested application service.
-        self.appservice_handler.notify_interested_services(room_stream_id)
+        preserve_fn(self.appservice_handler.notify_interested_services)(
+            room_stream_id)
 
         if self.federation_sender:
-            self.federation_sender.notify_new_events(room_stream_id)
+            preserve_fn(self.federation_sender.notify_new_events)(
+                room_stream_id
+            )
 
         if event.type == EventTypes.Member and event.membership == Membership.JOIN:
             self._user_joined_room(event.state_key, event.room_id)
@@ -268,7 +267,6 @@ class Notifier(object):
             rooms=[event.room_id],
         )
 
-    @preserve_fn
     def on_new_event(self, stream_key, new_token, users=[], rooms=[]):
         """ Used to inform listeners that something has happend event wise.
 
@@ -295,7 +293,6 @@ class Notifier(object):
 
                 self.notify_replication()
 
-    @preserve_fn
     def on_new_replication_data(self):
         """Used to inform replication listeners that something has happend
         without waking up any of the normal user event streams"""

@@ -23,6 +23,7 @@ class VoipConfig(Config):
         self.turn_username = config.get("turn_username")
         self.turn_password = config.get("turn_password")
         self.turn_user_lifetime = self.parse_duration(config["turn_user_lifetime"])
+        self.turn_allow_guests = config.get("turn_allow_guests", True)
 
     def default_config(self, **kwargs):
         return """\
@@ -41,4 +42,11 @@ class VoipConfig(Config):
 
         # How long generated TURN credentials last
         turn_user_lifetime: "1h"
+
+        # Whether guests should be allowed to use the TURN server.
+        # This defaults to True, otherwise VoIP will be unreliable for guests.
+        # However, it does introduce a slight security risk as it allows users to
+        # connect to arbitrary endpoints without having first signed up for a
+        # valid account (e.g. by passing a CAPTCHA).
+        turn_allow_guests: True
         """

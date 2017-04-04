@@ -447,9 +447,7 @@ class Porter(object):
 
             postgres_tables = yield self.postgres_store._simple_select_onecol(
                 table="information_schema.tables",
-                keyvalues={
-                    "table_schema": "public",
-                },
+                keyvalues={},
                 retcol="distinct table_name",
             )
 
