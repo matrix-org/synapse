@@ -106,6 +106,7 @@ UPDATE_SYNCING_USERS_MS = 10 * 1000
 
 class SynchrotronPresence(object):
     def __init__(self, hs):
+        self.hs = hs
         self.is_mine_id = hs.is_mine_id
         self.http_client = hs.get_simple_http_client()
         self.store = hs.get_datastore()
@@ -122,7 +123,8 @@ class SynchrotronPresence(object):
         self.process_id = random_string(16)
         logger.info("Presence process_id is %r", self.process_id)
 
-        self.sync_callback = None
+    def send_user_sync(self, user_id, is_syncing, last_sync_ms):
+        self.hs.get_tcp_replication().send_user_sync(user_id, is_syncing, last_sync_ms)
 
     def set_state(self, user, state, ignore_status_msg=False):
         # TODO Hows this supposed to work?
@@ -138,10 +140,10 @@ class SynchrotronPresence(object):
             curr_sync = self.user_to_num_current_syncs.get(user_id, 0)
             self.user_to_num_current_syncs[user_id] = curr_sync + 1
 
-            if self.sync_callback:
-                if self.user_to_num_current_syncs[user_id] == 1:
-                    now = self.clock.time_msec()
-                    self.sync_callback(user_id, True, now)
+            # If we went from no in flight sync to some, notify replication
+            if self.user_to_num_current_syncs[user_id] == 1:
+                now = self.clock.time_msec()
+                self.send_user_sync(user_id, True, now)
 
         def _end():
             # We check that the user_id is in user_to_num_current_syncs because
@@ -150,10 +152,10 @@ class SynchrotronPresence(object):
             if affect_presence and user_id in self.user_to_num_current_syncs:
                 self.user_to_num_current_syncs[user_id] -= 1
 
-                if self.sync_callback:
-                    if self.user_to_num_current_syncs[user_id] == 0:
-                        now = self.clock.time_msec()
-                        self.sync_callback(user_id, False, now)
+                # If we went from one in flight sync to non, notify replication
+                if self.user_to_num_current_syncs[user_id] == 0:
+                    now = self.clock.time_msec()
+                    self.send_user_sync(user_id, False, now)
 
         @contextlib.contextmanager
         def _user_syncing():
