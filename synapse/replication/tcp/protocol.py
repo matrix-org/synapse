@@ -365,6 +365,7 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
         self.streamer.new_connection(self)
 
     def on_NAME(self, cmd):
+        logger.info("[%s] Renamed to %r", self.id(), cmd.data)
         self.name = cmd.data
 
     def on_USER_SYNC(self, cmd):
@@ -442,7 +443,7 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
             self.send_command(RdataCommand(stream_name, token, data))
         elif stream_name in self.connecting_streams:
             # The client is being subscribed to the stream
-            logger.info("[%s] Queuing RDATA %r %r", self.id(), stream_name, token)
+            logger.debug("[%s] Queuing RDATA %r %r", self.id(), stream_name, token)
             self.pending_rdata.setdefault(stream_name, []).append((token, data))
         else:
             # The client isn't subscribed
@@ -453,7 +454,6 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
     def on_connection_closed(self):
         BaseReplicationStreamProtocol.on_connection_closed(self)
-        logger.info("[%s] Replication connection closed", self.id())
         self.streamer.lost_connection(self)
 
 
