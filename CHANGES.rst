@@ -1,3 +1,47 @@
+Changes in synapse v0.20.0-rc1 (2017-03-30)
+===========================================
+
+Features:
+
+* Add delete_devices API (PR #1993)
+* Add phone number registration/login support (PR #1994, #2055)
+
+
+Changes:
+
+* Use JSONSchema for validation of filters. Thanks @pik! (PR #1783)
+* Reread log config on SIGHUP (PR #1982)
+* Speed up public room list (PR #1989)
+* Add helpful texts to logger config options (PR #1990)
+* Minor ``/sync`` performance improvements. (PR #2002, #2013, #2022)
+* Add some debug to help diagnose weird federation issue (PR #2035)
+* Correctly limit retries for all federation requests (PR #2050, #2061)
+* Don't lock table when persisting new one time keys (PR #2053)
+* Reduce some CPU work on DB threads (PR #2054)
+* Cache hosts in room (PR #2060)
+* Batch sending of device list pokes (PR #2063)
+* Speed up persist event path in certain edge cases (PR #2070)
+
+
+Bug fixes:
+
+* Fix bug where current_state_events renamed to current_state_ids (PR #1849)
+* Fix routing loop when fetching remote media (PR #1992)
+* Fix current_state_events table to not lie (PR #1996)
+* Fix CAS login to handle PartialDownloadError (PR #1997)
+* Fix assertion to stop transaction queue getting wedged (PR #2010)
+* Fix presence to fallback to last_active_ts if it beats the last sync time.
+  Thanks @Half-Shot! (PR #2014)
+* Fix bug when federation received a PDU while a room join is in progress (PR
+  #2016)
+* Fix resetting state on rejected events (PR #2025)
+* Fix installation issues in readme. Thanks @ricco386 (PR #2037)
+* Fix caching of remote servers' signature keys (PR #2042)
+* Fix some leaking log context (PR #2048, #2049, #2057, #2058)
+* Fix rejection of invites not reaching sync (PR #2056)
+
+
+
 Changes in synapse v0.19.3 (2017-03-20)
 =======================================
 

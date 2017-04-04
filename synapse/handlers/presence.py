@@ -30,6 +30,7 @@ from synapse.api.constants import PresenceState
 from synapse.storage.presence import UserPresenceState
 
 from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.util.async import Linearizer
 from synapse.util.logcontext import preserve_fn
 from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
@@ -187,6 +188,7 @@ class PresenceHandler(object):
         # process_id to millisecond timestamp last updated.
         self.external_process_to_current_syncs = {}
         self.external_process_last_updated_ms = {}
+        self.external_sync_linearizer = Linearizer(name="external_sync_linearizer")
 
         # Start a LoopingCall in 30s that fires every 5s.
         # The initial delay is to allow disconnected clients a chance to
@@ -510,6 +512,73 @@ class PresenceHandler(object):
         # if we don't receive an update in the given timeframe.
         self.external_process_last_updated_ms[process_id] = self.clock.time_msec()
         self.external_process_to_current_syncs[process_id] = syncing_user_ids
+
+    @defer.inlineCallbacks
+    def update_external_syncs_row(self, process_id, user_id, is_syncing, sync_time_msec):
+        """Update the syncing users for an external process as a delta.
+
+        Args:
+            process_id (str): An identifier for the process the users are
+                syncing against. This allows synapse to process updates
+                as user start and stop syncing against a given process.
+            user_id (str): The user who has started or stopped syncing
+            is_syncing (bool): Whether or not the user is now syncing
+            sync_time_msec(int): Time in ms when the user was last syncing
+        """
+        with (yield self.external_sync_linearizer.queue(process_id)):
+            prev_state = yield self.current_state_for_user(user_id)
+
+            process_presence = self.external_process_to_current_syncs.setdefault(
+                process_id, set()
+            )
+
+            updates = []
+            if is_syncing and user_id not in process_presence:
+                if prev_state.state == PresenceState.OFFLINE:
+                    updates.append(prev_state.copy_and_replace(
+                        state=PresenceState.ONLINE,
+                        last_active_ts=sync_time_msec,
+                        last_user_sync_ts=sync_time_msec,
+                    ))
+                else:
+                    updates.append(prev_state.copy_and_replace(
+                        last_user_sync_ts=sync_time_msec,
+                    ))
+                process_presence.add(user_id)
+            elif user_id in process_presence:
+                updates.append(prev_state.copy_and_replace(
+                    last_user_sync_ts=sync_time_msec,
+                ))
+
+            if not is_syncing:
+                process_presence.discard(user_id)
+
+            if updates:
+                yield self._update_states(updates)
+
+            self.external_process_last_updated_ms[process_id] = self.clock.time_msec()
+
+    @defer.inlineCallbacks
+    def update_external_syncs_clear(self, process_id):
+        """Marks all users that had been marked as syncing by a given process
+        as offline.
+
+        Used when the process has stopped/disappeared.
+        """
+        with (yield self.external_sync_linearizer.queue(process_id)):
+            process_presence = self.external_process_to_current_syncs.pop(
+                process_id, set()
+            )
+            prev_states = yield self.current_state_for_users(process_presence)
+            time_now_ms = self.clock.time_msec()
+
+            yield self._update_states([
+                prev_state.copy_and_replace(
+                    last_user_sync_ts=time_now_ms,
+                )
+                for prev_state in prev_states.itervalues()
+            ])
+            self.external_process_last_updated_ms.pop(process_id, None)
 
     @defer.inlineCallbacks
     def current_state_for_user(self, user_id):
