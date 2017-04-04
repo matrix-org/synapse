@@ -89,6 +89,13 @@ class Stream(object):
         """
         self.upto_token = self.current_token()
 
+    def discard_updates_and_advance(self):
+        """Called when the stream should advance but the updates would be discarded,
+        e.g. when there are no currently connected workers.
+        """
+        self.upto_token = self.current_token()
+        self.last_token = self.upto_token
+
     @defer.inlineCallbacks
     def get_updates(self):
         """Gets all updates since the last time this function was called (or

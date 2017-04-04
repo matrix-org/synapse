@@ -415,15 +415,17 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
                 token, row = update[0], update[1]
                 self.send_command(RdataCommand(stream_name, token, row))
 
-            # Now we can send any updates that came in while we were subscribing
-            pending_rdata = self.pending_rdata.pop(stream_name, [])
-            for token, update in pending_rdata:
-                self.send_command(RdataCommand(stream_name, token, update))
-
             # We send a POSITION command to ensure that they have an up to
             # date token (especially useful if we didn't send any updates
             # above)
             self.send_command(PositionCommand(stream_name, current_token))
+
+            # Now we can send any updates that came in while we were subscribing
+            pending_rdata = self.pending_rdata.pop(stream_name, [])
+            for token, update in pending_rdata:
+                # Only send updates newer than the current token
+                if token > current_token:
+                    self.send_command(RdataCommand(stream_name, token, update))
 
             # They're now fully subscribed
             self.replication_streams.add(stream_name)
