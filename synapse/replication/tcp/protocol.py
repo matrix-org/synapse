@@ -336,10 +336,10 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
         for cmd in COMMAND_MAP:
             outbound_commands_counter.unregister_counter(
-                cmd.NAME, self.name, self.conn_id
+                cmd, self.name, self.conn_id
             )
             inbound_commands_counter.unregister_counter(
-                cmd.NAME, self.name, self.conn_id
+                cmd, self.name, self.conn_id
             )
 
         if self.transport:
