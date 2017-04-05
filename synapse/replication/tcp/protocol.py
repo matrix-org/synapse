@@ -220,6 +220,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             logger.exception("[%s] Failed to handle line: %r", self.id(), line)
 
     def close(self):
+        logger.warn("[%s] Closing connection", self.id())
         self.time_we_closed = self.clock.time_msec()
         self.transport.loseConnection()
         self.on_connection_closed()
@@ -505,7 +506,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
     def on_SERVER(self, cmd):
         if cmd.data != self.server_name:
             logger.error("[%s] Connected to wrong remote: %r", self.id(), cmd.data)
-            self.transport.abortConnection()
+            self.send_error("Wrong remote")
 
     def on_RDATA(self, cmd):
         try:
