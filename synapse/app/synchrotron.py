@@ -62,7 +62,6 @@ import sys
 import logging
 import contextlib
 import gc
-import ujson as json
 
 logger = logging.getLogger("synapse.app.synchrotron")
 
@@ -215,9 +214,8 @@ class SynchrotronTyping(object):
         self._latest_room_serial = token
 
         for row in rows:
-            typing = json.loads(row.user_ids)
             self._room_serials[row.room_id] = token
-            self._room_typing[row.room_id] = typing
+            self._room_typing[row.room_id] = row.user_ids
 
 
 class SynchrotronApplicationService(object):
