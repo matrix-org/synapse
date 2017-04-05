@@ -51,7 +51,6 @@ from daemonize import Daemonize
 import sys
 import logging
 import gc
-import ujson as json
 
 logger = logging.getLogger("synapse.app.appservice")
 
@@ -290,8 +289,7 @@ class FederationSenderHandler(object):
             # Parse the rows in the stream
             for row in rows:
                 typ = row.type
-                content_js = row.data
-                content = json.loads(content_js)
+                content = row.data
 
                 if typ == send_queue.PRESENCE_TYPE:
                     destination = content["destination"]

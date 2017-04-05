@@ -35,7 +35,6 @@ from synapse.util.metrics import Measure
 import synapse.metrics
 
 from blist import sorteddict
-import ujson
 
 
 metrics = synapse.metrics.get_metrics_for(__name__)
@@ -258,10 +257,10 @@ class FederationRemoteSendQueue(object):
         )
 
         for (key, (dest, user_id)) in dest_user_ids:
-            rows.append((key, PRESENCE_TYPE, ujson.dumps({
+            rows.append((key, PRESENCE_TYPE, {
                 "destination": dest,
                 "state": self.presence_map[user_id].as_dict(),
-            })))
+            }))
 
         # Fetch changes keyed edus
         keys = self.keyed_edu_changed.keys()
@@ -271,10 +270,10 @@ class FederationRemoteSendQueue(object):
 
         for (pos, (destination, edu_key)) in keyed_edus:
             rows.append(
-                (pos, KEYED_EDU_TYPE, ujson.dumps({
+                (pos, KEYED_EDU_TYPE, {
                     "key": edu_key,
                     "edu": self.keyed_edu[(destination, edu_key)].get_internal_dict(),
-                }))
+                })
             )
 
         # Fetch changed edus
@@ -284,7 +283,7 @@ class FederationRemoteSendQueue(object):
         edus = set((k, self.edus[k]) for k in keys[i:j])
 
         for (pos, edu) in edus:
-            rows.append((pos, EDU_TYPE, ujson.dumps(edu.get_internal_dict())))
+            rows.append((pos, EDU_TYPE, edu.get_internal_dict()))
 
         # Fetch changed failures
         keys = self.failures.keys()
@@ -293,10 +292,10 @@ class FederationRemoteSendQueue(object):
         failures = set((k, self.failures[k]) for k in keys[i:j])
 
         for (pos, (destination, failure)) in failures:
-            rows.append((pos, FAILURE_TYPE, ujson.dumps({
+            rows.append((pos, FAILURE_TYPE, {
                 "destination": destination,
                 "failure": failure,
-            })))
+            }))
 
         # Fetch changed device messages
         keys = self.device_messages.keys()
@@ -305,9 +304,9 @@ class FederationRemoteSendQueue(object):
         device_messages = set((k, self.device_messages[k]) for k in keys[i:j])
 
         for (pos, destination) in device_messages:
-            rows.append((pos, DEVICE_MESSAGE_TYPE, ujson.dumps({
+            rows.append((pos, DEVICE_MESSAGE_TYPE, {
                 "destination": destination,
-            })))
+            }))
 
         # Sort rows based on pos
         rows.sort()
