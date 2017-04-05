@@ -48,15 +48,14 @@ class SlavedPresenceStore(BaseSlavedStore):
         result["presence"] = position
         return result
 
-    def process_replication(self, result):
-        stream = result.get("presence")
-        if stream:
-            self._presence_id_gen.advance(int(stream["position"]))
-            for row in stream["rows"]:
-                position, user_id = row[:2]
+    def process_replication_rows(self, stream_name, token, rows):
+        if stream_name == "presence":
+            self._presence_id_gen.advance(token)
+            for row in rows:
                 self.presence_stream_cache.entity_has_changed(
-                    user_id, position
+                    row.user_id, token
                 )
-                self._get_presence_for_user.invalidate((user_id,))
-
-        return super(SlavedPresenceStore, self).process_replication(result)
+                self._get_presence_for_user.invalidate((row.user_id,))
+        return super(SlavedPresenceStore, self).process_replication_rows(
+            stream_name, token, rows
+        )
