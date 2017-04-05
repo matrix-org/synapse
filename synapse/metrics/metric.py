@@ -83,6 +83,9 @@ class CounterMetric(BaseMetric):
     def render(self):
         return map_concat(self.render_item, sorted(self.counts.keys()))
 
+    def unregister_counter(self, *values):
+        self.counts.pop(values, None)
+
 
 class CallbackMetric(BaseMetric):
     """A metric that returns the numeric value returned by a callback whenever
