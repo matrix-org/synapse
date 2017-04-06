@@ -143,7 +143,7 @@ class SynchrotronPresence(object):
         """
         going_offline = self.users_going_offline.pop(user_id, None)
         if not going_offline:
-            # Safe to skip if we haven't yet told the master they were offline
+            # Safe to skip because we haven't yet told the master they were offline
             self.send_user_sync(user_id, True, self.clock.time_msec())
 
     def mark_as_going_offline(self, user_id):
