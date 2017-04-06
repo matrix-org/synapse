@@ -137,9 +137,13 @@ class SynchrotronPresence(object):
     def mark_as_coming_online(self, user_id):
         """A user has started syncing. Send a UserSync to the master, unless they
         had recently stopped syncing.
+
+        Args:
+            user_id (str)
         """
         going_offline = self.users_going_offline.pop(user_id, None)
         if not going_offline:
+            # Safe to skip if we haven't yet told the master they were offline
             self.send_user_sync(user_id, True, self.clock.time_msec())
 
     def mark_as_going_offline(self, user_id):
@@ -147,6 +151,9 @@ class SynchrotronPresence(object):
         its likely they'll come back soon. This allows us to avoid sending
         a stopped syncing immediately followed by a started syncing notification
         to the master
+
+        Args:
+            user_id (str)
         """
         self.users_going_offline[user_id] = self.clock.time_msec()
 
