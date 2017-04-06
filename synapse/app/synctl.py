@@ -98,7 +98,7 @@ def main():
         "configfile",
         nargs="?",
         default="homeserver.yaml",
-        help="the homeserver config file, defaults to homserver.yaml",
+        help="the homeserver config file, defaults to homeserver.yaml",
     )
     parser.add_argument(
         "-w", "--worker",
