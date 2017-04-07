@@ -1101,15 +1101,15 @@ class FederationHandler(BaseHandler):
                 user_id,
                 "leave"
             )
-            signed_event = self._sign_event(event)
+            event = self._sign_event(event)
         except SynapseError:
             raise
         except CodeMessageException as e:
             logger.warn("Failed to reject invite: %s", e)
             raise SynapseError(500, "Failed to reject invite")
 
-        # Try the host we successfully got a response to /make_join/
-        # request first.
+        # Try the host that we succesfully called /make_leave/ on first for
+        # the /send_leave/ request.
         try:
             target_hosts.remove(origin)
             target_hosts.insert(0, origin)
@@ -1119,7 +1119,7 @@ class FederationHandler(BaseHandler):
         try:
             yield self.replication_layer.send_leave(
                 target_hosts,
-                signed_event
+                event
             )
         except SynapseError:
             raise
