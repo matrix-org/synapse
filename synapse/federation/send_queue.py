@@ -38,6 +38,10 @@ import synapse.metrics
 from blist import sorteddict
 from collections import namedtuple
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 
@@ -480,6 +484,10 @@ def process_rows_for_federation(federation_sender, rows):
 
     # Parse the rows in the stream and add to the buffer
     for row in rows:
+        if row.type not in TypeToRow:
+            logger.error("Unrecognized federation row type %r", row.type)
+            continue
+
         RowType = TypeToRow[row.type]
         parsed_row = RowType.from_data(row.data)
         parsed_row.add_to_buffer(buff)
