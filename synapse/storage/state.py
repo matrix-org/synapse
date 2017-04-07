@@ -71,6 +71,15 @@ class StateStore(SQLBaseStore):
 
     @cached(max_entries=100000, iterable=True)
     def get_current_state_ids(self, room_id):
+        """Get the current state event ids for a room based on the
+        current_state_events table.
+
+        Args:
+            room_id (str)
+
+        Returns:
+            deferred: dict of (type, state_key) -> event_id
+        """
         def _get_current_state_ids_txn(txn):
             txn.execute(
                 """SELECT type, state_key, event_id FROM current_state_events
