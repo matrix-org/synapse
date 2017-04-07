@@ -312,16 +312,29 @@ class FederationRemoteSendQueue(object):
 
 
 class BaseFederationRow(object):
-    TypeId = None
+    """Base class for rows to be sent in the federation stream.
+
+    Specifies how to identify, serialize and deserialize the different types.
+    """
+
+    TypeId = None  # Unique string that ids the type. Must be overriden in sub classes.
 
     @staticmethod
     def from_data(data):
         """Parse the data from the federation stream into a row.
+
+        Args:
+            data: The value of ``data`` from FederationStreamRow.data, type
+                depends on the type of stream
         """
         raise NotImplementedError()
 
     def to_data(self):
-        """Serialize this row to be sent over the federation stream
+        """Serialize this row to be sent over the federation stream.
+
+        Returns:
+            The value to be sent in FederationStreamRow.data. The type depends
+            on the type of stream.
         """
         raise NotImplementedError()
 
