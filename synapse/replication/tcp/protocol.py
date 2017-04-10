@@ -85,6 +85,8 @@ logger = logging.getLogger(__name__)
 
 
 PING_TIME = 5000
+PING_TIMEOUT_MULTIPLIER = 5
+PING_TIMEOUT_MS = PING_TIME * PING_TIMEOUT_MULTIPLIER
 
 
 class ConnectionStates(object):
@@ -166,7 +168,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         now = self.clock.time_msec()
 
         if self.time_we_closed:
-            if now - self.time_we_closed > PING_TIME * 3:
+            if now - self.time_we_closed > PING_TIMEOUT_MS:
                 logger.info(
                     "[%s] Failed to close connection gracefully, aborting", self.id()
                 )
@@ -175,7 +177,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             if now - self.last_sent_command >= PING_TIME:
                 self.send_command(PingCommand(now))
 
-            if self.received_ping and now - self.last_received_command > PING_TIME * 3:
+            if self.received_ping and now - self.last_received_command > PING_TIMEOUT_MS:
                 logger.info(
                     "[%s] Connection hasn't received command in %r ms. Closing.",
                     self.id(), now - self.last_received_command
