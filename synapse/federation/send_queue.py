@@ -447,10 +447,10 @@ class DeviceRow(BaseFederationRow, namedtuple("DeviceRow", (
 
     @staticmethod
     def from_data(data):
-        return DeviceRow(destination=data)
+        return DeviceRow(destination=data["destination"])
 
     def to_data(self):
-        return self.destination
+        return {"destination": self.destination}
 
     def add_to_buffer(self, buff):
         buff.device_destinations.add(self.destination)
