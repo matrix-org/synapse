@@ -206,10 +206,8 @@ class SynchrotronPresence(object):
 
     @defer.inlineCallbacks
     def notify_from_replication(self, states, stream_id):
-        parties = yield self._get_interested_parties(
-            states, calculate_remote_hosts=False
-        )
-        room_ids_to_states, users_to_states, _ = parties
+        parties = yield self._get_interested_parties(states)
+        room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(
             "presence_key", stream_id, rooms=room_ids_to_states.keys(),
