@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached, cachedList, cachedInlineCallbacks
+from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches import intern_string
 from synapse.storage.engines import PostgresEngine
 
@@ -69,17 +69,33 @@ class StateStore(SQLBaseStore):
             where_clause="type='m.room.member'",
         )
 
-    @cachedInlineCallbacks(max_entries=100000, iterable=True)
+    @cached(max_entries=100000, iterable=True)
     def get_current_state_ids(self, room_id):
-        rows = yield self._simple_select_list(
-            table="current_state_events",
-            keyvalues={"room_id": room_id},
-            retcols=["event_id", "type", "state_key"],
-            desc="_calculate_state_delta",
+        """Get the current state event ids for a room based on the
+        current_state_events table.
+
+        Args:
+            room_id (str)
+
+        Returns:
+            deferred: dict of (type, state_key) -> event_id
+        """
+        def _get_current_state_ids_txn(txn):
+            txn.execute(
+                """SELECT type, state_key, event_id FROM current_state_events
+                WHERE room_id = ?
+                """,
+                (room_id,)
+            )
+
+            return {
+                (r[0], r[1]): r[2] for r in txn
+            }
+
+        return self.runInteraction(
+            "get_current_state_ids",
+            _get_current_state_ids_txn,
         )
-        defer.returnValue({
-            (r["type"], r["state_key"]): r["event_id"] for r in rows
-        })
 
     @defer.inlineCallbacks
     def get_state_groups_ids(self, room_id, event_ids):

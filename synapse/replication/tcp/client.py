@@ -175,7 +175,7 @@ class ReplicationClientHandler(object):
     def send_invalidate_cache(self, cache_func, keys):
         """Poke the master to invalidate a cache.
         """
-        cmd = InvalidateCacheCommand(cache_func, keys)
+        cmd = InvalidateCacheCommand(cache_func.__name__, keys)
         self.send_command(cmd)
 
     def await_sync(self, data):

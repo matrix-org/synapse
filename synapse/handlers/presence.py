@@ -599,14 +599,14 @@ class PresenceHandler(object):
             for user_id in user_ids
         }
 
-        missing = [user_id for user_id, state in states.items() if not state]
+        missing = [user_id for user_id, state in states.iteritems() if not state]
         if missing:
             # There are things not in our in memory cache. Lets pull them out of
             # the database.
             res = yield self.store.get_presence_for_users(missing)
             states.update(res)
 
-            missing = [user_id for user_id, state in states.items() if not state]
+            missing = [user_id for user_id, state in states.iteritems() if not state]
             if missing:
                 new = {
                     user_id: UserPresenceState.default(user_id)
