@@ -468,7 +468,7 @@ TypeToRow = {
 }
 
 
-BufferedToSend = namedtuple("BufferedToSend", (
+ParsedFederationStreamData = namedtuple("ParsedFederationStreamData", (
     "presence",  # dict of destination -> [UserPresenceState]
     "keyed_edus",  # dict of destination -> { key -> Edu }
     "edus",  # dict of destination -> [Edu]
@@ -490,7 +490,7 @@ def process_rows_for_federation(federation_sender, rows):
     # rows that need to be handled differently. We parse the rows, put
     # them into the appropriate collection and then send them off.
 
-    buff = BufferedToSend(
+    buff = ParsedFederationStreamData(
         presence={},
         keyed_edus={},
         edus={},
