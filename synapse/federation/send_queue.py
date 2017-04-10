@@ -282,7 +282,7 @@ class FederationRemoteSendQueue(object):
         keys = self.edus.keys()
         i = keys.bisect_right(from_token)
         j = keys.bisect_right(to_token) + 1
-        edus = [(k, self.edus[k]) for k in keys[i:j]]
+        edus = ((k, self.edus[k]) for k in keys[i:j])
 
         for (pos, edu) in edus:
             rows.append((pos, EduRow(edu)))
@@ -291,7 +291,7 @@ class FederationRemoteSendQueue(object):
         keys = self.failures.keys()
         i = keys.bisect_right(from_token)
         j = keys.bisect_right(to_token) + 1
-        failures = [(k, self.failures[k]) for k in keys[i:j]]
+        failures = ((k, self.failures[k]) for k in keys[i:j])
 
         for (pos, (destination, failure)) in failures:
             rows.append((pos, FailureRow(
