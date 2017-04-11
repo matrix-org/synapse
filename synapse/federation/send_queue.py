@@ -191,9 +191,15 @@ class FederationRemoteSendQueue(object):
         self.notifier.on_new_replication_data()
 
     def send_presence(self, states):
-        """As per TransactionQueue"""
+        """As per TransactionQueue
+
+        Args:
+            states (list(UserPresenceState))
+        """
         pos = self._next_pos()
 
+        # We only want to send presence for our own users, so lets always just
+        # filter here just in case.
         local_states = filter(lambda s: self.is_mine_id(s.user_id), states)
 
         self.presence_map.update({state.user_id: state for state in local_states})

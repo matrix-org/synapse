@@ -251,6 +251,8 @@ class TransactionQueue(object):
 
         # First we queue up the new presence by user ID, so multiple presence
         # updates in quick successtion are correctly handled
+        # We only want to send presence for our own users, so lets always just
+        # filter here just in case.
         self.pending_presence.update({
             state.user_id: state for state in states
             if self.is_mine_id(state.user_id)
