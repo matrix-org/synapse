@@ -42,41 +42,17 @@ class ReadMarkerHandler(BaseHandler):
         """
 
         # Get ordering for existing read marker
-        with (yield self.read_marker_linearizer.queue(room_id + "_" + user_id)):
+        with (yield self.read_marker_linearizer.queue((room_id, user_id))):
             account_data = yield self.store.get_account_data_for_room(user_id, room_id)
             existing_read_marker = account_data["m.read_marker"]
 
             should_update = True
 
-            res = yield self.store._simple_select_one(
-                table="events",
-                retcols=["topological_ordering", "stream_ordering"],
-                keyvalues={"event_id": event_id},
-                allow_none=True
-            )
-
-            if not res:
-                raise SynapseError(404, 'Event does not exist')
-
             if existing_read_marker:
-                new_to = int(res["topological_ordering"])
-                new_so = int(res["stream_ordering"])
-
-                # Get ordering for existing read marker
-                res = yield self.store._simple_select_one(
-                    table="events",
-                    retcols=["topological_ordering", "stream_ordering"],
-                    keyvalues={"event_id": existing_read_marker['marker']},
-                    allow_none=True
+                should_update = yield self.store.is_event_after(
+                    existing_read_marker['marker'],
+                    event_id
                 )
-                existing_to = int(res["topological_ordering"]) if res else None
-                existing_so = int(res["stream_ordering"]) if res else None
-
-                # Prevent updating if the existing marker is ahead in the stream
-                if existing_to > new_to:
-                    should_update = False
-                elif existing_to == new_to and existing_so >= new_so:
-                    should_update = False
 
             if should_update:
                 content = {
