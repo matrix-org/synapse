@@ -18,7 +18,6 @@ from ._base import BaseHandler
 from twisted.internet import defer
 
 from synapse.util.async import Linearizer
-from synapse.api.errors import SynapseError
 
 import logging
 logger = logging.getLogger(__name__)
