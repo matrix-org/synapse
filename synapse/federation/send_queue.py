@@ -55,17 +55,17 @@ class FederationRemoteSendQueue(object):
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
 
-        self.presence_map = {}
-        self.presence_changed = sorteddict()
+        self.presence_map = {}  # Pending presence map user_id -> UserPresenceState
+        self.presence_changed = sorteddict()  # Stream position -> user_id
 
-        self.keyed_edu = {}
-        self.keyed_edu_changed = sorteddict()
+        self.keyed_edu = {}  # (destination, key) -> EDU
+        self.keyed_edu_changed = sorteddict()  # stream position -> (destination, key)
 
-        self.edus = sorteddict()
+        self.edus = sorteddict()  # stream position -> Edu
 
-        self.failures = sorteddict()
+        self.failures = sorteddict()  # stream position -> (destination, Failure)
 
-        self.device_messages = sorteddict()
+        self.device_messages = sorteddict()  # stream position -> destination
 
         self.pos = 1
         self.pos_time = sorteddict()
