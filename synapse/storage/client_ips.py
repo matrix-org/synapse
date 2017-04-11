@@ -90,6 +90,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             are (user_id, device_id) tuples. The values are also dicts, with
             keys giving the column names
         """
+
         res = yield self.runInteraction(
             "get_last_client_ip_by_device",
             self._get_last_client_ip_by_device_txn,
@@ -109,9 +110,6 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
     @classmethod
     def _get_last_client_ip_by_device_txn(cls, txn, devices, retcols):
-        if not devices:
-            return []
-
         where_clauses = []
         bindings = []
         for (user_id, device_id) in devices:
@@ -121,6 +119,9 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             else:
                 where_clauses.append("(user_id = ? AND device_id = ?)")
                 bindings.extend((user_id, device_id))
+
+        if not where_clauses:
+            return []
 
         inner_select = (
             "SELECT MAX(last_seen) mls, user_id, device_id FROM user_ips "
