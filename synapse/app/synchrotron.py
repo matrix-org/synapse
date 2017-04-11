@@ -44,7 +44,7 @@ from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.server import HomeServer
 from synapse.storage.client_ips import ClientIpStore
 from synapse.storage.engines import create_engine
-from synapse.storage.presence import PresenceStore, UserPresenceState
+from synapse.storage.presence import UserPresenceState
 from synapse.storage.roommember import RoomMemberStore
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext, preserve_fn
@@ -88,16 +88,6 @@ class SynchrotronSlavedStore(
     did_forget = (
         RoomMemberStore.__dict__["did_forget"]
     )
-
-    # XXX: This is a bit broken because we don't persist the accepted list in a
-    # way that can be replicated. This means that we don't have a way to
-    # invalidate the cache correctly.
-    get_presence_list_accepted = PresenceStore.__dict__[
-        "get_presence_list_accepted"
-    ]
-    get_presence_list_observers_accepted = PresenceStore.__dict__[
-        "get_presence_list_observers_accepted"
-    ]
 
 
 UPDATE_SYNCING_USERS_MS = 10 * 1000

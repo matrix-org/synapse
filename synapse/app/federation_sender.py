@@ -28,11 +28,11 @@ from synapse.replication.slave.storage.deviceinbox import SlavedDeviceInboxStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
+from synapse.replication.slave.storage.presence import SlavedPresenceStore
 from synapse.replication.slave.storage.transactions import TransactionStore
 from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.storage.engines import create_engine
-from synapse.storage.presence import PresenceStore
 from synapse.util.async import Linearizer
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext, preserve_fn
@@ -56,7 +56,7 @@ logger = logging.getLogger("synapse.app.appservice")
 
 class FederationSenderSlaveStore(
     SlavedDeviceInboxStore, TransactionStore, SlavedReceiptsStore, SlavedEventStore,
-    SlavedRegistrationStore, SlavedDeviceStore,
+    SlavedRegistrationStore, SlavedDeviceStore, SlavedPresenceStore,
 ):
     def __init__(self, db_conn, hs):
         super(FederationSenderSlaveStore, self).__init__(db_conn, hs)
@@ -80,17 +80,6 @@ class FederationSenderSlaveStore(
         txn.close()
 
         return rows[0][0] if rows else -1
-
-    # XXX: This is a bit broken because we don't persist the accepted list in a
-    # way that can be replicated. This means that we don't have a way to
-    # invalidate the cache correctly.
-    # This is fine since in practice nobody uses the presence list stuff...
-    get_presence_list_accepted = PresenceStore.__dict__[
-        "get_presence_list_accepted"
-    ]
-    get_presence_list_observers_accepted = PresenceStore.__dict__[
-        "get_presence_list_observers_accepted"
-    ]
 
 
 class FederationSenderServer(HomeServer):
