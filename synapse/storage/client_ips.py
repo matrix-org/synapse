@@ -90,6 +90,8 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             are (user_id, device_id) tuples. The values are also dicts, with
             keys giving the column names
         """
+        if not devices:
+            defer.returnValue({})
 
         res = yield self.runInteraction(
             "get_last_client_ip_by_device",
@@ -110,6 +112,9 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
     @classmethod
     def _get_last_client_ip_by_device_txn(cls, txn, devices, retcols):
+        if not devices:
+            return []
+
         where_clauses = []
         bindings = []
         for (user_id, device_id) in devices:
