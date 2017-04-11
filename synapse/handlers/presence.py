@@ -657,8 +657,10 @@ class PresenceHandler(object):
             host = get_domain_from_id(user_id)
             hosts_to_states.setdefault(host, []).extend(local_states)
 
-        # TODO: de-dup hosts_to_states, as a single host might have multiple
+        # de-dup hosts_to_states, as a single host might have multiple
         # of same presence
+        for h in hosts_to_states:
+            hosts_to_states[h] = list(set(hosts_to_states[h]))
 
         defer.returnValue((room_ids_to_states, users_to_states, hosts_to_states))
 
