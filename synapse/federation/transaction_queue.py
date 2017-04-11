@@ -78,8 +78,18 @@ class TransactionQueue(object):
         self.pending_edus_by_dest = edus = {}
 
         # Presence needs to be separate as we send single aggragate EDUs
+
+        # Map of user_id -> UserPresenceState for all the pending presence
+        # to be sent out by user_id. Entries here get processed and put in
+        # pending_presence_by_dest
         self.pending_presence = {}
+        # Map of destination -> user_id -> UserPresenceState of pending presence
+        # to be sent to each destinations
         self.pending_presence_by_dest = presence = {}
+
+        # Pending EDUs by their "key". Keyed EDUs are EDUs that get clobbered
+        # based on their key (e.g. typing events by room_id)
+        # Map of destination -> (edu_type, key) -> Edu
         self.pending_edus_keyed_by_dest = edus_keyed = {}
 
         metrics.register_callback(
@@ -227,10 +237,13 @@ class TransactionQueue(object):
                 self._attempt_new_transaction, destination
             )
 
-    @preserve_fn
+    @preserve_fn  # the caller should not yield on this
     @defer.inlineCallbacks
     def send_presence(self, states):
         """Send the new presence states to the appropriate destinations.
+
+        This actually queues up the presence states ready for sending and
+        triggers a background task to process them and send out the transactions.
 
         Args:
             states (list(UserPresenceState))
