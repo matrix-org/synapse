@@ -25,7 +25,7 @@ from synapse.util.logcontext import preserve_context_over_fn, preserve_fn
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
 from synapse.util.metrics import measure_func
 from synapse.types import get_domain_from_id
-from synapse.handlers.presence import format_user_presence_state
+from synapse.handlers.presence import format_user_presence_state, get_interested_remotes
 import synapse.metrics
 
 import logging
@@ -251,7 +251,10 @@ class TransactionQueue(object):
 
         # First we queue up the new presence by user ID, so multiple presence
         # updates in quick successtion are correctly handled
-        self.pending_presence.update({state.user_id: state for state in states})
+        self.pending_presence.update({
+            state.user_id: state for state in states
+            if self.is_mine_id(state.user_id)
+        })
 
         # We then handle the new pending presence in batches, first figuring
         # out the destinations we need to send each state to and then poking it
@@ -283,40 +286,8 @@ class TransactionQueue(object):
         Args:
             states (list(UserPresenceState))
         """
-        # First we look up the rooms each user is in (as well as any explicit
-        # subscriptions), then for each distinct room we look up the remote
-        # hosts in those rooms.
-        room_ids_to_states = {}
-        users_to_states = {}
-        for state in states.itervalues():
-            room_ids = yield self.store.get_rooms_for_user(state.user_id)
-            for room_id in room_ids:
-                room_ids_to_states.setdefault(room_id, []).append(state)
+        hosts_and_states = yield get_interested_remotes(self.store, states)
 
-            plist = yield self.store.get_presence_list_observers_accepted(
-                state.user_id,
-            )
-            for u in plist:
-                users_to_states.setdefault(u, []).append(state)
-
-        hosts_and_states = []
-        for room_id, states in room_ids_to_states.items():
-            local_states = filter(lambda s: self.is_mine_id(s.user_id), states)
-            if not local_states:
-                continue
-
-            hosts = yield self.store.get_hosts_in_room(room_id)
-            hosts_and_states.append((hosts, local_states))
-
-        for user_id, states in users_to_states.items():
-            local_states = filter(lambda s: self.is_mine_id(s.user_id), states)
-            if not local_states:
-                continue
-
-            host = get_domain_from_id(user_id)
-            hosts_and_states.append(([host], local_states))
-
-        # And now finally queue up new transactions
         for destinations, states in hosts_and_states:
             for destination in destinations:
                 if not self.can_send_to(destination):
