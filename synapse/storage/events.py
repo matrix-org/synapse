@@ -2188,6 +2188,7 @@ class EventsStore(SQLBaseStore):
 
         defer.returnValue((int(res["topological_ordering"]), int(res["stream_ordering"])))
 
+
 AllNewEventsResult = namedtuple("AllNewEventsResult", [
     "new_forward_events", "new_backfill_events",
     "forward_ex_outliers", "backward_ex_outliers",
