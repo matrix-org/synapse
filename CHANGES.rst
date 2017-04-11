@@ -1,4 +1,4 @@
-Changes in synapse v0.20.0 (2017-04-07)
+Changes in synapse v0.20.0 (2017-04-11)
 =======================================
 
 Bug fixes:
