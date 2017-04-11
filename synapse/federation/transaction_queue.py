@@ -41,6 +41,8 @@ sent_pdus_destination_dist = client_metrics.register_distribution(
 )
 sent_edus_counter = client_metrics.register_counter("sent_edus")
 
+sent_transactions_counter = client_metrics.register_counter("sent_transactions")
+
 
 class TransactionQueue(object):
     """This class makes sure we only have one transaction in flight at
@@ -374,6 +376,7 @@ class TransactionQueue(object):
                     destination, pending_pdus, pending_edus, pending_failures,
                 )
                 if success:
+                    sent_transactions_counter.inc()
                     # Remove the acknowledged device messages from the database
                     # Only bother if we actually sent some device messages
                     if device_message_edus:
