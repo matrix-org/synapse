@@ -25,14 +25,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class ReceiptRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns(
-        "/rooms/(?P<room_id>[^/]*)"
-        "/read_marker$"
-    )
+class ReadMarkerRestServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/rooms/(?P<room_id>[^/]*)/read_marker$")
 
     def __init__(self, hs):
-        super(ReceiptRestServlet, self).__init__()
+        super(ReadMarkerRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.receipts_handler = hs.get_receipts_handler()
@@ -40,7 +37,7 @@ class ReceiptRestServlet(RestServlet):
         self.presence_handler = hs.get_presence_handler()
 
     @defer.inlineCallbacks
-    def on_POST(self, request, room_id, receipt_type, event_id):
+    def on_POST(self, request, room_id):
         requester = yield self.auth.get_user_by_req(request)
 
         yield self.presence_handler.bump_presence_active_time(requester.user)
@@ -68,4 +65,4 @@ class ReceiptRestServlet(RestServlet):
 
 
 def register_servlets(hs, http_server):
-    ReceiptRestServlet(hs).register(http_server)
+    ReadMarkerRestServlet(hs).register(http_server)
