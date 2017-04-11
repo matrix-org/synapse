@@ -15,7 +15,6 @@
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from ._base import client_v2_patterns
 
@@ -45,7 +44,7 @@ class ReadMarkerRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         if "m.read" in body:
-            read_event_id = body["m.read"];
+            read_event_id = body["m.read"]
             yield self.receipts_handler.received_client_receipt(
                 room_id,
                 "m.read",

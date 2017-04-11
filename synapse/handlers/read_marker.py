@@ -17,13 +17,12 @@ from ._base import BaseHandler
 
 from twisted.internet import defer
 
-from synapse.util.logcontext import PreserveLoggingContext
 from synapse.util.async import Linearizer
-from synapse.types import get_domain_from_id
 from synapse.api.errors import SynapseError
 
 import logging
 logger = logging.getLogger(__name__)
+
 
 class ReadMarkerHandler(BaseHandler):
     def __init__(self, hs):
