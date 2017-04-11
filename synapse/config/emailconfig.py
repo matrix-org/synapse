@@ -71,6 +71,15 @@ class EmailConfig(Config):
             self.email_riot_base_url = email_config.get(
                 "riot_base_url", None
             )
+            self.email_smtp_user = email_config.get(
+                "smtp_user", None
+            )
+            self.email_smtp_pass = email_config.get(
+                "smtp_pass", None
+            )
+            self.require_transport_security = email_config.get(
+                "require_transport_security", False
+            )
             if "app_name" in email_config:
                 self.email_app_name = email_config["app_name"]
             else:
@@ -91,10 +100,17 @@ class EmailConfig(Config):
         # Defining a custom URL for Riot is only needed if email notifications
         # should contain links to a self-hosted installation of Riot; when set
         # the "app_name" setting is ignored.
+        #
+        # If your SMTP server requires authentication, the optional smtp_user &
+        # smtp_pass variables should be used
+        #
         #email:
         #   enable_notifs: false
         #   smtp_host: "localhost"
         #   smtp_port: 25
+        #   smtp_user: "exampleusername"
+        #   smtp_pass: "examplepassword"
+        #   require_transport_security: False
         #   notif_from: "Your Friendly %(app)s Home Server <noreply@example.com>"
         #   app_name: Matrix
         #   template_dir: res/templates

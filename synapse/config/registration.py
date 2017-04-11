@@ -69,6 +69,7 @@ class RegistrationConfig(Config):
         trusted_third_party_id_servers:
             - matrix.org
             - vector.im
+            - riot.im
         """ % locals()
 
     def add_arguments(self, parser):

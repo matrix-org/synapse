@@ -403,7 +403,7 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
     def on_REMOVE_PUSHER(self, cmd):
         self.streamer.on_remove_pusher(cmd.app_id, cmd.push_key, cmd.user_id)
 
-    def onINVALIDATE_CACHE(self, cmd):
+    def on_INVALIDATE_CACHE(self, cmd):
         self.streamer.on_invalidate_cache(cmd.cache_func, cmd.keys)
 
     @defer.inlineCallbacks

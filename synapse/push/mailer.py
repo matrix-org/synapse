@@ -200,7 +200,11 @@ class Mailer(object):
         yield sendmail(
             self.hs.config.email_smtp_host,
             raw_from, raw_to, multipart_msg.as_string(),
-            port=self.hs.config.email_smtp_port
+            port=self.hs.config.email_smtp_port,
+            requireAuthentication=self.hs.config.email_smtp_user is not None,
+            username=self.hs.config.email_smtp_user,
+            password=self.hs.config.email_smtp_pass,
+            requireTransportSecurity=self.hs.config.require_transport_security
         )
 
     @defer.inlineCallbacks
