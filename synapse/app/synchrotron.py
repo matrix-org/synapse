@@ -20,7 +20,7 @@ from synapse.api.constants import EventTypes
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
-from synapse.handlers.presence import PresenceHandler
+from synapse.handlers.presence import PresenceHandler, get_interested_parties
 from synapse.http.site import SynapseSite
 from synapse.http.server import JsonResource
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
@@ -172,7 +172,6 @@ class SynchrotronPresence(object):
 
     get_states = PresenceHandler.get_states.__func__
     get_state = PresenceHandler.get_state.__func__
-    _get_interested_parties = PresenceHandler._get_interested_parties.__func__
     current_state_for_users = PresenceHandler.current_state_for_users.__func__
 
     def user_syncing(self, user_id, affect_presence):
@@ -206,7 +205,7 @@ class SynchrotronPresence(object):
 
     @defer.inlineCallbacks
     def notify_from_replication(self, states, stream_id):
-        parties = yield self._get_interested_parties(states)
+        parties = yield get_interested_parties(self.store, states)
         room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(

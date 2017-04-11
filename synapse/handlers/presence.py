@@ -611,38 +611,13 @@ class PresenceHandler(object):
         defer.returnValue(states)
 
     @defer.inlineCallbacks
-    def _get_interested_parties(self, states):
-        """Given a list of states return which entities (rooms, users, servers)
-        are interested in the given states.
-
-        Returns:
-            2-tuple: `(room_ids_to_states, users_to_states)`,
-            with each item being a dict of `entity_name` -> `[UserPresenceState]`
-        """
-        room_ids_to_states = {}
-        users_to_states = {}
-        for state in states:
-            room_ids = yield self.store.get_rooms_for_user(state.user_id)
-            for room_id in room_ids:
-                room_ids_to_states.setdefault(room_id, []).append(state)
-
-            plist = yield self.store.get_presence_list_observers_accepted(state.user_id)
-            for u in plist:
-                users_to_states.setdefault(u, []).append(state)
-
-            # Always notify self
-            users_to_states.setdefault(state.user_id, []).append(state)
-
-        defer.returnValue((room_ids_to_states, users_to_states))
-
-    @defer.inlineCallbacks
     def _persist_and_notify(self, states):
         """Persist states in the database, poke the notifier and send to
         interested remote servers
         """
         stream_id, max_token = yield self.store.update_presence(states)
 
-        parties = yield self._get_interested_parties(states)
+        parties = yield get_interested_parties(self.store, states)
         room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(
@@ -654,7 +629,7 @@ class PresenceHandler(object):
 
     @defer.inlineCallbacks
     def notify_for_states(self, state, stream_id):
-        parties = yield self._get_interested_parties([state])
+        parties = yield get_interested_parties(self.store, [state])
         room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(
@@ -1316,6 +1291,36 @@ def handle_update(prev_state, new_state, is_mine, wheel_timer, now):
 
     return new_state, persist_and_notify, federation_ping
 
+
+@defer.inlineCallbacks
+def get_interested_parties(store, states):
+    """Given a list of states return which entities (rooms, users)
+    are interested in the given states.
+
+    Args:
+        states (list(UserPresenceState))
+
+    Returns:
+        2-tuple: `(room_ids_to_states, users_to_states)`,
+        with each item being a dict of `entity_name` -> `[UserPresenceState]`
+    """
+    room_ids_to_states = {}
+    users_to_states = {}
+    for state in states:
+        room_ids = yield store.get_rooms_for_user(state.user_id)
+        for room_id in room_ids:
+            room_ids_to_states.setdefault(room_id, []).append(state)
+
+        plist = yield store.get_presence_list_observers_accepted(state.user_id)
+        for u in plist:
+            users_to_states.setdefault(u, []).append(state)
+
+        # Always notify self
+        users_to_states.setdefault(state.user_id, []).append(state)
+
+    defer.returnValue((room_ids_to_states, users_to_states))
+
+
 @defer.inlineCallbacks
 def get_interested_remotes(store, states):
     """Given a list of presence states figure out which remote servers
@@ -1351,17 +1356,11 @@ def get_interested_remotes(store, states):
             users_to_states.setdefault(u, []).append(state)
 
     for room_id, states in room_ids_to_states.items():
-        if not local_states:
-            continue
-
         hosts = yield store.get_hosts_in_room(room_id)
-        hosts_and_states.append((hosts, local_states))
+        hosts_and_states.append((hosts, states))
 
     for user_id, states in users_to_states.items():
-        if not local_states:
-            continue
-
         host = get_domain_from_id(user_id)
-        hosts_and_states.append(([host], local_states))
+        hosts_and_states.append(([host], states))
 
     defer.returnValue(hosts_and_states)
