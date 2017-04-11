@@ -146,6 +146,7 @@ To install the synapse homeserver run::
 
     virtualenv -p python2.7 ~/.synapse
     source ~/.synapse/bin/activate
+    pip install --upgrade pip
     pip install --upgrade setuptools
     pip install https://github.com/matrix-org/synapse/tarball/master
 
@@ -228,6 +229,7 @@ To get started, it is easiest to use the command line to register new users::
     New user localpart: erikj
     Password:
     Confirm password:
+    Make admin [no]:
     Success!
 
 This process uses a setting ``registration_shared_secret`` in
@@ -808,7 +810,7 @@ directory of your choice::
 Synapse has a number of external dependencies, that are easiest
 to install using pip and a virtualenv::
 
-    virtualenv env
+    virtualenv -p python2.7 env
     source env/bin/activate
     python synapse/python_dependencies.py | xargs pip install
     pip install lxml mock

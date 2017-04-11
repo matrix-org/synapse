@@ -68,7 +68,7 @@ class ReplicationResourceCase(unittest.TestCase):
         code, body = yield get
         self.assertEquals(code, 200)
         self.assertEquals(body["events"]["field_names"], [
-            "position", "internal", "json", "state_group"
+            "position", "event_id", "room_id", "type", "state_key",
         ])
 
     @defer.inlineCallbacks

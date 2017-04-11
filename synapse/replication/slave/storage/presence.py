@@ -57,5 +57,6 @@ class SlavedPresenceStore(BaseSlavedStore):
                 self.presence_stream_cache.entity_has_changed(
                     user_id, position
                 )
+                self._get_presence_for_user.invalidate((user_id,))
 
         return super(SlavedPresenceStore, self).process_replication(result)

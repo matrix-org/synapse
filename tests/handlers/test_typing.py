@@ -192,6 +192,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                 ),
                 json_data_callback=ANY,
                 long_retries=True,
+                backoff_on_404=True,
             ),
             defer.succeed((200, "OK"))
         )
@@ -263,6 +264,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                 ),
                 json_data_callback=ANY,
                 long_retries=True,
+                backoff_on_404=True,
             ),
             defer.succeed((200, "OK"))
         )

@@ -93,6 +93,7 @@ class DirectoryTestCase(unittest.TestCase):
                 "room_alias": "#another:remote",
             },
             retry_on_dns_fail=False,
+            ignore_backoff=True,
         )
 
     @defer.inlineCallbacks

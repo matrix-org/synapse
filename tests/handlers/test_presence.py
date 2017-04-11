@@ -324,7 +324,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         state = UserPresenceState.default(user_id)
         state = state.copy_and_replace(
             state=PresenceState.ONLINE,
-            last_active_ts=now,
+            last_active_ts=0,
             last_user_sync_ts=now - SYNC_ONLINE_TIMEOUT - 1,
         )
 

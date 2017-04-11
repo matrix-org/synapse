@@ -177,17 +177,12 @@ class StateHandler(object):
 
     @defer.inlineCallbacks
     def compute_event_context(self, event, old_state=None):
-        """ Fills out the context with the `current state` of the graph. The
-        `current state` here is defined to be the state of the event graph
-        just before the event - i.e. it never includes `event`
-
-        If `event` has `auth_events` then this will also fill out the
-        `auth_events` field on `context` from the `current_state`.
+        """Build an EventContext structure for the event.
 
         Args:
-            event (EventBase)
+            event (synapse.events.EventBase):
         Returns:
-            an EventContext
+            synapse.events.snapshot.EventContext:
         """
         context = EventContext()
 
@@ -200,11 +195,11 @@ class StateHandler(object):
                     (s.type, s.state_key): s.event_id for s in old_state
                 }
                 if event.is_state():
-                    context.current_state_events = dict(context.prev_state_ids)
+                    context.current_state_ids = dict(context.prev_state_ids)
                     key = (event.type, event.state_key)
-                    context.current_state_events[key] = event.event_id
+                    context.current_state_ids[key] = event.event_id
                 else:
-                    context.current_state_events = context.prev_state_ids
+                    context.current_state_ids = context.prev_state_ids
             else:
                 context.current_state_ids = {}
                 context.prev_state_ids = {}

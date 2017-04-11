@@ -283,12 +283,12 @@ class ReplicationResource(Resource):
 
             if request_events != upto_events_token:
                 writer.write_header_and_rows("events", res.new_forward_events, (
-                    "position", "internal", "json", "state_group"
+                    "position", "event_id", "room_id", "type", "state_key",
                 ), position=upto_events_token)
 
             if request_backfill != upto_backfill_token:
                 writer.write_header_and_rows("backfill", res.new_backfill_events, (
-                    "position", "internal", "json", "state_group",
+                    "position", "event_id", "room_id", "type", "state_key", "redacts",
                 ), position=upto_backfill_token)
 
             writer.write_header_and_rows(
