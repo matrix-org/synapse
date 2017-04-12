@@ -269,13 +269,13 @@ class TransactionQueue(object):
         self._processing_pending_presence = True
         try:
             while True:
-                states = self.pending_presence
+                states_map = self.pending_presence
                 self.pending_presence = {}
 
-                if not states:
+                if not states_map:
                     break
 
-                yield self._process_presence_inner(states)
+                yield self._process_presence_inner(states_map.values())
         finally:
             self._processing_pending_presence = False
 

@@ -641,7 +641,7 @@ class PresenceHandler(object):
         """Sends state updates to remote servers.
 
         Args:
-            hosts_to_states (list(UserPresenceState))
+            states (list(UserPresenceState))
         """
         self.federation.send_presence(states)
 
@@ -1337,29 +1337,18 @@ def get_interested_remotes(store, states):
         each row the list of UserPresenceState should be sent to each
         destination
     """
-    hosts_and_states = []  # Final result to return
+    hosts_and_states = []
 
     # First we look up the rooms each user is in (as well as any explicit
     # subscriptions), then for each distinct room we look up the remote
     # hosts in those rooms.
-    room_ids_to_states = {}
-    users_to_states = {}
-    for state in states.itervalues():
-        room_ids = yield store.get_rooms_for_user(state.user_id)
-        for room_id in room_ids:
-            room_ids_to_states.setdefault(room_id, []).append(state)
+    room_ids_to_states, users_to_states = yield get_interested_parties(store, states)
 
-        plist = yield store.get_presence_list_observers_accepted(
-            state.user_id,
-        )
-        for u in plist:
-            users_to_states.setdefault(u, []).append(state)
-
-    for room_id, states in room_ids_to_states.items():
+    for room_id, states in room_ids_to_states.iteritems():
         hosts = yield store.get_hosts_in_room(room_id)
         hosts_and_states.append((hosts, states))
 
-    for user_id, states in users_to_states.items():
+    for user_id, states in users_to_states.iteritems():
         host = get_domain_from_id(user_id)
         hosts_and_states.append(([host], states))
 
