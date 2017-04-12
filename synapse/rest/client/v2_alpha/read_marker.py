@@ -42,8 +42,8 @@ class ReadMarkerRestServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
 
-        if "m.read" in body:
-            read_event_id = body["m.read"]
+        read_event_id = body.get("m.read", None)
+        if read_event_id:
             yield self.receipts_handler.received_client_receipt(
                 room_id,
                 "m.read",
@@ -51,8 +51,8 @@ class ReadMarkerRestServlet(RestServlet):
                 event_id=read_event_id
             )
 
-        if "m.read_marker" in body:
-            read_marker_event_id = body["m.read_marker"]
+        read_marker_event_id = body.get("m.read_marker", None)
+        if read_marker_event_id:
             yield self.read_marker_handler.received_client_read_marker(
                 room_id,
                 user_id=requester.user.to_string(),
