@@ -85,8 +85,8 @@ class RoomAccountDataServlet(RestServlet):
         if account_data_type == "m.read_marker":
             raise SynapseError(
                 405,
-                "Cannot set m.read_marker through this API. "
-                "Use /rooms/!roomId:server.name/read_marker"
+                "Cannot set m.read_marker through this API."
+                " Use /rooms/!roomId:server.name/read_marker"
             )
 
         max_id = yield self.store.add_account_data_to_room(
