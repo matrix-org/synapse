@@ -45,7 +45,8 @@ e.g. the HTTP listener that it provides (if any); logging configuration; etc.
 You should minimise the number of overrides though to maintain a usable config.
 
 You must specify the type of worker application (worker_app) and the replication
-endpoint that it's talking to on the main synapse process (worker_replication_url).
+endpoint that it's talking to on the main synapse process (worker_replication_host
+and worker_replication_port).
 
 For instance::
 
