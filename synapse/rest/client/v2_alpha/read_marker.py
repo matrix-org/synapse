@@ -29,7 +29,6 @@ class ReadMarkerRestServlet(RestServlet):
 
     def __init__(self, hs):
         super(ReadMarkerRestServlet, self).__init__()
-        self.hs = hs
         self.auth = hs.get_auth()
         self.receipts_handler = hs.get_receipts_handler()
         self.read_marker_handler = hs.get_read_marker_handler()
