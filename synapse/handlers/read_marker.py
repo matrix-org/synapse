@@ -43,7 +43,10 @@ class ReadMarkerHandler(BaseHandler):
         # Get ordering for existing read marker
         with (yield self.read_marker_linearizer.queue((room_id, user_id))):
             account_data = yield self.store.get_account_data_for_room(user_id, room_id)
-            existing_read_marker = account_data["m.read_marker"]
+
+            existing_read_marker = None
+            if "m.read_marker" in account_data:
+                existing_read_marker = account_data["m.read_marker"]
 
             should_update = True
 
