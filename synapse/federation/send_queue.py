@@ -383,6 +383,10 @@ class KeyedEduRow(BaseFederationRow, namedtuple("KeyedEduRow", (
     "key",  # tuple(str) - the edu key passed to send_edu
     "edu",  # Edu
 ))):
+    """Streams EDUs that have an associated key that is ued to clobber. For example,
+    typing EDUs clobber based on room_id.
+    """
+
     TypeId = "k"
 
     @staticmethod
@@ -407,6 +411,8 @@ class KeyedEduRow(BaseFederationRow, namedtuple("KeyedEduRow", (
 class EduRow(BaseFederationRow, namedtuple("EduRow", (
     "edu",  # Edu
 ))):
+    """Streams EDUs that don't have keys. See KeyedEduRow
+    """
     TypeId = "e"
 
     @staticmethod
@@ -424,6 +430,11 @@ class FailureRow(BaseFederationRow, namedtuple("FailureRow", (
     "destination",  # str
     "failure",
 ))):
+    """Streams failures to a remote server. Failures are issued when there was
+    something wrong with a transaction the remote sent us, e.g. it included
+    an event that was invalid.
+    """
+
     TypeId = "f"
 
     @staticmethod
@@ -446,6 +457,10 @@ class FailureRow(BaseFederationRow, namedtuple("FailureRow", (
 class DeviceRow(BaseFederationRow, namedtuple("DeviceRow", (
     "destination",  # str
 ))):
+    """Streams the fact that either a) there is pending to device messages for
+    users on the remote, or b) a local users device has changed and needs to
+    be sent to the remote.
+    """
     TypeId = "d"
 
     @staticmethod
