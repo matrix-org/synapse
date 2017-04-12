@@ -120,6 +120,9 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                 where_clauses.append("(user_id = ? AND device_id = ?)")
                 bindings.extend((user_id, device_id))
 
+        if not where_clauses:
+            return []
+
         inner_select = (
             "SELECT MAX(last_seen) mls, user_id, device_id FROM user_ips "
             "WHERE %(where)s "

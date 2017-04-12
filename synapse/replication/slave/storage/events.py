@@ -71,6 +71,7 @@ class SlavedEventStore(BaseSlavedStore):
     # to reach inside the __dict__ to extract them.
     get_rooms_for_user = RoomMemberStore.__dict__["get_rooms_for_user"]
     get_users_in_room = RoomMemberStore.__dict__["get_users_in_room"]
+    get_hosts_in_room = RoomMemberStore.__dict__["get_hosts_in_room"]
     get_users_who_share_room_with_user = (
         RoomMemberStore.__dict__["get_users_who_share_room_with_user"]
     )

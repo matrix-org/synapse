@@ -1,3 +1,12 @@
+Changes in synapse v0.20.0 (2017-04-11)
+=======================================
+
+Bug fixes:
+
+* Fix joining rooms over federation where not all servers in the room saw the
+  new server had joined (PR #2094)
+
+
 Changes in synapse v0.20.0-rc1 (2017-03-30)
 ===========================================
 

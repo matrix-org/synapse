@@ -12,7 +12,7 @@ across multiple processes is a recipe for disaster, plus you should be using
 postgres anyway if you care about scalability).
 
 The workers communicate with the master synapse process via a synapse-specific
-HTTP protocol called 'replication' - analogous to MySQL or Postgres style
+TCP protocol called 'replication' - analogous to MySQL or Postgres style
 database replication; feeding a stream of relevant data to the workers so they
 can be kept in sync with the main synapse process and database state.
 
@@ -21,16 +21,11 @@ To enable workers, you need to add a replication listener to the master synapse,
     listeners:
       - port: 9092
         bind_address: '127.0.0.1'
-        type: http
-        tls: false
-        x_forwarded: false
-        resources:
-          - names: [replication]
-            compress: false
+        type: replication
 
 Under **no circumstances** should this replication API listener be exposed to the
 public internet; it currently implements no authentication whatsoever and is
-unencrypted HTTP.
+unencrypted.
 
 You then create a set of configs for the various worker processes.  These should be
 worker configuration files should be stored in a dedicated subdirectory, to allow
@@ -50,14 +45,16 @@ e.g. the HTTP listener that it provides (if any); logging configuration; etc.
 You should minimise the number of overrides though to maintain a usable config.
 
 You must specify the type of worker application (worker_app) and the replication
-endpoint that it's talking to on the main synapse process (worker_replication_url).
+endpoint that it's talking to on the main synapse process (worker_replication_host
+and worker_replication_port).
 
 For instance::
 
     worker_app: synapse.app.synchrotron
 
     # The replication listener on the synapse to talk to.
-    worker_replication_url: http://127.0.0.1:9092/_synapse/replication
+    worker_replication_host: 127.0.0.1
+    worker_replication_port: 9092
 
     worker_listeners:
      - type: http
@@ -95,4 +92,3 @@ To manipulate a specific worker, you pass the -w option to synctl::
 All of the above is highly experimental and subject to change as Synapse evolves,
 but documenting it here to help folks needing highly scalable Synapses similar
 to the one running matrix.org!
-
