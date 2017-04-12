@@ -60,6 +60,4 @@ class ReadMarkerHandler(BaseHandler):
                 max_id = yield self.store.add_account_data_to_room(
                     user_id, room_id, "m.read_marker", content
                 )
-                self.notifier.on_new_event(
-                    "account_data_key", max_id, users=[user_id], rooms=[room_id]
-                )
+                self.notifier.on_new_event("account_data_key", max_id, users=[user_id])
