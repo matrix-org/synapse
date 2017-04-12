@@ -77,12 +77,11 @@ class TransactionQueue(object):
         # destination -> list of tuple(edu, deferred)
         self.pending_edus_by_dest = edus = {}
 
-        # Presence needs to be separate as we send single aggragate EDUs
-
         # Map of user_id -> UserPresenceState for all the pending presence
         # to be sent out by user_id. Entries here get processed and put in
         # pending_presence_by_dest
         self.pending_presence = {}
+
         # Map of destination -> user_id -> UserPresenceState of pending presence
         # to be sent to each destinations
         self.pending_presence_by_dest = presence = {}
