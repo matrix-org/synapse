@@ -20,7 +20,7 @@ from synapse.api.constants import EventTypes
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
-from synapse.handlers.presence import PresenceHandler
+from synapse.handlers.presence import PresenceHandler, get_interested_parties
 from synapse.http.site import SynapseSite
 from synapse.http.server import JsonResource
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
@@ -44,7 +44,7 @@ from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.server import HomeServer
 from synapse.storage.client_ips import ClientIpStore
 from synapse.storage.engines import create_engine
-from synapse.storage.presence import PresenceStore, UserPresenceState
+from synapse.storage.presence import UserPresenceState
 from synapse.storage.roommember import RoomMemberStore
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext, preserve_fn
@@ -88,16 +88,6 @@ class SynchrotronSlavedStore(
     did_forget = (
         RoomMemberStore.__dict__["did_forget"]
     )
-
-    # XXX: This is a bit broken because we don't persist the accepted list in a
-    # way that can be replicated. This means that we don't have a way to
-    # invalidate the cache correctly.
-    get_presence_list_accepted = PresenceStore.__dict__[
-        "get_presence_list_accepted"
-    ]
-    get_presence_list_observers_accepted = PresenceStore.__dict__[
-        "get_presence_list_observers_accepted"
-    ]
 
 
 UPDATE_SYNCING_USERS_MS = 10 * 1000
@@ -172,7 +162,6 @@ class SynchrotronPresence(object):
 
     get_states = PresenceHandler.get_states.__func__
     get_state = PresenceHandler.get_state.__func__
-    _get_interested_parties = PresenceHandler._get_interested_parties.__func__
     current_state_for_users = PresenceHandler.current_state_for_users.__func__
 
     def user_syncing(self, user_id, affect_presence):
@@ -206,10 +195,8 @@ class SynchrotronPresence(object):
 
     @defer.inlineCallbacks
     def notify_from_replication(self, states, stream_id):
-        parties = yield self._get_interested_parties(
-            states, calculate_remote_hosts=False
-        )
-        room_ids_to_states, users_to_states, _ = parties
+        parties = yield get_interested_parties(self.store, states)
+        room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(
             "presence_key", stream_id, rooms=room_ids_to_states.keys(),
