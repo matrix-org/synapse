@@ -2161,18 +2161,11 @@ class EventsStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def is_event_after(self, event_id1, event_id2):
-        is_after = True
-
+        """Returns True if event_id1 is after event_id2 in the stream
+        """
         to_1, so_1 = yield self._get_event_ordering(event_id1)
         to_2, so_2 = yield self._get_event_ordering(event_id2)
-
-        # Prevent updating if the existing marker is ahead in the stream
-        if to_1 > to_2:
-            is_after = False
-        elif to_1 == to_2 and so_1 >= so_2:
-            is_after = False
-
-        defer.returnValue(is_after)
+        defer.returnValue(to_1 > to_2 and so_1 > so_2)
 
     @defer.inlineCallbacks
     def _get_event_ordering(self, event_id):

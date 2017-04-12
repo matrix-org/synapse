@@ -48,9 +48,10 @@ class ReadMarkerHandler(BaseHandler):
             should_update = True
 
             if existing_read_marker:
+                # Only update if the new marker is ahead in the stream
                 should_update = yield self.store.is_event_after(
-                    existing_read_marker['marker'],
-                    event_id
+                    event_id,
+                    existing_read_marker['marker']
                 )
 
             if should_update:
