@@ -39,7 +39,6 @@ class Clock(object):
     """A small utility that obtains current time-of-day so that time may be
     mocked during unit-tests.
 
-    TODO(paul): Also move the sleep() functionality into it
     """
 
     def time(self):
@@ -49,6 +48,14 @@ class Clock(object):
     def time_msec(self):
         """Returns the current system time in miliseconds since epoch."""
         return int(self.time() * 1000)
+
+    def sleep(self, msec):
+        """Suspend excecution.
+
+        Args:
+            msec(float): How long to sleep in milliseconds.
+        """
+        time.sleep(msec / 1000.0)
 
     def looping_call(self, f, msec):
         """Call a function repeatedly.
