@@ -2165,7 +2165,7 @@ class EventsStore(SQLBaseStore):
         """
         to_1, so_1 = yield self._get_event_ordering(event_id1)
         to_2, so_2 = yield self._get_event_ordering(event_id2)
-        defer.returnValue(to_1 > to_2 and so_1 > so_2)
+        defer.returnValue((to_1, so_1) > (to_2, so_2))
 
     @defer.inlineCallbacks
     def _get_event_ordering(self, event_id):
