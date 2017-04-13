@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class ReadMarkerRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/rooms/(?P<room_id>[^/]*)/read_marker$")
+    PATTERNS = client_v2_patterns("/rooms/(?P<room_id>[^/]*)/read_markers$")
 
     def __init__(self, hs):
         super(ReadMarkerRestServlet, self).__init__()
@@ -51,7 +51,7 @@ class ReadMarkerRestServlet(RestServlet):
                 event_id=read_event_id
             )
 
-        read_marker_event_id = body.get("m.read_marker", None)
+        read_marker_event_id = body.get("m.read_up_to", None)
         if read_marker_event_id:
             yield self.read_marker_handler.received_client_read_marker(
                 room_id,
