@@ -24,9 +24,7 @@ import sys
 import synapse.config.logger
 from synapse.config._base import ConfigError
 
-from synapse.python_dependencies import (
-    check_requirements, DEPENDENCY_LINKS
-)
+from synapse.python_dependencies import check_requirements
 
 from synapse.rest import ClientRestResource
 from synapse.storage.engines import create_engine, IncorrectDatabaseSetup
