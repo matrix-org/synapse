@@ -144,6 +144,12 @@ class ServerConfig(Config):
         # Whether to serve a web client from the HTTP/HTTPS root resource.
         web_client: True
 
+        # The root directory to server for the above web client.
+        # If left undefined, synapse will serve the matrix-angular-sdk web client.
+        # Make sure matrix-angular-sdk is installed with pip if web_client is True
+        # and web_client_location is undefined
+        # web_client_location: "/path/to/web/root"
+
         # The public-facing base URL for the client API (not including _matrix/...)
         # public_baseurl: https://example.com:8448/
 

@@ -88,11 +88,10 @@ def build_resource_for_web_client(hs):
                 "the location of the source to serve via the configuration\n"
                 "option `web_client_location`\n\n"
                 "To install the `matrix-angular-sdk` via pip, run:\n\n"
-                "    pip install '%(dep)s'\n"
+                "    pip install matrix-angular-sdk\n"
                 "\n"
                 "You can also disable hosting of the webclient via the\n"
                 "configuration option `web_client`\n"
-                % {"dep": DEPENDENCY_LINKS["matrix-angular-sdk"]}
             )
         syweb_path = os.path.dirname(syweb.__file__)
         webclient_path = os.path.join(syweb_path, "webclient")
