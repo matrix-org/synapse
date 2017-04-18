@@ -43,7 +43,7 @@ class ReadMarkerHandler(BaseHandler):
         with (yield self.read_marker_linearizer.queue((room_id, user_id))):
             account_data = yield self.store.get_account_data_for_room(user_id, room_id)
 
-            existing_read_marker = account_data.get("m.read_up_to", None)
+            existing_read_marker = account_data.get("m.fully_read", None)
 
             should_update = True
 
@@ -59,6 +59,6 @@ class ReadMarkerHandler(BaseHandler):
                     "event_id": event_id
                 }
                 max_id = yield self.store.add_account_data_to_room(
-                    user_id, room_id, "m.read_up_to", content
+                    user_id, room_id, "m.fully_read", content
                 )
                 self.notifier.on_new_event("account_data_key", max_id, users=[user_id])

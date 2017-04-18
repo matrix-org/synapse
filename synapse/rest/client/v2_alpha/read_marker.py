@@ -51,7 +51,7 @@ class ReadMarkerRestServlet(RestServlet):
                 event_id=read_event_id
             )
 
-        read_marker_event_id = body.get("m.read_up_to", None)
+        read_marker_event_id = body.get("m.fully_read", None)
         if read_marker_event_id:
             yield self.read_marker_handler.received_client_read_marker(
                 room_id,
