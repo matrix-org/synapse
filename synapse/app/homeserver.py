@@ -24,7 +24,9 @@ import sys
 import synapse.config.logger
 from synapse.config._base import ConfigError
 
-from synapse.python_dependencies import check_requirements
+from synapse.python_dependencies import (
+    check_requirements, CONDITIONAL_REQUIREMENTS
+)
 
 from synapse.rest import ClientRestResource
 from synapse.storage.engines import create_engine, IncorrectDatabaseSetup
@@ -86,10 +88,11 @@ def build_resource_for_web_client(hs):
                 "the location of the source to serve via the configuration\n"
                 "option `web_client_location`\n\n"
                 "To install the `matrix-angular-sdk` via pip, run:\n\n"
-                "    pip install matrix-angular-sdk\n"
+                "    pip install '%(dep)s'\n"
                 "\n"
                 "You can also disable hosting of the webclient via the\n"
                 "configuration option `web_client`\n"
+                % {"dep": CONDITIONAL_REQUIREMENTS["web_client"].keys()[0]}
             )
         syweb_path = os.path.dirname(syweb.__file__)
         webclient_path = os.path.join(syweb_path, "webclient")
