@@ -193,6 +193,26 @@ class TransportLayerClient(object):
     @defer.inlineCallbacks
     @log_function
     def make_membership_event(self, destination, room_id, user_id, membership):
+        """Asks a remote server to build and sign us a membership event
+
+        Note that this does not append any events to any graphs.
+
+        Args:
+            destination (str): address of remote homeserver
+            room_id (str): room to join/leave
+            user_id (str): user to be joined/left
+            membership (str): one of join/leave
+
+        Returns:
+            Deferred: Succeeds when we get a 2xx HTTP response. The result
+            will be the decoded JSON body (ie, the new event).
+
+            Fails with ``HTTPRequestException`` if we get an HTTP response
+            code >= 300.
+
+            Fails with ``NotRetryingDestination`` if we are not yet ready
+            to retry this server.
+        """
         valid_memberships = {Membership.JOIN, Membership.LEAVE}
         if membership not in valid_memberships:
             raise RuntimeError(
