@@ -9,7 +9,7 @@ The api is::
 
 including an ``access_token`` of a server admin.
 
-It returns a JSON body liek the following:
+It returns a JSON body like the following:
 
 .. code:: json
 
@@ -22,10 +22,14 @@ It returns a JSON body liek the following:
                         "connections": [
                             {
                                 "ip": "1.2.3.4",
-                                "last_seen": 1417222374433, # ms since 1970
+                                "last_seen": 1417222374433,
                                 "user_agent": "Mozilla/5.0 ..."
                             },
-                            # ...
+                            {
+                                "ip": "1.2.3.10",
+                                "last_seen": 1417222374500,
+                                "user_agent": "Dalvik/2.1.0 ..."
+                            }
                         ]
                     }
                 ]
@@ -33,6 +37,7 @@ It returns a JSON body liek the following:
         }
     }
 
+``last_seen`` is measured in milliseconds since the Unix epoch.
 
 Deactivate Account
 ==================
@@ -57,7 +62,9 @@ The api is::
 
     POST /_matrix/client/r0/admin/reset_password/<user_id>
 
-with a body of::
+with a body of:
+
+.. code:: json
 
    {
        "new_password": "<secret>"
