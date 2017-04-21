@@ -323,17 +323,30 @@ class MatrixProxyClient(object):
             result = yield self.simpleHttpClient.post_json_get_json(uri, post_json)
             defer.returnValue(result)
         except CodeMessageException as cme:
-            ex = None
-            try:
-                errbody = json.loads(cme.msg)
-                errcode = errbody['errcode']
-                errtext = errbody['error']
-                ex = SynapseError(cme.code, errtext, errcode)
-            except:
-                pass
+            ex = self._tryGetMatrixError(cme.msg)
             if ex is not None:
                 raise ex
             raise cme
+
+    @defer.inlineCallbacks
+    def get_json(self, uri, args={}):
+        try:
+            result = yield self.simpleHttpClient.get_json(uri, args)
+            defer.returnValue(result)
+        except CodeMessageException as cme:
+            ex = self._tryGetMatrixError(cme.msg)
+            if ex is not None:
+                raise ex
+            raise cme
+
+    def _tryGetMatrixError(self, body):
+        try:
+            errbody = json.loads(body)
+            errcode = errbody['errcode']
+            errtext = errbody['error']
+            return SynapseError(cme.code, errtext, errcode)
+        except:
+            return None
 
 
 # XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
