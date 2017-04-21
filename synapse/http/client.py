@@ -323,7 +323,7 @@ class MatrixProxyClient(object):
             result = yield self.simpleHttpClient.post_json_get_json(uri, post_json)
             defer.returnValue(result)
         except CodeMessageException as cme:
-            ex = self._tryGetMatrixError(cme.msg)
+            ex = self._tryGetMatrixError(cme)
             if ex is not None:
                 raise ex
             raise cme
@@ -334,17 +334,17 @@ class MatrixProxyClient(object):
             result = yield self.simpleHttpClient.get_json(uri, args)
             defer.returnValue(result)
         except CodeMessageException as cme:
-            ex = self._tryGetMatrixError(cme.msg)
+            ex = self._tryGetMatrixError(cme)
             if ex is not None:
                 raise ex
             raise cme
 
-    def _tryGetMatrixError(self, body):
+    def _tryGetMatrixError(self, codeMessageException):
         try:
-            errbody = json.loads(body)
+            errbody = json.loads(codeMessageException.msg)
             errcode = errbody['errcode']
             errtext = errbody['error']
-            return SynapseError(cme.code, errtext, errcode)
+            return SynapseError(codeMessageException.code, errtext, errcode)
         except:
             return None
 
