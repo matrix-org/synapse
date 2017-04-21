@@ -35,7 +35,7 @@ class IdentityHandler(BaseHandler):
     def __init__(self, hs):
         super(IdentityHandler, self).__init__(hs)
 
-        self.http_client = hs.get_simple_http_client()
+        self.proxy_client = hs.get_matrix_proxy_client()
 
         self.trusted_id_servers = set(hs.config.trusted_third_party_id_servers)
         self.trust_any_id_server_just_for_testing_do_not_use = (
@@ -83,7 +83,7 @@ class IdentityHandler(BaseHandler):
 
         data = {}
         try:
-            data = yield self.http_client.get_json(
+            data = yield self.proxy_client.get_json(
                 "https://%s%s" % (
                     id_server,
                     "/_matrix/identity/api/v1/3pid/getValidated3pid"
@@ -118,7 +118,7 @@ class IdentityHandler(BaseHandler):
             raise SynapseError(400, "No client_secret in creds")
 
         try:
-            data = yield self.http_client.post_urlencoded_get_json(
+            data = yield self.proxy_client.post_urlencoded_get_json(
                 "https://%s%s" % (
                     id_server, "/_matrix/identity/api/v1/3pid/bind"
                 ),
@@ -151,7 +151,7 @@ class IdentityHandler(BaseHandler):
         params.update(kwargs)
 
         try:
-            data = yield self.http_client.post_json_get_json(
+            data = yield self.proxy_client.post_json_get_json(
                 "https://%s%s" % (
                     id_server,
                     "/_matrix/identity/api/v1/validate/email/requestToken"
@@ -185,7 +185,7 @@ class IdentityHandler(BaseHandler):
         params.update(kwargs)
 
         try:
-            data = yield self.http_client.post_json_get_json(
+            data = yield self.proxy_client.post_json_get_json(
                 "https://%s%s" % (
                     id_server,
                     "/_matrix/identity/api/v1/validate/msisdn/requestToken"

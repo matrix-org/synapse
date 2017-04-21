@@ -145,6 +145,9 @@ class SimpleHttpClient(object):
 
         body = yield preserve_context_over_fn(readBody, response)
 
+        if response.code / 100 != 2:
+            raise CodeMessageException(response.code, body)
+
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
@@ -304,6 +307,33 @@ class SimpleHttpClient(object):
             )
 
         defer.returnValue((length, headers, response.request.absoluteURI, response.code))
+
+
+class MatrixProxyClient(object):
+    """
+    An HTTP client that proxies other Matrix endpoints, ie. if the remote endpoint
+    returns Matrix-style error response, this will raise the appropriate SynapseError
+    """
+    def __init__(self, hs):
+        self.simpleHttpClient = SimpleHttpClient(hs)
+
+    @defer.inlineCallbacks
+    def post_json_get_json(self, uri, post_json):
+        try:
+            result = yield self.simpleHttpClient.post_json_get_json(uri, post_json)
+            defer.returnValue(result)
+        except CodeMessageException as cme:
+            ex = None
+            try:
+                errbody = json.loads(cme.msg)
+                errcode = errbody['errcode']
+                errtext = errbody['error']
+                ex = SynapseError(cme.code, errtext, errcode)
+            except:
+                pass
+            if ex is not None:
+                raise ex
+            raise cme
 
 
 # XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.

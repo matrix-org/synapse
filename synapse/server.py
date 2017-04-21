@@ -48,7 +48,9 @@ from synapse.handlers.typing import TypingHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.receipts import ReceiptsHandler
-from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
+from synapse.http.client import (
+    SimpleHttpClient, InsecureInterceptableContextFactory, MatrixProxyClient
+)
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier
 from synapse.push.pusherpool import PusherPool
@@ -127,6 +129,7 @@ class HomeServer(object):
         'filtering',
         'http_client_context_factory',
         'simple_http_client',
+        'matrix_proxy_client',
         'media_repository',
         'federation_transport_client',
         'federation_sender',
@@ -187,6 +190,9 @@ class HomeServer(object):
 
     def build_simple_http_client(self):
         return SimpleHttpClient(self)
+
+    def build_matrix_proxy_client(self):
+        return MatrixProxyClient(self)
 
     def build_v1auth(self):
         orf = Auth(self)
