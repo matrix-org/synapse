@@ -145,7 +145,7 @@ class SimpleHttpClient(object):
 
         body = yield preserve_context_over_fn(readBody, response)
 
-        if response.code / 100 != 2:
+        if response.code / 100 >= 4:
             raise CodeMessageException(response.code, body)
 
         defer.returnValue(json.loads(body))
