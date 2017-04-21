@@ -16,7 +16,7 @@
 from ._base import client_v2_patterns
 
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.api.errors import AuthError
+from synapse.api.errors import AuthError, SynapseError
 
 from twisted.internet import defer
 
@@ -81,6 +81,13 @@ class RoomAccountDataServlet(RestServlet):
             raise AuthError(403, "Cannot add account data for other users.")
 
         body = parse_json_object_from_request(request)
+
+        if account_data_type == "m.fully_read":
+            raise SynapseError(
+                405,
+                "Cannot set m.fully_read through this API."
+                " Use /rooms/!roomId:server.name/read_markers"
+            )
 
         max_id = yield self.store.add_account_data_to_room(
             user_id, room_id, account_data_type, body
