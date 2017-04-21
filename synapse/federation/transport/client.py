@@ -221,11 +221,23 @@ class TransportLayerClient(object):
             )
         path = PREFIX + "/make_%s/%s/%s" % (membership, room_id, user_id)
 
+        ignore_backoff = False
+        retry_on_dns_fail = False
+
+        if membership == Membership.LEAVE:
+            # we particularly want to do our best to send leave events. The
+            # problem is that if it fails, we won't retry it later, so if the
+            # remote server was just having a momentary blip, the room will be
+            # out of sync.
+            ignore_backoff = True
+            retry_on_dns_fail = True
+
         content = yield self.client.get_json(
             destination=destination,
             path=path,
-            retry_on_dns_fail=False,
+            retry_on_dns_fail=retry_on_dns_fail,
             timeout=20000,
+            ignore_backoff=ignore_backoff,
         )
 
         defer.returnValue(content)
@@ -252,6 +264,12 @@ class TransportLayerClient(object):
             destination=destination,
             path=path,
             data=content,
+
+            # we want to do our best to send this through. The problem is
+            # that if it fails, we won't retry it later, so if the remote
+            # server was just having a momentary blip, the room will be out of
+            # sync.
+            ignore_backoff=True,
         )
 
         defer.returnValue(response)
