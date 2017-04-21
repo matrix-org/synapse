@@ -287,7 +287,13 @@ class RoomMemberHandler(BaseHandler):
                             target.to_string(),
                         )
                         defer.returnValue(ret)
-                    except SynapseError as e:
+                    except Exception as e:
+                        # if we were unable to reject the exception, just mark
+                        # it as rejected on our end and plough ahead.
+                        #
+                        # The 'except' clause is very broad, but we need to
+                        # capture everything from DNS failures upwards
+                        #
                         logger.warn("Failed to reject invite: %s", e)
 
                         yield self.store.locally_reject_invite(
