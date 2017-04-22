@@ -23,6 +23,7 @@ from .download_resource import DownloadResource
 from .thumbnail_resource import ThumbnailResource
 from .identicon_resource import IdenticonResource
 from .preview_url_resource import PreviewUrlResource
+from .shred_resource import ShredResource
 from .filepath import MediaFilePaths
 from .thumbnailer import Thumbnailer
 
@@ -552,6 +553,7 @@ class MediaRepositoryResource(Resource):
 
         self.putChild("upload", UploadResource(hs, media_repo))
         self.putChild("download", DownloadResource(hs, media_repo))
+        self.putChild("shred", ShredResource(hs, media_repo))
         self.putChild("thumbnail", ThumbnailResource(hs, media_repo))
         self.putChild("identicon", IdenticonResource())
         if hs.config.url_preview_enabled:
