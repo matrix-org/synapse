@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import synapse.metrics
-from lrucache import LruCache
 import os
 
 CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.1))
@@ -40,10 +39,6 @@ def register_cache(name, cache):
     )
 
 
-_string_cache = LruCache(int(100000 * CACHE_SIZE_FACTOR))
-_stirng_cache_metrics = register_cache("string_cache", _string_cache)
-
-
 KNOWN_KEYS = {
     key: key for key in
     (
@@ -67,14 +62,16 @@ KNOWN_KEYS = {
 
 
 def intern_string(string):
-    """Takes a (potentially) unicode string and interns using custom cache
+    """Takes a (potentially) unicode string and interns it if it's ascii
     """
-    new_str = _string_cache.setdefault(string, string)
-    if new_str is string:
-        _stirng_cache_metrics.inc_hits()
-    else:
-        _stirng_cache_metrics.inc_misses()
-    return new_str
+    if string is None:
+        return None
+
+    try:
+        string = string.encode("ascii")
+        return intern(string)
+    except UnicodeEncodeError:
+        return string
 
 
 def intern_dict(dictionary):
@@ -87,13 +84,9 @@ def intern_dict(dictionary):
 
 
 def _intern_known_values(key, value):
-    intern_str_keys = ("event_id", "room_id")
-    intern_unicode_keys = ("sender", "user_id", "type", "state_key")
+    intern_keys = ("event_id", "room_id", "sender", "user_id", "type", "state_key",)
 
-    if key in intern_str_keys:
-        return intern(value.encode('ascii'))
-
-    if key in intern_unicode_keys:
+    if key in intern_keys:
         return intern_string(value)
 
     return value
