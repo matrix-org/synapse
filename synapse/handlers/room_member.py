@@ -139,13 +139,6 @@ class RoomMemberHandler(BaseHandler):
         )
         yield user_joined_room(self.distributor, user, room_id)
 
-    def reject_remote_invite(self, user_id, room_id, remote_room_hosts):
-        return self.hs.get_handlers().federation_handler.do_remotely_reject_invite(
-            remote_room_hosts,
-            room_id,
-            user_id
-        )
-
     @defer.inlineCallbacks
     def update_membership(
             self,
@@ -286,13 +279,21 @@ class RoomMemberHandler(BaseHandler):
                 else:
                     # send the rejection to the inviter's HS.
                     remote_room_hosts = remote_room_hosts + [inviter.domain]
-
+                    fed_handler = self.hs.get_handlers().federation_handler
                     try:
-                        ret = yield self.reject_remote_invite(
-                            target.to_string(), room_id, remote_room_hosts
+                        ret = yield fed_handler.do_remotely_reject_invite(
+                            remote_room_hosts,
+                            room_id,
+                            target.to_string(),
                         )
                         defer.returnValue(ret)
-                    except SynapseError as e:
+                    except Exception as e:
+                        # if we were unable to reject the exception, just mark
+                        # it as rejected on our end and plough ahead.
+                        #
+                        # The 'except' clause is very broad, but we need to
+                        # capture everything from DNS failures upwards
+                        #
                         logger.warn("Failed to reject invite: %s", e)
 
                         yield self.store.locally_reject_invite(
