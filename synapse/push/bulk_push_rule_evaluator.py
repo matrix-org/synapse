@@ -19,17 +19,21 @@ from twisted.internet import defer
 
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, Membership
 
 
 logger = logging.getLogger(__name__)
 
 
+rules_by_room = {}
+
+
 @defer.inlineCallbacks
 def evaluator_for_event(event, hs, store, context):
-    rules_by_user = yield store.bulk_get_push_rules_for_room(
-        event, context
-    )
+    room_id = event.room_id
+    rules_for_room = rules_by_room.setdefault(room_id, RulesForRoom(hs, room_id))
+
+    rules_by_user = yield rules_for_room.get_rules(context)
 
     # if this event is an invite event, we may need to run rules for the user
     # who's been invited, otherwise they won't get told they've been invited
@@ -66,11 +70,14 @@ class BulkPushRuleEvaluator:
     def action_for_event_by_user(self, event, context):
         actions_by_user = {}
 
-        room_members = yield self.store.get_joined_users_from_context(
-            event, context
-        )
+        # room_members = yield self.store.get_joined_users_from_context(
+        #     event, context
+        # )
+        room_members = {}
 
-        evaluator = PushRuleEvaluatorForEvent(event, len(room_members))
+        num_room_members = yield self.store.get_number_of_users_in_rooms(event.room_id)
+
+        evaluator = PushRuleEvaluatorForEvent(event, num_room_members)
 
         condition_cache = {}
 
@@ -127,3 +134,128 @@ def _condition_checker(evaluator, conditions, uid, display_name, cache):
             return False
 
     return True
+
+
+class RulesForRoom(object):
+    def __init__(self, hs, room_id):
+        self.room_id = room_id
+        self.is_mine_id = hs.is_mine_id
+        self.store = hs.get_datastore()
+
+        self.member_map = {}  # event_id -> (user_id, state)
+        self.rules_by_user = {}  # user_id -> rules
+        self.state_group = object()
+
+        self.sequence = 0
+
+    @defer.inlineCallbacks
+    def get_rules(self, context):
+        state_group = context.state_group
+        current_state_ids = context.current_state_ids
+
+        if state_group and self.state_group == state_group:
+            defer.returnValue(self.rules_by_user)
+
+        ret_rules_by_user = {}
+        missing_member_event_ids = {}
+        for key, event_id in current_state_ids.iteritems():
+            res = self.member_map.get(event_id, None)
+            if res:
+                user_id, state = res
+                if state == Membership.JOIN:
+                    rules = self.rules_by_user.get(user_id, None)
+                    if rules:
+                        ret_rules_by_user[user_id] = rules
+                continue
+
+            if key[0] != EventTypes.Member:
+                continue
+
+            user_id = key[1]
+            if not self.is_mine_id(user_id):
+                continue
+
+            if self.store.get_if_app_services_interested_in_user(user_id):
+                continue
+
+            missing_member_event_ids[user_id] = event_id
+
+        if missing_member_event_ids:
+            missing_rules = yield self.get_rules_for_member_event_ids(
+                missing_member_event_ids, state_group
+            )
+            ret_rules_by_user.update(missing_rules)
+
+        defer.returnValue(ret_rules_by_user)
+
+    @defer.inlineCallbacks
+    def get_rules_for_member_event_ids(self, member_event_ids, state_group):
+        sequence = self.sequence
+
+        rows = yield self.store._simple_select_many_batch(
+            table="room_memberships",
+            column="event_id",
+            iterable=member_event_ids.values(),
+            retcols=['user_id', 'membership', 'event_id'],
+            keyvalues={},
+            batch_size=500,
+            desc="get_rules_for_member_event_ids",
+        )
+
+        members = {
+            row["event_id"]: (row["user_id"], row["membership"])
+            for row in rows
+        }
+
+        interested_in_user_ids = set(user_id for user_id, _ in members.itervalues())
+
+        if_users_with_pushers = yield self.store.get_if_users_have_pushers(
+            interested_in_user_ids,
+            on_invalidate=self.invalidate_all,
+        )
+
+        user_ids = set(
+            uid for uid, have_pusher in if_users_with_pushers.items() if have_pusher
+        )
+
+        users_with_receipts = yield self.store.get_users_with_read_receipts_in_room(
+            self.room_id, on_invalidate=self.invalidate_all,
+        )
+
+        # any users with pushers must be ours: they have pushers
+        for uid in users_with_receipts:
+            if uid in interested_in_user_ids:
+                user_ids.add(uid)
+
+        forgotten = yield self.store.who_forgot_in_room(
+            self.room_id, on_invalidate=self.invalidate_all,
+        )
+
+        for row in forgotten:
+            user_id = row["user_id"]
+            event_id = row["event_id"]
+
+            mem_id = member_event_ids.get((user_id), None)
+            if event_id == mem_id:
+                user_ids.discard(user_id)
+
+        rules_by_user = yield self.store.bulk_get_push_rules(
+            user_ids, on_invalidate=self.invalidate_all,
+        )
+
+        rules_by_user = {k: v for k, v in rules_by_user.iteritems() if v is not None}
+
+        self.update_cache(sequence, members, rules_by_user, state_group)
+
+        defer.returnValue(rules_by_user)
+
+    def invalidate_all(self):
+        self.sequence += 1
+        self.member_map = {}
+        self.rules_by_user = {}
+
+    def update_cache(self, sequence, members, rules_by_user, state_group):
+        if sequence == self.sequence:
+            self.member_map.update(members)
+            self.rules_by_user.update(rules_by_user)
+            self.state_group = state_group

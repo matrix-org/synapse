@@ -417,25 +417,47 @@ class RoomMemberStore(SQLBaseStore):
             if key[0] == EventTypes.Member
         ]
 
-        rows = yield self._simple_select_many_batch(
-            table="room_memberships",
-            column="event_id",
-            iterable=member_event_ids,
-            retcols=['user_id', 'display_name', 'avatar_url'],
-            keyvalues={
-                "membership": Membership.JOIN,
-            },
-            batch_size=500,
-            desc="_get_joined_users_from_context",
+        event_map = self._get_events_from_cache(
+            member_event_ids,
+            allow_rejected=False,
         )
 
-        users_in_room = {
-            to_ascii(row["user_id"]): ProfileInfo(
-                avatar_url=to_ascii(row["avatar_url"]),
-                display_name=to_ascii(row["display_name"]),
+        missing_member_event_ids = []
+        users_in_room = {}
+        for event_id, ev_entry in event_map.iteritems():
+            if event_id:
+                if ev_entry.event.membership == Membership.JOIN:
+                    users_in_room[to_ascii(ev_entry.event.state_key)] = ProfileInfo(
+                        display_name=to_ascii(
+                            ev_entry.event.content.get("displayname", None)
+                        ),
+                        avatar_url=to_ascii(
+                            ev_entry.event.content.get("avatar_url", None)
+                        ),
+                    )
+            else:
+                missing_member_event_ids.append(event_id)
+
+        if missing_member_event_ids:
+            rows = yield self._simple_select_many_batch(
+                table="room_memberships",
+                column="event_id",
+                iterable=member_event_ids,
+                retcols=('user_id', 'display_name', 'avatar_url',),
+                keyvalues={
+                    "membership": Membership.JOIN,
+                },
+                batch_size=500,
+                desc="_get_joined_users_from_context",
             )
-            for row in rows
-        }
+
+            users_in_room.update({
+                to_ascii(row["user_id"]): ProfileInfo(
+                    avatar_url=to_ascii(row["avatar_url"]),
+                    display_name=to_ascii(row["display_name"]),
+                )
+                for row in rows
+            })
 
         if event is not None and event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
@@ -446,6 +468,17 @@ class RoomMemberStore(SQLBaseStore):
                     )
 
         defer.returnValue(users_in_room)
+
+    def get_number_of_users_in_rooms(self, room_id):
+        sql = """SELECT coalesce(count(*), 0) FROM current_state_events
+            INNER JOIN room_memberships USING (room_id, event_id)
+            WHERE room_id = ? AND membership = 'join'
+        """
+        return self._execute(
+            "get_number_of_users_in_rooms",
+            lambda txn: txn.fetchone()[0],
+            sql, room_id
+        )
 
     def is_host_joined(self, room_id, host, state_group, state_ids):
         if not state_group:
@@ -481,6 +514,44 @@ class RoomMemberStore(SQLBaseStore):
                     defer.returnValue(True)
 
         defer.returnValue(False)
+
+    def get_joined_hosts(self, room_id, state_group, state_ids):
+        if not state_group:
+            # If state_group is None it means it has yet to be assigned a
+            # state group, i.e. we need to make sure that calls with a state_group
+            # of None don't hit previous cached calls with a None state_group.
+            # To do this we set the state_group to a new object as object() != object()
+            state_group = object()
+
+        return self._get_joined_hosts(
+            room_id, state_group, state_ids
+        )
+
+    @cachedInlineCallbacks(num_args=3)
+    def _get_joined_hosts(self, room_id, state_group, current_state_ids):
+        # We don't use `state_group`, its there so that we can cache based
+        # on it. However, its important that its never None, since two current_state's
+        # with a state_group of None are likely to be different.
+        # See bulk_get_push_rules_for_room for how we work around this.
+        assert state_group is not None
+
+        joined_hosts = set()
+        for (etype, state_key), event_id in current_state_ids.items():
+            if etype == EventTypes.Member:
+                try:
+                    host = get_domain_from_id(state_key)
+                except:
+                    logger.warn("state_key not user_id: %s", state_key)
+                    continue
+
+                if host in joined_hosts:
+                    continue
+
+                event = yield self.get_event(event_id, allow_none=True)
+                if event and event.content["membership"] == Membership.JOIN:
+                    joined_hosts.add(host)
+
+        defer.returnValue(joined_hosts)
 
     @defer.inlineCallbacks
     def _background_add_membership_profile(self, progress, batch_size):
