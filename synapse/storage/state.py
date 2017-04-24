@@ -279,12 +279,7 @@ class StateStore(SQLBaseStore):
 
             return count
 
-    @cached(num_args=2, max_entries=100000, iterable=True)
-    def _get_state_group_from_group(self, group, types):
-        raise NotImplementedError()
-
-    @cachedList(cached_method_name="_get_state_group_from_group",
-                list_name="groups", num_args=2, inlineCallbacks=True)
+    @defer.inlineCallbacks
     def _get_state_groups_from_groups(self, groups, types):
         """Returns dictionary state_group -> (dict of (type, state_key) -> event id)
         """
