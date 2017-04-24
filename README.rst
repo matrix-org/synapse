@@ -373,7 +373,7 @@ FreeBSD
 
 Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
 
- - Ports: ``cd /usr/ports/net/py-matrix-synapse && make install clean``
+ - Ports: ``cd /usr/ports/net-im/py-matrix-synapse && make install clean``
  - Packages: ``pkg install py27-matrix-synapse``
 
 

@@ -2158,6 +2158,28 @@ class EventsStore(SQLBaseStore):
             ]
         )
 
+    @defer.inlineCallbacks
+    def is_event_after(self, event_id1, event_id2):
+        """Returns True if event_id1 is after event_id2 in the stream
+        """
+        to_1, so_1 = yield self._get_event_ordering(event_id1)
+        to_2, so_2 = yield self._get_event_ordering(event_id2)
+        defer.returnValue((to_1, so_1) > (to_2, so_2))
+
+    @defer.inlineCallbacks
+    def _get_event_ordering(self, event_id):
+        res = yield self._simple_select_one(
+            table="events",
+            retcols=["topological_ordering", "stream_ordering"],
+            keyvalues={"event_id": event_id},
+            allow_none=True
+        )
+
+        if not res:
+            raise SynapseError(404, "Could not find event %s" % (event_id,))
+
+        defer.returnValue((int(res["topological_ordering"]), int(res["stream_ordering"])))
+
 
 AllNewEventsResult = namedtuple("AllNewEventsResult", [
     "new_forward_events", "new_backfill_events",
