@@ -21,13 +21,12 @@ How to monitor Synapse metrics using Prometheus
 
 3. Add a prometheus target for synapse.
 
-   It needs to set the ``metrics_path`` to a non-default value::
+   It needs to set the ``metrics_path`` to a non-default value (under ``scrape_configs``)::
 
     - job_name: "synapse"
       metrics_path: "/_synapse/metrics"
       static_configs:
-        - targets:
-            "my.server.here:9092"
+        - targets: ["my.server.here:9092"]
 
    If your prometheus is older than 1.5.2, you will need to replace 
    ``static_configs`` in the above with ``target_groups``.
