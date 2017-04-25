@@ -91,7 +91,8 @@ class BulkPushRuleEvaluator:
             profile_info = room_members.get(uid)
             if profile_info:
                 display_name = profile_info.display_name
-            else:
+
+            if not display_name:
                 # Handle the case where we are pushing a membership event to
                 # that user, as they might not be already joined.
                 if event.type == EventTypes.Member and event.state_key == uid:
