@@ -19,6 +19,7 @@ from collections import namedtuple
 
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
+from synapse.util.stringutils import to_ascii
 
 from synapse.api.constants import Membership, EventTypes
 from synapse.types import get_domain_from_id
@@ -32,6 +33,11 @@ logger = logging.getLogger(__name__)
 RoomsForUser = namedtuple(
     "RoomsForUser",
     ("room_id", "sender", "membership", "event_id", "stream_ordering")
+)
+
+
+ProfileInfo = namedtuple(
+    "ProfileInfo", ("avatar_url", "display_name")
 )
 
 
@@ -422,20 +428,20 @@ class RoomMemberStore(SQLBaseStore):
         )
 
         users_in_room = {
-            row["user_id"]: {
-                "display_name": row["display_name"],
-                "avatar_url": row["avatar_url"],
-            }
+            to_ascii(row["user_id"]): ProfileInfo(
+                avatar_url=to_ascii(row["avatar_url"]),
+                display_name=to_ascii(row["display_name"]),
+            )
             for row in rows
         }
 
         if event is not None and event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
                 if event.event_id in member_event_ids:
-                    users_in_room[event.state_key] = {
-                        "display_name": event.content.get("displayname", None),
-                        "avatar_url": event.content.get("avatar_url", None),
-                    }
+                    users_in_room[to_ascii(event.state_key)] = ProfileInfo(
+                        display_name=to_ascii(event.content.get("displayname", None)),
+                        avatar_url=to_ascii(event.content.get("avatar_url", None)),
+                    )
 
         defer.returnValue(users_in_room)
 
