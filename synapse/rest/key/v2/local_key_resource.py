@@ -84,12 +84,11 @@ class LocalKey(Resource):
             }
 
         old_verify_keys = {}
-        for key in self.config.old_signing_keys:
-            key_id = "%s:%s" % (key.alg, key.version)
+        for key_id, key in self.config.old_signing_keys.items():
             verify_key_bytes = key.encode()
             old_verify_keys[key_id] = {
                 u"key": encode_base64(verify_key_bytes),
-                u"expired_ts": key.expired,
+                u"expired_ts": key.expired_ts,
             }
 
         tls_fingerprints = self.config.tls_fingerprints
