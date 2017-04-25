@@ -88,7 +88,7 @@ class BulkPushRuleEvaluator:
 
         for uid, rules in self.rules_by_user.items():
             display_name = None
-            profile_info = room_members.get(uid, {})
+            profile_info = room_members.get(uid)
             if profile_info:
                 display_name = profile_info.display_name
             else:
