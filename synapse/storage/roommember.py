@@ -36,6 +36,8 @@ RoomsForUser = namedtuple(
 )
 
 
+# We store this using a namedtuple so that we save about 3x space over using a
+# dict.
 ProfileInfo = namedtuple(
     "ProfileInfo", ("avatar_url", "display_name")
 )
