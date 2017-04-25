@@ -16,7 +16,7 @@ from OpenSSL import SSL
 from OpenSSL.SSL import VERIFY_NONE
 
 from synapse.api.errors import (
-    CodeMessageException, SynapseError, Codes,
+    CodeMessageException, MatrixCodeMessageException, SynapseError, Codes,
 )
 from synapse.util.logcontext import preserve_context_over_fn
 import synapse.metrics
@@ -145,8 +145,10 @@ class SimpleHttpClient(object):
 
         body = yield preserve_context_over_fn(readBody, response)
 
-        if response.code / 100 >= 4:
-            raise CodeMessageException(response.code, body)
+        if 200 <= response.code < 300:
+            defer.returnValue(json.loads(body))
+        else:
+            raise self._exceptionFromFailedRequest(response, body)
 
         defer.returnValue(json.loads(body))
 
@@ -168,7 +170,11 @@ class SimpleHttpClient(object):
             error message.
         """
         body = yield self.get_raw(uri, args)
-        defer.returnValue(json.loads(body))
+
+        if 200 <= response.code < 300:
+            defer.returnValue(json.loads(body))
+        else:
+            raise self._exceptionFromFailedRequest(response, body)
 
     @defer.inlineCallbacks
     def put_json(self, uri, json_body, args={}):
@@ -249,6 +255,16 @@ class SimpleHttpClient(object):
         else:
             raise CodeMessageException(response.code, body)
 
+    def _exceptionFromFailedRequest(self, response, body):
+        try:
+            jsonBody = json.loads(body)
+            errcode = jsonBody['errcode']
+            error = jsonBody['error']
+            return MatrixCodeMessageException(response.code, error, errcode)
+        except e:
+            print e
+            return CodeMessageException(response.code, body)
+
     # XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
     # The two should be factored out.
 
@@ -307,46 +323,6 @@ class SimpleHttpClient(object):
             )
 
         defer.returnValue((length, headers, response.request.absoluteURI, response.code))
-
-
-class MatrixProxyClient(object):
-    """
-    An HTTP client that proxies other Matrix endpoints, ie. if the remote endpoint
-    returns Matrix-style error response, this will raise the appropriate SynapseError
-    """
-    def __init__(self, hs):
-        self.simpleHttpClient = SimpleHttpClient(hs)
-
-    @defer.inlineCallbacks
-    def post_json_get_json(self, uri, post_json):
-        try:
-            result = yield self.simpleHttpClient.post_json_get_json(uri, post_json)
-            defer.returnValue(result)
-        except CodeMessageException as cme:
-            ex = self._tryGetMatrixError(cme)
-            if ex is not None:
-                raise ex
-            raise cme
-
-    @defer.inlineCallbacks
-    def get_json(self, uri, args={}):
-        try:
-            result = yield self.simpleHttpClient.get_json(uri, args)
-            defer.returnValue(result)
-        except CodeMessageException as cme:
-            ex = self._tryGetMatrixError(cme)
-            if ex is not None:
-                raise ex
-            raise cme
-
-    def _tryGetMatrixError(self, codeMessageException):
-        try:
-            errbody = json.loads(codeMessageException.msg)
-            errcode = errbody['errcode']
-            errtext = errbody['error']
-            return SynapseError(codeMessageException.code, errtext, errcode)
-        except:
-            return None
 
 
 # XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.

@@ -18,7 +18,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import (
-    CodeMessageException
+    MatrixCodeMessageException, CodeMessageException
 )
 from ._base import BaseHandler
 from synapse.util.async import run_on_reactor
@@ -35,7 +35,7 @@ class IdentityHandler(BaseHandler):
     def __init__(self, hs):
         super(IdentityHandler, self).__init__(hs)
 
-        self.proxy_client = hs.get_matrix_proxy_client()
+        self.http_client = hs.get_simple_http_client()
 
         self.trusted_id_servers = set(hs.config.trusted_third_party_id_servers)
         self.trust_any_id_server_just_for_testing_do_not_use = (
@@ -83,13 +83,16 @@ class IdentityHandler(BaseHandler):
 
         data = {}
         try:
-            data = yield self.proxy_client.get_json(
-                "https://%s%s" % (
+            data = yield self.http_client.get_json(
+                "http://%s%s" % (
                     id_server,
                     "/_matrix/identity/api/v1/3pid/getValidated3pid"
                 ),
                 {'sid': creds['sid'], 'client_secret': client_secret}
             )
+        except MatrixCodeMessageException as e:
+            logger.info("getValidated3pid failed with Matrix error: %r", e)
+            raise SynapseError(e.code, e.msg, e.errcode)
         except CodeMessageException as e:
             data = json.loads(e.msg)
 
@@ -118,8 +121,8 @@ class IdentityHandler(BaseHandler):
             raise SynapseError(400, "No client_secret in creds")
 
         try:
-            data = yield self.proxy_client.post_urlencoded_get_json(
-                "https://%s%s" % (
+            data = yield self.http_client.post_urlencoded_get_json(
+                "http://%s%s" % (
                     id_server, "/_matrix/identity/api/v1/3pid/bind"
                 ),
                 {
@@ -151,14 +154,17 @@ class IdentityHandler(BaseHandler):
         params.update(kwargs)
 
         try:
-            data = yield self.proxy_client.post_json_get_json(
-                "https://%s%s" % (
+            data = yield self.http_client.post_json_get_json(
+                "http://%s%s" % (
                     id_server,
                     "/_matrix/identity/api/v1/validate/email/requestToken"
                 ),
                 params
             )
             defer.returnValue(data)
+        except MatrixCodeMessageException as e:
+            logger.info("Proxied requestToken failed with Matrix error: %r", e)
+            raise SynapseError(e.code, e.msg, e.errcode)
         except CodeMessageException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e
@@ -185,14 +191,17 @@ class IdentityHandler(BaseHandler):
         params.update(kwargs)
 
         try:
-            data = yield self.proxy_client.post_json_get_json(
-                "https://%s%s" % (
+            data = yield self.http_client.post_json_get_json(
+                "http://%s%s" % (
                     id_server,
                     "/_matrix/identity/api/v1/validate/msisdn/requestToken"
                 ),
                 params
             )
             defer.returnValue(data)
+        except MatrixCodeMessageException as e:
+            logger.info("Proxied requestToken failed with Matrix error: %r", e)
+            raise SynapseError(e.code, e.msg, e.errcode)
         except CodeMessageException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e
