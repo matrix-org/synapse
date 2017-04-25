@@ -1090,19 +1090,13 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def do_remotely_reject_invite(self, target_hosts, room_id, user_id):
-        try:
-            origin, event = yield self._make_and_verify_event(
-                target_hosts,
-                room_id,
-                user_id,
-                "leave"
-            )
-            event = self._sign_event(event)
-        except SynapseError:
-            raise
-        except CodeMessageException as e:
-            logger.warn("Failed to reject invite: %s", e)
-            raise SynapseError(500, "Failed to reject invite")
+        origin, event = yield self._make_and_verify_event(
+            target_hosts,
+            room_id,
+            user_id,
+            "leave"
+        )
+        event = self._sign_event(event)
 
         # Try the host that we succesfully called /make_leave/ on first for
         # the /send_leave/ request.
@@ -1112,16 +1106,10 @@ class FederationHandler(BaseHandler):
         except ValueError:
             pass
 
-        try:
-            yield self.replication_layer.send_leave(
-                target_hosts,
-                event
-            )
-        except SynapseError:
-            raise
-        except CodeMessageException as e:
-            logger.warn("Failed to reject invite: %s", e)
-            raise SynapseError(500, "Failed to reject invite")
+        yield self.replication_layer.send_leave(
+            target_hosts,
+            event
+        )
 
         context = yield self.state_handler.compute_event_context(event)
 
