@@ -40,3 +40,17 @@ def is_ascii(s):
         return False
     else:
         return True
+
+
+def to_ascii(s):
+    """Converts a string to ascii if it is ascii, otherwise leave it alone.
+
+    If given None then will return None.
+    """
+    if s is None:
+        return None
+
+    try:
+        return s.encode("ascii")
+    except UnicodeEncodeError:
+        return s
