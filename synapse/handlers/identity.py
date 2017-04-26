@@ -84,7 +84,7 @@ class IdentityHandler(BaseHandler):
         data = {}
         try:
             data = yield self.http_client.get_json(
-                "http://%s%s" % (
+                "https://%s%s" % (
                     id_server,
                     "/_matrix/identity/api/v1/3pid/getValidated3pid"
                 ),
@@ -122,7 +122,7 @@ class IdentityHandler(BaseHandler):
 
         try:
             data = yield self.http_client.post_urlencoded_get_json(
-                "http://%s%s" % (
+                "https://%s%s" % (
                     id_server, "/_matrix/identity/api/v1/3pid/bind"
                 ),
                 {
@@ -155,7 +155,7 @@ class IdentityHandler(BaseHandler):
 
         try:
             data = yield self.http_client.post_json_get_json(
-                "http://%s%s" % (
+                "https://%s%s" % (
                     id_server,
                     "/_matrix/identity/api/v1/validate/email/requestToken"
                 ),
@@ -192,7 +192,7 @@ class IdentityHandler(BaseHandler):
 
         try:
             data = yield self.http_client.post_json_get_json(
-                "http://%s%s" % (
+                "https://%s%s" % (
                     id_server,
                     "/_matrix/identity/api/v1/validate/msisdn/requestToken"
                 ),
