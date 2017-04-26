@@ -16,6 +16,7 @@
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches import intern_string
+from synapse.util.stringutils import to_ascii
 from synapse.storage.engines import PostgresEngine
 
 from twisted.internet import defer
@@ -89,7 +90,7 @@ class StateStore(SQLBaseStore):
             )
 
             return {
-                (r[0], r[1]): r[2] for r in txn
+                (intern_string(r[0]), intern_string(r[1])): to_ascii(r[2]) for r in txn
             }
 
         return self.runInteraction(
@@ -655,7 +656,7 @@ class StateStore(SQLBaseStore):
                     state_dict = results[group]
 
                 state_dict.update(
-                    ((intern_string(k[0]), intern_string(k[1])), v)
+                    ((intern_string(k[0]), intern_string(k[1])), to_ascii(v))
                     for k, v in group_state_dict.iteritems()
                 )
 
