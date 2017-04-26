@@ -266,6 +266,9 @@ def serialize_event(e, time_now_ms, as_client_event=True,
             if txn_id is not None:
                 d["unsigned"]["transaction_id"] = txn_id
 
+    if not is_invite:
+        d["unsigned"].pop("invite_room_state", None)
+
     if as_client_event:
         d = event_format(d)
 
@@ -274,8 +277,5 @@ def serialize_event(e, time_now_ms, as_client_event=True,
                 not all(isinstance(f, basestring) for f in only_event_fields)):
             raise TypeError("only_event_fields must be a list of strings")
         d = only_fields(d, only_event_fields)
-
-    if not is_invite:
-        d["unsigned"].pop("invite_room_state", None)
 
     return d
