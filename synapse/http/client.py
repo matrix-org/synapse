@@ -169,12 +169,11 @@ class SimpleHttpClient(object):
             On a non-2xx HTTP response. The response body will be used as the
             error message.
         """
-        body = yield self.get_raw(uri, args)
-
-        if 200 <= response.code < 300:
+        try:
+            body = yield self.get_raw(uri, args)
             defer.returnValue(json.loads(body))
-        else:
-            raise self._exceptionFromFailedRequest(response, body)
+        except CodeMessageException as e:
+            raise self._exceptionFromFailedRequest(e.code, e.msg)
 
     @defer.inlineCallbacks
     def put_json(self, uri, json_body, args={}):
