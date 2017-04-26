@@ -87,7 +87,11 @@ class BulkPushRuleEvaluator:
         condition_cache = {}
 
         for uid, rules in self.rules_by_user.items():
-            display_name = room_members.get(uid, {}).get("display_name", None)
+            display_name = None
+            profile_info = room_members.get(uid)
+            if profile_info:
+                display_name = profile_info.display_name
+
             if not display_name:
                 # Handle the case where we are pushing a membership event to
                 # that user, as they might not be already joined.

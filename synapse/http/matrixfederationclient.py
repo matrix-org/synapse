@@ -125,6 +125,8 @@ class MatrixFederationHttpClient(object):
                 code >= 300.
             Fails with ``NotRetryingDestination`` if we are not yet ready
                 to retry this server.
+            (May also fail with plenty of other Exceptions for things like DNS
+                failures, connection failures, SSL failures.)
         """
         limiter = yield synapse.util.retryutils.get_retry_limiter(
             destination,
@@ -302,8 +304,10 @@ class MatrixFederationHttpClient(object):
 
         Returns:
             Deferred: Succeeds when we get a 2xx HTTP response. The result
-            will be the decoded JSON body. On a 4xx or 5xx error response a
-            CodeMessageException is raised.
+            will be the decoded JSON body.
+
+            Fails with ``HTTPRequestException`` if we get an HTTP response
+            code >= 300.
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
             to retry this server.
@@ -360,8 +364,10 @@ class MatrixFederationHttpClient(object):
                 try the request anyway.
         Returns:
             Deferred: Succeeds when we get a 2xx HTTP response. The result
-            will be the decoded JSON body. On a 4xx or 5xx error response a
-            CodeMessageException is raised.
+            will be the decoded JSON body.
+
+            Fails with ``HTTPRequestException`` if we get an HTTP response
+            code >= 300.
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
             to retry this server.
@@ -410,10 +416,11 @@ class MatrixFederationHttpClient(object):
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
         Returns:
-            Deferred: Succeeds when we get *any* HTTP response.
+            Deferred: Succeeds when we get a 2xx HTTP response. The result
+            will be the decoded JSON body.
 
-            The result of the deferred is a tuple of `(code, response)`,
-            where `response` is a dict representing the decoded JSON body.
+            Fails with ``HTTPRequestException`` if we get an HTTP response
+            code >= 300.
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
             to retry this server.
