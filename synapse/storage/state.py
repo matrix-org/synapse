@@ -16,6 +16,7 @@
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches import intern_string
+from synapse.util.stringutils import to_ascii
 from synapse.storage.engines import PostgresEngine
 
 from twisted.internet import defer
@@ -89,7 +90,7 @@ class StateStore(SQLBaseStore):
             )
 
             return {
-                (r[0], r[1]): r[2] for r in txn
+                (intern_string(r[0]), intern_string(r[1])): to_ascii(r[2]) for r in txn
             }
 
         return self.runInteraction(
@@ -507,7 +508,7 @@ class StateStore(SQLBaseStore):
         state_map = yield self.get_state_ids_for_events([event_id], types)
         defer.returnValue(state_map[event_id])
 
-    @cached(num_args=2, max_entries=100000)
+    @cached(num_args=2, max_entries=50000)
     def _get_state_group_for_event(self, room_id, event_id):
         return self._simple_select_one_onecol(
             table="event_to_state_groups",
@@ -655,7 +656,7 @@ class StateStore(SQLBaseStore):
                     state_dict = results[group]
 
                 state_dict.update(
-                    ((intern_string(k[0]), intern_string(k[1])), v)
+                    ((intern_string(k[0]), intern_string(k[1])), to_ascii(v))
                     for k, v in group_state_dict.iteritems()
                 )
 
