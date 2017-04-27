@@ -354,8 +354,11 @@ ArchLinux
 ---------
 
 The quickest way to get up and running with ArchLinux is probably with the community package
-https://www.archlinux.org/packages/community/any/matrix-synapse/, which should pull in all
-the necessary dependencies.
+https://www.archlinux.org/packages/community/any/matrix-synapse/, which should pull in most of
+the necessary dependencies. If the default web client is to be served (enabled by default in
+the generated config),
+https://www.archlinux.org/packages/community/any/python2-matrix-angular-sdk/ will also need to
+be installed. 
 
 Alternatively, to install using pip a few changes may be needed as ArchLinux
 defaults to python 3, but synapse currently assumes python 2.7 by default:

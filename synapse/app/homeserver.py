@@ -25,7 +25,7 @@ import synapse.config.logger
 from synapse.config._base import ConfigError
 
 from synapse.python_dependencies import (
-    check_requirements, DEPENDENCY_LINKS
+    check_requirements, CONDITIONAL_REQUIREMENTS
 )
 
 from synapse.rest import ClientRestResource
@@ -92,7 +92,7 @@ def build_resource_for_web_client(hs):
                 "\n"
                 "You can also disable hosting of the webclient via the\n"
                 "configuration option `web_client`\n"
-                % {"dep": DEPENDENCY_LINKS["matrix-angular-sdk"]}
+                % {"dep": CONDITIONAL_REQUIREMENTS["web_client"].keys()[0]}
             )
         syweb_path = os.path.dirname(syweb.__file__)
         webclient_path = os.path.join(syweb_path, "webclient")
