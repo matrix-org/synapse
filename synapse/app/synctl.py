@@ -234,6 +234,9 @@ def main():
 
     if action == "start" or action == "restart":
         if start_stop_synapse:
+            # Check if synapse is already running
+            if os.path.exists(pidfile) and pid_running(int(open(pidfile).read())):
+                abort("synapse.app.homeserver already running")
             start(configfile)
 
         for worker in workers:
