@@ -238,7 +238,7 @@ class FederationHandler(BaseHandler):
         latest |= seen
 
         logger.info(
-            "Missing %d events for room %r pdy %s: %r...",
+            "Missing %d events for room %r pdu %s: %r...",
             len(prevs - seen), pdu.room_id, pdu.event_id, list(prevs - seen)[:5]
         )
 
