@@ -228,12 +228,6 @@ class BackgroundUpdateStore(SQLBaseStore):
             columns (list[str]): columns/expressions to include in index
         """
 
-        # we only create the index if it doesn't already exist. This works
-        # around an issue where synapse gets shut down before the index
-        # creation completes. In that case the index will still be created
-        # but the completion of the background update will not be recorded,
-        # so then we get stuck with logs full of "relation already exists".
-
         def create_index_psql(conn):
             conn.rollback()
             # postgres insists on autocommit for the index
@@ -242,15 +236,13 @@ class BackgroundUpdateStore(SQLBaseStore):
             try:
                 c = conn.cursor()
 
-                # CREATE INDEX IF NOT EXISTS was only added in postgres 9.5 :/.
-                #
-                # instead see if there's a record in pg_class for it.
-                #
-                c.execute("SELECT 1 from pg_class where relname = %s",
-                          (index_name,))
-                if c.rowcount > 0:
-                    logger.info("Index %s already exists", index_name)
-                    return
+                # If a previous attempt to create the index was interrupted,
+                # we may already have a half-built index. Let's just drop it
+                # before trying to create it again.
+
+                sql = "DROP INDEX IF EXISTS %s" % (index_name,)
+                logger.debug("[SQL] %s", sql)
+                c.execute(sql)
 
                 sql = (
                     "CREATE INDEX CONCURRENTLY %(name)s ON %(table)s"
@@ -272,8 +264,11 @@ class BackgroundUpdateStore(SQLBaseStore):
             # We don't use partial indices on SQLite as it wasn't introduced
             # until 3.8, and wheezy has 3.7
             #
-            # SQLite has supported CREATE TABLE|INDEX IF NOT EXISTS since
-            # 3.3.0
+            # We assume that sqlite doesn't give us invalid indices; however
+            # we may still end up with the index existing but the
+            # background_updates not having been recorded if synapse got shut
+            # down at the wrong moment - hance we use IF NOT EXISTS. (SQLite
+            # has supported CREATE TABLE|INDEX IF NOT EXISTS since 3.3.0.)
             sql = (
                 "CREATE INDEX IF NOT EXISTS %(name)s ON %(table)s"
                 " (%(columns)s)"
