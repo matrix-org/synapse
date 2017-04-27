@@ -531,9 +531,9 @@ class MessageHandler(BaseHandler):
 
                 state_to_include_ids = [
                     e_id
-                    for k, e_id in context.current_state_ids.items()
+                    for k, e_id in context.current_state_ids.iteritems()
                     if k[0] in self.hs.config.room_invite_state_types
-                    or k[0] == EventTypes.Member and k[1] == event.sender
+                    or k == (EventTypes.Member, event.sender)
                 ]
 
                 state_to_include = yield self.store.get_events(state_to_include_ids)
@@ -545,7 +545,7 @@ class MessageHandler(BaseHandler):
                         "content": e.content,
                         "sender": e.sender,
                     }
-                    for e in state_to_include.values()
+                    for e in state_to_include.itervalues()
                 ]
 
                 invitee = UserID.from_string(event.state_key)
@@ -618,6 +618,3 @@ class MessageHandler(BaseHandler):
             )
 
         preserve_fn(_notify)()
-
-        # If invite, remove room_state from unsigned before sending.
-        event.unsigned.pop("invite_room_state", None)
