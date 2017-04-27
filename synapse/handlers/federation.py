@@ -171,6 +171,12 @@ class FederationHandler(BaseHandler):
                         yield self._get_missing_events_for_pdu(
                             origin, pdu, prevs, min_depth
                         )
+                elif prevs - seen:
+                    logger.info(
+                        "Not fetching %d missing events for room %r,event %s: %r...",
+                        len(prevs - seen), pdu.room_id, pdu.event_id,
+                        list(prevs - seen)[:5],
+                    )
 
             prevs = {e_id for e_id, _ in pdu.prev_events}
             seen = set(have_seen.keys())
@@ -232,8 +238,8 @@ class FederationHandler(BaseHandler):
         latest |= seen
 
         logger.info(
-            "Missing %d events for room %r: %r...",
-            len(prevs - seen), pdu.room_id, list(prevs - seen)[:5]
+            "Missing %d events for room %r pdy %s: %r...",
+            len(prevs - seen), pdu.room_id, pdu.event_id, list(prevs - seen)[:5]
         )
 
         # XXX: we set timeout to 10s to help workaround
@@ -265,11 +271,17 @@ class FederationHandler(BaseHandler):
             timeout=10000,
         )
 
+        logger.info(
+            "Got %d events: %r...",
+            len(missing_events), [e.event_id for e in missing_events[:5]]
+        )
+
         # We want to sort these by depth so we process them and
         # tell clients about them in order.
         missing_events.sort(key=lambda x: x.depth)
 
         for e in missing_events:
+            logger.info("Handling found event %s", e.event_id)
             yield self.on_receive_pdu(
                 origin,
                 e,
@@ -279,6 +291,14 @@ class FederationHandler(BaseHandler):
         have_seen = yield self.store.have_events(
             [ev for ev, _ in pdu.prev_events]
         )
+        seen = set(have_seen.keys())
+        if prevs - seen:
+            logger.info(
+                "Still missing %d prev events for %s: %r...",
+                len(prevs - seen), pdu.event_id, list(prevs - seen)[:5]
+            )
+        else:
+            logger.info("Found all missing prev events for %s", pdu.event_id)
         defer.returnValue(have_seen)
 
     @log_function
