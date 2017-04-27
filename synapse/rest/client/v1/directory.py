@@ -39,6 +39,7 @@ class ClientDirectoryServer(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(ClientDirectoryServer, self).__init__(hs)
+        self.store = hs.get_datastore()
         self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
@@ -70,7 +71,10 @@ class ClientDirectoryServer(ClientV1RestServlet):
         logger.debug("Got servers: %s", servers)
 
         # TODO(erikj): Check types.
-        # TODO(erikj): Check that room exists
+
+        room = yield self.store.get_room(room_id)
+        if room is None:
+            raise SynapseError(400, "Room does not exist")
 
         dir_handler = self.handlers.directory_handler
 
