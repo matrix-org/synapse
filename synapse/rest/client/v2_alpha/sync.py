@@ -250,7 +250,6 @@ class SyncRestServlet(RestServlet):
         """
         invited = {}
         for room in rooms:
-            logger.info("invite: %r", room.invite)
             invite = serialize_event(
                 room.invite, time_now, token_id=token_id,
                 event_format=format_event_for_client_v2_without_room_id,
