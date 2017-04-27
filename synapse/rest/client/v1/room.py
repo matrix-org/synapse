@@ -406,7 +406,13 @@ class JoinedRoomMemberListRestServlet(ClientV1RestServlet):
         users_with_profile = yield self.state.get_current_user_in_room(room_id)
 
         defer.returnValue((200, {
-            "joined": users_with_profile
+            "joined": {
+                user_id: {
+                    "avatar_url": profile.avatar_url,
+                    "display_name": profile.display_name,
+                }
+                for user_id, profile in users_with_profile.iteritems()
+            }
         }))
 
 

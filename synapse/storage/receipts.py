@@ -47,10 +47,13 @@ class ReceiptsStore(SQLBaseStore):
         # Returns an ObservableDeferred
         res = self.get_users_with_read_receipts_in_room.cache.get((room_id,), None)
 
-        if res and res.called and user_id in res.result:
-            # We'd only be adding to the set, so no point invalidating if the
-            # user is already there
-            return
+        if res:
+            if isinstance(res, defer.Deferred) and res.called:
+                res = res.result
+            if user_id in res:
+                # We'd only be adding to the set, so no point invalidating if the
+                # user is already there
+                return
 
         self.get_users_with_read_receipts_in_room.invalidate((room_id,))
 
