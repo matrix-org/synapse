@@ -16,7 +16,6 @@
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
 from synapse.push.baserules import list_with_base_rules
-from synapse.api.constants import EventTypes
 from twisted.internet import defer
 
 import logging
