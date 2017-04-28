@@ -171,6 +171,12 @@ class FederationHandler(BaseHandler):
                         yield self._get_missing_events_for_pdu(
                             origin, pdu, prevs, min_depth
                         )
+
+                        # Update the set of things we've seen after trying to
+                        # fetch the missing stuff
+                        have_seen = yield self.store.have_events(
+                            [ev for ev, _ in pdu.prev_events]
+                        )
                 elif prevs - seen:
                     logger.info(
                         "Not fetching %d missing events for room %r,event %s: %r...",
