@@ -29,6 +29,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from synapse.state import resolve_events
 from synapse.util.caches.descriptors import cached
+from synapse.types import get_domain_from_id
 
 from canonicaljson import encode_canonical_json
 from collections import deque, namedtuple, OrderedDict
@@ -49,6 +50,9 @@ logger = logging.getLogger(__name__)
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 persist_event_counter = metrics.register_counter("persisted_events")
+event_counter = metrics.register_counter(
+    "persisted_events_sep", labels=["type", "origin_type", "origin_entity"]
+)
 
 
 def encode_json(json_object):
@@ -370,6 +374,18 @@ class EventsStore(SQLBaseStore):
                     new_forward_extremeties=new_forward_extremeties,
                 )
                 persist_event_counter.inc_by(len(chunk))
+                for event, context in chunk:
+                    if context.app_service:
+                        origin_type = "local"
+                        origin_entity = context.app_service.id
+                    elif self.hs.is_mine_id(event.sender):
+                        origin_type = "local"
+                        origin_entity = "*client*"
+                    else:
+                        origin_type = "remote"
+                        origin_entity = get_domain_from_id(event.sender)
+
+                    event_counter.inc(event.type, origin_type, origin_entity)
 
     @defer.inlineCallbacks
     def _calculate_new_extremeties(self, room_id, event_contexts, latest_event_ids):

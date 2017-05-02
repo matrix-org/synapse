@@ -50,6 +50,7 @@ class EventContext(object):
         "prev_group",
         "delta_ids",
         "prev_state_events",
+        "app_service",
     ]
 
     def __init__(self):
@@ -68,3 +69,5 @@ class EventContext(object):
         self.delta_ids = None
 
         self.prev_state_events = None
+
+        self.app_service = None
