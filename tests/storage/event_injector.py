@@ -27,10 +27,10 @@ class EventInjector:
         self.event_builder_factory = hs.get_event_builder_factory()
 
     @defer.inlineCallbacks
-    def create_room(self, room):
+    def create_room(self, room, user):
         builder = self.event_builder_factory.new({
             "type": EventTypes.Create,
-            "sender": "",
+            "sender": user.to_string(),
             "room_id": room.to_string(),
             "content": {},
         })
