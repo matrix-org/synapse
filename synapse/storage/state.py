@@ -227,6 +227,14 @@ class StateStore(SQLBaseStore):
                     ],
                 )
 
+            txn.call_after(
+                self._state_group_cache.update,
+                self._state_group_cache.sequence,
+                key=context.state_group,
+                value=context.current_state_ids,
+                full=True,
+            )
+
         self._simple_insert_many_txn(
             txn,
             table="event_to_state_groups",
