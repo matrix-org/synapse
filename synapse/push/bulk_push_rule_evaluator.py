@@ -19,60 +19,78 @@ from twisted.internet import defer
 
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
-from synapse.api.constants import EventTypes
 from synapse.visibility import filter_events_for_clients_context
+from synapse.api.constants import EventTypes, Membership
+from synapse.util.caches.descriptors import cached
+from synapse.util.async import Linearizer
 
 
 logger = logging.getLogger(__name__)
 
 
-@defer.inlineCallbacks
-def evaluator_for_event(event, hs, store, context):
-    rules_by_user = yield store.bulk_get_push_rules_for_room(
-        event, context
-    )
-
-    # if this event is an invite event, we may need to run rules for the user
-    # who's been invited, otherwise they won't get told they've been invited
-    if event.type == 'm.room.member' and event.content['membership'] == 'invite':
-        invited_user = event.state_key
-        if invited_user and hs.is_mine_id(invited_user):
-            has_pusher = yield store.user_has_pusher(invited_user)
-            if has_pusher:
-                rules_by_user = dict(rules_by_user)
-                rules_by_user[invited_user] = yield store.get_push_rules_for_user(
-                    invited_user
-                )
-
-    defer.returnValue(BulkPushRuleEvaluator(
-        event.room_id, rules_by_user, store
-    ))
+rules_by_room = {}
 
 
 class BulkPushRuleEvaluator:
+    """Calculates the outcome of push rules for an event for all users in the
+    room at once.
     """
-    Runs push rules for all users in a room.
-    This is faster than running PushRuleEvaluator for each user because it
-    fetches all the rules for all the users in one (batched) db query
-    rather than doing multiple queries per-user. It currently uses
-    the same logic to run the actual rules, but could be optimised further
-    (see https://matrix.org/jira/browse/SYN-562)
-    """
-    def __init__(self, room_id, rules_by_user, store):
-        self.room_id = room_id
-        self.rules_by_user = rules_by_user
-        self.store = store
+
+    def __init__(self, hs):
+        self.hs = hs
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def _get_rules_for_event(self, event, context):
+        """This gets the rules for all users in the room at the time of the event,
+        as well as the push rules for the invitee if the event is an invite.
+
+        Returns:
+            dict of user_id -> push_rules
+        """
+        room_id = event.room_id
+        rules_for_room = self._get_rules_for_room(room_id)
+
+        rules_by_user = yield rules_for_room.get_rules(context)
+
+        # if this event is an invite event, we may need to run rules for the user
+        # who's been invited, otherwise they won't get told they've been invited
+        if event.type == 'm.room.member' and event.content['membership'] == 'invite':
+            invited = event.state_key
+            if invited and self.hs.is_mine_id(invited):
+                has_pusher = yield self.store.user_has_pusher(invited)
+                if has_pusher:
+                    rules_by_user = dict(rules_by_user)
+                    rules_by_user[invited] = yield self.store.get_push_rules_for_user(
+                        invited
+                    )
+
+        defer.returnValue(rules_by_user)
+
+    @cached(max_entries=10000)
+    def _get_rules_for_room(self, room_id):
+        """Get the current RulesForRoom object for the given room id
+
+        Returns:
+            RulesForRoom
+        """
+        return RulesForRoom(self.hs, room_id, self._get_rules_for_room.cache)
 
     @defer.inlineCallbacks
     def action_for_event_by_user(self, event, context):
+        """Given an event and context, evaluate the push rules and return
+        the results
+
+        Returns:
+            dict of user_id -> action
+        """
+        rules_by_user = yield self._get_rules_for_event(event, context)
         actions_by_user = {}
 
         # None of these users can be peeking since this list of users comes
         # from the set of users in the room, so we know for sure they're all
         # actually in the room.
-        user_tuples = [
-            (u, False) for u in self.rules_by_user.keys()
-        ]
+        user_tuples = [(u, False) for u in rules_by_user]
 
         filtered_by_user = yield filter_events_for_clients_context(
             self.store, user_tuples, [event], {event.event_id: context}
@@ -86,7 +104,7 @@ class BulkPushRuleEvaluator:
 
         condition_cache = {}
 
-        for uid, rules in self.rules_by_user.items():
+        for uid, rules in rules_by_user.iteritems():
             display_name = None
             profile_info = room_members.get(uid)
             if profile_info:
@@ -138,3 +156,190 @@ def _condition_checker(evaluator, conditions, uid, display_name, cache):
             return False
 
     return True
+
+
+class RulesForRoom(object):
+    """Caches push rules for users in a room.
+
+    This efficiently handles users joining/leaving the room by not invalidating
+    the entire cache for the room.
+    """
+
+    def __init__(self, hs, room_id, rules_for_room_cache):
+        """
+        Args:
+            hs (HomeServer)
+            room_id (str)
+            rules_for_room_cache(Cache): The cache object that caches these
+                RoomsForUser objects.
+        """
+        self.room_id = room_id
+        self.is_mine_id = hs.is_mine_id
+        self.store = hs.get_datastore()
+
+        self.linearizer = Linearizer(name="rules_for_room")
+
+        self.member_map = {}  # event_id -> (user_id, state)
+        self.rules_by_user = {}  # user_id -> rules
+
+        # The last state group we updated the caches for. If the state_group of
+        # a new event comes along, we know that we can just return the cached
+        # result.
+        # On invalidation of the rules themselves (if the user changes them),
+        # we invalidate everything and set state_group to `object()`
+        self.state_group = object()
+
+        # A sequence number to keep track of when we're allowed to update the
+        # cache. We bump the sequence number when we invalidate the cache. If
+        # the sequence number changes while we're calculating stuff we should
+        # not update the cache with it.
+        self.sequence = 0
+
+        # We need to be clever on the invalidating caches callbacks, as
+        # otherwise the invalidation callback holds a reference to the object,
+        # potentially causing it to leak.
+        # To get around this we pass a function that on invalidations looks ups
+        # the RoomsForUser entry in the cache, rather than keeping a reference
+        # to self around in the callback.
+        def invalidate_all_cb():
+            rules = rules_for_room_cache.get(room_id, update_metrics=False)
+            if rules:
+                rules.invalidate_all()
+
+        self.invalidate_all_cb = invalidate_all_cb
+
+    @defer.inlineCallbacks
+    def get_rules(self, context):
+        """Given an event context return the rules for all users who are
+        currently in the room.
+        """
+        state_group = context.state_group
+
+        with (yield self.linearizer.queue(())):
+            if state_group and self.state_group == state_group:
+                defer.returnValue(self.rules_by_user)
+
+            ret_rules_by_user = {}
+            missing_member_event_ids = {}
+            if state_group and self.state_group == context.prev_group:
+                # If we have a simple delta then we can reuse most of the previous
+                # results.
+                ret_rules_by_user = self.rules_by_user
+                current_state_ids = context.delta_ids
+            else:
+                current_state_ids = context.current_state_ids
+
+            # Loop through to see which member events we've seen and have rules
+            # for and which we need to fetch
+            for key, event_id in current_state_ids.iteritems():
+                if key[0] != EventTypes.Member:
+                    continue
+
+                res = self.member_map.get(event_id, None)
+                if res:
+                    user_id, state = res
+                    if state == Membership.JOIN:
+                        rules = self.rules_by_user.get(user_id, None)
+                        if rules:
+                            ret_rules_by_user[user_id] = rules
+                    continue
+
+                user_id = key[1]
+                if not self.is_mine_id(user_id):
+                    continue
+
+                if self.store.get_if_app_services_interested_in_user(
+                    user_id, exclusive=True
+                ):
+                    continue
+
+                # If a user has left a room we remove their push rule. If they
+                # joined then we readd it later in _update_rules_with_member_event_ids
+                ret_rules_by_user.pop(user_id, None)
+                missing_member_event_ids[user_id] = event_id
+
+            if missing_member_event_ids:
+                # If we have some memebr events we haven't seen, look them up
+                # and fetch push rules for them if appropriate.
+                yield self._update_rules_with_member_event_ids(
+                    ret_rules_by_user, missing_member_event_ids, state_group
+                )
+
+        defer.returnValue(ret_rules_by_user)
+
+    @defer.inlineCallbacks
+    def _update_rules_with_member_event_ids(self, ret_rules_by_user, member_event_ids,
+                                            state_group):
+        """Update the partially filled rules_by_user dict by fetching rules for
+        any newly joined users in the `member_event_ids` list.
+
+        Args:
+            ret_rules_by_user (dict): Partiallly filled dict of push rules. Gets
+                updated with any new rules.
+            member_event_ids (list): List of event ids for membership events that
+                have happened since the last time we filled rules_by_user
+            state_group: The state group we are currently computing push rules
+                for. Used when updating the cache.
+        """
+        sequence = self.sequence
+
+        rows = yield self.store._simple_select_many_batch(
+            table="room_memberships",
+            column="event_id",
+            iterable=member_event_ids.values(),
+            retcols=('user_id', 'membership', 'event_id'),
+            keyvalues={},
+            batch_size=500,
+            desc="_get_rules_for_member_event_ids",
+        )
+
+        members = {
+            row["event_id"]: (row["user_id"], row["membership"])
+            for row in rows
+        }
+
+        interested_in_user_ids = set(user_id for user_id, _ in members.itervalues())
+
+        if_users_with_pushers = yield self.store.get_if_users_have_pushers(
+            interested_in_user_ids,
+            on_invalidate=self.invalidate_all_cb,
+        )
+
+        user_ids = set(
+            uid for uid, have_pusher in if_users_with_pushers.iteritems() if have_pusher
+        )
+
+        users_with_receipts = yield self.store.get_users_with_read_receipts_in_room(
+            self.room_id, on_invalidate=self.invalidate_all_cb,
+        )
+
+        # any users with pushers must be ours: they have pushers
+        for uid in users_with_receipts:
+            if uid in interested_in_user_ids:
+                user_ids.add(uid)
+
+        rules_by_user = yield self.store.bulk_get_push_rules(
+            user_ids, on_invalidate=self.invalidate_all_cb,
+        )
+
+        ret_rules_by_user.update(
+            item for item in rules_by_user.iteritems() if item[0] is not None
+        )
+
+        self.update_cache(sequence, members, ret_rules_by_user, state_group)
+
+    def invalidate_all(self):
+        # Note: Don't hand this function directly to an invalidation callback
+        # as it keeps a reference to self and will stop this instance from being
+        # GC'd if it gets dropped from the rules_to_user cache. Instead use
+        # `self.invalidate_all_cb`
+        self.sequence += 1
+        self.state_group = object()
+        self.member_map = {}
+        self.rules_by_user = {}
+
+    def update_cache(self, sequence, members, rules_by_user, state_group):
+        if sequence == self.sequence:
+            self.member_map.update(members)
+            self.rules_by_user = rules_by_user
+            self.state_group = state_group
