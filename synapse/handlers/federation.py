@@ -175,14 +175,9 @@ class FederationHandler(BaseHandler):
                         # Update the set of things we've seen after trying to
                         # fetch the missing stuff
                         have_seen = yield self.store.have_events(prevs)
-
                         seen = set(have_seen.iterkeys())
-                        if prevs - seen:
-                            logger.info(
-                                "Still missing %d prev events for %s: %r...",
-                                len(prevs - seen), pdu.event_id, list(prevs - seen)[:5]
-                            )
-                        else:
+
+                        if not prevs - seen:
                             logger.info(
                                 "Found all missing prev events for %s", pdu.event_id
                             )
@@ -193,8 +188,6 @@ class FederationHandler(BaseHandler):
                         list(prevs - seen)[:5],
                     )
 
-            prevs = {e_id for e_id, _ in pdu.prev_events}
-            seen = set(have_seen.keys())
             if prevs - seen:
                 logger.info(
                     "Still missing %d events for room %r: %r...",
