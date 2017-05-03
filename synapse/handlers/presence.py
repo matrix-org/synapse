@@ -372,7 +372,6 @@ class PresenceHandler(object):
         """We've seen the user do something that indicates they're interacting
         with the app.
         """
-        return
         user_id = user.to_string()
 
         bump_active_time_counter.inc()
@@ -402,7 +401,6 @@ class PresenceHandler(object):
                 Useful for streams that are not associated with an actual
                 client that is being used by a user.
         """
-        affect_presence = False
         if affect_presence:
             curr_sync = self.user_to_num_current_syncs.get(user_id, 0)
             self.user_to_num_current_syncs[user_id] = curr_sync + 1
@@ -464,8 +462,6 @@ class PresenceHandler(object):
             syncing_user_ids(set(str)): The set of user_ids that are
                 currently syncing on that server.
         """
-        return
-
         # Grab the previous list of user_ids that were syncing on that process
         prev_syncing_user_ids = (
             self.external_process_to_current_syncs.get(process_id, set())
