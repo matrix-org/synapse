@@ -260,7 +260,7 @@ class SimpleHttpClient(object):
             errcode = jsonBody['errcode']
             error = jsonBody['error']
             return MatrixCodeMessageException(response.code, error, errcode)
-        except (ValueError, KeyError) as e:
+        except (ValueError, KeyError):
             return CodeMessageException(response.code, body)
 
     # XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
