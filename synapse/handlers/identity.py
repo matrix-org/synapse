@@ -18,7 +18,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import (
-    CodeMessageException
+    MatrixCodeMessageException, CodeMessageException
 )
 from ._base import BaseHandler
 from synapse.util.async import run_on_reactor
@@ -90,6 +90,9 @@ class IdentityHandler(BaseHandler):
                 ),
                 {'sid': creds['sid'], 'client_secret': client_secret}
             )
+        except MatrixCodeMessageException as e:
+            logger.info("getValidated3pid failed with Matrix error: %r", e)
+            raise SynapseError(e.code, e.msg, e.errcode)
         except CodeMessageException as e:
             data = json.loads(e.msg)
 
@@ -159,6 +162,9 @@ class IdentityHandler(BaseHandler):
                 params
             )
             defer.returnValue(data)
+        except MatrixCodeMessageException as e:
+            logger.info("Proxied requestToken failed with Matrix error: %r", e)
+            raise SynapseError(e.code, e.msg, e.errcode)
         except CodeMessageException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e
@@ -193,6 +199,9 @@ class IdentityHandler(BaseHandler):
                 params
             )
             defer.returnValue(data)
+        except MatrixCodeMessageException as e:
+            logger.info("Proxied requestToken failed with Matrix error: %r", e)
+            raise SynapseError(e.code, e.msg, e.errcode)
         except CodeMessageException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e
