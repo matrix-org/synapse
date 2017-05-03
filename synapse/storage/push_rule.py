@@ -188,7 +188,7 @@ class PushRuleStore(SQLBaseStore):
             user_ids, on_invalidate=cache_context.invalidate,
         )
 
-        rules_by_user = {k: v for k, v in rules_by_user.items() if v is not None}
+        rules_by_user = {k: v for k, v in rules_by_user.iteritems() if v is not None}
 
         defer.returnValue(rules_by_user)
 
@@ -398,7 +398,8 @@ class PushRuleStore(SQLBaseStore):
         with self._push_rules_stream_id_gen.get_next() as ids:
             stream_id, event_stream_ordering = ids
             yield self.runInteraction(
-                "delete_push_rule", delete_push_rule_txn, stream_id, event_stream_ordering
+                "delete_push_rule", delete_push_rule_txn, stream_id,
+                event_stream_ordering,
             )
 
     @defer.inlineCallbacks

@@ -225,7 +225,22 @@ def format_event_for_client_v2_without_room_id(d):
 
 def serialize_event(e, time_now_ms, as_client_event=True,
                     event_format=format_event_for_client_v1,
-                    token_id=None, only_event_fields=None):
+                    token_id=None, only_event_fields=None, is_invite=False):
+    """Serialize event for clients
+
+    Args:
+        e (EventBase)
+        time_now_ms (int)
+        as_client_event (bool)
+        event_format
+        token_id
+        only_event_fields
+        is_invite (bool): Whether this is an invite that is being sent to the
+            invitee
+
+    Returns:
+        dict
+    """
     # FIXME(erikj): To handle the case of presence events and the like
     if not isinstance(e, EventBase):
         return e
@@ -250,6 +265,12 @@ def serialize_event(e, time_now_ms, as_client_event=True,
             txn_id = getattr(e.internal_metadata, "txn_id", None)
             if txn_id is not None:
                 d["unsigned"]["transaction_id"] = txn_id
+
+    # If this is an invite for somebody else, then we don't care about the
+    # invite_room_state as that's meant solely for the invitee. Other clients
+    # will already have the state since they're in the room.
+    if not is_invite:
+        d["unsigned"].pop("invite_room_state", None)
 
     if as_client_event:
         d = event_format(d)

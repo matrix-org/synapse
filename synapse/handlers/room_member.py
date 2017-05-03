@@ -70,6 +70,7 @@ class RoomMemberHandler(BaseHandler):
             content["kind"] = "guest"
 
         event, context = yield msg_handler.create_event(
+            requester,
             {
                 "type": EventTypes.Member,
                 "content": content,

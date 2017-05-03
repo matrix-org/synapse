@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class DeferredTimedOutError(SynapseError):
     def __init__(self):
-        super(SynapseError, self).__init__(504, "Timed out")
+        super(DeferredTimedOutError, self).__init__(504, "Timed out")
 
 
 def unwrapFirstError(failure):

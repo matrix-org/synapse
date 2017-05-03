@@ -175,7 +175,8 @@ class MessageHandler(BaseHandler):
         defer.returnValue(chunk)
 
     @defer.inlineCallbacks
-    def create_event(self, event_dict, token_id=None, txn_id=None, prev_event_ids=None):
+    def create_event(self, requester, event_dict, token_id=None, txn_id=None,
+                     prev_event_ids=None):
         """
         Given a dict from a client, create a new event.
 
@@ -185,6 +186,7 @@ class MessageHandler(BaseHandler):
         Adds display names to Join membership events.
 
         Args:
+            requester
             event_dict (dict): An entire event
             token_id (str)
             txn_id (str)
@@ -226,6 +228,7 @@ class MessageHandler(BaseHandler):
 
             event, context = yield self._create_new_client_event(
                 builder=builder,
+                requester=requester,
                 prev_event_ids=prev_event_ids,
             )
 
@@ -319,6 +322,7 @@ class MessageHandler(BaseHandler):
         See self.create_event and self.send_nonmember_event.
         """
         event, context = yield self.create_event(
+            requester,
             event_dict,
             token_id=requester.access_token_id,
             txn_id=txn_id
@@ -416,7 +420,7 @@ class MessageHandler(BaseHandler):
 
     @measure_func("_create_new_client_event")
     @defer.inlineCallbacks
-    def _create_new_client_event(self, builder, prev_event_ids=None):
+    def _create_new_client_event(self, builder, requester=None, prev_event_ids=None):
         if prev_event_ids:
             prev_events = yield self.store.add_event_hashes(prev_event_ids)
             prev_max_depth = yield self.store.get_max_depth_of_events(prev_event_ids)
@@ -456,6 +460,8 @@ class MessageHandler(BaseHandler):
         state_handler = self.state_handler
 
         context = yield state_handler.compute_event_context(builder)
+        if requester:
+            context.app_service = requester.app_service
 
         if builder.is_state():
             builder.prev_state = yield self.store.add_event_hashes(
@@ -531,9 +537,9 @@ class MessageHandler(BaseHandler):
 
                 state_to_include_ids = [
                     e_id
-                    for k, e_id in context.current_state_ids.items()
+                    for k, e_id in context.current_state_ids.iteritems()
                     if k[0] in self.hs.config.room_invite_state_types
-                    or k[0] == EventTypes.Member and k[1] == event.sender
+                    or k == (EventTypes.Member, event.sender)
                 ]
 
                 state_to_include = yield self.store.get_events(state_to_include_ids)
@@ -545,7 +551,7 @@ class MessageHandler(BaseHandler):
                         "content": e.content,
                         "sender": e.sender,
                     }
-                    for e in state_to_include.values()
+                    for e in state_to_include.itervalues()
                 ]
 
                 invitee = UserID.from_string(event.state_key)
@@ -618,6 +624,3 @@ class MessageHandler(BaseHandler):
             )
 
         preserve_fn(_notify)()
-
-        # If invite, remove room_state from unsigned before sending.
-        event.unsigned.pop("invite_room_state", None)
