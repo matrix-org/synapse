@@ -129,11 +129,16 @@ class UsernameAvailabilityRestServlet(RestServlet):
         self.registration_handler = hs.get_handlers().registration_handler
         self.ratelimiter = FederationRateLimiter(
             hs.get_clock(),
-            window_size=2000, # Time window of 2s
-            sleep_limit=1, # Artificially delay requests if rate > sleep_limit/window_size
-            sleep_msec=1000, # Amount of artificial delay to apply
-            reject_limit=1, # Error with 429 if more than reject_limit requests are queued
-            concurrent_requests=1, # Allow 1 request at a time
+            # Time window of 2s
+            window_size=2000,
+            # Artificially delay requests if rate > sleep_limit/window_size
+            sleep_limit=1,
+            # Amount of artificial delay to apply
+            sleep_msec=1000,
+            # Error with 429 if more than reject_limit requests are queued
+            reject_limit=1,
+            # Allow 1 request at a time
+            concurrent_requests=1,
         )
 
     @defer.inlineCallbacks
