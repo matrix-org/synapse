@@ -164,6 +164,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
         else:
             msg_handler = self.handlers.message_handler
             event, context = yield msg_handler.create_event(
+                requester,
                 event_dict,
                 token_id=requester.access_token_id,
                 txn_id=txn_id,
