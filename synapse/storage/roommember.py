@@ -18,6 +18,7 @@ from twisted.internet import defer
 from collections import namedtuple
 
 from ._base import SQLBaseStore
+from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.util.stringutils import to_ascii
 
@@ -516,7 +517,7 @@ class RoomMemberStore(SQLBaseStore):
 
                 event = yield self.get_event(event_id, allow_none=True)
                 if event and event.content["membership"] == Membership.JOIN:
-                    joined_hosts.add(host)
+                    joined_hosts.add(intern_string(host))
 
         defer.returnValue(joined_hosts)
 
