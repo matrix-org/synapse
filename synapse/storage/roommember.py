@@ -417,6 +417,9 @@ class RoomMemberStore(SQLBaseStore):
             if key[0] == EventTypes.Member
         ]
 
+        # We check if we have any of the member event ids in the event cache
+        # before we ask the DB
+
         event_map = self._get_events_from_cache(
             member_event_ids,
             allow_rejected=False,
