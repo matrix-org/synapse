@@ -494,7 +494,7 @@ class RoomMemberStore(SQLBaseStore):
             room_id, state_group, state_ids
         )
 
-    @cachedInlineCallbacks(num_args=3)
+    @cachedInlineCallbacks(num_args=2)
     def _get_joined_hosts(self, room_id, state_group, current_state_ids):
         # We don't use `state_group`, its there so that we can cache based
         # on it. However, its important that its never None, since two current_state's
