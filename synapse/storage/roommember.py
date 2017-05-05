@@ -427,8 +427,9 @@ class RoomMemberStore(SQLBaseStore):
 
         missing_member_event_ids = []
         users_in_room = {}
-        for event_id, ev_entry in event_map.iteritems():
-            if event_id:
+        for event_id in member_event_ids:
+            ev_entry = event_map.get(event_id)
+            if ev_entry:
                 if ev_entry.event.membership == Membership.JOIN:
                     users_in_room[to_ascii(ev_entry.event.state_key)] = ProfileInfo(
                         display_name=to_ascii(
@@ -445,7 +446,7 @@ class RoomMemberStore(SQLBaseStore):
             rows = yield self._simple_select_many_batch(
                 table="room_memberships",
                 column="event_id",
-                iterable=member_event_ids,
+                iterable=missing_member_event_ids,
                 retcols=('user_id', 'display_name', 'avatar_url',),
                 keyvalues={
                     "membership": Membership.JOIN,
