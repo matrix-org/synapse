@@ -372,6 +372,7 @@ class InitialSyncHandler(BaseHandler):
 
         @defer.inlineCallbacks
         def get_presence():
+            defer.returnValue([])
             states = yield presence_handler.get_states(
                 [m.user_id for m in room_members],
                 as_event=True,
