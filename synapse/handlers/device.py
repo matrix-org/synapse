@@ -426,6 +426,8 @@ class DeviceListEduUpdater(object):
                 # This can happen since we batch updates
                 return
 
+            # Given a list of updates we check if we need to resync. This
+            # happens if we've missed updates.
             resync = yield self._need_to_do_resync(user_id, pending_updates)
 
             if resync:
@@ -434,6 +436,8 @@ class DeviceListEduUpdater(object):
                 try:
                     result = yield self.federation.query_user_devices(origin, user_id)
                 except NotRetryingDestination:
+                    # TODO: Remember that we are now out of sync and try again
+                    # later
                     logger.warn(
                         "Failed to handle device list update for %s,"
                         " we're not retrying the remote",
@@ -441,6 +445,8 @@ class DeviceListEduUpdater(object):
                     )
                     return
                 except Exception:
+                    # TODO: Remember that we are now out of sync and try again
+                    # later
                     logger.exception(
                         "Failed to handle device list update for %s", user_id
                     )
