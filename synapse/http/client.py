@@ -72,6 +72,7 @@ class SimpleHttpClient(object):
             contextFactory=hs.get_http_client_context_factory()
         )
         self.user_agent = hs.version_string
+        self.clock = hs.get_clock()
         if hs.config.user_agent_suffix:
             self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix,)
 
