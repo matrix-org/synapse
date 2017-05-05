@@ -24,6 +24,7 @@ from synapse.http.servlet import (
 )
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.versionstring import get_version_string
+from synapse.util.logcontext import preserve_fn
 from synapse.types import ThirdPartyInstanceID
 
 import functools
@@ -143,7 +144,8 @@ class Authenticator(object):
         # alive
         retry_timings = yield self.store.get_destination_retry_timings(origin)
         if retry_timings and retry_timings["retry_last_ts"]:
-            self.store.set_destination_retry_timings(origin, 0, 0)
+            logger.info("Marking origin %r as up", origin)
+            preserve_fn(self.store.set_destination_retry_timings)(origin, 0, 0)
 
         defer.returnValue(origin)
 
