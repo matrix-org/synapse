@@ -984,11 +984,13 @@ class RoomInitialSyncTestCase(RestTestCase):
 
         self.assertTrue("presence" in response)
 
-        presence_by_user = {
-            e["content"]["user_id"]: e for e in response["presence"]
-        }
-        self.assertTrue(self.user_id in presence_by_user)
-        self.assertEquals("m.presence", presence_by_user[self.user_id]["type"])
+        # presence is turned off on hotfixes
+
+        # presence_by_user = {
+        #     e["content"]["user_id"]: e for e in response["presence"]
+        # }
+        # self.assertTrue(self.user_id in presence_by_user)
+        # self.assertEquals("m.presence", presence_by_user[self.user_id]["type"])
 
 
 class RoomMessageListTestCase(RestTestCase):
