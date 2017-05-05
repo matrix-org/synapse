@@ -19,6 +19,7 @@ from synapse.api.errors import (
     CodeMessageException, MatrixCodeMessageException, SynapseError, Codes,
 )
 from synapse.util.logcontext import preserve_context_over_fn
+from synapse.util import logcontext
 import synapse.metrics
 from synapse.http.endpoint import SpiderEndpoint
 
@@ -82,7 +83,6 @@ class SimpleHttpClient(object):
         # counters to it
         outgoing_requests_counter.inc(method)
 
-
         def send_request():
             request_deferred = self.agent.request(
                 method, uri, *args, **kwargs
@@ -104,7 +104,7 @@ class SimpleHttpClient(object):
                 "Received response to  %s %s: %s",
                 method, uri, response.code
             )
-            return response
+            defer.returnValue(response)
         except Exception as e:
             incoming_responses_counter.inc(method, "ERR")
             logger.info(
