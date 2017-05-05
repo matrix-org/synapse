@@ -443,6 +443,12 @@ class DeviceListEduUpdater(object):
                         " we're not retrying the remote",
                         user_id,
                     )
+                    # We abort on exceptions rather than accepting the update
+                    # as otherwise synapse will 'forget' that its device list
+                    # is out of date. If we bail then we will retry the resync
+                    # next time we get a device list update for this user_id.
+                    # This makes it more likely that the device lists will
+                    # eventually become consistent.
                     return
                 except Exception:
                     # TODO: Remember that we are now out of sync and try again
