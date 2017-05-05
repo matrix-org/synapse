@@ -75,36 +75,42 @@ class SimpleHttpClient(object):
         if hs.config.user_agent_suffix:
             self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix,)
 
+    @defer.inlineCallbacks
     def request(self, method, uri, *args, **kwargs):
         # A small wrapper around self.agent.request() so we can easily attach
         # counters to it
         outgoing_requests_counter.inc(method)
-        d = preserve_context_over_fn(
-            self.agent.request,
-            method, uri, *args, **kwargs
-        )
+
+
+        def send_request():
+            request_deferred = self.agent.request(
+                method, uri, *args, **kwargs
+            )
+
+            return self.clock.time_bound_deferred(
+                request_deferred,
+                time_out=60,
+            )
 
         logger.info("Sending request %s %s", method, uri)
 
-        def _cb(response):
+        try:
+            with logcontext.PreserveLoggingContext():
+                response = yield send_request()
+
             incoming_responses_counter.inc(method, response.code)
             logger.info(
                 "Received response to  %s %s: %s",
                 method, uri, response.code
             )
             return response
-
-        def _eb(failure):
+        except Exception as e:
             incoming_responses_counter.inc(method, "ERR")
             logger.info(
                 "Error sending request to  %s %s: %s %s",
-                method, uri, failure.type, failure.getErrorMessage()
+                method, uri, type(e).__name__, e.message
             )
-            return failure
-
-        d.addCallbacks(_cb, _eb)
-
-        return d
+            raise e
 
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, uri, args={}):
