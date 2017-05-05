@@ -148,7 +148,7 @@ class RoomMemberStore(SQLBaseStore):
         hosts = frozenset(get_domain_from_id(user_id) for user_id in user_ids)
         defer.returnValue(hosts)
 
-    @cached(max_entries=500000, iterable=True)
+    @cached(max_entries=100000, iterable=True)
     def get_users_in_room(self, room_id):
         def f(txn):
             sql = (
@@ -161,7 +161,7 @@ class RoomMemberStore(SQLBaseStore):
             )
 
             txn.execute(sql, (room_id, Membership.JOIN,))
-            return [r[0] for r in txn]
+            return [to_ascii(r[0]) for r in txn]
         return self.runInteraction("get_users_in_room", f)
 
     @cached()
