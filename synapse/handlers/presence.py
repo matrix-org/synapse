@@ -391,6 +391,7 @@ class PresenceHandler(object):
         """We've seen the user do something that indicates they're interacting
         with the app.
         """
+        return
         user_id = user.to_string()
 
         bump_active_time_counter.inc()
@@ -420,6 +421,7 @@ class PresenceHandler(object):
                 Useful for streams that are not associated with an actual
                 client that is being used by a user.
         """
+        affect_presence = False
         if affect_presence:
             curr_sync = self.user_to_num_current_syncs.get(user_id, 0)
             self.user_to_num_current_syncs[user_id] = curr_sync + 1
@@ -465,6 +467,7 @@ class PresenceHandler(object):
         Returns:
             set(str): A set of user_id strings.
         """
+        return set()
         syncing_user_ids = {
             user_id for user_id, count in self.user_to_num_current_syncs.items()
             if count
