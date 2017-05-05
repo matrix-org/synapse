@@ -24,7 +24,6 @@ from synapse.util.async import run_on_reactor
 from synapse.util.logcontext import preserve_context_over_fn, preserve_fn
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
 from synapse.util.metrics import measure_func
-from synapse.types import get_domain_from_id
 from synapse.handlers.presence import format_user_presence_state, get_interested_remotes
 import synapse.metrics
 
@@ -183,15 +182,12 @@ class TransactionQueue(object):
                     # Otherwise if the last member on a server in a room is
                     # banned then it won't receive the event because it won't
                     # be in the room after the ban.
-                    users_in_room = yield self.state.get_current_user_in_room(
+                    destinations = yield self.state.get_current_hosts_in_room(
                         event.room_id, latest_event_ids=[
                             prev_id for prev_id, _ in event.prev_events
                         ],
                     )
 
-                    destinations = set(
-                        get_domain_from_id(user_id) for user_id in users_in_room
-                    )
                     if send_on_behalf_of is not None:
                         # If we are sending the event on behalf of another server
                         # then it already has the event and there is no reason to

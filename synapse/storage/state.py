@@ -227,18 +227,6 @@ class StateStore(SQLBaseStore):
                     ],
                 )
 
-            # Prefill the state group cache with this group.
-            # It's fine to use the sequence like this as the state group map
-            # is immutable. (If the map wasn't immutable then this prefill could
-            # race with another update)
-            txn.call_after(
-                self._state_group_cache.update,
-                self._state_group_cache.sequence,
-                key=context.state_group,
-                value=context.current_state_ids,
-                full=True,
-            )
-
         self._simple_insert_many_txn(
             txn,
             table="event_to_state_groups",

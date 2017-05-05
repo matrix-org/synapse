@@ -16,7 +16,7 @@ from OpenSSL import SSL
 from OpenSSL.SSL import VERIFY_NONE
 
 from synapse.api.errors import (
-    CodeMessageException, SynapseError, Codes,
+    CodeMessageException, MatrixCodeMessageException, SynapseError, Codes,
 )
 from synapse.util.logcontext import preserve_context_over_fn
 import synapse.metrics
@@ -145,6 +145,11 @@ class SimpleHttpClient(object):
 
         body = yield preserve_context_over_fn(readBody, response)
 
+        if 200 <= response.code < 300:
+            defer.returnValue(json.loads(body))
+        else:
+            raise self._exceptionFromFailedRequest(response, body)
+
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
@@ -164,8 +169,11 @@ class SimpleHttpClient(object):
             On a non-2xx HTTP response. The response body will be used as the
             error message.
         """
-        body = yield self.get_raw(uri, args)
-        defer.returnValue(json.loads(body))
+        try:
+            body = yield self.get_raw(uri, args)
+            defer.returnValue(json.loads(body))
+        except CodeMessageException as e:
+            raise self._exceptionFromFailedRequest(e.code, e.msg)
 
     @defer.inlineCallbacks
     def put_json(self, uri, json_body, args={}):
@@ -245,6 +253,15 @@ class SimpleHttpClient(object):
             defer.returnValue(body)
         else:
             raise CodeMessageException(response.code, body)
+
+    def _exceptionFromFailedRequest(self, response, body):
+        try:
+            jsonBody = json.loads(body)
+            errcode = jsonBody['errcode']
+            error = jsonBody['error']
+            return MatrixCodeMessageException(response.code, error, errcode)
+        except (ValueError, KeyError):
+            return CodeMessageException(response.code, body)
 
     # XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
     # The two should be factored out.
