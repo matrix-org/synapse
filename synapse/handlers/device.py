@@ -17,6 +17,7 @@ from synapse.api.constants import EventTypes
 from synapse.util import stringutils
 from synapse.util.async import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.metrics import measure_func
 from synapse.types import get_domain_from_id, RoomStreamToken
 from twisted.internet import defer
@@ -430,7 +431,21 @@ class DeviceListEduUpdater(object):
             if resync:
                 # Fetch all devices for the user.
                 origin = get_domain_from_id(user_id)
-                result = yield self.federation.query_user_devices(origin, user_id)
+                try:
+                    result = yield self.federation.query_user_devices(origin, user_id)
+                except NotRetryingDestination:
+                    logger.warn(
+                        "Failed to handle device list update for %s,"
+                        " we're not retrying the remote",
+                        user_id,
+                    )
+                    return
+                except Exception:
+                    logger.exception(
+                        "Failed to handle device list update for %s", user_id
+                    )
+                    return
+
                 stream_id = result["stream_id"]
                 devices = result["devices"]
                 yield self.store.update_remote_device_list_cache(
