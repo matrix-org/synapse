@@ -144,6 +144,9 @@ class SlavedEventStore(BaseSlavedStore):
         RoomMemberStore.__dict__["_get_joined_users_from_context"]
     )
 
+    get_joined_hosts = DataStore.get_joined_hosts.__func__
+    _get_joined_hosts = RoomMemberStore.__dict__["_get_joined_hosts"]
+
     get_recent_events_for_room = DataStore.get_recent_events_for_room.__func__
     get_room_events_stream_for_rooms = (
         DataStore.get_room_events_stream_for_rooms.__func__
