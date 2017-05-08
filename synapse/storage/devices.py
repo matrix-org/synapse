@@ -106,6 +106,7 @@ class DeviceStore(SQLBaseStore):
             desc="get_device",
         )
 
+    @defer.inlineCallbacks
     def delete_device(self, user_id, device_id):
         """Delete a device.
 
@@ -115,7 +116,7 @@ class DeviceStore(SQLBaseStore):
         Returns:
             defer.Deferred
         """
-        self._simple_delete_one(
+        yield self._simple_delete_one(
             table="devices",
             keyvalues={"user_id": user_id, "device_id": device_id},
             desc="delete_device",
@@ -123,6 +124,7 @@ class DeviceStore(SQLBaseStore):
 
         self.device_id_exists_cache.invalidate((user_id, device_id))
 
+    @defer.inlineCallbacks
     def delete_devices(self, user_id, device_ids):
         """Deletes several devices.
 
@@ -132,7 +134,7 @@ class DeviceStore(SQLBaseStore):
         Returns:
             defer.Deferred
         """
-        self._simple_delete_many(
+        yield self._simple_delete_many(
             table="devices",
             column="device_id",
             iterable=device_ids,
