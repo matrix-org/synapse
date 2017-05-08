@@ -1343,11 +1343,20 @@ class EventsStore(SQLBaseStore):
     def _invalidate_get_event_cache(self, event_id):
             self._get_event_cache.invalidate((event_id,))
 
-    def _get_events_from_cache(self, events, allow_rejected):
+    def _get_events_from_cache(self, events, allow_rejected, update_metrics=True):
+        """
+        Args:
+            events (list(str)): list of event_ids to fetch
+            allow_rejected (bool): Whether to teturn events that were rejected
+            update_metrics (bool): Whether to update the cache hit ratio metrics
+        """
         event_map = {}
 
         for event_id in events:
-            ret = self._get_event_cache.get((event_id,), None)
+            ret = self._get_event_cache.get(
+                (event_id,), None,
+                update_metrics=update_metrics,
+            )
             if not ret:
                 continue
 
