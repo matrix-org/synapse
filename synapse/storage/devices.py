@@ -29,6 +29,8 @@ class DeviceStore(SQLBaseStore):
     def __init__(self, hs):
         super(DeviceStore, self).__init__(hs)
 
+        # Map of (user_id, device_id) -> bool. If there is an entry that implies
+        # the device exists.
         self.device_id_exists_cache = Cache(
             name="device_id_exists",
             keylen=2,
