@@ -1,3 +1,16 @@
+Changes in synapse v0.21.0-rc2 (2017-05-08)
+===========================================
+
+Changes:
+
+* Always mark remotes as up if we receive a signed request from them (PR #2190)
+
+
+Bug fixes:
+
+* Fix bug where users got pushed for rooms they had muted (PR #2200)
+
+
 Changes in synapse v0.21.0-rc1 (2017-05-08)
 ===========================================
 
