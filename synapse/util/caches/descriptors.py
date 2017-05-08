@@ -96,7 +96,7 @@ class Cache(object):
                     "Cache objects can only be accessed from the main thread"
                 )
 
-    def get(self, key, default=_CacheSentinel, callback=None):
+    def get(self, key, default=_CacheSentinel, callback=None, update_metrics=True):
         """Looks the key up in the caches.
 
         Args:
@@ -104,6 +104,7 @@ class Cache(object):
             default: What is returned if key is not in the caches. If not
                 specified then function throws KeyError instead
             callback(fn): Gets called when the entry in the cache is invalidated
+            update_metrics (bool): whether to update the cache hit rate metrics
 
         Returns:
             Either a Deferred or the raw result
@@ -113,7 +114,8 @@ class Cache(object):
         if val is not _CacheSentinel:
             if val.sequence == self.sequence:
                 val.callbacks.update(callbacks)
-                self.metrics.inc_hits()
+                if update_metrics:
+                    self.metrics.inc_hits()
                 return val.deferred
 
         val = self.cache.get(key, _CacheSentinel, callbacks=callbacks)
@@ -121,7 +123,8 @@ class Cache(object):
             self.metrics.inc_hits()
             return val
 
-        self.metrics.inc_misses()
+        if update_metrics:
+            self.metrics.inc_misses()
 
         if default is _CacheSentinel:
             raise KeyError()
