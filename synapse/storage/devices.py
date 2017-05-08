@@ -18,7 +18,7 @@ import ujson as json
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
-from ._base import SQLBaseStore
+from ._base import SQLBaseStore, Cache
 from synapse.util.caches.descriptors import cached, cachedList, cachedInlineCallbacks
 
 
@@ -28,6 +28,14 @@ logger = logging.getLogger(__name__)
 class DeviceStore(SQLBaseStore):
     def __init__(self, hs):
         super(DeviceStore, self).__init__(hs)
+
+        # Map of (user_id, device_id) -> bool. If there is an entry that implies
+        # the device exists.
+        self.device_id_exists_cache = Cache(
+            name="device_id_exists",
+            keylen=2,
+            max_entries=10000,
+        )
 
         self._clock.looping_call(
             self._prune_old_outbound_device_pokes, 60 * 60 * 1000
@@ -54,6 +62,10 @@ class DeviceStore(SQLBaseStore):
             defer.Deferred: boolean whether the device was inserted or an
                 existing device existed with that ID.
         """
+        key = (user_id, device_id)
+        if self.device_id_exists_cache.get(key, None):
+            defer.returnValue(False)
+
         try:
             inserted = yield self._simple_insert(
                 "devices",
@@ -65,6 +77,7 @@ class DeviceStore(SQLBaseStore):
                 desc="store_device",
                 or_ignore=True,
             )
+            self.device_id_exists_cache.prefill(key, True)
             defer.returnValue(inserted)
         except Exception as e:
             logger.error("store_device with device_id=%s(%r) user_id=%s(%r)"
@@ -93,6 +106,7 @@ class DeviceStore(SQLBaseStore):
             desc="get_device",
         )
 
+    @defer.inlineCallbacks
     def delete_device(self, user_id, device_id):
         """Delete a device.
 
@@ -102,12 +116,15 @@ class DeviceStore(SQLBaseStore):
         Returns:
             defer.Deferred
         """
-        return self._simple_delete_one(
+        yield self._simple_delete_one(
             table="devices",
             keyvalues={"user_id": user_id, "device_id": device_id},
             desc="delete_device",
         )
 
+        self.device_id_exists_cache.invalidate((user_id, device_id))
+
+    @defer.inlineCallbacks
     def delete_devices(self, user_id, device_ids):
         """Deletes several devices.
 
@@ -117,13 +134,15 @@ class DeviceStore(SQLBaseStore):
         Returns:
             defer.Deferred
         """
-        return self._simple_delete_many(
+        yield self._simple_delete_many(
             table="devices",
             column="device_id",
             iterable=device_ids,
             keyvalues={"user_id": user_id},
             desc="delete_devices",
         )
+        for device_id in device_ids:
+            self.device_id_exists_cache.invalidate((user_id, device_id))
 
     def update_device(self, user_id, device_id, new_display_name=None):
         """Update a device.
