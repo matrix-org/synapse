@@ -15,6 +15,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
+from synapse.util.caches.descriptors import cached
 
 from canonicaljson import encode_canonical_json
 import ujson as json
@@ -177,10 +178,14 @@ class EndToEndKeyStore(SQLBaseStore):
                     for algorithm, key_id, json_bytes in new_keys
                 ],
             )
+            txn.call_after(
+                self.count_e2e_one_time_keys.invalidate, (user_id, device_id,)
+            )
         yield self.runInteraction(
             "add_e2e_one_time_keys_insert", _add_e2e_one_time_keys
         )
 
+    @cached(max_entries=10000)
     def count_e2e_one_time_keys(self, user_id, device_id):
         """ Count the number of one time keys the server has for a device
         Returns:
@@ -225,6 +230,9 @@ class EndToEndKeyStore(SQLBaseStore):
             )
             for user_id, device_id, algorithm, key_id in delete:
                 txn.execute(sql, (user_id, device_id, algorithm, key_id))
+                txn.call_after(
+                    self.count_e2e_one_time_keys.invalidate, (user_id, device_id,)
+                )
             return result
         return self.runInteraction(
             "claim_e2e_one_time_keys", _claim_e2e_one_time_keys
@@ -242,3 +250,4 @@ class EndToEndKeyStore(SQLBaseStore):
             keyvalues={"user_id": user_id, "device_id": device_id},
             desc="delete_e2e_one_time_keys_by_device"
         )
+        self.count_e2e_one_time_keys.invalidate((user_id, device_id,))
