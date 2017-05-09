@@ -142,3 +142,37 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             self.fail("No error when replacing dict key")
         except errors.SynapseError:
             pass
+
+    @unittest.DEBUG
+    @defer.inlineCallbacks
+    def test_claim_one_time_key(self):
+        local_user = "@boris:" + self.hs.hostname
+        device_id = "xyz"
+        keys = {
+            "alg1:k1": "key1",
+        }
+
+        res = yield self.handler.upload_keys_for_user(
+            local_user, device_id, {"one_time_keys": keys},
+        )
+        self.assertDictEqual(res, {
+            "one_time_key_counts": {"alg1": 1}
+        })
+
+        res2 = yield self.handler.claim_one_time_keys({
+            "one_time_keys": {
+                local_user: {
+                    device_id: "alg1"
+                }
+            }
+        }, timeout=None)
+        self.assertEqual(res2, {
+            "failures": {},
+            "one_time_keys": {
+                local_user: {
+                    device_id: {
+                        "alg1:k1": "key1"
+                    }
+                }
+            }
+        })
