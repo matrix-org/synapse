@@ -21,7 +21,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, CodeMessageException
 from synapse.types import get_domain_from_id
-from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
+from synapse.util.logcontext import preserve_fn, make_deferred_yieldable
 from synapse.util.retryutils import NotRetryingDestination
 
 logger = logging.getLogger(__name__)
@@ -145,7 +145,7 @@ class E2eKeysHandler(object):
                     "status": 503, "message": e.message
                 }
 
-        yield preserve_context_over_deferred(defer.gatherResults([
+        yield make_deferred_yieldable(defer.gatherResults([
             preserve_fn(do_remote_query)(destination)
             for destination in remote_queries_not_in_cache
         ]))
@@ -257,7 +257,7 @@ class E2eKeysHandler(object):
                     "status": 503, "message": e.message
                 }
 
-        yield preserve_context_over_deferred(defer.gatherResults([
+        yield make_deferred_yieldable(defer.gatherResults([
             preserve_fn(claim_client_keys)(destination)
             for destination in remote_queries
         ]))
