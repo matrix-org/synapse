@@ -54,6 +54,13 @@ class RegistrationHandler(BaseHandler):
                 Codes.INVALID_USERNAME
             )
 
+        if len(localpart) == 0:
+            raise SynapseError(
+                400,
+                "User ID cannot be empty",
+                Codes.INVALID_USERNAME
+            )
+
         if localpart[0] == '_':
             raise SynapseError(
                 400,
