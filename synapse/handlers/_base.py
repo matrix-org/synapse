@@ -53,7 +53,20 @@ class BaseHandler(object):
 
         self.event_builder_factory = hs.get_event_builder_factory()
 
-    def ratelimit(self, requester):
+    @defer.inlineCallbacks
+    def ratelimit(self, requester, update=True):
+        """Ratelimits requests.
+
+        Args:
+            requester (Requester)
+            update (bool): Whether to record that a request is being processed.
+                Set to False when doing multiple checks for one request (e.g.
+                to check up front if we would reject the request), and set to
+                True for the last call for a given request.
+
+        Raises:
+            LimitExceededError if the request should be ratelimited
+        """
         time_now = self.clock.time()
         user_id = requester.user.to_string()
 
@@ -67,10 +80,25 @@ class BaseHandler(object):
         if requester.app_service and not requester.app_service.is_rate_limited():
             return
 
+        # Check if there is a per user override in the DB.
+        override = yield self.store.get_ratelimit_for_user(user_id)
+        if override:
+            # If overriden with a null Hz then ratelimiting has been entirely
+            # disabled for the user
+            if not override.messages_per_second:
+                return
+
+            messages_per_second = override.messages_per_second
+            burst_count = override.burst_count
+        else:
+            messages_per_second = self.hs.config.rc_messages_per_second
+            burst_count = self.hs.config.rc_message_burst_count
+
         allowed, time_allowed = self.ratelimiter.send_message(
             user_id, time_now,
-            msg_rate_hz=self.hs.config.rc_messages_per_second,
-            burst_count=self.hs.config.rc_message_burst_count,
+            msg_rate_hz=messages_per_second,
+            burst_count=burst_count,
+            update=update,
         )
         if not allowed:
             raise LimitExceededError(
