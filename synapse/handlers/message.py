@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, SynapseError, LimitExceededError
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
@@ -254,17 +254,7 @@ class MessageHandler(BaseHandler):
         # We check here if we are currently being rate limited, so that we
         # don't do unnecessary work. We check again just before we actually
         # send the event.
-        time_now = self.clock.time()
-        allowed, time_allowed = self.ratelimiter.send_message(
-            event.sender, time_now,
-            msg_rate_hz=self.hs.config.rc_messages_per_second,
-            burst_count=self.hs.config.rc_message_burst_count,
-            update=False,
-        )
-        if not allowed:
-            raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now)),
-            )
+        yield self.ratelimit(requester, update=False)
 
         user = UserID.from_string(event.sender)
 
@@ -499,7 +489,7 @@ class MessageHandler(BaseHandler):
         # We now need to go and hit out to wherever we need to hit out to.
 
         if ratelimit:
-            self.ratelimit(requester)
+            yield self.ratelimit(requester)
 
         try:
             yield self.auth.check_from_context(event, context)

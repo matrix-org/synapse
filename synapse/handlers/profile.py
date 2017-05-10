@@ -156,7 +156,7 @@ class ProfileHandler(BaseHandler):
         if not self.hs.is_mine(user):
             return
 
-        self.ratelimit(requester)
+        yield self.ratelimit(requester)
 
         room_ids = yield self.store.get_rooms_for_user(
             user.to_string(),
