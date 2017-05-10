@@ -2033,6 +2033,8 @@ class EventsStore(SQLBaseStore):
         for event_id, state_key in event_rows:
             txn.call_after(self._get_state_group_for_event.invalidate, (event_id,))
 
+        logger.debug("[purge] Finding new backward extremities")
+
         # We calculate the new entries for the backward extremeties by finding
         # all events that point to events that are to be purged
         txn.execute(
@@ -2044,6 +2046,8 @@ class EventsStore(SQLBaseStore):
             (room_id, topological_ordering, topological_ordering)
         )
         new_backwards_extrems = txn.fetchall()
+
+        logger.debug("[purge] replacing backward extremities: %r", new_backwards_extrems)
 
         txn.execute(
             "DELETE FROM event_backward_extremities WHERE room_id = ?",
@@ -2058,6 +2062,8 @@ class EventsStore(SQLBaseStore):
                 (room_id, event_id) for event_id, in new_backwards_extrems
             ]
         )
+
+        logger.debug("[purge] finding redundant state groups")
 
         # Get all state groups that are only referenced by events that are
         # to be deleted.
@@ -2075,6 +2081,10 @@ class EventsStore(SQLBaseStore):
 
         state_rows = txn.fetchall()
         state_groups_to_delete = [sg for sg, in state_rows]
+
+        logger.debug(
+            "[purge] finding state groups which depend on redundant state groups"
+        )
 
         # Now we get all the state groups that rely on these state groups
         new_state_edges = []
@@ -2096,6 +2106,8 @@ class EventsStore(SQLBaseStore):
         # Now we turn the state groups that reference to-be-deleted state groups
         # to non delta versions.
         for new_state_edge in new_state_edges:
+            logger.debug("[purge] de-delta-ing remaining state group %s",
+                         new_state_edge)
             curr_state = self._get_state_groups_from_groups_txn(
                 txn, [new_state_edge], types=None
             )
@@ -2132,6 +2144,7 @@ class EventsStore(SQLBaseStore):
                 ],
             )
 
+        logger.debug("[purge] removing redundant state groups")
         txn.executemany(
             "DELETE FROM state_groups_state WHERE state_group = ?",
             state_rows
@@ -2140,12 +2153,15 @@ class EventsStore(SQLBaseStore):
             "DELETE FROM state_groups WHERE id = ?",
             state_rows
         )
+
         # Delete all non-state
+        logger.debug("[purge] removing events from event_to_state_groups")
         txn.executemany(
             "DELETE FROM event_to_state_groups WHERE event_id = ?",
             [(event_id,) for event_id, _ in event_rows]
         )
 
+        logger.debug("[purge] updating room_depth")
         txn.execute(
             "UPDATE room_depth SET min_depth = ? WHERE room_id = ?",
             (topological_ordering, room_id,)
@@ -2171,16 +2187,15 @@ class EventsStore(SQLBaseStore):
             "event_signatures",
             "rejections",
         ):
+            logger.debug("[purge] removing non-state events from %s", table)
+
             txn.executemany(
                 "DELETE FROM %s WHERE event_id = ?" % (table,),
                 to_delete
             )
 
-        txn.executemany(
-            "DELETE FROM events WHERE event_id = ?",
-            to_delete
-        )
         # Mark all state and own events as outliers
+        logger.debug("[purge] marking events as outliers")
         txn.executemany(
             "UPDATE events SET outlier = ?"
             " WHERE event_id = ?",
@@ -2189,6 +2204,8 @@ class EventsStore(SQLBaseStore):
                 if state_key is not None or self.hs.is_mine_id(event_id)
             ]
         )
+
+        logger.debug("[purge] done")
 
     @defer.inlineCallbacks
     def is_event_after(self, event_id1, event_id2):
