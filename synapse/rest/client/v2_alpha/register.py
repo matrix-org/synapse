@@ -142,7 +142,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
         )
 
     @defer.inlineCallbacks
-    def on_GET(self, request):
+    def on_POST(self, request):
         ip = self.hs.get_ip_from_request(request)
         with self.ratelimiter.ratelimit(ip) as wait_deferred:
             yield wait_deferred
