@@ -2080,19 +2080,14 @@ class EventsStore(SQLBaseStore):
         )
 
         state_rows = txn.fetchall()
-        state_groups_to_delete = [sg for sg, in state_rows]
-
-        logger.debug(
-            "[purge] finding state groups which depend on redundant state groups"
-        )
+        state_groups_to_delete = set([sg for sg, in state_rows])
 
         # Now we get all the state groups that rely on these state groups
+        logger.debug("[purge] finding state groups which depend on redundant"
+                     " state groups")
         new_state_edges = []
-        chunks = [
-            state_groups_to_delete[i:i + 100]
-            for i in xrange(0, len(state_groups_to_delete), 100)
-        ]
-        for chunk in chunks:
+        for i in xrange(0, len(state_rows), 100):
+            chunk = [sg for sg, in state_rows[i:i + 100]]
             rows = self._simple_select_many_txn(
                 txn,
                 table="state_group_edges",
@@ -2101,7 +2096,10 @@ class EventsStore(SQLBaseStore):
                 retcols=["state_group"],
                 keyvalues={},
             )
-            new_state_edges.extend(row["state_group"] for row in rows)
+            new_state_edges.extend(
+                row["state_group"] for row in rows
+                if row["state_group"] not in state_groups_to_delete
+            )
 
         # Now we turn the state groups that reference to-be-deleted state groups
         # to non delta versions.
