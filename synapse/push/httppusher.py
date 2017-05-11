@@ -294,7 +294,11 @@ class HttpPusher(object):
             defer.returnValue([])
         try:
             resp = yield self.http_client.post_json_get_json(self.url, notification_dict)
-            logger.info("Sent to: %s push-notify: %r get response: %r" % (self.url, notification_dict, resp))
+            logger.info(
+                "Sent to: %s push-notify: %r get response: %r" % (
+                    self.url, notification_dict, resp
+                )
+            )
         except:
             logger.warn("Failed to push %s %r" % (self.url, notification_dict))
             defer.returnValue(False)
@@ -325,7 +329,11 @@ class HttpPusher(object):
         }
         try:
             resp = yield self.http_client.post_json_get_json(self.url, d)
-            logger.info("Sent to: %s bagde update push: %r get response: %r" % (self.url, d, resp))
+            logger.info(
+                "Sent to: %s bagde update push: %r get response: %r" % (
+                    self.url, d, resp
+                )
+            )
         except:
             logger.exception("Failed to push badge %s %r" % (self.url, d))
             defer.returnValue(False)
