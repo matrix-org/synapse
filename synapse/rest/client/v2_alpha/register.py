@@ -21,7 +21,7 @@ from synapse.api.auth import get_access_token_from_request, has_access_token
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
 from synapse.http.servlet import (
-    RestServlet, parse_json_object_from_request, assert_params_in_request
+    RestServlet, parse_json_object_from_request, assert_params_in_request, parse_string
 )
 from synapse.util.msisdn import phone_number_to_msisdn
 
@@ -142,15 +142,14 @@ class UsernameAvailabilityRestServlet(RestServlet):
         )
 
     @defer.inlineCallbacks
-    def on_POST(self, request):
+    def on_GET(self, request):
         ip = self.hs.get_ip_from_request(request)
         with self.ratelimiter.ratelimit(ip) as wait_deferred:
             yield wait_deferred
 
-            body = parse_json_object_from_request(request)
-            assert_params_in_request(body, ['username'])
+            username = parse_string(request, "username", required=True)
 
-            yield self.registration_handler.check_username(body['username'])
+            yield self.registration_handler.check_username(username)
 
             defer.returnValue((200, {"available": True}))
 
