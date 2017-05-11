@@ -52,6 +52,15 @@ class FilteringStore(SQLBaseStore):
         # INSERT a new one
         def _do_txn(txn):
             sql = (
+                "SELECT filter_id FROM user_filters "
+                "WHERE user_id = ? AND filter_json = ?"
+            )
+            txn.execute(sql, (user_localpart,def_json))
+            filter_id = txn.fetchone()[0]
+            if filter_id is not None:
+                return filter_id
+
+            sql = (
                 "SELECT MAX(filter_id) FROM user_filters "
                 "WHERE user_id = ?"
             )
