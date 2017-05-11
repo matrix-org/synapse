@@ -210,7 +210,8 @@ class BackgroundUpdateStore(SQLBaseStore):
         self._background_update_handlers[update_name] = update_handler
 
     def register_background_index_update(self, update_name, index_name,
-                                         table, columns, where_clause=None):
+                                         table, columns, where_clause=None,
+                                         unique=False):
         """Helper for store classes to do a background index addition
 
         To use:
@@ -245,9 +246,11 @@ class BackgroundUpdateStore(SQLBaseStore):
                 c.execute(sql)
 
                 sql = (
-                    "CREATE INDEX CONCURRENTLY %(name)s ON %(table)s"
+                    "CREATE %(unique)s INDEX CONCURRENTLY %(name)s"
+                    " ON %(table)s"
                     " (%(columns)s) %(where_clause)s"
                 ) % {
+                    "unique": "UNIQUE" if unique else "",
                     "name": index_name,
                     "table": table,
                     "columns": ", ".join(columns),
@@ -270,9 +273,10 @@ class BackgroundUpdateStore(SQLBaseStore):
             # down at the wrong moment - hance we use IF NOT EXISTS. (SQLite
             # has supported CREATE TABLE|INDEX IF NOT EXISTS since 3.3.0.)
             sql = (
-                "CREATE INDEX IF NOT EXISTS %(name)s ON %(table)s"
+                "CREATE %(unique)s INDEX IF NOT EXISTS %(name)s ON %(table)s"
                 " (%(columns)s)"
             ) % {
+                "unique": "UNIQUE" if unique else "",
                 "name": index_name,
                 "table": table,
                 "columns": ", ".join(columns),
