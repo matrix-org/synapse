@@ -216,6 +216,7 @@ class EventsStore(SQLBaseStore):
             table="event_search",
             columns=["event_id"],
             unique=True,
+            psql_only=True,
         )
 
         self._event_persist_queue = _EventPeristenceQueue()
