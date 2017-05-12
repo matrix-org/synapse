@@ -55,7 +55,7 @@ class FilteringStore(SQLBaseStore):
                 "SELECT filter_id FROM user_filters "
                 "WHERE user_id = ? AND filter_json = ?"
             )
-            txn.execute(sql, (user_localpart,def_json))
+            txn.execute(sql, (user_localpart, def_json))
             filter_id = txn.fetchone()[0]
             if filter_id is not None:
                 return filter_id
