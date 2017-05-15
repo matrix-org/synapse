@@ -34,6 +34,7 @@ from synapse.api.errors import SynapseError, HttpResponseException, \
 from synapse.util.async import Linearizer
 from synapse.util.stringutils import is_ascii
 from synapse.util.logcontext import preserve_context_over_fn
+from synapse.util.retryutils import NotRetryingDestination
 
 import os
 import errno
@@ -181,7 +182,8 @@ class MediaRepository(object):
                     logger.exception("Failed to fetch remote media %s/%s",
                                      server_name, media_id)
                     raise
-
+                except NotRetryingDestination:
+                    logger.warn("Not retrying destination %r", server_name)
                 except Exception:
                     logger.exception("Failed to fetch remote media %s/%s",
                                      server_name, media_id)
