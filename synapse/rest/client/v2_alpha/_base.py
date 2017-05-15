@@ -52,6 +52,9 @@ def client_v2_patterns(path_regex, releases=(0,),
 def set_timeline_upper_limit(filter_json, filter_timeline_limit):
     if filter_timeline_limit < 0:
         return  # no upper limits
-    if 'room' in filter_json and 'limit' in filter_json['room']:
-        filter_json['room']["limit"] = min(filter_json['room']["limit"],
-                                           filter_timeline_limit)
+    if 'room' in filter_json \
+            and 'timeline' in filter_json['room'] \
+            and 'limit' in filter_json['room']['timeline']:
+        filter_json['room']['timeline']["limit"] = min(
+            filter_json['room']['timeline']['limit'],
+            filter_timeline_limit)
