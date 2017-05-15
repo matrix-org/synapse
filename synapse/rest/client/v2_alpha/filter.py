@@ -20,6 +20,7 @@ from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import UserID
 
 from ._base import client_v2_patterns
+from ._base import set_timeline_upper_limit
 
 import logging
 
@@ -85,6 +86,11 @@ class CreateFilterRestServlet(RestServlet):
             raise AuthError(403, "Can only create filters for local users")
 
         content = parse_json_object_from_request(request)
+        set_timeline_upper_limit(
+            content,
+            self.hs.config.filter_timeline_limit
+        )
+
         filter_id = yield self.filtering.add_user_filter(
             user_localpart=target_user.localpart,
             user_filter=content,
