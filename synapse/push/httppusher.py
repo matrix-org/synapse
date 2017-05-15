@@ -300,7 +300,7 @@ class HttpPusher(object):
                 )
             )
         except:
-            logger.warn("Failed to push %s %r" % (self.url, notification_dict))
+            logger.debug("Failed to push %s %r" % (self.url, notification_dict))
             defer.returnValue(False)
         rejected = []
         if 'rejected' in resp:
