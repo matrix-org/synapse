@@ -56,9 +56,9 @@ class FilteringStore(SQLBaseStore):
                 "WHERE user_id = ? AND filter_json = ?"
             )
             txn.execute(sql, (user_localpart, def_json))
-            filter_id = txn.fetchone()[0]
-            if filter_id is not None:
-                return filter_id
+            filter_id_response = txn.fetchone()
+            if filter_id_response is not None:
+                return filter_id_response[0]
 
             sql = (
                 "SELECT MAX(filter_id) FROM user_filters "
