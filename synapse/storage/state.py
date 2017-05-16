@@ -235,7 +235,7 @@ class StateStore(SQLBaseStore):
                 self._state_group_cache.update,
                 self._state_group_cache.sequence,
                 key=context.state_group,
-                value=context.current_state_ids,
+                value=dict(context.current_state_ids),
                 full=True,
             )
 
