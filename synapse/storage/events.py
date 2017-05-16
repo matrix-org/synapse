@@ -387,19 +387,6 @@ class EventsStore(SQLBaseStore):
 
                     event_counter.inc(event.type, origin_type, origin_entity)
 
-                for event, context in chunk:
-                    if context.app_service:
-                        origin_type = "local"
-                        origin_entity = context.app_service.id
-                    elif self.hs.is_mine_id(event.sender):
-                        origin_type = "local"
-                        origin_entity = "*client*"
-                    else:
-                        origin_type = "remote"
-                        origin_entity = get_domain_from_id(event.sender)
-
-                    event_counter.inc(event.type, origin_type, origin_entity)
-
                 for room_id, (_, _, new_state) in current_state_for_room.iteritems():
                     self.get_current_state_ids.prefill(
                         (room_id, ), new_state
