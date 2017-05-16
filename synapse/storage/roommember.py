@@ -534,7 +534,7 @@ class RoomMemberStore(SQLBaseStore):
         assert state_group is not None
 
         joined_hosts = set()
-        for (etype, state_key), event_id in current_state_ids.items():
+        for etype, state_key in current_state_ids:
             if etype == EventTypes.Member:
                 try:
                     host = get_domain_from_id(state_key)
@@ -545,6 +545,7 @@ class RoomMemberStore(SQLBaseStore):
                 if host in joined_hosts:
                     continue
 
+                event_id = current_state_ids[(etype, state_key)]
                 event = yield self.get_event(event_id, allow_none=True)
                 if event and event.content["membership"] == Membership.JOIN:
                     joined_hosts.add(intern_string(host))
