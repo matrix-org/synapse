@@ -387,7 +387,9 @@ class RoomMemberStore(SQLBaseStore):
             state_group = object()
 
         return self._get_joined_users_from_context(
-            event.room_id, state_group, context.current_state_ids, event=event,
+            event.room_id, state_group, context.current_state_ids,
+            event=event,
+            context=context,
         )
 
     def get_joined_users_from_state(self, room_id, state_group, state_ids):
@@ -405,18 +407,33 @@ class RoomMemberStore(SQLBaseStore):
     @cachedInlineCallbacks(num_args=2, cache_context=True, iterable=True,
                            max_entries=100000)
     def _get_joined_users_from_context(self, room_id, state_group, current_state_ids,
-                                       cache_context, event=None):
+                                       cache_context, event=None, context=None):
         # We don't use `state_group`, it's there so that we can cache based
         # on it. However, it's important that it's never None, since two current_states
         # with a state_group of None are likely to be different.
         # See bulk_get_push_rules_for_room for how we work around this.
         assert state_group is not None
 
+        users_in_room = {}
         member_event_ids = [
             e_id
             for key, e_id in current_state_ids.iteritems()
             if key[0] == EventTypes.Member
         ]
+        if context is not None:
+            if context.prev_group and context.delta_ids:
+                prev_res = self._get_joined_users_from_context.cache.get(
+                    (room_id, context.prev_group), None
+                )
+                if prev_res and isinstance(prev_res, dict):
+                    users_in_room = dict(prev_res)
+                    member_event_ids = [
+                        e_id
+                        for key, e_id in context.delta_ids.iteritems()
+                        if key[0] == EventTypes.Member
+                    ]
+                    for etype, state_key in context.delta_ids:
+                        users_in_room.pop(state_key, None)
 
         # We check if we have any of the member event ids in the event cache
         # before we ask the DB
@@ -431,7 +448,6 @@ class RoomMemberStore(SQLBaseStore):
         )
 
         missing_member_event_ids = []
-        users_in_room = {}
         for event_id in member_event_ids:
             ev_entry = event_map.get(event_id)
             if ev_entry:
