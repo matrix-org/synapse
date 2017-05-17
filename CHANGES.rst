@@ -10,7 +10,8 @@ Features:
 
 Changes:
 
-* Various small performance fixes (PR #2201, #2202, #2224, #2226, #2227, #2228)
+* Various small performance fixes (PR #2201, #2202, #2224, #2226, #2227, #2228,
+  #2229)
 * Update username availability checker API (PR #2209, #2213)
 * When purging, don't de-delta state groups we're about to delete (PR #2214)
 * Documentation to check synapse version (PR #2215) Thanks to @hamber-dick!
