@@ -420,7 +420,12 @@ class RoomMemberStore(SQLBaseStore):
             for key, e_id in current_state_ids.iteritems()
             if key[0] == EventTypes.Member
         ]
+
         if context is not None:
+            # If we have a context with a delta from a previous state group,
+            # check if we also have the result from the previous group in cache.
+            # If we do then we can reuse that result and simply update it with
+            # any membership changes in `delta_ids`
             if context.prev_group and context.delta_ids:
                 prev_res = self._get_joined_users_from_context.cache.get(
                     (room_id, context.prev_group), None
