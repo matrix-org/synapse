@@ -780,12 +780,12 @@ class PresenceHandler(object):
         # don't need to send to local clients here, as that is done as part
         # of the event stream/sync.
         # TODO: Only send to servers not already in the room.
-        user_ids = yield self.store.get_users_in_room(room_id)
         if self.is_mine(user):
             state = yield self.current_state_for_user(user.to_string())
 
             self._push_to_remotes([state])
         else:
+            user_ids = yield self.store.get_users_in_room(room_id)
             user_ids = filter(self.is_mine_id, user_ids)
 
             states = yield self.current_state_for_users(user_ids)
@@ -1322,7 +1322,7 @@ def get_interested_parties(store, states):
 
 
 @defer.inlineCallbacks
-def get_interested_remotes(store, states):
+def get_interested_remotes(store, states, state_handler):
     """Given a list of presence states figure out which remote servers
     should be sent which.
 
@@ -1345,7 +1345,7 @@ def get_interested_remotes(store, states):
     room_ids_to_states, users_to_states = yield get_interested_parties(store, states)
 
     for room_id, states in room_ids_to_states.iteritems():
-        hosts = yield store.get_hosts_in_room(room_id)
+        hosts = yield state_handler.get_current_hosts_in_room(room_id)
         hosts_and_states.append((hosts, states))
 
     for user_id, states in users_to_states.iteritems():

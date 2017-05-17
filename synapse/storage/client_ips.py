@@ -33,6 +33,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         self.client_ip_last_seen = Cache(
             name="client_ip_last_seen",
             keylen=4,
+            max_entries=5000,
         )
 
         super(ClientIpStore, self).__init__(hs)

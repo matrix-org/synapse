@@ -421,9 +421,13 @@ class RoomMemberStore(SQLBaseStore):
         # We check if we have any of the member event ids in the event cache
         # before we ask the DB
 
+        # We don't update the event cache hit ratio as it completely throws off
+        # the hit ratio counts. After all, we don't populate the cache if we
+        # miss it here
         event_map = self._get_events_from_cache(
             member_event_ids,
             allow_rejected=False,
+            update_metrics=False,
         )
 
         missing_member_event_ids = []
@@ -530,7 +534,7 @@ class RoomMemberStore(SQLBaseStore):
         assert state_group is not None
 
         joined_hosts = set()
-        for (etype, state_key), event_id in current_state_ids.items():
+        for etype, state_key in current_state_ids:
             if etype == EventTypes.Member:
                 try:
                     host = get_domain_from_id(state_key)
@@ -541,6 +545,7 @@ class RoomMemberStore(SQLBaseStore):
                 if host in joined_hosts:
                     continue
 
+                event_id = current_state_ids[(etype, state_key)]
                 event = yield self.get_event(event_id, allow_none=True)
                 if event and event.content["membership"] == Membership.JOIN:
                     joined_hosts.add(intern_string(host))
