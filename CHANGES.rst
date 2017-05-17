@@ -3,7 +3,7 @@ Changes in synapse v0.21.0-rc3 (2017-05-17)
 
 Features:
 
-* Add per user ratelimiting overrides (PR #2208)
+* Add per user rate-limiting overrides (PR #2208)
 * Add config option to limit maximum number of events requested by ``/sync``
   and ``/messages`` (PR #2221) Thanks to @psaavedra!
 
@@ -13,7 +13,7 @@ Changes:
 * Various small performance fixes (PR #2201, #2202, #2224, #2226, #2227, #2228)
 * Update username availability checker API (PR #2209, #2213)
 * When purging, don't de-delta state groups we're about to delete (PR #2214)
-* Documantation to chek synapse version (PR #2215) Thanks to @hamber-dick!
+* Documentation to check synapse version (PR #2215) Thanks to @hamber-dick!
 * Add an index to event_search to speed up purge history API (PR #2218)
 
 
