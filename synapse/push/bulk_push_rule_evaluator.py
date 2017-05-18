@@ -67,7 +67,7 @@ class BulkPushRuleEvaluator:
 
         defer.returnValue(rules_by_user)
 
-    @cached(max_entries=10000)
+    @cached()
     def _get_rules_for_room(self, room_id):
         """Get the current RulesForRoom object for the given room id
 
