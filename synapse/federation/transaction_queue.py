@@ -285,7 +285,7 @@ class TransactionQueue(object):
         Args:
             states (list(UserPresenceState))
         """
-        hosts_and_states = yield get_interested_remotes(self.store, states)
+        hosts_and_states = yield get_interested_remotes(self.store, states, self.state)
 
         for destinations, states in hosts_and_states:
             for destination in destinations:
