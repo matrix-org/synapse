@@ -299,7 +299,10 @@ class RulesForRoom(object):
             for row in rows
         }
 
-        interested_in_user_ids = set(user_id for user_id, _ in members.itervalues())
+        interested_in_user_ids = set(
+            user_id for user_id, membership in members.itervalues()
+            if membership == Membership.JOIN
+        )
 
         if_users_with_pushers = yield self.store.get_if_users_have_pushers(
             interested_in_user_ids,
