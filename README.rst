@@ -84,6 +84,7 @@ Synapse Installation
 Synapse is the reference python/twisted Matrix homeserver implementation.
 
 System requirements:
+
 - POSIX-compliant system (tested on Linux & OS X)
 - Python 2.7
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
