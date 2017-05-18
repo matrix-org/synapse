@@ -251,9 +251,7 @@ class RulesForRoom(object):
                 if not self.is_mine_id(user_id):
                     continue
 
-                if self.store.get_if_app_services_interested_in_user(
-                    user_id, exclusive=True
-                ):
+                if self.store.get_if_app_services_interested_in_user(user_id):
                     continue
 
                 # If a user has left a room we remove their push rule. If they
