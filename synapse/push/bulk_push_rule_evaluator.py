@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 rules_by_room = {}
 
 
-class BulkPushRuleEvaluator:
+class BulkPushRuleEvaluator(object):
     """Calculates the outcome of push rules for an event for all users in the
     room at once.
     """
