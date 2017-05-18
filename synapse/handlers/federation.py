@@ -28,7 +28,7 @@ from synapse.api.constants import EventTypes, Membership, RejectedReason
 from synapse.events.validator import EventValidator
 from synapse.util import unwrapFirstError
 from synapse.util.logcontext import (
-    PreserveLoggingContext, preserve_fn, preserve_context_over_deferred
+    preserve_fn, preserve_context_over_deferred
 )
 from synapse.util.metrics import measure_func
 from synapse.util.logutils import log_function
@@ -172,8 +172,22 @@ class FederationHandler(BaseHandler):
                             origin, pdu, prevs, min_depth
                         )
 
-            prevs = {e_id for e_id, _ in pdu.prev_events}
-            seen = set(have_seen.keys())
+                        # Update the set of things we've seen after trying to
+                        # fetch the missing stuff
+                        have_seen = yield self.store.have_events(prevs)
+                        seen = set(have_seen.iterkeys())
+
+                        if not prevs - seen:
+                            logger.info(
+                                "Found all missing prev events for %s", pdu.event_id
+                            )
+                elif prevs - seen:
+                    logger.info(
+                        "Not fetching %d missing events for room %r,event %s: %r...",
+                        len(prevs - seen), pdu.room_id, pdu.event_id,
+                        list(prevs - seen)[:5],
+                    )
+
             if prevs - seen:
                 logger.info(
                     "Still missing %d events for room %r: %r...",
@@ -208,19 +222,15 @@ class FederationHandler(BaseHandler):
         Args:
             origin (str): Origin of the pdu. Will be called to get the missing events
             pdu: received pdu
-            prevs (str[]): List of event ids which we are missing
+            prevs (set(str)): List of event ids which we are missing
             min_depth (int): Minimum depth of events to return.
-
-        Returns:
-            Deferred<dict(str, str?)>: updated have_seen dictionary
         """
         # We recalculate seen, since it may have changed.
         have_seen = yield self.store.have_events(prevs)
         seen = set(have_seen.keys())
 
         if not prevs - seen:
-            # nothing left to do
-            defer.returnValue(have_seen)
+            return
 
         latest = yield self.store.get_latest_event_ids_in_room(
             pdu.room_id
@@ -232,8 +242,8 @@ class FederationHandler(BaseHandler):
         latest |= seen
 
         logger.info(
-            "Missing %d events for room %r: %r...",
-            len(prevs - seen), pdu.room_id, list(prevs - seen)[:5]
+            "Missing %d events for room %r pdu %s: %r...",
+            len(prevs - seen), pdu.room_id, pdu.event_id, list(prevs - seen)[:5]
         )
 
         # XXX: we set timeout to 10s to help workaround
@@ -265,21 +275,22 @@ class FederationHandler(BaseHandler):
             timeout=10000,
         )
 
+        logger.info(
+            "Got %d events: %r...",
+            len(missing_events), [e.event_id for e in missing_events[:5]]
+        )
+
         # We want to sort these by depth so we process them and
         # tell clients about them in order.
         missing_events.sort(key=lambda x: x.depth)
 
         for e in missing_events:
+            logger.info("Handling found event %s", e.event_id)
             yield self.on_receive_pdu(
                 origin,
                 e,
                 get_missing=False
             )
-
-        have_seen = yield self.store.have_events(
-            [ev for ev, _ in pdu.prev_events]
-        )
-        defer.returnValue(have_seen)
 
     @log_function
     @defer.inlineCallbacks
@@ -369,13 +380,6 @@ class FederationHandler(BaseHandler):
                     affected=event.event_id,
                 )
 
-        # if we're receiving valid events from an origin,
-        # it's probably a good idea to mark it as not in retry-state
-        # for sending (although this is a bit of a leap)
-        retry_timings = yield self.store.get_destination_retry_timings(origin)
-        if retry_timings and retry_timings["retry_last_ts"]:
-            self.store.set_destination_retry_timings(origin, 0, 0)
-
         room = yield self.store.get_room(event.room_id)
 
         if not room:
@@ -394,11 +398,10 @@ class FederationHandler(BaseHandler):
             target_user = UserID.from_string(target_user_id)
             extra_users.append(target_user)
 
-        with PreserveLoggingContext():
-            self.notifier.on_new_room_event(
-                event, event_stream_id, max_stream_id,
-                extra_users=extra_users
-            )
+        self.notifier.on_new_room_event(
+            event, event_stream_id, max_stream_id,
+            extra_users=extra_users
+        )
 
         if event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
@@ -916,11 +919,10 @@ class FederationHandler(BaseHandler):
                 origin, auth_chain, state, event
             )
 
-            with PreserveLoggingContext():
-                self.notifier.on_new_room_event(
-                    event, event_stream_id, max_stream_id,
-                    extra_users=[joinee]
-                )
+            self.notifier.on_new_room_event(
+                event, event_stream_id, max_stream_id,
+                extra_users=[joinee]
+            )
 
             logger.debug("Finished joining %s to %s", joinee, room_id)
         finally:
@@ -1035,10 +1037,9 @@ class FederationHandler(BaseHandler):
             target_user = UserID.from_string(target_user_id)
             extra_users.append(target_user)
 
-        with PreserveLoggingContext():
-            self.notifier.on_new_room_event(
-                event, event_stream_id, max_stream_id, extra_users=extra_users
-            )
+        self.notifier.on_new_room_event(
+            event, event_stream_id, max_stream_id, extra_users=extra_users
+        )
 
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.JOIN:
@@ -1084,29 +1085,22 @@ class FederationHandler(BaseHandler):
         )
 
         target_user = UserID.from_string(event.state_key)
-        with PreserveLoggingContext():
-            self.notifier.on_new_room_event(
-                event, event_stream_id, max_stream_id,
-                extra_users=[target_user],
-            )
+        self.notifier.on_new_room_event(
+            event, event_stream_id, max_stream_id,
+            extra_users=[target_user],
+        )
 
         defer.returnValue(event)
 
     @defer.inlineCallbacks
     def do_remotely_reject_invite(self, target_hosts, room_id, user_id):
-        try:
-            origin, event = yield self._make_and_verify_event(
-                target_hosts,
-                room_id,
-                user_id,
-                "leave"
-            )
-            event = self._sign_event(event)
-        except SynapseError:
-            raise
-        except CodeMessageException as e:
-            logger.warn("Failed to reject invite: %s", e)
-            raise SynapseError(500, "Failed to reject invite")
+        origin, event = yield self._make_and_verify_event(
+            target_hosts,
+            room_id,
+            user_id,
+            "leave"
+        )
+        event = self._sign_event(event)
 
         # Try the host that we succesfully called /make_leave/ on first for
         # the /send_leave/ request.
@@ -1116,16 +1110,10 @@ class FederationHandler(BaseHandler):
         except ValueError:
             pass
 
-        try:
-            yield self.replication_layer.send_leave(
-                target_hosts,
-                event
-            )
-        except SynapseError:
-            raise
-        except CodeMessageException as e:
-            logger.warn("Failed to reject invite: %s", e)
-            raise SynapseError(500, "Failed to reject invite")
+        yield self.replication_layer.send_leave(
+            target_hosts,
+            event
+        )
 
         context = yield self.state_handler.compute_event_context(event)
 
@@ -1246,10 +1234,9 @@ class FederationHandler(BaseHandler):
             target_user = UserID.from_string(target_user_id)
             extra_users.append(target_user)
 
-        with PreserveLoggingContext():
-            self.notifier.on_new_room_event(
-                event, event_stream_id, max_stream_id, extra_users=extra_users
-            )
+        self.notifier.on_new_room_event(
+            event, event_stream_id, max_stream_id, extra_users=extra_users
+        )
 
         defer.returnValue(None)
 

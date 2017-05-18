@@ -1,3 +1,96 @@
+Changes in synapse v0.21.0 (2017-05-18)
+=======================================
+
+No changes since v0.21.0-rc3
+
+
+Changes in synapse v0.21.0-rc3 (2017-05-17)
+===========================================
+
+Features:
+
+* Add per user rate-limiting overrides (PR #2208)
+* Add config option to limit maximum number of events requested by ``/sync``
+  and ``/messages`` (PR #2221) Thanks to @psaavedra!
+
+
+Changes:
+
+* Various small performance fixes (PR #2201, #2202, #2224, #2226, #2227, #2228,
+  #2229)
+* Update username availability checker API (PR #2209, #2213)
+* When purging, don't de-delta state groups we're about to delete (PR #2214)
+* Documentation to check synapse version (PR #2215) Thanks to @hamber-dick!
+* Add an index to event_search to speed up purge history API (PR #2218)
+
+
+Bug fixes:
+
+* Fix API to allow clients to upload one-time-keys with new sigs (PR #2206)
+
+
+Changes in synapse v0.21.0-rc2 (2017-05-08)
+===========================================
+
+Changes:
+
+* Always mark remotes as up if we receive a signed request from them (PR #2190)
+
+
+Bug fixes:
+
+* Fix bug where users got pushed for rooms they had muted (PR #2200)
+
+
+Changes in synapse v0.21.0-rc1 (2017-05-08)
+===========================================
+
+Features:
+
+* Add username availability checker API (PR #2183)
+* Add read marker API (PR #2120)
+
+
+Changes:
+
+* Enable guest access for the 3pl/3pid APIs (PR #1986)
+* Add setting to support TURN for guests (PR #2011)
+* Various performance improvements (PR #2075, #2076, #2080, #2083, #2108,
+  #2158, #2176, #2185)
+* Make synctl a bit more user friendly (PR #2078, #2127) Thanks @APwhitehat!
+* Replace HTTP replication with TCP replication (PR #2082, #2097, #2098,
+  #2099, #2103, #2014, #2016, #2115, #2116, #2117)
+* Support authenticated SMTP (PR #2102) Thanks @DanielDent!
+* Add a counter metric for successfully-sent transactions (PR #2121)
+* Propagate errors sensibly from proxied IS requests (PR #2147)
+* Add more granular event send metrics (PR #2178)
+
+
+
+Bug fixes:
+
+* Fix nuke-room script to work with current schema (PR #1927) Thanks
+  @zuckschwerdt!
+* Fix db port script to not assume postgres tables are in the public schema
+  (PR #2024) Thanks @jerrykan!
+* Fix getting latest device IP for user with no devices (PR #2118)
+* Fix rejection of invites to unreachable servers (PR #2145)
+* Fix code for reporting old verify keys in synapse (PR #2156)
+* Fix invite state to always include all events (PR #2163)
+* Fix bug where synapse would always fetch state for any missing event (PR #2170)
+* Fix a leak with timed out HTTP connections (PR #2180)
+* Fix bug where we didn't time out HTTP requests to ASes  (PR #2192)
+
+
+Docs:
+
+* Clarify doc for SQLite to PostgreSQL port (PR #1961) Thanks @benhylau!
+* Fix typo in synctl help (PR #2107) Thanks @HarHarLinks!
+* ``web_client_location`` documentation fix (PR #2131) Thanks @matthewjwolff!
+* Update README.rst with FreeBSD changes (PR #2132) Thanks @feld!
+* Clarify setting up metrics (PR #2149) Thanks @encks!
+
+
 Changes in synapse v0.20.0 (2017-04-11)
 =======================================
 

@@ -50,7 +50,7 @@ class EventsStoreTestCase(unittest.TestCase):
         # Create something to report
         room = RoomID.from_string("!abc123:test")
         user = UserID.from_string("@raccoonlover:test")
-        yield self.event_injector.create_room(room)
+        yield self.event_injector.create_room(room, user)
 
         self.base_event = yield self._get_last_stream_token()
 

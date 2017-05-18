@@ -71,6 +71,7 @@ class SlavedEventStore(BaseSlavedStore):
     # to reach inside the __dict__ to extract them.
     get_rooms_for_user = RoomMemberStore.__dict__["get_rooms_for_user"]
     get_users_in_room = RoomMemberStore.__dict__["get_users_in_room"]
+    get_hosts_in_room = RoomMemberStore.__dict__["get_hosts_in_room"]
     get_users_who_share_room_with_user = (
         RoomMemberStore.__dict__["get_users_who_share_room_with_user"]
     )
@@ -100,9 +101,6 @@ class SlavedEventStore(BaseSlavedStore):
     )
     _get_state_groups_from_groups_txn = (
         DataStore._get_state_groups_from_groups_txn.__func__
-    )
-    _get_state_group_from_group = (
-        StateStore.__dict__["_get_state_group_from_group"]
     )
     get_recent_event_ids_for_room = (
         StreamStore.__dict__["get_recent_event_ids_for_room"]
@@ -145,6 +143,9 @@ class SlavedEventStore(BaseSlavedStore):
     _get_joined_users_from_context = (
         RoomMemberStore.__dict__["_get_joined_users_from_context"]
     )
+
+    get_joined_hosts = DataStore.get_joined_hosts.__func__
+    _get_joined_hosts = RoomMemberStore.__dict__["_get_joined_hosts"]
 
     get_recent_events_for_room = DataStore.get_recent_events_for_room.__func__
     get_room_events_stream_for_rooms = (
@@ -201,48 +202,25 @@ class SlavedEventStore(BaseSlavedStore):
         result["backfill"] = -self._backfill_id_gen.get_current_token()
         return result
 
-    def process_replication(self, result):
-        stream = result.get("events")
-        if stream:
-            self._stream_id_gen.advance(int(stream["position"]))
-
-            if stream["rows"]:
-                logger.info("Got %d event rows", len(stream["rows"]))
-
-            for row in stream["rows"]:
-                self._process_replication_row(
-                    row, backfilled=False,
+    def process_replication_rows(self, stream_name, token, rows):
+        if stream_name == "events":
+            self._stream_id_gen.advance(token)
+            for row in rows:
+                self.invalidate_caches_for_event(
+                    token, row.event_id, row.room_id, row.type, row.state_key,
+                    row.redacts,
+                    backfilled=False,
                 )
-
-        stream = result.get("backfill")
-        if stream:
-            self._backfill_id_gen.advance(-int(stream["position"]))
-            for row in stream["rows"]:
-                self._process_replication_row(
-                    row, backfilled=True,
+        elif stream_name == "backfill":
+            self._backfill_id_gen.advance(-token)
+            for row in rows:
+                self.invalidate_caches_for_event(
+                    -token, row.event_id, row.room_id, row.type, row.state_key,
+                    row.redacts,
+                    backfilled=True,
                 )
-
-        stream = result.get("forward_ex_outliers")
-        if stream:
-            self._stream_id_gen.advance(int(stream["position"]))
-            for row in stream["rows"]:
-                event_id = row[1]
-                self._invalidate_get_event_cache(event_id)
-
-        stream = result.get("backward_ex_outliers")
-        if stream:
-            self._backfill_id_gen.advance(-int(stream["position"]))
-            for row in stream["rows"]:
-                event_id = row[1]
-                self._invalidate_get_event_cache(event_id)
-
-        return super(SlavedEventStore, self).process_replication(result)
-
-    def _process_replication_row(self, row, backfilled):
-        stream_ordering = row[0] if not backfilled else -row[0]
-        self.invalidate_caches_for_event(
-            stream_ordering, row[1], row[2], row[3], row[4], row[5],
-            backfilled=backfilled,
+        return super(SlavedEventStore, self).process_replication_rows(
+            stream_name, token, rows
         )
 
     def invalidate_caches_for_event(self, stream_ordering, event_id, room_id,

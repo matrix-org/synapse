@@ -16,9 +16,10 @@ from OpenSSL import SSL
 from OpenSSL.SSL import VERIFY_NONE
 
 from synapse.api.errors import (
-    CodeMessageException, SynapseError, Codes,
+    CodeMessageException, MatrixCodeMessageException, SynapseError, Codes,
 )
 from synapse.util.logcontext import preserve_context_over_fn
+from synapse.util import logcontext
 import synapse.metrics
 from synapse.http.endpoint import SpiderEndpoint
 
@@ -72,39 +73,45 @@ class SimpleHttpClient(object):
             contextFactory=hs.get_http_client_context_factory()
         )
         self.user_agent = hs.version_string
+        self.clock = hs.get_clock()
         if hs.config.user_agent_suffix:
             self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix,)
 
+    @defer.inlineCallbacks
     def request(self, method, uri, *args, **kwargs):
         # A small wrapper around self.agent.request() so we can easily attach
         # counters to it
         outgoing_requests_counter.inc(method)
-        d = preserve_context_over_fn(
-            self.agent.request,
-            method, uri, *args, **kwargs
-        )
+
+        def send_request():
+            request_deferred = self.agent.request(
+                method, uri, *args, **kwargs
+            )
+
+            return self.clock.time_bound_deferred(
+                request_deferred,
+                time_out=60,
+            )
 
         logger.info("Sending request %s %s", method, uri)
 
-        def _cb(response):
+        try:
+            with logcontext.PreserveLoggingContext():
+                response = yield send_request()
+
             incoming_responses_counter.inc(method, response.code)
             logger.info(
                 "Received response to  %s %s: %s",
                 method, uri, response.code
             )
-            return response
-
-        def _eb(failure):
+            defer.returnValue(response)
+        except Exception as e:
             incoming_responses_counter.inc(method, "ERR")
             logger.info(
                 "Error sending request to  %s %s: %s %s",
-                method, uri, failure.type, failure.getErrorMessage()
+                method, uri, type(e).__name__, e.message
             )
-            return failure
-
-        d.addCallbacks(_cb, _eb)
-
-        return d
+            raise e
 
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, uri, args={}):
@@ -145,6 +152,11 @@ class SimpleHttpClient(object):
 
         body = yield preserve_context_over_fn(readBody, response)
 
+        if 200 <= response.code < 300:
+            defer.returnValue(json.loads(body))
+        else:
+            raise self._exceptionFromFailedRequest(response, body)
+
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
@@ -164,8 +176,11 @@ class SimpleHttpClient(object):
             On a non-2xx HTTP response. The response body will be used as the
             error message.
         """
-        body = yield self.get_raw(uri, args)
-        defer.returnValue(json.loads(body))
+        try:
+            body = yield self.get_raw(uri, args)
+            defer.returnValue(json.loads(body))
+        except CodeMessageException as e:
+            raise self._exceptionFromFailedRequest(e.code, e.msg)
 
     @defer.inlineCallbacks
     def put_json(self, uri, json_body, args={}):
@@ -245,6 +260,15 @@ class SimpleHttpClient(object):
             defer.returnValue(body)
         else:
             raise CodeMessageException(response.code, body)
+
+    def _exceptionFromFailedRequest(self, response, body):
+        try:
+            jsonBody = json.loads(body)
+            errcode = jsonBody['errcode']
+            error = jsonBody['error']
+            return MatrixCodeMessageException(response.code, error, errcode)
+        except (ValueError, KeyError):
+            return CodeMessageException(response.code, body)
 
     # XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
     # The two should be factored out.

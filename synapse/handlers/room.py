@@ -75,7 +75,7 @@ class RoomCreationHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        self.ratelimit(requester)
+        yield self.ratelimit(requester)
 
         if "room_alias_name" in config:
             for wchar in string.whitespace:

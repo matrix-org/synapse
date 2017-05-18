@@ -125,7 +125,7 @@ def main():
         "configfile",
         nargs="?",
         default="homeserver.yaml",
-        help="the homeserver config file, defaults to homserver.yaml",
+        help="the homeserver config file, defaults to homeserver.yaml",
     )
     parser.add_argument(
         "-w", "--worker",
@@ -202,7 +202,8 @@ def main():
         worker_app = worker_config["worker_app"]
         worker_pidfile = worker_config["worker_pid_file"]
         worker_daemonize = worker_config["worker_daemonize"]
-        assert worker_daemonize  # TODO print something more user friendly
+        assert worker_daemonize, "In config %r: expected '%s' to be True" % (
+            worker_configfile, "worker_daemonize")
         worker_cache_factor = worker_config.get("synctl_cache_factor")
         workers.append(Worker(
             worker_app, worker_configfile, worker_pidfile, worker_cache_factor,
@@ -233,6 +234,9 @@ def main():
 
     if action == "start" or action == "restart":
         if start_stop_synapse:
+            # Check if synapse is already running
+            if os.path.exists(pidfile) and pid_running(int(open(pidfile).read())):
+                abort("synapse.app.homeserver already running")
             start(configfile)
 
         for worker in workers:

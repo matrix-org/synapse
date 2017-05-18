@@ -21,11 +21,10 @@ from .units import Transaction, Edu
 
 from synapse.api.errors import HttpResponseException
 from synapse.util.async import run_on_reactor
-from synapse.util.logcontext import preserve_context_over_fn
+from synapse.util.logcontext import preserve_context_over_fn, preserve_fn
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
 from synapse.util.metrics import measure_func
-from synapse.types import get_domain_from_id
-from synapse.handlers.presence import format_user_presence_state
+from synapse.handlers.presence import format_user_presence_state, get_interested_remotes
 import synapse.metrics
 
 import logging
@@ -40,6 +39,8 @@ sent_pdus_destination_dist = client_metrics.register_distribution(
     "sent_pdu_destinations"
 )
 sent_edus_counter = client_metrics.register_counter("sent_edus")
+
+sent_transactions_counter = client_metrics.register_counter("sent_transactions")
 
 
 class TransactionQueue(object):
@@ -77,8 +78,18 @@ class TransactionQueue(object):
         # destination -> list of tuple(edu, deferred)
         self.pending_edus_by_dest = edus = {}
 
-        # Presence needs to be separate as we send single aggragate EDUs
+        # Map of user_id -> UserPresenceState for all the pending presence
+        # to be sent out by user_id. Entries here get processed and put in
+        # pending_presence_by_dest
+        self.pending_presence = {}
+
+        # Map of destination -> user_id -> UserPresenceState of pending presence
+        # to be sent to each destinations
         self.pending_presence_by_dest = presence = {}
+
+        # Pending EDUs by their "key". Keyed EDUs are EDUs that get clobbered
+        # based on their key (e.g. typing events by room_id)
+        # Map of destination -> (edu_type, key) -> Edu
         self.pending_edus_keyed_by_dest = edus_keyed = {}
 
         metrics.register_callback(
@@ -112,6 +123,8 @@ class TransactionQueue(object):
 
         self._is_processing = False
         self._last_poked_id = -1
+
+        self._processing_pending_presence = False
 
     def can_send_to(self, destination):
         """Can we send messages to the given server?
@@ -169,15 +182,12 @@ class TransactionQueue(object):
                     # Otherwise if the last member on a server in a room is
                     # banned then it won't receive the event because it won't
                     # be in the room after the ban.
-                    users_in_room = yield self.state.get_current_user_in_room(
+                    destinations = yield self.state.get_current_hosts_in_room(
                         event.room_id, latest_event_ids=[
                             prev_id for prev_id, _ in event.prev_events
                         ],
                     )
 
-                    destinations = set(
-                        get_domain_from_id(user_id) for user_id in users_in_room
-                    )
                     if send_on_behalf_of is not None:
                         # If we are sending the event on behalf of another server
                         # then it already has the event and there is no reason to
@@ -224,17 +234,71 @@ class TransactionQueue(object):
                 self._attempt_new_transaction, destination
             )
 
-    def send_presence(self, destination, states):
-        if not self.can_send_to(destination):
-            return
+    @preserve_fn  # the caller should not yield on this
+    @defer.inlineCallbacks
+    def send_presence(self, states):
+        """Send the new presence states to the appropriate destinations.
 
-        self.pending_presence_by_dest.setdefault(destination, {}).update({
+        This actually queues up the presence states ready for sending and
+        triggers a background task to process them and send out the transactions.
+
+        Args:
+            states (list(UserPresenceState))
+        """
+
+        # First we queue up the new presence by user ID, so multiple presence
+        # updates in quick successtion are correctly handled
+        # We only want to send presence for our own users, so lets always just
+        # filter here just in case.
+        self.pending_presence.update({
             state.user_id: state for state in states
+            if self.is_mine_id(state.user_id)
         })
 
-        preserve_context_over_fn(
-            self._attempt_new_transaction, destination
-        )
+        # We then handle the new pending presence in batches, first figuring
+        # out the destinations we need to send each state to and then poking it
+        # to attempt a new transaction. We linearize this so that we don't
+        # accidentally mess up the ordering and send multiple presence updates
+        # in the wrong order
+        if self._processing_pending_presence:
+            return
+
+        self._processing_pending_presence = True
+        try:
+            while True:
+                states_map = self.pending_presence
+                self.pending_presence = {}
+
+                if not states_map:
+                    break
+
+                yield self._process_presence_inner(states_map.values())
+        finally:
+            self._processing_pending_presence = False
+
+    @measure_func("txnqueue._process_presence")
+    @defer.inlineCallbacks
+    def _process_presence_inner(self, states):
+        """Given a list of states populate self.pending_presence_by_dest and
+        poke to send a new transaction to each destination
+
+        Args:
+            states (list(UserPresenceState))
+        """
+        hosts_and_states = yield get_interested_remotes(self.store, states, self.state)
+
+        for destinations, states in hosts_and_states:
+            for destination in destinations:
+                if not self.can_send_to(destination):
+                    continue
+
+                self.pending_presence_by_dest.setdefault(
+                    destination, {}
+                ).update({
+                    state.user_id: state for state in states
+                })
+
+                preserve_fn(self._attempt_new_transaction)(destination)
 
     def send_edu(self, destination, edu_type, content, key=None):
         edu = Edu(
@@ -374,6 +438,7 @@ class TransactionQueue(object):
                     destination, pending_pdus, pending_edus, pending_failures,
                 )
                 if success:
+                    sent_transactions_counter.inc()
                     # Remove the acknowledged device messages from the database
                     # Only bother if we actually sent some device messages
                     if device_message_edus:

@@ -24,7 +24,6 @@ from synapse.types import UserID, get_domain_from_id
 import logging
 
 from collections import namedtuple
-import ujson as json
 
 logger = logging.getLogger(__name__)
 
@@ -288,10 +287,12 @@ class TypingHandler(object):
         for room_id, serial in self._room_serials.items():
             if last_id < serial and serial <= current_id:
                 typing = self._room_typing[room_id]
-                typing_bytes = json.dumps(list(typing), ensure_ascii=False)
-                rows.append((serial, room_id, typing_bytes))
+                rows.append((serial, room_id, list(typing)))
         rows.sort()
         return rows
+
+    def get_current_token(self):
+        return self._latest_room_serial
 
 
 class TypingNotificationEventSource(object):

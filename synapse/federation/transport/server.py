@@ -24,6 +24,7 @@ from synapse.http.servlet import (
 )
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.versionstring import get_version_string
+from synapse.util.logcontext import preserve_fn
 from synapse.types import ThirdPartyInstanceID
 
 import functools
@@ -79,6 +80,7 @@ class Authenticator(object):
     def __init__(self, hs):
         self.keyring = hs.get_keyring()
         self.server_name = hs.hostname
+        self.store = hs.get_datastore()
 
     # A method just so we can pass 'self' as the authenticator to the Servlets
     @defer.inlineCallbacks
@@ -137,6 +139,13 @@ class Authenticator(object):
 
         logger.info("Request from %s", origin)
         request.authenticated_entity = origin
+
+        # If we get a valid signed request from the other side, its probably
+        # alive
+        retry_timings = yield self.store.get_destination_retry_timings(origin)
+        if retry_timings and retry_timings["retry_last_ts"]:
+            logger.info("Marking origin %r as up", origin)
+            preserve_fn(self.store.set_destination_retry_timings)(origin, 0, 0)
 
         defer.returnValue(origin)
 

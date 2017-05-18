@@ -164,6 +164,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
         else:
             msg_handler = self.handlers.message_handler
             event, context = yield msg_handler.create_event(
+                requester,
                 event_dict,
                 token_id=requester.access_token_id,
                 txn_id=txn_id,
@@ -406,7 +407,13 @@ class JoinedRoomMemberListRestServlet(ClientV1RestServlet):
         users_with_profile = yield self.state.get_current_user_in_room(room_id)
 
         defer.returnValue((200, {
-            "joined": users_with_profile
+            "joined": {
+                user_id: {
+                    "avatar_url": profile.avatar_url,
+                    "display_name": profile.display_name,
+                }
+                for user_id, profile in users_with_profile.iteritems()
+            }
         }))
 
 

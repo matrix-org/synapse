@@ -47,3 +47,13 @@ def client_v2_patterns(path_regex, releases=(0,),
         new_prefix = CLIENT_V2_ALPHA_PREFIX.replace("/v2_alpha", "/r%d" % release)
         patterns.append(re.compile("^" + new_prefix + path_regex))
     return patterns
+
+
+def set_timeline_upper_limit(filter_json, filter_timeline_limit):
+    if filter_timeline_limit < 0:
+        return  # no upper limits
+    timeline = filter_json.get('room', {}).get('timeline', {})
+    if 'limit' in timeline:
+        filter_json['room']['timeline']["limit"] = min(
+            filter_json['room']['timeline']['limit'],
+            filter_timeline_limit)

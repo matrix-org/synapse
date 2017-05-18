@@ -25,7 +25,7 @@ import synapse.config.logger
 from synapse.config._base import ConfigError
 
 from synapse.python_dependencies import (
-    check_requirements, DEPENDENCY_LINKS
+    check_requirements, CONDITIONAL_REQUIREMENTS
 )
 
 from synapse.rest import ClientRestResource
@@ -55,7 +55,7 @@ from synapse.crypto import context_factory
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.metrics import register_memory_metrics, get_metrics_for
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
-from synapse.replication.resource import ReplicationResource, REPLICATION_PREFIX
+from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.federation.transport.server import TransportLayerServer
 
 from synapse.util.rlimit import change_resource_limit
@@ -92,7 +92,7 @@ def build_resource_for_web_client(hs):
                 "\n"
                 "You can also disable hosting of the webclient via the\n"
                 "configuration option `web_client`\n"
-                % {"dep": DEPENDENCY_LINKS["matrix-angular-sdk"]}
+                % {"dep": CONDITIONAL_REQUIREMENTS["web_client"].keys()[0]}
             )
         syweb_path = os.path.dirname(syweb.__file__)
         webclient_path = os.path.join(syweb_path, "webclient")
@@ -166,9 +166,6 @@ class SynapseHomeServer(HomeServer):
                 if name == "metrics" and self.get_config().enable_metrics:
                     resources[METRICS_PREFIX] = MetricsResource(self)
 
-                if name == "replication":
-                    resources[REPLICATION_PREFIX] = ReplicationResource(self)
-
         if WEB_CLIENT_PREFIX in resources:
             root_resource = RootRedirect(WEB_CLIENT_PREFIX)
         else:
@@ -221,6 +218,16 @@ class SynapseHomeServer(HomeServer):
                             globals={"hs": self},
                         ),
                         interface=address
+                    )
+            elif listener["type"] == "replication":
+                bind_addresses = listener["bind_addresses"]
+                for address in bind_addresses:
+                    factory = ReplicationStreamProtocolFactory(self)
+                    server_listener = reactor.listenTCP(
+                        listener["port"], factory, interface=address
+                    )
+                    reactor.addSystemEventTrigger(
+                        "before", "shutdown", server_listener.stopListening,
                     )
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])

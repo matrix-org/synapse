@@ -35,6 +35,8 @@ class ServerConfig(Config):
         # "disable" federation
         self.send_federation = config.get("send_federation", True)
 
+        self.filter_timeline_limit = config.get("filter_timeline_limit", -1)
+
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
                 self.public_baseurl += '/'
@@ -144,6 +146,12 @@ class ServerConfig(Config):
         # Whether to serve a web client from the HTTP/HTTPS root resource.
         web_client: True
 
+        # The root directory to server for the above web client.
+        # If left undefined, synapse will serve the matrix-angular-sdk web client.
+        # Make sure matrix-angular-sdk is installed with pip if web_client is True
+        # and web_client_location is undefined
+        # web_client_location: "/path/to/web/root"
+
         # The public-facing base URL for the client API (not including _matrix/...)
         # public_baseurl: https://example.com:8448/
 
@@ -154,6 +162,10 @@ class ServerConfig(Config):
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         # gc_thresholds: [700, 10, 10]
+
+        # Set the limit on the returned events in the timeline in the get
+        # and sync operations. The default value is -1, means no upper limit.
+        # filter_timeline_limit: 5000
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.

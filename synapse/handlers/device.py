@@ -17,6 +17,7 @@ from synapse.api.constants import EventTypes
 from synapse.util import stringutils
 from synapse.util.async import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.metrics import measure_func
 from synapse.types import get_domain_from_id, RoomStreamToken
 from twisted.internet import defer
@@ -425,12 +426,38 @@ class DeviceListEduUpdater(object):
                 # This can happen since we batch updates
                 return
 
+            # Given a list of updates we check if we need to resync. This
+            # happens if we've missed updates.
             resync = yield self._need_to_do_resync(user_id, pending_updates)
 
             if resync:
                 # Fetch all devices for the user.
                 origin = get_domain_from_id(user_id)
-                result = yield self.federation.query_user_devices(origin, user_id)
+                try:
+                    result = yield self.federation.query_user_devices(origin, user_id)
+                except NotRetryingDestination:
+                    # TODO: Remember that we are now out of sync and try again
+                    # later
+                    logger.warn(
+                        "Failed to handle device list update for %s,"
+                        " we're not retrying the remote",
+                        user_id,
+                    )
+                    # We abort on exceptions rather than accepting the update
+                    # as otherwise synapse will 'forget' that its device list
+                    # is out of date. If we bail then we will retry the resync
+                    # next time we get a device list update for this user_id.
+                    # This makes it more likely that the device lists will
+                    # eventually become consistent.
+                    return
+                except Exception:
+                    # TODO: Remember that we are now out of sync and try again
+                    # later
+                    logger.exception(
+                        "Failed to handle device list update for %s", user_id
+                    )
+                    return
+
                 stream_id = result["stream_id"]
                 devices = result["devices"]
                 yield self.store.update_remote_device_list_cache(

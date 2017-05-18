@@ -176,6 +176,17 @@ class StateHandler(object):
         defer.returnValue(joined_users)
 
     @defer.inlineCallbacks
+    def get_current_hosts_in_room(self, room_id, latest_event_ids=None):
+        if not latest_event_ids:
+            latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
+        logger.debug("calling resolve_state_groups from get_current_hosts_in_room")
+        entry = yield self.resolve_state_groups(room_id, latest_event_ids)
+        joined_hosts = yield self.store.get_joined_hosts(
+            room_id, entry.state_id, entry.state
+        )
+        defer.returnValue(joined_hosts)
+
+    @defer.inlineCallbacks
     def compute_event_context(self, event, old_state=None):
         """Build an EventContext structure for the event.
 

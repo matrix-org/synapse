@@ -440,6 +440,16 @@ class FederationServer(FederationBase):
                         key_id: json.loads(json_bytes)
                     }
 
+        logger.info(
+            "Claimed one-time-keys: %s",
+            ",".join((
+                "%s for %s:%s" % (key_id, user_id, device_id)
+                for user_id, user_keys in json_result.iteritems()
+                for device_id, device_keys in user_keys.iteritems()
+                for key_id, _ in device_keys.iteritems()
+            )),
+        )
+
         defer.returnValue({"one_time_keys": json_result})
 
     @defer.inlineCallbacks

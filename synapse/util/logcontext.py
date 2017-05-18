@@ -334,12 +334,8 @@ def preserve_fn(f):
         LoggingContext.set_current_context(LoggingContext.sentinel)
         return result
 
-    # XXX: why is this here rather than inside g? surely we want to preserve
-    # the context from the time the function was called, not when it was
-    # wrapped?
-    current = LoggingContext.current_context()
-
     def g(*args, **kwargs):
+        current = LoggingContext.current_context()
         res = f(*args, **kwargs)
         if isinstance(res, defer.Deferred) and not res.called:
             # The function will have reset the context before returning, so

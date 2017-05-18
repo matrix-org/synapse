@@ -474,8 +474,13 @@ class FederationClient(FederationBase):
             content (object): Any additional data to put into the content field
                 of the event.
         Return:
-            A tuple of (origin (str), event (object)) where origin is the remote
-            homeserver which generated the event.
+            Deferred: resolves to a tuple of (origin (str), event (object))
+            where origin is the remote homeserver which generated the event.
+
+            Fails with a ``CodeMessageException`` if the chosen remote server
+            returns a 300/400 code.
+
+            Fails with a ``RuntimeError`` if no servers were reachable.
         """
         valid_memberships = {Membership.JOIN, Membership.LEAVE}
         if membership not in valid_memberships:
@@ -528,6 +533,27 @@ class FederationClient(FederationBase):
 
     @defer.inlineCallbacks
     def send_join(self, destinations, pdu):
+        """Sends a join event to one of a list of homeservers.
+
+        Doing so will cause the remote server to add the event to the graph,
+        and send the event out to the rest of the federation.
+
+        Args:
+            destinations (str): Candidate homeservers which are probably
+                participating in the room.
+            pdu (BaseEvent): event to be sent
+
+        Return:
+            Deferred: resolves to a dict with members ``origin`` (a string
+            giving the serer the event was sent to, ``state`` (?) and
+            ``auth_chain``.
+
+            Fails with a ``CodeMessageException`` if the chosen remote server
+            returns a 300/400 code.
+
+            Fails with a ``RuntimeError`` if no servers were reachable.
+        """
+
         for destination in destinations:
             if destination == self.server_name:
                 continue
@@ -635,6 +661,26 @@ class FederationClient(FederationBase):
 
     @defer.inlineCallbacks
     def send_leave(self, destinations, pdu):
+        """Sends a leave event to one of a list of homeservers.
+
+        Doing so will cause the remote server to add the event to the graph,
+        and send the event out to the rest of the federation.
+
+        This is mostly useful to reject received invites.
+
+        Args:
+            destinations (str): Candidate homeservers which are probably
+                participating in the room.
+            pdu (BaseEvent): event to be sent
+
+        Return:
+            Deferred: resolves to None.
+
+            Fails with a ``CodeMessageException`` if the chosen remote server
+            returns a non-200 code.
+
+            Fails with a ``RuntimeError`` if no servers were reachable.
+        """
         for destination in destinations:
             if destination == self.server_name:
                 continue

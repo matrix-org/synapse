@@ -48,6 +48,7 @@ from synapse.handlers.typing import TypingHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.receipts import ReceiptsHandler
+from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier
@@ -132,6 +133,8 @@ class HomeServer(object):
         'federation_sender',
         'receipts_handler',
         'macaroon_generator',
+        'tcp_replication',
+        'read_marker_handler',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -289,6 +292,12 @@ class HomeServer(object):
 
     def build_receipts_handler(self):
         return ReceiptsHandler(self)
+
+    def build_read_marker_handler(self):
+        return ReadMarkerHandler(self)
+
+    def build_tcp_replication(self):
+        raise NotImplementedError()
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

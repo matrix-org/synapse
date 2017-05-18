@@ -109,10 +109,10 @@ Installing prerequisites on ArchLinux::
     sudo pacman -S base-devel python2 python-pip \
                    python-setuptools python-virtualenv sqlite3
 
-Installing prerequisites on CentOS 7::
+Installing prerequisites on CentOS 7 or Fedora 25::
 
     sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
-                     lcms2-devel libwebp-devel tcl-devel tk-devel \
+                     lcms2-devel libwebp-devel tcl-devel tk-devel redhat-rpm-config \
                      python-virtualenv libffi-devel openssl-devel
     sudo yum groupinstall "Development Tools"
 
@@ -246,6 +246,25 @@ Setting up a TURN server
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server.  See `<docs/turn-howto.rst>`_ for details.
 
+IPv6
+----
+
+As of Synapse 0.19 we finally support IPv6, many thanks to @kyrias and @glyph
+for providing PR #1696.
+
+However, for federation to work on hosts with IPv6 DNS servers you **must**
+be running Twisted 17.1.0 or later - see https://github.com/matrix-org/synapse/issues/1002
+for details.  We can't make Synapse depend on Twisted 17.1 by default
+yet as it will break most older distributions (see https://github.com/matrix-org/synapse/pull/1909)
+so if you are using operating system dependencies you'll have to install your
+own Twisted 17.1 package via pip or backports etc.
+
+If you're running in a virtualenv then pip should have installed the newest
+Twisted automatically, but if your virtualenv is old you will need to manually
+upgrade to a newer Twisted dependency via:
+
+    pip install Twisted>=17.1.0
+
 
 Running Synapse
 ===============
@@ -336,8 +355,11 @@ ArchLinux
 ---------
 
 The quickest way to get up and running with ArchLinux is probably with the community package
-https://www.archlinux.org/packages/community/any/matrix-synapse/, which should pull in all
-the necessary dependencies.
+https://www.archlinux.org/packages/community/any/matrix-synapse/, which should pull in most of
+the necessary dependencies. If the default web client is to be served (enabled by default in
+the generated config),
+https://www.archlinux.org/packages/community/any/python2-matrix-angular-sdk/ will also need to
+be installed. 
 
 Alternatively, to install using pip a few changes may be needed as ArchLinux
 defaults to python 3, but synapse currently assumes python 2.7 by default:
@@ -374,7 +396,7 @@ FreeBSD
 
 Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
 
- - Ports: ``cd /usr/ports/net/py-matrix-synapse && make install clean``
+ - Ports: ``cd /usr/ports/net-im/py-matrix-synapse && make install clean``
  - Packages: ``pkg install py27-matrix-synapse``
 
 

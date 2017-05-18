@@ -33,6 +33,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         self.client_ip_last_seen = Cache(
             name="client_ip_last_seen",
             keylen=4,
+            max_entries=5000,
         )
 
         super(ClientIpStore, self).__init__(hs)
@@ -119,6 +120,9 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             else:
                 where_clauses.append("(user_id = ? AND device_id = ?)")
                 bindings.extend((user_id, device_id))
+
+        if not where_clauses:
+            return []
 
         inner_select = (
             "SELECT MAX(last_seen) mls, user_id, device_id FROM user_ips "

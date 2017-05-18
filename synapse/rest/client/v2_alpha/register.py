@@ -21,7 +21,7 @@ from synapse.api.auth import get_access_token_from_request, has_access_token
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
 from synapse.http.servlet import (
-    RestServlet, parse_json_object_from_request, assert_params_in_request
+    RestServlet, parse_json_object_from_request, assert_params_in_request, parse_string
 )
 from synapse.util.msisdn import phone_number_to_msisdn
 
@@ -31,6 +31,7 @@ import logging
 import hmac
 from hashlib import sha1
 from synapse.util.async import run_on_reactor
+from synapse.util.ratelimitutils import FederationRateLimiter
 
 
 # We ought to be using hmac.compare_digest() but on older pythons it doesn't
@@ -113,6 +114,44 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
 
         ret = yield self.identity_handler.requestMsisdnToken(**body)
         defer.returnValue((200, ret))
+
+
+class UsernameAvailabilityRestServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/register/available")
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(UsernameAvailabilityRestServlet, self).__init__()
+        self.hs = hs
+        self.registration_handler = hs.get_handlers().registration_handler
+        self.ratelimiter = FederationRateLimiter(
+            hs.get_clock(),
+            # Time window of 2s
+            window_size=2000,
+            # Artificially delay requests if rate > sleep_limit/window_size
+            sleep_limit=1,
+            # Amount of artificial delay to apply
+            sleep_msec=1000,
+            # Error with 429 if more than reject_limit requests are queued
+            reject_limit=1,
+            # Allow 1 request at a time
+            concurrent_requests=1,
+        )
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        ip = self.hs.get_ip_from_request(request)
+        with self.ratelimiter.ratelimit(ip) as wait_deferred:
+            yield wait_deferred
+
+            username = parse_string(request, "username", required=True)
+
+            yield self.registration_handler.check_username(username)
+
+            defer.returnValue((200, {"available": True}))
 
 
 class RegisterRestServlet(RestServlet):
@@ -555,4 +594,5 @@ class RegisterRestServlet(RestServlet):
 def register_servlets(hs, http_server):
     EmailRegisterRequestTokenRestServlet(hs).register(http_server)
     MsisdnRegisterRequestTokenRestServlet(hs).register(http_server)
+    UsernameAvailabilityRestServlet(hs).register(http_server)
     RegisterRestServlet(hs).register(http_server)
