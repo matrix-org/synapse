@@ -74,6 +74,9 @@ class BulkPushRuleEvaluator:
         Returns:
             RulesForRoom
         """
+        # It's important that RulesForRoom gets added to self._get_rules_for_room.cache
+        # before any lookup methods get called on it as otherwise there may be
+        # a race if invalidate_all gets called (which assumes its in the cache)
         return RulesForRoom(self.hs, room_id, self._get_rules_for_room.cache)
 
     @defer.inlineCallbacks
