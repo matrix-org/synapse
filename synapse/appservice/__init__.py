@@ -241,6 +241,16 @@ class ApplicationService(object):
     def is_exclusive_room(self, room_id):
         return self._is_exclusive(ApplicationService.NS_ROOMS, room_id)
 
+    def get_exlusive_user_regexes(self):
+        """Get the list of regexes used to determine if a user is exclusively
+        registered by the AS
+        """
+        return [
+            regex_obj["regex"]
+            for regex_obj in self.namespaces[ApplicationService.NS_USERS]
+            if regex_obj["exclusive"]
+        ]
+
     def is_rate_limited(self):
         return self.rate_limited
 
