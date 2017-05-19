@@ -45,7 +45,9 @@ class ReceiptsStore(SQLBaseStore):
             return
 
         # Returns an ObservableDeferred
-        res = self.get_users_with_read_receipts_in_room.cache.get((room_id,), None)
+        res = self.get_users_with_read_receipts_in_room.cache.get(
+            room_id, None, update_metrics=False,
+        )
 
         if res:
             if isinstance(res, defer.Deferred) and res.called:
