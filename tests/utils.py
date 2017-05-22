@@ -55,6 +55,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.password_providers = []
         config.worker_replication_url = ""
         config.worker_app = None
+        config.email_enable_notifs = False
 
     config.use_frozen_dicts = True
     config.database_config = {"name": "sqlite3"}
