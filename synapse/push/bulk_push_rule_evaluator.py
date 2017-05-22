@@ -236,10 +236,10 @@ class RulesForRoom(object):
             # Loop through to see which member events we've seen and have rules
             # for and which we need to fetch
             for key in current_state_ids:
-                if key[0] != EventTypes.Member:
+                typ, user_id = key
+                if typ != EventTypes.Member:
                     continue
 
-                user_id = key[1]
                 if user_id in self.uninteresting_user_set:
                     continue
 
