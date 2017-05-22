@@ -381,15 +381,24 @@ installing under virtualenv)::
     sudo pip2.7 uninstall py-bcrypt
     sudo pip2.7 install py-bcrypt
 
-During setup of Synapse you need to call python2.7 directly again::
+During setup of Synapse, regardless of whether you installed synapse manually
+or used the community package, you need to call python2.7 directly again::
 
-    cd ~/.synapse
     python2.7 -m synapse.app.homeserver \
       --server-name machine.my.domain.name \
       --config-path homeserver.yaml \
       --generate-config
 
 ...substituting your host and domain name as appropriate.
+
+The community package ships with a systemd service file, which assumes the
+configuration file to be in the folder /etc/synapse. If you create a new 
+configuration file, cd into this directory before running the code above.
+
+You can start Synapse via Systemd::
+
+  systemctl start synapse.service
+
 
 FreeBSD
 -------
