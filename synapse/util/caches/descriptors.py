@@ -471,14 +471,22 @@ class CacheListDescriptor(_CacheDescriptorBase):
             results = {}
             cached_defers = {}
             missing = []
+
+            # If the cache takes a single arg then that is used as the key,
+            # otherwise a tuple is used.
+            if num_args == 1:
+                def cache_get(arg):
+                    return cache.get(arg, callback=invalidate_callback)
+            else:
+                key = list(keyargs)
+
+                def cache_get(arg):
+                    key[self.list_pos] = arg
+                    return cache.get(tuple(key), callback=invalidate_callback)
+
             for arg in list_args:
                 try:
-                    if num_args == 1:
-                        res = cache.get(arg, callback=invalidate_callback)
-                    else:
-                        key = list(keyargs)
-                        key[self.list_pos] = arg
-                        res = cache.get(tuple(key), callback=invalidate_callback)
+                    res = cache_get(arg)
 
                     if not isinstance(res, ObservableDeferred):
                         results[arg] = res
