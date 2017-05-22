@@ -334,8 +334,7 @@ class RulesForRoom(object):
             if membership == Membership.JOIN
         )
 
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug("Joined: %r", interested_in_user_ids)
+        logger.debug("Joined: %r", interested_in_user_ids)
 
         if_users_with_pushers = yield self.store.get_if_users_have_pushers(
             interested_in_user_ids,
@@ -346,15 +345,13 @@ class RulesForRoom(object):
             uid for uid, have_pusher in if_users_with_pushers.iteritems() if have_pusher
         )
 
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug("With pushers: %r", user_ids)
+        logger.debug("With pushers: %r", user_ids)
 
         users_with_receipts = yield self.store.get_users_with_read_receipts_in_room(
             self.room_id, on_invalidate=self.invalidate_all_cb,
         )
 
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug("With receipts: %r", users_with_receipts)
+        logger.debug("With receipts: %r", users_with_receipts)
 
         # any users with pushers must be ours: they have pushers
         for uid in users_with_receipts:
