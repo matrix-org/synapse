@@ -201,7 +201,10 @@ class RulesForRoom(object):
         self.sequence = 0
 
         # A cache of user_ids that we *know* aren't interesting, e.g. user_ids
-        # owned by AS's, or remote users, etc.
+        # owned by AS's, or remote users, etc. (I.e. users we will never need to
+        # calculate push for)
+        # These never need to be invalidated as we will never set up push for
+        # them.
         self.uninteresting_user_set = set()
 
         # We need to be clever on the invalidating caches callbacks, as
