@@ -321,6 +321,8 @@ class RulesForRoom(object):
             for row in rows
         }
 
+        # If the event is a join event then it will be in current state evnts
+        # map but not in the DB, so we have to explicitly insert it.
         if event.type == EventTypes.Member:
             for event_id in member_event_ids.itervalues():
                 if event_id == event.event_id:
