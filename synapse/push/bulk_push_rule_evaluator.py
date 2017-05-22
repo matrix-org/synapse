@@ -200,6 +200,13 @@ class RulesForRoom(object):
         # not update the cache with it.
         self.sequence = 0
 
+        # A cache of user_ids that we *know* aren't interesting, e.g. user_ids
+        # owned by AS's, or remote users, etc. (I.e. users we will never need to
+        # calculate push for)
+        # These never need to be invalidated as we will never set up push for
+        # them.
+        self.uninteresting_user_set = set()
+
         # We need to be clever on the invalidating caches callbacks, as
         # otherwise the invalidation callback holds a reference to the object,
         # potentially causing it to leak.
@@ -231,9 +238,23 @@ class RulesForRoom(object):
 
             # Loop through to see which member events we've seen and have rules
             # for and which we need to fetch
-            for key, event_id in current_state_ids.iteritems():
-                if key[0] != EventTypes.Member:
+            for key in current_state_ids:
+                typ, user_id = key
+                if typ != EventTypes.Member:
                     continue
+
+                if user_id in self.uninteresting_user_set:
+                    continue
+
+                if not self.is_mine_id(user_id):
+                    self.uninteresting_user_set.add(user_id)
+                    continue
+
+                if self.store.get_if_app_services_interested_in_user(user_id):
+                    self.uninteresting_user_set.add(user_id)
+                    continue
+
+                event_id = current_state_ids[key]
 
                 res = self.member_map.get(event_id, None)
                 if res:
@@ -242,13 +263,6 @@ class RulesForRoom(object):
                         rules = self.rules_by_user.get(user_id, None)
                         if rules:
                             ret_rules_by_user[user_id] = rules
-                    continue
-
-                user_id = key[1]
-                if not self.is_mine_id(user_id):
-                    continue
-
-                if self.store.get_if_app_services_interested_in_user(user_id):
                     continue
 
                 # If a user has left a room we remove their push rule. If they
