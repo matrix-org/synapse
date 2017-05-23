@@ -434,6 +434,8 @@ def _calc_og(tree, media_uri):
                 for el in _iterate_over_text(tree.find("body"), *TAGS_TO_REMOVE)
             )
             og['og:description'] = summarize_paragraphs(text_nodes)
+    else:
+        og['og:description'] = summarize_paragraphs([og['og:description']])
 
     # TODO: delete the url downloads to stop diskfilling,
     # as we only ever cared about its OG
