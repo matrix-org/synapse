@@ -31,7 +31,7 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import AuthError, SynapseError, Codes
 from synapse.types import UserID, RoomID
-from synapse.util.async import Linearizer
+from synapse.util.async import Linearizer, Limiter
 from synapse.util.distributor import user_left_room, user_joined_room
 
 
@@ -68,6 +68,7 @@ class RoomMemberHandler(object):
         self.event_creation_hander = hs.get_event_creation_handler()
 
         self.member_linearizer = Linearizer(name="member")
+        self.member_limiter = Limiter(3)
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
@@ -241,18 +242,23 @@ class RoomMemberHandler(object):
     ):
         key = (room_id,)
 
-        with (yield self.member_linearizer.queue(key)):
-            result = yield self._update_membership(
-                requester,
-                target,
-                room_id,
-                action,
-                txn_id=txn_id,
-                remote_room_hosts=remote_room_hosts,
-                third_party_signed=third_party_signed,
-                ratelimit=ratelimit,
-                content=content,
-            )
+        as_id = object()
+        if requester.app_service:
+            as_id = requester.app_service.id
+
+        with (yield self.member_limiter.queue(as_id)):
+            with (yield self.member_linearizer.queue(key)):
+                result = yield self._update_membership(
+                    requester,
+                    target,
+                    room_id,
+                    action,
+                    txn_id=txn_id,
+                    remote_room_hosts=remote_room_hosts,
+                    third_party_signed=third_party_signed,
+                    ratelimit=ratelimit,
+                    content=content,
+                )
 
         defer.returnValue(result)
 
