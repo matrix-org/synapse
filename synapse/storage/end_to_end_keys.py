@@ -237,9 +237,6 @@ class EndToEndKeyStore(SQLBaseStore):
             )
             for user_id, device_id, algorithm, key_id in delete:
                 txn.execute(sql, (user_id, device_id, algorithm, key_id))
-                txn.call_after(
-                    self.count_e2e_one_time_keys.invalidate, (user_id, device_id,)
-                )
                 self._invalidate_cache_and_stream(
                     txn, self.count_e2e_one_time_keys, (user_id, device_id,)
                 )
