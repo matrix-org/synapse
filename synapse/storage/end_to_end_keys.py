@@ -240,6 +240,9 @@ class EndToEndKeyStore(SQLBaseStore):
                 txn.call_after(
                     self.count_e2e_one_time_keys.invalidate, (user_id, device_id,)
                 )
+                self._invalidate_cache_and_stream(
+                    txn, self.count_e2e_one_time_keys, (user_id, device_id,)
+                )
             return result
         return self.runInteraction(
             "claim_e2e_one_time_keys", _claim_e2e_one_time_keys
