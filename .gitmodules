@@ -1,0 +1,3 @@
+[submodule "contrib/python-matrix-appSrv-bot"]
+	path = contrib/python-matrix-appSrv-bot
+	url = https://github.com/Torxed/python-matrix-appSrv-bot.git
