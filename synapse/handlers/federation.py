@@ -832,7 +832,11 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def on_event_auth(self, event_id):
-        auth = yield self.store.get_auth_chain([event_id])
+        event = yield self.store.get_event(event_id)
+        auth = yield self.store.get_auth_chain(
+            [auth_id for auth_id, _ in event.auth_events],
+            include_given=True
+        )
 
         for event in auth:
             event.signatures.update(
@@ -1047,9 +1051,7 @@ class FederationHandler(BaseHandler):
                 yield user_joined_room(self.distributor, user, event.room_id)
 
         state_ids = context.prev_state_ids.values()
-        auth_chain = yield self.store.get_auth_chain(set(
-            [event.event_id] + state_ids
-        ))
+        auth_chain = yield self.store.get_auth_chain(state_ids)
 
         state = yield self.store.get_events(context.prev_state_ids.values())
 
@@ -1598,7 +1600,11 @@ class FederationHandler(BaseHandler):
                 pass
 
         # Now get the current auth_chain for the event.
-        local_auth_chain = yield self.store.get_auth_chain([event_id])
+        event = yield self.store.get_event(event_id)
+        local_auth_chain = yield self.store.get_auth_chain(
+            [auth_id for auth_id, _ in event.auth_events],
+            include_given=True
+        )
 
         # TODO: Check if we would now reject event_id. If so we need to tell
         # everyone.
@@ -1791,7 +1797,9 @@ class FederationHandler(BaseHandler):
                 auth_ids = yield self.auth.compute_auth_events(
                     event, context.prev_state_ids
                 )
-                local_auth_chain = yield self.store.get_auth_chain(auth_ids)
+                local_auth_chain = yield self.store.get_auth_chain(
+                    auth_ids, include_given=True
+                )
 
                 try:
                     # 2. Get remote difference.
