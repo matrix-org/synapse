@@ -131,7 +131,7 @@ class DeviceHandler(BaseHandler):
         try:
             device = yield self.store.get_device(user_id, device_id)
         except errors.StoreError:
-            raise errors.NotFoundError
+            raise errors.NotFoundError()
         ips = yield self.store.get_last_client_ip_by_device(
             devices=((user_id, device_id),)
         )
