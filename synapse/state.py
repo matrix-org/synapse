@@ -170,9 +170,7 @@ class StateHandler(object):
             latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
         logger.debug("calling resolve_state_groups from get_current_user_in_room")
         entry = yield self.resolve_state_groups(room_id, latest_event_ids)
-        joined_users = yield self.store.get_joined_users_from_state(
-            room_id, entry.state_id, entry.state
-        )
+        joined_users = yield self.store.get_joined_users_from_state(room_id, entry)
         defer.returnValue(joined_users)
 
     @defer.inlineCallbacks
@@ -181,9 +179,9 @@ class StateHandler(object):
             latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
         logger.debug("calling resolve_state_groups from get_current_hosts_in_room")
         entry = yield self.resolve_state_groups(room_id, latest_event_ids)
-        joined_hosts = yield self.store.get_joined_hosts(
-            room_id, entry.state_id, entry.state
-        )
+        logger.info("State: %r", entry.state_group)
+        joined_hosts = yield self.store.get_joined_hosts(room_id, entry)
+        logger.info("returning: %r", joined_hosts)
         defer.returnValue(joined_hosts)
 
     @defer.inlineCallbacks
@@ -307,11 +305,13 @@ class StateHandler(object):
         if len(group_names) == 1:
             name, state_list = state_groups_ids.items().pop()
 
+            prev_group, delta_ids = yield self.store.get_state_group_delta(name)
+
             defer.returnValue(_StateCacheEntry(
                 state=state_list,
                 state_group=name,
-                prev_group=None,
-                delta_ids=None,
+                prev_group=prev_group,
+                delta_ids=delta_ids,
             ))
 
         with (yield self.resolve_linearizer.queue(group_names)):
