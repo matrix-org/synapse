@@ -692,7 +692,10 @@ class _JoinedHostsCache(object):
                     host = intern_string(get_domain_from_id(user_id))
                     self.hosts_to_joined_users.setdefault(host, set()).add(user_id)
 
-            self.state_group = state_entry.state_group
+            if state_entry.state_group:
+                self.state_group = state_entry.state_group
+            else:
+                self.state_group = object()
             self._len = sum(len(v) for v in self.hosts_to_joined_users.itervalues())
         defer.returnValue(frozenset(self.hosts_to_joined_users))
 
