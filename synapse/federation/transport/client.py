@@ -471,3 +471,47 @@ class TransportLayerClient(object):
         )
 
         defer.returnValue(content)
+
+    @log_function
+    def get_group_profile(self, destination, group_id, requester_user_id):
+        path = PREFIX + "/groups/%s/profile" % (group_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def get_group_summary(self, destination, group_id, requester_user_id):
+        path = PREFIX + "/groups/%s/summary" % (group_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def get_group_rooms(self, destination, group_id, requester_user_id):
+        path = PREFIX + "/groups/%s/rooms" % (group_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def get_group_users(self, destination, group_id, requester_user_id):
+        path = PREFIX + "/groups/%s/users" % (group_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )

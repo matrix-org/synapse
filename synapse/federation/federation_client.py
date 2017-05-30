@@ -27,6 +27,7 @@ from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
 from synapse.events import FrozenEvent, builder
+from synapse.types import get_domain_from_id
 import synapse.metrics
 
 from synapse.util.retryutils import NotRetryingDestination
@@ -836,3 +837,27 @@ class FederationClient(FederationBase):
                 )
 
         raise RuntimeError("Failed to send to any server.")
+
+    def get_group_profile(self, group_id, requester_user_id):
+        destination = get_domain_from_id(group_id)
+        return self.transport_layer.get_group_profile(
+            destination, group_id, requester_user_id,
+        )
+
+    def get_group_summary(self, group_id, requester_user_id):
+        destination = get_domain_from_id(group_id)
+        return self.transport_layer.get_group_summary(
+            destination, group_id, requester_user_id,
+        )
+
+    def get_group_rooms(self, group_id, requester_user_id):
+        destination = get_domain_from_id(group_id)
+        return self.transport_layer.get_group_rooms(
+            destination, group_id, requester_user_id,
+        )
+
+    def get_group_users(self, group_id, requester_user_id):
+        destination = get_domain_from_id(group_id)
+        return self.transport_layer.get_group_users(
+            destination, group_id, requester_user_id,
+        )

@@ -58,6 +58,8 @@ class FederationServer(FederationBase):
         # come in waves.
         self._state_resp_cache = ResponseCache(hs, timeout_ms=30000)
 
+        self.groups_handler = hs.get_groups_handler()
+
     def set_handler(self, handler):
         """Sets the handler that the replication layer will use to communicate
         receipt of new PDUs from other home servers. The required methods are
@@ -567,3 +569,35 @@ class FederationServer(FederationBase):
             origin, room_id, event_dict
         )
         defer.returnValue(ret)
+
+    def on_groups_profile_request(self, origin, content, group_id):
+        requester_user_id = content["requester_user_id"]
+
+        if get_domain_from_id(requester_user_id) != origin:
+            raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        return self.groups_handler.get_local_group_profile(group_id, requester_user_id)
+
+    def on_groups_profile_summary(self, origin, content, group_id):
+        requester_user_id = content["requester_user_id"]
+
+        if get_domain_from_id(requester_user_id) != origin:
+            raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        return self.groups_handler.get_local_group_summary(group_id, requester_user_id)
+
+    def on_groups_rooms_request(self, origin, content, group_id):
+        requester_user_id = content["requester_user_id"]
+
+        if get_domain_from_id(requester_user_id) != origin:
+            raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        return self.groups_handler.get_local_rooms_in_group(group_id, requester_user_id)
+
+    def on_groups_users_request(self, origin, content, group_id):
+        requester_user_id = content["requester_user_id"]
+
+        if get_domain_from_id(requester_user_id) != origin:
+            raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        return self.groups_handler.get_local_users_in_group(group_id, requester_user_id)

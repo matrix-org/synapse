@@ -52,6 +52,7 @@ from synapse.rest.client.v2_alpha import (
     thirdparty,
     sendtodevice,
     user_directory,
+    groups,
 )
 
 from synapse.http.server import JsonResource
@@ -102,3 +103,4 @@ class ClientRestResource(JsonResource):
         thirdparty.register_servlets(hs, client_resource)
         sendtodevice.register_servlets(hs, client_resource)
         user_directory.register_servlets(hs, client_resource)
+        groups.register_servlets(hs, client_resource)

@@ -611,6 +611,54 @@ class FederationVersionServlet(BaseFederationServlet):
         }))
 
 
+class FederationGroupsProfileServlet(BaseFederationServlet):
+    PATH = "/groups/(?P<group_id>[^/]*)/profile$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id):
+        new_content = yield self.handler.on_groups_profile_request(
+            origin, content, group_id
+        )
+
+        defer.returnValue((200, new_content))
+
+
+class FederationGroupsSummaryServlet(BaseFederationServlet):
+    PATH = "/groups/(?P<group_id>[^/]*)/summary$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id):
+        new_content = yield self.handler.on_groups_profile_summary(
+            origin, content, group_id
+        )
+
+        defer.returnValue((200, new_content))
+
+
+class FederationGroupsRoomsServlet(BaseFederationServlet):
+    PATH = "/groups/(?P<group_id>[^/]*)/rooms$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id):
+        new_content = yield self.handler.on_groups_rooms_request(
+            origin, content, group_id
+        )
+
+        defer.returnValue((200, new_content))
+
+
+class FederationGroupsUsersServlet(BaseFederationServlet):
+    PATH = "/groups/(?P<group_id>[^/]*)/users$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id):
+        new_content = yield self.handler.on_groups_users_request(
+            origin, content, group_id
+        )
+
+        defer.returnValue((200, new_content))
+
+
 SERVLET_CLASSES = (
     FederationSendServlet,
     FederationPullServlet,
@@ -636,6 +684,9 @@ SERVLET_CLASSES = (
     OpenIdUserInfo,
     PublicRoomList,
     FederationVersionServlet,
+    FederationGroupsProfileServlet,
+    FederationGroupsRoomsServlet,
+    FederationGroupsUsersServlet,
 )
 
 
