@@ -749,6 +749,7 @@ class EventsStore(SQLBaseStore):
                             "type": key[0],
                             "state_key": key[1],
                             "event_id": ev_id,
+                            "prev_event_id": to_delete.get(key, None),
                         }
                         for key, ev_id in state_deltas.iteritems()
                     ]
