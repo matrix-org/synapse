@@ -724,3 +724,27 @@ class _AccountHandler(object):
         """
         reg = self.hs.get_handlers().registration_handler
         return reg.register(localpart=localpart)
+
+    def set_displayname(self, localpart, displayname):
+        """ Setup Display Name from external auth source
+        """
+        # TODO (slipeer) : It may be necessary to check that
+        # the new name differs from the old one.
+        # And call self.get_handlers().profile_handler._update_join_states()
+        # for notifying in the rooms about changing the name.
+        yield self.get_handlers().profile_handler.storeset_profile_displayname(
+            localpart,
+            displayname
+        )
+
+    def set_3pid(self, user_id, type, threepid):
+        """ Setup 3pid from external auth source
+        """
+        validated_at = self.hs.get_clock().time_msec()
+        yield self.get_handlers().profile_handler.store.user_add_threepid(
+            user_id,
+            type,
+            threepid,
+            validated_at,
+            validated_at
+        )
