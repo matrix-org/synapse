@@ -124,6 +124,17 @@ class UserDirectoryStore(SQLBaseStore):
         )
         self.get_user_in_directory.invalidate((user_id,))
 
+    def get_users_in_dir_due_to_room(self, room_id):
+        """Get all user_ids that are in the room directory becuase they're
+        in the given room_id
+        """
+        return self._simple_select_onecol(
+            table="user_directory",
+            keyvalues={"room_id": room_id},
+            retcol="user_id",
+            desc="get_users_in_dir_due_to_room",
+        )
+
     def get_all_rooms(self):
         """Get all room_ids we've ever known about
         """

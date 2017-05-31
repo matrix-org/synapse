@@ -41,6 +41,7 @@ CREATE TABLE user_directory (
 );
 
 CREATE INDEX user_directory_fts_idx ON user_directory USING gin(vector);
+CREATE INDEX user_directory_room_idx ON user_directory(room_id);
 CREATE INDEX user_directory_user_idx ON user_directory(user_id);
 """
 
@@ -48,6 +49,9 @@ CREATE INDEX user_directory_user_idx ON user_directory(user_id);
 SQLITE_TABLE = """
 CREATE VIRTUAL TABLE user_directory
     USING fts4 ( user_id, room_id, display_name, avatar_url, value );
+
+CREATE INDEX user_directory_room_idx ON user_directory(room_id);
+CREATE INDEX user_directory_user_idx ON user_directory(user_id);
 """
 
 

@@ -132,7 +132,9 @@ class UserDirectoyHandler(object):
     def _handle_intial_room(self, room_id):
         """Called when we initially fill out user_directory one room at a time
         """
-        # TODO: Check we're still joined to room
+        is_in_room = yield self.store.get_is_host_in_room(room_id, self.server_name)
+        if not is_in_room:
+            return
 
         is_public = yield self.store.is_room_world_readable_or_publicly_joinable(room_id)
         if not is_public:
@@ -229,7 +231,22 @@ class UserDirectoyHandler(object):
                 if change is None:
                     continue
 
-                if change:
+                if not change:
+                    # Need to check if the server left the room entirely, if so
+                    # we might need to remove all the users in that room
+                    is_in_room = yield self.store.get_is_host_in_room(
+                        room_id, self.server_name,
+                    )
+                    if not is_in_room:
+                        # Fetch all the users that we marked as being in user
+                        # directory due to being in the room and then check if
+                        # need to remove those users or not
+                        user_ids = yield self.store.get_users_in_dir_due_to_room(room_id)
+                        for user_id in user_ids:
+                            yield self._handle_remove_user(room_id, user_id)
+                        return
+
+                if change:  # The user joined
                     event = yield self.store.get_event(event_id)
                     profile = ProfileInfo(
                         avatar_url=event.content.get("avatar_url"),
@@ -237,7 +254,7 @@ class UserDirectoyHandler(object):
                     )
 
                     yield self._handle_new_user(room_id, state_key, profile)
-                else:
+                else:  # The user left
                     yield self._handle_remove_user(room_id, state_key)
 
     @defer.inlineCallbacks
