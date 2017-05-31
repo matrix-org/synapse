@@ -153,3 +153,38 @@ class UserDirectoryStore(SQLBaseStore):
         return self._execute(
             "get_current_state_deltas", self.cursor_to_dict, sql, prev_stream_id
         )
+
+    @defer.inlineCallbacks
+    def search_user_dir(self, search_term, limit):
+        if isinstance(self.database_engine, PostgresEngine):
+            sql = """
+                SELECT user_id, display_name, avatar_url
+                FROM user_directory
+                WHERE vector @@ to_tsquery('english', ?)
+                ORDER BY  ts_rank_cd(vector, to_tsquery('english', ?)) DESC
+                LIMIT ?
+            """
+            args = (search_term, search_term, limit + 1,)
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            sql = """
+                SELECT user_id, display_name, avatar_url
+                FROM user_directory
+                WHERE value MATCH ?
+                ORDER BY rank(matchinfo(user_directory)) DESC
+                LIMIT ?
+            """
+            args = (search_term, limit + 1)
+        else:
+            # This should be unreachable.
+            raise Exception("Unrecognized database engine")
+
+        results = yield self._execute(
+            "search_user_dir", self.cursor_to_dict, sql, *args
+        )
+
+        limited = len(results) > limit
+
+        defer.returnValue({
+            "limited": limited,
+            "results": results,
+        })
