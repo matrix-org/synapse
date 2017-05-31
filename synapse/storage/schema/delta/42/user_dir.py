@@ -37,7 +37,7 @@ CREATE TABLE user_directory (
 );
 
 CREATE INDEX user_directory_room_idx ON user_directory(room_id);
-CREATE INDEX user_directory_user_idx ON user_directory(user_id);
+CREATE UNIQUE INDEX user_directory_user_idx ON user_directory(user_id);
 """
 
 
@@ -48,7 +48,7 @@ CREATE TABLE user_directory_search (
 );
 
 CREATE INDEX user_directory_search_fts_idx ON user_directory_search USING gin(vector);
-CREATE INDEX user_directory_search_user_idx ON user_directory_search(user_id);
+CREATE UNIQUE INDEX user_directory_search_user_idx ON user_directory_search(user_id);
 """
 
 
