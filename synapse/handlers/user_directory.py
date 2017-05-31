@@ -66,8 +66,8 @@ class UserDirectoyHandler(object):
 
                 yield self._handle_deltas(deltas)
 
-                max_stream_id = deltas[-1]["stream_id"]
-                yield self.store.update_user_directory_stream_pos(max_stream_id)
+                self.pos = deltas[-1]["stream_id"]
+                yield self.store.update_user_directory_stream_pos(self.pos)
 
     @defer.inlineCallbacks
     def _handle_room(self, room_id):
@@ -207,8 +207,6 @@ class UserDirectoyHandler(object):
 
         if event:
             hist_vis = event.content.get(key_name, None)
-
-        logger.info("prev: %r, new: %r", prev_hist_vis, hist_vis)
 
         if hist_vis == public_value and prev_hist_vis != public_value:
             defer.returnValue(True)
