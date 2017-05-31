@@ -121,12 +121,13 @@ class UserDirectoyHandler(object):
 
         # TODO: Make this faster?
         rooms = yield self.store.get_rooms_for_user(user_id)
-        for room_id in rooms:
+        for j_room_id in rooms:
             is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
-                room_id
+                j_room_id
             )
 
             if is_public:
+                yield self.store.update_user_in_user_dir(user_id, j_room_id)
                 return
 
         yield self.store.remove_from_user_dir(user_id)
@@ -149,6 +150,15 @@ class UserDirectoyHandler(object):
                 if change is None:
                     continue
 
+                is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
+                    room_id
+                )
+
+                if change and is_public:
+                    continue
+                elif not change and not is_public:
+                    continue
+
                 users_with_profile = yield self.state.get_current_user_in_room(room_id)
                 for user_id, profile in users_with_profile.iteritems():
                     if change:
@@ -162,6 +172,15 @@ class UserDirectoyHandler(object):
                     public_value=JoinRules.PUBLIC,
                 )
                 if change is None:
+                    continue
+
+                is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
+                    room_id
+                )
+
+                if change and is_public:
+                    continue
+                elif not change and not is_public:
                     continue
 
                 users_with_profile = yield self.state.get_current_user_in_room(room_id)

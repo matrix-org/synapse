@@ -80,6 +80,16 @@ class UserDirectoryStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
+    def update_user_in_user_dir(self, user_id, room_id):
+        yield self._simple_update_one(
+            table="user_directory",
+            keyvalues={"user_id": user_id},
+            updatevalues={"room_id": room_id},
+            desc="update_user_in_user_dir",
+        )
+        self.get_user_in_directory.invalidate((user_id,))
+
+    @defer.inlineCallbacks
     def remove_from_user_dir(self, user_id):
         yield self._simple_delete(
             table="user_directory",
