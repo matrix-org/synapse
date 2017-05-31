@@ -274,14 +274,20 @@ class UserDirectoryStore(SQLBaseStore):
                     ]
                 }
         """
+
         search_query = _parse_query(self.database_engine, search_term)
+
         if isinstance(self.database_engine, PostgresEngine):
+            # We order by rank and then if they have profile info
             sql = """
                 SELECT user_id, display_name, avatar_url
                 FROM user_directory_search
                 INNER JOIN user_directory USING (user_id)
                 WHERE vector @@ to_tsquery('english', ?)
-                ORDER BY ts_rank_cd(vector, to_tsquery('english', ?)) DESC
+                ORDER BY
+                    ts_rank_cd(vector, to_tsquery('english', ?)) DESC,
+                    display_name IS NULL,
+                    avatar_url IS NULL
                 LIMIT ?
             """
             args = (search_query, search_query, limit + 1,)
@@ -291,7 +297,10 @@ class UserDirectoryStore(SQLBaseStore):
                 FROM user_directory_search
                 INNER JOIN user_directory USING (user_id)
                 WHERE value MATCH ?
-                ORDER BY rank(matchinfo(user_directory)) DESC
+                ORDER BY
+                    rank(matchinfo(user_directory)) DESC,
+                    display_name IS NULL,
+                    avatar_url IS NULL
                 LIMIT ?
             """
             args = (search_query, limit + 1)
