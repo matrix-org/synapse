@@ -304,10 +304,10 @@ class UserDirectoyHandler(object):
         `shared` to `world_readable` (`public_value`).
 
         Returns:
-            None if the field in the events either both match `public_value` o
+            None if the field in the events either both match `public_value`
             neither do, i.e. there has been no change.
             True if it didnt match `public_value` but now does
-            Falsse if it did match `public_value` but now doesn't
+            False if it did match `public_value` but now doesn't
         """
         prev_event = None
         event = None
@@ -320,18 +320,18 @@ class UserDirectoyHandler(object):
         if not event and not prev_event:
             defer.returnValue(None)
 
-        prev_hist_vis = None
-        hist_vis = None
+        prev_value = None
+        value = None
 
         if prev_event:
-            prev_hist_vis = prev_event.content.get(key_name, None)
+            prev_value = prev_event.content.get(key_name, None)
 
         if event:
-            hist_vis = event.content.get(key_name, None)
+            value = event.content.get(key_name, None)
 
-        if hist_vis == public_value and prev_hist_vis != public_value:
+        if value == public_value and prev_value != public_value:
             defer.returnValue(True)
-        elif hist_vis != public_value and prev_hist_vis == public_value:
+        elif value != public_value and prev_value == public_value:
             defer.returnValue(False)
         else:
             defer.returnValue(None)
