@@ -162,63 +162,10 @@ class UserDirectoyHandler(object):
 
             # For join rule and visibility changes we need to check if the room
             # may have become public or not and add/remove the users in said room
-            if typ == EventTypes.RoomHistoryVisibility:
-                change = yield self._get_key_change(
-                    prev_event_id, event_id,
-                    key_name="history_visibility",
-                    public_value="world_readable",
+            if typ in (EventTypes.RoomHistoryVisibility, EventTypes.JoinRules):
+                yield self._handle_room_publicity_change(
+                    room_id, prev_event_id, event_id, typ,
                 )
-
-                # If change is None, no change. True => become world readable,
-                # False => was world readable
-                if change is None:
-                    continue
-
-                # There's been a change to or from being world readable.
-
-                is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
-                    room_id
-                )
-
-                if change and not is_public:
-                    # If we became world readable but room isn't currently public then
-                    # we ignore the change
-                    continue
-                elif not change and is_public:
-                    # If we stopped being world readable but are still public,
-                    # ignore the change
-                    continue
-
-                users_with_profile = yield self.state.get_current_user_in_room(room_id)
-                for user_id, profile in users_with_profile.iteritems():
-                    if change:
-                        yield self._handle_new_user(room_id, user_id, profile)
-                    else:
-                        yield self._handle_remove_user(room_id, user_id)
-            elif typ == EventTypes.JoinRules:
-                change = yield self._get_key_change(
-                    prev_event_id, event_id,
-                    key_name="join_rules",
-                    public_value=JoinRules.PUBLIC,
-                )
-                if change is None:
-                    continue
-
-                is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
-                    room_id
-                )
-
-                if change and is_public:
-                    continue
-                elif not change and not is_public:
-                    continue
-
-                users_with_profile = yield self.state.get_current_user_in_room(room_id)
-                for user_id, profile in users_with_profile.iteritems():
-                    if change:
-                        yield self._handle_new_user(room_id, user_id, profile)
-                    else:
-                        yield self._handle_remove_user(room_id, user_id)
             elif typ == EventTypes.Member:
                 change = yield self._get_key_change(
                     prev_event_id, event_id,
@@ -254,6 +201,57 @@ class UserDirectoyHandler(object):
                     yield self._handle_new_user(room_id, state_key, profile)
                 else:  # The user left
                     yield self._handle_remove_user(room_id, state_key)
+
+    def _handle_room_publicity_change(self, room_id, prev_event_id, event_id, typ):
+        """Handle a room having potentially changed from/to world_readable/publically
+        joinable.
+
+        Args:
+            room_id (str)
+            prev_event_id (str|None): The previous event before the state change
+            event_id (str|None): The new event after the state change
+            typ (str): Type of the event
+        """
+        if typ == EventTypes.RoomHistoryVisibility:
+            change = yield self._get_key_change(
+                prev_event_id, event_id,
+                key_name="history_visibility",
+                public_value="world_readable",
+            )
+        elif typ == EventTypes.JoinRules:
+            change = yield self._get_key_change(
+                prev_event_id, event_id,
+                key_name="join_rules",
+                public_value=JoinRules.PUBLIC,
+            )
+        else:
+            raise Exception("Invalid event type")
+        # If change is None, no change. True => become world_readable/public,
+        # False => was world_readable/public
+        if change is None:
+            return
+
+        # There's been a change to or from being world readable.
+
+        is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
+            room_id
+        )
+
+        if change and not is_public:
+            # If we became world readable but room isn't currently public then
+            # we ignore the change
+            return
+        elif not change and is_public:
+            # If we stopped being world readable but are still public,
+            # ignore the change
+            return
+
+        users_with_profile = yield self.state.get_current_user_in_room(room_id)
+        for user_id, profile in users_with_profile.iteritems():
+            if change:
+                yield self._handle_new_user(room_id, user_id, profile)
+            else:
+                yield self._handle_remove_user(room_id, user_id)
 
     @defer.inlineCallbacks
     def _handle_new_user(self, room_id, user_id, profile):
