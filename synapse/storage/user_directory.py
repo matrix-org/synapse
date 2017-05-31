@@ -61,9 +61,8 @@ class UserDirectoryStore(SQLBaseStore):
             # We weight the loclpart most highly, then display name and finally
             # server name
             sql = """
-                INSERT INTO user_directory
-                    (user_id, room_id, display_name, avatar_url, vector)
-                VALUES (?,?,?,?,
+                INSERT INTO user_directory_search(user_id, vector)
+                VALUES (?,
                     setweight(to_tsvector('english', ?), 'A')
                     || setweight(to_tsvector('english', ?), 'D')
                     || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
@@ -71,21 +70,19 @@ class UserDirectoryStore(SQLBaseStore):
             """
             args = (
                 (
-                    user_id, room_id, p.display_name, p.avatar_url,
-                    get_localpart_from_id(user_id), get_domain_from_id(user_id),
-                    p.display_name,
+                    user_id, get_localpart_from_id(user_id), get_domain_from_id(user_id),
+                    profile.display_name,
                 )
-                for user_id, p in users_with_profile.iteritems()
+                for user_id, profile in users_with_profile.iteritems()
             )
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = """
-                INSERT INTO user_directory
-                    (user_id, room_id, display_name, avatar_url, value)
-                VALUES (?,?,?,?,?)
+                INSERT INTO user_directory_search(user_id, value)
+                VALUES (?,?)
             """
             args = (
                 (
-                    user_id, room_id, p.display_name, p.avatar_url,
+                    user_id,
                     "%s %s" % (user_id, p.display_name,) if p.display_name else user_id
                 )
                 for user_id, p in users_with_profile.iteritems()
@@ -96,6 +93,19 @@ class UserDirectoryStore(SQLBaseStore):
 
         def _add_profiles_to_user_dir_txn(txn):
             txn.executemany(sql, args)
+            self._simple_insert_many_txn(
+                txn,
+                table="user_directory",
+                values=[
+                    {
+                        "user_id": user_id,
+                        "room_id": room_id,
+                        "display_name": profile.display_name,
+                        "avatar_url": profile.avatar_url,
+                    }
+                    for user_id, profile in users_with_profile.iteritems()
+                ]
+            )
             for user_id in users_with_profile:
                 txn.call_after(
                     self.get_user_in_directory.invalidate, (user_id,)
@@ -117,12 +127,23 @@ class UserDirectoryStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def remove_from_user_dir(self, user_id):
-        yield self._simple_delete(
-            table="user_directory",
-            keyvalues={"user_id": user_id},
-            desc="remove_from_user_dir",
+        def _remove_from_user_dir_txn(txn):
+            self._simple_delete_txn(
+                txn,
+                table="user_directory",
+                keyvalues={"user_id": user_id},
+            )
+            self._simple_delete_txn(
+                txn,
+                table="user_directory_search",
+                keyvalues={"user_id": user_id},
+            )
+            txn.call_after(
+                self.get_user_in_directory.invalidate, (user_id,)
+            )
+        return self.runInteraction(
+            "remove_from_user_dir", _remove_from_user_dir_txn,
         )
-        self.get_user_in_directory.invalidate((user_id,))
 
     def get_users_in_dir_due_to_room(self, room_id):
         """Get all user_ids that are in the room directory becuase they're
@@ -150,6 +171,7 @@ class UserDirectoryStore(SQLBaseStore):
         """
         def _delete_all_from_user_dir_txn(txn):
             txn.execute("DELETE FROM user_directory")
+            txn.execute("DELETE FROM user_directory_search")
             txn.call_after(self.get_user_in_directory.invalidate_all)
         return self.runInteraction(
             "delete_all_from_user_dir", _delete_all_from_user_dir_txn
@@ -225,7 +247,8 @@ class UserDirectoryStore(SQLBaseStore):
         if isinstance(self.database_engine, PostgresEngine):
             sql = """
                 SELECT user_id, display_name, avatar_url
-                FROM user_directory
+                FROM user_directory_search
+                INNER JOIN user_directory USING (user_id)
                 WHERE vector @@ plainto_tsquery('english', ?)
                 ORDER BY ts_rank_cd(vector, plainto_tsquery('english', ?)) DESC
                 LIMIT ?
@@ -234,7 +257,8 @@ class UserDirectoryStore(SQLBaseStore):
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = """
                 SELECT user_id, display_name, avatar_url
-                FROM user_directory
+                FROM user_directory_search
+                INNER JOIN user_directory USING (user_id)
                 WHERE value MATCH ?
                 ORDER BY rank(matchinfo(user_directory)) DESC
                 LIMIT ?

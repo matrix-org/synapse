@@ -28,30 +28,33 @@ CREATE TABLE user_directory_stream_pos (
 );
 
 INSERT INTO user_directory_stream_pos (stream_id) VALUES (null);
-"""
 
-
-POSTGRES_TABLE = """
 CREATE TABLE user_directory (
     user_id TEXT NOT NULL,
     room_id TEXT NOT NULL,  -- A room_id that we know is public
     display_name TEXT,
-    avatar_url TEXT,
-    vector tsvector
+    avatar_url TEXT
 );
 
-CREATE INDEX user_directory_fts_idx ON user_directory USING gin(vector);
 CREATE INDEX user_directory_room_idx ON user_directory(room_id);
 CREATE INDEX user_directory_user_idx ON user_directory(user_id);
 """
 
 
-SQLITE_TABLE = """
-CREATE VIRTUAL TABLE user_directory
-    USING fts4 ( user_id, room_id, display_name, avatar_url, value );
+POSTGRES_TABLE = """
+CREATE TABLE user_directory_search (
+    user_id TEXT NOT NULL,
+    vector tsvector
+);
 
-CREATE INDEX user_directory_room_idx ON user_directory(room_id);
-CREATE INDEX user_directory_user_idx ON user_directory(user_id);
+CREATE INDEX user_directory_search_fts_idx ON user_directory_search USING gin(vector);
+CREATE INDEX user_directory_search_user_idx ON user_directory_search(user_id);
+"""
+
+
+SQLITE_TABLE = """
+CREATE VIRTUAL TABLE user_directory_search
+    USING fts4 ( user_id, value );
 """
 
 
