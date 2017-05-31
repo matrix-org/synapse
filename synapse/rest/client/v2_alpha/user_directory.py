@@ -38,7 +38,7 @@ class UserDirectorySearchRestServlet(RestServlet):
         self.user_directory_handler = hs.get_user_directory_handler()
 
     @defer.inlineCallbacks
-    def on_GET(self, request):
+    def on_POST(self, request):
         yield self.auth.get_user_by_req(request, allow_guest=False)
         body = parse_json_object_from_request(request)
 
