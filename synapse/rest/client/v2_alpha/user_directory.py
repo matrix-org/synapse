@@ -39,6 +39,22 @@ class UserDirectorySearchRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        """Searches for users in directory
+
+        Returns:
+            dict of the form::
+
+                {
+                    "limited": <bool>,  # whether there were more results or not
+                    "results": [  # Ordered by best match first
+                        {
+                            "user_id": <user_id>,
+                            "display_name": <display_name>,
+                            "avatar_url": <avatar_url>
+                        }
+                    ]
+                }
+        """
         yield self.auth.get_user_by_req(request, allow_guest=False)
         body = parse_json_object_from_request(request)
 

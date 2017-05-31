@@ -26,6 +26,8 @@ class UserDirectoryStore(SQLBaseStore):
 
     @cachedInlineCallbacks(cache_context=True)
     def is_room_world_readable_or_publicly_joinable(self, room_id, cache_context):
+        """Check if the room is either world_readable or publically joinable
+        """
         current_state_ids = yield self.get_current_state_ids(
             room_id, on_invalidate=cache_context.invalidate
         )
@@ -47,14 +49,24 @@ class UserDirectoryStore(SQLBaseStore):
         defer.returnValue(False)
 
     def add_profiles_to_user_dir(self, room_id, users_with_profile):
+        """Add profiles to the user directory
+
+        Args:
+            room_id (str): A room_id that all users are in that is world_readable
+                or publically joinable
+            users_with_profile (dict): Users to add to directory in the form of
+                mapping of user_id -> ProfileInfo
+        """
         if isinstance(self.database_engine, PostgresEngine):
+            # We weight the loclpart most highly, then display name and finally
+            # server name
             sql = """
                 INSERT INTO user_directory
                     (user_id, room_id, display_name, avatar_url, vector)
                 VALUES (?,?,?,?,
                     setweight(to_tsvector('english', ?), 'A')
-                    || to_tsvector('english', ?)
-                    || to_tsvector('english', COALESCE(?, ''))
+                    || setweight(to_tsvector('english', ?), 'D')
+                    || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
                 )
             """
             args = (
@@ -113,6 +125,8 @@ class UserDirectoryStore(SQLBaseStore):
         self.get_user_in_directory.invalidate((user_id,))
 
     def get_all_rooms(self):
+        """Get all room_ids we've ever known about
+        """
         return self._simple_select_onecol(
             table="current_state_events",
             keyvalues={},
@@ -121,6 +135,8 @@ class UserDirectoryStore(SQLBaseStore):
         )
 
     def delete_all_from_user_dir(self):
+        """Delete the entire user directory
+        """
         def _delete_all_from_user_dir_txn(txn):
             txn.execute("DELETE FROM user_directory")
             txn.call_after(self.get_user_in_directory.invalidate_all)
@@ -170,12 +186,29 @@ class UserDirectoryStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def search_user_dir(self, search_term, limit):
+        """Searches for users in directory
+
+        Returns:
+            dict of the form::
+
+                {
+                    "limited": <bool>,  # whether there were more results or not
+                    "results": [  # Ordered by best match first
+                        {
+                            "user_id": <user_id>,
+                            "display_name": <display_name>,
+                            "avatar_url": <avatar_url>
+                        }
+                    ]
+                }
+        """
+
         if isinstance(self.database_engine, PostgresEngine):
             sql = """
                 SELECT user_id, display_name, avatar_url
                 FROM user_directory
                 WHERE vector @@ plainto_tsquery('english', ?)
-                ORDER BY  ts_rank_cd(vector, plainto_tsquery('english', ?)) DESC
+                ORDER BY ts_rank_cd(vector, plainto_tsquery('english', ?)) DESC
                 LIMIT ?
             """
             args = (search_term, search_term, limit + 1,)

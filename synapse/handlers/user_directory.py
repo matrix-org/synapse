@@ -26,25 +26,54 @@ logger = logging.getLogger(__name__)
 
 
 class UserDirectoyHandler(object):
+    """Handles querying of and keeping updated the user_directory.
+
+    N.B.: ASSUMES IT IS THE ONLY THING THAT MODIFIES THE USER DIRECTORY
+    """
+
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self.server_name = hs.hostname
         self.clock = hs.get_clock()
 
+        # When start up for the first time we need to populate the user_directory.
+        # This is a set of user_id's we've inserted already
         self.initially_handled_users = set()
 
+        # The current position in the current_state_delta stream
         self.pos = None
 
+        # Guard to ensure we only process deltas one at a time
         self._is_processing = False
 
+        # We kick this off so that we don't have to wait for a change before
+        # we start populating the user directory
         self.clock.call_later(0, self.notify_new_event)
 
     def search_users(self, search_term, limit):
+        """Searches for users in directory
+
+        Returns:
+            dict of the form::
+
+                {
+                    "limited": <bool>,  # whether there were more results or not
+                    "results": [  # Ordered by best match first
+                        {
+                            "user_id": <user_id>,
+                            "display_name": <display_name>,
+                            "avatar_url": <avatar_url>
+                        }
+                    ]
+                }
+        """
         return self.store.search_user_dir(search_term, limit)
 
     @defer.inlineCallbacks
     def notify_new_event(self):
+        """Called when there may be more deltas to process
+        """
         if self._is_processing:
             return
 
@@ -56,13 +85,16 @@ class UserDirectoyHandler(object):
 
     @defer.inlineCallbacks
     def _unsafe_process(self):
+        # If self.pos is None then means we haven't fetched it from DB
         if self.pos is None:
             self.pos = yield self.store.get_user_directory_stream_pos()
 
+        # If still None then we need to do the initial fill of directory
         if self.pos is None:
             yield self._do_initial_spam()
             self.pos = yield self.store.get_user_directory_stream_pos()
 
+        # Loop round handling deltas until we're up to date
         while True:
             with Measure(self.clock, "user_dir_delta"):
                 deltas = yield self.store.get_current_state_deltas(self.pos)
@@ -75,7 +107,31 @@ class UserDirectoyHandler(object):
                 yield self.store.update_user_directory_stream_pos(self.pos)
 
     @defer.inlineCallbacks
-    def _handle_room(self, room_id):
+    def _do_initial_spam(self):
+        """Populates the user_directory from the current state of the DB, used
+        when synapse first starts with user_directory support
+        """
+
+        # TODO: pull from current delta stream_id
+        new_pos = self.store.get_room_max_stream_ordering()
+
+        # Delete any existing entries just in case there are any
+        yield self.store.delete_all_from_user_dir()
+
+        # We process by going through each existing room at a time.
+        room_ids = yield self.store.get_all_rooms()
+
+        for room_id in room_ids:
+            yield self._handle_intial_room(room_id)
+
+        self.initially_handled_users = None
+
+        yield self.store.update_user_directory_stream_pos(new_pos)
+
+    @defer.inlineCallbacks
+    def _handle_intial_room(self, room_id):
+        """Called when we initially fill out user_directory one room at a time
+        """
         # TODO: Check we're still joined to room
 
         is_public = yield self.store.is_room_world_readable_or_publicly_joinable(room_id)
@@ -94,49 +150,9 @@ class UserDirectoyHandler(object):
         self.initially_handled_users |= unhandled_users
 
     @defer.inlineCallbacks
-    def _do_initial_spam(self):
-        # TODO: pull from current delta stream_id
-        new_pos = self.store.get_room_max_stream_ordering()
-
-        yield self.store.delete_all_from_user_dir()
-
-        room_ids = yield self.store.get_all_rooms()
-
-        for room_id in room_ids:
-            yield self._handle_room(room_id)
-
-        self.initially_handled_users = None
-
-        yield self.store.update_user_directory_stream_pos(new_pos)
-
-    @defer.inlineCallbacks
-    def _handle_new_user(self, room_id, user_id, profile):
-        row = yield self.store.get_user_in_directory(user_id)
-        if row:
-            return
-
-        yield self.store.add_profiles_to_user_dir(room_id, {user_id: profile})
-
-    def _handle_remove_user(self, room_id, user_id):
-        row = yield self.store.get_user_in_directory(user_id)
-        if not row or row["room_id"] != room_id:
-            return
-
-        # TODO: Make this faster?
-        rooms = yield self.store.get_rooms_for_user(user_id)
-        for j_room_id in rooms:
-            is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
-                j_room_id
-            )
-
-            if is_public:
-                yield self.store.update_user_in_user_dir(user_id, j_room_id)
-                return
-
-        yield self.store.remove_from_user_dir(user_id)
-
-    @defer.inlineCallbacks
     def _handle_deltas(self, deltas):
+        """Called with the state deltas to process
+        """
         for delta in deltas:
             typ = delta["type"]
             state_key = delta["state_key"]
@@ -144,22 +160,33 @@ class UserDirectoyHandler(object):
             event_id = delta["event_id"]
             prev_event_id = delta["prev_event_id"]
 
+            # For join rule and visibility changes we need to check if the room
+            # may have become public or not and add/remove the users in said room
             if typ == EventTypes.RoomHistoryVisibility:
                 change = yield self._get_key_change(
                     prev_event_id, event_id,
                     key_name="history_visibility",
                     public_value="world_readable",
                 )
+
+                # If change is None, no change. True => become world readable,
+                # False => was world readable
                 if change is None:
                     continue
+
+                # There's been a change to or from being world readable.
 
                 is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
                     room_id
                 )
 
-                if change and is_public:
+                if change and not is_public:
+                    # If we became world readable but room isn't currently public then
+                    # we ignore the change
                     continue
-                elif not change and not is_public:
+                elif not change and is_public:
+                    # If we stopped being world readable but are still public,
+                    # ignore the change
                     continue
 
                 users_with_profile = yield self.state.get_current_user_in_room(room_id)
@@ -214,7 +241,59 @@ class UserDirectoyHandler(object):
                     yield self._handle_remove_user(room_id, state_key)
 
     @defer.inlineCallbacks
+    def _handle_new_user(self, room_id, user_id, profile):
+        """Called when we might need to add user to directory
+
+        Args:
+            room_id (str): room_id that user joined or started being public that
+            user_id (str)
+        """
+        row = yield self.store.get_user_in_directory(user_id)
+        if row:
+            return
+
+        yield self.store.add_profiles_to_user_dir(room_id, {user_id: profile})
+
+    def _handle_remove_user(self, room_id, user_id):
+        """Called when we might need to remove user to directory
+
+        Args:
+            room_id (str): room_id that user left or stopped being public that
+            user_id (str)
+        """
+        row = yield self.store.get_user_in_directory(user_id)
+        if not row or row["room_id"] != room_id:
+            # Either the user wasn't in directory or we're still in a room that
+            # is public (i.e. the room_id in the database)
+            return
+
+        # TODO: Make this faster?
+        rooms = yield self.store.get_rooms_for_user(user_id)
+        for j_room_id in rooms:
+            is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
+                j_room_id
+            )
+
+            if is_public:
+                yield self.store.update_user_in_user_dir(user_id, j_room_id)
+                return
+
+        yield self.store.remove_from_user_dir(user_id)
+
+    @defer.inlineCallbacks
     def _get_key_change(self, prev_event_id, event_id, key_name, public_value):
+        """Given two events check if the `key_name` field in content changed
+        from not matching `public_value` to doing so.
+
+        For example, check if `history_visibility` (`key_name`) changed from
+        `shared` to `world_readable` (`public_value`).
+
+        Returns:
+            None if the field in the events either both match `public_value` o
+            neither do, i.e. there has been no change.
+            True if it didnt match `public_value` but now does
+            Falsse if it did match `public_value` but now doesn't
+        """
         prev_event = None
         event = None
         if prev_event_id:

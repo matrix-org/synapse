@@ -34,7 +34,7 @@ INSERT INTO user_directory_stream_pos (stream_id) VALUES (null);
 POSTGRES_TABLE = """
 CREATE TABLE user_directory (
     user_id TEXT NOT NULL,
-    room_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,  -- A room_id that we know is public
     display_name TEXT,
     avatar_url TEXT,
     vector tsvector
