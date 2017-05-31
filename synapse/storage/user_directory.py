@@ -221,6 +221,7 @@ class UserDirectoryStore(SQLBaseStore):
             txn.execute(sql, (prev_stream_id,))
 
             total = 0
+            max_stream_id = prev_stream_id
             for max_stream_id, count in txn:
                 total += count
                 if total > 50:
