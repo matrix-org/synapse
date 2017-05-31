@@ -90,6 +90,9 @@ class UserDirectoyHandler(object):
 
     @defer.inlineCallbacks
     def _do_initial_spam(self):
+        # TODO: pull from current delta stream_id
+        new_pos = self.store.get_room_max_stream_ordering()
+
         yield self.store.delete_all_from_user_dir()
 
         room_ids = yield self.store.get_all_rooms()
@@ -99,7 +102,7 @@ class UserDirectoyHandler(object):
 
         self.initially_handled_users = None
 
-        yield self.store.update_user_directory_stream_pos(-1)
+        yield self.store.update_user_directory_stream_pos(new_pos)
 
     @defer.inlineCallbacks
     def _handle_new_user(self, room_id, user_id, profile):
