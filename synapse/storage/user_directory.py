@@ -204,7 +204,9 @@ class UserDirectoryStore(SQLBaseStore):
         )
 
     def get_current_state_deltas(self, prev_stream_id):
-        # TODO: Add stream change cache
+        if not self._curr_state_delta_stream_cache.has_any_entity_changed(prev_stream_id):
+            return []
+
         # TODO: Add limit
         sql = """
             SELECT stream_id, room_id, type, state_key, event_id, prev_event_id
