@@ -167,6 +167,7 @@ class Notifier(object):
 
         self.clock = hs.get_clock()
         self.appservice_handler = hs.get_application_service_handler()
+        self.user_directory_handler = hs.get_user_directory_handler()
 
         if hs.should_send_federation():
             self.federation_sender = hs.get_federation_sender()
@@ -251,7 +252,10 @@ class Notifier(object):
         """Notify any user streams that are interested in this room event"""
         # poke any interested application service.
         preserve_fn(self.appservice_handler.notify_interested_services)(
-            room_stream_id)
+            room_stream_id
+        )
+
+        preserve_fn(self.user_directory_handler.notify_new_event)()
 
         if self.federation_sender:
             preserve_fn(self.federation_sender.notify_new_events)(
