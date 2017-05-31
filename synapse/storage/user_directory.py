@@ -210,7 +210,9 @@ class UserDirectoryStore(SQLBaseStore):
 
         def get_current_state_deltas_txn(txn):
             # First we calculate the max stream id that will give us less than
-            # N results
+            # N results.
+            # We arbitarily limit to 100 stream_id entries to ensure we don't
+            # select toooo many.
             sql = """
                 SELECT stream_id, count(*)
                 FROM current_state_delta_stream
@@ -225,7 +227,9 @@ class UserDirectoryStore(SQLBaseStore):
             max_stream_id = prev_stream_id
             for max_stream_id, count in txn:
                 total += count
-                if total > 50:
+                if total > 100:
+                    # We arbitarily limit to 100 entries to ensure we don't
+                    # select toooo many.
                     break
 
             # Now actually get the deltas
