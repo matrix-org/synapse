@@ -111,9 +111,7 @@ class UserDirectoyHandler(object):
         """Populates the user_directory from the current state of the DB, used
         when synapse first starts with user_directory support
         """
-
-        # TODO: pull from current delta stream_id
-        new_pos = self.store.get_room_max_stream_ordering()
+        new_pos = yield self.store.get_max_stream_id_in_current_state_deltas()
 
         # Delete any existing entries just in case there are any
         yield self.store.delete_all_from_user_dir()
@@ -284,7 +282,7 @@ class UserDirectoyHandler(object):
             # is public (i.e. the room_id in the database)
             return
 
-        # TODO: Make this faster?
+        # XXX: Make this faster?
         rooms = yield self.store.get_rooms_for_user(user_id)
         for j_room_id in rooms:
             is_public = yield self.store.is_room_world_readable_or_publicly_joinable(

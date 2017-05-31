@@ -195,6 +195,14 @@ class UserDirectoryStore(SQLBaseStore):
             "get_current_state_deltas", self.cursor_to_dict, sql, prev_stream_id
         )
 
+    def get_max_stream_id_in_current_state_deltas(self):
+        return self._simple_select_one_onecol(
+            table="current_state_delta_stream",
+            keyvalues={},
+            retcol="COALESCE(MAX(stream_id), -1)",
+            desc="get_max_stream_id_in_current_state_deltas",
+        )
+
     @defer.inlineCallbacks
     def search_user_dir(self, search_term, limit):
         """Searches for users in directory
