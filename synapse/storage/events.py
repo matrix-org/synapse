@@ -755,7 +755,7 @@ class EventsStore(SQLBaseStore):
                     ]
                 )
 
-                self._curr_state_delta_stream_cache.enttity_has_changed(
+                self._curr_state_delta_stream_cache.entity_has_changed(
                     room_id, max_stream_order,
                 )
 
