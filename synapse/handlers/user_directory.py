@@ -38,6 +38,8 @@ class UserDirectoyHandler(object):
 
         self._is_processing = False
 
+        self.clock.call_later(0, self.notify_new_event)
+
     @defer.inlineCallbacks
     def notify_new_event(self):
         if self._is_processing:
