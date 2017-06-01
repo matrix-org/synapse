@@ -368,7 +368,7 @@ class UserDirectoryStore(SQLBaseStore):
                 INNER JOIN users_in_pubic_room USING (user_id)
                 WHERE value MATCH ?
                 ORDER BY
-                    rank(matchinfo(user_directory)) DESC,
+                    rank(matchinfo(user_directory_search)) DESC,
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
