@@ -127,7 +127,6 @@ class UserDirectoryStore(SQLBaseStore):
         )
         self.get_user_in_directory.invalidate((user_id,))
 
-    @defer.inlineCallbacks
     def remove_from_user_dir(self, user_id):
         def _remove_from_user_dir_txn(txn):
             self._simple_delete_txn(
