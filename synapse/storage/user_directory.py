@@ -38,7 +38,7 @@ class UserDirectoryStore(SQLBaseStore):
         if join_rules_id:
             join_rule_ev = yield self.get_event(join_rules_id, allow_none=True)
             if join_rule_ev:
-                if join_rule_ev.content.get("join_rules") == JoinRules.PUBLIC:
+                if join_rule_ev.content.get("join_rule") == JoinRules.PUBLIC:
                     defer.returnValue(True)
 
         hist_vis_id = current_state_ids.get((EventTypes.RoomHistoryVisibility, ""))
