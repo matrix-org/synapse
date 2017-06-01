@@ -755,6 +755,10 @@ class EventsStore(SQLBaseStore):
                     ]
                 )
 
+                self._curr_state_delta_stream_cache.entity_has_changed(
+                    room_id, max_stream_order,
+                )
+
                 # Invalidate the various caches
 
                 # Figure out the changes of membership to invalidate the
