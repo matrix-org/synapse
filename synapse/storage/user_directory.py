@@ -333,9 +333,9 @@ def _parse_query(database_engine, search_term):
     results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
 
     if isinstance(database_engine, PostgresEngine):
-        return " & ".join("%s:* & %s" % (result, result,) for result in results)
+        return " & ".join("(%s:* | %s)" % (result, result,) for result in results)
     elif isinstance(database_engine, Sqlite3Engine):
-        return " & ".join("%s* & %s" % (result, result,) for result in results)
+        return " & ".join("(%s* | %s)" % (result, result,) for result in results)
     else:
         # This should be unreachable.
         raise Exception("Unrecognized database engine")
