@@ -121,7 +121,7 @@ class BulkPushRuleEvaluator(object):
                 if event.type == EventTypes.Member and event.state_key == uid:
                     display_name = event.content.get("displayname", None)
 
-            filtered = filtered_by_user[uid]
+            filtered = filtered_by_user.get(uid, [])
             if len(filtered) == 0:
                 continue
 

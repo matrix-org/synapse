@@ -178,14 +178,37 @@ def filter_events_for_clients(store, user_tuples, events, event_id_to_state):
             # we don't know when they left.
             return not is_peeking
 
-    defer.returnValue({
-        user_id: [
-            event
-            for event in events
-            if allowed(event, user_id, is_peeking, ignore_dict.get(user_id, []))
-        ]
-        for user_id, is_peeking in user_tuples
-    })
+    @defer.inlineCallbacks
+    def is_state_redaction(event):
+        # As a very temporary measure, don't relay state redaction events to clients
+        # as it causes a thundering herd.  FIXME: this should be removed once
+        # room initialSync is optimised enough to make the herd not a problem.
+        # https://github.com/vector-im/riot-android/issues/928
+        if event.type == EventTypes.Redaction:
+            original_event = yield store.get_event(
+                event.redacts,
+                check_redacted=False,
+                get_prev_content=False,
+                allow_rejected=False,
+                allow_none=False
+            )
+            if original_event and original_event.is_state():
+                defer.returnValue(True)
+            else:
+                defer.returnValue(False)
+        else:
+            defer.returnValue(False)
+
+    res = {}
+    for user_id, is_peeking in user_tuples:
+        for event in events:
+            if (
+                allowed(event, user_id, is_peeking, ignore_dict.get(user_id, []))
+                and not (yield is_state_redaction(event))
+            ):
+                res.setdefault(user_id, []).append(event)
+
+    defer.returnValue(res)
 
 
 @defer.inlineCallbacks
