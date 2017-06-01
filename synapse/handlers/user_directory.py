@@ -346,7 +346,7 @@ class UserDirectoyHandler(object):
 
         Returns:
             None if the field in the events either both match `public_value`
-            neither do, i.e. there has been no change.
+            or if neither do, i.e. there has been no change.
             True if it didnt match `public_value` but now does
             False if it did match `public_value` but now doesn't
         """
@@ -366,10 +366,10 @@ class UserDirectoyHandler(object):
         value = None
 
         if prev_event:
-            prev_value = prev_event.content.get(key_name, None)
+            prev_value = prev_event.content.get(key_name)
 
         if event:
-            value = event.content.get(key_name, None)
+            value = event.content.get(key_name)
 
         logger.debug("prev_value: %r -> value: %r", prev_value, value)
 
