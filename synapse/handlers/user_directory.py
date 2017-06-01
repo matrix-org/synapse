@@ -294,6 +294,7 @@ class UserDirectoyHandler(object):
 
         yield self.store.add_profiles_to_user_dir(room_id, {user_id: profile})
 
+    @defer.inlineCallbacks
     def _handle_remove_user(self, room_id, user_id):
         """Called when we might need to remove user to directory
 
@@ -301,10 +302,13 @@ class UserDirectoyHandler(object):
             room_id (str): room_id that user left or stopped being public that
             user_id (str)
         """
+        logger.debug("Maybe removing user %r", user_id)
+
         row = yield self.store.get_user_in_directory(user_id)
         if not row or row["room_id"] != room_id:
             # Either the user wasn't in directory or we're still in a room that
             # is public (i.e. the room_id in the database)
+            logger.debug("Not removing as row: %r", row)
             return
 
         # XXX: Make this faster?
@@ -316,6 +320,7 @@ class UserDirectoyHandler(object):
 
             if is_public:
                 yield self.store.update_user_in_user_dir(user_id, j_room_id)
+                logger.debug("Not removing as found other public room: %r", j_room_id)
                 return
 
         yield self.store.remove_from_user_dir(user_id)
