@@ -284,7 +284,7 @@ class UserDirectoryStore(SQLBaseStore):
                 INNER JOIN user_directory USING (user_id)
                 WHERE vector @@ to_tsquery('english', ?)
                 ORDER BY
-                    ts_rank_cd(vector, to_tsquery('english', ?)) DESC,
+                    ts_rank_cd(vector, to_tsquery('english', ?), 1) DESC,
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
