@@ -195,6 +195,7 @@ class UserDirectoyHandler(object):
                         room_id, self.server_name,
                     )
                     if not is_in_room:
+                        logger.debug("Server left room: %r", room_id)
                         # Fetch all the users that we marked as being in user
                         # directory due to being in the room and then check if
                         # need to remove those users or not
@@ -202,6 +203,8 @@ class UserDirectoyHandler(object):
                         for user_id in user_ids:
                             yield self._handle_remove_user(room_id, user_id)
                         return
+                    else:
+                        logger.debug("Server is still in room: %r", room_id)
 
                 is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
                     room_id
@@ -288,6 +291,7 @@ class UserDirectoyHandler(object):
             room_id (str): room_id that user joined or started being public that
             user_id (str)
         """
+        logger.debug("Adding user to dir, %r", user_id)
         row = yield self.store.get_user_in_directory(user_id)
         if row:
             return
@@ -314,6 +318,13 @@ class UserDirectoyHandler(object):
         # XXX: Make this faster?
         rooms = yield self.store.get_rooms_for_user(user_id)
         for j_room_id in rooms:
+            is_in_room = yield self.state.get_is_host_in_room(
+                j_room_id, self.server_name,
+            )
+
+            if not is_in_room:
+                continue
+
             is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
                 j_room_id
             )
