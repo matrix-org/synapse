@@ -31,13 +31,21 @@ INSERT INTO user_directory_stream_pos (stream_id) VALUES (null);
 
 CREATE TABLE user_directory (
     user_id TEXT NOT NULL,
-    room_id TEXT NOT NULL,  -- A room_id that we know is public
+    room_id TEXT NOT NULL,  -- A room_id that we know the user is joined to
     display_name TEXT,
     avatar_url TEXT
 );
 
 CREATE INDEX user_directory_room_idx ON user_directory(room_id);
 CREATE UNIQUE INDEX user_directory_user_idx ON user_directory(user_id);
+
+CREATE TABLE users_in_pubic_room (
+    user_id TEXT NOT NULL,
+    room_id TEXT NOT NULL  -- A room_id that we know is public
+);
+
+CREATE INDEX users_in_pubic_room_room_idx ON users_in_pubic_room(room_id);
+CREATE UNIQUE INDEX users_in_pubic_room_user_idx ON users_in_pubic_room(user_id);
 """
 
 

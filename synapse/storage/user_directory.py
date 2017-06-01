@@ -50,12 +50,34 @@ class UserDirectoryStore(SQLBaseStore):
 
         defer.returnValue(False)
 
-    def add_profiles_to_user_dir(self, room_id, users_with_profile):
-        """Add profiles to the user directory
+    @defer.inlineCallbacks
+    def add_users_to_public_room(self, room_id, user_ids):
+        """Add user to the list of users in public rooms
 
         Args:
             room_id (str): A room_id that all users are in that is world_readable
                 or publically joinable
+            user_ids (list(str)): Users to add
+        """
+        yield self._simple_insert_many(
+            table="users_in_pubic_room",
+            values=[
+                {
+                    "user_id": user_id,
+                    "room_id": room_id,
+                }
+                for user_id in user_ids
+            ],
+            desc="add_users_to_public_room"
+        )
+        for user_id in user_ids:
+            self.get_user_in_public_room.invalidate((user_id,))
+
+    def add_profiles_to_user_dir(self, room_id, users_with_profile):
+        """Add profiles to the user directory
+
+        Args:
+            room_id (str): A room_id that all users are joined to
             users_with_profile (dict): Users to add to directory in the form of
                 mapping of user_id -> ProfileInfo
         """
@@ -125,7 +147,15 @@ class UserDirectoryStore(SQLBaseStore):
             updatevalues={"room_id": room_id},
             desc="update_user_in_user_dir",
         )
-        self.get_user_in_directory.invalidate((user_id,))
+
+    @defer.inlineCallbacks
+    def update_user_in_public_user_list(self, user_id, room_id):
+        yield self._simple_update_one(
+            table="users_in_pubic_room",
+            keyvalues={"user_id": user_id},
+            updatevalues={"room_id": room_id},
+            desc="update_user_in_public_user_list",
+        )
 
     def remove_from_user_dir(self, user_id):
         def _remove_from_user_dir_txn(txn):
@@ -139,11 +169,39 @@ class UserDirectoryStore(SQLBaseStore):
                 table="user_directory_search",
                 keyvalues={"user_id": user_id},
             )
+            self._simple_delete_txn(
+                txn,
+                table="users_in_pubic_room",
+                keyvalues={"user_id": user_id},
+            )
             txn.call_after(
                 self.get_user_in_directory.invalidate, (user_id,)
             )
+            txn.call_after(
+                self.get_user_in_public_room.invalidate, (user_id,)
+            )
         return self.runInteraction(
             "remove_from_user_dir", _remove_from_user_dir_txn,
+        )
+
+    @defer.inlineCallbacks
+    def remove_from_user_in_public_room(self, user_id):
+        yield self._simple_delete(
+            table="users_in_pubic_room",
+            keyvalues={"user_id": user_id},
+            desc="remove_from_user_in_public_room",
+        )
+        self.get_user_in_public_room.invalidate((user_id,))
+
+    def get_users_in_public_due_to_room(self, room_id):
+        """Get all user_ids that are in the room directory becuase they're
+        in the given room_id
+        """
+        return self._simple_select_onecol(
+            table="users_in_pubic_room",
+            keyvalues={"room_id": room_id},
+            retcol="user_id",
+            desc="get_users_in_public_due_to_room",
         )
 
     def get_users_in_dir_due_to_room(self, room_id):
@@ -173,6 +231,7 @@ class UserDirectoryStore(SQLBaseStore):
         def _delete_all_from_user_dir_txn(txn):
             txn.execute("DELETE FROM user_directory")
             txn.execute("DELETE FROM user_directory_search")
+            txn.execute("DELETE FROM users_in_pubic_room")
             txn.call_after(self.get_user_in_directory.invalidate_all)
         return self.runInteraction(
             "delete_all_from_user_dir", _delete_all_from_user_dir_txn
@@ -186,6 +245,16 @@ class UserDirectoryStore(SQLBaseStore):
             retcols=("room_id", "display_name", "avatar_url",),
             allow_none=True,
             desc="get_user_in_directory",
+        )
+
+    @cached()
+    def get_user_in_public_room(self, user_id):
+        return self._simple_select_one(
+            table="users_in_pubic_room",
+            keyvalues={"user_id": user_id},
+            retcols=("room_id",),
+            allow_none=True,
+            desc="get_user_in_public_room",
         )
 
     def get_user_directory_stream_pos(self):
@@ -282,6 +351,7 @@ class UserDirectoryStore(SQLBaseStore):
                 SELECT user_id, display_name, avatar_url
                 FROM user_directory_search
                 INNER JOIN user_directory USING (user_id)
+                INNER JOIN users_in_pubic_room USING (user_id)
                 WHERE vector @@ to_tsquery('english', ?)
                 ORDER BY
                     ts_rank_cd(vector, to_tsquery('english', ?), 1) DESC,
@@ -295,6 +365,7 @@ class UserDirectoryStore(SQLBaseStore):
                 SELECT user_id, display_name, avatar_url
                 FROM user_directory_search
                 INNER JOIN user_directory USING (user_id)
+                INNER JOIN users_in_pubic_room USING (user_id)
                 WHERE value MATCH ?
                 ORDER BY
                     rank(matchinfo(user_directory)) DESC,

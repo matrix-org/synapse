@@ -50,6 +50,7 @@ class UserDirectoyHandler(object):
         # When start up for the first time we need to populate the user_directory.
         # This is a set of user_id's we've inserted already
         self.initially_handled_users = set()
+        self.initially_handled_users_in_public = set()
 
         # The current position in the current_state_delta stream
         self.pos = None
@@ -145,8 +146,6 @@ class UserDirectoyHandler(object):
             return
 
         is_public = yield self.store.is_room_world_readable_or_publicly_joinable(room_id)
-        if not is_public:
-            return
 
         users_with_profile = yield self.state.get_current_user_in_room(room_id)
         unhandled_users = set(users_with_profile) - self.initially_handled_users
@@ -158,6 +157,13 @@ class UserDirectoyHandler(object):
         )
 
         self.initially_handled_users |= unhandled_users
+
+        if is_public:
+            yield self.store.add_users_to_public_room(
+                room_id,
+                user_ids=unhandled_users - self.initially_handled_users_in_public
+            )
+            self.initially_handled_users_in_public != unhandled_users
 
     @defer.inlineCallbacks
     def _handle_deltas(self, deltas):
@@ -206,14 +212,7 @@ class UserDirectoyHandler(object):
                     else:
                         logger.debug("Server is still in room: %r", room_id)
 
-                is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
-                    room_id
-                )
-
                 if change:  # The user joined
-                    if not is_public:
-                        return
-
                     event = yield self.store.get_event(event_id)
                     profile = ProfileInfo(
                         avatar_url=event.content.get("avatar_url"),
@@ -276,11 +275,13 @@ class UserDirectoyHandler(object):
             # ignore the change
             return
 
-        users_with_profile = yield self.state.get_current_user_in_room(room_id)
-        for user_id, profile in users_with_profile.iteritems():
-            if change:
+        if change:
+            users_with_profile = yield self.state.get_current_user_in_room(room_id)
+            for user_id, profile in users_with_profile.iteritems():
                 yield self._handle_new_user(room_id, user_id, profile)
-            else:
+        else:
+            users = yield self.store.get_users_in_public_due_to_room(room_id)
+            for user_id in users:
                 yield self._handle_remove_user(room_id, user_id)
 
     @defer.inlineCallbacks
@@ -292,11 +293,21 @@ class UserDirectoyHandler(object):
             user_id (str)
         """
         logger.debug("Adding user to dir, %r", user_id)
+
         row = yield self.store.get_user_in_directory(user_id)
-        if row:
+        if not row:
+            yield self.store.add_profiles_to_user_dir(room_id, {user_id: profile})
+
+        is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
+            room_id
+        )
+
+        if not is_public:
             return
 
-        yield self.store.add_profiles_to_user_dir(room_id, {user_id: profile})
+        row = yield self.store.get_user_in_public_room(user_id)
+        if not row:
+            yield self.store.add_users_to_public_room(room_id, [user_id])
 
     @defer.inlineCallbacks
     def _handle_remove_user(self, room_id, user_id):
@@ -309,15 +320,20 @@ class UserDirectoyHandler(object):
         logger.debug("Maybe removing user %r", user_id)
 
         row = yield self.store.get_user_in_directory(user_id)
-        if not row or row["room_id"] != room_id:
-            # Either the user wasn't in directory or we're still in a room that
-            # is public (i.e. the room_id in the database)
-            logger.debug("Not removing as row: %r", row)
+        update_user_dir = row and row["room_id"] == room_id
+
+        row = yield self.store.get_user_in_public_room(user_id)
+        update_user_in_public = row and row["room_id"] == room_id
+
+        if not update_user_in_public and not update_user_dir:
             return
 
         # XXX: Make this faster?
         rooms = yield self.store.get_rooms_for_user(user_id)
         for j_room_id in rooms:
+            if not update_user_in_public and not update_user_dir:
+                break
+
             is_in_room = yield self.state.get_is_host_in_room(
                 j_room_id, self.server_name,
             )
@@ -325,16 +341,23 @@ class UserDirectoyHandler(object):
             if not is_in_room:
                 continue
 
-            is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
-                j_room_id
-            )
-
-            if is_public:
+            if update_user_dir:
+                update_user_dir = False
                 yield self.store.update_user_in_user_dir(user_id, j_room_id)
-                logger.debug("Not removing as found other public room: %r", j_room_id)
-                return
 
-        yield self.store.remove_from_user_dir(user_id)
+            if update_user_in_public:
+                is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
+                    j_room_id
+                )
+
+                if is_public:
+                    yield self.store.update_user_in_public_user_list(user_id, j_room_id)
+                    update_user_in_public = False
+
+        if update_user_dir:
+            yield self.store.remove_from_user_dir(user_id)
+        elif update_user_in_public:
+            yield self.store.remove_from_user_in_public_room(user_id)
 
     @defer.inlineCallbacks
     def _get_key_change(self, prev_event_id, event_id, key_name, public_value):
