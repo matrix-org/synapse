@@ -601,3 +601,21 @@ class FederationServer(FederationBase):
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
         return self.groups_handler.get_local_users_in_group(group_id, requester_user_id)
+
+    def on_groups_users_membership_request(self, origin, content, group_id):
+        if get_domain_from_id(group_id) != origin:
+            raise SynapseError(403, "group_id doesn't match origin")
+
+        user_states = content["users"]
+
+        return self.groups_handler.on_groups_users_membership(group_id, user_states)
+
+    def on_groups_users_admin_join_user_request(self, origin, content, group_id):
+        requester_user_id = content.pop("requester_user_id")
+
+        if get_domain_from_id(requester_user_id) != origin:
+            raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        return self.groups_handler.on_groups_users_admin_join_user(
+            group_id, requester_user_id, content,
+        )

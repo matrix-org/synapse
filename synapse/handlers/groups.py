@@ -154,3 +154,59 @@ class GroupsHandler(object):
             "chunk": chunk,
             "total_room_count_estimate": len(room_results),
         })
+
+    def on_groups_users_membership(self, group_id, user_states):
+        for user_id, user_state in user_states.iteritems():
+            membership = user_state["membership"]
+            is_admin = user_state["is_admin"]
+            if not self.is_mine_id(user_id):
+                logger.warn(
+                    "Group %r informed us of %r of user %r",
+                    group_id, membership, user_id
+                )
+                continue
+            if membership not in ("join", "leave",):
+                logger.warn(
+                    "Group %r informed us of unkown membership state %r for user %r",
+                    group_id, membership, user_id
+                )
+                continue
+            yield self.store.register_user_group_membership(
+                group_id, user_id, is_admin, membership
+            )
+
+    def on_groups_users_admin_join_user(self, group_id, requester_user_id, content):
+        group = yield self.store.get_group(group_id)
+        if not group:
+            raise SynapseError(404, "Unknown group")
+
+        is_admin = yield self.store.is_user_adim_in_group(group_id, requester_user_id)
+        if not is_admin:
+            raise SynapseError(403, "User is not admin in group")
+
+        user_id = content["target_user_id"]
+        membership = content["membership"]
+        is_admin = content["is_admin"]
+
+        if membership not in ("join", "leave",):
+            logger.warn(
+                "Group %r informed us of unkown membership state %r for user %r",
+                group_id, membership, user_id
+            )
+            raise SynapseError(400, "Unknown membership %r" % (membership,))
+
+        if membership == "join":
+            yield self.store.add_user_to_group(group_id, user_id)
+        else:
+            yield self.store.remove_user_to_group(group_id, user_id)
+
+        if self.hs.is_mine_id(user_id):
+            yield self.store.register_user_group_membership(
+                group_id, user_id, is_admin, membership,
+            )
+        else:
+            repl_layer = self.hs.get_replication_layer()
+            yield repl_layer.send_group_user_membership(group_id, user_id, {
+                "membership": membership,
+                "is_admin": is_admin,
+            })

@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
 from ._base import SQLBaseStore
 
 
@@ -72,14 +74,37 @@ class GroupServerStore(SQLBaseStore):
             desc="is_user_in_group",
         ).addCallback(lambda r: bool(r))
 
-    def add_user_to_group(self, group_id, user_id):
+    def is_user_adim_in_group(self, user_id, group_id):
+        return self._simple_select_one_onecol(
+            table="group_users",
+            keyvalues={
+                "group_id": group_id,
+                "user_id": user_id,
+            },
+            retcol="admin",
+            allow_none=True,
+            desc="is_user_adim_in_group",
+        )
+
+    def add_user_to_group(self, group_id, user_id, is_admin):
         return self._simple_insert(
             table="group_users",
             values={
                 "group_id": group_id,
                 "user_id": user_id,
+                "is_admin": is_admin,
             },
             desc="add_user_to_group",
+        )
+
+    def remove_user_to_group(self, group_id, user_id):
+        return self._simple_delete(
+            table="group_users",
+            values={
+                "group_id": group_id,
+                "user_id": user_id,
+            },
+            desc="remove_user_to_group",
         )
 
     def add_room_to_group(self, group_id, room_id, is_public):
@@ -92,3 +117,18 @@ class GroupServerStore(SQLBaseStore):
             },
             desc="add_room_to_group",
         )
+
+    @defer.inlineCallbacks
+    def register_user_group_membership(self, group_id, user_id, is_admin, membership):
+        with self._group_membership_id_gen.get_next() as next_id:
+            yield self._simple_insert(
+                table="local_group_membership",
+                values={
+                    "stream_id": next_id,
+                    "group_id": group_id,
+                    "user_id": user_id,
+                    "is_admin": is_admin,
+                    "membership": membership,
+                },
+                desc="register_user_group_membership",
+            )

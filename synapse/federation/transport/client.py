@@ -515,3 +515,14 @@ class TransportLayerClient(object):
             data={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
+
+    @log_function
+    def send_group_user_membership(self, destination, group_id, user_id, state):
+        path = PREFIX + "/groups/%s/user_membership" % (group_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data={"users": {user_id: state}},
+            ignore_backoff=True,
+        )

@@ -861,3 +861,9 @@ class FederationClient(FederationBase):
         return self.transport_layer.get_group_users(
             destination, group_id, requester_user_id,
         )
+
+    def send_group_user_membership(self, group_id, user_id, state):
+        destination = get_domain_from_id(group_id)
+        return self.transport_layer.send_group_user_membership(
+            destination, group_id, user_id, state,
+        )

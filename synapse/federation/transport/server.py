@@ -659,6 +659,30 @@ class FederationGroupsUsersServlet(BaseFederationServlet):
         defer.returnValue((200, new_content))
 
 
+class FederationGroupsUsersMembershipServlet(BaseFederationServlet):
+    PATH = "/groups/(?P<group_id>[^/]*)/user_membership$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id):
+        new_content = yield self.handler.on_groups_users_membership_request(
+            origin, content, group_id
+        )
+
+        defer.returnValue((200, new_content))
+
+
+class FederationGroupsAdminAddUserServlet(BaseFederationServlet):
+    PATH = "/groups/(?P<group_id>[^/]*)/admin/add_user$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id):
+        new_content = yield self.handler.on_groups_users_admin_join_user_request(
+            origin, content, group_id
+        )
+
+        defer.returnValue((200, new_content))
+
+
 SERVLET_CLASSES = (
     FederationSendServlet,
     FederationPullServlet,
@@ -687,6 +711,8 @@ SERVLET_CLASSES = (
     FederationGroupsProfileServlet,
     FederationGroupsRoomsServlet,
     FederationGroupsUsersServlet,
+    FederationGroupsUsersMembershipServlet,
+    FederationGroupsAdminAddUserServlet,
 )
 
 

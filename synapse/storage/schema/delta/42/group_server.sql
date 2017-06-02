@@ -27,6 +27,7 @@ CREATE UNIQUE INDEX groups_idx ON groups(group_id);
 CREATE TABLE group_users (
     group_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
+    admin BOOLEAN NOT NULL,
     is_public BOOLEAN NOT NULL
 );
 
@@ -48,9 +49,13 @@ CREATE INDEX groups_rooms_r_idx ON group_rooms(room_id, group_id);
 
 
 CREATE TABLE local_group_membership (
+    stream_id BIGINT NOT NULL,
     group_id TEXT NOT NULL,
-    user_id TEXT NOT NULL
+    user_id TEXT NOT NULL,
+    is_admin BOOLEAN NOT NULL,
+    membership TEXT NOT NULL  -- "join" or "leave"
 );
 
 CREATE INDEX local_group_membership_u_idx ON local_group_membership(user_id, group_id);
 CREATE INDEX local_group_membership_g_idx ON local_group_membership(group_id, group_id);
+CREATE INDEX local_group_membership_s_idx ON local_group_membership(user_id, stream_id);
