@@ -186,7 +186,6 @@ class GroupsHandler(object):
 
         user_id = content["target_user_id"]
         membership = content["membership"]
-        is_admin = content["is_admin"]
 
         if membership not in ("join", "leave",):
             logger.warn(
@@ -202,11 +201,10 @@ class GroupsHandler(object):
 
         if self.hs.is_mine_id(user_id):
             yield self.store.register_user_group_membership(
-                group_id, user_id, is_admin, membership,
+                group_id, user_id, is_admin=False, membership=membership,
             )
         else:
             repl_layer = self.hs.get_replication_layer()
             yield repl_layer.send_group_user_membership(group_id, user_id, {
                 "membership": membership,
-                "is_admin": is_admin,
             })
