@@ -132,3 +132,20 @@ class GroupServerStore(SQLBaseStore):
                 },
                 desc="register_user_group_membership",
             )
+
+    @defer.inlineCallbacks
+    def create_group(self, group_id, user_id, name, avatar_url, short_description,
+                     long_description,):
+        yield self._simple_insert(
+            table="groups",
+            values={
+                "group_id": group_id,
+                "name": name,
+                "avatar_url": avatar_url,
+                "short_description": short_description,
+                "long_description": long_description,
+            },
+            desc="create_group",
+        )
+
+        yield self.register_user_group_membership(group_id, user_id, True, "join")

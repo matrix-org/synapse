@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from synapse.http.servlet import RestServlet
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
 from ._base import client_v2_patterns
 
@@ -100,8 +100,28 @@ class GroupUsersServlet(RestServlet):
         defer.returnValue((200, result))
 
 
+class GroupCreateServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/create$")
+
+    def __init__(self, hs):
+        super(GroupCreateServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.groups_handler = hs.get_groups_handler()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, group_id):
+        requester = yield self.auth.get_user_by_req(request)
+
+        content = parse_json_object_from_request(request)
+        result = yield self.groups_handler.create_group(group_id, requester, content)
+
+        defer.returnValue((200, result))
+
+
 def register_servlets(hs, http_server):
     GroupServlet(hs).register(http_server)
     GroupSummaryServlet(hs).register(http_server)
     GroupUsersServlet(hs).register(http_server)
     GroupRoomServlet(hs).register(http_server)
+    GroupCreateServlet(hs).register(http_server)

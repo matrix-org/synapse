@@ -27,6 +27,7 @@ class GroupsHandler(object):
         self.hs = hs
         self.store = hs.get_datastore()
         self.room_list_handler = hs.get_room_list_handler()
+        self.auth = hs.get_auth()
         self.is_mine_id = hs.is_mine_id
 
     def get_group_summary(self, group_id, requester_user_id):
@@ -208,3 +209,37 @@ class GroupsHandler(object):
             yield repl_layer.send_group_user_membership(group_id, user_id, {
                 "membership": membership,
             })
+
+    @defer.inlineCallbacks
+    def create_group(self, group_id, requester, content):
+        logger.info("Attempting to create group with ID: %r", group_id)
+        group = yield self.store.get_group(group_id)
+        if group:
+            raise SynapseError(400, "Group already exists")
+
+        user_id = requester.user.to_string()
+
+        if not self.is_mine_id(group_id):
+            repl_layer = self.hs.get_replication_layer()
+            res = yield repl_layer.create_group(group_id, user_id)  # TODO
+            defer.returnValue(res)
+
+        is_admin = yield self.auth.is_server_admin(requester.user)
+        if not is_admin and not group_id.startswith("+u/"):
+            raise SynapseError(403, "Group ID must start with '+u/' or be a server admin")
+
+        name = content["name"]
+        avatar_url = content.get("avatar_url")
+        short_description = content.get("short_description")
+        long_description = content.get("long_description")
+
+        yield self.store.create_group(
+            group_id,
+            user_id,
+            name=name,
+            avatar_url=avatar_url,
+            short_description=short_description,
+            long_description=long_description,
+        )
+
+        defer.returnValue({})
