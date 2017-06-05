@@ -853,6 +853,14 @@ This should end with a 'PASSED' result::
     PASSED (successes=143)
 
 
+To install the synapse homeserver from your source run:
+
+    source env/bin/activate
+    mkdir build && cd build
+    pip install ..
+
+This should install synapse in the `/build` directory
+
 Building Internal API Documentation
 ===================================
 
