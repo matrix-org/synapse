@@ -75,14 +75,14 @@ class GroupsHandler(object):
             return self.get_local_users_in_group(group_id, requester_user_id)
 
         repl_layer = self.hs.get_replication_layer()
-        return repl_layer.get_users_in_group(group_id, requester_user_id)
+        return repl_layer.get_group_users(group_id, requester_user_id)
 
     def get_rooms_in_group(self, group_id, requester_user_id):
         if self.is_mine_id(group_id):
             return self.get_local_rooms_in_group(group_id, requester_user_id)
 
         repl_layer = self.hs.get_replication_layer()
-        return repl_layer.get_rooms_in_group(group_id, requester_user_id)
+        return repl_layer.get_group_rooms(group_id, requester_user_id)
 
     @defer.inlineCallbacks
     def get_local_users_in_group(self, group_id, requester_user_id):
