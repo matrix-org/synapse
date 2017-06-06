@@ -156,6 +156,127 @@ class GroupsHandler(object):
             "total_room_count_estimate": len(room_results),
         })
 
+    @defer.inlineCallbacks
+    def create_group(self, group_id, requester, content):
+        logger.info("Attempting to create group with ID: %r", group_id)
+        group = yield self.store.get_group(group_id)
+        if group:
+            raise SynapseError(400, "Group already exists")
+
+        user_id = requester.user.to_string()
+
+        if not self.is_mine_id(group_id):
+            repl_layer = self.hs.get_replication_layer()
+            res = yield repl_layer.create_group(group_id, user_id)  # TODO
+            defer.returnValue(res)
+
+        is_admin = yield self.auth.is_server_admin(requester.user)
+        if not is_admin and not group_id.startswith("+u/"):
+            raise SynapseError(403, "Group ID must start with '+u/' or be a server admin")
+
+        profile = content.get("profile", {})
+        name = profile.get("name")
+        avatar_url = profile.get("avatar_url")
+        short_description = profile.get("short_description")
+        long_description = profile.get("long_description")
+
+        yield self.store.create_group(
+            group_id,
+            user_id,
+            name=name,
+            avatar_url=avatar_url,
+            short_description=short_description,
+            long_description=long_description,
+        )
+
+        yield self._change_user_memebrship(
+            group_id, user_id,
+            membership="join",
+            is_admin=True,
+            is_public=True,
+        )
+
+        defer.returnValue({"group_id": group_id})
+
+    @defer.inlineCallbacks
+    def add_room(self, group_id, requester_user_id, room_id, content):
+        # TODO: Remote
+
+        group = yield self.store.get_group(group_id)
+        if not group:
+            raise SynapseError(404, "Unknown group")
+
+        is_admin = yield self.store.is_user_admin_in_group(group_id, requester_user_id)
+        if not is_admin:
+            raise SynapseError(403, "User is not admin in group")
+
+        # TODO: Check if room has already been added
+
+        visibility = content.get("visibility")
+        if visibility:
+            vis_type = visibility["type"]
+            if vis_type not in ("public", "private"):
+                raise SynapseError(
+                    400, "Synapse only supports 'public'/'private' visibility"
+                )
+            is_public = vis_type == "public"
+        else:
+            is_public = True
+
+        yield self.store.add_room_to_group(group_id, room_id, is_public=is_public)
+
+        defer.returnValue({})
+
+    @defer.inlineCallbacks
+    def add_user(self, group_id, requester_user_id, target_user_id, content):
+        # TODO: Remote
+
+        group = yield self.store.get_group(group_id)
+        if not group:
+            raise SynapseError(404, "Unknown group")
+
+        is_admin = yield self.store.is_user_admin_in_group(group_id, requester_user_id)
+        if not is_admin:
+            raise SynapseError(403, "User is not admin in group")
+
+        # TODO: Check if user has already been added
+
+        visibility = content.get("visibility")
+        if visibility:
+            vis_type = visibility["type"]
+            if vis_type not in ("public", "private"):
+                raise SynapseError(
+                    400, "Synapse only supports 'public'/'private' visibility"
+                )
+            is_public = vis_type == "public"
+        else:
+            is_public = True
+
+        yield self._change_user_memebrship(
+            group_id, target_user_id,
+            membership="join",
+            is_admin=False,
+            is_public=is_public,
+        )
+
+        defer.returnValue({})
+
+    @defer.inlineCallbacks
+    def _change_user_memebrship(self, group_id, user_id, membership, is_admin=False,
+                                is_public=True):
+        yield self.store.add_user_to_group(
+            group_id, user_id, is_admin=is_admin, is_public=is_public,
+        )
+        if self.hs.is_mine_id(user_id):
+            yield self.store.register_user_group_membership(
+                group_id, user_id, is_admin=is_admin, membership=membership,
+            )
+        else:
+            repl_layer = self.hs.get_replication_layer()
+            yield repl_layer.send_group_user_membership(group_id, user_id, {
+                "membership": membership,
+            })
+
     def on_groups_users_membership(self, group_id, user_states):
         for user_id, user_state in user_states.iteritems():
             membership = user_state["membership"]
@@ -209,76 +330,3 @@ class GroupsHandler(object):
             yield repl_layer.send_group_user_membership(group_id, user_id, {
                 "membership": membership,
             })
-
-    @defer.inlineCallbacks
-    def create_group(self, group_id, requester, content):
-        logger.info("Attempting to create group with ID: %r", group_id)
-        group = yield self.store.get_group(group_id)
-        if group:
-            raise SynapseError(400, "Group already exists")
-
-        user_id = requester.user.to_string()
-
-        if not self.is_mine_id(group_id):
-            repl_layer = self.hs.get_replication_layer()
-            res = yield repl_layer.create_group(group_id, user_id)  # TODO
-            defer.returnValue(res)
-
-        is_admin = yield self.auth.is_server_admin(requester.user)
-        if not is_admin and not group_id.startswith("+u/"):
-            raise SynapseError(403, "Group ID must start with '+u/' or be a server admin")
-
-        profile = content.get("profile", {})
-        name = profile.get("name")
-        avatar_url = profile.get("avatar_url")
-        short_description = profile.get("short_description")
-        long_description = profile.get("long_description")
-
-        yield self.store.create_group(
-            group_id,
-            user_id,
-            name=name,
-            avatar_url=avatar_url,
-            short_description=short_description,
-            long_description=long_description,
-        )
-
-        yield self.store.add_user_to_group(group_id, user_id, is_admin=True)
-        if self.hs.is_mine_id(user_id):
-            yield self.store.register_user_group_membership(
-                group_id, user_id, is_admin=True, membership="join",
-            )
-        else:
-            repl_layer = self.hs.get_replication_layer()
-            yield repl_layer.send_group_user_membership(group_id, user_id, {
-                "membership": "join",
-            })
-
-        defer.returnValue({"group_id": group_id})
-
-    @defer.inlineCallbacks
-    def add_room(self, group_id, requester_user_id, room_id, content):
-        # TODO: Remote
-
-        group = yield self.store.get_group(group_id)
-        if not group:
-            raise SynapseError(404, "Unknown group")
-
-        is_admin = yield self.store.is_user_admin_in_group(group_id, requester_user_id)
-        if not is_admin:
-            raise SynapseError(403, "User is not admin in group")
-
-        visibility = content.get("visibility")
-        if visibility:
-            vis_type = visibility["type"]
-            if vis_type not in ("public", "private"):
-                raise SynapseError(
-                    400, "Synapse only supports 'public'/'private' visibility"
-                )
-            is_public = vis_type == "public"
-        else:
-            is_public = True
-
-        yield self.store.add_room_to_group(group_id, room_id, is_public=is_public)
-
-        defer.returnValue({})

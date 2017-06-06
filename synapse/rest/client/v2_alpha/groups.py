@@ -124,23 +124,48 @@ class GroupCreateServlet(RestServlet):
         defer.returnValue((200, result))
 
 
-class GroupAdminAddRoomsServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/admin/add_room$")
+class GroupAdminRoomsServlet(RestServlet):
+    PATTERNS = client_v2_patterns(
+        "/groups/(?P<group_id>[^/]*)/admin/rooms/(?P<room_id>[^/]*)$"
+    )
 
     def __init__(self, hs):
-        super(GroupAdminAddRoomsServlet, self).__init__()
+        super(GroupAdminRoomsServlet, self).__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_handler()
 
     @defer.inlineCallbacks
-    def on_POST(self, request, group_id):
+    def on_PUT(self, request, group_id, room_id):
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        room_id = content.pop("room_id")
         result = yield self.groups_handler.add_room(group_id, user_id, room_id, content)
+
+        defer.returnValue((200, result))
+
+
+class GroupAdminUsersServlet(RestServlet):
+    PATTERNS = client_v2_patterns(
+        "/groups/(?P<group_id>[^/]*)/admin/users/(?P<user_id>[^/]*)$"
+    )
+
+    def __init__(self, hs):
+        super(GroupAdminUsersServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.groups_handler = hs.get_groups_handler()
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, group_id, user_id):
+        requester = yield self.auth.get_user_by_req(request)
+        requester_user_id = requester.user.to_string()
+
+        content = parse_json_object_from_request(request)
+        result = yield self.groups_handler.add_user(
+            group_id, requester_user_id, user_id, content,
+        )
 
         defer.returnValue((200, result))
 
@@ -151,4 +176,5 @@ def register_servlets(hs, http_server):
     GroupUsersServlet(hs).register(http_server)
     GroupRoomServlet(hs).register(http_server)
     GroupCreateServlet(hs).register(http_server)
-    GroupAdminAddRoomsServlet(hs).register(http_server)
+    GroupAdminRoomsServlet(hs).register(http_server)
+    GroupAdminUsersServlet(hs).register(http_server)
