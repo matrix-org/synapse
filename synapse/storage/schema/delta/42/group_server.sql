@@ -28,12 +28,13 @@ CREATE TABLE group_users (
     group_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     is_admin BOOLEAN NOT NULL,
-    is_public BOOLEAN NOT NULL
+    is_public BOOLEAN NOT NULL,
+    assestation TEXT
 );
 
 
 CREATE INDEX groups_users_g_idx ON group_users(group_id, user_id);
-CREATE INDEX groups_users_u_idx ON group_users(user_id, group_id);
+CREATE INDEX groups_users_u_idx ON group_users(user_id);
 
 
 CREATE TABLE group_rooms (
@@ -44,7 +45,7 @@ CREATE TABLE group_rooms (
 
 
 CREATE INDEX groups_rooms_g_idx ON group_rooms(group_id, room_id);
-CREATE INDEX groups_rooms_r_idx ON group_rooms(room_id, group_id);
+CREATE INDEX groups_rooms_r_idx ON group_rooms(room_id);
 
 
 

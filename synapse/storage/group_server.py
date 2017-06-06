@@ -17,6 +17,8 @@ from twisted.internet import defer
 
 from ._base import SQLBaseStore
 
+import ujson as json
+
 
 class GroupServerStore(SQLBaseStore):
     def get_group(self, group_id):
@@ -86,7 +88,8 @@ class GroupServerStore(SQLBaseStore):
             desc="is_user_adim_in_group",
         )
 
-    def add_user_to_group(self, group_id, user_id, is_admin=False, is_public=True):
+    def add_user_to_group(self, group_id, user_id, is_admin=False, is_public=True,
+                          assestation=None):
         return self._simple_insert(
             table="group_users",
             values={
@@ -94,6 +97,7 @@ class GroupServerStore(SQLBaseStore):
                 "user_id": user_id,
                 "is_admin": is_admin,
                 "is_public": is_public,
+                "assestation": json.dumps(assestation),
             },
             desc="add_user_to_group",
         )
@@ -120,7 +124,8 @@ class GroupServerStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def register_user_group_membership(self, group_id, user_id, is_admin, membership):
+    def register_user_group_membership(self, group_id, user_id, membership,
+                                       is_admin=False):
         with self._group_membership_id_gen.get_next() as next_id:
             yield self._simple_insert(
                 table="local_group_membership",
@@ -148,5 +153,3 @@ class GroupServerStore(SQLBaseStore):
             },
             desc="create_group",
         )
-
-        yield self.register_user_group_membership(group_id, user_id, True, "join")

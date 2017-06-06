@@ -16,10 +16,16 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
+from synapse.types import get_domain_from_id
+
+from signedjson.sign import sign_json
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+DEFAULT_ASSESSTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
 
 
 class GroupsHandler(object):
@@ -28,7 +34,11 @@ class GroupsHandler(object):
         self.store = hs.get_datastore()
         self.room_list_handler = hs.get_room_list_handler()
         self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.keyring = hs.get_keyring()
         self.is_mine_id = hs.is_mine_id
+        self.signing_key = hs.config.signing_key[0]
+        self.server_name = hs.hostname
 
     def get_group_summary(self, group_id, requester_user_id):
         if self.is_mine_id(group_id):
@@ -189,9 +199,8 @@ class GroupsHandler(object):
             long_description=long_description,
         )
 
-        yield self._change_user_memebrship(
+        yield self._send_user_join(
             group_id, user_id,
-            membership="join",
             is_admin=True,
             is_public=True,
         )
@@ -252,9 +261,8 @@ class GroupsHandler(object):
         else:
             is_public = True
 
-        yield self._change_user_memebrship(
+        yield self._send_user_join(
             group_id, target_user_id,
-            membership="join",
             is_admin=False,
             is_public=is_public,
         )
@@ -262,71 +270,45 @@ class GroupsHandler(object):
         defer.returnValue({})
 
     @defer.inlineCallbacks
-    def _change_user_memebrship(self, group_id, user_id, membership, is_admin=False,
-                                is_public=True):
+    def _send_user_join(self, group_id, user_id, is_admin=False, is_public=True):
+        if self.hs.is_mine_id(user_id):
+            yield self.store.register_user_group_membership(
+                group_id, user_id, membership="join", is_admin=is_admin
+            )
+            assestation = None
+        else:
+            domain = get_domain_from_id(user_id)
+
+            repl_layer = self.hs.get_replication_layer()
+            res = yield repl_layer.send_group_user_join(group_id, user_id, {
+                "assestation": self._create_assestation(group_id, user_id),
+            })
+
+            assestation = res["assestation"]
+            yield self.keyring.verify_json_for_server(domain, assestation)
+
         yield self.store.add_user_to_group(
-            group_id, user_id, is_admin=is_admin, is_public=is_public,
+            group_id, user_id,
+            is_admin=is_admin,
+            is_public=is_public,
+            assestation=assestation,
         )
-        if self.hs.is_mine_id(user_id):
-            yield self.store.register_user_group_membership(
-                group_id, user_id, is_admin=is_admin, membership=membership,
-            )
-        else:
-            repl_layer = self.hs.get_replication_layer()
-            yield repl_layer.send_group_user_membership(group_id, user_id, {
-                "membership": membership,
-            })
 
-    def on_groups_users_membership(self, group_id, user_states):
-        for user_id, user_state in user_states.iteritems():
-            membership = user_state["membership"]
-            is_admin = user_state["is_admin"]
-            if not self.is_mine_id(user_id):
-                logger.warn(
-                    "Group %r informed us of %r of user %r",
-                    group_id, membership, user_id
-                )
-                continue
-            if membership not in ("join", "leave",):
-                logger.warn(
-                    "Group %r informed us of unkown membership state %r for user %r",
-                    group_id, membership, user_id
-                )
-                continue
-            yield self.store.register_user_group_membership(
-                group_id, user_id, is_admin, membership
-            )
+    def _create_assestation(self, group_id, user_id):
+        return sign_json({
+            "group_id": group_id,
+            "user_id": user_id,
+            "valid_until_ms": self.clock.time_msec() + DEFAULT_ASSESSTATION_LENGTH_MS,
+        }, self.server_name, self.signing_key)
 
-    def on_groups_users_admin_join_user(self, group_id, requester_user_id, content):
-        group = yield self.store.get_group(group_id)
-        if not group:
-            raise SynapseError(404, "Unknown group")
+    @defer.inlineCallbacks
+    def on_groups_user_join(self, group_id, user_id, state):
+        if not self.hs.is_mine_id(user_id):
+            raise SynapseError(400, "User not on this server")
 
-        is_admin = yield self.store.is_user_admin_in_group(group_id, requester_user_id)
-        if not is_admin:
-            raise SynapseError(403, "User is not admin in group")
-
-        user_id = content["target_user_id"]
-        membership = content["membership"]
-
-        if membership not in ("join", "leave",):
-            logger.warn(
-                "Group %r informed us of unkown membership state %r for user %r",
-                group_id, membership, user_id
-            )
-            raise SynapseError(400, "Unknown membership %r" % (membership,))
-
-        if membership == "join":
-            yield self.store.add_user_to_group(group_id, user_id)
-        else:
-            yield self.store.remove_user_to_group(group_id, user_id)
-
-        if self.hs.is_mine_id(user_id):
-            yield self.store.register_user_group_membership(
-                group_id, user_id, is_admin=False, membership=membership,
-            )
-        else:
-            repl_layer = self.hs.get_replication_layer()
-            yield repl_layer.send_group_user_membership(group_id, user_id, {
-                "membership": membership,
-            })
+        yield self.store.register_user_group_membership(
+            group_id, user_id, membership="join",
+        )
+        defer.returnValue({
+            "assestation": self._create_assestation(group_id, user_id),
+        })
