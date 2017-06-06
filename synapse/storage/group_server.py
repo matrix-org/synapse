@@ -74,14 +74,14 @@ class GroupServerStore(SQLBaseStore):
             desc="is_user_in_group",
         ).addCallback(lambda r: bool(r))
 
-    def is_user_adim_in_group(self, user_id, group_id):
+    def is_user_admin_in_group(self, group_id, user_id):
         return self._simple_select_one_onecol(
             table="group_users",
             keyvalues={
                 "group_id": group_id,
                 "user_id": user_id,
             },
-            retcol="admin",
+            retcol="is_admin",
             allow_none=True,
             desc="is_user_adim_in_group",
         )

@@ -181,7 +181,7 @@ class GroupsHandler(object):
         if not group:
             raise SynapseError(404, "Unknown group")
 
-        is_admin = yield self.store.is_user_adim_in_group(group_id, requester_user_id)
+        is_admin = yield self.store.is_user_admin_in_group(group_id, requester_user_id)
         if not is_admin:
             raise SynapseError(403, "User is not admin in group")
 
@@ -246,7 +246,7 @@ class GroupsHandler(object):
         yield self.store.add_user_to_group(group_id, user_id, is_admin=True)
         if self.hs.is_mine_id(user_id):
             yield self.store.register_user_group_membership(
-                group_id, user_id, is_admin=False, membership="join",
+                group_id, user_id, is_admin=True, membership="join",
             )
         else:
             repl_layer = self.hs.get_replication_layer()
@@ -264,7 +264,7 @@ class GroupsHandler(object):
         if not group:
             raise SynapseError(404, "Unknown group")
 
-        is_admin = yield self.store.is_user_adim_in_group(group_id, requester_user_id)
+        is_admin = yield self.store.is_user_admin_in_group(group_id, requester_user_id)
         if not is_admin:
             raise SynapseError(403, "User is not admin in group")
 
