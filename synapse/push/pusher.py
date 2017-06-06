@@ -57,7 +57,7 @@ class PusherFactory(object):
             logger.info("found pusher")
             return self.pusher_types[pusherdict['kind']](self.hs, pusherdict)
 
-    def _create_email_pusher(self, pusherdict):
+    def _create_email_pusher(self, _hs, pusherdict):
         app_name = self._brand_from_pusherdict
         mailer = self.mailers.get(app_name)
         if not mailer:
