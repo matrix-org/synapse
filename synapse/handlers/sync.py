@@ -117,6 +117,8 @@ class SyncResult(collections.namedtuple("SyncResult", [
     "archived",  # ArchivedSyncResult for each archived room.
     "to_device",  # List of direct messages for the device.
     "device_lists",  # List of user_ids whose devices have chanegd
+    "device_one_time_keys_count",  # Dict of algorithm to count for one time keys
+                                   # for this device
 ])):
     __slots__ = []
 
@@ -550,6 +552,14 @@ class SyncHandler(object):
             sync_result_builder
         )
 
+        device_id = sync_config.device_id
+        one_time_key_counts = {}
+        if device_id:
+            user_id = sync_config.user.to_string()
+            one_time_key_counts = yield self.store.count_e2e_one_time_keys(
+                user_id, device_id
+            )
+
         defer.returnValue(SyncResult(
             presence=sync_result_builder.presence,
             account_data=sync_result_builder.account_data,
@@ -558,6 +568,7 @@ class SyncHandler(object):
             archived=sync_result_builder.archived,
             to_device=sync_result_builder.to_device,
             device_lists=device_lists,
+            device_one_time_keys_count=one_time_key_counts,
             next_batch=sync_result_builder.now_token,
         ))
 
