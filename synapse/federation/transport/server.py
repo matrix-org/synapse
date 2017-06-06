@@ -709,6 +709,7 @@ SERVLET_CLASSES = (
     PublicRoomList,
     FederationVersionServlet,
     FederationGroupsProfileServlet,
+    FederationGroupsSummaryServlet,
     FederationGroupsRoomsServlet,
     FederationGroupsUsersServlet,
     FederationGroupsUsersMembershipServlet,
