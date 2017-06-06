@@ -27,7 +27,7 @@ CREATE UNIQUE INDEX groups_idx ON groups(group_id);
 CREATE TABLE group_users (
     group_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
-    admin BOOLEAN NOT NULL,
+    is_admin BOOLEAN NOT NULL,
     is_public BOOLEAN NOT NULL
 );
 

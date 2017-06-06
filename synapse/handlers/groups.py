@@ -228,10 +228,11 @@ class GroupsHandler(object):
         if not is_admin and not group_id.startswith("+u/"):
             raise SynapseError(403, "Group ID must start with '+u/' or be a server admin")
 
-        name = content["name"]
-        avatar_url = content.get("avatar_url")
-        short_description = content.get("short_description")
-        long_description = content.get("long_description")
+        profile = content.get("profile", {})
+        name = profile.get("name")
+        avatar_url = profile.get("avatar_url")
+        short_description = profile.get("short_description")
+        long_description = profile.get("long_description")
 
         yield self.store.create_group(
             group_id,
@@ -241,5 +242,43 @@ class GroupsHandler(object):
             short_description=short_description,
             long_description=long_description,
         )
+
+        yield self.store.add_user_to_group(group_id, user_id, is_admin=True)
+        if self.hs.is_mine_id(user_id):
+            yield self.store.register_user_group_membership(
+                group_id, user_id, is_admin=False, membership="join",
+            )
+        else:
+            repl_layer = self.hs.get_replication_layer()
+            yield repl_layer.send_group_user_membership(group_id, user_id, {
+                "membership": "join",
+            })
+
+        defer.returnValue({"group_id": group_id})
+
+    @defer.inlineCallbacks
+    def add_room(self, group_id, requester_user_id, room_id, content):
+        # TODO: Remote
+
+        group = yield self.store.get_group(group_id)
+        if not group:
+            raise SynapseError(404, "Unknown group")
+
+        is_admin = yield self.store.is_user_adim_in_group(group_id, requester_user_id)
+        if not is_admin:
+            raise SynapseError(403, "User is not admin in group")
+
+        visibility = content.get("visibility")
+        if visibility:
+            vis_type = visibility["type"]
+            if vis_type not in ("public", "private"):
+                raise SynapseError(
+                    400, "Synapse only supports 'public'/'private' visibility"
+                )
+            is_public = vis_type == "public"
+        else:
+            is_public = True
+
+        yield self.store.add_room_to_group(group_id, room_id, is_public=is_public)
 
         defer.returnValue({})

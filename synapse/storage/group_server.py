@@ -86,13 +86,14 @@ class GroupServerStore(SQLBaseStore):
             desc="is_user_adim_in_group",
         )
 
-    def add_user_to_group(self, group_id, user_id, is_admin):
+    def add_user_to_group(self, group_id, user_id, is_admin=False, is_public=True):
         return self._simple_insert(
             table="group_users",
             values={
                 "group_id": group_id,
                 "user_id": user_id,
                 "is_admin": is_admin,
+                "is_public": is_public,
             },
             desc="add_user_to_group",
         )
