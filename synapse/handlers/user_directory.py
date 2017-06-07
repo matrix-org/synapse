@@ -46,6 +46,9 @@ class UserDirectoyHandler(object):
         self.state = hs.get_state_handler()
         self.server_name = hs.hostname
         self.clock = hs.get_clock()
+        self.notifier = hs.get_notifier()
+
+        self.notifier.add_replication_callback(self.notify_new_event)
 
         # When start up for the first time we need to populate the user_directory.
         # This is a set of user_id's we've inserted already
