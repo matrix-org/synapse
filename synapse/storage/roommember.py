@@ -644,6 +644,10 @@ class RoomMemberStore(SQLBaseStore):
 
 
 class _JoinedHostsCache(object):
+    """Cache for joined hosts in a room that is optimised to handle updates
+    via state deltas.
+    """
+
     def __init__(self, store, room_id):
         self.store = store
         self.room_id = room_id
@@ -658,6 +662,11 @@ class _JoinedHostsCache(object):
 
     @defer.inlineCallbacks
     def get_destinations(self, state_entry):
+        """Get set of destinations for a state entry
+
+        Args:
+            state_entry(synapse.state._StateCacheEntry)
+        """
         if state_entry.state_group == self.state_group:
             defer.returnValue(frozenset(self.hosts_to_joined_users))
 

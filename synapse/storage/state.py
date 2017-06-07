@@ -99,6 +99,12 @@ class StateStore(SQLBaseStore):
         )
 
     def get_state_group_delta(self, state_group):
+        """Given a state group try to return a previous group and a delta between
+        the old and the new.
+
+        Returns:
+            (prev_group, delta_ids), where both may be None.
+        """
         def _get_state_group_delta_txn(txn):
             prev_group = self._simple_select_one_onecol_txn(
                 txn,
