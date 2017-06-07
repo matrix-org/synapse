@@ -25,6 +25,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# TODO: Renew assestations
+# TODO: Allow remote servers to accept invitations to rooms asyncly.
+# TODO: Allow users to "knock" or simpkly join depending on rules
+# TODO: Federation admin APIs
+# TODO: is_priveged flag to users and is_public to users and rooms
+
+
 DEFAULT_ASSESSTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
 
 
