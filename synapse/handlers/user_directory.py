@@ -46,6 +46,9 @@ class UserDirectoyHandler(object):
         self.state = hs.get_state_handler()
         self.server_name = hs.hostname
         self.clock = hs.get_clock()
+        self.notifier = hs.get_notifier()
+
+        self.notifier.add_replication_callback(self.notify_new_event)
 
         # When start up for the first time we need to populate the user_directory.
         # This is a set of user_id's we've inserted already
@@ -130,8 +133,15 @@ class UserDirectoyHandler(object):
         # We process by going through each existing room at a time.
         room_ids = yield self.store.get_all_rooms()
 
+        logger.info("Doing initial update of user directory. %d rooms", len(room_ids))
+        num_processed_rooms = 1
+
         for room_id in room_ids:
+            logger.info("Handling room %d/%d", num_processed_rooms, len(room_ids))
             yield self._handle_intial_room(room_id)
+            num_processed_rooms += 1
+
+        logger.info("Processed all rooms.")
 
         self.initially_handled_users = None
 
