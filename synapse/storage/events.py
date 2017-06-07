@@ -1439,7 +1439,7 @@ class EventsStore(SQLBaseStore):
                 ]
 
                 rows = self._new_transaction(
-                    conn, "do_fetch", [], None, self._fetch_event_rows, event_ids
+                    conn, "do_fetch", [], [], None, self._fetch_event_rows, event_ids
                 )
 
                 row_dict = {
