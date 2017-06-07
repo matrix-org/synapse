@@ -560,7 +560,6 @@ class RoomMemberStore(SQLBaseStore):
 
         cache = self._get_joined_hosts_cache(room_id)
         joined_hosts = yield cache.get_destinations(state_entry)
-        logger.info("returning: %r", joined_hosts)
 
         defer.returnValue(joined_hosts)
 

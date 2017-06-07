@@ -179,9 +179,7 @@ class StateHandler(object):
             latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
         logger.debug("calling resolve_state_groups from get_current_hosts_in_room")
         entry = yield self.resolve_state_groups(room_id, latest_event_ids)
-        logger.info("State: %r", entry.state_group)
         joined_hosts = yield self.store.get_joined_hosts(room_id, entry)
-        logger.info("returning: %r", joined_hosts)
         defer.returnValue(joined_hosts)
 
     @defer.inlineCallbacks
