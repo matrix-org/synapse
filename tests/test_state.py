@@ -143,7 +143,6 @@ class StateTestCase(unittest.TestCase):
                 "add_event_hashes",
                 "get_events",
                 "get_next_state_group",
-                "get_state_group_delta",
             ]
         )
         hs = Mock(spec_set=[
@@ -155,7 +154,6 @@ class StateTestCase(unittest.TestCase):
         hs.get_auth.return_value = Auth(hs)
 
         self.store.get_next_state_group.side_effect = Mock
-        self.store.get_state_group_delta.return_value = (None, None)
 
         self.state = StateHandler(hs)
         self.event_id = 0

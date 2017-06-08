@@ -187,7 +187,6 @@ class TransactionQueue(object):
                             prev_id for prev_id, _ in event.prev_events
                         ],
                     )
-                    destinations = set(destinations)
 
                     if send_on_behalf_of is not None:
                         # If we are sending the event on behalf of another server

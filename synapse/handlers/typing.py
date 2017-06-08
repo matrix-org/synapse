@@ -89,7 +89,7 @@ class TypingHandler(object):
             until = self._member_typing_until.get(member, None)
             if not until or until <= now:
                 logger.info("Timing out typing for: %s", member.user_id)
-                self._stopped_typing(member)
+                preserve_fn(self._stopped_typing)(member)
                 continue
 
             # Check if we need to resend a keep alive over federation for this
@@ -147,7 +147,7 @@ class TypingHandler(object):
             # No point sending another notification
             defer.returnValue(None)
 
-        self._push_update(
+        yield self._push_update(
             member=member,
             typing=True,
         )
@@ -171,7 +171,7 @@ class TypingHandler(object):
 
         member = RoomMember(room_id=room_id, user_id=target_user_id)
 
-        self._stopped_typing(member)
+        yield self._stopped_typing(member)
 
     @defer.inlineCallbacks
     def user_left_room(self, user, room_id):
@@ -180,6 +180,7 @@ class TypingHandler(object):
             member = RoomMember(room_id=room_id, user_id=user_id)
             yield self._stopped_typing(member)
 
+    @defer.inlineCallbacks
     def _stopped_typing(self, member):
         if member.user_id not in self._room_typing.get(member.room_id, set()):
             # No point
@@ -188,15 +189,16 @@ class TypingHandler(object):
         self._member_typing_until.pop(member, None)
         self._member_last_federation_poke.pop(member, None)
 
-        self._push_update(
+        yield self._push_update(
             member=member,
             typing=False,
         )
 
+    @defer.inlineCallbacks
     def _push_update(self, member, typing):
         if self.hs.is_mine_id(member.user_id):
             # Only send updates for changes to our own users.
-            preserve_fn(self._push_remote)(member, typing)
+            yield self._push_remote(member, typing)
 
         self._push_update_local(
             member=member,
