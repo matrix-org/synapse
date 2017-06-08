@@ -273,7 +273,8 @@ class StateHandler(object):
                 }
             elif entry.prev_group:
                 context.prev_group = entry.prev_group
-                context.delta_ids = entry.delta_ids
+                context.delta_ids = dict(entry.delta_ids)
+                context.delta_ids[key] = event.event_id
         else:
             if entry.state_group is None:
                 entry.state_group = self.store.get_next_state_group()
@@ -364,12 +365,10 @@ class StateHandler(object):
                 if new_state_event_ids == frozenset(e_id for e_id in events):
                     state_group = sg
                     break
-            if state_group is None:
-                # Worker instances don't have access to this method, but we want
-                # to set the state_group on the main instance to increase cache
-                # hits.
-                if hasattr(self.store, "get_next_state_group"):
-                    state_group = self.store.get_next_state_group()
+
+            # TODO: We want to create a state group for this set of events, to
+            # increase cache hits, but we need to make sure that it doesn't
+            # end up as a prev_group without being added to the database
 
             prev_group = None
             delta_ids = None
