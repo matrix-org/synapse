@@ -99,7 +99,7 @@ class StreamChangeCache(object):
             keys = self._cache.keys()
             i = keys.bisect_right(stream_pos)
 
-            return len(keys[i:]) > 0
+            return i < len(keys)
         else:
             self.metrics.inc_misses()
             return True
