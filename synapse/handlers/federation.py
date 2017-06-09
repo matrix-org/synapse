@@ -1102,6 +1102,7 @@ class FederationHandler(BaseHandler):
             user_id,
             "leave"
         )
+        event.internal_metadata.outlier = True
         event = self._sign_event(event)
 
         # Try the host that we succesfully called /make_leave/ on first for
