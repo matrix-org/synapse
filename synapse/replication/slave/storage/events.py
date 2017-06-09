@@ -108,7 +108,7 @@ class SlavedEventStore(BaseSlavedStore):
     get_current_state_ids = (
         StateStore.__dict__["get_current_state_ids"]
     )
-    get_state_group_delta = DataStore.get_state_group_delta.__func__
+    get_state_group_delta = StateStore.__dict__["get_state_group_delta"]
     _get_joined_hosts_cache = RoomMemberStore.__dict__["_get_joined_hosts_cache"]
     has_room_changed_since = DataStore.has_room_changed_since.__func__
 
