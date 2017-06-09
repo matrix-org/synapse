@@ -20,6 +20,7 @@ from synapse.util.stringutils import to_ascii
 from synapse.storage.engines import PostgresEngine
 
 from twisted.internet import defer
+from collections import namedtuple
 
 import logging
 
@@ -27,6 +28,13 @@ logger = logging.getLogger(__name__)
 
 
 MAX_STATE_DELTA_HOPS = 100
+
+
+class _GetStateGroupDelta(namedtuple("_GetStateGroupDelta", ("prev_group", "delta_ids"))):
+    __slots__ = []
+
+    def __len__(self):
+        return len(self.delta_ids) if self.delta_ids else None
 
 
 class StateStore(SQLBaseStore):
@@ -98,6 +106,7 @@ class StateStore(SQLBaseStore):
             _get_current_state_ids_txn,
         )
 
+    @cached(max_entries=10000, iterable=True)
     def get_state_group_delta(self, state_group):
         """Given a state group try to return a previous group and a delta between
         the old and the new.
@@ -117,7 +126,7 @@ class StateStore(SQLBaseStore):
             )
 
             if not prev_group:
-                return None, None
+                return _GetStateGroupDelta(None, None)
 
             delta_ids = self._simple_select_list_txn(
                 txn,
@@ -128,10 +137,10 @@ class StateStore(SQLBaseStore):
                 retcols=("type", "state_key", "event_id",)
             )
 
-            return prev_group, {
+            return _GetStateGroupDelta(prev_group, {
                 (row["type"], row["state_key"]): row["event_id"]
                 for row in delta_ids
-            }
+            })
         return self.runInteraction(
             "get_state_group_delta",
             _get_state_group_delta_txn,
