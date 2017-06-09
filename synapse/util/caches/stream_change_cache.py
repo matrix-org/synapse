@@ -96,10 +96,10 @@ class StreamChangeCache(object):
 
         if stream_pos >= self._earliest_known_stream_pos:
             self.metrics.inc_hits()
-            if stream_pos >= max(self._cache):
-                return False
-            else:
-                return True
+            keys = self._cache.keys()
+            i = keys.bisect_right(stream_pos)
+
+            return len(keys[i:]) > 0
         else:
             self.metrics.inc_misses()
             return True
