@@ -37,7 +37,7 @@ class _GetStateGroupDelta(namedtuple("_GetStateGroupDelta", ("prev_group", "delt
     __slots__ = []
 
     def __len__(self):
-        return len(self.delta_ids) if self.delta_ids else None
+        return len(self.delta_ids) if self.delta_ids else 0
 
 
 class StateStore(SQLBaseStore):
