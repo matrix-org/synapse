@@ -507,9 +507,12 @@ class RoomMemberStore(SQLBaseStore):
             raise Exception("Invalid host name")
 
         sql = """
-            SELECT state_key FROM current_state_events
-            INNER JOIN room_memberships USING (room_id, event_id)
-            WHERE membership = 'join' AND room_id = ? AND state_key LIKE ?
+            SELECT state_key FROM current_state_events AS c
+            INNER JOIN room_memberships USING (event_id)
+            WHERE membership = 'join'
+                AND type = 'm.room.member'
+                AND c.room_id = ?
+                AND state_key LIKE ?
             LIMIT 1
         """
 
