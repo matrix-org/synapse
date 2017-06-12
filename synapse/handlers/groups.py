@@ -317,7 +317,9 @@ class GroupsHandler(object):
                     valid_until_ms=valid_until_ms,
                 )
             elif res["state"] == "invite":
-                raise NotImplementedError()
+                yield self.store.add_group_invite(
+                    group_id, user_id,
+                )
             elif res["state"] == "reject":
                 raise SynapseError(400, "Remote rejected invite")
 
@@ -330,17 +332,42 @@ class GroupsHandler(object):
 
     @defer.inlineCallbacks
     def on_groups_user_join(self, group_id, user_id, state):
-        # TODO: Accept remote users for local groups
-        if not self.hs.is_mine_id(user_id):
-            raise SynapseError(400, "User not on this server")
+        if self.hs.is_mine_id(user_id):
+            # TODO: Store given assestation
+            yield self.store.register_user_group_membership(
+                group_id, user_id, membership="join",
+            )
+            defer.returnValue({
+                "state": "join",  # join / pending
+                "assestation": self._create_assestation(group_id, user_id),
+            })
 
-        yield self.store.register_user_group_membership(
-            group_id, user_id, membership="join",
-        )
-        defer.returnValue({
-            "state": "join",  # join / accept / reject
-            "assestation": self._create_assestation(group_id, user_id),
-        })
+        if self.hs.is_mine_id(group_id):
+            is_invited = yield self.store.is_user_invited_to_local_group(
+                group_id, user_id,
+            )
+
+            if not is_invited:
+                raise SynapseError(403, "User not invited to group")
+
+            assestation = state["assestation"]
+            valid_until_ms = assestation["valid_until_ms"]
+
+            domain = get_domain_from_id(user_id)
+            yield self.keyring.verify_json_for_server(domain, assestation)
+
+            yield self.store.add_user_to_group(
+                group_id, user_id,
+                assestation=assestation,
+                valid_until_ms=valid_until_ms,
+            )
+
+            defer.returnValue({
+                "state": "join",  # join / pending
+                "assestation": self._create_assestation(group_id, user_id),
+            })
+
+        raise Exception("Neither user_id not group_id were local")
 
     @defer.inlineCallbacks
     def on_groups_user_leave_request(self, group_id, user_id, content):

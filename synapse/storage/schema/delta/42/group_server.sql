@@ -37,6 +37,15 @@ CREATE INDEX groups_users_g_idx ON group_users(group_id, user_id);
 CREATE INDEX groups_users_u_idx ON group_users(user_id);
 
 
+CREATE TABLE group_invites (
+    group_id TEXT NOT NULL,
+    user_id TEXT NOT NULL
+);
+
+CREATE INDEX groups_invites_g_idx ON group_invites(group_id, user_id);
+CREATE INDEX groups_invites_u_idx ON group_invites(user_id);
+
+
 CREATE TABLE group_rooms (
     group_id TEXT NOT NULL,
     room_id TEXT NOT NULL,

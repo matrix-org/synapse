@@ -88,6 +88,28 @@ class GroupServerStore(SQLBaseStore):
             desc="is_user_adim_in_group",
         )
 
+    def add_group_invite(self, group_id, user_id):
+        return self._simple_insert(
+            table="group_invites",
+            values={
+                "group_id": group_id,
+                "user_id": user_id,
+            },
+            desc="add_group_invite",
+        )
+
+    def is_user_invited_to_local_group(self, group_id, user_id):
+        return self._simple_select_one_onecol(
+            table="group_invites",
+            keyvalues={
+                "group_id": group_id,
+                "user_id": user_id,
+            },
+            retcol="user_id",
+            desc="is_user_invited_to_local_group",
+            allow_none=True,
+        )
+
     def add_user_to_group(self, group_id, user_id, is_admin=False, is_public=True,
                           assestation=None, valid_until_ms=None):
         def _add_user_to_group_txn(txn):
@@ -100,6 +122,15 @@ class GroupServerStore(SQLBaseStore):
                     "is_admin": is_admin,
                     "is_public": is_public,
                     "assestation": json.dumps(assestation),
+                },
+            )
+
+            self._simple_delete_txn(
+                txn,
+                table="group_invites",
+                keyvalues={
+                    "group_id": group_id,
+                    "user_id": user_id,
                 },
             )
 
@@ -123,6 +154,14 @@ class GroupServerStore(SQLBaseStore):
             self._simple_delete_txn(
                 txn,
                 table="group_users",
+                keyvalues={
+                    "group_id": group_id,
+                    "user_id": user_id,
+                },
+            )
+            self._simple_delete_txn(
+                txn,
+                table="group_invites",
                 keyvalues={
                     "group_id": group_id,
                     "user_id": user_id,
