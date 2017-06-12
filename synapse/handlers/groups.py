@@ -380,3 +380,8 @@ class GroupsHandler(object):
             yield repl_layer.send_group_user_leave(group_id, target_user_id)
 
         defer.returnValue({})
+
+    @defer.inlineCallbacks
+    def get_joined_groups(self, user_id):
+        group_ids = yield self.store.get_joined_groups(user_id)
+        defer.returnValue({"groups": group_ids})

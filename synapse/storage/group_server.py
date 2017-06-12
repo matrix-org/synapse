@@ -194,3 +194,14 @@ class GroupServerStore(SQLBaseStore):
             },
             desc="create_group",
         )
+
+    def get_joined_groups(self, user_id):
+        return self._simple_select_onecol(
+            table="local_group_membership",
+            keyvalues={
+                "user_id": user_id,
+                "membership": "join",
+            },
+            retcol="group_id",
+            desc="get_joined_groups",
+        )
