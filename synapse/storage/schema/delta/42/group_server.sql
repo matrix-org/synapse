@@ -60,3 +60,14 @@ CREATE TABLE local_group_membership (
 CREATE INDEX local_group_membership_u_idx ON local_group_membership(user_id, group_id);
 CREATE INDEX local_group_membership_g_idx ON local_group_membership(group_id, group_id);
 CREATE INDEX local_group_membership_s_idx ON local_group_membership(user_id, stream_id);
+
+
+CREATE TABLE group_assestations_renewals (
+    group_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    valid_until_ms BIGINT NOT NULL
+);
+
+CREATE INDEX group_assestations_renewals_g_idx ON group_assestations_renewals(group_id, user_id);
+CREATE INDEX group_assestations_renewals_u_idx ON group_assestations_renewals(user_id);
+CREATE INDEX group_assestations_renewals_v_idx ON group_assestations_renewals(valid_until_ms);

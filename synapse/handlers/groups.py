@@ -213,7 +213,7 @@ class GroupsHandler(object):
             long_description=long_description,
         )
 
-        yield self._send_user_join(
+        yield self._send_user_invite(
             group_id, user_id,
             is_admin=True,
             is_public=True,
@@ -275,7 +275,7 @@ class GroupsHandler(object):
         else:
             is_public = True
 
-        yield self._send_user_join(
+        yield self._send_user_invite(
             group_id, target_user_id,
             is_admin=False,
             is_public=is_public,
@@ -284,12 +284,14 @@ class GroupsHandler(object):
         defer.returnValue({})
 
     @defer.inlineCallbacks
-    def _send_user_join(self, group_id, user_id, is_admin=False, is_public=True):
+    def _send_user_invite(self, group_id, user_id, is_admin=False, is_public=True):
         if self.hs.is_mine_id(user_id):
+            # TODO: Invite instead of auto join.
             yield self.store.register_user_group_membership(
                 group_id, user_id, membership="join", is_admin=is_admin
             )
             assestation = None
+            valid_until_ms = None
         else:
             domain = get_domain_from_id(user_id)
 
@@ -298,15 +300,23 @@ class GroupsHandler(object):
                 "assestation": self._create_assestation(group_id, user_id),
             })
 
-            assestation = res["assestation"]
-            yield self.keyring.verify_json_for_server(domain, assestation)
+            if res["state"] == "join":
+                assestation = res["assestation"]
+                valid_until_ms = assestation["valid_until_ms"]
 
-        yield self.store.add_user_to_group(
-            group_id, user_id,
-            is_admin=is_admin,
-            is_public=is_public,
-            assestation=assestation,
-        )
+                yield self.keyring.verify_json_for_server(domain, assestation)
+
+                yield self.store.add_user_to_group(
+                    group_id, user_id,
+                    is_admin=is_admin,
+                    is_public=is_public,
+                    assestation=assestation,
+                    valid_until_ms=valid_until_ms,
+                )
+            elif res["state"] == "invite":
+                raise NotImplementedError()
+            elif res["state"] == "reject":
+                raise SynapseError(400, "Remote rejected invite")
 
     def _create_assestation(self, group_id, user_id):
         return sign_json({
@@ -324,5 +334,6 @@ class GroupsHandler(object):
             group_id, user_id, membership="join",
         )
         defer.returnValue({
+            "state": "join",  # join / accept / reject
             "assestation": self._create_assestation(group_id, user_id),
         })

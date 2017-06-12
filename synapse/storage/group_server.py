@@ -89,17 +89,33 @@ class GroupServerStore(SQLBaseStore):
         )
 
     def add_user_to_group(self, group_id, user_id, is_admin=False, is_public=True,
-                          assestation=None):
-        return self._simple_insert(
-            table="group_users",
-            values={
-                "group_id": group_id,
-                "user_id": user_id,
-                "is_admin": is_admin,
-                "is_public": is_public,
-                "assestation": json.dumps(assestation),
-            },
-            desc="add_user_to_group",
+                          assestation=None, valid_until_ms=None):
+        def _add_user_to_group_txn(txn):
+            self._simple_insert_txn(
+                txn,
+                table="group_users",
+                values={
+                    "group_id": group_id,
+                    "user_id": user_id,
+                    "is_admin": is_admin,
+                    "is_public": is_public,
+                    "assestation": json.dumps(assestation),
+                },
+            )
+
+            if valid_until_ms:
+                self._simple_insert_txn(
+                    txn,
+                    table="group_assestations_renewals",
+                    values={
+                        "group_id": group_id,
+                        "user_id": user_id,
+                        "valid_until_ms": valid_until_ms,
+                    },
+                )
+
+        return self.runInteraction(
+            "add_user_to_group", _add_user_to_group_txn
         )
 
     def remove_user_to_group(self, group_id, user_id):

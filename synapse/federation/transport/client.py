@@ -518,7 +518,7 @@ class TransportLayerClient(object):
 
     @log_function
     def send_group_user_join(self, destination, group_id, user_id, state):
-        path = PREFIX + "/groups/%s/notification/users/%s/join" % (group_id, user_id)
+        path = PREFIX + "/groups/%s/users/%s/request_join" % (group_id, user_id)
 
         return self.client.post_json(
             destination=destination,

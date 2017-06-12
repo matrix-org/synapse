@@ -660,7 +660,7 @@ class FederationGroupsUsersServlet(BaseFederationServlet):
 
 
 class FederationGroupsUserSendServlet(BaseFederationServlet):
-    PATH = "/groups/(?P<group_id>[^/]*)/notification/users/(?P<user_id>[^/]*)/join$"
+    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/request_join$"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
