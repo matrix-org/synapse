@@ -119,14 +119,24 @@ class GroupServerStore(SQLBaseStore):
         )
 
     def remove_user_to_group(self, group_id, user_id):
-        return self._simple_delete(
-            table="group_users",
-            values={
-                "group_id": group_id,
-                "user_id": user_id,
-            },
-            desc="remove_user_to_group",
-        )
+        def _remove_user_to_group_txn(txn):
+            self._simple_delete_txn(
+                txn,
+                table="group_users",
+                keyvalues={
+                    "group_id": group_id,
+                    "user_id": user_id,
+                },
+            )
+            self._simple_delete_txn(
+                txn,
+                table="group_assestations_renewals",
+                keyvalues={
+                    "group_id": group_id,
+                    "user_id": user_id,
+                },
+            )
+        return self.runInteraction("remove_user_to_group", _remove_user_to_group_txn)
 
     def add_room_to_group(self, group_id, room_id, is_public):
         return self._simple_insert(
@@ -142,8 +152,9 @@ class GroupServerStore(SQLBaseStore):
     @defer.inlineCallbacks
     def register_user_group_membership(self, group_id, user_id, membership,
                                        is_admin=False):
-        with self._group_membership_id_gen.get_next() as next_id:
-            yield self._simple_insert(
+        def _register_user_group_membership_txn(txn, next_id):
+            self._simple_insert_txn(
+                txn,
                 table="local_group_membership",
                 values={
                     "stream_id": next_id,
@@ -152,7 +163,21 @@ class GroupServerStore(SQLBaseStore):
                     "is_admin": is_admin,
                     "membership": membership,
                 },
-                desc="register_user_group_membership",
+            )
+            if membership != "join":
+                self._simple_delete_txn(
+                    txn,
+                    table="group_assestations_renewals",
+                    keyvalues={
+                        "group_id": group_id,
+                        "user_id": user_id,
+                    },
+                )
+
+        with self._group_membership_id_gen.get_next() as next_id:
+            yield self.runInteraction(
+                "register_user_group_membership",
+                _register_user_group_membership_txn, next_id,
             )
 
     @defer.inlineCallbacks

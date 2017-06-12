@@ -864,6 +864,22 @@ class FederationClient(FederationBase):
 
     def send_group_user_join(self, group_id, user_id, state):
         destination = get_domain_from_id(user_id)
+        if destination == self.server_name:
+            destination = get_domain_from_id(group_id)
+        if destination == self.server_name:
+            raise Exception("Both user_id and group_id are local users")
+
         return self.transport_layer.send_group_user_join(
             destination, group_id, user_id, state,
+        )
+
+    def send_group_user_leave(self, group_id, user_id):
+        destination = get_domain_from_id(user_id)
+        if destination == self.server_name:
+            destination = get_domain_from_id(group_id)
+        if destination == self.server_name:
+            raise Exception("Both user_id and group_id are local users")
+
+        return self.transport_layer.send_group_user_leave(
+            destination, group_id, user_id,
         )

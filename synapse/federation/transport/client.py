@@ -526,3 +526,14 @@ class TransportLayerClient(object):
             data=state,
             ignore_backoff=True,
         )
+
+    @log_function
+    def send_group_user_leave(self, destination, group_id, user_id):
+        path = PREFIX + "/groups/%s/users/%s/leave" % (group_id, user_id)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data={},
+            ignore_backoff=True,
+        )

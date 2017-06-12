@@ -290,8 +290,11 @@ class GroupsHandler(object):
             yield self.store.register_user_group_membership(
                 group_id, user_id, membership="join", is_admin=is_admin
             )
-            assestation = None
-            valid_until_ms = None
+            yield self.store.add_user_to_group(
+                group_id, user_id,
+                is_admin=is_admin,
+                is_public=is_public,
+            )
         else:
             domain = get_domain_from_id(user_id)
 
@@ -327,6 +330,7 @@ class GroupsHandler(object):
 
     @defer.inlineCallbacks
     def on_groups_user_join(self, group_id, user_id, state):
+        # TODO: Accept remote users for local groups
         if not self.hs.is_mine_id(user_id):
             raise SynapseError(400, "User not on this server")
 
@@ -337,3 +341,42 @@ class GroupsHandler(object):
             "state": "join",  # join / accept / reject
             "assestation": self._create_assestation(group_id, user_id),
         })
+
+    @defer.inlineCallbacks
+    def on_groups_user_leave_request(self, group_id, user_id, content):
+        if self.hs.is_mine_id(user_id):
+            yield self.store.register_user_group_membership(
+                group_id, user_id, membership="leave",
+            )
+        if self.hs.is_mine_id(group_id):
+            yield self.store.remove_user_to_group(group_id, user_id)
+
+        defer.returnValue({})
+
+    @defer.inlineCallbacks
+    def remove_user(self, group_id, requester_user_id, target_user_id, content):
+        if self.is_mine_id(group_id):
+            group = yield self.store.get_group(group_id)
+            if not group:
+                raise SynapseError(404, "Unknown group")
+
+            is_admin = yield self.store.is_user_admin_in_group(
+                group_id, requester_user_id,
+            )
+            if requester_user_id != target_user_id and not is_admin:
+                raise SynapseError(403, "User is not admin in group")
+
+            yield self.store.remove_user_to_group(group_id, target_user_id)
+        else:
+            repl_layer = self.hs.get_replication_layer()
+            yield repl_layer.send_group_user_leave(group_id, target_user_id)
+
+        if self.hs.is_mine_id(target_user_id):
+            yield self.store.register_user_group_membership(
+                group_id, target_user_id, membership="leave",
+            )
+        else:
+            repl_layer = self.hs.get_replication_layer()
+            yield repl_layer.send_group_user_leave(group_id, target_user_id)
+
+        defer.returnValue({})

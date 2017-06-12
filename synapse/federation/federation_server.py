@@ -603,7 +603,23 @@ class FederationServer(FederationBase):
         return self.groups_handler.get_local_users_in_group(group_id, requester_user_id)
 
     def on_groups_user_join_request(self, origin, content, group_id, user_id):
-        if get_domain_from_id(group_id) != origin:
-            raise SynapseError(403, "group_id doesn't match origin")
+        if get_domain_from_id(group_id) == origin:
+            pass
+        elif get_domain_from_id(user_id) == origin:
+            pass
+        else:
+            raise SynapseError(403, "Neither group_id nor user_id matches origin")
 
         return self.groups_handler.on_groups_user_join(group_id, user_id, content)
+
+    def on_groups_user_leave_request(self, origin, content, group_id, user_id):
+        if get_domain_from_id(group_id) == origin:
+            pass
+        elif get_domain_from_id(user_id) == origin:
+            pass
+        else:
+            raise SynapseError(403, "Neither group_id nor user_id matches origin")
+
+        return self.groups_handler.on_groups_user_leave_request(
+            group_id, user_id, content
+        )
