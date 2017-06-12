@@ -151,7 +151,7 @@ class UserDirectoyHandler(object):
     def _handle_intial_room(self, room_id):
         """Called when we initially fill out user_directory one room at a time
         """
-        is_in_room = yield self.state.get_is_host_in_room(room_id, self.server_name)
+        is_in_room = yield self.store.is_host_joined(room_id, self.server_name)
         if not is_in_room:
             return
 
@@ -209,7 +209,7 @@ class UserDirectoyHandler(object):
                 if not change:
                     # Need to check if the server left the room entirely, if so
                     # we might need to remove all the users in that room
-                    is_in_room = yield self.state.get_is_host_in_room(
+                    is_in_room = yield self.store.is_host_joined(
                         room_id, self.server_name,
                     )
                     if not is_in_room:
@@ -346,7 +346,7 @@ class UserDirectoyHandler(object):
             if not update_user_in_public and not update_user_dir:
                 break
 
-            is_in_room = yield self.state.get_is_host_in_room(
+            is_in_room = yield self.store.is_host_joined(
                 j_room_id, self.server_name,
             )
 

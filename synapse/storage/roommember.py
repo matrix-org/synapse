@@ -501,40 +501,37 @@ class RoomMemberStore(SQLBaseStore):
 
         defer.returnValue(users_in_room)
 
-    def is_host_joined(self, room_id, host, state_group, state_ids):
-        if not state_group:
-            # If state_group is None it means it has yet to be assigned a
-            # state group, i.e. we need to make sure that calls with a state_group
-            # of None don't hit previous cached calls with a None state_group.
-            # To do this we set the state_group to a new object as object() != object()
-            state_group = object()
+    @defer.inlineCallbacks
+    def is_host_joined(self, room_id, host):
+        if '%' in host or '_' in host:
+            raise Exception("Invalid host name")
 
-        return self._is_host_joined(
-            room_id, host, state_group, state_ids
-        )
+        sql = """
+            SELECT state_key FROM current_state_events AS c
+            INNER JOIN room_memberships USING (event_id)
+            WHERE membership = 'join'
+                AND type = 'm.room.member'
+                AND c.room_id = ?
+                AND state_key LIKE ?
+            LIMIT 1
+        """
 
-    @cachedInlineCallbacks(num_args=3)
-    def _is_host_joined(self, room_id, host, state_group, current_state_ids):
-        # We don't use `state_group`, its there so that we can cache based
-        # on it. However, its important that its never None, since two current_state's
-        # with a state_group of None are likely to be different.
-        # See bulk_get_push_rules_for_room for how we work around this.
-        assert state_group is not None
+        # We do need to be careful to ensure that host doesn't have any wild cards
+        # in it, but we checked above for known ones and we'll check below that
+        # the returned user actually has the correct domain.
+        like_clause = "%:" + host
 
-        for (etype, state_key), event_id in current_state_ids.items():
-            if etype == EventTypes.Member:
-                try:
-                    if get_domain_from_id(state_key) != host:
-                        continue
-                except:
-                    logger.warn("state_key not user_id: %s", state_key)
-                    continue
+        rows = yield self._execute("is_host_joined", None, sql, room_id, like_clause)
 
-                event = yield self.get_event(event_id, allow_none=True)
-                if event and event.content["membership"] == Membership.JOIN:
-                    defer.returnValue(True)
+        if not rows:
+            defer.returnValue(False)
 
-        defer.returnValue(False)
+        user_id = rows[0][0]
+        if get_domain_from_id(user_id) != host:
+            # This can only happen if the host name has something funky in it
+            raise Exception("Invalid host name")
+
+        defer.returnValue(True)
 
     def get_joined_hosts(self, room_id, state_entry):
         state_group = state_entry.state_group
