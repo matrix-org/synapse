@@ -99,7 +99,6 @@ class UserDirectoyHandler(object):
 
     @defer.inlineCallbacks
     def _unsafe_process(self):
-        return
         # If self.pos is None then means we haven't fetched it from DB
         if self.pos is None:
             self.pos = yield self.store.get_user_directory_stream_pos()
