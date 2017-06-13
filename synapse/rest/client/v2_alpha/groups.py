@@ -218,6 +218,30 @@ class GroupSelfLeaveServlet(RestServlet):
         defer.returnValue((200, result))
 
 
+class GroupSelfJoinServlet(RestServlet):
+    PATTERNS = client_v2_patterns(
+        "/groups/(?P<group_id>[^/]*)/self/join$"
+    )
+
+    def __init__(self, hs):
+        super(GroupSelfJoinServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.groups_handler = hs.get_groups_handler()
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, group_id):
+        requester = yield self.auth.get_user_by_req(request)
+        requester_user_id = requester.user.to_string()
+
+        content = parse_json_object_from_request(request)
+        result = yield self.groups_handler.add_user(
+            group_id, requester_user_id, requester_user_id, content,
+        )
+
+        defer.returnValue((200, result))
+
+
 class GroupsForUserServlet(RestServlet):
     PATTERNS = client_v2_patterns(
         "/joined_groups$"
@@ -249,4 +273,5 @@ def register_servlets(hs, http_server):
     GroupAdminUsersInviteServlet(hs).register(http_server)
     GroupAdminUsersKickServlet(hs).register(http_server)
     GroupSelfLeaveServlet(hs).register(http_server)
+    GroupSelfJoinServlet(hs).register(http_server)
     GroupsForUserServlet(hs).register(http_server)

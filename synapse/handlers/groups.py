@@ -334,6 +334,7 @@ class GroupsHandler(object):
     def on_groups_user_join(self, group_id, user_id, state):
         if self.hs.is_mine_id(user_id):
             # TODO: Store given assestation
+            # TODO: Do invites?
             yield self.store.register_user_group_membership(
                 group_id, user_id, membership="join",
             )
