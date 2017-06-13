@@ -149,12 +149,13 @@ class UserDirectoryStore(SQLBaseStore):
         )
         self.get_user_in_directory.invalidate((user_id,))
 
-    def update_profile_in_user_dir(self, user_id, display_name, avatar_url):
+    def update_profile_in_user_dir(self, user_id, display_name, avatar_url, room_id):
         def _update_profile_in_user_dir_txn(txn):
             new_entry = self._simple_upsert_txn(
                 txn,
                 table="user_directory",
                 keyvalues={"user_id": user_id},
+                insertion_values={"room_id": room_id},
                 values={"display_name": display_name, "avatar_url": avatar_url},
                 lock=False,  # We're only inserter
             )

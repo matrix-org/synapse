@@ -203,7 +203,9 @@ class UserDirectoyHandler(object):
 
                 if change is None:
                     # Handle any profile changes
-                    yield self._handle_profile_change(state_key, prev_event_id, event_id)
+                    yield self._handle_profile_change(
+                        state_key, room_id, prev_event_id, event_id,
+                    )
                     continue
 
                 if not change:
@@ -372,7 +374,7 @@ class UserDirectoyHandler(object):
             yield self.store.remove_from_user_in_public_room(user_id)
 
     @defer.inlineCallbacks
-    def _handle_profile_change(self, user_id, prev_event_id, event_id):
+    def _handle_profile_change(self, user_id, room_id, prev_event_id, event_id):
         """Check member event changes for any profile changes and update the
         database if there are.
         """
@@ -395,7 +397,9 @@ class UserDirectoyHandler(object):
         new_avatar = event.content.get("avatar_url")
 
         if prev_name != new_name or prev_avatar != new_avatar:
-            yield self.store.update_profile_in_user_dir(user_id, new_name, new_avatar)
+            yield self.store.update_profile_in_user_dir(
+                user_id, new_name, new_avatar, room_id,
+            )
 
     @defer.inlineCallbacks
     def _get_key_change(self, prev_event_id, event_id, key_name, public_value):
