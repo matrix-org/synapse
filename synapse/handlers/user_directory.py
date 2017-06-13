@@ -226,7 +226,7 @@ class UserDirectoyHandler(object):
                         logger.debug("Server is still in room: %r", room_id)
 
                 if change:  # The user joined
-                    event = yield self.store.get_event(event_id)
+                    event = yield self.store.get_event(event_id, allow_none=True)
                     profile = ProfileInfo(
                         avatar_url=event.content.get("avatar_url"),
                         display_name=event.content.get("displayname"),
@@ -380,8 +380,11 @@ class UserDirectoyHandler(object):
         if not prev_event_id or not event_id:
             return
 
-        prev_event = yield self.store.get_event(prev_event_id)
-        event = yield self.store.get_event(event_id)
+        prev_event = yield self.store.get_event(prev_event_id, allow_none=True)
+        event = yield self.store.get_event(event_id, allow_none=True)
+
+        if not prev_event or not event:
+            return
 
         if event.membership != Membership.JOIN:
             return

@@ -184,6 +184,7 @@ class MediaRepository(object):
                     raise
                 except NotRetryingDestination:
                     logger.warn("Not retrying destination %r", server_name)
+                    raise SynapseError(502, "Failed to fetch remote media")
                 except Exception:
                     logger.exception("Failed to fetch remote media %s/%s",
                                      server_name, media_id)
