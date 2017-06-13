@@ -391,11 +391,14 @@ class UserDirectoryStore(SQLBaseStore):
                     ]
                 }
         """
-
-        search_query = _parse_query(self.database_engine, search_term)
-
         if isinstance(self.database_engine, PostgresEngine):
+            full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
+
             # We order by rank and then if they have profile info
+            # The ranking algorithm is hand tweaked for "best" results. Broadly
+            # the idea is we give a higher weight to exact matches.
+            # The array of numbers are the weights for the various part of the
+            # search: (domain, _, display name, localpart)
             sql = """
                 SELECT user_id, display_name, avatar_url
                 FROM user_directory_search
@@ -403,13 +406,27 @@ class UserDirectoryStore(SQLBaseStore):
                 INNER JOIN users_in_pubic_room USING (user_id)
                 WHERE vector @@ to_tsquery('english', ?)
                 ORDER BY
-                    ts_rank_cd(vector, to_tsquery('english', ?), 1) DESC,
+                    2 * ts_rank_cd(
+                        '{0.1, 0.1, 0.9, 1.0}',
+                        vector,
+                        to_tsquery('english', ?),
+                        8
+                    )
+                    + ts_rank_cd(
+                        '{0.1, 0.1, 0.9, 1.0}',
+                        vector,
+                        to_tsquery('english', ?),
+                        8
+                    )
+                    DESC,
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
             """
-            args = (search_query, search_query, limit + 1,)
+            args = (full_query, exact_query, prefix_query, limit + 1,)
         elif isinstance(self.database_engine, Sqlite3Engine):
+            search_query = _parse_query_sqlite(search_term)
+
             sql = """
                 SELECT user_id, display_name, avatar_url
                 FROM user_directory_search
@@ -439,7 +456,7 @@ class UserDirectoryStore(SQLBaseStore):
         })
 
 
-def _parse_query(database_engine, search_term):
+def _parse_query_sqlite(search_term):
     """Takes a plain unicode string from the user and converts it into a form
     that can be passed to database.
     We use this so that we can add prefix matching, which isn't something
@@ -451,11 +468,21 @@ def _parse_query(database_engine, search_term):
 
     # Pull out the individual words, discarding any non-word characters.
     results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
+    return " & ".join("(%s* | %s)" % (result, result,) for result in results)
 
-    if isinstance(database_engine, PostgresEngine):
-        return " & ".join("(%s:* | %s)" % (result, result,) for result in results)
-    elif isinstance(database_engine, Sqlite3Engine):
-        return " & ".join("(%s* | %s)" % (result, result,) for result in results)
-    else:
-        # This should be unreachable.
-        raise Exception("Unrecognized database engine")
+
+def _parse_query_postgres(search_term):
+    """Takes a plain unicode string from the user and converts it into a form
+    that can be passed to database.
+    We use this so that we can add prefix matching, which isn't something
+    that is supported by default.
+    """
+
+    # Pull out the individual words, discarding any non-word characters.
+    results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
+
+    both = " & ".join("(%s:* | %s)" % (result, result,) for result in results)
+    exact = " & ".join("%s" % (result,) for result in results)
+    prefix = " & ".join("%s:*" % (result,) for result in results)
+
+    return both, exact, prefix
