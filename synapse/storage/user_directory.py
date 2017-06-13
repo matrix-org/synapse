@@ -151,43 +151,60 @@ class UserDirectoryStore(SQLBaseStore):
 
     def update_profile_in_user_dir(self, user_id, display_name, avatar_url):
         def _update_profile_in_user_dir_txn(txn):
-            self._simple_update_one_txn(
+            new_entry = self._simple_upsert_txn(
                 txn,
                 table="user_directory",
                 keyvalues={"user_id": user_id},
-                updatevalues={"display_name": display_name, "avatar_url": avatar_url},
+                values={"display_name": display_name, "avatar_url": avatar_url},
+                lock=False,  # We're only inserter
             )
 
             if isinstance(self.database_engine, PostgresEngine):
                 # We weight the loclpart most highly, then display name and finally
                 # server name
-                sql = """
-                    UPDATE user_directory_search
-                    SET vector = setweight(to_tsvector('english', ?), 'A')
-                        || setweight(to_tsvector('english', ?), 'D')
-                        || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
-                    WHERE user_id = ?
-                """
-                args = (
-                    get_localpart_from_id(user_id), get_domain_from_id(user_id),
-                    display_name,
-                    user_id,
-                )
+                if new_entry:
+                    sql = """
+                        INSERT INTO user_directory_search(user_id, vector)
+                        VALUES (?,
+                            setweight(to_tsvector('english', ?), 'A')
+                            || setweight(to_tsvector('english', ?), 'D')
+                            || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
+                        )
+                    """
+                    txn.execute(
+                        sql,
+                        (
+                            user_id, get_localpart_from_id(user_id),
+                            get_domain_from_id(user_id), display_name,
+                        )
+                    )
+                else:
+                    sql = """
+                        UPDATE user_directory_search
+                        SET vector = setweight(to_tsvector('english', ?), 'A')
+                            || setweight(to_tsvector('english', ?), 'D')
+                            || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
+                        WHERE user_id = ?
+                    """
+                    txn.execute(
+                        sql,
+                        (
+                            get_localpart_from_id(user_id), get_domain_from_id(user_id),
+                            display_name, user_id,
+                        )
+                    )
             elif isinstance(self.database_engine, Sqlite3Engine):
-                sql = """
-                    UPDATE user_directory_search
-                    set value = ?
-                    WHERE user_id = ?
-                """
-                args = (
-                    "%s %s" % (user_id, display_name,) if display_name else user_id,
-                    user_id,
+                value = "%s %s" % (user_id, display_name,) if display_name else user_id
+                self._simple_upsert_txn(
+                    txn,
+                    table="user_directory_search",
+                    keyvalues={"user_id": user_id},
+                    values={"value": value},
+                    lock=False,  # We're only inserter
                 )
             else:
                 # This should be unreachable.
                 raise Exception("Unrecognized database engine")
-
-            txn.execute(sql, args)
 
             txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
 
