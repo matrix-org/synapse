@@ -171,10 +171,12 @@ class UserDirectoryStore(SQLBaseStore):
                             || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
                         )
                     """
-                    args = (
-                        user_id,
-                        get_localpart_from_id(user_id), get_domain_from_id(user_id),
-                        display_name,
+                    txn.execute(
+                        sql,
+                        (
+                            user_id, get_localpart_from_id(user_id),
+                            get_domain_from_id(user_id), display_name,
+                        )
                     )
                 else:
                     sql = """
@@ -184,10 +186,12 @@ class UserDirectoryStore(SQLBaseStore):
                             || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
                         WHERE user_id = ?
                     """
-                    args = (
-                        get_localpart_from_id(user_id), get_domain_from_id(user_id),
-                        display_name,
-                        user_id,
+                    txn.execute(
+                        sql,
+                        (
+                            get_localpart_from_id(user_id), get_domain_from_id(user_id),
+                            display_name, user_id,
+                        )
                     )
             elif isinstance(self.database_engine, Sqlite3Engine):
                 value = "%s %s" % (user_id, display_name,) if display_name else user_id
@@ -201,8 +205,6 @@ class UserDirectoryStore(SQLBaseStore):
             else:
                 # This should be unreachable.
                 raise Exception("Unrecognized database engine")
-
-            txn.execute(sql, args)
 
             txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
 
