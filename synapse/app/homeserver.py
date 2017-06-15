@@ -415,7 +415,9 @@ def run(hs):
         stats["timestamp"] = now
         stats["uptime_seconds"] = uptime
         stats["total_users"] = yield hs.get_datastore().count_all_users()
-        stats["total_users"] = yield hs.get_datastore().count_nonbridged_users()
+
+        total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()
+        stats["total_nonbridged_users"] = total_nonbridged_users
 
         room_count = yield hs.get_datastore().get_room_count()
         stats["total_room_count"] = room_count
