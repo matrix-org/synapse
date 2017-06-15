@@ -38,7 +38,6 @@ from functools import wraps
 import synapse.metrics
 
 import logging
-import math
 import ujson as json
 
 # these are only included to make the type annotations work
@@ -1625,66 +1624,52 @@ class EventsStore(SQLBaseStore):
         call to this function, it will return None.
         """
         def _count_messages(txn):
-            now = self.hs.get_clock().time()
-
-            txn.execute(
-                "SELECT reported_stream_token, reported_time FROM stats_reporting"
-            )
-            last_reported = self.cursor_to_dict(txn)
-
-            txn.execute(
-                "SELECT stream_ordering"
-                " FROM events"
-                " ORDER BY stream_ordering DESC"
-                " LIMIT 1"
-            )
-            now_reporting = self.cursor_to_dict(txn)
-            if not now_reporting:
-                logger.info("Calculating daily messages skipped; no now_reporting")
-                return None
-            now_reporting = now_reporting[0]["stream_ordering"]
-
-            txn.execute("DELETE FROM stats_reporting")
-            txn.execute(
-                "INSERT INTO stats_reporting"
-                " (reported_stream_token, reported_time)"
-                " VALUES (?, ?)",
-                (now_reporting, now,)
-            )
-
-            if not last_reported:
-                logger.info("Calculating daily messages skipped; no last_reported")
-                return None
-
-            # Close enough to correct for our purposes.
-            yesterday = (now - 24 * 60 * 60)
-            since_yesterday_seconds = yesterday - last_reported[0]["reported_time"]
-            any_since_yesterday = math.fabs(since_yesterday_seconds) > 60 * 60
-            if any_since_yesterday:
-                logger.info(
-                    "Calculating daily messages skipped; since_yesterday_seconds: %d" %
-                    (since_yesterday_seconds,)
-                )
-                return None
-
-            txn.execute(
-                "SELECT COUNT(*) as messages"
-                " FROM events NATURAL JOIN event_json"
-                " WHERE json like '%m.room.message%'"
-                " AND stream_ordering > ?"
-                " AND stream_ordering <= ?",
-                (
-                    last_reported[0]["reported_stream_token"],
-                    now_reporting,
-                )
-            )
-            rows = self.cursor_to_dict(txn)
-            if not rows:
-                logger.info("Calculating daily messages skipped; messages count missing")
-                return None
-            return rows[0]["messages"]
+            sql = """
+                SELECT COALESCE(COUNT(*), 0) FROM events
+                WHERE type = 'm.room.message'
+                AND stream_ordering > ?
+            """
+            txn.execute(sql, (self.stream_ordering_day_ago,))
+            count, = txn.fetchone()
+            return count
 
         ret = yield self.runInteraction("count_messages", _count_messages)
+        defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def count_daily_sent_messages(self):
+        def _count_messages(txn):
+            # This is good enough as if you have silly characters in your own
+            # hostname then thats your own fault.
+            like_clause = "%:" + self.hs.hostname
+
+            sql = """
+                SELECT COALESCE(COUNT(*), 0) FROM events
+                WHERE type = 'm.room.message'
+                    AND sender LIKE ?
+                AND stream_ordering > ?
+            """
+
+            txn.execute(sql, (like_clause, self.stream_ordering_day_ago,))
+            count, = txn.fetchone()
+            return count
+
+        ret = yield self.runInteraction("count_daily_sent_messages", _count_messages)
+        defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def count_daily_active_rooms(self):
+        def _count(txn):
+            sql = """
+                SELECT COALESCE(COUNT(DISTINCT room_id), 0) FROM events
+                WHERE type = 'm.room.message'
+                AND stream_ordering > ?
+            """
+            txn.execute(sql, (self.stream_ordering_day_ago,))
+            count, = txn.fetchone()
+            return count
+
+        ret = yield self.runInteraction("count_daily_active_rooms", _count)
         defer.returnValue(ret)
 
     @defer.inlineCallbacks

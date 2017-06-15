@@ -246,7 +246,7 @@ class DataStore(RoomMemberStore, RoomStore,
         cur.close()
 
         self.find_stream_orderings_looping_call = self._clock.looping_call(
-            self._find_stream_orderings_for_times, 60 * 60 * 1000
+            self._find_stream_orderings_for_times, 10 * 60 * 1000
         )
 
         self._stream_order_on_start = self.get_room_max_stream_ordering()
@@ -287,17 +287,19 @@ class DataStore(RoomMemberStore, RoomStore,
         Counts the number of users who used this homeserver in the last 24 hours.
         """
         def _count_users(txn):
-            txn.execute(
-                "SELECT COUNT(DISTINCT user_id) AS users"
-                " FROM user_ips"
-                " WHERE last_seen > ?",
-                # This is close enough to a day for our purposes.
-                (int(self._clock.time_msec()) - (1000 * 60 * 60 * 24),)
-            )
-            rows = self.cursor_to_dict(txn)
-            if rows:
-                return rows[0]["users"]
-            return 0
+            yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24),
+
+            sql = """
+                SELECT COALESCE(count(*), 0) FROM (
+                    SELECT user_id FROM user_ips
+                    WHERE last_seen > ?
+                    GROUP BY user_id
+                ) u
+            """
+
+            txn.execute(sql, (yesterday,))
+            count, = txn.fetchone()
+            return count
 
         ret = yield self.runInteraction("count_users", _count_users)
         defer.returnValue(ret)
