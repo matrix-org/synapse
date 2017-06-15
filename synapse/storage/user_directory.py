@@ -611,7 +611,7 @@ class UserDirectoryStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def search_user_dir(self, search_term, limit):
+    def search_user_dir(self, user_id, search_term, limit):
         """Searches for users in directory
 
         Returns:
@@ -637,46 +637,63 @@ class UserDirectoryStore(SQLBaseStore):
             # The array of numbers are the weights for the various part of the
             # search: (domain, _, display name, localpart)
             sql = """
-                SELECT user_id, display_name, avatar_url
+                SELECT d.user_id, display_name, avatar_url
                 FROM user_directory_search
-                INNER JOIN user_directory USING (user_id)
-                INNER JOIN users_in_pubic_room USING (user_id)
-                WHERE vector @@ to_tsquery('english', ?)
+                INNER JOIN user_directory AS d USING (user_id)
+                LEFT JOIN users_in_pubic_room AS p USING (user_id)
+                LEFT JOIN (
+                    SELECT other_user_id AS user_id FROM users_who_share_rooms
+                    WHERE user_id = ? AND share_private
+                ) AS s USING (user_id)
+                WHERE
+                    (s.user_id IS NOT NULL OR p.user_id IS NOT NULL)
+                    AND vector @@ to_tsquery('english', ?)
                 ORDER BY
-                    2 * ts_rank_cd(
-                        '{0.1, 0.1, 0.9, 1.0}',
-                        vector,
-                        to_tsquery('english', ?),
-                        8
-                    )
-                    + ts_rank_cd(
-                        '{0.1, 0.1, 0.9, 1.0}',
-                        vector,
-                        to_tsquery('english', ?),
-                        8
+                    (CASE WHEN s.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
+                    * (CASE WHEN display_name IS NOT NULL THEN 1.2 ELSE 1.0 END)
+                    * (CASE WHEN avatar_url IS NOT NULL THEN 1.2 ELSE 1.0 END)
+                    * (
+                        3 * ts_rank_cd(
+                            '{0.1, 0.1, 0.9, 1.0}',
+                            vector,
+                            to_tsquery('english', ?),
+                            8
+                        )
+                        + ts_rank_cd(
+                            '{0.1, 0.1, 0.9, 1.0}',
+                            vector,
+                            to_tsquery('english', ?),
+                            8
+                        )
                     )
                     DESC,
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
             """
-            args = (full_query, exact_query, prefix_query, limit + 1,)
+            args = (user_id, full_query, exact_query, prefix_query, limit + 1,)
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_sqlite(search_term)
 
             sql = """
-                SELECT user_id, display_name, avatar_url
+                SELECT d.user_id, display_name, avatar_url
                 FROM user_directory_search
-                INNER JOIN user_directory USING (user_id)
-                INNER JOIN users_in_pubic_room USING (user_id)
-                WHERE value MATCH ?
+                INNER JOIN user_directory AS d USING (user_id)
+                LEFT JOIN users_in_pubic_room AS p USING (user_id)
+                LEFT JOIN (
+                    SELECT other_user_id AS user_id FROM users_who_share_rooms
+                    WHERE user_id = ? AND share_private
+                ) AS s USING (user_id)
+                WHERE
+                    (s.user_id IS NOT NULL OR p.user_id IS NOT NULL)
+                    AND value MATCH ?
                 ORDER BY
                     rank(matchinfo(user_directory_search)) DESC,
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
             """
-            args = (search_query, limit + 1)
+            args = (user_id, search_query, limit + 1)
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")

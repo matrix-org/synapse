@@ -71,7 +71,7 @@ class UserDirectoyHandler(object):
         # we start populating the user directory
         self.clock.call_later(0, self.notify_new_event)
 
-    def search_users(self, search_term, limit):
+    def search_users(self, user_id, search_term, limit):
         """Searches for users in directory
 
         Returns:
@@ -88,7 +88,7 @@ class UserDirectoyHandler(object):
                     ]
                 }
         """
-        return self.store.search_user_dir(search_term, limit)
+        return self.store.search_user_dir(user_id, search_term, limit)
 
     @defer.inlineCallbacks
     def notify_new_event(self):
