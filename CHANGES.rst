@@ -1,3 +1,11 @@
+Changes in synapse v0.21.1 (2017-06-15)
+=======================================
+
+Bug fixes:
+
+* Fix bug in anonymous usage statistic reporting (PR #2281)
+
+
 Changes in synapse v0.21.0 (2017-05-18)
 =======================================
 
