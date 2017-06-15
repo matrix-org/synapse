@@ -415,8 +415,15 @@ def run(hs):
         stats["timestamp"] = now
         stats["uptime_seconds"] = uptime
         stats["total_users"] = yield hs.get_datastore().count_all_users()
+        stats["total_users"] = yield hs.get_datastore().count_nonbridged_users()
+
+        room_count = yield hs.get_datastore().get_room_count()
+        stats["total_room_count"] = room_count
+
         stats["daily_active_users"] = yield hs.get_datastore().count_daily_users()
+        stats["daily_active_rooms"] = yield hs.get_datastore().count_daily_active_rooms()
         stats["daily_messages"] = yield hs.get_datastore().count_daily_messages()
+
         daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
         stats["daily_sent_messages"] = daily_sent_messages
 
