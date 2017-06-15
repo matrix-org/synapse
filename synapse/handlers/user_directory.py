@@ -50,8 +50,7 @@ class UserDirectoyHandler(object):
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
-
-        self.notifier.add_replication_callback(self.notify_new_event)
+        self.update_user_directory = hs.config.update_user_directory
 
         # When start up for the first time we need to populate the user_directory.
         # This is a set of user_id's we've inserted already
@@ -67,9 +66,12 @@ class UserDirectoyHandler(object):
         # Guard to ensure we only process deltas one at a time
         self._is_processing = False
 
-        # We kick this off so that we don't have to wait for a change before
-        # we start populating the user directory
-        self.clock.call_later(0, self.notify_new_event)
+        if self.update_user_directory:
+            self.notifier.add_replication_callback(self.notify_new_event)
+
+            # We kick this off so that we don't have to wait for a change before
+            # we start populating the user directory
+            self.clock.call_later(0, self.notify_new_event)
 
     def search_users(self, user_id, search_term, limit):
         """Searches for users in directory
@@ -94,6 +96,9 @@ class UserDirectoyHandler(object):
     def notify_new_event(self):
         """Called when there may be more deltas to process
         """
+        if not self.update_user_directory:
+            return
+
         if self._is_processing:
             return
 
@@ -324,7 +329,7 @@ class UserDirectoyHandler(object):
             event_id (str|None): The new event after the state change
             typ (str): Type of the event
         """
-        logger.debug("Handling change for %s", typ)
+        logger.debug("Handling change for %s: %s", typ, room_id)
 
         if typ == EventTypes.RoomHistoryVisibility:
             change = yield self._get_key_change(
@@ -394,6 +399,8 @@ class UserDirectoyHandler(object):
             row = yield self.store.get_user_in_public_room(user_id)
             if not row:
                 yield self.store.add_users_to_public_room(room_id, [user_id])
+        else:
+            logger.debug("Not adding user to public dir, %r", user_id)
 
         # Now we update users who share rooms with users. We do this by getting
         # all the current users in the room and seeing which aren't already
