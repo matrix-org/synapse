@@ -671,6 +671,18 @@ class FederationGroupsRequestJoinServlet(BaseFederationServlet):
         defer.returnValue((200, new_content))
 
 
+class FederationGroupsAceceptServlet(BaseFederationServlet):
+    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/accept$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id, user_id):
+        new_content = yield self.handler.on_groups_user_accept_request(
+            origin, content, group_id, user_id
+        )
+
+        defer.returnValue((200, new_content))
+
+
 class FederationGroupsLeaveSendServlet(BaseFederationServlet):
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/leave$"
 

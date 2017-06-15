@@ -213,10 +213,13 @@ class GroupsHandler(object):
             long_description=long_description,
         )
 
-        yield self._send_user_invite(
+        yield self.store.register_user_group_membership(
+            group_id, user_id, membership="join", is_admin=True
+        )
+        yield self.store.add_user_to_group(
             group_id, user_id,
             is_admin=True,
-            is_public=True,
+            is_public=False,
         )
 
         defer.returnValue({"group_id": group_id})
@@ -288,12 +291,7 @@ class GroupsHandler(object):
         if self.hs.is_mine_id(user_id):
             # TODO: Invite instead of auto join.
             yield self.store.register_user_group_membership(
-                group_id, user_id, membership="join", is_admin=is_admin
-            )
-            yield self.store.add_user_to_group(
-                group_id, user_id,
-                is_admin=is_admin,
-                is_public=is_public,
+                group_id, user_id, membership="invite", is_admin=is_admin
             )
         else:
             domain = get_domain_from_id(user_id)
