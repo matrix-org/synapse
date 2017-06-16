@@ -50,7 +50,8 @@ from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.user_directory import UserDirectoyHandler
-from synapse.handlers.groups import GroupsHandler
+from synapse.handlers.groups_local import GroupsLocalHandler
+from synapse.handlers.groups_server import GroupsServerHandler
 from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier
@@ -140,7 +141,8 @@ class HomeServer(object):
         'read_marker_handler',
         'action_generator',
         'user_directory_handler',
-        'groups_handler',
+        'groups_local_handler',
+        'groups_server_handler',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -311,8 +313,11 @@ class HomeServer(object):
     def build_user_directory_handler(self):
         return UserDirectoyHandler(self)
 
-    def build_groups_handler(self):
-        return GroupsHandler(self)
+    def build_groups_local_handler(self):
+        return GroupsLocalHandler(self)
+
+    def build_groups_server_handler(self):
+        return GroupsServerHandler(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

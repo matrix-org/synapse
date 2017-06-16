@@ -17,6 +17,7 @@ from twisted.internet import defer
 
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import GroupID
+from synapse.api.errors import SynapseError
 
 from ._base import client_v2_patterns
 
@@ -32,7 +33,7 @@ class GroupServlet(RestServlet):
         super(GroupServlet, self).__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.groups_handler = hs.get_groups_handler()
+        self.groups_handler = hs.get_groups_local_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, group_id):
@@ -51,7 +52,7 @@ class GroupSummaryServlet(RestServlet):
         super(GroupSummaryServlet, self).__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.groups_handler = hs.get_groups_handler()
+        self.groups_handler = hs.get_groups_local_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, group_id):
@@ -70,7 +71,7 @@ class GroupRoomServlet(RestServlet):
         super(GroupRoomServlet, self).__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.groups_handler = hs.get_groups_handler()
+        self.groups_handler = hs.get_groups_local_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, group_id):
@@ -89,7 +90,7 @@ class GroupUsersServlet(RestServlet):
         super(GroupUsersServlet, self).__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.groups_handler = hs.get_groups_handler()
+        self.groups_handler = hs.get_groups_local_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, group_id):
@@ -108,18 +109,20 @@ class GroupCreateServlet(RestServlet):
         super(GroupCreateServlet, self).__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.groups_handler = hs.get_groups_handler()
+        self.groups_handler = hs.get_groups_local_handler()
         self.server_name = hs.hostname
 
     @defer.inlineCallbacks
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
 
+        # TODO: Create group on remote server
         content = parse_json_object_from_request(request)
         localpart = content.pop("localpart")
         group_id = GroupID.create(localpart, self.server_name).to_string()
 
-        result = yield self.groups_handler.create_group(group_id, requester, content)
+        result = yield self.groups_handler.create_group(group_id, user_id, content)
 
         defer.returnValue((200, result))
 
@@ -133,7 +136,7 @@ class GroupAdminRoomsServlet(RestServlet):
         super(GroupAdminRoomsServlet, self).__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.groups_handler = hs.get_groups_handler()
+        self.groups_handler = hs.get_groups_local_handler()
 
     @defer.inlineCallbacks
     def on_PUT(self, request, group_id, room_id):
@@ -155,7 +158,9 @@ class GroupAdminUsersInviteServlet(RestServlet):
         super(GroupAdminUsersInviteServlet, self).__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.groups_handler = hs.get_groups_handler()
+        self.groups_handler = hs.get_groups_local_handler()
+        self.store = hs.get_datastore()
+        self.is_mine_id = hs.is_mine_id
 
     @defer.inlineCallbacks
     def on_PUT(self, request, group_id, user_id):
@@ -163,8 +168,8 @@ class GroupAdminUsersInviteServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.add_user(
-            group_id, requester_user_id, user_id, content,
+        result = yield self.groups_handler.invite(
+            group_id, user_id, requester_user_id, content,
         )
 
         defer.returnValue((200, result))
@@ -179,7 +184,7 @@ class GroupAdminUsersKickServlet(RestServlet):
         super(GroupAdminUsersKickServlet, self).__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.groups_handler = hs.get_groups_handler()
+        self.groups_handler = hs.get_groups_local_handler()
 
     @defer.inlineCallbacks
     def on_PUT(self, request, group_id, user_id):
@@ -203,7 +208,7 @@ class GroupSelfLeaveServlet(RestServlet):
         super(GroupSelfLeaveServlet, self).__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.groups_handler = hs.get_groups_handler()
+        self.groups_handler = hs.get_groups_local_handler()
 
     @defer.inlineCallbacks
     def on_PUT(self, request, group_id):
@@ -227,7 +232,7 @@ class GroupSelfJoinServlet(RestServlet):
         super(GroupSelfJoinServlet, self).__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.groups_handler = hs.get_groups_handler()
+        self.groups_handler = hs.get_groups_local_handler()
 
     @defer.inlineCallbacks
     def on_PUT(self, request, group_id):
@@ -242,6 +247,30 @@ class GroupSelfJoinServlet(RestServlet):
         defer.returnValue((200, result))
 
 
+class GroupSelfAcceptInviteServlet(RestServlet):
+    PATTERNS = client_v2_patterns(
+        "/groups/(?P<group_id>[^/]*)/self/accept_invite$"
+    )
+
+    def __init__(self, hs):
+        super(GroupSelfAcceptInviteServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.groups_handler = hs.get_groups_local_handler()
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, group_id):
+        requester = yield self.auth.get_user_by_req(request)
+        requester_user_id = requester.user.to_string()
+
+        content = parse_json_object_from_request(request)
+        result = yield self.groups_handler.accept_invite(
+            group_id, requester_user_id, content,
+        )
+
+        defer.returnValue((200, result))
+
+
 class GroupsForUserServlet(RestServlet):
     PATTERNS = client_v2_patterns(
         "/joined_groups$"
@@ -251,7 +280,7 @@ class GroupsForUserServlet(RestServlet):
         super(GroupsForUserServlet, self).__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.groups_handler = hs.get_groups_handler()
+        self.groups_handler = hs.get_groups_local_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -274,4 +303,5 @@ def register_servlets(hs, http_server):
     GroupAdminUsersKickServlet(hs).register(http_server)
     GroupSelfLeaveServlet(hs).register(http_server)
     GroupSelfJoinServlet(hs).register(http_server)
+    GroupSelfAcceptInviteServlet(hs).register(http_server)
     GroupsForUserServlet(hs).register(http_server)

@@ -190,7 +190,8 @@ class GroupServerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def register_user_group_membership(self, group_id, user_id, membership,
-                                       is_admin=False):
+                                       is_admin=False, assestation=None,
+                                       valid_until_ms=None):
         def _register_user_group_membership_txn(txn, next_id):
             self._simple_insert_txn(
                 txn,
@@ -203,7 +204,17 @@ class GroupServerStore(SQLBaseStore):
                     "membership": membership,
                 },
             )
-            if membership != "join":
+            if valid_until_ms and membership == "join":
+                self._simple_insert_txn(
+                    txn,
+                    table="group_assestations_renewals",
+                    values={
+                        "group_id": group_id,
+                        "user_id": user_id,
+                        "valid_until_ms": valid_until_ms,
+                    },
+                )
+            elif membership != "join":
                 self._simple_delete_txn(
                     txn,
                     table="group_assestations_renewals",
