@@ -55,7 +55,9 @@ class UserDirectorySearchRestServlet(RestServlet):
                     ]
                 }
         """
-        yield self.auth.get_user_by_req(request, allow_guest=False)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        user_id = requester.user.to_string()
+
         body = parse_json_object_from_request(request)
 
         limit = body.get("limit", 10)
@@ -66,7 +68,9 @@ class UserDirectorySearchRestServlet(RestServlet):
         except:
             raise SynapseError(400, "`search_term` is required field")
 
-        results = yield self.user_directory_handler.search_users(search_term, limit)
+        results = yield self.user_directory_handler.search_users(
+            user_id, search_term, limit,
+        )
 
         defer.returnValue((200, results))
 
