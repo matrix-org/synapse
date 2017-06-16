@@ -121,7 +121,7 @@ class Store(object):
                     try:
                         txn = conn.cursor()
                         return func(
-                            LoggingTransaction(txn, desc, self.database_engine, []),
+                            LoggingTransaction(txn, desc, self.database_engine, [], []),
                             *args, **kwargs
                         )
                     except self.database_engine.module.DatabaseError as e:
