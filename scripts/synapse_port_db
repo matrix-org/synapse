@@ -41,6 +41,7 @@ BOOLEAN_COLUMNS = {
     "presence_stream": ["currently_active"],
     "public_room_list_stream": ["visibility"],
     "device_lists_outbound_pokes": ["sent"],
+    "users_who_share_rooms": ["share_private"],
 }
 
 
