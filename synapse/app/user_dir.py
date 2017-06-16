@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright 2016 OpenMarket Ltd
+# Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,27 +22,27 @@ from synapse.config.logger import setup_logging
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.http.site import SynapseSite
-from synapse.federation import send_queue
+from synapse.http.server import JsonResource
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
-from synapse.replication.slave.storage.deviceinbox import SlavedDeviceInboxStore
+from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.events import SlavedEventStore
-from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
+from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
-from synapse.replication.slave.storage.presence import SlavedPresenceStore
-from synapse.replication.slave.storage.transactions import TransactionStore
-from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.rest.client.v2_alpha import user_directory
 from synapse.storage.engines import create_engine
-from synapse.util.async import Linearizer
+from synapse.storage.client_ips import ClientIpStore
+from synapse.storage.user_directory import UserDirectoryStore
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext, preserve_fn
 from synapse.util.manhole import manhole
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
+from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from synapse import events
 
-from twisted.internet import reactor, defer
+from twisted.internet import reactor
 from twisted.web.resource import Resource
 
 from daemonize import Daemonize
@@ -51,38 +51,53 @@ import sys
 import logging
 import gc
 
-logger = logging.getLogger("synapse.app.federation_sender")
+logger = logging.getLogger("synapse.app.user_dir")
 
 
-class FederationSenderSlaveStore(
-    SlavedDeviceInboxStore, TransactionStore, SlavedReceiptsStore, SlavedEventStore,
-    SlavedRegistrationStore, SlavedDeviceStore, SlavedPresenceStore,
+class UserDirectorySlaveStore(
+    SlavedEventStore,
+    SlavedApplicationServiceStore,
+    SlavedRegistrationStore,
+    UserDirectoryStore,
+    BaseSlavedStore,
+    ClientIpStore,  # After BaseSlavedStore because the constructor is different
 ):
     def __init__(self, db_conn, hs):
-        super(FederationSenderSlaveStore, self).__init__(db_conn, hs)
+        super(UserDirectorySlaveStore, self).__init__(db_conn, hs)
 
-        # We pull out the current federation stream position now so that we
-        # always have a known value for the federation position in memory so
-        # that we don't have to bounce via a deferred once when we start the
-        # replication streams.
-        self.federation_out_pos_startup = self._get_federation_out_pos(db_conn)
-
-    def _get_federation_out_pos(self, db_conn):
-        sql = (
-            "SELECT stream_id FROM federation_stream_position"
-            " WHERE type = ?"
+        events_max = self._stream_id_gen.get_current_token()
+        curr_state_delta_prefill, min_curr_state_delta_id = self._get_cache_dict(
+            db_conn, "current_state_delta_stream",
+            entity_column="room_id",
+            stream_column="stream_id",
+            max_value=events_max,  # As we share the stream id with events token
+            limit=1000,
         )
-        sql = self.database_engine.convert_param_style(sql)
+        self._curr_state_delta_stream_cache = StreamChangeCache(
+            "_curr_state_delta_stream_cache", min_curr_state_delta_id,
+            prefilled_cache=curr_state_delta_prefill,
+        )
 
-        txn = db_conn.cursor()
-        txn.execute(sql, ("federation",))
-        rows = txn.fetchall()
-        txn.close()
+        self._current_state_delta_pos = events_max
 
-        return rows[0][0] if rows else -1
+    def stream_positions(self):
+        result = super(UserDirectorySlaveStore, self).stream_positions()
+        result["current_state_deltas"] = self._current_state_delta_pos
+        return result
+
+    def process_replication_rows(self, stream_name, token, rows):
+        if stream_name == "current_state_deltas":
+            self._current_state_delta_pos = token
+            for row in rows:
+                self._curr_state_delta_stream_cache.entity_has_changed(
+                    row.room_id, token
+                )
+        return super(UserDirectorySlaveStore, self).process_replication_rows(
+            stream_name, token, rows
+        )
 
 
-class FederationSenderServer(HomeServer):
+class UserDirectoryServer(HomeServer):
     def get_db_conn(self, run_new_connection=True):
         # Any param beginning with cp_ is a parameter for adbapi, and should
         # not be passed to the database engine.
@@ -98,7 +113,7 @@ class FederationSenderServer(HomeServer):
 
     def setup(self):
         logger.info("Setting up.")
-        self.datastore = FederationSenderSlaveStore(self.get_db_conn(), self)
+        self.datastore = UserDirectorySlaveStore(self.get_db_conn(), self)
         logger.info("Finished setting up.")
 
     def _listen_http(self, listener_config):
@@ -110,6 +125,15 @@ class FederationSenderServer(HomeServer):
             for name in res["names"]:
                 if name == "metrics":
                     resources[METRICS_PREFIX] = MetricsResource(self)
+                elif name == "client":
+                    resource = JsonResource(self, canonical_json=False)
+                    user_directory.register_servlets(self, resource)
+                    resources.update({
+                        "/_matrix/client/r0": resource,
+                        "/_matrix/client/unstable": resource,
+                        "/_matrix/client/v2_alpha": resource,
+                        "/_matrix/client/api/v1": resource,
+                    })
 
         root_resource = create_resource_tree(resources, Resource())
 
@@ -125,7 +149,7 @@ class FederationSenderServer(HomeServer):
                 interface=address
             )
 
-        logger.info("Synapse federation_sender now listening on port %d", port)
+        logger.info("Synapse user_dir now listening on port %d", port)
 
     def start_listening(self, listeners):
         for listener in listeners:
@@ -150,36 +174,32 @@ class FederationSenderServer(HomeServer):
         self.get_tcp_replication().start_replication(self)
 
     def build_tcp_replication(self):
-        return FederationSenderReplicationHandler(self)
+        return UserDirectoryReplicationHandler(self)
 
 
-class FederationSenderReplicationHandler(ReplicationClientHandler):
+class UserDirectoryReplicationHandler(ReplicationClientHandler):
     def __init__(self, hs):
-        super(FederationSenderReplicationHandler, self).__init__(hs.get_datastore())
-        self.send_handler = FederationSenderHandler(hs, self)
+        super(UserDirectoryReplicationHandler, self).__init__(hs.get_datastore())
+        self.user_directory = hs.get_user_directory_handler()
 
     def on_rdata(self, stream_name, token, rows):
-        super(FederationSenderReplicationHandler, self).on_rdata(
+        super(UserDirectoryReplicationHandler, self).on_rdata(
             stream_name, token, rows
         )
-        self.send_handler.process_replication_rows(stream_name, token, rows)
-
-    def get_streams_to_replicate(self):
-        args = super(FederationSenderReplicationHandler, self).get_streams_to_replicate()
-        args.update(self.send_handler.stream_positions())
-        return args
+        if stream_name == "current_state_deltas":
+            preserve_fn(self.user_directory.notify_new_event)()
 
 
 def start(config_options):
     try:
         config = HomeServerConfig.load_config(
-            "Synapse federation sender", config_options
+            "Synapse user directory", config_options
         )
     except ConfigError as e:
         sys.stderr.write("\n" + e.message + "\n")
         sys.exit(1)
 
-    assert config.worker_app == "synapse.app.federation_sender"
+    assert config.worker_app == "synapse.app.user_dir"
 
     setup_logging(config, use_worker_options=True)
 
@@ -187,21 +207,21 @@ def start(config_options):
 
     database_engine = create_engine(config.database_config)
 
-    if config.send_federation:
+    if config.update_user_directory:
         sys.stderr.write(
-            "\nThe send_federation must be disabled in the main synapse process"
+            "\nThe update_user_directory must be disabled in the main synapse process"
             "\nbefore they can be run in a separate worker."
-            "\nPlease add ``send_federation: false`` to the main config"
+            "\nPlease add ``update_user_directory: false`` to the main config"
             "\n"
         )
         sys.exit(1)
 
     # Force the pushers to start since they will be disabled in the main config
-    config.send_federation = True
+    config.update_user_directory = True
 
     tls_server_context_factory = context_factory.ServerContextFactory(config)
 
-    ps = FederationSenderServer(
+    ps = UserDirectoryServer(
         config.server_name,
         db_config=config.database_config,
         tls_server_context_factory=tls_server_context_factory,
@@ -233,7 +253,7 @@ def start(config_options):
 
     if config.worker_daemonize:
         daemon = Daemonize(
-            app="synapse-federation-sender",
+            app="synapse-user-dir",
             pid=config.worker_pid_file,
             action=run,
             auto_close_fds=False,
@@ -243,61 +263,6 @@ def start(config_options):
         daemon.start()
     else:
         run()
-
-
-class FederationSenderHandler(object):
-    """Processes the replication stream and forwards the appropriate entries
-    to the federation sender.
-    """
-    def __init__(self, hs, replication_client):
-        self.store = hs.get_datastore()
-        self.federation_sender = hs.get_federation_sender()
-        self.replication_client = replication_client
-
-        self.federation_position = self.store.federation_out_pos_startup
-        self._fed_position_linearizer = Linearizer(name="_fed_position_linearizer")
-
-        self._last_ack = self.federation_position
-
-        self._room_serials = {}
-        self._room_typing = {}
-
-    def on_start(self):
-        # There may be some events that are persisted but haven't been sent,
-        # so send them now.
-        self.federation_sender.notify_new_events(
-            self.store.get_room_max_stream_ordering()
-        )
-
-    def stream_positions(self):
-        return {"federation": self.federation_position}
-
-    def process_replication_rows(self, stream_name, token, rows):
-        # The federation stream contains things that we want to send out, e.g.
-        # presence, typing, etc.
-        if stream_name == "federation":
-            send_queue.process_rows_for_federation(self.federation_sender, rows)
-            preserve_fn(self.update_token)(token)
-
-        # We also need to poke the federation sender when new events happen
-        elif stream_name == "events":
-            self.federation_sender.notify_new_events(token)
-
-    @defer.inlineCallbacks
-    def update_token(self, token):
-        self.federation_position = token
-
-        # We linearize here to ensure we don't have races updating the token
-        with (yield self._fed_position_linearizer.queue(None)):
-            if self._last_ack < self.federation_position:
-                yield self.store.update_federation_out_pos(
-                    "federation", self.federation_position
-                )
-
-                # We ACK this token over replication so that the master can drop
-                # its in memory queues
-                self.replication_client.send_federation_ack(self.federation_position)
-                self._last_ack = self.federation_position
 
 
 if __name__ == '__main__':
