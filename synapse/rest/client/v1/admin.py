@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from synapse.api.constants import Membership, EventTypes
+from synapse.api.constants import Membership
 from synapse.api.errors import AuthError, SynapseError
 from synapse.types import UserID, create_requester
 from synapse.http.servlet import parse_json_object_from_request
