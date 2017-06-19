@@ -1068,6 +1068,10 @@ class FederationHandler(BaseHandler):
         """
         event = pdu
 
+        is_blocked = yield self.store.is_room_blocked(event.room_id)
+        if is_blocked:
+            raise SynapseError(403, "This room has been blocked on this server")
+
         event.internal_metadata.outlier = True
         event.internal_metadata.invite_from_remote = True
 

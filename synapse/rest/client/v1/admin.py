@@ -15,8 +15,9 @@
 
 from twisted.internet import defer
 
+from synapse.api.constants import Membership
 from synapse.api.errors import AuthError, SynapseError
-from synapse.types import UserID
+from synapse.types import UserID, create_requester
 from synapse.http.servlet import parse_json_object_from_request
 
 from .base import ClientV1RestServlet, client_path_patterns
@@ -155,6 +156,118 @@ class DeactivateAccountRestServlet(ClientV1RestServlet):
         yield self.store.user_set_password_hash(target_user_id, None)
 
         defer.returnValue((200, {}))
+
+
+class ShutdownRoomRestServlet(ClientV1RestServlet):
+    """Shuts down a room by removing all local users from the room and blocking
+    all future invites and joins to the room. Any local aliases will be repointed
+    to a new room created by `new_room_user_id` and kicked users will be auto
+    joined to the new room.
+    """
+    PATTERNS = client_path_patterns("/admin/shutdown_room/(?P<room_id>[^/]+)")
+
+    DEFAULT_MESSAGE = (
+        "Sharing illegal content on this server is not permitted and rooms in"
+        " violatation will be blocked."
+    )
+
+    def __init__(self, hs):
+        super(ShutdownRoomRestServlet, self).__init__(hs)
+        self.store = hs.get_datastore()
+        self.handlers = hs.get_handlers()
+        self.state = hs.get_state_handler()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, room_id):
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+
+        content = parse_json_object_from_request(request)
+
+        new_room_user_id = content.get("new_room_user_id")
+        if not new_room_user_id:
+            raise SynapseError(400, "Please provide field `new_room_user_id`")
+
+        room_creator_requester = create_requester(new_room_user_id)
+
+        message = content.get("message", self.DEFAULT_MESSAGE)
+        room_name = content.get("room_name", "Content Violation Notification")
+
+        info = yield self.handlers.room_creation_handler.create_room(
+            room_creator_requester,
+            config={
+                "preset": "public_chat",
+                "name": room_name,
+                "power_level_content_override": {
+                    "users_default": -10,
+                },
+            },
+            ratelimit=False,
+        )
+        new_room_id = info["room_id"]
+
+        msg_handler = self.handlers.message_handler
+        yield msg_handler.create_and_send_nonmember_event(
+            room_creator_requester,
+            {
+                "type": "m.room.message",
+                "content": {"body": message, "msgtype": "m.text"},
+                "room_id": new_room_id,
+                "sender": new_room_user_id,
+            },
+            ratelimit=False,
+        )
+
+        requester_user_id = requester.user.to_string()
+
+        logger.info("Shutting down room %r", room_id)
+
+        yield self.store.block_room(room_id, requester_user_id)
+
+        users = yield self.state.get_current_user_in_room(room_id)
+        kicked_users = []
+        for user_id in users:
+            if not self.hs.is_mine_id(user_id):
+                continue
+
+            logger.info("Kicking %r from %r...", user_id, room_id)
+
+            target_requester = create_requester(user_id)
+            yield self.handlers.room_member_handler.update_membership(
+                requester=target_requester,
+                target=target_requester.user,
+                room_id=room_id,
+                action=Membership.LEAVE,
+                content={},
+                ratelimit=False
+            )
+
+            yield self.handlers.room_member_handler.forget(target_requester.user, room_id)
+
+            yield self.handlers.room_member_handler.update_membership(
+                requester=target_requester,
+                target=target_requester.user,
+                room_id=new_room_id,
+                action=Membership.JOIN,
+                content={},
+                ratelimit=False
+            )
+
+            kicked_users.append(user_id)
+
+        aliases_for_room = yield self.store.get_aliases_for_room(room_id)
+
+        yield self.store.update_aliases_for_room(
+            room_id, new_room_id, requester_user_id
+        )
+
+        defer.returnValue((200, {
+            "kicked_users": kicked_users,
+            "local_aliases": aliases_for_room,
+            "new_room_id": new_room_id,
+        }))
 
 
 class ResetPasswordRestServlet(ClientV1RestServlet):
@@ -353,3 +466,4 @@ def register_servlets(hs, http_server):
     ResetPasswordRestServlet(hs).register(http_server)
     GetUsersPaginatedRestServlet(hs).register(http_server)
     SearchUsersRestServlet(hs).register(http_server)
+    ShutdownRoomRestServlet(hs).register(http_server)
