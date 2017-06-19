@@ -207,6 +207,8 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
                 content={},
             )
 
+            yield self.handlers.room_member_handler.forget(target_requester.user, room_id)
+
             kicked_users.append(user_id)
 
         aliases_for_room = yield self.store.get_aliases_for_room(room_id)
