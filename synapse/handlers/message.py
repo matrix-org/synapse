@@ -34,6 +34,7 @@ from canonicaljson import encode_canonical_json
 
 import logging
 import random
+import ujson
 
 logger = logging.getLogger(__name__)
 
@@ -497,6 +498,14 @@ class MessageHandler(BaseHandler):
         except AuthError as err:
             logger.warn("Denying new event %r because %s", event, err)
             raise err
+
+        # Ensure that we can round trip before trying to persist in db
+        try:
+            dump = ujson.dumps(event.content)
+            load = ujson.loads(dump)
+        except:
+            logger.exception("Failed to encode content: %r", event.content)
+            raise
 
         yield self.maybe_kick_guest_users(event, context)
 
