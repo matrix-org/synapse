@@ -562,18 +562,20 @@ class RoomStore(SQLBaseStore):
                     next_token = stream_ordering
                     content = json.loads(content_json)
 
-                    url = content.get("url")
-                    if not url:
-                        continue
+                    content_url = content.get("url")
+                    thumbnail_url = content.get("info", {}).get("thumbnail_url")
 
-                    matches = mxc_re.match(url)
-                    if matches:
-                        hostname = matches.group(1)
-                        media_id = matches.group(2)
-                        if hostname == self.hostname:
-                            local_media_mxcs.append(media_id)
-                        else:
-                            remote_media_mxcs.append((hostname, media_id))
+                    for url in (content_url, thumbnail_url):
+                        if not url:
+                            continue
+                        matches = mxc_re.match(url)
+                        if matches:
+                            hostname = matches.group(1)
+                            media_id = matches.group(2)
+                            if hostname == self.hostname:
+                                local_media_mxcs.append(media_id)
+                            else:
+                                remote_media_mxcs.append((hostname, media_id))
 
                 # Now update all the tables to set the quarantined_by flag
 
