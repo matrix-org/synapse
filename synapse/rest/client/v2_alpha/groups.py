@@ -17,7 +17,6 @@ from twisted.internet import defer
 
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import GroupID
-from synapse.api.errors import SynapseError
 
 from ._base import client_v2_patterns
 
@@ -192,7 +191,7 @@ class GroupAdminUsersKickServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.remove_user(
+        result = yield self.groups_handler.leave_group(
             group_id, requester_user_id, user_id, content,
         )
 
@@ -216,8 +215,8 @@ class GroupSelfLeaveServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.remove_user(
-            group_id, requester_user_id, requester_user_id, content,
+        result = yield self.groups_handler.leave_group(
+            group_id, requester_user_id, content,
         )
 
         defer.returnValue((200, result))

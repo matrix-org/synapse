@@ -193,6 +193,14 @@ class GroupServerStore(SQLBaseStore):
                                        is_admin=False, assestation=None,
                                        valid_until_ms=None):
         def _register_user_group_membership_txn(txn, next_id):
+            self._simple_delete_txn(
+                txn,
+                table="local_group_membership",
+                keyvalues={
+                    "group_id": group_id,
+                    "user_id": user_id,
+                },
+            )
             self._simple_insert_txn(
                 txn,
                 table="local_group_membership",

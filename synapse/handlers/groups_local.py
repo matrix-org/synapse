@@ -185,6 +185,28 @@ class GroupsLocalHandler(object):
         else:
             raise SynapseError(502, "Unknown state returned by HS")
 
+    @defer.inlineCallbacks
+    def leave_group(self, group_id, user_id, content):
+        yield self.store.register_user_group_membership(
+            group_id, user_id,
+            membership="leave",
+        )
+
+        # TODO: Should probably remember that we tried to leave so that we can
+        # retry if the group server is currently down.
+
+        if self.is_mine_id(group_id):
+            res = yield self.groups_server_handler.leave_group(
+                group_id, user_id, user_id, content,
+            )
+        else:
+            repl_layer = self.hs.get_replication_layer()
+            res = yield repl_layer.leave_group(
+                group_id, user_id, content
+            )  # TODO
+
+        defer.returnValue(res)
+
     def _create_assestation(self, group_id, user_id):
         return sign_json({
             "group_id": group_id,

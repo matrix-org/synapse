@@ -278,7 +278,7 @@ class GroupsServerHandler(object):
 
     @check_group_is_ours(and_exists=True)
     @defer.inlineCallbacks
-    def leave(self, group_id, user_id, requester_user_id, content):
+    def leave_group(self, group_id, user_id, requester_user_id, content):
         if requester_user_id != user_id:
             is_admin = yield self.store.is_user_admin_in_group(
                 group_id, requester_user_id
@@ -289,6 +289,8 @@ class GroupsServerHandler(object):
         yield self.store.remove_user_to_group(
             group_id, user_id,
         )
+
+        defer.returnValue({})
 
     @check_group_is_ours()
     @defer.inlineCallbacks
