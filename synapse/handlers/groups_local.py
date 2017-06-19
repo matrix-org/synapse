@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 # TODO: Audit log for admins (profile updates, membership changes, users who tried
 #       to join but were rejected, etc)
 # TODO: Flairs
+# TODO: Add group memebership  /sync
 
 
 DEFAULT_ASSESSTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
@@ -110,6 +111,10 @@ class GroupsLocalHandler(object):
 
         repl_layer = self.hs.get_replication_layer()
         return repl_layer.add_room_to_group(group_id, user_id, room_id, content)  # TODO
+
+    @defer.inlineCallbacks
+    def join_group(self, group_id, user_id, content):
+        pass  # TODO
 
     @defer.inlineCallbacks
     def accept_invite(self, group_id, user_id, content):

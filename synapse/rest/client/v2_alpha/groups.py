@@ -239,8 +239,8 @@ class GroupSelfJoinServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.add_user(
-            group_id, requester_user_id, requester_user_id, content,
+        result = yield self.groups_handler.join_group(
+            group_id, requester_user_id, content,
         )
 
         defer.returnValue((200, result))

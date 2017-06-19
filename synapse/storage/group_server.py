@@ -210,6 +210,7 @@ class GroupServerStore(SQLBaseStore):
                     "user_id": user_id,
                     "is_admin": is_admin,
                     "membership": membership,
+                    "content": "{}",  # TODO
                 },
             )
             if valid_until_ms and membership == "join":
