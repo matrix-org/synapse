@@ -119,6 +119,7 @@ class SyncResult(collections.namedtuple("SyncResult", [
     "device_lists",  # List of user_ids whose devices have chanegd
     "device_one_time_keys_count",  # Dict of algorithm to count for one time keys
                                    # for this device
+    "groups",
 ])):
     __slots__ = []
 
@@ -134,7 +135,8 @@ class SyncResult(collections.namedtuple("SyncResult", [
             self.archived or
             self.account_data or
             self.to_device or
-            self.device_lists
+            self.device_lists or
+            self.groups
         )
 
 

@@ -264,3 +264,16 @@ class GroupServerStore(SQLBaseStore):
             retcol="group_id",
             desc="get_joined_groups",
         )
+
+    def get_all_groups_for_user(self, user_id):
+        def _get_all_groups_for_user_txn(txn):
+            sql = """
+                SELECT stream_id, group_id, membership, content
+                FROM local_group_membership
+                WHERE user_id = ? AND membership != 'leave'
+            """
+            txn.execute(sql, (user_id,))
+            return self.cursor_to_dict(txn)
+        return self.runInteraction(
+            "get_all_groups_for_user", _get_all_groups_for_user_txn,
+        )
