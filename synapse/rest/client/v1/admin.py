@@ -270,6 +270,30 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
         }))
 
 
+class QuarantineMediaInRoom(ClientV1RestServlet):
+    """Quarantines all media in a room so that no one can download it via
+    this server.
+    """
+    PATTERNS = client_path_patterns("/admin/quarantine_media/(?P<room_id>[^/]+)")
+
+    def __init__(self, hs):
+        super(QuarantineMediaInRoom, self).__init__(hs)
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, room_id):
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+
+        num_quarantined = yield self.store.quarantine_media_ids_in_room(
+            room_id, requester.user.to_string(),
+        )
+
+        defer.returnValue((200, {"num_quarantined": num_quarantined}))
+
+
 class ResetPasswordRestServlet(ClientV1RestServlet):
     """Post request to allow an administrator reset password for a user.
     This need a user have a administrator access in Synapse.
@@ -467,3 +491,4 @@ def register_servlets(hs, http_server):
     GetUsersPaginatedRestServlet(hs).register(http_server)
     SearchUsersRestServlet(hs).register(http_server)
     ShutdownRoomRestServlet(hs).register(http_server)
+    QuarantineMediaInRoom(hs).register(http_server)
