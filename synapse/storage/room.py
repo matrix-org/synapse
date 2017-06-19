@@ -507,3 +507,27 @@ class RoomStore(SQLBaseStore):
             ))
         else:
             defer.returnValue(None)
+
+    @cached(max_entries=10000)
+    def is_room_blocked(self, room_id):
+        return self._simple_select_one_onecol(
+            table="blocked_rooms",
+            keyvalues={
+                "room_id": room_id,
+            },
+            retcol="1",
+            allow_none=True,
+            desc="is_room_blocked",
+        )
+
+    @defer.inlineCallbacks
+    def block_room(self, room_id, user_id):
+        yield self._simple_insert(
+            table="blocked_rooms",
+            values={
+                "room_id": room_id,
+                "user_id": user_id,
+            },
+            desc="block_room",
+        )
+        self.is_room_blocked.invalidate((room_id,))
