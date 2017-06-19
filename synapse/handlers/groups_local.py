@@ -186,26 +186,35 @@ class GroupsLocalHandler(object):
             raise SynapseError(502, "Unknown state returned by HS")
 
     @defer.inlineCallbacks
-    def leave_group(self, group_id, user_id, content):
+    def remove_from_group(self, group_id, user_id, requester_user_id, content):
+        if user_id == requester_user_id:
+            yield self.store.register_user_group_membership(
+                group_id, user_id,
+                membership="leave",
+            )
+
+            # TODO: Should probably remember that we tried to leave so that we can
+            # retry if the group server is currently down.
+
+        if self.is_mine_id(group_id):
+            res = yield self.groups_server_handler.remove_from_group(
+                group_id, user_id, requester_user_id, content,
+            )
+        else:
+            repl_layer = self.hs.get_replication_layer()
+            res = yield repl_layer.remove_from_group(
+                group_id, user_id, requester_user_id, content
+            )  # TODO
+
+        defer.returnValue(res)
+
+    @defer.inlineCallbacks
+    def user_removed_from_group(self, group_id, user_id, content):
+        # TODO: Check if user in group
         yield self.store.register_user_group_membership(
             group_id, user_id,
             membership="leave",
         )
-
-        # TODO: Should probably remember that we tried to leave so that we can
-        # retry if the group server is currently down.
-
-        if self.is_mine_id(group_id):
-            res = yield self.groups_server_handler.leave_group(
-                group_id, user_id, user_id, content,
-            )
-        else:
-            repl_layer = self.hs.get_replication_layer()
-            res = yield repl_layer.leave_group(
-                group_id, user_id, content
-            )  # TODO
-
-        defer.returnValue(res)
 
     def _create_assestation(self, group_id, user_id):
         return sign_json({

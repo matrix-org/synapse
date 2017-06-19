@@ -176,7 +176,7 @@ class GroupAdminUsersInviteServlet(RestServlet):
 
 class GroupAdminUsersKickServlet(RestServlet):
     PATTERNS = client_v2_patterns(
-        "/groups/(?P<group_id>[^/]*)/admin/users/kick/(?P<user_id>[^/]*)$"
+        "/groups/(?P<group_id>[^/]*)/admin/users/remove/(?P<user_id>[^/]*)$"
     )
 
     def __init__(self, hs):
@@ -191,8 +191,8 @@ class GroupAdminUsersKickServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.leave_group(
-            group_id, requester_user_id, user_id, content,
+        result = yield self.groups_handler.remove_from_group(
+            group_id, user_id, requester_user_id, content,
         )
 
         defer.returnValue((200, result))
@@ -215,8 +215,8 @@ class GroupSelfLeaveServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.leave_group(
-            group_id, requester_user_id, content,
+        result = yield self.groups_handler.remove_from_group(
+            group_id, requester_user_id, requester_user_id, content,
         )
 
         defer.returnValue((200, result))
