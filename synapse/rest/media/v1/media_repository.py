@@ -135,6 +135,8 @@ class MediaRepository(object):
             media_info = yield self._download_remote_file(
                 server_name, media_id
             )
+        elif media_info["quarantined_by"]:
+            raise NotFoundError()
         else:
             self.recently_accessed_remotes.add((server_name, media_id))
             yield self.store.update_cached_last_access_time(
