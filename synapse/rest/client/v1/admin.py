@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from synapse.api.constants import Membership
+from synapse.api.constants import Membership, EventTypes
 from synapse.api.errors import AuthError, SynapseError
 from synapse.types import UserID, create_requester
 from synapse.http.servlet import parse_json_object_from_request
@@ -161,9 +161,15 @@ class DeactivateAccountRestServlet(ClientV1RestServlet):
 class ShutdownRoomRestServlet(ClientV1RestServlet):
     """Shuts down a room by removing all local users from the room and blocking
     all future invites and joins to the room. Any local aliases will be repointed
-    to a given room id.
+    to a new room created by `new_room_user_id` and kicked users will be auto
+    joined to the new room.
     """
     PATTERNS = client_path_patterns("/admin/shutdown_room/(?P<room_id>[^/]+)")
+
+    DEFAULT_MESSAGE = (
+        "Sharing illegal content on this server is not permitted and rooms in"
+        " violatation will be blocked."
+    )
 
     def __init__(self, hs):
         super(ShutdownRoomRestServlet, self).__init__(hs)
@@ -180,9 +186,39 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        repoint_aliases_to_room_id = content.get("repoint_aliases_to_room_id")
-        if not repoint_aliases_to_room_id:
-            raise SynapseError(400, "Please provide field `repoint_aliases_to_room_id`")
+        new_room_user_id = content.get("new_room_user_id")
+        if not new_room_user_id:
+            raise SynapseError(400, "Please provide field `new_room_user_id`")
+
+        room_creator_requester = create_requester(new_room_user_id)
+
+        message = content.get("message", self.DEFAULT_MESSAGE)
+        room_name = content.get("room_name", "Content Violation Notification")
+
+        info = yield self.handlers.room_creation_handler.create_room(
+            room_creator_requester,
+            config={
+                "preset": "public_chat",
+                "name": room_name,
+                "power_level_content_override": {
+                    "users_default": -10,
+                },
+            },
+            ratelimit=False,
+        )
+        new_room_id = info["room_id"]
+
+        msg_handler = self.handlers.message_handler
+        yield msg_handler.create_and_send_nonmember_event(
+            room_creator_requester,
+            {
+                "type": "m.room.message",
+                "content": {"body": message, "msgtype": "m.text"},
+                "room_id": new_room_id,
+                "sender": new_room_user_id,
+            },
+            ratelimit=False,
+        )
 
         requester_user_id = requester.user.to_string()
 
@@ -205,21 +241,32 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
                 room_id=room_id,
                 action=Membership.LEAVE,
                 content={},
+                ratelimit=False
             )
 
             yield self.handlers.room_member_handler.forget(target_requester.user, room_id)
+
+            yield self.handlers.room_member_handler.update_membership(
+                requester=target_requester,
+                target=target_requester.user,
+                room_id=new_room_id,
+                action=Membership.JOIN,
+                content={},
+                ratelimit=False
+            )
 
             kicked_users.append(user_id)
 
         aliases_for_room = yield self.store.get_aliases_for_room(room_id)
 
         yield self.store.update_aliases_for_room(
-            room_id, repoint_aliases_to_room_id, requester_user_id
+            room_id, new_room_id, requester_user_id
         )
 
         defer.returnValue((200, {
             "kicked_users": kicked_users,
             "local_aliases": aliases_for_room,
+            "new_room_id": new_room_id,
         }))
 
 
