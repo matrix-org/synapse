@@ -374,6 +374,11 @@ class RoomMemberHandler(BaseHandler):
                     # so don't really fit into the general auth process.
                     raise AuthError(403, "Guest access not allowed")
 
+        if event.membership not in (Membership.LEAVE, Membership.BAN):
+            is_blocked = yield self.store.is_room_blocked(room_id)
+            if is_blocked:
+                raise SynapseError(403, "This room has been blocked on this server")
+
         yield message_handler.handle_new_client_event(
             requester,
             event,
