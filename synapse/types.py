@@ -171,6 +171,7 @@ class StreamToken(
         "push_rules_key",
         "to_device_key",
         "device_list_key",
+        "groups_key",
     ))
 ):
     _SEPARATOR = "_"
@@ -209,6 +210,7 @@ class StreamToken(
             or (int(other.push_rules_key) < int(self.push_rules_key))
             or (int(other.to_device_key) < int(self.to_device_key))
             or (int(other.device_list_key) < int(self.device_list_key))
+            or (int(other.groups_token) < int(self.groups_token))
         )
 
     def copy_and_advance(self, key, new_value):

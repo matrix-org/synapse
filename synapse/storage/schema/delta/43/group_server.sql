@@ -57,21 +57,6 @@ CREATE INDEX groups_rooms_g_idx ON group_rooms(group_id, room_id);
 CREATE INDEX groups_rooms_r_idx ON group_rooms(room_id);
 
 
-
-CREATE TABLE local_group_membership (
-    stream_id BIGINT NOT NULL,
-    group_id TEXT NOT NULL,
-    user_id TEXT NOT NULL,
-    is_admin BOOLEAN NOT NULL,
-    membership TEXT NOT NULL,
-    content TEXT NOT NULL
-);
-
-CREATE INDEX local_group_membership_u_idx ON local_group_membership(user_id, group_id);
-CREATE INDEX local_group_membership_g_idx ON local_group_membership(group_id, group_id);
-CREATE INDEX local_group_membership_s_idx ON local_group_membership(user_id, stream_id);
-
-
 CREATE TABLE group_assestations_renewals (
     group_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
@@ -81,3 +66,32 @@ CREATE TABLE group_assestations_renewals (
 CREATE INDEX group_assestations_renewals_g_idx ON group_assestations_renewals(group_id, user_id);
 CREATE INDEX group_assestations_renewals_u_idx ON group_assestations_renewals(user_id);
 CREATE INDEX group_assestations_renewals_v_idx ON group_assestations_renewals(valid_until_ms);
+
+
+
+CREATE TABLE local_group_membership (
+    group_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    is_admin BOOLEAN NOT NULL,
+    membership TEXT NOT NULL,
+    content TEXT NOT NULL
+);
+
+CREATE INDEX local_group_membership_u_idx ON local_group_membership(user_id, group_id);
+CREATE INDEX local_group_membership_g_idx ON local_group_membership(group_id);
+
+
+CREATE TABLE local_group_updates (
+    stream_id BIGINT NOT NULL,
+    group_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    content TEXT NOT NULL
+);
+
+
+CREATE TABLE local_group_profiles (
+    group_id TEXT NOT NULL,
+    name TEXT,
+    avatar_url TEXT
+);
