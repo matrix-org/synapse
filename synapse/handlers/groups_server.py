@@ -274,10 +274,21 @@ class GroupsServerHandler(object):
 
         local_attestation = self._create_attestation(group_id, user_id)
 
+        visibility = content.get("visibility")
+        if visibility:
+            vis_type = visibility["type"]
+            if vis_type not in ("public", "private"):
+                raise SynapseError(
+                    400, "Synapse only supports 'public'/'private' visibility"
+                )
+            is_public = vis_type == "public"
+        else:
+            is_public = True
+
         yield self.store.add_user_to_group(
             group_id, user_id,
             is_admin=False,
-            is_public=False,  # TODO
+            is_public=is_public,
             local_attestation=local_attestation,
             remote_attestation=remote_attestation,
         )
