@@ -25,8 +25,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# TODO: Renew assestations
-# TODO: Validate assestations
+# TODO: Renew attestations
+# TODO: Validate attestations
 # TODO: Allow remote servers to accept invitations to rooms asyncly.
 # TODO: Allow users to "knock" or simpkly join depending on rules
 # TODO: Federation admin APIs
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 # TODO: Add group memebership  /sync
 
 
-DEFAULT_ASSESSTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
+DEFAULT_ATTESTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
 
 
 class GroupsLocalHandler(object):
@@ -122,40 +122,49 @@ class GroupsLocalHandler(object):
             yield self.groups_server_handler.accept_invite(
                 group_id, user_id, content
             )
-            assestation = None
+            attestation = None
             valid_until_ms = None
         else:
+            attestation = yield self._create_attestation(group_id, user_id)
+            valid_until_ms = attestation["valid_until_ms"]
+            content["attestation"] = attestation
+
+            logger.info("attestation: %r", attestation)
+
             repl_layer = self.hs.get_replication_layer()
-            res = yield repl_layer.accept_invite(group_id, user_id, content)  # TODO
-            assestation = res["assestation"]
-            valid_until_ms = assestation["valid_until_ms"]
+            res = yield repl_layer.accept_group_invite(group_id, user_id, content)
+            attestation = res["attestation"]
+            valid_until_ms = attestation["valid_until_ms"]
             # TODO: Check valid_until_ms > now
 
             domain = get_domain_from_id(user_id)
-            yield self.keyring.verify_json_for_server(domain, assestation)
+            yield self.keyring.verify_json_for_server(domain, attestation)
 
         yield self.store.register_user_group_membership(
             group_id, user_id,
             membership="join",
             is_admin=False,
-            assestation=assestation,
+            attestation=attestation,
             valid_until_ms=valid_until_ms,
         )
 
         defer.returnValue({})
 
     @defer.inlineCallbacks
-    def invite(self, group_id, user_id, requester_user_id, content):
+    def invite(self, group_id, user_id, requester_user_id, config):
+        content = {
+            "requester": requester_user_id,
+            "config": config,
+        }
         if self.is_mine_id(group_id):
-            res = yield self.groups_server_handler.invite(
+            res = yield self.groups_server_handler.invite_to_group(
                 group_id, user_id, requester_user_id, content,
-                local_result={"state": "invite"}
             )
         else:
             repl_layer = self.hs.get_replication_layer()
             res = yield repl_layer.invite_to_group(
-                group_id, user_id, requester_user_id, content
-            )  # TODO
+                group_id, user_id, content,
+            )
 
         defer.returnValue(res)
 
@@ -176,7 +185,7 @@ class GroupsLocalHandler(object):
         yield self.store.register_user_group_membership(
             group_id, user_id,
             membership="invite",
-            content={"profile": local_profile},
+            content={"profile": local_profile, "inviter": content["inviter"]},
         )
 
         defer.returnValue({"state": "invite"})
@@ -212,11 +221,11 @@ class GroupsLocalHandler(object):
             membership="leave",
         )
 
-    def _create_assestation(self, group_id, user_id):
+    def _create_attestation(self, group_id, user_id):
         return sign_json({
             "group_id": group_id,
             "user_id": user_id,
-            "valid_until_ms": self.clock.time_msec() + DEFAULT_ASSESSTATION_LENGTH_MS,
+            "valid_until_ms": self.clock.time_msec() + DEFAULT_ATTESTATION_LENGTH_MS,
         }, self.server_name, self.signing_key)
 
     @defer.inlineCallbacks

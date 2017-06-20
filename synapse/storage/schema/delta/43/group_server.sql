@@ -29,7 +29,7 @@ CREATE TABLE group_users (
     user_id TEXT NOT NULL,
     is_admin BOOLEAN NOT NULL,
     is_public BOOLEAN NOT NULL,
-    assestation TEXT
+    attestation TEXT
 );
 
 
@@ -57,15 +57,15 @@ CREATE INDEX groups_rooms_g_idx ON group_rooms(group_id, room_id);
 CREATE INDEX groups_rooms_r_idx ON group_rooms(room_id);
 
 
-CREATE TABLE group_assestations_renewals (
+CREATE TABLE group_attestations_renewals (
     group_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     valid_until_ms BIGINT NOT NULL
 );
 
-CREATE INDEX group_assestations_renewals_g_idx ON group_assestations_renewals(group_id, user_id);
-CREATE INDEX group_assestations_renewals_u_idx ON group_assestations_renewals(user_id);
-CREATE INDEX group_assestations_renewals_v_idx ON group_assestations_renewals(valid_until_ms);
+CREATE INDEX group_attestations_renewals_g_idx ON group_attestations_renewals(group_id, user_id);
+CREATE INDEX group_attestations_renewals_u_idx ON group_attestations_renewals(user_id);
+CREATE INDEX group_attestations_renewals_v_idx ON group_attestations_renewals(valid_until_ms);
 
 
 

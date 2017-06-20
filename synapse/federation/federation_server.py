@@ -58,7 +58,8 @@ class FederationServer(FederationBase):
         # come in waves.
         self._state_resp_cache = ResponseCache(hs, timeout_ms=30000)
 
-        self.groups_handler = hs.get_groups_server_handler()
+        self.groups_server_handler = hs.get_groups_server_handler()
+        self.groups_local_handler = hs.get_groups_local_handler()
 
     def set_handler(self, handler):
         """Sets the handler that the replication layer will use to communicate
@@ -576,7 +577,7 @@ class FederationServer(FederationBase):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        return self.groups_handler.get_group_profile(group_id, requester_user_id)
+        return self.groups_server_handler.get_group_profile(group_id, requester_user_id)
 
     def on_groups_profile_summary(self, origin, content, group_id):
         requester_user_id = content["requester_user_id"]
@@ -584,7 +585,7 @@ class FederationServer(FederationBase):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        return self.groups_handler.get_group_summary(group_id, requester_user_id)
+        return self.groups_server_handler.get_group_summary(group_id, requester_user_id)
 
     def on_groups_rooms_request(self, origin, content, group_id):
         requester_user_id = content["requester_user_id"]
@@ -592,7 +593,7 @@ class FederationServer(FederationBase):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        return self.groups_handler.get_rooms_in_group(group_id, requester_user_id)
+        return self.groups_server_handler.get_rooms_in_group(group_id, requester_user_id)
 
     def on_groups_users_request(self, origin, content, group_id):
         requester_user_id = content["requester_user_id"]
@@ -600,26 +601,29 @@ class FederationServer(FederationBase):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        return self.groups_handler.get_users_in_group(group_id, requester_user_id)
+        return self.groups_server_handler.get_users_in_group(group_id, requester_user_id)
 
-    def on_groups_user_join_request(self, origin, content, group_id, user_id):
-        if get_domain_from_id(group_id) == origin:
-            pass
-        elif get_domain_from_id(user_id) == origin:
-            pass
+    def on_groups_invite_request(self, origin, content, group_id, user_id):
+        if self.hs.is_mine_id(user_id):
+            if get_domain_from_id(group_id) != origin:
+                raise SynapseError(403, "group_id doesn't match origin")
+
+            return self.groups_local_handler.on_invite(
+                group_id, user_id, content,
+            )
         else:
-            raise SynapseError(403, "Neither group_id nor user_id matches origin")
+            requester_user_id = content["requester"]
+            if get_domain_from_id(requester_user_id) != origin:
+                raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        return self.groups_handler.on_groups_user_join(group_id, user_id, content)
+            return self.groups_server_handler.invite_to_group(
+                group_id, user_id, requester_user_id, content,
+            )
 
-    def on_groups_user_leave_request(self, origin, content, group_id, user_id):
-        if get_domain_from_id(group_id) == origin:
-            pass
-        elif get_domain_from_id(user_id) == origin:
-            pass
-        else:
-            raise SynapseError(403, "Neither group_id nor user_id matches origin")
+    def on_groups_user_accept_request(self, origin, content, group_id, user_id):
+        if get_domain_from_id(user_id) != origin:
+            raise SynapseError(403, "user_id doesn't match origin")
 
-        return self.groups_handler.on_groups_user_leave_request(
+        return self.groups_server_handler.accept_invite(
             group_id, user_id, content
         )

@@ -111,7 +111,7 @@ class GroupServerStore(SQLBaseStore):
         )
 
     def add_user_to_group(self, group_id, user_id, is_admin=False, is_public=True,
-                          assestation=None, valid_until_ms=None):
+                          attestation=None, valid_until_ms=None):
         def _add_user_to_group_txn(txn):
             self._simple_insert_txn(
                 txn,
@@ -121,7 +121,7 @@ class GroupServerStore(SQLBaseStore):
                     "user_id": user_id,
                     "is_admin": is_admin,
                     "is_public": is_public,
-                    "assestation": json.dumps(assestation),
+                    "attestation": json.dumps(attestation),
                 },
             )
 
@@ -137,7 +137,7 @@ class GroupServerStore(SQLBaseStore):
             if valid_until_ms:
                 self._simple_insert_txn(
                     txn,
-                    table="group_assestations_renewals",
+                    table="group_attestations_renewals",
                     values={
                         "group_id": group_id,
                         "user_id": user_id,
@@ -169,7 +169,7 @@ class GroupServerStore(SQLBaseStore):
             )
             self._simple_delete_txn(
                 txn,
-                table="group_assestations_renewals",
+                table="group_attestations_renewals",
                 keyvalues={
                     "group_id": group_id,
                     "user_id": user_id,
@@ -190,7 +190,7 @@ class GroupServerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def register_user_group_membership(self, group_id, user_id, membership,
-                                       is_admin=False, assestation=None,
+                                       is_admin=False, attestation=None,
                                        valid_until_ms=None, content={}):
         def _register_user_group_membership_txn(txn, next_id):
             # TODO: Upsert?
@@ -238,7 +238,7 @@ class GroupServerStore(SQLBaseStore):
             if valid_until_ms and membership == "join":
                 self._simple_insert_txn(
                     txn,
-                    table="group_assestations_renewals",
+                    table="group_attestations_renewals",
                     values={
                         "group_id": group_id,
                         "user_id": user_id,
@@ -248,7 +248,7 @@ class GroupServerStore(SQLBaseStore):
             elif membership != "join":
                 self._simple_delete_txn(
                     txn,
-                    table="group_assestations_renewals",
+                    table="group_attestations_renewals",
                     keyvalues={
                         "group_id": group_id,
                         "user_id": user_id,

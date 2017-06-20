@@ -167,8 +167,9 @@ class GroupAdminUsersInviteServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
+        config = content.get("config", {})
         result = yield self.groups_handler.invite(
-            group_id, user_id, requester_user_id, content,
+            group_id, user_id, requester_user_id, config,
         )
 
         defer.returnValue((200, result))

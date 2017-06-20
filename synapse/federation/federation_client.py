@@ -862,24 +862,18 @@ class FederationClient(FederationBase):
             destination, group_id, requester_user_id,
         )
 
-    def send_group_user_join(self, group_id, user_id, state):
-        destination = get_domain_from_id(user_id)
-        if destination == self.server_name:
-            destination = get_domain_from_id(group_id)
-        if destination == self.server_name:
-            raise Exception("Both user_id and group_id are local users")
-
-        return self.transport_layer.send_group_user_join(
-            destination, group_id, user_id, state,
+    def accept_group_invite(self, group_id, user_id, content):
+        destination = get_domain_from_id(group_id)
+        return self.transport_layer.accept_group_invite(
+            destination, group_id, user_id, content,
         )
 
-    def send_group_user_leave(self, group_id, user_id):
-        destination = get_domain_from_id(user_id)
-        if destination == self.server_name:
+    def invite_to_group(self, group_id, user_id, content):
+        if self.hs.is_mine_id(group_id):
+            destination = get_domain_from_id(user_id)
+        else:
             destination = get_domain_from_id(group_id)
-        if destination == self.server_name:
-            raise Exception("Both user_id and group_id are local users")
 
-        return self.transport_layer.send_group_user_leave(
-            destination, group_id, user_id,
+        return self.transport_layer.invite_to_group(
+            destination, group_id, user_id, content,
         )

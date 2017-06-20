@@ -26,21 +26,19 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# TODO: Renew assestations
-# TODO: Validate assestations
+# TODO: Renew attestations
+# TODO: Validate attestations
 # TODO: Allow remote servers to accept invitations to rooms asyncly.
 # TODO: Allow users to "knock" or simpkly join depending on rules
 # TODO: Federation admin APIs
 # TODO: is_priveged flag to users and is_public to users and rooms
 # TODO: Roles
-# TODO: Group memebrship stream
-# TODO: Self memebrship management
 # TODO: Audit log for admins (profile updates, membership changes, users who tried
 #       to join but were rejected, etc)
 # TODO: Flairs
 
 
-DEFAULT_ASSESSTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
+DEFAULT_ATTESTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
 
 
 def check_group_is_ours(and_exists=False):
@@ -182,7 +180,7 @@ class GroupsServerHandler(object):
 
     @check_group_is_ours(and_exists=True)
     @defer.inlineCallbacks
-    def invite(self, group_id, user_id, requester_user_id, content, local_result=None):
+    def invite_to_group(self, group_id, user_id, requester_user_id, content):
         is_admin = yield self.store.is_user_admin_in_group(
             group_id, requester_user_id
         )
@@ -197,7 +195,8 @@ class GroupsServerHandler(object):
             "profile": {
                 "name": group["name"],
                 "avatar_url": group["avatar_url"],
-            }
+            },
+            "inviter": requester_user_id,
         }
 
         if self.hs.is_mine_id(user_id):
@@ -207,28 +206,28 @@ class GroupsServerHandler(object):
             domain = get_domain_from_id(user_id)
 
             content.update({
-                "assestation": self._create_assestation(group_id, user_id),
+                "attestation": self._create_attestation(group_id, user_id),
             })
 
             repl_layer = self.hs.get_replication_layer()
-            res = yield repl_layer.send_group_user_join(group_id, user_id, content)
+            res = yield repl_layer.invite_to_group(group_id, user_id, content)
 
         if res["state"] == "join":
             if not self.hs.is_mine_id(user_id):
-                assestation = res["assestation"]
-                valid_until_ms = assestation["valid_until_ms"]
+                attestation = res["attestation"]
+                valid_until_ms = attestation["valid_until_ms"]
                 # TODO: Check valid_until_ms > now
 
-                yield self.keyring.verify_json_for_server(domain, assestation)
+                yield self.keyring.verify_json_for_server(domain, attestation)
             else:
-                assestation = None
+                attestation = None
                 valid_until_ms = None
 
             yield self.store.add_user_to_group(
                 group_id, user_id,
                 is_admin=False,
                 is_public=False,  # TODO
-                assestation=assestation,
+                attestation=attestation,
                 valid_until_ms=valid_until_ms,
             )
         elif res["state"] == "invite":
@@ -252,27 +251,29 @@ class GroupsServerHandler(object):
             raise SynapseError(403, "User not invited to group")
 
         if not self.hs.is_mine_id(user_id):
-            assestation = content["assestation"]
-            valid_until_ms = assestation["valid_until_ms"]
+            attestation = content["attestation"]
+            valid_until_ms = attestation["valid_until_ms"]
             # TODO: Check valid_until_ms > now
 
+            logger.info("attestation: %r", attestation)
+
             domain = get_domain_from_id(user_id)
-            yield self.keyring.verify_json_for_server(domain, assestation)
+            yield self.keyring.verify_json_for_server(domain, attestation)
         else:
-            assestation = None
+            attestation = None
             valid_until_ms = None
 
         yield self.store.add_user_to_group(
             group_id, user_id,
             is_admin=False,
             is_public=False,  # TODO
-            assestation=assestation,
+            attestation=attestation,
             valid_until_ms=valid_until_ms,
         )
 
         defer.returnValue({
             "state": "join",
-            "assestation": self._create_assestation(group_id, user_id),
+            "attestation": self._create_attestation(group_id, user_id),
         })
 
     @check_group_is_ours(and_exists=True)
@@ -340,29 +341,29 @@ class GroupsServerHandler(object):
         )
 
         if not self.hs.is_mine_id(user_id):
-            assestation = content["assestation"]
-            valid_until_ms = assestation["valid_until_ms"]
+            attestation = content["attestation"]
+            valid_until_ms = attestation["valid_until_ms"]
             # TODO: Check valid_until_ms > now
 
             domain = get_domain_from_id(user_id)
-            yield self.keyring.verify_json_for_server(domain, assestation)
+            yield self.keyring.verify_json_for_server(domain, attestation)
         else:
-            assestation = None
+            attestation = None
             valid_until_ms = None
 
         yield self.store.add_user_to_group(
             group_id, user_id,
             is_admin=True,
             is_public=True,  # TODO
-            assestation=assestation,
+            attestation=attestation,
             valid_until_ms=valid_until_ms,
         )
 
         defer.returnValue({"group_id": group_id})
 
-    def _create_assestation(self, group_id, user_id):
+    def _create_attestation(self, group_id, user_id):
         return sign_json({
             "group_id": group_id,
             "user_id": user_id,
-            "valid_until_ms": self.clock.time_msec() + DEFAULT_ASSESSTATION_LENGTH_MS,
+            "valid_until_ms": self.clock.time_msec() + DEFAULT_ATTESTATION_LENGTH_MS,
         }, self.server_name, self.signing_key)

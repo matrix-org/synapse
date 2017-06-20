@@ -517,34 +517,23 @@ class TransportLayerClient(object):
         )
 
     @log_function
-    def send_group_user_join(self, destination, group_id, user_id, state):
-        path = PREFIX + "/groups/%s/users/%s/request_join" % (group_id, user_id)
+    def accept_group_invite(self, destination, group_id, user_id, content):
+        path = PREFIX + "/groups/%s/users/%s/accept_invite" % (group_id, user_id)
 
         return self.client.post_json(
             destination=destination,
             path=path,
-            data=state,
+            data=content,
             ignore_backoff=True,
         )
 
     @log_function
-    def send_group_user_accept(self, destination, group_id, user_id, state):
-        path = PREFIX + "/groups/%s/users/%s/accept" % (group_id, user_id)
+    def invite_to_group(self, destination, group_id, user_id, content):
+        path = PREFIX + "/groups/%s/users/%s/invite" % (group_id, user_id)
 
         return self.client.post_json(
             destination=destination,
             path=path,
-            data=state,
-            ignore_backoff=True,
-        )
-
-    @log_function
-    def send_group_user_leave(self, destination, group_id, user_id):
-        path = PREFIX + "/groups/%s/users/%s/leave" % (group_id, user_id)
-
-        return self.client.post_json(
-            destination=destination,
-            path=path,
-            data={},
+            data=content,
             ignore_backoff=True,
         )
