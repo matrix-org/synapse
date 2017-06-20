@@ -372,3 +372,42 @@ class GroupServerStore(SQLBaseStore):
 
     def get_group_stream_token(self):
         return self._group_updates_id_gen.get_current_token()
+
+    def get_attestations_need_renewals(self, valid_until_ms):
+        def _get_attestations_need_renewals_txn(txn):
+            sql = """
+                SELECT group_id, user_id FROM group_attestations_renewals
+                WHERE valid_until_ms <= ?
+            """
+            txn.execute(sql, (valid_until_ms,))
+            return self.cursor_to_dict(txn)
+        return self.runInteraction(
+            "get_attestations_need_renewals", _get_attestations_need_renewals_txn
+        )
+
+    def update_attestation_renewal(self, group_id, user_id, attestation):
+        return self._simple_update_one(
+            table="group_attestations_renewals",
+            keyvalues={
+                "group_id": group_id,
+                "user_id": user_id,
+            },
+            updatevalues={
+                "valid_until_ms": attestation["valid_until_ms"],
+            },
+            desc="update_attestation_renewal",
+        )
+
+    def update_remote_attestion(self, group_id, user_id, attestation):
+        return self._simple_update_one(
+            table="group_attestations_remote",
+            keyvalues={
+                "group_id": group_id,
+                "user_id": user_id,
+            },
+            updatevalues={
+                "valid_until_ms": attestation["valid_until_ms"],
+                "attestation": json.dumps(attestation)
+            },
+            desc="update_remote_attestion",
+        )

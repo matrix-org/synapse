@@ -17,6 +17,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.types import get_domain_from_id, UserID
+from synapse.util.logcontext import preserve_fn
 
 from signedjson.sign import sign_json
 
@@ -40,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_ATTESTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
 MIN_ATTESTATION_LENGTH_MS = 1 * 60 * 60 * 1000
+UPDATE_ATTESTATION_TIME_MS = 1 * 24 * 60 * 60 * 1000
 
 
 def check_group_is_ours(and_exists=False):
@@ -72,6 +74,10 @@ class GroupsServerHandler(object):
         self.is_mine_id = hs.is_mine_id
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
+
+        self.cleaner = self.clock.looping_call(
+            self._renew_attestations, 30 * 60 * 1000,
+        )
 
     @check_group_is_ours(and_exists=True)
     @defer.inlineCallbacks
@@ -372,9 +378,47 @@ class GroupsServerHandler(object):
             "group_id": group_id,
         })
 
+    def on_renew_attestation(self, group_id, user_id, content):
+        attestation = content["attestation"]
+
+        if self.hs.is_mine_id(group_id):
+            domain = get_domain_from_id(user_id)
+        else:
+            domain = get_domain_from_id(group_id)
+        yield self.keyring.verify_json_for_server(domain, attestation)
+
+        yield self.store.update_remote_attestion(group_id, user_id, attestation)
+
+        defer.returnValue({})
+
     def _create_attestation(self, group_id, user_id):
         return sign_json({
             "group_id": group_id,
             "user_id": user_id,
             "valid_until_ms": self.clock.time_msec() + DEFAULT_ATTESTATION_LENGTH_MS,
         }, self.server_name, self.signing_key)
+
+    @defer.inlineCallbacks
+    def _renew_attestations(self):
+        now = self.clock.time_msec()
+        # We start validate
+
+        rows = yield self.store.get_attestations_need_renewals(
+            now + UPDATE_ATTESTATION_TIME_MS
+        )
+
+        repl_layer = self.hs.get_replication_layer()
+
+        @defer.inlineCallbacks
+        def _renew_attestation(self, group_id, user_id):
+            attestation = self._create_attestation(group_id, user_id)
+            yield repl_layer.renew_group_attestation(group_id, user_id, attestation)
+            yield self.store.update_attestation_renewal(
+                group_id, user_id, attestation
+            )
+
+        for row in rows:
+            group_id = row["group_id"]
+            user_id = row["user_id"]
+
+            preserve_fn(_renew_attestation)(group_id, user_id)

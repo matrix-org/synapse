@@ -644,3 +644,8 @@ class FederationServer(FederationBase):
             return self.groups_server_handler.remove_user_from_group(
                 group_id, user_id, requester_user_id, content,
             )
+
+    def on_renew_group_attestation(self, origin, content, group_id, user_id):
+        return self.groups_server_handler.on_renew_attestation(
+            group_id, user_id, content,
+        )

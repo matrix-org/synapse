@@ -695,6 +695,18 @@ class FederationGroupsRemoveUserServlet(BaseFederationServlet):
         defer.returnValue((200, new_content))
 
 
+class FederationGroupsRenewAttestaionServlet(BaseFederationServlet):
+    PATH = "/groups/(?P<group_id>[^/]*)/renew_attestation/(?P<user_id>[^/]*)$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id, user_id):
+        new_content = yield self.handler.on_renew_group_attestation(
+            origin, content, group_id, user_id
+        )
+
+        defer.returnValue((200, new_content))
+
+
 SERVLET_CLASSES = (
     FederationSendServlet,
     FederationPullServlet,
@@ -727,6 +739,7 @@ SERVLET_CLASSES = (
     FederationGroupsInviteServlet,
     FederationGroupsAcceptInviteServlet,
     FederationGroupsRemoveUserServlet,
+    FederationGroupsRenewAttestaionServlet,
 )
 
 
