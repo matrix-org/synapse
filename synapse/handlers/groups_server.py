@@ -192,17 +192,26 @@ class GroupsServerHandler(object):
         # TODO: Check if user knocked
         # TODO: Check if user is already invited
 
+        group = yield self.store.get_group(group_id)
+        content = {
+            "profile": {
+                "name": group["name"],
+                "avatar_url": group["avatar_url"],
+            }
+        }
+
         if self.hs.is_mine_id(user_id):
-            if not local_result:
-                raise Exception("must specify local_result when inviting local user")
-            res = local_result
+            groups_local = self.hs.get_groups_local_handler()
+            res = yield groups_local.on_invite(group_id, user_id, content)
         else:
             domain = get_domain_from_id(user_id)
 
-            repl_layer = self.hs.get_replication_layer()
-            res = yield repl_layer.send_group_user_join(group_id, user_id, {
+            content.update({
                 "assestation": self._create_assestation(group_id, user_id),
             })
+
+            repl_layer = self.hs.get_replication_layer()
+            res = yield repl_layer.send_group_user_join(group_id, user_id, content)
 
         if res["state"] == "join":
             if not self.hs.is_mine_id(user_id):

@@ -157,38 +157,29 @@ class GroupsLocalHandler(object):
                 group_id, user_id, requester_user_id, content
             )  # TODO
 
-        if res["state"] == "join":
-            if not self.hs.is_mine_id(group_id):
-                assestation = res["assestation"]
-                valid_until_ms = assestation["valid_until_ms"]
-                # TODO: Check valid_until_ms > now
+        defer.returnValue(res)
 
-                domain = get_domain_from_id(group_id)
-                yield self.keyring.verify_json_for_server(domain, assestation)
-            else:
-                assestation = None
-                valid_until_ms = None
+    @defer.inlineCallbacks
+    def on_invite(self, group_id, user_id, content):
+        # TODO: Support auto join and rejection
 
-            yield self.store.register_user_group_membership(
-                group_id, user_id,
-                membership="join",
-                assestation=assestation,
-                valid_until_ms=valid_until_ms,
-            )
-        elif res["state"] == "invite":
-            yield self.store.register_user_group_membership(
-                group_id, user_id,
-                membership="invite",
-            )
-            defer.returnValue({
-                "state": "invite"
-            })
-        elif res["state"] == "reject":
-            defer.returnValue({
-                "state": "reject"
-            })
-        else:
-            raise SynapseError(502, "Unknown state returned by HS")
+        if not self.is_mine_id(user_id):
+            raise SynapseError(400, "User not on this server")
+
+        local_profile = {}
+        if "profile" in content:
+            if "name" in content["profile"]:
+                local_profile["name"] = content["profile"]["name"]
+            if "avatar_url" in content["profile"]:
+                local_profile["avatar_url"] = content["profile"]["avatar_url"]
+
+        yield self.store.register_user_group_membership(
+            group_id, user_id,
+            membership="invite",
+            content={"profile": local_profile},
+        )
+
+        defer.returnValue({"state": "invite"})
 
     @defer.inlineCallbacks
     def remove_from_group(self, group_id, user_id, requester_user_id, content):
