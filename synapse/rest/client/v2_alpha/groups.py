@@ -192,7 +192,7 @@ class GroupAdminUsersKickServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.remove_from_group(
+        result = yield self.groups_handler.remove_user_from_group(
             group_id, user_id, requester_user_id, content,
         )
 
@@ -216,7 +216,7 @@ class GroupSelfLeaveServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.remove_from_group(
+        result = yield self.groups_handler.remove_user_from_group(
             group_id, requester_user_id, requester_user_id, content,
         )
 

@@ -537,3 +537,14 @@ class TransportLayerClient(object):
             data=content,
             ignore_backoff=True,
         )
+
+    @log_function
+    def remove_user_from_group(self, destination, group_id, user_id, content):
+        path = PREFIX + "/groups/%s/users/%s/remove" % (group_id, user_id)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data=content,
+            ignore_backoff=True,
+        )

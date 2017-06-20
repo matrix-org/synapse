@@ -877,3 +877,13 @@ class FederationClient(FederationBase):
         return self.transport_layer.invite_to_group(
             destination, group_id, user_id, content,
         )
+
+    def remove_user_from_group(self, group_id, user_id, content):
+        if self.hs.is_mine_id(group_id):
+            destination = get_domain_from_id(user_id)
+        else:
+            destination = get_domain_from_id(group_id)
+
+        return self.transport_layer.remove_user_from_group(
+            destination, group_id, user_id, content,
+        )

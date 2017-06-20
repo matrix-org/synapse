@@ -627,3 +627,20 @@ class FederationServer(FederationBase):
         return self.groups_server_handler.accept_invite(
             group_id, user_id, content
         )
+
+    def on_groups_remove_user(self, origin, content, group_id, user_id):
+        if self.hs.is_mine_id(user_id):
+            if get_domain_from_id(group_id) != origin:
+                raise SynapseError(403, "group_id doesn't match origin")
+
+            return self.groups_local_handler.user_removed_from_group(
+                group_id, user_id, content,
+            )
+        else:
+            requester_user_id = content["requester"]
+            if get_domain_from_id(requester_user_id) != origin:
+                raise SynapseError(403, "requester_user_id doesn't match origin")
+
+            return self.groups_server_handler.remove_user_from_group(
+                group_id, user_id, requester_user_id, content,
+            )

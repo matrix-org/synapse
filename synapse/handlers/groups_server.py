@@ -288,7 +288,7 @@ class GroupsServerHandler(object):
 
     @check_group_is_ours(and_exists=True)
     @defer.inlineCallbacks
-    def remove_from_group(self, group_id, user_id, requester_user_id, content):
+    def remove_user_from_group(self, group_id, user_id, requester_user_id, content):
         is_kick = False
         if requester_user_id != user_id:
             is_admin = yield self.store.is_user_admin_in_group(
@@ -308,8 +308,8 @@ class GroupsServerHandler(object):
                 groups_local = self.hs.get_groups_local_handler()
                 yield groups_local.user_removed_from_group(group_id, user_id, {})
             else:
-                # TODO: Send leave notification over federation
-                pass
+                repl_layer = self.hs.get_replication_layer()
+                yield repl_layer.remove_user_from_group(group_id, user_id, {})
 
         defer.returnValue({})
 

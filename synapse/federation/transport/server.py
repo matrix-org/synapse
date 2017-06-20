@@ -671,12 +671,24 @@ class FederationGroupsInviteServlet(BaseFederationServlet):
         defer.returnValue((200, new_content))
 
 
-class FederationGroupsAceceptInviteServlet(BaseFederationServlet):
+class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/accept_invite$"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
         new_content = yield self.handler.on_groups_user_accept_request(
+            origin, content, group_id, user_id
+        )
+
+        defer.returnValue((200, new_content))
+
+
+class FederationGroupsRemoveUserServlet(BaseFederationServlet):
+    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id, user_id):
+        new_content = yield self.handler.on_groups_remove_user(
             origin, content, group_id, user_id
         )
 
@@ -713,7 +725,8 @@ SERVLET_CLASSES = (
     FederationGroupsRoomsServlet,
     FederationGroupsUsersServlet,
     FederationGroupsInviteServlet,
-    FederationGroupsAceceptInviteServlet,
+    FederationGroupsAcceptInviteServlet,
+    FederationGroupsRemoveUserServlet,
 )
 
 

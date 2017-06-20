@@ -137,7 +137,9 @@ class GroupsLocalHandler(object):
             valid_until_ms = attestation["valid_until_ms"]
             # TODO: Check valid_until_ms > now
 
-            domain = get_domain_from_id(user_id)
+            logger.info("attestation: %r", attestation)
+
+            domain = get_domain_from_id(group_id)
             yield self.keyring.verify_json_for_server(domain, attestation)
 
         yield self.store.register_user_group_membership(
@@ -191,7 +193,7 @@ class GroupsLocalHandler(object):
         defer.returnValue({"state": "invite"})
 
     @defer.inlineCallbacks
-    def remove_from_group(self, group_id, user_id, requester_user_id, content):
+    def remove_user_from_group(self, group_id, user_id, requester_user_id, content):
         if user_id == requester_user_id:
             yield self.store.register_user_group_membership(
                 group_id, user_id,
@@ -202,13 +204,14 @@ class GroupsLocalHandler(object):
             # retry if the group server is currently down.
 
         if self.is_mine_id(group_id):
-            res = yield self.groups_server_handler.remove_from_group(
+            res = yield self.groups_server_handler.remove_user_from_group(
                 group_id, user_id, requester_user_id, content,
             )
         else:
+            content["requester"] = requester_user_id
             repl_layer = self.hs.get_replication_layer()
-            res = yield repl_layer.remove_from_group(
-                group_id, user_id, requester_user_id, content
+            res = yield repl_layer.remove_user_from_group(
+                group_id, user_id, content
             )  # TODO
 
         defer.returnValue(res)
