@@ -111,7 +111,7 @@ class GroupServerStore(SQLBaseStore):
         )
 
     def add_user_to_group(self, group_id, user_id, is_admin=False, is_public=True,
-                          attestation=None, valid_until_ms=None):
+                          local_attestation=None, remote_attestation=None):
         def _add_user_to_group_txn(txn):
             self._simple_insert_txn(
                 txn,
@@ -121,7 +121,6 @@ class GroupServerStore(SQLBaseStore):
                     "user_id": user_id,
                     "is_admin": is_admin,
                     "is_public": is_public,
-                    "attestation": json.dumps(attestation),
                 },
             )
 
@@ -134,14 +133,25 @@ class GroupServerStore(SQLBaseStore):
                 },
             )
 
-            if valid_until_ms:
+            if local_attestation:
                 self._simple_insert_txn(
                     txn,
                     table="group_attestations_renewals",
                     values={
                         "group_id": group_id,
                         "user_id": user_id,
-                        "valid_until_ms": valid_until_ms,
+                        "valid_until_ms": local_attestation["valid_until_ms"],
+                    },
+                )
+            if remote_attestation:
+                self._simple_insert_txn(
+                    txn,
+                    table="group_attestations_remote",
+                    values={
+                        "group_id": group_id,
+                        "user_id": user_id,
+                        "valid_until_ms": remote_attestation["valid_until_ms"],
+                        "attestation": json.dumps(remote_attestation),
                     },
                 )
 
@@ -175,6 +185,14 @@ class GroupServerStore(SQLBaseStore):
                     "user_id": user_id,
                 },
             )
+            self._simple_delete_txn(
+                txn,
+                table="group_attestations_remote",
+                keyvalues={
+                    "group_id": group_id,
+                    "user_id": user_id,
+                },
+            )
         return self.runInteraction("remove_user_to_group", _remove_user_to_group_txn)
 
     def add_room_to_group(self, group_id, room_id, is_public):
@@ -190,8 +208,10 @@ class GroupServerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def register_user_group_membership(self, group_id, user_id, membership,
-                                       is_admin=False, attestation=None,
-                                       valid_until_ms=None, content={}):
+                                       is_admin=False, content={},
+                                       local_attestation=None,
+                                       remote_attestation=None,
+                                       ):
         def _register_user_group_membership_txn(txn, next_id):
             # TODO: Upsert?
             self._simple_delete_txn(
@@ -234,21 +254,43 @@ class GroupServerStore(SQLBaseStore):
                 }
             )
             self._group_updates_stream_cache.entity_has_changed(user_id, next_id)
+
             # TODO: Insert profile to ensuer it comes down stream if its a join.
-            if valid_until_ms and membership == "join":
-                self._simple_insert_txn(
-                    txn,
-                    table="group_attestations_renewals",
-                    values={
-                        "group_id": group_id,
-                        "user_id": user_id,
-                        "valid_until_ms": valid_until_ms,
-                    },
-                )
-            elif membership != "join":
+
+            if membership == "join":
+                if local_attestation:
+                    self._simple_insert_txn(
+                        txn,
+                        table="group_attestations_renewals",
+                        values={
+                            "group_id": group_id,
+                            "user_id": user_id,
+                            "valid_until_ms": local_attestation["valid_until_ms"],
+                        }
+                    )
+                if remote_attestation:
+                    self._simple_insert_txn(
+                        txn,
+                        table="group_attestations_remote",
+                        values={
+                            "group_id": group_id,
+                            "user_id": user_id,
+                            "valid_until_ms": remote_attestation["valid_until_ms"],
+                            "attestation": json.dumps(remote_attestation),
+                        }
+                    )
+            else:
                 self._simple_delete_txn(
                     txn,
                     table="group_attestations_renewals",
+                    keyvalues={
+                        "group_id": group_id,
+                        "user_id": user_id,
+                    },
+                )
+                self._simple_delete_txn(
+                    txn,
+                    table="group_attestations_remote",
                     keyvalues={
                         "group_id": group_id,
                         "user_id": user_id,

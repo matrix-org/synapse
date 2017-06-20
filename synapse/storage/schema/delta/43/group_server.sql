@@ -28,8 +28,7 @@ CREATE TABLE group_users (
     group_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     is_admin BOOLEAN NOT NULL,
-    is_public BOOLEAN NOT NULL,
-    attestation TEXT
+    is_public BOOLEAN NOT NULL
 );
 
 
@@ -66,6 +65,17 @@ CREATE TABLE group_attestations_renewals (
 CREATE INDEX group_attestations_renewals_g_idx ON group_attestations_renewals(group_id, user_id);
 CREATE INDEX group_attestations_renewals_u_idx ON group_attestations_renewals(user_id);
 CREATE INDEX group_attestations_renewals_v_idx ON group_attestations_renewals(valid_until_ms);
+
+CREATE TABLE group_attestations_remote (
+    group_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    valid_until_ms BIGINT NOT NULL,
+    attestation TEXT NOT NULL
+);
+
+CREATE INDEX group_attestations_remote_g_idx ON group_attestations_remote(group_id, user_id);
+CREATE INDEX group_attestations_remote_u_idx ON group_attestations_remote(user_id);
+CREATE INDEX group_attestations_remote_v_idx ON group_attestations_remote(valid_until_ms);
 
 
 

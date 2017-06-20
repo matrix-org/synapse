@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 DEFAULT_ATTESTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
+MIN_ATTESTATION_LENGTH_MS = 1 * 60 * 60 * 1000
 
 
 def check_group_is_ours(and_exists=False):
@@ -202,11 +203,13 @@ class GroupsServerHandler(object):
         if self.hs.is_mine_id(user_id):
             groups_local = self.hs.get_groups_local_handler()
             res = yield groups_local.on_invite(group_id, user_id, content)
+            local_attestation = None
         else:
             domain = get_domain_from_id(user_id)
 
+            local_attestation = self._create_attestation(group_id, user_id)
             content.update({
-                "attestation": self._create_attestation(group_id, user_id),
+                "attestation": local_attestation,
             })
 
             repl_layer = self.hs.get_replication_layer()
@@ -214,21 +217,22 @@ class GroupsServerHandler(object):
 
         if res["state"] == "join":
             if not self.hs.is_mine_id(user_id):
-                attestation = res["attestation"]
-                valid_until_ms = attestation["valid_until_ms"]
-                # TODO: Check valid_until_ms > now
+                remote_attestation = res["attestation"]
+                valid_until_ms = remote_attestation["valid_until_ms"]
 
-                yield self.keyring.verify_json_for_server(domain, attestation)
+                if valid_until_ms - self.clock.time_msec() < MIN_ATTESTATION_LENGTH_MS:
+                    raise SynapseError(400, "Attestation not valid for long enough")
+
+                yield self.keyring.verify_json_for_server(domain, remote_attestation)
             else:
-                attestation = None
-                valid_until_ms = None
+                remote_attestation = None
 
             yield self.store.add_user_to_group(
                 group_id, user_id,
                 is_admin=False,
                 is_public=False,  # TODO
-                attestation=attestation,
-                valid_until_ms=valid_until_ms,
+                local_attestation=local_attestation,
+                remote_attestation=remote_attestation,
             )
         elif res["state"] == "invite":
             yield self.store.add_group_invite(
@@ -251,29 +255,30 @@ class GroupsServerHandler(object):
             raise SynapseError(403, "User not invited to group")
 
         if not self.hs.is_mine_id(user_id):
-            attestation = content["attestation"]
-            valid_until_ms = attestation["valid_until_ms"]
-            # TODO: Check valid_until_ms > now
+            remote_attestation = content["attestation"]
+            valid_until_ms = remote_attestation["valid_until_ms"]
 
-            logger.info("attestation: %r", attestation)
+            if valid_until_ms - self.clock.time_msec() < MIN_ATTESTATION_LENGTH_MS:
+                raise SynapseError(400, "Attestation not valid for long enough")
 
             domain = get_domain_from_id(user_id)
-            yield self.keyring.verify_json_for_server(domain, attestation)
+            yield self.keyring.verify_json_for_server(domain, remote_attestation)
         else:
-            attestation = None
-            valid_until_ms = None
+            remote_attestation = None
+
+        local_attestation = self._create_attestation(group_id, user_id)
 
         yield self.store.add_user_to_group(
             group_id, user_id,
             is_admin=False,
             is_public=False,  # TODO
-            attestation=attestation,
-            valid_until_ms=valid_until_ms,
+            local_attestation=local_attestation,
+            remote_attestation=remote_attestation,
         )
 
         defer.returnValue({
             "state": "join",
-            "attestation": self._create_attestation(group_id, user_id),
+            "attestation": local_attestation,
         })
 
     @check_group_is_ours(and_exists=True)
@@ -341,25 +346,31 @@ class GroupsServerHandler(object):
         )
 
         if not self.hs.is_mine_id(user_id):
-            attestation = content["attestation"]
-            valid_until_ms = attestation["valid_until_ms"]
-            # TODO: Check valid_until_ms > now
+            remote_attestation = content["attestation"]
+            valid_until_ms = remote_attestation["valid_until_ms"]
+
+            if valid_until_ms - self.clock.time_msec() < MIN_ATTESTATION_LENGTH_MS:
+                raise SynapseError(400, "Attestation not valid for long enough")
 
             domain = get_domain_from_id(user_id)
-            yield self.keyring.verify_json_for_server(domain, attestation)
+            yield self.keyring.verify_json_for_server(domain, remote_attestation)
+
+            local_attestation = yield self._create_attestation(group_id, user_id)
         else:
-            attestation = None
-            valid_until_ms = None
+            local_attestation = None
+            remote_attestation = None
 
         yield self.store.add_user_to_group(
             group_id, user_id,
             is_admin=True,
             is_public=True,  # TODO
-            attestation=attestation,
-            valid_until_ms=valid_until_ms,
+            local_attestation=local_attestation,
+            remote_attestation=remote_attestation,
         )
 
-        defer.returnValue({"group_id": group_id})
+        defer.returnValue({
+            "group_id": group_id,
+        })
 
     def _create_attestation(self, group_id, user_id):
         return sign_json({

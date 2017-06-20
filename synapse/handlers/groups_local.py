@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 DEFAULT_ATTESTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
+MIN_ATTESTATION_LENGTH_MS = 1 * 60 * 60 * 1000
 
 
 class GroupsLocalHandler(object):
@@ -122,32 +123,29 @@ class GroupsLocalHandler(object):
             yield self.groups_server_handler.accept_invite(
                 group_id, user_id, content
             )
-            attestation = None
-            valid_until_ms = None
+            local_attestation = None
+            remote_attestation = None
         else:
-            attestation = yield self._create_attestation(group_id, user_id)
-            valid_until_ms = attestation["valid_until_ms"]
-            content["attestation"] = attestation
-
-            logger.info("attestation: %r", attestation)
+            local_attestation = yield self._create_attestation(group_id, user_id)
+            content["attestation"] = local_attestation
 
             repl_layer = self.hs.get_replication_layer()
             res = yield repl_layer.accept_group_invite(group_id, user_id, content)
-            attestation = res["attestation"]
-            valid_until_ms = attestation["valid_until_ms"]
-            # TODO: Check valid_until_ms > now
+            remote_attestation = res["attestation"]
+            valid_until_ms = remote_attestation["valid_until_ms"]
 
-            logger.info("attestation: %r", attestation)
+            if valid_until_ms - self.clock.time_msec() < MIN_ATTESTATION_LENGTH_MS:
+                raise SynapseError(400, "Attestation not valid for long enough")
 
             domain = get_domain_from_id(group_id)
-            yield self.keyring.verify_json_for_server(domain, attestation)
+            yield self.keyring.verify_json_for_server(domain, remote_attestation)
 
         yield self.store.register_user_group_membership(
             group_id, user_id,
             membership="join",
             is_admin=False,
-            attestation=attestation,
-            valid_until_ms=valid_until_ms,
+            local_attestation=local_attestation,
+            remote_attestation=remote_attestation,
         )
 
         defer.returnValue({})
