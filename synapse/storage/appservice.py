@@ -27,6 +27,25 @@ from ._base import SQLBaseStore
 logger = logging.getLogger(__name__)
 
 
+def _make_exclusive_regex(services_cache):
+    # We precompie a regex constructed from all the regexes that the AS's
+    # have registered for exclusive users.
+    exclusive_user_regexes = [
+        regex.pattern
+        for service in services_cache
+        for regex in service.get_exlusive_user_regexes()
+    ]
+    if exclusive_user_regexes:
+        exclusive_user_regex = "|".join("(" + r + ")" for r in exclusive_user_regexes)
+        exclusive_user_regex = re.compile(exclusive_user_regex)
+    else:
+        # We handle this case specially otherwise the constructed regex
+        # will always match
+        exclusive_user_regex = None
+
+    return exclusive_user_regex
+
+
 class ApplicationServiceStore(SQLBaseStore):
 
     def __init__(self, hs):
@@ -36,21 +55,7 @@ class ApplicationServiceStore(SQLBaseStore):
             hs.hostname,
             hs.config.app_service_config_files
         )
-
-        # We precompie a regex constructed from all the regexes that the AS's
-        # have registered for exclusive users.
-        exclusive_user_regexes = [
-            regex.pattern
-            for service in self.services_cache
-            for regex in service.get_exlusive_user_regexes()
-        ]
-        if exclusive_user_regexes:
-            exclusive_user_regex = "|".join("(" + r + ")" for r in exclusive_user_regexes)
-            self.exclusive_user_regex = re.compile(exclusive_user_regex)
-        else:
-            # We handle this case specially otherwise the constructed regex
-            # will always match
-            self.exclusive_user_regex = None
+        self.exclusive_user_regex = _make_exclusive_regex(self.services_cache)
 
     def get_app_services(self):
         return self.services_cache
