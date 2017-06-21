@@ -38,3 +38,6 @@ class SlavedApplicationServiceStore(BaseSlavedStore):
     get_appservice_state = DataStore.get_appservice_state.__func__
     set_appservice_last_pos = DataStore.set_appservice_last_pos.__func__
     set_appservice_state = DataStore.set_appservice_state.__func__
+    get_if_app_services_interested_in_user = (
+        DataStore.get_if_app_services_interested_in_user.__func__
+    )
