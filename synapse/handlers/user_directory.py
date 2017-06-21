@@ -205,6 +205,10 @@ class UserDirectoyHandler(object):
                 count += 1
                 continue
 
+            if self.store.get_if_app_services_interested_in_user(user_id):
+                count += 1
+                continue
+
             for other_user_id in user_ids:
                 if user_id == other_user_id:
                     continue
@@ -411,8 +415,10 @@ class UserDirectoyHandler(object):
         to_insert = set()
         to_update = set()
 
+        is_appservice = self.store.get_if_app_services_interested_in_user(user_id)
+
         # First, if they're our user then we need to update for every user
-        if self.is_mine_id(user_id):
+        if self.is_mine_id(user_id) and not is_appservice:
             # Returns a map of other_user_id -> shared_private. We only need
             # to update mappings if for users that either don't share a room
             # already (aren't in the map) or, if the room is private, those that
@@ -443,7 +449,10 @@ class UserDirectoyHandler(object):
             if user_id == other_user_id:
                 continue
 
-            if self.is_mine_id(other_user_id):
+            is_appservice = self.store.get_if_app_services_interested_in_user(
+                other_user_id
+            )
+            if self.is_mine_id(other_user_id) and not is_appservice:
                 shared_is_private = yield self.store.get_if_users_share_a_room(
                     other_user_id, user_id,
                 )

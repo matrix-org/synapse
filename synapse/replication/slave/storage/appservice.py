@@ -16,6 +16,7 @@
 from ._base import BaseSlavedStore
 from synapse.storage import DataStore
 from synapse.config.appservice import load_appservices
+from synapse.storage.appservice import _make_exclusive_regex
 
 
 class SlavedApplicationServiceStore(BaseSlavedStore):
@@ -25,6 +26,7 @@ class SlavedApplicationServiceStore(BaseSlavedStore):
             hs.config.server_name,
             hs.config.app_service_config_files
         )
+        self.exclusive_user_regex = _make_exclusive_regex(self.services_cache)
 
     get_app_service_by_token = DataStore.get_app_service_by_token.__func__
     get_app_service_by_user_id = DataStore.get_app_service_by_user_id.__func__
@@ -38,3 +40,6 @@ class SlavedApplicationServiceStore(BaseSlavedStore):
     get_appservice_state = DataStore.get_appservice_state.__func__
     set_appservice_last_pos = DataStore.set_appservice_last_pos.__func__
     set_appservice_state = DataStore.set_appservice_state.__func__
+    get_if_app_services_interested_in_user = (
+        DataStore.get_if_app_services_interested_in_user.__func__
+    )
