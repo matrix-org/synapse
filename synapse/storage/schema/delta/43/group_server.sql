@@ -51,9 +51,28 @@ CREATE TABLE group_rooms (
     is_public BOOLEAN NOT NULL
 );
 
-
 CREATE INDEX groups_rooms_g_idx ON group_rooms(group_id, room_id);
 CREATE INDEX groups_rooms_r_idx ON group_rooms(room_id);
+
+
+CREATE TABLE group_summary_rooms (
+    group_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    category TEXT,
+    is_public BOOLEAN NOT NULL
+)
+
+CREATE INDEX group_summary_rooms_g_idx ON group_summary_rooms(group_id);
+
+
+CREATE TABLE group_summary_users (
+    group_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    category TEXT,
+    is_public BOOLEAN NOT NULL
+)
+
+CREATE INDEX group_summary_users_g_idx ON group_summary_users(group_id);
 
 
 CREATE TABLE group_attestations_renewals (
