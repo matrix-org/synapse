@@ -56,10 +56,17 @@ def create_requester(user_id, access_token_id=None, is_guest=False,
 
 
 def get_domain_from_id(string):
-    try:
-        return string.split(":", 1)[1]
-    except IndexError:
+    idx = string.find(":")
+    if idx == -1:
         raise SynapseError(400, "Invalid ID: %r" % (string,))
+    return string[idx + 1:]
+
+
+def get_localpart_from_id(string):
+    idx = string.find(":")
+    if idx == -1:
+        raise SynapseError(400, "Invalid ID: %r" % (string,))
+    return string[1:idx]
 
 
 class DomainSpecificString(

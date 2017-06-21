@@ -41,6 +41,7 @@ BOOLEAN_COLUMNS = {
     "presence_stream": ["currently_active"],
     "public_room_list_stream": ["visibility"],
     "device_lists_outbound_pokes": ["sent"],
+    "users_who_share_rooms": ["share_private"],
 }
 
 
@@ -121,7 +122,7 @@ class Store(object):
                     try:
                         txn = conn.cursor()
                         return func(
-                            LoggingTransaction(txn, desc, self.database_engine, []),
+                            LoggingTransaction(txn, desc, self.database_engine, [], []),
                             *args, **kwargs
                         )
                     except self.database_engine.module.DatabaseError as e:

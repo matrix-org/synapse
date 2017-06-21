@@ -49,6 +49,7 @@ from .tags import TagsStore
 from .account_data import AccountDataStore
 from .openid import OpenIdStore
 from .client_ips import ClientIpStore
+from .user_directory import UserDirectoryStore
 
 from .util.id_generators import IdGenerator, StreamIdGenerator, ChainedIdGenerator
 from .engines import PostgresEngine
@@ -86,6 +87,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 ClientIpStore,
                 DeviceStore,
                 DeviceInboxStore,
+                UserDirectoryStore,
                 ):
 
     def __init__(self, db_conn, hs):
@@ -221,17 +223,30 @@ class DataStore(RoomMemberStore, RoomStore,
             "DeviceListFederationStreamChangeCache", device_list_max,
         )
 
+        curr_state_delta_prefill, min_curr_state_delta_id = self._get_cache_dict(
+            db_conn, "current_state_delta_stream",
+            entity_column="room_id",
+            stream_column="stream_id",
+            max_value=events_max,  # As we share the stream id with events token
+            limit=1000,
+        )
+        self._curr_state_delta_stream_cache = StreamChangeCache(
+            "_curr_state_delta_stream_cache", min_curr_state_delta_id,
+            prefilled_cache=curr_state_delta_prefill,
+        )
+
         cur = LoggingTransaction(
             db_conn.cursor(),
             name="_find_stream_orderings_for_times_txn",
             database_engine=self.database_engine,
-            after_callbacks=[]
+            after_callbacks=[],
+            final_callbacks=[],
         )
         self._find_stream_orderings_for_times_txn(cur)
         cur.close()
 
         self.find_stream_orderings_looping_call = self._clock.looping_call(
-            self._find_stream_orderings_for_times, 60 * 60 * 1000
+            self._find_stream_orderings_for_times, 10 * 60 * 1000
         )
 
         self._stream_order_on_start = self.get_room_max_stream_ordering()
@@ -272,17 +287,19 @@ class DataStore(RoomMemberStore, RoomStore,
         Counts the number of users who used this homeserver in the last 24 hours.
         """
         def _count_users(txn):
-            txn.execute(
-                "SELECT COUNT(DISTINCT user_id) AS users"
-                " FROM user_ips"
-                " WHERE last_seen > ?",
-                # This is close enough to a day for our purposes.
-                (int(self._clock.time_msec()) - (1000 * 60 * 60 * 24),)
-            )
-            rows = self.cursor_to_dict(txn)
-            if rows:
-                return rows[0]["users"]
-            return 0
+            yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24),
+
+            sql = """
+                SELECT COALESCE(count(*), 0) FROM (
+                    SELECT user_id FROM user_ips
+                    WHERE last_seen > ?
+                    GROUP BY user_id
+                ) u
+            """
+
+            txn.execute(sql, (yesterday,))
+            count, = txn.fetchone()
+            return count
 
         ret = yield self.runInteraction("count_users", _count_users)
         defer.returnValue(ret)

@@ -144,17 +144,8 @@ class Auth(object):
     @defer.inlineCallbacks
     def check_host_in_room(self, room_id, host):
         with Measure(self.clock, "check_host_in_room"):
-            latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
-
-            logger.debug("calling resolve_state_groups from check_host_in_room")
-            entry = yield self.state.resolve_state_groups(
-                room_id, latest_event_ids
-            )
-
-            ret = yield self.store.is_host_joined(
-                room_id, host, entry.state_group, entry.state
-            )
-            defer.returnValue(ret)
+            latest_event_ids = yield self.store.is_host_joined(room_id, host)
+            defer.returnValue(latest_event_ids)
 
     def _check_joined_room(self, member, user_id, room_id):
         if not member or member.membership != Membership.JOIN:

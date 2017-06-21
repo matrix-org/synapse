@@ -412,7 +412,7 @@ def set_cors_headers(request):
     )
     request.setHeader(
         "Access-Control-Allow-Headers",
-        "Origin, X-Requested-With, Content-Type, Accept"
+        "Origin, X-Requested-With, Content-Type, Accept, Authorization"
     )
 
 
