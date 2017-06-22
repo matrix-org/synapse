@@ -189,7 +189,7 @@ class UserDirectoyHandler(object):
                 room_id,
                 user_ids=user_ids - self.initially_handled_users_in_public
             )
-            self.initially_handled_users_in_public != user_ids
+            self.initially_handled_users_in_public |= user_ids
 
         # We now go and figure out the new users who share rooms with user entries
         # We sleep aggressively here as otherwise it can starve resources.
