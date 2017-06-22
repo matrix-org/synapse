@@ -501,7 +501,7 @@ class RoomMemberStore(SQLBaseStore):
 
         defer.returnValue(users_in_room)
 
-    @defer.inlineCallbacks
+    @cachedInlineCallbacks(max_entries=10000)
     def is_host_joined(self, room_id, host):
         if '%' in host or '_' in host:
             raise Exception("Invalid host name")

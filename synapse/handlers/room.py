@@ -61,7 +61,7 @@ class RoomCreationHandler(BaseHandler):
     }
 
     @defer.inlineCallbacks
-    def create_room(self, requester, config):
+    def create_room(self, requester, config, ratelimit=True):
         """ Creates a new room.
 
         Args:
@@ -75,7 +75,8 @@ class RoomCreationHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        yield self.ratelimit(requester)
+        if ratelimit:
+            yield self.ratelimit(requester)
 
         if "room_alias_name" in config:
             for wchar in string.whitespace:
@@ -167,6 +168,7 @@ class RoomCreationHandler(BaseHandler):
             initial_state=initial_state,
             creation_content=creation_content,
             room_alias=room_alias,
+            power_level_content_override=config.get("power_level_content_override", {})
         )
 
         if "name" in config:
@@ -245,7 +247,8 @@ class RoomCreationHandler(BaseHandler):
             invite_list,
             initial_state,
             creation_content,
-            room_alias
+            room_alias,
+            power_level_content_override,
     ):
         def create(etype, content, **kwargs):
             e = {
@@ -291,7 +294,15 @@ class RoomCreationHandler(BaseHandler):
             ratelimit=False,
         )
 
-        if (EventTypes.PowerLevels, '') not in initial_state:
+        # We treat the power levels override specially as this needs to be one
+        # of the first events that get sent into a room.
+        pl_content = initial_state.pop((EventTypes.PowerLevels, ''), None)
+        if pl_content is not None:
+            yield send(
+                etype=EventTypes.PowerLevels,
+                content=pl_content,
+            )
+        else:
             power_level_content = {
                 "users": {
                     creator_id: 100,
@@ -315,6 +326,8 @@ class RoomCreationHandler(BaseHandler):
             if config["original_invitees_have_ops"]:
                 for invitee in invite_list:
                     power_level_content["users"][invitee] = 100
+
+            power_level_content.update(power_level_content_override)
 
             yield send(
                 etype=EventTypes.PowerLevels,
