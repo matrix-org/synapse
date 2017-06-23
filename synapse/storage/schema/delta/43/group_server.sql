@@ -61,7 +61,7 @@ CREATE TABLE group_summary_rooms (
     category_id TEXT,
     order BIGINT NOT NULL,
     is_public BOOLEAN NOT NULL
-)
+);
 
 CREATE INDEX group_summary_rooms_g_idx ON group_summary_rooms(group_id);
 
@@ -79,7 +79,7 @@ CREATE TABLE group_summary_users (
     user_id TEXT NOT NULL,
     category TEXT,
     is_public BOOLEAN NOT NULL
-)
+);
 
 CREATE INDEX group_summary_users_g_idx ON group_summary_users(group_id);
 
