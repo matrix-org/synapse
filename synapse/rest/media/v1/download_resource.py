@@ -66,7 +66,7 @@ class DownloadResource(Resource):
     @defer.inlineCallbacks
     def _respond_local_file(self, request, media_id, name):
         media_info = yield self.store.get_local_media(media_id)
-        if not media_info:
+        if not media_info or media_info["quarantined_by"]:
             respond_404(request)
             return
 

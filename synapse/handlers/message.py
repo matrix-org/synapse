@@ -20,7 +20,6 @@ from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
-from synapse.push.action_generator import ActionGenerator
 from synapse.types import (
     UserID, RoomAlias, RoomStreamToken,
 )
@@ -53,6 +52,8 @@ class MessageHandler(BaseHandler):
         # We arbitrarily limit concurrent event creation for a room to 5.
         # This is to stop us from diverging history *too* much.
         self.limiter = Limiter(max_count=5)
+
+        self.action_generator = hs.get_action_generator()
 
     @defer.inlineCallbacks
     def purge_history(self, room_id, event_id):
@@ -590,8 +591,7 @@ class MessageHandler(BaseHandler):
                 "Changing the room create event is forbidden",
             )
 
-        action_generator = ActionGenerator(self.hs)
-        yield action_generator.handle_push_actions_for_event(
+        yield self.action_generator.handle_push_actions_for_event(
             event, context
         )
 

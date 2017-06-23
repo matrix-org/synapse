@@ -62,6 +62,13 @@ def get_domain_from_id(string):
     return string[idx + 1:]
 
 
+def get_localpart_from_id(string):
+    idx = string.find(":")
+    if idx == -1:
+        raise SynapseError(400, "Invalid ID: %r" % (string,))
+    return string[1:idx]
+
+
 class DomainSpecificString(
         namedtuple("DomainSpecificString", ("localpart", "domain"))
 ):

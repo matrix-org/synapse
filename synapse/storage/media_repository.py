@@ -30,7 +30,7 @@ class MediaRepositoryStore(SQLBaseStore):
         return self._simple_select_one(
             "local_media_repository",
             {"media_id": media_id},
-            ("media_type", "media_length", "upload_name", "created_ts"),
+            ("media_type", "media_length", "upload_name", "created_ts", "quarantined_by"),
             allow_none=True,
             desc="get_local_media",
         )
@@ -138,7 +138,7 @@ class MediaRepositoryStore(SQLBaseStore):
             {"media_origin": origin, "media_id": media_id},
             (
                 "media_type", "media_length", "upload_name", "created_ts",
-                "filesystem_id",
+                "filesystem_id", "quarantined_by",
             ),
             allow_none=True,
             desc="get_cached_remote_media",

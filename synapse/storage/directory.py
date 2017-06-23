@@ -170,3 +170,17 @@ class DirectoryStore(SQLBaseStore):
             "room_alias",
             desc="get_aliases_for_room",
         )
+
+    def update_aliases_for_room(self, old_room_id, new_room_id, creator):
+        def _update_aliases_for_room_txn(txn):
+            sql = "UPDATE room_aliases SET room_id = ?, creator = ? WHERE room_id = ?"
+            txn.execute(sql, (new_room_id, creator, old_room_id,))
+            self._invalidate_cache_and_stream(
+                txn, self.get_aliases_for_room, (old_room_id,)
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_aliases_for_room, (new_room_id,)
+            )
+        return self.runInteraction(
+            "_update_aliases_for_room_txn", _update_aliases_for_room_txn
+        )

@@ -275,7 +275,7 @@ class HttpPusher(object):
         if event.type == 'm.room.member':
             d['notification']['membership'] = event.content['membership']
             d['notification']['user_is_target'] = event.state_key == self.user_id
-        if 'content' in event:
+        if not hs.config.push_redact_content and 'content' in event:
             d['notification']['content'] = event.content
 
         # We no longer send aliases separately, instead, we send the human
