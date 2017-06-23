@@ -59,7 +59,7 @@ CREATE TABLE group_summary_rooms (
     group_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
     category_id TEXT,
-    order BIGINT NOT NULL,
+    room_order BIGINT NOT NULL,
     is_public BOOLEAN NOT NULL
 );
 
@@ -69,9 +69,9 @@ CREATE TABLE group_summary_room_categories (
     group_id TEXT NOT NULL,
     category_id TEXT NOT NULL,
     profile TEXT NOT NULL,
-    order BIGINT NOT NULL,
+    cat_order BIGINT NOT NULL,
     is_public BOOLEAN NOT NULL
-)
+);
 
 
 CREATE TABLE group_summary_users (
