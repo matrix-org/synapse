@@ -13,9 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file can't be called email.py because if it is, we cannot:
-import email.utils
-
 from ._base import Config
 
 

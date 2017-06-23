@@ -33,7 +33,7 @@ from .jwt import JWTConfig
 from .password_auth_providers import PasswordAuthProviderConfig
 from .emailconfig import EmailConfig
 from .workers import WorkerConfig
-from .pushconfig import PushConfig
+from .push import PushConfig
 
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
