@@ -58,7 +58,7 @@ CREATE INDEX groups_rooms_r_idx ON group_rooms(room_id);
 CREATE TABLE group_summary_rooms (
     group_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
-    category_id TEXT,
+    category_id TEXT NOT NULL,
     room_order BIGINT NOT NULL,
     is_public BOOLEAN NOT NULL
 );

@@ -64,6 +64,33 @@ class GroupServerStore(SQLBaseStore):
             desc="get_rooms_in_group",
         )
 
+    def get_rooms_for_summary_by_category(self, group_id, include_private=False):
+        def _get_rooms_for_summary_txn(txn):
+            keyvalues = {
+                "group_id": group_id,
+            }
+            if not include_private:
+                keyvalues["is_public"] = True
+
+            rooms = self._simple_select_list_txn(
+                txn,
+                table="group_summary_rooms",
+                keyvalues=keyvalues,
+                retcols=("room_id", "is_public", "category_id", "room_order",),
+            )
+
+            categories = self._simple_select_list_txn(
+                txn,
+                table="group_summary_room_categories",
+                keyvalues=keyvalues,
+                retcols=("category_id", "is_public", "profile", "cat_order",),
+            )
+
+            return rooms, categories
+        return self.runInteraction(
+            "get_rooms_for_summary", _get_rooms_for_summary_txn
+        )
+
     def is_user_in_group(self, user_id, group_id):
         return self._simple_select_one_onecol(
             table="group_users",
