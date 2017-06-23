@@ -146,8 +146,11 @@ class GroupsServerHandler(object):
             joined_users = yield self.store.get_users_in_room(room_id)
             entry = yield self.room_list_handler.generate_room_entry(
                 room_id, len(joined_users),
-                with_alias=False,
+                with_alias=False, allow_private=True,
             )
+
+            if not entry:
+                continue
 
             if not is_public:
                 entry["is_public"] = False

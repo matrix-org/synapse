@@ -283,7 +283,7 @@ class RoomListHandler(BaseHandler):
 
     @cachedInlineCallbacks(num_args=1, cache_context=True)
     def generate_room_entry(self, room_id, num_joined_users, cache_context,
-                            with_alias=True):
+                            with_alias=True, allow_private=False):
         """Returns the entry for a room
         """
         result = {
@@ -317,7 +317,7 @@ class RoomListHandler(BaseHandler):
         join_rules_event = current_state.get((EventTypes.JoinRules, ""))
         if join_rules_event:
             join_rule = join_rules_event.content.get("join_rule", None)
-            if join_rule and join_rule != JoinRules.PUBLIC:
+            if not allow_private and join_rule and join_rule != JoinRules.PUBLIC:
                 defer.returnValue(None)
 
         if with_alias:
