@@ -26,11 +26,19 @@ class PushConfig(Config):
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Control how push messages are sent to google/apple to notifications.
-        # Normally every message is posted to a push server hosted by matrix.org
+        # Normally every message said in a room with one or more people using
+        # mobile devices will be posted to a push server hosted by matrix.org
         # which is registered with google and apple in order to allow push
-        # notifications to be sent to mobile devices.
+        # notifications to be sent to these mobile devices.
+        #
         # Setting redact_content to true will make the push messages contain no
-        # message content which will provide increased privacy.
+        # message content which will provide increased privacy. This is a
+        # temporary solution pending improvements to Android and iPhone apps
+        # to get content from the app rather than the notification.
+        #
+        # For modern android devices the notification content will still appear
+        # because it is loaded by the app. iPhone, however will send a
+        # notification saying only that a message arrived and who it came from.
         #
         #push:
         #   redact_content: false
