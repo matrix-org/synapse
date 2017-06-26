@@ -72,19 +72,48 @@ class GroupServerStore(SQLBaseStore):
             if not include_private:
                 keyvalues["is_public"] = True
 
-            rooms = self._simple_select_list_txn(
-                txn,
-                table="group_summary_rooms",
-                keyvalues=keyvalues,
-                retcols=("room_id", "is_public", "category_id", "room_order",),
-            )
+            sql = """
+                SELECT room_id, is_public, category_id, room_order
+                FROM group_summary_rooms
+                WHERE group_id = ?
+            """
 
-            categories = self._simple_select_list_txn(
-                txn,
-                table="group_summary_room_categories",
-                keyvalues=keyvalues,
-                retcols=("category_id", "is_public", "profile", "cat_order",),
-            )
+            if not include_private:
+                sql += " AND is_public = ?"
+                txn.execute(sql, (group_id, True))
+            else:
+                txn.execute(sql, (group_id,))
+
+            rooms = {
+                row[0]: {
+                    "is_public": row[1],
+                    "category_id": row[2],
+                    "order": row[3],
+                }
+                for row in txn
+            }
+
+            sql = """
+                SELECT category_id, is_public, profile, cat_order
+                FROM group_summary_room_categories
+                INNER JOIN group_room_categories USING (group_id, category_id)
+                WHERE group_id = ?
+            """
+
+            if not include_private:
+                sql += " AND is_public = ?"
+                txn.execute(sql, (group_id, True))
+            else:
+                txn.execute(sql, (group_id,))
+
+            categories = {
+                row[0]: {
+                    "is_public": row[1],
+                    "profile": json.loads(row[2]),
+                    "order": row[3],
+                }
+                for row in txn
+            }
 
             return rooms, categories
         return self.runInteraction(

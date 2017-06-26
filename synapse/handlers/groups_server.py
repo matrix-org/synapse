@@ -23,7 +23,6 @@ from signedjson.sign import sign_json
 
 import functools
 import logging
-import ujson as json
 
 logger = logging.getLogger(__name__)
 
@@ -88,24 +87,11 @@ class GroupsServerHandler(object):
         profile = yield self.get_group_profile(group_id, requester_user_id)
         users = yield self.get_users_in_group(group_id, requester_user_id)
 
-        rooms_rows, category_rows = yield self.store.get_rooms_for_summary_by_category(
+        rooms, categories = yield self.store.get_rooms_for_summary_by_category(
             group_id, include_private=is_user_in_group,
         )
 
-        categories = {
-            category["category_id"]: {
-                "is_public": category["is_public"],
-                "profile": json.loads(category["profile"]),
-                "order": json.loads(category["cat_order"]),
-            }
-            for category in category_rows
-        }
-
-        for room in rooms_rows:
-            cat = categories.setdefault(room["category_id"], {"rooms": {}})
-
-            room_id = room["room_id"]
-
+        for room_id, room_entry in rooms.iteritems():
             joined_users = yield self.store.get_users_in_room(room_id)
             entry = yield self.room_list_handler.generate_room_entry(
                 room_id, len(joined_users),
@@ -113,19 +99,15 @@ class GroupsServerHandler(object):
             )
             entry.pop("room_id", None)
 
-            cat["rooms"][room["room_id"]] = {
-                "order": room["room_order"],
-                "is_public": room["is_public"],
-                "category_id": room["category_id"],
-                profile: entry,
-            }
+            room_entry["profile"] = entry
 
         defer.returnValue({
             "profile": profile,
             "users": users,
             "rooms": {
+                "rooms": rooms,
                 "categories": categories,
-                "total_user_count_estimate": 0,  # TODO
+                "total_room_count_estimate": 0,  # TODO
             },
         })
 

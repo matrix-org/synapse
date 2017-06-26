@@ -63,13 +63,18 @@ CREATE TABLE group_summary_rooms (
     is_public BOOLEAN NOT NULL
 );
 
-CREATE INDEX group_summary_rooms_g_idx ON group_summary_rooms(group_id);
+CREATE UNIQUE INDEX group_summary_rooms_g_idx ON group_summary_rooms(group_id, room_id, category_id);
 
 CREATE TABLE group_summary_room_categories (
     group_id TEXT NOT NULL,
     category_id TEXT NOT NULL,
+    cat_order BIGINT NOT NULL
+);
+
+CREATE TABLE group_room_categories (
+    group_id TEXT NOT NULL,
+    category_id TEXT NOT NULL,
     profile TEXT NOT NULL,
-    cat_order BIGINT NOT NULL,
     is_public BOOLEAN NOT NULL
 );
 
