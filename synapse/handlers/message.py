@@ -502,7 +502,7 @@ class MessageHandler(BaseHandler):
         # Ensure that we can round trip before trying to persist in db
         try:
             dump = ujson.dumps(event.content)
-            load = ujson.loads(dump)
+            ujson.loads(dump)
         except:
             logger.exception("Failed to encode content: %r", event.content)
             raise
