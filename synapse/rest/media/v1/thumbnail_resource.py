@@ -81,7 +81,7 @@ class ThumbnailResource(Resource):
                                  method, m_type):
         media_info = yield self.store.get_local_media(media_id)
 
-        if not media_info:
+        if not media_info or media_info["quarantined_by"]:
             respond_404(request)
             return
 
@@ -101,9 +101,16 @@ class ThumbnailResource(Resource):
             t_type = thumbnail_info["thumbnail_type"]
             t_method = thumbnail_info["thumbnail_method"]
 
-            file_path = self.filepaths.local_media_thumbnail(
-                media_id, t_width, t_height, t_type, t_method,
-            )
+            if media_info["url_cache"]:
+                # TODO: Check the file still exists, if it doesn't we can redownload
+                # it from the url `media_info["url_cache"]`
+                file_path = self.filepaths.url_cache_thumbnail(
+                    media_id, t_width, t_height, t_type, t_method,
+                )
+            else:
+                file_path = self.filepaths.local_media_thumbnail(
+                    media_id, t_width, t_height, t_type, t_method,
+                )
             yield respond_with_file(request, t_type, file_path)
 
         else:
@@ -117,7 +124,7 @@ class ThumbnailResource(Resource):
                                             desired_type):
         media_info = yield self.store.get_local_media(media_id)
 
-        if not media_info:
+        if not media_info or media_info["quarantined_by"]:
             respond_404(request)
             return
 
@@ -134,9 +141,18 @@ class ThumbnailResource(Resource):
             t_type = info["thumbnail_type"] == desired_type
 
             if t_w and t_h and t_method and t_type:
-                file_path = self.filepaths.local_media_thumbnail(
-                    media_id, desired_width, desired_height, desired_type, desired_method,
-                )
+                if media_info["url_cache"]:
+                    # TODO: Check the file still exists, if it doesn't we can redownload
+                    # it from the url `media_info["url_cache"]`
+                    file_path = self.filepaths.url_cache_thumbnail(
+                        media_id, desired_width, desired_height, desired_type,
+                        desired_method,
+                    )
+                else:
+                    file_path = self.filepaths.local_media_thumbnail(
+                        media_id, desired_width, desired_height, desired_type,
+                        desired_method,
+                    )
                 yield respond_with_file(request, desired_type, file_path)
                 return
 

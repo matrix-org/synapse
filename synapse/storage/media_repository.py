@@ -30,13 +30,16 @@ class MediaRepositoryStore(SQLBaseStore):
         return self._simple_select_one(
             "local_media_repository",
             {"media_id": media_id},
-            ("media_type", "media_length", "upload_name", "created_ts"),
+            (
+                "media_type", "media_length", "upload_name", "created_ts",
+                "quarantined_by", "url_cache",
+            ),
             allow_none=True,
             desc="get_local_media",
         )
 
     def store_local_media(self, media_id, media_type, time_now_ms, upload_name,
-                          media_length, user_id):
+                          media_length, user_id, url_cache=None):
         return self._simple_insert(
             "local_media_repository",
             {
@@ -46,6 +49,7 @@ class MediaRepositoryStore(SQLBaseStore):
                 "upload_name": upload_name,
                 "media_length": media_length,
                 "user_id": user_id.to_string(),
+                "url_cache": url_cache,
             },
             desc="store_local_media",
         )
@@ -138,7 +142,7 @@ class MediaRepositoryStore(SQLBaseStore):
             {"media_origin": origin, "media_id": media_id},
             (
                 "media_type", "media_length", "upload_name", "created_ts",
-                "filesystem_id",
+                "filesystem_id", "quarantined_by",
             ),
             allow_none=True,
             desc="get_cached_remote_media",

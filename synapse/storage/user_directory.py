@@ -439,6 +439,7 @@ class UserDirectoryStore(SQLBaseStore):
             },
             retcol="share_private",
             allow_none=True,
+            desc="get_if_users_share_a_room",
         )
 
     @cachedInlineCallbacks(max_entries=500000, iterable=True)
