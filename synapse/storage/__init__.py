@@ -304,16 +304,6 @@ class DataStore(RoomMemberStore, RoomStore,
         ret = yield self.runInteraction("count_users", _count_users)
         defer.returnValue(ret)
 
-    def get_user_ip_and_agents(self, user):
-        return self._simple_select_list(
-            table="user_ips",
-            keyvalues={"user_id": user.to_string()},
-            retcols=[
-                "access_token", "ip", "user_agent", "last_seen"
-            ],
-            desc="get_user_ip_and_agents",
-        )
-
     def get_users(self):
         """Function to reterive a list of users in users table.
 
