@@ -20,6 +20,7 @@ from twisted.internet.protocol import ReconnectingClientFactory
 
 from .commands import (
     FederationAckCommand, UserSyncCommand, RemovePusherCommand, InvalidateCacheCommand,
+    UserIpCommand,
 )
 from .protocol import ClientReplicationStreamProtocol
 
@@ -176,6 +177,12 @@ class ReplicationClientHandler(object):
         """Poke the master to invalidate a cache.
         """
         cmd = InvalidateCacheCommand(cache_func.__name__, keys)
+        self.send_command(cmd)
+
+    def send_user_ip(self, user_id, access_token, ip, user_agent, device_id, last_seen):
+        """Tell the master that the user made a request.
+        """
+        cmd = UserIpCommand(user_id, access_token, ip, user_agent, device_id, last_seen)
         self.send_command(cmd)
 
     def await_sync(self, data):

@@ -25,7 +25,8 @@ CREATE TABLE users_who_share_rooms (
 
 
 CREATE UNIQUE INDEX users_who_share_rooms_u_idx ON users_who_share_rooms(user_id, other_user_id);
-CREATE INDEX users_who_share_rooms_r_idx ON users_who_share_rooms(room_id, user_id);
+CREATE INDEX users_who_share_rooms_r_idx ON users_who_share_rooms(room_id);
+CREATE INDEX users_who_share_rooms_o_idx ON users_who_share_rooms(other_user_id);
 
 
 -- Make sure that we popualte the table initially
