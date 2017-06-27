@@ -304,6 +304,36 @@ class InvalidateCacheCommand(Command):
         return " ".join((self.cache_func, json.dumps(self.keys)))
 
 
+class UserIpCommand(Command):
+    """Sent periodically when a worker sees activity from a client.
+
+    Format::
+
+        USER_IP <user_id>, <access_token>, <ip>, <device_id>, <last_seen>, <user_agent>
+    """
+    NAME = "USER_IP"
+
+    def __init__(self, user_id, access_token, ip, user_agent, device_id, last_seen):
+        self.user_id = user_id
+        self.access_token = access_token
+        self.ip = ip
+        self.user_agent = user_agent
+        self.device_id = device_id
+        self.last_seen = last_seen
+
+    @classmethod
+    def from_line(cls, line):
+        user_id, access_token, ip, device_id, last_seen, user_agent = line.split(" ", 5)
+
+        return cls(user_id, access_token, ip, user_agent, device_id, int(last_seen))
+
+    def to_line(self):
+        return " ".join((
+            self.user_id, self.access_token, self.ip, self.device_id,
+            str(self.last_seen), self.user_agent,
+        ))
+
+
 # Map of command name to command type.
 COMMAND_MAP = {
     cmd.NAME: cmd
@@ -320,6 +350,7 @@ COMMAND_MAP = {
         SyncCommand,
         RemovePusherCommand,
         InvalidateCacheCommand,
+        UserIpCommand,
     )
 }
 
@@ -342,5 +373,6 @@ VALID_CLIENT_COMMANDS = (
     FederationAckCommand.NAME,
     RemovePusherCommand.NAME,
     InvalidateCacheCommand.NAME,
+    UserIpCommand.NAME,
     ErrorCommand.NAME,
 )

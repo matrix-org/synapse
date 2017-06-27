@@ -26,12 +26,12 @@ from synapse.http.server import JsonResource
 from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
+from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.rest.client.v2_alpha import user_directory
 from synapse.storage.engines import create_engine
-from synapse.storage.client_ips import ClientIpStore
 from synapse.storage.user_directory import UserDirectoryStore
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext, preserve_fn
@@ -58,9 +58,9 @@ class UserDirectorySlaveStore(
     SlavedEventStore,
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
+    SlavedClientIpStore,
     UserDirectoryStore,
     BaseSlavedStore,
-    ClientIpStore,  # After BaseSlavedStore because the constructor is different
 ):
     def __init__(self, db_conn, hs):
         super(UserDirectorySlaveStore, self).__init__(db_conn, hs)
