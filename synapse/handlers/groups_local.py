@@ -39,6 +39,18 @@ DEFAULT_ATTESTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
 MIN_ATTESTATION_LENGTH_MS = 1 * 60 * 60 * 1000
 
 
+def _create_rerouter(name):
+    def f(self, group_id, *args, **kwargs):
+        if self.is_mine_id(group_id):
+            return getattr(self.groups_server_handler, name)(
+                group_id, *args, **kwargs
+            )
+
+        repl_layer = self.hs.get_replication_layer()
+        return getattr(repl_layer, name)(group_id, *args, **kwargs)
+    return f
+
+
 class GroupsLocalHandler(object):
     def __init__(self, hs):
         self.hs = hs
@@ -52,41 +64,11 @@ class GroupsLocalHandler(object):
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
 
-    def get_group_summary(self, group_id, requester_user_id):
-        if self.is_mine_id(group_id):
-            return self.groups_server_handler.get_group_summary(
-                group_id, requester_user_id
-            )
-
-        repl_layer = self.hs.get_replication_layer()
-        return repl_layer.get_group_summary(group_id, requester_user_id)
-
-    def get_group_profile(self, group_id, requester_user_id):
-        if self.is_mine_id(group_id):
-            return self.groups_server_handler.get_group_profile(
-                group_id, requester_user_id
-            )
-
-        repl_layer = self.hs.get_replication_layer()
-        return repl_layer.get_group_profile(group_id, requester_user_id)
-
-    def get_users_in_group(self, group_id, requester_user_id):
-        if self.is_mine_id(group_id):
-            return self.groups_server_handler.get_users_in_group(
-                group_id, requester_user_id
-            )
-
-        repl_layer = self.hs.get_replication_layer()
-        return repl_layer.get_group_users(group_id, requester_user_id)
-
-    def get_rooms_in_group(self, group_id, requester_user_id):
-        if self.is_mine_id(group_id):
-            return self.groups_server_handler.get_rooms_in_group(
-                group_id, requester_user_id
-            )
-
-        repl_layer = self.hs.get_replication_layer()
-        return repl_layer.get_group_rooms(group_id, requester_user_id)
+    get_group_summary = _create_rerouter("get_group_summary")
+    get_group_profile = _create_rerouter("get_group_profile")
+    get_users_in_group = _create_rerouter("get_users_in_group")
+    get_rooms_in_group = _create_rerouter("get_rooms_in_group")
+    update_group_summary_room = _create_rerouter("update_group_summary_room")
 
     def create_group(self, group_id, user_id, content):
         logger.info("Asking to create group with ID: %r", group_id)

@@ -60,7 +60,9 @@ CREATE TABLE group_summary_rooms (
     room_id TEXT NOT NULL,
     category_id TEXT NOT NULL,
     room_order BIGINT NOT NULL,
-    is_public BOOLEAN NOT NULL
+    is_public BOOLEAN NOT NULL,
+    UNIQUE (group_id, category_id, room_id, room_order),
+    CHECK (room_order > 0)
 );
 
 CREATE UNIQUE INDEX group_summary_rooms_g_idx ON group_summary_rooms(group_id, room_id, category_id);
@@ -68,7 +70,9 @@ CREATE UNIQUE INDEX group_summary_rooms_g_idx ON group_summary_rooms(group_id, r
 CREATE TABLE group_summary_room_categories (
     group_id TEXT NOT NULL,
     category_id TEXT NOT NULL,
-    cat_order BIGINT NOT NULL
+    cat_order BIGINT NOT NULL,
+    UNIQUE (group_id, category_id, cat_order),
+    CHECK (cat_order > 0)
 );
 
 CREATE TABLE group_room_categories (

@@ -64,7 +64,7 @@ class GroupSummaryServlet(RestServlet):
 
 
 class GroupSummaryRoomsServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/summary/room$")
+    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/summary/rooms$")
 
     def __init__(self, hs):
         super(GroupSummaryServlet, self).__init__()
@@ -73,13 +73,40 @@ class GroupSummaryRoomsServlet(RestServlet):
         self.groups_handler = hs.get_groups_local_handler()
 
     @defer.inlineCallbacks
-    def on_POST(self, request, group_id):
+    def on_GET(self, request, group_id):
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         get_group_summary = yield self.groups_handler.get_group_summary(group_id, user_id)
 
         defer.returnValue((200, get_group_summary))
+
+
+class GroupSummaryRoomsDefaultCatServlet(RestServlet):
+    PATTERNS = client_v2_patterns(
+        "/groups/(?P<group_id>[^/]*)/summary/rooms/(?P<room_id>[^/]*)$"
+    )
+
+    def __init__(self, hs):
+        super(GroupSummaryRoomsDefaultCatServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.groups_handler = hs.get_groups_local_handler()
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, group_id, room_id):
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        content = parse_json_object_from_request(request)
+        resp = yield self.groups_handler.update_group_summary_room(
+            group_id, user_id,
+            room_id=room_id,
+            category_id=None,
+            content=content,
+        )
+
+        defer.returnValue((200, resp))
 
 
 class GroupRoomServlet(RestServlet):
@@ -324,3 +351,4 @@ def register_servlets(hs, http_server):
     GroupSelfJoinServlet(hs).register(http_server)
     GroupSelfAcceptInviteServlet(hs).register(http_server)
     GroupsForUserServlet(hs).register(http_server)
+    GroupSummaryRoomsDefaultCatServlet(hs).register(http_server)

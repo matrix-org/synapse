@@ -850,13 +850,13 @@ class FederationClient(FederationBase):
             destination, group_id, requester_user_id,
         )
 
-    def get_group_rooms(self, group_id, requester_user_id):
+    def get_rooms_in_group(self, group_id, requester_user_id):
         destination = get_domain_from_id(group_id)
         return self.transport_layer.get_group_rooms(
             destination, group_id, requester_user_id,
         )
 
-    def get_group_users(self, group_id, requester_user_id):
+    def get_users_in_group(self, group_id, requester_user_id):
         destination = get_domain_from_id(group_id)
         return self.transport_layer.get_group_users(
             destination, group_id, requester_user_id,

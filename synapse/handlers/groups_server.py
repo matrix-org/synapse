@@ -103,13 +103,43 @@ class GroupsServerHandler(object):
 
         defer.returnValue({
             "profile": profile,
-            "users": users,
-            "rooms": {
+            "users_section": users,
+            "rooms_section": {
                 "rooms": rooms,
                 "categories": categories,
                 "total_room_count_estimate": 0,  # TODO
             },
         })
+
+    @check_group_is_ours(and_exists=True)
+    @defer.inlineCallbacks
+    def update_group_summary_room(self, group_id, user_id, room_id, category_id, content):
+        is_admin = yield self.store.is_user_admin_in_group(group_id, user_id)
+        if not is_admin:
+            raise SynapseError(403, "User is not admin in group")
+
+        order = content.get("order", None)
+
+        visibility = content.get("visibility")
+        if visibility:
+            vis_type = visibility["type"]
+            if vis_type not in ("public", "private"):
+                raise SynapseError(
+                    400, "Synapse only supports 'public'/'private' visibility"
+                )
+            is_public = vis_type == "public"
+        else:
+            is_public = None
+
+        yield self.store.add_room_to_summary(
+            group_id=group_id,
+            room_id=room_id,
+            category_id=category_id,
+            order=order,
+            is_public=is_public,
+        )
+
+        defer.returnValue({})
 
     @check_group_is_ours()
     @defer.inlineCallbacks
