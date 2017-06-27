@@ -29,9 +29,8 @@ class SlavedClientIpStore(BaseSlavedStore):
             max_entries=50000 * CACHE_SIZE_FACTOR,
         )
 
-    def insert_client_ip(self, user, access_token, ip, user_agent, device_id):
+    def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id):
         now = int(self._clock.time_msec())
-        user_id = user.to_string()
         key = (user_id, access_token, ip)
 
         try:
