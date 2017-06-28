@@ -70,6 +70,10 @@ class GroupsLocalHandler(object):
     get_rooms_in_group = _create_rerouter("get_rooms_in_group")
     update_group_summary_room = _create_rerouter("update_group_summary_room")
     delete_group_summary_room = _create_rerouter("delete_group_summary_room")
+    update_group_category = _create_rerouter("update_group_category")
+    delete_group_category = _create_rerouter("delete_group_category")
+    get_group_category = _create_rerouter("get_group_category")
+    get_group_categories = _create_rerouter("get_group_categories")
 
     def create_group(self, group_id, user_id, content):
         logger.info("Asking to create group with ID: %r", group_id)

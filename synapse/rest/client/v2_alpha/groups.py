@@ -122,6 +122,79 @@ class GroupSummaryRoomsDefaultCatServlet(RestServlet):
         defer.returnValue((200, resp))
 
 
+class GroupCategoryServlet(RestServlet):
+    PATTERNS = client_v2_patterns(
+        "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)$"
+    )
+
+    def __init__(self, hs):
+        super(GroupCategoryServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.groups_handler = hs.get_groups_local_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, group_id, category_id):
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        category = yield self.groups_handler.get_group_category(
+            group_id, user_id,
+            category_id=category_id,
+        )
+
+        defer.returnValue((200, category))
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, group_id, category_id):
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        content = parse_json_object_from_request(request)
+        resp = yield self.groups_handler.update_group_category(
+            group_id, user_id,
+            category_id=category_id,
+            content=content,
+        )
+
+        defer.returnValue((200, resp))
+
+    @defer.inlineCallbacks
+    def on_DELETE(self, request, group_id, category_id):
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        resp = yield self.groups_handler.delete_group_category(
+            group_id, user_id,
+            category_id=category_id,
+        )
+
+        defer.returnValue((200, resp))
+
+
+class GroupCategorieServlet(RestServlet):
+    PATTERNS = client_v2_patterns(
+        "/groups/(?P<group_id>[^/]*)/categories/$"
+    )
+
+    def __init__(self, hs):
+        super(GroupCategorieServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.groups_handler = hs.get_groups_local_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, group_id):
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        category = yield self.groups_handler.get_group_categories(
+            group_id, user_id,
+        )
+
+        defer.returnValue((200, category))
+
+
 class GroupRoomServlet(RestServlet):
     PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/rooms$")
 
@@ -365,3 +438,5 @@ def register_servlets(hs, http_server):
     GroupSelfAcceptInviteServlet(hs).register(http_server)
     GroupsForUserServlet(hs).register(http_server)
     GroupSummaryRoomsDefaultCatServlet(hs).register(http_server)
+    GroupCategoryServlet(hs).register(http_server)
+    GroupCategorieServlet(hs).register(http_server)

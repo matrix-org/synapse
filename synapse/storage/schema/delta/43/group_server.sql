@@ -79,7 +79,8 @@ CREATE TABLE group_room_categories (
     group_id TEXT NOT NULL,
     category_id TEXT NOT NULL,
     profile TEXT NOT NULL,
-    is_public BOOLEAN NOT NULL
+    is_public BOOLEAN NOT NULL,
+    UNIQUE (group_id, category_id)
 );
 
 

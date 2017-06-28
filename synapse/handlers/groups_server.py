@@ -156,6 +156,64 @@ class GroupsServerHandler(object):
 
         defer.returnValue({})
 
+    @check_group_is_ours(and_exists=True)
+    @defer.inlineCallbacks
+    def get_group_categories(self, group_id, user_id):
+        categories = yield self.store.get_group_categories(
+            group_id=group_id,
+        )
+        defer.returnValue({"categories": categories})
+
+    @check_group_is_ours(and_exists=True)
+    def get_group_category(self, group_id, user_id, category_id):
+        return self.store.get_group_category(
+            group_id=group_id,
+            category_id=category_id,
+        )
+
+    @check_group_is_ours(and_exists=True)
+    @defer.inlineCallbacks
+    def update_group_category(self, group_id, user_id, category_id, content):
+        is_admin = yield self.store.is_user_admin_in_group(group_id, user_id)
+        if not is_admin:
+            raise SynapseError(403, "User is not admin in group")
+
+        visibility = content.get("visibility")
+        if visibility:
+            vis_type = visibility["type"]
+            if vis_type not in ("public", "private"):
+                raise SynapseError(
+                    400, "Synapse only supports 'public'/'private' visibility"
+                )
+            is_public = vis_type == "public"
+        else:
+            is_public = None
+
+        profile = content.get("profile")
+
+        yield self.store.upsert_group_category(
+            group_id=group_id,
+            category_id=category_id,
+            is_public=is_public,
+            profile=profile,
+        )
+
+        defer.returnValue({})
+
+    @check_group_is_ours(and_exists=True)
+    @defer.inlineCallbacks
+    def delete_group_category(self, group_id, user_id, category_id):
+        is_admin = yield self.store.is_user_admin_in_group(group_id, user_id)
+        if not is_admin:
+            raise SynapseError(403, "User is not admin in group")
+
+        yield self.store.remove_group_category(
+            group_id=group_id,
+            category_id=category_id,
+        )
+
+        defer.returnValue({})
+
     @check_group_is_ours()
     @defer.inlineCallbacks
     def get_group_profile(self, group_id, requester_user_id):
