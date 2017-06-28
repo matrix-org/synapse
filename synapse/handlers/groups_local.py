@@ -77,6 +77,9 @@ class GroupsLocalHandler(object):
     get_group_category = _create_rerouter("get_group_category")
     get_group_categories = _create_rerouter("get_group_categories")
 
+    update_group_summary_user = _create_rerouter("update_group_summary_user")
+    delete_group_summary_user = _create_rerouter("delete_group_summary_user")
+
     update_group_role = _create_rerouter("update_group_role")
     delete_group_role = _create_rerouter("delete_group_role")
     get_group_role = _create_rerouter("get_group_role")

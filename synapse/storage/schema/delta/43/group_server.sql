@@ -88,6 +88,7 @@ CREATE TABLE group_summary_users (
     group_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     role_id TEXT NOT NULL,
+    user_order BIGINT NOT NULL,
     is_public BOOLEAN NOT NULL
 );
 

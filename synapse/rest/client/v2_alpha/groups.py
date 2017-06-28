@@ -309,6 +309,87 @@ class GroupRolesServlet(RestServlet):
         defer.returnValue((200, category))
 
 
+class GroupSummaryUsersDefaultRoleServlet(RestServlet):
+    PATTERNS = client_v2_patterns(
+        "/groups/(?P<group_id>[^/]*)/summary/users/(?P<user_id>[^/]*)$"
+    )
+
+    def __init__(self, hs):
+        super(GroupSummaryUsersDefaultRoleServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.groups_handler = hs.get_groups_local_handler()
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, group_id, user_id):
+        requester = yield self.auth.get_user_by_req(request)
+        requester_user_id = requester.user.to_string()
+
+        content = parse_json_object_from_request(request)
+        resp = yield self.groups_handler.update_group_summary_user(
+            group_id, requester_user_id,
+            user_id=user_id,
+            role_id=None,
+            content=content,
+        )
+
+        defer.returnValue((200, resp))
+
+    @defer.inlineCallbacks
+    def on_DELETE(self, request, group_id, user_id):
+        requester = yield self.auth.get_user_by_req(request)
+        requester_user_id = requester.user.to_string()
+
+        resp = yield self.groups_handler.delete_group_summary_user(
+            group_id, requester_user_id,
+            user_id=user_id,
+            role_id=None,
+        )
+
+        defer.returnValue((200, resp))
+
+
+class GroupSummaryUsersRoleServlet(RestServlet):
+    PATTERNS = client_v2_patterns(
+        "/groups/(?P<group_id>[^/]*)/summary"
+        "/roles/(?P<role_id>[^/]+)/users/(?P<user_id>[^/]+)$"
+    )
+
+    def __init__(self, hs):
+        super(GroupSummaryUsersRoleServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.groups_handler = hs.get_groups_local_handler()
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, group_id, role_id, user_id):
+        requester = yield self.auth.get_user_by_req(request)
+        requester_user_id = requester.user.to_string()
+
+        content = parse_json_object_from_request(request)
+        resp = yield self.groups_handler.update_group_summary_user(
+            group_id, requester_user_id,
+            user_id=user_id,
+            role_id=role_id,
+            content=content,
+        )
+
+        defer.returnValue((200, resp))
+
+    @defer.inlineCallbacks
+    def on_DELETE(self, request, group_id, role_id, user_id):
+        requester = yield self.auth.get_user_by_req(request)
+        requester_user_id = requester.user.to_string()
+
+        resp = yield self.groups_handler.delete_group_summary_user(
+            group_id, requester_user_id,
+            user_id=user_id,
+            role_id=role_id,
+        )
+
+        defer.returnValue((200, resp))
+
+
 class GroupRoomServlet(RestServlet):
     PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/rooms$")
 
@@ -557,3 +638,5 @@ def register_servlets(hs, http_server):
     GroupSummaryRoomsCatServlet(hs).register(http_server)
     GroupRoleServlet(hs).register(http_server)
     GroupRolesServlet(hs).register(http_server)
+    GroupSummaryUsersDefaultRoleServlet(hs).register(http_server)
+    GroupSummaryUsersRoleServlet(hs).register(http_server)

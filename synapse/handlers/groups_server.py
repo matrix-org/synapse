@@ -85,7 +85,12 @@ class GroupsServerHandler(object):
         is_user_in_group = yield self.store.is_user_in_group(requester_user_id, group_id)
 
         profile = yield self.get_group_profile(group_id, requester_user_id)
-        users = yield self.get_users_in_group(group_id, requester_user_id)
+
+        users, roles = yield self.store.get_users_for_summary_by_role(
+            group_id, include_private=is_user_in_group,
+        )
+
+        # TODO: Add profiles to users
 
         rooms, categories = yield self.store.get_rooms_for_summary_by_category(
             group_id, include_private=is_user_in_group,
@@ -103,7 +108,11 @@ class GroupsServerHandler(object):
 
         defer.returnValue({
             "profile": profile,
-            "users_section": users,
+            "users_section": {
+                "users": users,
+                "roles": roles,
+                "total_user_count_estimate": 0,  # TODO
+            },
             "rooms_section": {
                 "rooms": rooms,
                 "categories": categories,
@@ -267,6 +276,52 @@ class GroupsServerHandler(object):
 
         yield self.store.remove_group_role(
             group_id=group_id,
+            role_id=role_id,
+        )
+
+        defer.returnValue({})
+
+    @check_group_is_ours(and_exists=True)
+    @defer.inlineCallbacks
+    def update_group_summary_user(self, group_id, requester_user_id, user_id, role_id,
+                                  content):
+        is_admin = yield self.store.is_user_admin_in_group(group_id, requester_user_id)
+        if not is_admin:
+            raise SynapseError(403, "User is not admin in group")
+
+        order = content.get("order", None)
+
+        visibility = content.get("visibility")
+        if visibility:
+            vis_type = visibility["type"]
+            if vis_type not in ("public", "private"):
+                raise SynapseError(
+                    400, "Synapse only supports 'public'/'private' visibility"
+                )
+            is_public = vis_type == "public"
+        else:
+            is_public = None
+
+        yield self.store.add_user_to_summary(
+            group_id=group_id,
+            user_id=user_id,
+            role_id=role_id,
+            order=order,
+            is_public=is_public,
+        )
+
+        defer.returnValue({})
+
+    @check_group_is_ours(and_exists=True)
+    @defer.inlineCallbacks
+    def delete_group_summary_user(self, group_id, requester_user_id, user_id, role_id):
+        is_admin = yield self.store.is_user_admin_in_group(group_id, requester_user_id)
+        if not is_admin:
+            raise SynapseError(403, "User is not admin in group")
+
+        yield self.store.remove_user_from_summary(
+            group_id=group_id,
+            user_id=user_id,
             role_id=role_id,
         )
 
