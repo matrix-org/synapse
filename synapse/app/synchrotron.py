@@ -29,6 +29,7 @@ from synapse.rest.client.v1 import events
 from synapse.rest.client.v1.room import RoomInitialSyncRestServlet
 from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
 from synapse.replication.slave.storage._base import BaseSlavedStore
+from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
@@ -42,7 +43,6 @@ from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.server import HomeServer
-from synapse.storage.client_ips import ClientIpStore
 from synapse.storage.engines import create_engine
 from synapse.storage.presence import UserPresenceState
 from synapse.storage.roommember import RoomMemberStore
@@ -77,9 +77,9 @@ class SynchrotronSlavedStore(
     SlavedPresenceStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
+    SlavedClientIpStore,
     RoomStore,
     BaseSlavedStore,
-    ClientIpStore,  # After BaseSlavedStore because the constructor is different
 ):
     who_forgot_in_room = (
         RoomMemberStore.__dict__["who_forgot_in_room"]

@@ -35,6 +35,7 @@ user_sync_counter = metrics.register_counter("user_sync")
 federation_ack_counter = metrics.register_counter("federation_ack")
 remove_pusher_counter = metrics.register_counter("remove_pusher")
 invalidate_cache_counter = metrics.register_counter("invalidate_cache")
+user_ip_cache_counter = metrics.register_counter("user_ip_cache")
 
 logger = logging.getLogger(__name__)
 
@@ -237,6 +238,15 @@ class ReplicationStreamer(object):
         """
         invalidate_cache_counter.inc()
         getattr(self.store, cache_func).invalidate(tuple(keys))
+
+    @measure_func("repl.on_user_ip")
+    def on_user_ip(self, user_id, access_token, ip, user_agent, device_id, last_seen):
+        """The client saw a user request
+        """
+        user_ip_cache_counter.inc()
+        self.store.insert_client_ip(
+            user_id, access_token, ip, user_agent, device_id, last_seen,
+        )
 
     def send_sync_to_all_connections(self, data):
         """Sends a SYNC command to all clients.

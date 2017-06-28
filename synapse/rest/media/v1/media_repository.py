@@ -326,13 +326,17 @@ class MediaRepository(object):
             defer.returnValue(t_path)
 
     @defer.inlineCallbacks
-    def _generate_local_thumbnails(self, media_id, media_info):
+    def _generate_local_thumbnails(self, media_id, media_info, url_cache=False):
         media_type = media_info["media_type"]
         requirements = self._get_thumbnail_requirements(media_type)
         if not requirements:
             return
 
-        input_path = self.filepaths.local_media_filepath(media_id)
+        if url_cache:
+            input_path = self.filepaths.url_cache_filepath(media_id)
+        else:
+            input_path = self.filepaths.local_media_filepath(media_id)
+
         thumbnailer = Thumbnailer(input_path)
         m_width = thumbnailer.width
         m_height = thumbnailer.height
@@ -360,9 +364,14 @@ class MediaRepository(object):
 
             for t_width, t_height, t_type in scales:
                 t_method = "scale"
-                t_path = self.filepaths.local_media_thumbnail(
-                    media_id, t_width, t_height, t_type, t_method
-                )
+                if url_cache:
+                    t_path = self.filepaths.url_cache_thumbnail(
+                        media_id, t_width, t_height, t_type, t_method
+                    )
+                else:
+                    t_path = self.filepaths.local_media_thumbnail(
+                        media_id, t_width, t_height, t_type, t_method
+                    )
                 self._makedirs(t_path)
                 t_len = thumbnailer.scale(t_path, t_width, t_height, t_type)
 
@@ -377,9 +386,14 @@ class MediaRepository(object):
                     # thumbnail.
                     continue
                 t_method = "crop"
-                t_path = self.filepaths.local_media_thumbnail(
-                    media_id, t_width, t_height, t_type, t_method
-                )
+                if url_cache:
+                    t_path = self.filepaths.url_cache_thumbnail(
+                        media_id, t_width, t_height, t_type, t_method
+                    )
+                else:
+                    t_path = self.filepaths.local_media_thumbnail(
+                        media_id, t_width, t_height, t_type, t_method
+                    )
                 self._makedirs(t_path)
                 t_len = thumbnailer.crop(t_path, t_width, t_height, t_type)
                 local_thumbnails.append((
