@@ -141,6 +141,21 @@ class GroupsServerHandler(object):
 
         defer.returnValue({})
 
+    @check_group_is_ours(and_exists=True)
+    @defer.inlineCallbacks
+    def delete_group_summary_room(self, group_id, user_id, room_id, category_id):
+        is_admin = yield self.store.is_user_admin_in_group(group_id, user_id)
+        if not is_admin:
+            raise SynapseError(403, "User is not admin in group")
+
+        yield self.store.remove_room_from_summary(
+            group_id=group_id,
+            room_id=room_id,
+            category_id=category_id,
+        )
+
+        defer.returnValue({})
+
     @check_group_is_ours()
     @defer.inlineCallbacks
     def get_group_profile(self, group_id, requester_user_id):

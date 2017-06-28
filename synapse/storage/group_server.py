@@ -227,6 +227,20 @@ class GroupServerStore(SQLBaseStore):
                 },
             )
 
+    def remove_room_from_summary(self, group_id, room_id, category_id):
+        if category_id is None:
+            category_id = _DEFAULT_CATEGORY_ID
+
+        return self._simple_delete(
+            table="group_summary_rooms",
+            keyvalues={
+                "group_id": group_id,
+                "category_id": category_id,
+                "room_id": room_id,
+            },
+            desc="remove_room_from_summary",
+        )
+
     def is_user_in_group(self, user_id, group_id):
         return self._simple_select_one_onecol(
             table="group_users",

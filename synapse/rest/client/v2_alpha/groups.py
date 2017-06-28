@@ -108,6 +108,19 @@ class GroupSummaryRoomsDefaultCatServlet(RestServlet):
 
         defer.returnValue((200, resp))
 
+    @defer.inlineCallbacks
+    def on_DELETE(self, request, group_id, room_id):
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        resp = yield self.groups_handler.delete_group_summary_room(
+            group_id, user_id,
+            room_id=room_id,
+            category_id=None,
+        )
+
+        defer.returnValue((200, resp))
+
 
 class GroupRoomServlet(RestServlet):
     PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/rooms$")
