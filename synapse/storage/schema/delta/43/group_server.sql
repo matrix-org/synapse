@@ -87,11 +87,27 @@ CREATE TABLE group_room_categories (
 CREATE TABLE group_summary_users (
     group_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
-    category TEXT,
+    role_id TEXT NOT NULL,
     is_public BOOLEAN NOT NULL
 );
 
 CREATE INDEX group_summary_users_g_idx ON group_summary_users(group_id);
+
+CREATE TABLE group_summary_roles (
+    group_id TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    role_order BIGINT NOT NULL,
+    UNIQUE (group_id, role_id, role_order),
+    CHECK (role_order > 0)
+);
+
+CREATE TABLE group_roles (
+    group_id TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    profile TEXT NOT NULL,
+    is_public BOOLEAN NOT NULL,
+    UNIQUE (group_id, role_id)
+);
 
 
 CREATE TABLE group_attestations_renewals (

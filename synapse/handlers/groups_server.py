@@ -214,6 +214,64 @@ class GroupsServerHandler(object):
 
         defer.returnValue({})
 
+    @check_group_is_ours(and_exists=True)
+    @defer.inlineCallbacks
+    def get_group_roles(self, group_id, user_id):
+        roles = yield self.store.get_group_roles(
+            group_id=group_id,
+        )
+        defer.returnValue({"roles": roles})
+
+    @check_group_is_ours(and_exists=True)
+    def get_group_role(self, group_id, user_id, role_id):
+        return self.store.get_group_role(
+            group_id=group_id,
+            role_id=role_id,
+        )
+
+    @check_group_is_ours(and_exists=True)
+    @defer.inlineCallbacks
+    def update_group_role(self, group_id, user_id, role_id, content):
+        is_admin = yield self.store.is_user_admin_in_group(group_id, user_id)
+        if not is_admin:
+            raise SynapseError(403, "User is not admin in group")
+
+        visibility = content.get("visibility")
+        if visibility:
+            vis_type = visibility["type"]
+            if vis_type not in ("public", "private"):
+                raise SynapseError(
+                    400, "Synapse only supports 'public'/'private' visibility"
+                )
+            is_public = vis_type == "public"
+        else:
+            is_public = None
+
+        profile = content.get("profile")
+
+        yield self.store.upsert_group_role(
+            group_id=group_id,
+            role_id=role_id,
+            is_public=is_public,
+            profile=profile,
+        )
+
+        defer.returnValue({})
+
+    @check_group_is_ours(and_exists=True)
+    @defer.inlineCallbacks
+    def delete_group_role(self, group_id, user_id, role_id):
+        is_admin = yield self.store.is_user_admin_in_group(group_id, user_id)
+        if not is_admin:
+            raise SynapseError(403, "User is not admin in group")
+
+        yield self.store.remove_group_role(
+            group_id=group_id,
+            role_id=role_id,
+        )
+
+        defer.returnValue({})
+
     @check_group_is_ours()
     @defer.inlineCallbacks
     def get_group_profile(self, group_id, requester_user_id):

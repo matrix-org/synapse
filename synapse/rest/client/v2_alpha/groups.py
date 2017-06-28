@@ -213,13 +213,13 @@ class GroupCategoryServlet(RestServlet):
         defer.returnValue((200, resp))
 
 
-class GroupCategorieServlet(RestServlet):
+class GroupCategoriesServlet(RestServlet):
     PATTERNS = client_v2_patterns(
         "/groups/(?P<group_id>[^/]*)/categories/$"
     )
 
     def __init__(self, hs):
-        super(GroupCategorieServlet, self).__init__()
+        super(GroupCategoriesServlet, self).__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
@@ -230,6 +230,79 @@ class GroupCategorieServlet(RestServlet):
         user_id = requester.user.to_string()
 
         category = yield self.groups_handler.get_group_categories(
+            group_id, user_id,
+        )
+
+        defer.returnValue((200, category))
+
+
+class GroupRoleServlet(RestServlet):
+    PATTERNS = client_v2_patterns(
+        "/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)$"
+    )
+
+    def __init__(self, hs):
+        super(GroupRoleServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.groups_handler = hs.get_groups_local_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, group_id, role_id):
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        category = yield self.groups_handler.get_group_role(
+            group_id, user_id,
+            role_id=role_id,
+        )
+
+        defer.returnValue((200, category))
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, group_id, role_id):
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        content = parse_json_object_from_request(request)
+        resp = yield self.groups_handler.update_group_role(
+            group_id, user_id,
+            role_id=role_id,
+            content=content,
+        )
+
+        defer.returnValue((200, resp))
+
+    @defer.inlineCallbacks
+    def on_DELETE(self, request, group_id, role_id):
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        resp = yield self.groups_handler.delete_group_role(
+            group_id, user_id,
+            role_id=role_id,
+        )
+
+        defer.returnValue((200, resp))
+
+
+class GroupRolesServlet(RestServlet):
+    PATTERNS = client_v2_patterns(
+        "/groups/(?P<group_id>[^/]*)/roles/$"
+    )
+
+    def __init__(self, hs):
+        super(GroupRolesServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.groups_handler = hs.get_groups_local_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, group_id):
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        category = yield self.groups_handler.get_group_roles(
             group_id, user_id,
         )
 
@@ -480,5 +553,7 @@ def register_servlets(hs, http_server):
     GroupsForUserServlet(hs).register(http_server)
     GroupSummaryRoomsDefaultCatServlet(hs).register(http_server)
     GroupCategoryServlet(hs).register(http_server)
-    GroupCategorieServlet(hs).register(http_server)
+    GroupCategoriesServlet(hs).register(http_server)
     GroupSummaryRoomsCatServlet(hs).register(http_server)
+    GroupRoleServlet(hs).register(http_server)
+    GroupRolesServlet(hs).register(http_server)
