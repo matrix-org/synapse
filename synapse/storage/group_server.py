@@ -143,7 +143,7 @@ class GroupServerStore(SQLBaseStore):
                     "group_id": group_id,
                     "category_id": category_id,
                 },
-                retcol=group_id,
+                retcol="group_id",
                 allow_none=True,
             )
             if not cat_exists:
@@ -157,17 +157,17 @@ class GroupServerStore(SQLBaseStore):
                     "group_id": group_id,
                     "category_id": category_id,
                 },
-                retcol=group_id,
+                retcol="group_id",
                 allow_none=True,
             )
             if not cat_exists:
                 txn.execute("""
                     INSERT INTO group_summary_room_categories
                     (group_id, category_id, cat_order)
-                    SELECT group_id, category_id, COALESCE(MAX(room_order), 1)
+                    SELECT ?, ?, COALESCE(MAX(cat_order), 1)
                     FROM group_summary_room_categories
                     WHERE group_id = ? AND category_id = ?
-                """, (group_id, category_id,))
+                """, (group_id, category_id, group_id, category_id))
 
         existing = self._simple_select_one_txn(
             txn,
