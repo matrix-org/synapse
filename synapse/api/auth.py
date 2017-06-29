@@ -23,6 +23,8 @@ from synapse import event_auth
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.api.errors import AuthError, Codes
 from synapse.types import UserID
+from synapse.util.caches import register_cache, CACHE_SIZE_FACTOR
+from synapse.util.caches.lrucache import LruCache
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
@@ -38,6 +40,10 @@ AuthEventTypes = (
 GUEST_DEVICE_ID = "guest_device"
 
 
+class _InvalidMacaroonException(Exception):
+    pass
+
+
 class Auth(object):
     """
     FIXME: This class contains a mix of functions for authenticating users
@@ -49,6 +55,9 @@ class Auth(object):
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
+
+        self.token_cache = LruCache(CACHE_SIZE_FACTOR * 10000)
+        register_cache("token_cache", self.token_cache)
 
     @defer.inlineCallbacks
     def check_from_context(self, event, context, do_sig_check=True):
@@ -266,8 +275,8 @@ class Auth(object):
             AuthError if no user by that token exists or the token is invalid.
         """
         try:
-            macaroon = pymacaroons.Macaroon.deserialize(token)
-        except Exception:  # deserialize can throw more-or-less anything
+            user_id, guest = self._parse_and_validate_macaroon(token, rights)
+        except _InvalidMacaroonException:
             # doesn't look like a macaroon: treat it as an opaque token which
             # must be in the database.
             # TODO: it would be nice to get rid of this, but apparently some
@@ -276,18 +285,7 @@ class Auth(object):
             defer.returnValue(r)
 
         try:
-            user_id = self.get_user_id_from_macaroon(macaroon)
             user = UserID.from_string(user_id)
-
-            self.validate_macaroon(
-                macaroon, rights, self.hs.config.expire_access_token,
-                user_id=user_id,
-            )
-
-            guest = False
-            for caveat in macaroon.caveats:
-                if caveat.caveat_id == "guest = true":
-                    guest = True
 
             if guest:
                 # Guest access tokens are not stored in the database (there can
@@ -359,6 +357,55 @@ class Auth(object):
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Invalid macaroon passed.",
                 errcode=Codes.UNKNOWN_TOKEN
             )
+
+    def _parse_and_validate_macaroon(self, token, rights="access"):
+        """Takes a macaroon and tries to parse and validate it. This is cached
+        if and only if rights == access and there isn't an expiry.
+
+        On invalid macaroon raises _InvalidMacaroonException
+
+        Returns:
+            (user_id, is_guest)
+        """
+        if rights == "access":
+            cached = self.token_cache.get(token, None)
+            if cached:
+                return cached
+
+        try:
+            macaroon = pymacaroons.Macaroon.deserialize(token)
+        except Exception:  # deserialize can throw more-or-less anything
+            # doesn't look like a macaroon: treat it as an opaque token which
+            # must be in the database.
+            # TODO: it would be nice to get rid of this, but apparently some
+            # people use access tokens which aren't macaroons
+            raise _InvalidMacaroonException()
+
+        try:
+            user_id = self.get_user_id_from_macaroon(macaroon)
+
+            has_expiry = False
+            guest = False
+            for caveat in macaroon.caveats:
+                if caveat.caveat_id.startswith("time "):
+                    has_expiry = True
+                elif caveat.caveat_id == "guest = true":
+                    guest = True
+
+            self.validate_macaroon(
+                macaroon, rights, self.hs.config.expire_access_token,
+                user_id=user_id,
+            )
+        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
+            raise AuthError(
+                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Invalid macaroon passed.",
+                errcode=Codes.UNKNOWN_TOKEN
+            )
+
+        if not has_expiry and rights == "access":
+            self.token_cache[token] = (user_id, guest)
+
+        return user_id, guest
 
     def get_user_id_from_macaroon(self, macaroon):
         """Retrieve the user_id given by the caveats on the macaroon.
