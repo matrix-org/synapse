@@ -360,6 +360,14 @@ class GroupsServerHandler(object):
             if not is_public:
                 entry["is_public"] = False
 
+            attestation = yield self.store.get_remote_attestation(group_id, g_user_id)
+
+            if not attestation:
+                continue
+
+            if not self.is_mine_id(requester_user_id):
+                entry["attestation"] = attestation
+
             chunk.append(entry)
 
         # TODO: If admin add lists of users whose attestations have timed out
@@ -467,12 +475,8 @@ class GroupsServerHandler(object):
         if res["state"] == "join":
             if not self.hs.is_mine_id(user_id):
                 remote_attestation = res["attestation"]
-                valid_until_ms = remote_attestation["valid_until_ms"]
 
-                if valid_until_ms - self.clock.time_msec() < MIN_ATTESTATION_LENGTH_MS:
-                    raise SynapseError(400, "Attestation not valid for long enough")
-
-                yield self.keyring.verify_json_for_server(domain, remote_attestation)
+                yield self._verify_attestation(domain, remote_attestation)
             else:
                 remote_attestation = None
 
@@ -505,13 +509,9 @@ class GroupsServerHandler(object):
 
         if not self.hs.is_mine_id(user_id):
             remote_attestation = content["attestation"]
-            valid_until_ms = remote_attestation["valid_until_ms"]
-
-            if valid_until_ms - self.clock.time_msec() < MIN_ATTESTATION_LENGTH_MS:
-                raise SynapseError(400, "Attestation not valid for long enough")
 
             domain = get_domain_from_id(user_id)
-            yield self.keyring.verify_json_for_server(domain, remote_attestation)
+            yield self._verify_attestation(domain, remote_attestation)
         else:
             remote_attestation = None
 
@@ -607,13 +607,9 @@ class GroupsServerHandler(object):
 
         if not self.hs.is_mine_id(user_id):
             remote_attestation = content["attestation"]
-            valid_until_ms = remote_attestation["valid_until_ms"]
-
-            if valid_until_ms - self.clock.time_msec() < MIN_ATTESTATION_LENGTH_MS:
-                raise SynapseError(400, "Attestation not valid for long enough")
 
             domain = get_domain_from_id(user_id)
-            yield self.keyring.verify_json_for_server(domain, remote_attestation)
+            yield self._verify_attestation(domain, remote_attestation)
 
             local_attestation = yield self._create_attestation(group_id, user_id)
         else:
@@ -676,3 +672,11 @@ class GroupsServerHandler(object):
             user_id = row["user_id"]
 
             preserve_fn(_renew_attestation)(group_id, user_id)
+
+    def _verify_attestation(self, server_name, attestation):
+        valid_until_ms = attestation["valid_until_ms"]
+
+        if valid_until_ms - self.clock.time_msec() < MIN_ATTESTATION_LENGTH_MS:
+            raise SynapseError(400, "Attestation not valid for long enough")
+
+        yield self.keyring.verify_json_for_server(server_name, attestation)

@@ -900,3 +900,22 @@ class GroupServerStore(SQLBaseStore):
             },
             desc="update_remote_attestion",
         )
+
+    @defer.inlineCallbacks
+    def get_remote_attestation(self, group_id, user_id):
+        row = yield self._simple_select_one(
+            table="group_attestations_remote",
+            keyvalues={
+                "group_id": group_id,
+                "user_id": user_id,
+            },
+            retcols=("valid_until_ms", "attestation"),
+            desc="get_remote_attestation",
+            allow_none=True,
+        )
+
+        now = int(self._clock.time_msec())
+        if row and now < row["valid_until_ms"]:
+            defer.returnValue(json.loads(row["attestation"]))
+
+        defer.returnValue(None)

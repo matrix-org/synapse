@@ -66,7 +66,6 @@ class GroupsLocalHandler(object):
 
     get_group_summary = _create_rerouter("get_group_summary")
     get_group_profile = _create_rerouter("get_group_profile")
-    get_users_in_group = _create_rerouter("get_users_in_group")
     get_rooms_in_group = _create_rerouter("get_rooms_in_group")
 
     update_group_summary_room = _create_rerouter("update_group_summary_room")
@@ -106,6 +105,21 @@ class GroupsLocalHandler(object):
         return repl_layer.add_room_to_group(group_id, user_id, room_id, content)  # TODO
 
     @defer.inlineCallbacks
+    def get_users_in_group(self, group_id, requester_user_id):
+        if self.is_mine_id(group_id):
+            res = yield self.groups_server_handler.get_users_in_group(
+                group_id, requester_user_id
+            )
+            defer.returnValue(res)
+
+        repl_layer = self.hs.get_replication_layer()
+        res = yield repl_layer.get_users_in_group(group_id, requester_user_id)  # TODO
+
+        # TODO: Check attestations
+
+        defer.returnValue(res)
+
+    @defer.inlineCallbacks
     def join_group(self, group_id, user_id, content):
         pass  # TODO
 
@@ -123,14 +137,11 @@ class GroupsLocalHandler(object):
 
             repl_layer = self.hs.get_replication_layer()
             res = yield repl_layer.accept_group_invite(group_id, user_id, content)
-            remote_attestation = res["attestation"]
-            valid_until_ms = remote_attestation["valid_until_ms"]
 
-            if valid_until_ms - self.clock.time_msec() < MIN_ATTESTATION_LENGTH_MS:
-                raise SynapseError(400, "Attestation not valid for long enough")
+            remote_attestation = res["attestation"]
 
             domain = get_domain_from_id(group_id)
-            yield self.keyring.verify_json_for_server(domain, remote_attestation)
+            yield self._verify_attestation(domain, remote_attestation)
 
         yield self.store.register_user_group_membership(
             group_id, user_id,
@@ -225,3 +236,11 @@ class GroupsLocalHandler(object):
     def get_joined_groups(self, user_id):
         group_ids = yield self.store.get_joined_groups(user_id)
         defer.returnValue({"groups": group_ids})
+
+    def _verify_attestation(self, server_name, attestation):
+        valid_until_ms = attestation["valid_until_ms"]
+
+        if valid_until_ms - self.clock.time_msec() < MIN_ATTESTATION_LENGTH_MS:
+            raise SynapseError(400, "Attestation not valid for long enough")
+
+        yield self.keyring.verify_json_for_server(server_name, attestation)
