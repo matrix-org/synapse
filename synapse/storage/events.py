@@ -405,7 +405,7 @@ class EventsStore(SQLBaseStore):
 
                 for room_id, latest_event_ids in new_forward_extremeties.iteritems():
                     self.get_latest_event_ids_in_room.prefill(
-                        (room_id,), latest_event_ids
+                        (room_id,), list(latest_event_ids)
                     )
 
     @defer.inlineCallbacks
