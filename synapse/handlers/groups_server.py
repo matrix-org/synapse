@@ -91,6 +91,7 @@ class GroupsServerHandler(object):
         )
 
         # TODO: Add profiles to users
+        # TODO: Add assestations to users
 
         rooms, categories = yield self.store.get_rooms_for_summary_by_category(
             group_id, include_private=is_user_in_group,
@@ -354,11 +355,14 @@ class GroupsServerHandler(object):
             entry = {"user_id": g_user_id}
 
             # TODO: Get profile information
+            # TODO: Add attestations
 
             if not is_public:
                 entry["is_public"] = False
 
             chunk.append(entry)
+
+        # TODO: If admin add lists of users whose attestations have timed out
 
         defer.returnValue({
             "chunk": chunk,
