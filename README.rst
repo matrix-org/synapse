@@ -359,7 +359,7 @@ https://www.archlinux.org/packages/community/any/matrix-synapse/, which should p
 the necessary dependencies. If the default web client is to be served (enabled by default in
 the generated config),
 https://www.archlinux.org/packages/community/any/python2-matrix-angular-sdk/ will also need to
-be installed. 
+be installed.
 
 Alternatively, to install using pip a few changes may be needed as ArchLinux
 defaults to python 3, but synapse currently assumes python 2.7 by default:
@@ -899,12 +899,9 @@ cache a lot of recent room data and metadata in RAM in order to speed up
 common requests.  We'll improve this in future, but for now the easiest
 way to either reduce the RAM usage (at the risk of slowing things down)
 is to set the almost-undocumented ``SYNAPSE_CACHE_FACTOR`` environment
-variable.  Roughly speaking, a SYNAPSE_CACHE_FACTOR of 1.0 will max out
-at around 3-4GB of resident memory - this is what we currently run the
-matrix.org on.  The default setting is currently 0.1, which is probably
-around a ~700MB footprint.  You can dial it down further to 0.02 if
-desired, which targets roughly ~512MB.  Conversely you can dial it up if
-you need performance for lots of users and have a box with a lot of RAM.
+variable.  The default is 0.5, which can be decreased to reduce RAM usage
+in memory constrained enviroments, or increased if performance starts to
+degrade.
 
 
 .. _`key_management`: https://matrix.org/docs/spec/server_server/unstable.html#retrieving-server-keys

@@ -24,21 +24,18 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.events.snapshot import EventContext
 from synapse.util.async import Linearizer
+from synapse.util.caches import CACHE_SIZE_FACTOR
 
 from collections import namedtuple
 from frozendict import frozendict
 
 import logging
 import hashlib
-import os
 
 logger = logging.getLogger(__name__)
 
 
 KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
-
-
-CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.1))
 
 
 SIZE_OF_CACHE = int(100000 * CACHE_SIZE_FACTOR)
