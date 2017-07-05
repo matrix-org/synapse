@@ -16,10 +16,10 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.types import get_domain_from_id, UserID
+from synapse.groups.attestations import GroupAttestationSigning
+from synapse.types import UserID
 from synapse.util.logcontext import preserve_fn
 
-from signedjson.sign import sign_json
 
 import functools
 import logging
@@ -74,6 +74,12 @@ class GroupsServerHandler(object):
         self.is_mine_id = hs.is_mine_id
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
+
+        self.attestations = GroupAttestationSigning(
+            keyring=self.keyring,
+            clock=self.clock,
+            server_name=self.server_name,
+        )
 
         self.cleaner = self.clock.looping_call(
             self._renew_attestations, 30 * 60 * 1000,
@@ -462,9 +468,7 @@ class GroupsServerHandler(object):
             res = yield groups_local.on_invite(group_id, user_id, content)
             local_attestation = None
         else:
-            domain = get_domain_from_id(user_id)
-
-            local_attestation = self._create_attestation(group_id, user_id)
+            local_attestation = self.attestations.create_attestation(group_id, user_id)
             content.update({
                 "attestation": local_attestation,
             })
@@ -476,8 +480,8 @@ class GroupsServerHandler(object):
             if not self.hs.is_mine_id(user_id):
                 remote_attestation = res["attestation"]
 
-                yield self._verify_attestation(
-                    domain, remote_attestation,
+                yield self.attestations.verify_attestation(
+                    remote_attestation,
                     user_id=user_id,
                     group_id=group_id,
                 )
@@ -514,16 +518,15 @@ class GroupsServerHandler(object):
         if not self.hs.is_mine_id(user_id):
             remote_attestation = content["attestation"]
 
-            domain = get_domain_from_id(user_id)
-            yield self._verify_attestation(
-                domain, remote_attestation,
+            yield self.attestations.verify_attestation(
+                remote_attestation,
                 user_id=user_id,
                 group_id=group_id,
             )
         else:
             remote_attestation = None
 
-        local_attestation = self._create_attestation(group_id, user_id)
+        local_attestation = self.attestations.create_attestation(group_id, user_id)
 
         visibility = content.get("visibility")
         if visibility:
@@ -616,14 +619,13 @@ class GroupsServerHandler(object):
         if not self.hs.is_mine_id(user_id):
             remote_attestation = content["attestation"]
 
-            domain = get_domain_from_id(user_id)
-            yield self._verify_attestation(
-                domain, remote_attestation,
+            yield self.attestations.verify_attestation(
+                remote_attestation,
                 user_id=user_id,
                 group_id=group_id,
             )
 
-            local_attestation = yield self._create_attestation(group_id, user_id)
+            local_attestation = self.attestations.create_attestation(group_id, user_id)
         else:
             local_attestation = None
             remote_attestation = None
@@ -643,22 +645,15 @@ class GroupsServerHandler(object):
     def on_renew_attestation(self, group_id, user_id, content):
         attestation = content["attestation"]
 
-        if self.hs.is_mine_id(group_id):
-            domain = get_domain_from_id(user_id)
-        else:
-            domain = get_domain_from_id(group_id)
-        yield self.keyring.verify_json_for_server(domain, attestation)
+        yield self.attestations.verify_attestation(
+            attestation,
+            user_id=user_id,
+            group_id=group_id,
+        )
 
         yield self.store.update_remote_attestion(group_id, user_id, attestation)
 
         defer.returnValue({})
-
-    def _create_attestation(self, group_id, user_id):
-        return sign_json({
-            "group_id": group_id,
-            "user_id": user_id,
-            "valid_until_ms": self.clock.time_msec() + DEFAULT_ATTESTATION_LENGTH_MS,
-        }, self.server_name, self.signing_key)
 
     @defer.inlineCallbacks
     def _renew_attestations(self):
@@ -673,7 +668,7 @@ class GroupsServerHandler(object):
 
         @defer.inlineCallbacks
         def _renew_attestation(self, group_id, user_id):
-            attestation = self._create_attestation(group_id, user_id)
+            attestation = self.attestations.create_attestation(group_id, user_id)
             yield repl_layer.renew_group_attestation(group_id, user_id, attestation)
             yield self.store.update_attestation_renewal(
                 group_id, user_id, attestation
@@ -684,16 +679,3 @@ class GroupsServerHandler(object):
             user_id = row["user_id"]
 
             preserve_fn(_renew_attestation)(group_id, user_id)
-
-    def _verify_attestation(self, server_name, attestation, user_id, group_id):
-        if user_id != attestation["user_id"]:
-            raise SynapseError(400, "Attestation has incorrect user_id")
-
-        if group_id != attestation["group_id"]:
-            raise SynapseError(400, "Attestation has incorrect group_id")
-
-        valid_until_ms = attestation["valid_until_ms"]
-        if valid_until_ms - self.clock.time_msec() < MIN_ATTESTATION_LENGTH_MS:
-            raise SynapseError(400, "Attestation not valid for long enough")
-
-        yield self.keyring.verify_json_for_server(server_name, attestation)

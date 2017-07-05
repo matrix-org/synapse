@@ -16,9 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.types import get_domain_from_id
-
-from signedjson.sign import sign_json
+from synapse.groups.attestions import GroupAttestationSigning
 
 import logging
 
@@ -63,6 +61,12 @@ class GroupsLocalHandler(object):
         self.is_mine_id = hs.is_mine_id
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
+
+        self.attestations = GroupAttestationSigning(
+            keyring=self.keyring,
+            clock=self.clock,
+            server_name=self.server_name,
+        )
 
     get_group_summary = _create_rerouter("get_group_summary")
     get_group_profile = _create_rerouter("get_group_profile")
@@ -121,7 +125,7 @@ class GroupsLocalHandler(object):
 
     @defer.inlineCallbacks
     def join_group(self, group_id, user_id, content):
-        pass  # TODO
+        raise NotImplementedError()  # TODO
 
     @defer.inlineCallbacks
     def accept_invite(self, group_id, user_id, content):
@@ -132,7 +136,7 @@ class GroupsLocalHandler(object):
             local_attestation = None
             remote_attestation = None
         else:
-            local_attestation = yield self._create_attestation(group_id, user_id)
+            local_attestation = self.attestations.create_attestation(group_id, user_id)
             content["attestation"] = local_attestation
 
             repl_layer = self.hs.get_replication_layer()
@@ -140,8 +144,11 @@ class GroupsLocalHandler(object):
 
             remote_attestation = res["attestation"]
 
-            domain = get_domain_from_id(group_id)
-            yield self._verify_attestation(domain, remote_attestation)
+            yield self.attestations.verify_attestation(
+                remote_attestation,
+                user_id=user_id,
+                group_id=group_id,
+            )
 
         yield self.store.register_user_group_membership(
             group_id, user_id,
@@ -225,22 +232,7 @@ class GroupsLocalHandler(object):
             membership="leave",
         )
 
-    def _create_attestation(self, group_id, user_id):
-        return sign_json({
-            "group_id": group_id,
-            "user_id": user_id,
-            "valid_until_ms": self.clock.time_msec() + DEFAULT_ATTESTATION_LENGTH_MS,
-        }, self.server_name, self.signing_key)
-
     @defer.inlineCallbacks
     def get_joined_groups(self, user_id):
         group_ids = yield self.store.get_joined_groups(user_id)
         defer.returnValue({"groups": group_ids})
-
-    def _verify_attestation(self, server_name, attestation):
-        valid_until_ms = attestation["valid_until_ms"]
-
-        if valid_until_ms - self.clock.time_msec() < MIN_ATTESTATION_LENGTH_MS:
-            raise SynapseError(400, "Attestation not valid for long enough")
-
-        yield self.keyring.verify_json_for_server(server_name, attestation)
