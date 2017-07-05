@@ -51,7 +51,7 @@ from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.user_directory import UserDirectoyHandler
 from synapse.handlers.groups_local import GroupsLocalHandler
-from synapse.handlers.groups_server import GroupsServerHandler
+from synapse.groups.groups_server import GroupsServerHandler
 from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier

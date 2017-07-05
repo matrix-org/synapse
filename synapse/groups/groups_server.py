@@ -476,7 +476,11 @@ class GroupsServerHandler(object):
             if not self.hs.is_mine_id(user_id):
                 remote_attestation = res["attestation"]
 
-                yield self._verify_attestation(domain, remote_attestation)
+                yield self._verify_attestation(
+                    domain, remote_attestation,
+                    user_id=user_id,
+                    group_id=group_id,
+                )
             else:
                 remote_attestation = None
 
@@ -511,7 +515,11 @@ class GroupsServerHandler(object):
             remote_attestation = content["attestation"]
 
             domain = get_domain_from_id(user_id)
-            yield self._verify_attestation(domain, remote_attestation)
+            yield self._verify_attestation(
+                domain, remote_attestation,
+                user_id=user_id,
+                group_id=group_id,
+            )
         else:
             remote_attestation = None
 
@@ -609,7 +617,11 @@ class GroupsServerHandler(object):
             remote_attestation = content["attestation"]
 
             domain = get_domain_from_id(user_id)
-            yield self._verify_attestation(domain, remote_attestation)
+            yield self._verify_attestation(
+                domain, remote_attestation,
+                user_id=user_id,
+                group_id=group_id,
+            )
 
             local_attestation = yield self._create_attestation(group_id, user_id)
         else:
@@ -673,9 +685,14 @@ class GroupsServerHandler(object):
 
             preserve_fn(_renew_attestation)(group_id, user_id)
 
-    def _verify_attestation(self, server_name, attestation):
-        valid_until_ms = attestation["valid_until_ms"]
+    def _verify_attestation(self, server_name, attestation, user_id, group_id):
+        if user_id != attestation["user_id"]:
+            raise SynapseError(400, "Attestation has incorrect user_id")
 
+        if group_id != attestation["group_id"]:
+            raise SynapseError(400, "Attestation has incorrect group_id")
+
+        valid_until_ms = attestation["valid_until_ms"]
         if valid_until_ms - self.clock.time_msec() < MIN_ATTESTATION_LENGTH_MS:
             raise SynapseError(400, "Attestation not valid for long enough")
 
