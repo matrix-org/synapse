@@ -112,7 +112,22 @@ class GroupsLocalHandler(object):
         repl_layer = self.hs.get_replication_layer()
         res = yield repl_layer.get_users_in_group(group_id, requester_user_id)  # TODO
 
-        # TODO: Check attestations
+        chunk = res["chunk"]
+        valid_entries = []
+        for entry in chunk:
+            g_user_id = entry["user_id"]
+            attestation = entry.pop("attestation")
+            try:
+                yield self.attestations.verify_attestation(
+                    attestation,
+                    group_id=group_id,
+                    user_id=g_user_id,
+                )
+                valid_entries.append(entry)
+            except Exception as e:
+                logger.info("Failed to verify user is in group: %s", e)
+
+        res["chunk"] = valid_entries
 
         defer.returnValue(res)
 
@@ -139,8 +154,8 @@ class GroupsLocalHandler(object):
 
             yield self.attestations.verify_attestation(
                 remote_attestation,
-                user_id=user_id,
                 group_id=group_id,
+                user_id=user_id,
             )
 
         yield self.store.register_user_group_membership(

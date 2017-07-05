@@ -352,18 +352,20 @@ class GroupsServerHandler(object):
             entry = {"user_id": g_user_id}
 
             # TODO: Get profile information
-            # TODO: Add attestations
 
             if not is_public:
                 entry["is_public"] = False
 
-            attestation = yield self.store.get_remote_attestation(group_id, g_user_id)
-
-            if not attestation:
-                continue
-
             if not self.is_mine_id(requester_user_id):
+                attestation = yield self.store.get_remote_attestation(group_id, g_user_id)
+                if not attestation:
+                    continue
+
                 entry["attestation"] = attestation
+            else:
+                entry["attestation"] = self.attestations.create_attestation(
+                    group_id, g_user_id,
+                )
 
             chunk.append(entry)
 
