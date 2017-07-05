@@ -200,7 +200,9 @@ def _glob_to_re(glob, word_boundary):
         return re.compile(r, flags=re.IGNORECASE)
 
 
-def _flatten_dict(d, prefix=[], result={}):
+def _flatten_dict(d, prefix=[], result=None):
+    if result is None:
+        result = {}
     for key, value in d.items():
         if isinstance(value, basestring):
             result[".".join(prefix + [key])] = value.lower()
