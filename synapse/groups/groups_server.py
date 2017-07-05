@@ -16,9 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.groups.attestations import GroupAttestationSigning
-from synapse.types import UserID
-from synapse.util.logcontext import preserve_fn
+from synapse.types import UserID, get_domain_from_id
 
 
 import functools
@@ -72,16 +70,11 @@ class GroupsServerHandler(object):
         self.is_mine_id = hs.is_mine_id
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
+        self.attestations = hs.get_groups_attestation_signing()
+        self.transport_client = hs.get_federation_transport_client()
 
-        self.attestations = GroupAttestationSigning(
-            keyring=self.keyring,
-            clock=self.clock,
-            server_name=self.server_name,
-        )
-
-        self.cleaner = self.clock.looping_call(
-            self._renew_attestations, 30 * 60 * 1000,
-        )
+        # Ensure attestations get renewed
+        hs.get_groups_attestation_renewer()
 
     @check_group_is_ours(and_exists=True)
     @defer.inlineCallbacks
@@ -471,8 +464,9 @@ class GroupsServerHandler(object):
                 "attestation": local_attestation,
             })
 
-            repl_layer = self.hs.get_replication_layer()
-            res = yield repl_layer.invite_to_group(group_id, user_id, content)
+            res = yield self.transport_client.invite_to_group_notification(
+                get_domain_from_id(user_id), group_id, user_id, content
+            )
 
         if res["state"] == "join":
             if not self.hs.is_mine_id(user_id):
@@ -582,8 +576,9 @@ class GroupsServerHandler(object):
                 groups_local = self.hs.get_groups_local_handler()
                 yield groups_local.user_removed_from_group(group_id, user_id, {})
             else:
-                repl_layer = self.hs.get_replication_layer()
-                yield repl_layer.remove_user_from_group(group_id, user_id, {})
+                yield self.transport_client.remove_user_from_group_notification(
+                    get_domain_from_id(user_id), group_id, user_id, {}
+                )
 
         defer.returnValue({})
 
@@ -639,41 +634,3 @@ class GroupsServerHandler(object):
         defer.returnValue({
             "group_id": group_id,
         })
-
-    def on_renew_attestation(self, group_id, user_id, content):
-        attestation = content["attestation"]
-
-        yield self.attestations.verify_attestation(
-            attestation,
-            user_id=user_id,
-            group_id=group_id,
-        )
-
-        yield self.store.update_remote_attestion(group_id, user_id, attestation)
-
-        defer.returnValue({})
-
-    @defer.inlineCallbacks
-    def _renew_attestations(self):
-        now = self.clock.time_msec()
-        # We start validate
-
-        rows = yield self.store.get_attestations_need_renewals(
-            now + UPDATE_ATTESTATION_TIME_MS
-        )
-
-        repl_layer = self.hs.get_replication_layer()
-
-        @defer.inlineCallbacks
-        def _renew_attestation(self, group_id, user_id):
-            attestation = self.attestations.create_attestation(group_id, user_id)
-            yield repl_layer.renew_group_attestation(group_id, user_id, attestation)
-            yield self.store.update_attestation_renewal(
-                group_id, user_id, attestation
-            )
-
-        for row in rows:
-            group_id = row["group_id"]
-            user_id = row["user_id"]
-
-            preserve_fn(_renew_attestation)(group_id, user_id)

@@ -32,6 +32,7 @@ class GroupAttestationSigning(object):
         self.keyring = hs.get_keyring()
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
+        self.signing_key = hs.config.signing_key[0]
 
     @defer.inlineCallbacks
     def verify_attestation(self, attestation, group_id, user_id, server_name=None):
@@ -64,8 +65,8 @@ class GroupAttestationSigning(object):
 class GroupAttestionRenewer(object):
     def __init__(self, hs):
         self.clock = hs.get_clock()
-        self.store = hs.get_store()
-        self.assestations = GroupAttestationSigning(hs)
+        self.store = hs.get_datastore()
+        self.assestations = hs.get_groups_attestation_signing()
         self.transport_client = hs.get_federation_transport_client()
 
         self._renew_attestations_loop = self.clock.looping_call(

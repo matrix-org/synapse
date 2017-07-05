@@ -618,7 +618,7 @@ class FederationGroupsProfileServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        new_content = yield self.handler.on_groups_profile_request(
+        new_content = yield self.handler.get_group_profile(
             group_id, requester_user_id
         )
 
@@ -634,7 +634,7 @@ class FederationGroupsSummaryServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        new_content = yield self.handler.on_groups_profile_summary(
+        new_content = yield self.handler.get_group_summary(
             group_id, requester_user_id
         )
 
@@ -650,7 +650,7 @@ class FederationGroupsRoomsServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        new_content = yield self.handler.on_groups_rooms_request(
+        new_content = yield self.handler.get_rooms_in_group(
             group_id, requester_user_id
         )
 
@@ -666,7 +666,7 @@ class FederationGroupsUsersServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        new_content = yield self.handler.on_groups_users_request(
+        new_content = yield self.handler.get_users_in_group(
             group_id, requester_user_id
         )
 
@@ -682,7 +682,7 @@ class FederationGroupsInviteServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        new_content = yield self.handler.on_groups_invite_request(
+        new_content = yield self.handler.invite_to_group(
             group_id, user_id, requester_user_id, content,
         )
 
@@ -695,9 +695,9 @@ class FederationGroupsLocalInviteServlet(BaseFederationServlet):
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
         if get_domain_from_id(group_id) != origin:
-            raise SynapseError(403, "requester_user_id doesn't match origin")
+            raise SynapseError(403, "group_id doesn't match origin")
 
-        new_content = yield self.handler.on_groups_invite_request(
+        new_content = yield self.handler.on_invite(
             group_id, user_id, content,
         )
 
@@ -710,9 +710,9 @@ class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
         if get_domain_from_id(user_id) != origin:
-            raise SynapseError(403, "requester_user_id doesn't match origin")
+            raise SynapseError(403, "user_id doesn't match origin")
 
-        new_content = yield self.handler.on_groups_user_accept_request(
+        new_content = yield self.handler.accept_invite(
             group_id, user_id, content,
         )
 
@@ -728,7 +728,7 @@ class FederationGroupsRemoveUserServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        new_content = yield self.handler.on_groups_remove_user(
+        new_content = yield self.handler.remove_user_from_group(
             group_id, user_id, requester_user_id, content,
         )
 
@@ -741,9 +741,9 @@ class FederationGroupsRemoveLocalUserServlet(BaseFederationServlet):
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
         if get_domain_from_id(group_id) != origin:
-            raise SynapseError(403, "requester_user_id doesn't match origin")
+            raise SynapseError(403, "user_id doesn't match origin")
 
-        new_content = yield self.handler.on_groups_remove_user(
+        new_content = yield self.handler.user_removed_from_group(
             group_id, user_id, content,
         )
 
@@ -853,7 +853,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter):
 
     for servletclass in GROUP_ATTESTATION_SERVLET_CLASSES:
         servletclass(
-            handler=hs.get_groups_server_handler(),  # TODO
+            handler=hs.get_groups_attestation_renewer(),  # TODO
             authenticator=authenticator,
             ratelimiter=ratelimiter,
             server_name=hs.hostname,

@@ -16,7 +16,6 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.groups.attestions import GroupAttestationSigning
 
 import logging
 
@@ -57,12 +56,10 @@ class GroupsLocalHandler(object):
         self.is_mine_id = hs.is_mine_id
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
+        self.attestations = hs.get_groups_attestation_signing()
 
-        self.attestations = GroupAttestationSigning(
-            keyring=self.keyring,
-            clock=self.clock,
-            server_name=self.server_name,
-        )
+        # Ensure attestations get renewed
+        hs.get_groups_attestation_renewer()
 
     get_group_summary = _create_rerouter("get_group_summary")
     get_group_profile = _create_rerouter("get_group_profile")
@@ -159,7 +156,7 @@ class GroupsLocalHandler(object):
     @defer.inlineCallbacks
     def invite(self, group_id, user_id, requester_user_id, config):
         content = {
-            "requester": requester_user_id,
+            "requester_user_id": requester_user_id,
             "config": config,
         }
         if self.is_mine_id(group_id):
@@ -212,7 +209,7 @@ class GroupsLocalHandler(object):
                 group_id, user_id, requester_user_id, content,
             )
         else:
-            content["requester"] = requester_user_id
+            content["requester_user_id"] = requester_user_id
             repl_layer = self.hs.get_replication_layer()
             res = yield repl_layer.remove_user_from_group(
                 group_id, user_id, content

@@ -539,8 +539,31 @@ class TransportLayerClient(object):
         )
 
     @log_function
+    def invite_to_group_notification(self, destination, group_id, user_id, content):
+        path = PREFIX + "/groups/local/%s/users/%s/invite" % (group_id, user_id)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data=content,
+            ignore_backoff=True,
+        )
+
+    @log_function
     def remove_user_from_group(self, destination, group_id, user_id, content):
         path = PREFIX + "/groups/%s/users/%s/remove" % (group_id, user_id)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data=content,
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def remove_user_from_group_notification(self, destination, group_id, user_id,
+                                            content):
+        path = PREFIX + "/groups/local/%s/users/%s/remove" % (group_id, user_id)
 
         return self.client.post_json(
             destination=destination,

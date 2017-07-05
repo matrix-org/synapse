@@ -52,6 +52,7 @@ from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.user_directory import UserDirectoyHandler
 from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.groups.groups_server import GroupsServerHandler
+from synapse.groups.attestations import GroupAttestionRenewer, GroupAttestationSigning
 from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier
@@ -143,6 +144,8 @@ class HomeServer(object):
         'user_directory_handler',
         'groups_local_handler',
         'groups_server_handler',
+        'groups_attestation_signing',
+        'groups_attestation_renewer',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -318,6 +321,12 @@ class HomeServer(object):
 
     def build_groups_server_handler(self):
         return GroupsServerHandler(self)
+
+    def build_groups_attestation_signing(self):
+        return GroupAttestationSigning(self)
+
+    def build_groups_attestation_renewer(self):
+        return GroupAttestionRenewer(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
