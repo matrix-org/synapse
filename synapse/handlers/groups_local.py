@@ -33,10 +33,6 @@ logger = logging.getLogger(__name__)
 # TODO: Add group memebership  /sync
 
 
-DEFAULT_ATTESTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
-MIN_ATTESTATION_LENGTH_MS = 1 * 60 * 60 * 1000
-
-
 def _create_rerouter(name):
     def f(self, group_id, *args, **kwargs):
         if self.is_mine_id(group_id):

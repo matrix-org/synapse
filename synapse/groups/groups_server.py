@@ -39,8 +39,6 @@ logger = logging.getLogger(__name__)
 # TODO: Flairs
 
 
-DEFAULT_ATTESTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
-MIN_ATTESTATION_LENGTH_MS = 1 * 60 * 60 * 1000
 UPDATE_ATTESTATION_TIME_MS = 1 * 24 * 60 * 60 * 1000
 
 
