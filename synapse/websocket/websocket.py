@@ -4,6 +4,7 @@ from autobahn.twisted.websocket import WebSocketServerProtocol, \
 from autobahn.websocket.util import create_url
 from synapse.api.errors import AuthError, Codes
 from synapse.api.filtering import FilterCollection, DEFAULT_FILTER_COLLECTION
+from synapse.rest.client.v2_alpha._base import set_timeline_upper_limit
 from synapse.rest.client.v2_alpha.sync import SyncRestServlet
 from synapse.handlers.sync import SyncConfig
 import logging
@@ -54,6 +55,25 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         self.access_token = access_token
         self.user = user
 
+        filter_id = request.params.get("filter", None)
+        if filter_id[0]:
+            if filter_id[0].startswith('{'):
+                try:
+                    filter_object = json.loads(filter_id[0])
+                    set_timeline_upper_limit(filter_object,
+                        self.factory.hs.config.filter_timeline_limit)
+                except:
+                    raise SynapseError(400, "Invalid filter JSON")
+                self.factory.filtering.check_valid_filter(filter_object)
+                self.filter = FilterCollection(filter_object)
+            else:
+                self.filter = yield self.factory.filtering.get_user_filter(
+                    user['user'].localpart, filter_id[0]
+                )
+            self.filter_id = filter_id[0]
+
+        defer.returnValue(("m.json"))
+
     def onOpen(self):
         logger.info("New connection.")
         self.shouldSync = False
@@ -66,26 +86,45 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         else:
             logger.info("Text message received: {0}".format(payload.decode('utf8')))
 
-        # echo back message verbatim
-        self.sendMessage(payload, isBinary)
+        msg = {}
+        try:
+            msg = json.loads(payload.decode('utf8'))
+        except Exception as ex:
+            logger.warn("Received payload is not json")
+            return
+
+        supported_methods = {
+            "ping": self._handle_ping
+        }
+
+        method = supported_methods.get(msg["method"],
+            lambda empty: self.sendMessage(json.dumps({
+                id: msg.id,
+                errorcode: "M_BAD_JSON",
+                error: "Unknown method"
+            }))
+        )
+        logger.debug("Execute handler for type: " + msg["method"])
+        method(msg)
 
     def onClose(self, wasClean, code, reason):
         logger.info("WebSocket connection closed: {0} {1}".format(code, reason))
+        self.shouldSync = False
         if self.currentSync is not None:
             self.currentSync.cancel()
 
     def startSyncingClient(self):
         logger.info("Started syncing for %s." % self.peer)
         self.shouldSync = True
-        self._sync()
+        self.currentSync = self._sync()
 
     def _sync(self):
         sync_handler = self.factory.hs.get_sync_handler()
         request_key = (
             self.user['user'],
-            SYNC_TIMEOUT,
-            None if self.since is None else self.since.to_string(),
-            None,
+            0, # timeout
+            self.since,
+            self.filter_id,
             self.full_state,
             self.user['device_id'],
         )
@@ -96,6 +135,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             request_key=request_key,
             device_id=self.user['device_id'],
         )
+
         logger.debug("Syncing with %s" % str(self.since))
         sync = sync_handler.wait_for_sync_for_user(
             sync_config,
@@ -115,46 +155,21 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         if self.shouldSync:
             self.since = result.next_batch
             logger.debug("Sending sync")
-            self._process_sync_events(result)
+            time_now = self.factory.clock.time_msec()
+
+            self.sendMessage(json.dumps(SyncRestServlet.encode_response(
+                time_now,
+                result,
+                self.access_token,
+                self.filter
+            )),False)
             self.currentSync = self._sync()
             logger.debug("Returning from _handle_sync")
             return
             # Sync again
 
-    def _process_sync_events(self, result):
-        time_now = self.factory.hs.get_clock().time_msec()
-
-        joined = SyncRestServlet.encode_joined(
-            result.joined, time_now, self.user['token_id'],
-            self.filter.event_fields
-        )
-
-        invited = SyncRestServlet.encode_invited(
-            result.invited, time_now, self.user['token_id']
-        )
-
-        archived = SyncRestServlet.encode_archived(
-            result.archived, time_now, self.user['token_id'],
-            self.filter.event_fields,
-        )
-
-        response_content = {
-            "account_data": {"events": result.account_data},
-            "to_device": {"events": result.to_device},
-            "device_lists": {
-                "changed": list(result.device_lists),
-            },
-            "presence": SyncRestServlet.encode_presence(
-                result.presence, time_now
-            ),
-            "rooms": {
-                "join": joined,
-                "invite": invited,
-                "leave": archived,
-            },
-            "next_batch": result.next_batch.to_string(),
-        }
-        self.sendMessage(json.dumps(response_content))
+    def _handle_ping(self, msg):
+            self.sendMessage(bytes('{"id":"' + msg["id"] + '","result":{}}'))
 
 class SynapseWebsocketFactory(WebSocketServerFactory):
     def __init__(self, address, hs):
@@ -162,4 +177,6 @@ class SynapseWebsocketFactory(WebSocketServerFactory):
         super(SynapseWebsocketFactory, self).__init__(ws_address)
         self.protocol = SynapseWebsocketProtocol
         self.hs = hs
+        self.clock = hs.get_clock()
+        self.filtering = hs.get_filtering()
         self.clients = []
