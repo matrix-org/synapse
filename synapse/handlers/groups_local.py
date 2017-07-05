@@ -61,7 +61,6 @@ class GroupsLocalHandler(object):
         # Ensure attestations get renewed
         hs.get_groups_attestation_renewer()
 
-    get_group_summary = _create_rerouter("get_group_summary")
     get_group_profile = _create_rerouter("get_group_profile")
     get_rooms_in_group = _create_rerouter("get_rooms_in_group")
 
@@ -80,6 +79,38 @@ class GroupsLocalHandler(object):
     delete_group_role = _create_rerouter("delete_group_role")
     get_group_role = _create_rerouter("get_group_role")
     get_group_roles = _create_rerouter("get_group_roles")
+
+    @defer.inlineCallbacks
+    def get_group_summary(self, group_id, requester_user_id):
+        if self.is_mine_id(group_id):
+            res = yield self.groups_server_handler.get_group_summary(
+                group_id, requester_user_id
+            )
+            defer.returnValue(res)
+
+        repl_layer = self.hs.get_replication_layer()
+        res = yield repl_layer.get_group_summary(group_id, requester_user_id)
+
+        chunk = res["users_section"]["users"]
+        invalid_users = {}
+        for user_id in chunk:
+            entry = chunk["user_id"]
+            g_user_id = entry["user_id"]
+            attestation = entry.pop("attestation")
+            try:
+                yield self.attestations.verify_attestation(
+                    attestation,
+                    group_id=group_id,
+                    user_id=g_user_id,
+                )
+            except Exception as e:
+                logger.info("Failed to verify user is in group: %s", e)
+                invalid_users.append(user_id)
+
+        for user_id in invalid_users:
+            res["users_section"]["users"].pop(user_id, None)
+
+        defer.returnValue(res)
 
     def create_group(self, group_id, user_id, content):
         logger.info("Asking to create group with ID: %r", group_id)

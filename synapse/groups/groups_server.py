@@ -104,6 +104,18 @@ class GroupsServerHandler(object):
 
             room_entry["profile"] = entry
 
+        for user_id, entry in users.iteritems():
+            if not self.is_mine_id(requester_user_id):
+                attestation = yield self.store.get_remote_attestation(group_id, user_id)
+                if not attestation:
+                    continue
+
+                entry["attestation"] = attestation
+            else:
+                entry["attestation"] = self.attestations.create_attestation(
+                    group_id, user_id,
+                )
+
         defer.returnValue({
             "profile": profile,
             "users_section": {

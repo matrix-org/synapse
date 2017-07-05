@@ -498,7 +498,7 @@ class GroupServerStore(SQLBaseStore):
         )
 
     def get_users_for_summary_by_role(self, group_id, include_private=False):
-        def _get_rooms_for_summary_txn(txn):
+        def _get_users_for_summary_txn(txn):
             keyvalues = {
                 "group_id": group_id,
             }
@@ -550,7 +550,7 @@ class GroupServerStore(SQLBaseStore):
 
             return users, roles
         return self.runInteraction(
-            "get_users_for_summary_by_role", _get_rooms_for_summary_txn
+            "get_users_for_summary_by_role", _get_users_for_summary_txn
         )
 
     def is_user_in_group(self, user_id, group_id):
