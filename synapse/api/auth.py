@@ -209,7 +209,7 @@ class Auth(object):
             )[0]
             if user and access_token and ip_addr:
                 self.store.insert_client_ip(
-                    user=user,
+                    user_id=user.to_string(),
                     access_token=access_token,
                     ip=ip_addr,
                     user_agent=user_agent,

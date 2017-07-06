@@ -56,9 +56,11 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         )
         reactor.addSystemEventTrigger("before", "shutdown", self._update_client_ips_batch)
 
-    def insert_client_ip(self, user, access_token, ip, user_agent, device_id):
-        now = int(self._clock.time_msec())
-        key = (user.to_string(), access_token, ip)
+    def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id,
+                         now=None):
+        if not now:
+            now = int(self._clock.time_msec())
+        key = (user_id, access_token, ip)
 
         try:
             last_seen = self.client_ip_last_seen.get(key)
