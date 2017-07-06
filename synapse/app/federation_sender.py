@@ -51,7 +51,7 @@ import sys
 import logging
 import gc
 
-logger = logging.getLogger("synapse.app.appservice")
+logger = logging.getLogger("synapse.app.federation_sender")
 
 
 class FederationSenderSlaveStore(

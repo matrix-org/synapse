@@ -164,7 +164,7 @@ class PreviewUrlResource(Resource):
 
         if _is_media(media_info['media_type']):
             dims = yield self.media_repo._generate_local_thumbnails(
-                media_info['filesystem_id'], media_info
+                media_info['filesystem_id'], media_info, url_cache=True,
             )
 
             og = {
@@ -210,7 +210,7 @@ class PreviewUrlResource(Resource):
                 if _is_media(image_info['media_type']):
                     # TODO: make sure we don't choke on white-on-transparent images
                     dims = yield self.media_repo._generate_local_thumbnails(
-                        image_info['filesystem_id'], image_info
+                        image_info['filesystem_id'], image_info, url_cache=True,
                     )
                     if dims:
                         og["og:image:width"] = dims['width']
@@ -256,7 +256,7 @@ class PreviewUrlResource(Resource):
         # XXX: horrible duplication with base_resource's _download_remote_file()
         file_id = random_string(24)
 
-        fname = self.filepaths.local_media_filepath(file_id)
+        fname = self.filepaths.url_cache_filepath(file_id)
         self.media_repo._makedirs(fname)
 
         try:
@@ -303,6 +303,7 @@ class PreviewUrlResource(Resource):
                 upload_name=download_name,
                 media_length=length,
                 user_id=user,
+                url_cache=url,
             )
 
         except Exception as e:
@@ -434,6 +435,8 @@ def _calc_og(tree, media_uri):
                 for el in _iterate_over_text(tree.find("body"), *TAGS_TO_REMOVE)
             )
             og['og:description'] = summarize_paragraphs(text_nodes)
+    else:
+        og['og:description'] = summarize_paragraphs([og['og:description']])
 
     # TODO: delete the url downloads to stop diskfilling,
     # as we only ever cared about its OG

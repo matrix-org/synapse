@@ -43,10 +43,7 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
             "access_token", "ip", "user_agent", "device_id",
         )
 
-        # deliberately use an iterable here to make sure that the lookup
-        # method doesn't iterate it twice
-        device_list = iter(((user_id, "device_id"),))
-        result = yield self.store.get_last_client_ip_by_device(device_list)
+        result = yield self.store.get_last_client_ip_by_device(user_id, "device_id")
 
         r = result[(user_id, "device_id")]
         self.assertDictContainsSubset(

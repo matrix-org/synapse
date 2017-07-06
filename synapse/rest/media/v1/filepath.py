@@ -71,3 +71,21 @@ class MediaFilePaths(object):
             self.base_path, "remote_thumbnail", server_name,
             file_id[0:2], file_id[2:4], file_id[4:],
         )
+
+    def url_cache_filepath(self, media_id):
+        return os.path.join(
+            self.base_path, "url_cache",
+            media_id[0:2], media_id[2:4], media_id[4:]
+        )
+
+    def url_cache_thumbnail(self, media_id, width, height, content_type,
+                            method):
+        top_level_type, sub_type = content_type.split("/")
+        file_name = "%i-%i-%s-%s-%s" % (
+            width, height, top_level_type, sub_type, method
+        )
+        return os.path.join(
+            self.base_path, "url_cache_thumbnails",
+            media_id[0:2], media_id[2:4], media_id[4:],
+            file_name
+        )

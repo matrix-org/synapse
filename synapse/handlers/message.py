@@ -20,7 +20,6 @@ from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
-from synapse.push.action_generator import ActionGenerator
 from synapse.types import (
     UserID, RoomAlias, RoomStreamToken,
 )
@@ -35,6 +34,7 @@ from canonicaljson import encode_canonical_json
 
 import logging
 import random
+import ujson
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,8 @@ class MessageHandler(BaseHandler):
         # We arbitrarily limit concurrent event creation for a room to 5.
         # This is to stop us from diverging history *too* much.
         self.limiter = Limiter(max_count=5)
+
+        self.action_generator = hs.get_action_generator()
 
     @defer.inlineCallbacks
     def purge_history(self, room_id, event_id):
@@ -497,6 +499,14 @@ class MessageHandler(BaseHandler):
             logger.warn("Denying new event %r because %s", event, err)
             raise err
 
+        # Ensure that we can round trip before trying to persist in db
+        try:
+            dump = ujson.dumps(event.content)
+            ujson.loads(dump)
+        except:
+            logger.exception("Failed to encode content: %r", event.content)
+            raise
+
         yield self.maybe_kick_guest_users(event, context)
 
         if event.type == EventTypes.CanonicalAlias:
@@ -590,8 +600,7 @@ class MessageHandler(BaseHandler):
                 "Changing the room create event is forbidden",
             )
 
-        action_generator = ActionGenerator(self.hs)
-        yield action_generator.handle_push_actions_for_event(
+        yield self.action_generator.handle_push_actions_for_event(
             event, context
         )
 

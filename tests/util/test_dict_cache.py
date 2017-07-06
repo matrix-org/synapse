@@ -28,7 +28,7 @@ class DictCacheTestCase(unittest.TestCase):
         key = "test_simple_cache_hit_full"
 
         v = self.cache.get(key)
-        self.assertEqual((False, {}), v)
+        self.assertEqual((False, set(), {}), v)
 
         seq = self.cache.sequence
         test_value = {"test": "test_simple_cache_hit_full"}

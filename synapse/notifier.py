@@ -251,7 +251,8 @@ class Notifier(object):
         """Notify any user streams that are interested in this room event"""
         # poke any interested application service.
         preserve_fn(self.appservice_handler.notify_interested_services)(
-            room_stream_id)
+            room_stream_id
+        )
 
         if self.federation_sender:
             preserve_fn(self.federation_sender.notify_new_events)(

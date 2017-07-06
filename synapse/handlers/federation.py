@@ -43,7 +43,6 @@ from synapse.events.utils import prune_event
 
 from synapse.util.retryutils import NotRetryingDestination
 
-from synapse.push.action_generator import ActionGenerator
 from synapse.util.distributor import user_joined_room
 
 from twisted.internet import defer
@@ -75,6 +74,8 @@ class FederationHandler(BaseHandler):
         self.state_handler = hs.get_state_handler()
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
+        self.action_generator = hs.get_action_generator()
+        self.is_mine_id = hs.is_mine_id
 
         self.replication_layer.set_handler(self)
 
@@ -832,7 +833,11 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def on_event_auth(self, event_id):
-        auth = yield self.store.get_auth_chain([event_id])
+        event = yield self.store.get_event(event_id)
+        auth = yield self.store.get_auth_chain(
+            [auth_id for auth_id, _ in event.auth_events],
+            include_given=True
+        )
 
         for event in auth:
             event.signatures.update(
@@ -1047,9 +1052,7 @@ class FederationHandler(BaseHandler):
                 yield user_joined_room(self.distributor, user, event.room_id)
 
         state_ids = context.prev_state_ids.values()
-        auth_chain = yield self.store.get_auth_chain(set(
-            [event.event_id] + state_ids
-        ))
+        auth_chain = yield self.store.get_auth_chain(state_ids)
 
         state = yield self.store.get_events(context.prev_state_ids.values())
 
@@ -1065,6 +1068,24 @@ class FederationHandler(BaseHandler):
         Respond with the now signed event.
         """
         event = pdu
+
+        is_blocked = yield self.store.is_room_blocked(event.room_id)
+        if is_blocked:
+            raise SynapseError(403, "This room has been blocked on this server")
+
+        membership = event.content.get("membership")
+        if event.type != EventTypes.Member or membership != Membership.INVITE:
+            raise SynapseError(400, "The event was not an m.room.member invite event")
+
+        sender_domain = get_domain_from_id(event.sender)
+        if sender_domain != origin:
+            raise SynapseError(400, "The invite event was not from the server sending it")
+
+        if event.state_key is None:
+            raise SynapseError(400, "The invite event did not have a state key")
+
+        if not self.is_mine_id(event.state_key):
+            raise SynapseError(400, "The invite event must be for this server")
 
         event.internal_metadata.outlier = True
         event.internal_metadata.invite_from_remote = True
@@ -1100,6 +1121,9 @@ class FederationHandler(BaseHandler):
             user_id,
             "leave"
         )
+        # Mark as outlier as we don't have any state for this event; we're not
+        # even in the room.
+        event.internal_metadata.outlier = True
         event = self._sign_event(event)
 
         # Try the host that we succesfully called /make_leave/ on first for
@@ -1271,7 +1295,7 @@ class FederationHandler(BaseHandler):
             for event in res:
                 # We sign these again because there was a bug where we
                 # incorrectly signed things the first time round
-                if self.hs.is_mine_id(event.event_id):
+                if self.is_mine_id(event.event_id):
                     event.signatures.update(
                         compute_event_signature(
                             event,
@@ -1344,7 +1368,7 @@ class FederationHandler(BaseHandler):
         )
 
         if event:
-            if self.hs.is_mine_id(event.event_id):
+            if self.is_mine_id(event.event_id):
                 # FIXME: This is a temporary work around where we occasionally
                 # return events slightly differently than when they were
                 # originally signed
@@ -1389,8 +1413,7 @@ class FederationHandler(BaseHandler):
         )
 
         if not event.internal_metadata.is_outlier():
-            action_generator = ActionGenerator(self.hs)
-            yield action_generator.handle_push_actions_for_event(
+            yield self.action_generator.handle_push_actions_for_event(
                 event, context
             )
 
@@ -1599,7 +1622,11 @@ class FederationHandler(BaseHandler):
                 pass
 
         # Now get the current auth_chain for the event.
-        local_auth_chain = yield self.store.get_auth_chain([event_id])
+        event = yield self.store.get_event(event_id)
+        local_auth_chain = yield self.store.get_auth_chain(
+            [auth_id for auth_id, _ in event.auth_events],
+            include_given=True
+        )
 
         # TODO: Check if we would now reject event_id. If so we need to tell
         # everyone.
@@ -1792,7 +1819,9 @@ class FederationHandler(BaseHandler):
                 auth_ids = yield self.auth.compute_auth_events(
                     event, context.prev_state_ids
                 )
-                local_auth_chain = yield self.store.get_auth_chain(auth_ids)
+                local_auth_chain = yield self.store.get_auth_chain(
+                    auth_ids, include_given=True
+                )
 
                 try:
                     # 2. Get remote difference.

@@ -33,7 +33,7 @@ To check whether your update was sucessfull, run:
 
 .. code:: bash
 
-	 # replace your.server.domain with ther domain of your synaspe homeserver
+	 # replace your.server.domain with ther domain of your synapse homeserver
 	 curl https://<your.server.domain>/_matrix/federation/v1/version 
 
 So for the Matrix.org HS server the URL would be: https://matrix.org/_matrix/federation/v1/version.

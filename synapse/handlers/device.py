@@ -106,7 +106,7 @@ class DeviceHandler(BaseHandler):
         device_map = yield self.store.get_devices_by_user(user_id)
 
         ips = yield self.store.get_last_client_ip_by_device(
-            devices=((user_id, device_id) for device_id in device_map.keys())
+            user_id, device_id=None
         )
 
         devices = device_map.values()
@@ -133,7 +133,7 @@ class DeviceHandler(BaseHandler):
         except errors.StoreError:
             raise errors.NotFoundError
         ips = yield self.store.get_last_client_ip_by_device(
-            devices=((user_id, device_id),)
+            user_id, device_id,
         )
         _update_device_from_client_ips(device, ips)
         defer.returnValue(device)

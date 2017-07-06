@@ -403,6 +403,11 @@ class EventsStore(SQLBaseStore):
                         (room_id, ), new_state
                     )
 
+                for room_id, latest_event_ids in new_forward_extremeties.iteritems():
+                    self.get_latest_event_ids_in_room.prefill(
+                        (room_id,), list(latest_event_ids)
+                    )
+
     @defer.inlineCallbacks
     def _calculate_new_extremeties(self, room_id, event_contexts, latest_event_ids):
         """Calculates the new forward extremeties for a room given events to
@@ -647,9 +652,10 @@ class EventsStore(SQLBaseStore):
                 list of the event ids which are the forward extremities.
 
         """
-        self._update_current_state_txn(txn, current_state_for_room)
-
         max_stream_order = events_and_contexts[-1][0].internal_metadata.stream_ordering
+
+        self._update_current_state_txn(txn, current_state_for_room, max_stream_order)
+
         self._update_forward_extremities_txn(
             txn,
             new_forward_extremities=new_forward_extremeties,
@@ -712,7 +718,7 @@ class EventsStore(SQLBaseStore):
             backfilled=backfilled,
         )
 
-    def _update_current_state_txn(self, txn, state_delta_by_room):
+    def _update_current_state_txn(self, txn, state_delta_by_room, max_stream_order):
         for room_id, current_state_tuple in state_delta_by_room.iteritems():
                 to_delete, to_insert, _ = current_state_tuple
                 txn.executemany(
@@ -734,6 +740,29 @@ class EventsStore(SQLBaseStore):
                     ],
                 )
 
+                state_deltas = {key: None for key in to_delete}
+                state_deltas.update(to_insert)
+
+                self._simple_insert_many_txn(
+                    txn,
+                    table="current_state_delta_stream",
+                    values=[
+                        {
+                            "stream_id": max_stream_order,
+                            "room_id": room_id,
+                            "type": key[0],
+                            "state_key": key[1],
+                            "event_id": ev_id,
+                            "prev_event_id": to_delete.get(key, None),
+                        }
+                        for key, ev_id in state_deltas.iteritems()
+                    ]
+                )
+
+                self._curr_state_delta_stream_cache.entity_has_changed(
+                    room_id, max_stream_order,
+                )
+
                 # Invalidate the various caches
 
                 # Figure out the changes of membership to invalidate the
@@ -742,17 +771,18 @@ class EventsStore(SQLBaseStore):
                 # and which we have added, then we invlidate the caches for all
                 # those users.
                 members_changed = set(
-                    state_key for ev_type, state_key in to_delete.iterkeys()
-                    if ev_type == EventTypes.Member
-                )
-                members_changed.update(
-                    state_key for ev_type, state_key in to_insert.iterkeys()
+                    state_key for ev_type, state_key in state_deltas
                     if ev_type == EventTypes.Member
                 )
 
                 for member in members_changed:
                     self._invalidate_cache_and_stream(
                         txn, self.get_rooms_for_user, (member,)
+                    )
+
+                for host in set(get_domain_from_id(u) for u in members_changed):
+                    self._invalidate_cache_and_stream(
+                        txn, self.is_host_joined, (room_id, host)
                     )
 
                 self._invalidate_cache_and_stream(
@@ -1119,6 +1149,7 @@ class EventsStore(SQLBaseStore):
                 }
                 for event, _ in events_and_contexts
                 for auth_id, _ in event.auth_events
+                if event.is_state()
             ],
         )
 
@@ -1418,7 +1449,7 @@ class EventsStore(SQLBaseStore):
                 ]
 
                 rows = self._new_transaction(
-                    conn, "do_fetch", [], None, self._fetch_event_rows, event_ids
+                    conn, "do_fetch", [], [], None, self._fetch_event_rows, event_ids
                 )
 
                 row_dict = {
@@ -2242,6 +2273,24 @@ class EventsStore(SQLBaseStore):
             raise SynapseError(404, "Could not find event %s" % (event_id,))
 
         defer.returnValue((int(res["topological_ordering"]), int(res["stream_ordering"])))
+
+    def get_max_current_state_delta_stream_id(self):
+        return self._stream_id_gen.get_current_token()
+
+    def get_all_updated_current_state_deltas(self, from_token, to_token, limit):
+        def get_all_updated_current_state_deltas_txn(txn):
+            sql = """
+                SELECT stream_id, room_id, type, state_key, event_id
+                FROM current_state_delta_stream
+                WHERE ? < stream_id AND stream_id <= ?
+                ORDER BY stream_id ASC LIMIT ?
+            """
+            txn.execute(sql, (from_token, to_token, limit))
+            return txn.fetchall()
+        return self.runInteraction(
+            "get_all_updated_current_state_deltas",
+            get_all_updated_current_state_deltas_txn,
+        )
 
 
 AllNewEventsResult = namedtuple("AllNewEventsResult", [

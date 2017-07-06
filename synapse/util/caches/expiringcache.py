@@ -94,6 +94,9 @@ class ExpiringCache(object):
 
         return entry.value
 
+    def __contains__(self, key):
+        return key in self._cache
+
     def get(self, key, default=None):
         try:
             return self[key]

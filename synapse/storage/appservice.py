@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import re
 import simplejson as json
 from twisted.internet import defer
 
@@ -26,6 +27,25 @@ from ._base import SQLBaseStore
 logger = logging.getLogger(__name__)
 
 
+def _make_exclusive_regex(services_cache):
+    # We precompie a regex constructed from all the regexes that the AS's
+    # have registered for exclusive users.
+    exclusive_user_regexes = [
+        regex.pattern
+        for service in services_cache
+        for regex in service.get_exlusive_user_regexes()
+    ]
+    if exclusive_user_regexes:
+        exclusive_user_regex = "|".join("(" + r + ")" for r in exclusive_user_regexes)
+        exclusive_user_regex = re.compile(exclusive_user_regex)
+    else:
+        # We handle this case specially otherwise the constructed regex
+        # will always match
+        exclusive_user_regex = None
+
+    return exclusive_user_regex
+
+
 class ApplicationServiceStore(SQLBaseStore):
 
     def __init__(self, hs):
@@ -35,17 +55,18 @@ class ApplicationServiceStore(SQLBaseStore):
             hs.hostname,
             hs.config.app_service_config_files
         )
+        self.exclusive_user_regex = _make_exclusive_regex(self.services_cache)
 
     def get_app_services(self):
         return self.services_cache
 
     def get_if_app_services_interested_in_user(self, user_id):
-        """Check if the user is one associated with an app service
+        """Check if the user is one associated with an app service (exclusively)
         """
-        for service in self.services_cache:
-            if service.is_interested_in_user(user_id):
-                return True
-        return False
+        if self.exclusive_user_regex:
+            return bool(self.exclusive_user_regex.match(user_id))
+        else:
+            return False
 
     def get_app_service_by_user_id(self, user_id):
         """Retrieve an application service from their user ID.

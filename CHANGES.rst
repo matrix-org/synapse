@@ -1,3 +1,59 @@
+Changes in synapse v0.22.0 (2017-07-06)
+=======================================
+
+No changes since v0.22.0-rc2
+
+
+Changes in synapse v0.22.0-rc2 (2017-07-04)
+===========================================
+
+Changes:
+
+* Improve performance of storing user IPs (PR #2307, #2308)
+* Slightly improve performance of verifying access tokens (PR #2320)
+* Slightly improve performance of event persistence (PR #2321)
+* Increase default cache factor size from 0.1 to 0.5 (PR #2330)
+
+Bug fixes:
+
+* Fix bug with storing registration sessions that caused frequent CPU churn
+  (PR #2319)
+
+
+Changes in synapse v0.22.0-rc1 (2017-06-26)
+===========================================
+
+Features:
+
+* Add a user directory API (PR #2252, and many more)
+* Add shutdown room API to remove room from local server (PR #2291)
+* Add API to quarantine media (PR #2292)
+* Add new config option to not send event contents to push servers (PR #2301)
+  Thanks to @cjdelisle!
+
+Changes:
+
+* Various performance fixes (PR #2177, #2233, #2230, #2238, #2248, #2256,
+  #2274)
+* Deduplicate sync filters (PR #2219) Thanks to @krombel!
+* Correct a typo in UPGRADE.rst (PR #2231) Thanks to @aaronraimist!
+* Add count of one time keys to sync stream (PR #2237)
+* Only store event_auth for state events (PR #2247)
+* Store URL cache preview downloads separately (PR #2299)
+
+Bug fixes:
+
+* Fix users not getting notifications when AS listened to that user_id (PR
+  #2216) Thanks to @slipeer!
+* Fix users without push set up not getting notifications after joining rooms
+  (PR #2236)
+* Fix preview url API to trim long descriptions (PR #2243)
+* Fix bug where we used cached but unpersisted state group as prev group,
+  resulting in broken state of restart (PR #2263)
+* Fix removing of pushers when using workers (PR #2267)
+* Fix CORS headers to allow Authorization header (PR #2285) Thanks to @krombel!
+
+
 Changes in synapse v0.21.1 (2017-06-15)
 =======================================
 
