@@ -94,7 +94,8 @@ class GroupsServerHandler(object):
             group_id, include_private=is_user_in_group,
         )
 
-        for room_id, room_entry in rooms.iteritems():
+        for room_entry in rooms:
+            room_id = room_entry["room_id"]
             joined_users = yield self.store.get_users_in_room(room_id)
             entry = yield self.room_list_handler.generate_room_entry(
                 room_id, len(joined_users),
@@ -104,7 +105,11 @@ class GroupsServerHandler(object):
 
             room_entry["profile"] = entry
 
-        for user_id, entry in users.iteritems():
+        rooms.sort(key=lambda e: e.get("order", 0))
+
+        for entry in users:
+            user_id = entry["user_id"]
+
             if not self.is_mine_id(requester_user_id):
                 attestation = yield self.store.get_remote_attestation(group_id, user_id)
                 if not attestation:
@@ -115,6 +120,8 @@ class GroupsServerHandler(object):
                 entry["attestation"] = self.attestations.create_attestation(
                     group_id, user_id,
                 )
+
+        users.sort(key=lambda e: e.get("order", 0))
 
         defer.returnValue({
             "profile": profile,

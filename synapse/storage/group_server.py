@@ -89,14 +89,15 @@ class GroupServerStore(SQLBaseStore):
             else:
                 txn.execute(sql, (group_id,))
 
-            rooms = {
-                row[0]: {
+            rooms = [
+                {
+                    "room_id": row[0],
                     "is_public": row[1],
                     "category_id": row[2] if row[2] != _DEFAULT_CATEGORY_ID else None,
                     "order": row[3],
                 }
                 for row in txn
-            }
+            ]
 
             sql = """
                 SELECT category_id, is_public, profile, cat_order
@@ -517,14 +518,15 @@ class GroupServerStore(SQLBaseStore):
             else:
                 txn.execute(sql, (group_id,))
 
-            users = {
-                row[0]: {
+            users = [
+                {
+                    "user_id": row[0],
                     "is_public": row[1],
                     "role_id": row[2] if row[2] != _DEFAULT_CATEGORY_ID else None,
                     "order": row[3],
                 }
                 for row in txn
-            }
+            ]
 
             sql = """
                 SELECT role_id, is_public, profile, role_order

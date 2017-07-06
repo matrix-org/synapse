@@ -92,9 +92,8 @@ class GroupsLocalHandler(object):
         res = yield repl_layer.get_group_summary(group_id, requester_user_id)
 
         chunk = res["users_section"]["users"]
-        invalid_users = {}
-        for user_id in chunk:
-            entry = chunk["user_id"]
+        valid_users = []
+        for entry in chunk:
             g_user_id = entry["user_id"]
             attestation = entry.pop("attestation")
             try:
@@ -103,12 +102,14 @@ class GroupsLocalHandler(object):
                     group_id=group_id,
                     user_id=g_user_id,
                 )
+                valid_users.append(entry)
             except Exception as e:
                 logger.info("Failed to verify user is in group: %s", e)
-                invalid_users.append(user_id)
 
-        for user_id in invalid_users:
-            res["users_section"]["users"].pop(user_id, None)
+        res["users_section"]["users"] = valid_users
+
+        res["users_section"]["users"].sort(key=lambda e: e.get("order", 0))
+        res["rooms_section"]["rooms"].sort(key=lambda e: e.get("order", 0))
 
         defer.returnValue(res)
 
