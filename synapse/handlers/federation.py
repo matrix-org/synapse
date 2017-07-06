@@ -76,6 +76,7 @@ class FederationHandler(BaseHandler):
         self.keyring = hs.get_keyring()
         self.action_generator = hs.get_action_generator()
         self.is_mine_id = hs.is_mine_id
+        self.pusher_pool = hs.get_pusherpool()
 
         self.replication_layer.set_handler(self)
 
@@ -1426,7 +1427,7 @@ class FederationHandler(BaseHandler):
         if not backfilled:
             # this intentionally does not yield: we don't care about the result
             # and don't need to wait for it.
-            preserve_fn(self.hs.get_pusherpool().on_new_notifications)(
+            preserve_fn(self.pusher_pool.on_new_notifications)(
                 event_stream_id, max_stream_id
             )
 
