@@ -25,13 +25,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# TODO: Renew attestations
-# TODO: Validate attestations
-# TODO: Allow remote servers to accept invitations to rooms asyncly.
 # TODO: Allow users to "knock" or simpkly join depending on rules
 # TODO: Federation admin APIs
 # TODO: is_priveged flag to users and is_public to users and rooms
-# TODO: Roles
 # TODO: Audit log for admins (profile updates, membership changes, users who tried
 #       to join but were rejected, etc)
 # TODO: Flairs
