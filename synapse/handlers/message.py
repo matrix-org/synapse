@@ -50,6 +50,8 @@ class MessageHandler(BaseHandler):
 
         self.pagination_lock = ReadWriteLock()
 
+        self.pusher_pool = hs.get_pusherpool()
+
         # We arbitrarily limit concurrent event creation for a room to 5.
         # This is to stop us from diverging history *too* much.
         self.limiter = Limiter(max_count=5)
@@ -610,7 +612,7 @@ class MessageHandler(BaseHandler):
 
         # this intentionally does not yield: we don't care about the result
         # and don't need to wait for it.
-        preserve_fn(self.hs.get_pusherpool().on_new_notifications)(
+        preserve_fn(self.pusher_pool.on_new_notifications)(
             event_stream_id, max_stream_id
         )
 
