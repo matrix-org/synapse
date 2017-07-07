@@ -1,3 +1,12 @@
+Changes in synapse v0.22.1 (2017-07-06)
+=======================================
+
+Bug fixes:
+
+* Fix bug where pusher pool didn't start and caused issues when
+  interacting with some rooms (PR #2342)
+
+
 Changes in synapse v0.22.0 (2017-07-06)
 =======================================
 

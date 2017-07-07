@@ -25,6 +25,8 @@ from synapse.metrics.resource import MetricsResource, METRICS_PREFIX
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
 from synapse.replication.slave.storage.devices import SlavedDeviceStore
+from synapse.replication.slave.storage.registration import SlavedRegistrationStore
+from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
@@ -111,6 +113,8 @@ class KeyUploadServlet(RestServlet):
 class FrontendProxySlavedStore(
     SlavedDeviceStore,
     SlavedClientIpStore,
+    SlavedApplicationServiceStore,
+    SlavedRegistrationStore,
     BaseSlavedStore,
 ):
     pass
