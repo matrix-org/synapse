@@ -19,7 +19,6 @@ from twisted.internet import defer
 
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
-from synapse.visibility import filter_events_for_clients_context
 from synapse.api.constants import EventTypes, Membership
 from synapse.util.caches.descriptors import cached
 from synapse.util.async import Linearizer
@@ -92,15 +91,6 @@ class BulkPushRuleEvaluator(object):
         rules_by_user = yield self._get_rules_for_event(event, context)
         actions_by_user = {}
 
-        # None of these users can be peeking since this list of users comes
-        # from the set of users in the room, so we know for sure they're all
-        # actually in the room.
-        user_tuples = [(u, False) for u in rules_by_user]
-
-        filtered_by_user = yield filter_events_for_clients_context(
-            self.store, user_tuples, [event], {event.event_id: context}
-        )
-
         room_members = yield self.store.get_joined_users_from_context(
             event, context
         )
@@ -110,6 +100,14 @@ class BulkPushRuleEvaluator(object):
         condition_cache = {}
 
         for uid, rules in rules_by_user.iteritems():
+            if event.sender == uid:
+                continue
+
+            if not event.is_state():
+                is_ignored = yield self.store.is_ignored_by(event.sender, uid)
+                if is_ignored:
+                    continue
+
             display_name = None
             profile_info = room_members.get(uid)
             if profile_info:
@@ -120,13 +118,6 @@ class BulkPushRuleEvaluator(object):
                 # that user, as they might not be already joined.
                 if event.type == EventTypes.Member and event.state_key == uid:
                     display_name = event.content.get("displayname", None)
-
-            filtered = filtered_by_user[uid]
-            if len(filtered) == 0:
-                continue
-
-            if filtered[0].sender == uid:
-                continue
 
             for rule in rules:
                 if 'enabled' in rule and not rule['enabled']:
