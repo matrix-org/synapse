@@ -16,6 +16,7 @@ import logging
 
 from synapse.util.async import ObservableDeferred
 from synapse.util import unwrapFirstError, logcontext
+from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
 from synapse.util.stringutils import to_ascii
@@ -25,7 +26,6 @@ from . import register_cache
 from twisted.internet import defer
 from collections import namedtuple
 
-import os
 import functools
 import inspect
 import threading
@@ -35,9 +35,6 @@ logger = logging.getLogger(__name__)
 
 
 _CacheSentinel = object()
-
-
-CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.1))
 
 
 class CacheEntry(object):

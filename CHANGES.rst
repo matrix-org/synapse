@@ -1,3 +1,25 @@
+Changes in synapse v0.22.0 (2017-07-06)
+=======================================
+
+No changes since v0.22.0-rc2
+
+
+Changes in synapse v0.22.0-rc2 (2017-07-04)
+===========================================
+
+Changes:
+
+* Improve performance of storing user IPs (PR #2307, #2308)
+* Slightly improve performance of verifying access tokens (PR #2320)
+* Slightly improve performance of event persistence (PR #2321)
+* Increase default cache factor size from 0.1 to 0.5 (PR #2330)
+
+Bug fixes:
+
+* Fix bug with storing registration sessions that caused frequent CPU churn
+  (PR #2319)
+
+
 Changes in synapse v0.22.0-rc1 (2017-06-26)
 ===========================================
 

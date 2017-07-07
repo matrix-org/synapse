@@ -73,6 +73,7 @@ class PushersSetRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(PushersSetRestServlet, self).__init__(hs)
         self.notifier = hs.get_notifier()
+        self.pusher_pool = self.hs.get_pusherpool()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -81,12 +82,10 @@ class PushersSetRestServlet(ClientV1RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        pusher_pool = self.hs.get_pusherpool()
-
         if ('pushkey' in content and 'app_id' in content
                 and 'kind' in content and
                 content['kind'] is None):
-            yield pusher_pool.remove_pusher(
+            yield self.pusher_pool.remove_pusher(
                 content['app_id'], content['pushkey'], user_id=user.to_string()
             )
             defer.returnValue((200, {}))
@@ -109,14 +108,14 @@ class PushersSetRestServlet(ClientV1RestServlet):
             append = content['append']
 
         if not append:
-            yield pusher_pool.remove_pushers_by_app_id_and_pushkey_not_user(
+            yield self.pusher_pool.remove_pushers_by_app_id_and_pushkey_not_user(
                 app_id=content['app_id'],
                 pushkey=content['pushkey'],
                 not_user_id=user.to_string()
             )
 
         try:
-            yield pusher_pool.add_pusher(
+            yield self.pusher_pool.add_pusher(
                 user_id=user.to_string(),
                 access_token=requester.access_token_id,
                 kind=content['kind'],
@@ -152,6 +151,7 @@ class PushersRemoveRestServlet(RestServlet):
         self.hs = hs
         self.notifier = hs.get_notifier()
         self.auth = hs.get_v1auth()
+        self.pusher_pool = self.hs.get_pusherpool()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -161,10 +161,8 @@ class PushersRemoveRestServlet(RestServlet):
         app_id = parse_string(request, "app_id", required=True)
         pushkey = parse_string(request, "pushkey", required=True)
 
-        pusher_pool = self.hs.get_pusherpool()
-
         try:
-            yield pusher_pool.remove_pusher(
+            yield self.pusher_pool.remove_pusher(
                 app_id=app_id,
                 pushkey=pushkey,
                 user_id=user.to_string(),

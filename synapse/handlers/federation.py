@@ -75,6 +75,8 @@ class FederationHandler(BaseHandler):
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
         self.action_generator = hs.get_action_generator()
+        self.is_mine_id = hs.is_mine_id
+        self.pusher_pool = hs.get_pusherpool()
 
         self.replication_layer.set_handler(self)
 
@@ -1072,6 +1074,20 @@ class FederationHandler(BaseHandler):
         if is_blocked:
             raise SynapseError(403, "This room has been blocked on this server")
 
+        membership = event.content.get("membership")
+        if event.type != EventTypes.Member or membership != Membership.INVITE:
+            raise SynapseError(400, "The event was not an m.room.member invite event")
+
+        sender_domain = get_domain_from_id(event.sender)
+        if sender_domain != origin:
+            raise SynapseError(400, "The invite event was not from the server sending it")
+
+        if event.state_key is None:
+            raise SynapseError(400, "The invite event did not have a state key")
+
+        if not self.is_mine_id(event.state_key):
+            raise SynapseError(400, "The invite event must be for this server")
+
         event.internal_metadata.outlier = True
         event.internal_metadata.invite_from_remote = True
 
@@ -1280,7 +1296,7 @@ class FederationHandler(BaseHandler):
             for event in res:
                 # We sign these again because there was a bug where we
                 # incorrectly signed things the first time round
-                if self.hs.is_mine_id(event.event_id):
+                if self.is_mine_id(event.event_id):
                     event.signatures.update(
                         compute_event_signature(
                             event,
@@ -1353,7 +1369,7 @@ class FederationHandler(BaseHandler):
         )
 
         if event:
-            if self.hs.is_mine_id(event.event_id):
+            if self.is_mine_id(event.event_id):
                 # FIXME: This is a temporary work around where we occasionally
                 # return events slightly differently than when they were
                 # originally signed
@@ -1411,7 +1427,7 @@ class FederationHandler(BaseHandler):
         if not backfilled:
             # this intentionally does not yield: we don't care about the result
             # and don't need to wait for it.
-            preserve_fn(self.hs.get_pusherpool().on_new_notifications)(
+            preserve_fn(self.pusher_pool.on_new_notifications)(
                 event_stream_id, max_stream_id
             )
 

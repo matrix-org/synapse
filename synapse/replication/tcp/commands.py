@@ -323,14 +323,18 @@ class UserIpCommand(Command):
 
     @classmethod
     def from_line(cls, line):
-        user_id, access_token, ip, device_id, last_seen, user_agent = line.split(" ", 5)
+        user_id, jsn = line.split(" ", 1)
 
-        return cls(user_id, access_token, ip, user_agent, device_id, int(last_seen))
+        access_token, ip, user_agent, device_id, last_seen = json.loads(jsn)
+
+        return cls(
+            user_id, access_token, ip, user_agent, device_id, last_seen
+        )
 
     def to_line(self):
-        return " ".join((
-            self.user_id, self.access_token, self.ip, self.device_id,
-            str(self.last_seen), self.user_agent,
+        return self.user_id + " " + json.dumps((
+            self.access_token, self.ip, self.user_agent, self.device_id,
+            self.last_seen,
         ))
 
 

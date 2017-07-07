@@ -20,7 +20,8 @@ from twisted.internet import defer, reactor
 from ._base import Cache
 from . import background_updates
 
-import os
+from synapse.util.caches import CACHE_SIZE_FACTOR
+
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +29,6 @@ logger = logging.getLogger(__name__)
 # times give more inserts into the database even for readonly API hits
 # 120 seconds == 2 minutes
 LAST_SEEN_GRANULARITY = 120 * 1000
-
-
-CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.1))
 
 
 class ClientIpStore(background_updates.BackgroundUpdateStore):
