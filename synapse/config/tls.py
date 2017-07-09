@@ -59,13 +59,13 @@ class TlsConfig(Config):
             if sha256_fingerprint not in sha256_fingerprints:
                 self.tls_fingerprints.append({u"sha256": sha256_fingerprint})
 
-            # This config option applies to non-federation HTTP clients
-            # (e.g. for talking to recaptcha, identity servers, and such)
-            # It should never be used in production, and is intended for
-            # use only when running tests.
-            self.use_insecure_ssl_client_just_for_testing_do_not_use = config.get(
-                "use_insecure_ssl_client_just_for_testing_do_not_use"
-            )
+        # This config option applies to non-federation HTTP clients
+        # (e.g. for talking to recaptcha, identity servers, and such)
+        # It should never be used in production, and is intended for
+        # use only when running tests.
+        self.use_insecure_ssl_client_just_for_testing_do_not_use = config.get(
+            "use_insecure_ssl_client_just_for_testing_do_not_use"
+        )
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)

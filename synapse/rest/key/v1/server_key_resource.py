@@ -63,14 +63,18 @@ class LocalKey(Resource):
             key_id = "%s:%s" % (key.alg, key.version)
             verify_keys[key_id] = encode_base64(verify_key_bytes)
 
-        x509_certificate_bytes = crypto.dump_certificate(
-            crypto.FILETYPE_ASN1,
-            server_config.tls_certificate
-        )
+        if server_config.no_tls:
+            x509_b64 = u""
+        else:
+            x509_certificate_bytes = crypto.dump_certificate(
+                crypto.FILETYPE_ASN1,
+                server_config.tls_certificate
+            )
+            x509_b64 = encode_base64(x509_certificate_bytes)
         json_object = {
             u"server_name": server_config.server_name,
             u"verify_keys": verify_keys,
-            u"tls_certificate": encode_base64(x509_certificate_bytes)
+            u"tls_certificate": x509_b64
         }
         for key in server_config.signing_key:
             json_object = sign_json(

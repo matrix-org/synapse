@@ -114,7 +114,7 @@ class SynapseHomeServer(HomeServer):
         site_tag = listener_config.get("tag", port)
 
         if tls and config.no_tls:
-            return
+            raise RuntimeError('Listener is configured with tls enabled, but no_tls is set')
 
         resources = {}
         for res in listener_config["resources"]:
@@ -307,7 +307,10 @@ def setup(config_options):
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
-    tls_server_context_factory = context_factory.ServerContextFactory(config)
+    if config.no_tls:
+        tls_server_context_factory = None
+    else:
+        tls_server_context_factory = context_factory.ServerContextFactory(config)
 
     database_engine = create_engine(config.database_config)
     config.database_config["args"]["cp_openfun"] = database_engine.on_new_connection
