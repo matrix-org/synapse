@@ -1,5 +1,7 @@
 *.pyc
 .*.swp
+.*.swo
+.*.swn
 
 .DS_Store
 _trial_temp/

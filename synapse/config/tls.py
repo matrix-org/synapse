@@ -27,44 +27,45 @@ GENERATE_DH_PARAMS = False
 
 class TlsConfig(Config):
     def read_config(self, config):
-        self.tls_certificate = self.read_tls_certificate(
-            config.get("tls_certificate_path")
-        )
-        self.tls_certificate_file = config.get("tls_certificate_path")
-
         self.no_tls = config.get("no_tls", False)
 
         if self.no_tls:
             self.tls_private_key = None
+            self.tls_certificate = None
         else:
+            self.tls_certificate = self.read_tls_certificate(
+                config.get("tls_certificate_path")
+            )
+            self.tls_certificate_file = config.get("tls_certificate_path")
+
             self.tls_private_key = self.read_tls_private_key(
                 config.get("tls_private_key_path")
             )
 
-        self.tls_dh_params_path = self.check_file(
-            config.get("tls_dh_params_path"), "tls_dh_params"
-        )
+            self.tls_dh_params_path = self.check_file(
+                config.get("tls_dh_params_path"), "tls_dh_params"
+            )
 
-        self.tls_fingerprints = config["tls_fingerprints"]
+            self.tls_fingerprints = config["tls_fingerprints"]
 
-        # Check that our own certificate is included in the list of fingerprints
-        # and include it if it is not.
-        x509_certificate_bytes = crypto.dump_certificate(
-            crypto.FILETYPE_ASN1,
-            self.tls_certificate
-        )
-        sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
-        sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
-        if sha256_fingerprint not in sha256_fingerprints:
-            self.tls_fingerprints.append({u"sha256": sha256_fingerprint})
+            # Check that our own certificate is included in the list of fingerprints
+            # and include it if it is not.
+            x509_certificate_bytes = crypto.dump_certificate(
+                crypto.FILETYPE_ASN1,
+                self.tls_certificate
+            )
+            sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
+            sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
+            if sha256_fingerprint not in sha256_fingerprints:
+                self.tls_fingerprints.append({u"sha256": sha256_fingerprint})
 
-        # This config option applies to non-federation HTTP clients
-        # (e.g. for talking to recaptcha, identity servers, and such)
-        # It should never be used in production, and is intended for
-        # use only when running tests.
-        self.use_insecure_ssl_client_just_for_testing_do_not_use = config.get(
-            "use_insecure_ssl_client_just_for_testing_do_not_use"
-        )
+            # This config option applies to non-federation HTTP clients
+            # (e.g. for talking to recaptcha, identity servers, and such)
+            # It should never be used in production, and is intended for
+            # use only when running tests.
+            self.use_insecure_ssl_client_just_for_testing_do_not_use = config.get(
+                "use_insecure_ssl_client_just_for_testing_do_not_use"
+            )
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)
@@ -114,7 +115,7 @@ class TlsConfig(Config):
         """ % locals()
 
     def read_tls_certificate(self, cert_path):
-        cert_pem = self.read_file(cert_path, "tls_certificate")
+        cert_pem = self.read_file(cert_path, "tls_certificate_path")
         return crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
 
     def read_tls_private_key(self, private_key_path):
