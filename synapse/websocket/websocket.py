@@ -43,6 +43,13 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         auth = self.factory.hs.get_auth()
         try:
             user = yield auth.get_user_by_access_token(access_token)
+            self.requester = create_requester(
+                    user["user"],
+                    user["token_id"],
+                    user["is_guest"],
+                    user.get("device_id"),
+                    app_service=None
+            )
         except AuthError as ex:
             self.sendClose(3002, ERR_UNKNOWN_AT)
             logger.info("Closing due to auth error %s" % ex)
@@ -52,17 +59,9 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             logger.info("Closing due to unknown error %s" % ex)
             return
 
-        try:
-            self.requester = create_requester(
-                    user["user"],
-                    user["token_id"],
-                    user["is_guest"],
-                    user.get("device_id"),
-                    app_service=None
-            )
-        except Exception as ex:
-            logger.warn("Requester got not be generated")
-            self.sendClose(3003, ERR_UNKNOWN_FAIL)
+        full_state = request.params.get("full_state", None)
+        if full_state is not None:
+            self.full_state = full_state[0]
 
         since = request.params.get("since", None)
         if since is not None:
@@ -71,9 +70,10 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
 
         filter_id = request.params.get("filter", None)
         if filter_id[0]:
-            if filter_id[0].startswith('{'):
+            filter_id = filter_id[0]
+            if filter_id.startswith('{'):
                 try:
-                    filter_object = json.loads(filter_id[0])
+                    filter_object = json.loads(filter_id)
                     set_timeline_upper_limit(filter_object,
                         self.factory.hs.config.filter_timeline_limit)
                 except:
@@ -82,9 +82,9 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
                 self.filter = FilterCollection(filter_object)
             else:
                 self.filter = yield self.factory.filtering.get_user_filter(
-                    user['user'].localpart, filter_id[0]
+                    user['user'].localpart, filter_id
                 )
-            self.filter_id = filter_id[0]
+            self.filter_id = filter_id
 
         defer.returnValue(("m.json"))
 
@@ -104,7 +104,6 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             except Exception as ex:
                 logger.info("Text message received (unparseable)", ex)
 
-
         msg = {}
         try:
             msg = json.loads(payload.decode('utf8'))
@@ -119,7 +118,6 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             "typing":       self._handle_typing,
         }
 
-        response = None
         method = supported_methods.get(msg["method"],
             lambda msg: json.dumps({
                 "id": msg["id"],
@@ -150,7 +148,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             0, # timeout
             self.since,
             self.filter_id,
-            self.full_state,
+            self.full_state if initial else False,
             self.requester.device_id,
         )
         sync_config = SyncConfig(
@@ -166,9 +164,8 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             sync_config,
             since_token=self.since,
             timeout=0 if initial else SYNC_TIMEOUT,
-            full_state=self.full_state
-        )
-        logger.debug(sync)
+            full_state=self.full_state if initial else False
+        ))
         sync.addCallback(
             lambda result: self._sync_callback(result)
         )
@@ -176,7 +173,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         self.currentSync = sync
 
     def _sync_callback(self, result):
-        logger.info("Got sync")
+        logger.debug("Got sync")
         if self.shouldSync:
             self.since = result.next_batch
             logger.debug("Sending sync")
@@ -188,10 +185,10 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
                 self.requester.access_token_id,
                 self.filter
             )),False)
-            logger.debug("Returning from _sync_callback")
+
             reactor.callLater(0, lambda: self._sync())
-            return
-            # Sync again
+
+            logger.debug("Returning from _sync_callback")
 
     @defer.inlineCallbacks
     def _handle_ping(self, msg):
