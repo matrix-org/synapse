@@ -164,7 +164,9 @@ class SyncRestServlet(RestServlet):
             )
 
         time_now = self.clock.time_msec()
-        response_content = self.encode_response(time_now, sync_result, requester.access_token_id, filter)
+        response_content = self.encode_response(
+            time_now, sync_result, requester.access_token_id, filter
+        )
 
         defer.returnValue((200, response_content))
 
