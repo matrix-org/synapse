@@ -715,6 +715,21 @@ class FederationGroupsInviteServlet(BaseFederationServlet):
         defer.returnValue((200, new_content))
 
 
+class FederationGroupsLocalInviteServlet(BaseFederationServlet):
+    PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id, user_id):
+        if get_domain_from_id(group_id) != origin:
+            raise SynapseError(403, "group_id doesn't match origin")
+
+        new_content = yield self.handler.on_invite(
+            group_id, user_id, content,
+        )
+
+        defer.returnValue((200, new_content))
+
+
 class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
     """Accept an invitation from the group server
     """
@@ -745,6 +760,21 @@ class FederationGroupsRemoveUserServlet(BaseFederationServlet):
 
         new_content = yield self.handler.remove_user_from_group(
             group_id, user_id, requester_user_id, content,
+        )
+
+        defer.returnValue((200, new_content))
+
+
+class FederationGroupsRemoveLocalUserServlet(BaseFederationServlet):
+    PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id, user_id):
+        if get_domain_from_id(group_id) != origin:
+            raise SynapseError(403, "user_id doesn't match origin")
+
+        new_content = yield self.handler.user_removed_from_group(
+            group_id, user_id, content,
         )
 
         defer.returnValue((200, new_content))
@@ -1053,6 +1083,12 @@ GROUP_SERVER_SERVLET_CLASSES = (
 )
 
 
+GROUP_LOCAL_SERVLET_CLASSES = (
+    FederationGroupsLocalInviteServlet,
+    FederationGroupsRemoveLocalUserServlet,
+)
+
+
 GROUP_ATTESTATION_SERVLET_CLASSES = (
     FederationGroupsRenewAttestaionServlet,
 )
@@ -1078,6 +1114,14 @@ def register_servlets(hs, resource, authenticator, ratelimiter):
     for servletclass in GROUP_SERVER_SERVLET_CLASSES:
         servletclass(
             handler=hs.get_groups_server_handler(),
+            authenticator=authenticator,
+            ratelimiter=ratelimiter,
+            server_name=hs.hostname,
+        ).register(resource)
+
+    for servletclass in GROUP_LOCAL_SERVLET_CLASSES:
+        servletclass(
+            handler=hs.get_groups_local_handler(),
             authenticator=authenticator,
             ratelimiter=ratelimiter,
             server_name=hs.hostname,

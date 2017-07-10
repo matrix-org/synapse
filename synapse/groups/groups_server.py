@@ -462,7 +462,9 @@ class GroupsServerHandler(object):
         }
 
         if self.hs.is_mine_id(user_id):
-            raise NotImplementedError()
+            groups_local = self.hs.get_groups_local_handler()
+            res = yield groups_local.on_invite(group_id, user_id, content)
+            local_attestation = None
         else:
             local_attestation = self.attestations.create_attestation(group_id, user_id)
             content.update({
@@ -590,7 +592,8 @@ class GroupsServerHandler(object):
 
         if is_kick:
             if self.hs.is_mine_id(user_id):
-                raise NotImplementedError()
+                groups_local = self.hs.get_groups_local_handler()
+                yield groups_local.user_removed_from_group(group_id, user_id, {})
             else:
                 yield self.transport_client.remove_user_from_group_notification(
                     get_domain_from_id(user_id), group_id, user_id, {}

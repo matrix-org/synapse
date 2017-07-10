@@ -142,3 +142,31 @@ CREATE TABLE group_attestations_remote (
 CREATE INDEX group_attestations_remote_g_idx ON group_attestations_remote(group_id, user_id);
 CREATE INDEX group_attestations_remote_u_idx ON group_attestations_remote(user_id);
 CREATE INDEX group_attestations_remote_v_idx ON group_attestations_remote(valid_until_ms);
+
+
+CREATE TABLE local_group_membership (
+    group_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    is_admin BOOLEAN NOT NULL,
+    membership TEXT NOT NULL,
+    content TEXT NOT NULL
+);
+
+CREATE INDEX local_group_membership_u_idx ON local_group_membership(user_id, group_id);
+CREATE INDEX local_group_membership_g_idx ON local_group_membership(group_id);
+
+
+CREATE TABLE local_group_updates (
+    stream_id BIGINT NOT NULL,
+    group_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    content TEXT NOT NULL
+);
+
+
+CREATE TABLE local_group_profiles (
+    group_id TEXT NOT NULL,
+    name TEXT,
+    avatar_url TEXT
+);
