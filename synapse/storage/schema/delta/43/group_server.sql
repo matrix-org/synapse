@@ -56,6 +56,62 @@ CREATE INDEX groups_rooms_g_idx ON group_rooms(group_id, room_id);
 CREATE INDEX groups_rooms_r_idx ON group_rooms(room_id);
 
 
+CREATE TABLE group_summary_rooms (
+    group_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    category_id TEXT NOT NULL,
+    room_order BIGINT NOT NULL,
+    is_public BOOLEAN NOT NULL,
+    UNIQUE (group_id, category_id, room_id, room_order),
+    CHECK (room_order > 0)
+);
+
+CREATE UNIQUE INDEX group_summary_rooms_g_idx ON group_summary_rooms(group_id, room_id, category_id);
+
+CREATE TABLE group_summary_room_categories (
+    group_id TEXT NOT NULL,
+    category_id TEXT NOT NULL,
+    cat_order BIGINT NOT NULL,
+    UNIQUE (group_id, category_id, cat_order),
+    CHECK (cat_order > 0)
+);
+
+CREATE TABLE group_room_categories (
+    group_id TEXT NOT NULL,
+    category_id TEXT NOT NULL,
+    profile TEXT NOT NULL,
+    is_public BOOLEAN NOT NULL,
+    UNIQUE (group_id, category_id)
+);
+
+
+CREATE TABLE group_summary_users (
+    group_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    user_order BIGINT NOT NULL,
+    is_public BOOLEAN NOT NULL
+);
+
+CREATE INDEX group_summary_users_g_idx ON group_summary_users(group_id);
+
+CREATE TABLE group_summary_roles (
+    group_id TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    role_order BIGINT NOT NULL,
+    UNIQUE (group_id, role_id, role_order),
+    CHECK (role_order > 0)
+);
+
+CREATE TABLE group_roles (
+    group_id TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    profile TEXT NOT NULL,
+    is_public BOOLEAN NOT NULL,
+    UNIQUE (group_id, role_id)
+);
+
+
 -- List of  attestations we've given out and need to renew
 CREATE TABLE group_attestations_renewals (
     group_id TEXT NOT NULL,
