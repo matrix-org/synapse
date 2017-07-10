@@ -1,4 +1,4 @@
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from autobahn.twisted.websocket import WebSocketServerProtocol, \
     WebSocketServerFactory
 from autobahn.websocket.util import create_url
@@ -99,7 +99,11 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             logger.info("Binary message received: {0} bytes".format(len(payload)))
             return  # Ignore binary for now, but perhaps support something like BSON in the future.
         else:
-            logger.info("Text message received: {0}".format(payload.decode('utf8')))
+            try:
+                logger.info("Text message received: {0}".format(payload.decode('utf8')))
+            except Exception as ex:
+                logger.info("Text message received (unparseable)", ex)
+
 
         msg = {}
         try:
@@ -135,7 +139,9 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
     def startSyncingClient(self):
         logger.info("Started syncing for %s." % self.peer)
         self.shouldSync = True
-        self.currentSync = self._sync(initial=True)
+        self._sync(initial=True)
+        if not reactor.running:
+            reactor.run()
 
     def _sync(self, initial=False):
         sync_handler = self.factory.hs.get_sync_handler()
@@ -167,7 +173,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             lambda result: self._sync_callback(result)
         )
         logger.debug("Returning from _sync")
-        return sync
+        self.currentSync = sync
 
     def _sync_callback(self, result):
         logger.info("Got sync")
@@ -182,8 +188,8 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
                 self.requester.access_token_id,
                 self.filter
             )),False)
-            self.currentSync = self._sync()
             logger.debug("Returning from _sync_callback")
+            reactor.callLater(0, lambda: self._sync())
             return
             # Sync again
 
