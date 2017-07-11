@@ -172,44 +172,36 @@ class SyncRestServlet(RestServlet):
 
     @staticmethod
     def encode_response(time_now, sync_result, access_token_id, filter):
-        response = {
+        joined = SyncRestServlet.encode_joined(
+            sync_result.joined, time_now, access_token_id, filter.event_fields
+        )
+
+        invited = SyncRestServlet.encode_invited(
+            sync_result.invited, time_now, access_token_id,
+        )
+
+        archived = SyncRestServlet.encode_archived(
+            sync_result.archived, time_now, access_token_id,
+            filter.event_fields,
+        )
+
+        return {
+            "account_data": {"events": sync_result.account_data},
+            "to_device": {"events": sync_result.to_device},
+            "device_lists": {
+                "changed": list(sync_result.device_lists),
+            },
+            "presence": SyncRestServlet.encode_presence(
+                sync_result.presence, time_now
+            ),
+            "rooms": {
+                "join": joined,
+                "invite": invited,
+                "leave": archived,
+            },
             "device_one_time_keys_count": sync_result.device_one_time_keys_count,
             "next_batch": sync_result.next_batch.to_string(),
         }
-
-        if sync_result.account_data:
-            response["account_data"] = {"events": sync_result.account_data}
-        if sync_result.to_device:
-            response["to_device"] = {"events": sync_result.to_device}
-        if sync_result.device_lists:
-            response["device_lists"] = {
-                "changed": list(sync_result.device_lists),
-            }
-
-        if sync_result.presence:
-            response["presence"] = SyncRestServlet.encode_presence(
-                sync_result.presence, time_now
-            )
-
-        rooms = {}
-        if sync_result.joined:
-            rooms["join"] = SyncRestServlet.encode_joined(
-                sync_result.joined, time_now, access_token_id, filter.event_fields
-            )
-        if sync_result.invited:
-            rooms["invite"] = SyncRestServlet.encode_invited(
-                sync_result.invited, time_now, access_token_id
-            )
-        if sync_result.archived:
-            rooms["leave"] = SyncRestServlet.encode_archived(
-                sync_result.archived, time_now, access_token_id,
-                filter.event_fields,
-            )
-
-        if rooms:
-            response["rooms"] = rooms
-
-        return response
 
     @staticmethod
     def encode_presence(events, time_now):
