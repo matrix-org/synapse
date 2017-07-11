@@ -38,7 +38,7 @@ class GroupAttestationSigning(object):
 
     @defer.inlineCallbacks
     def verify_attestation(self, attestation, group_id, user_id, server_name=None):
-        """Verifies that the given attestation matches the given paramaters.
+        """Verifies that the given attestation matches the given parameters.
 
         An optional server_name can be supplied to explicitly set which server's
         signature is expected. Otherwise assumes that either the group_id or user_id
@@ -51,7 +51,7 @@ class GroupAttestationSigning(object):
             elif get_domain_from_id(user_id) == self.server_name:
                 server_name = get_domain_from_id(group_id)
             else:
-                raise Exception("Expected eitehr group_id or user_id to be local")
+                raise Exception("Expected either group_id or user_id to be local")
 
         if user_id != attestation["user_id"]:
             raise SynapseError(400, "Attestation has incorrect user_id")

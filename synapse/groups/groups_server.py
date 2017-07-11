@@ -80,7 +80,9 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def get_users_in_group(self, group_id, requester_user_id):
-        """Get the users in group as seen by requester_user_id
+        """Get the users in group as seen by requester_user_id.
+
+        The ordering is arbitrary at the moment
         """
 
         yield self.check_group_is_ours(group_id, and_exists=True)
@@ -126,6 +128,8 @@ class GroupsServerHandler(object):
     @defer.inlineCallbacks
     def get_rooms_in_group(self, group_id, requester_user_id):
         """Get the rooms in group as seen by requester_user_id
+
+        This returns rooms in order of decreasing number of joined users
         """
 
         yield self.check_group_is_ours(group_id, and_exists=True)

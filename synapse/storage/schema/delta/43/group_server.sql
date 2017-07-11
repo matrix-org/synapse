@@ -28,7 +28,7 @@ CREATE UNIQUE INDEX groups_idx ON groups(group_id);
 CREATE TABLE group_users (
     group_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
-    is_admin BOOLEAN NOT NULL,
+    is_admin BOOLEAN NOT NULL,  -- whether the users membership can be seen by everyone
     is_public BOOLEAN NOT NULL
 );
 
@@ -49,7 +49,7 @@ CREATE INDEX groups_invites_u_idx ON group_invites(user_id);
 CREATE TABLE group_rooms (
     group_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
-    is_public BOOLEAN NOT NULL
+    is_public BOOLEAN NOT NULL  -- whether the room can be seen by everyone
 );
 
 CREATE INDEX groups_rooms_g_idx ON group_rooms(group_id, room_id);
