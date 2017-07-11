@@ -175,16 +175,7 @@ class GroupsServerHandler(object):
 
         # TODO: Check if room has already been added
 
-        visibility = content.get("visibility")
-        if visibility:
-            vis_type = visibility["type"]
-            if vis_type not in ("public", "private"):
-                raise SynapseError(
-                    400, "Synapse only supports 'public'/'private' visibility"
-                )
-            is_public = vis_type == "public"
-        else:
-            is_public = True
+        is_public = _parse_visibility_from_contents(content)
 
         yield self.store.add_room_to_group(group_id, room_id, is_public=is_public)
 
@@ -285,16 +276,7 @@ class GroupsServerHandler(object):
 
         local_attestation = self.attestations.create_attestation(group_id, user_id)
 
-        visibility = content.get("visibility")
-        if visibility:
-            vis_type = visibility["type"]
-            if vis_type not in ("public", "private"):
-                raise SynapseError(
-                    400, "Synapse only supports 'public'/'private' visibility"
-                )
-            is_public = vis_type == "public"
-        else:
-            is_public = True
+        is_public = _parse_visibility_from_contents(content)
 
         yield self.store.add_user_to_group(
             group_id, user_id,
@@ -412,3 +394,22 @@ class GroupsServerHandler(object):
         defer.returnValue({
             "group_id": group_id,
         })
+
+
+def _parse_visibility_from_contents(content):
+    """Given a content for a request parse out whether the entity should be
+    public or not
+    """
+
+    visibility = content.get("visibility")
+    if visibility:
+        vis_type = visibility["type"]
+        if vis_type not in ("public", "private"):
+            raise SynapseError(
+                400, "Synapse only supports 'public'/'private' visibility"
+            )
+        is_public = vis_type == "public"
+    else:
+        is_public = True
+
+    return is_public
