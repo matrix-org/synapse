@@ -244,7 +244,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
                 becoming full.
         """
         if self.state == ConnectionStates.CLOSED:
-            logger.info("[%s] Not sending, connection closed", self.id())
+            logger.debug("[%s] Not sending, connection closed", self.id())
             return
 
         if do_buffer and self.state != ConnectionStates.ESTABLISHED:
@@ -264,7 +264,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
     def _queue_command(self, cmd):
         """Queue the command until the connection is ready to write to again.
         """
-        logger.info("[%s] Queing as conn %r, cmd: %r", self.id(), self.state, cmd)
+        logger.debug("[%s] Queing as conn %r, cmd: %r", self.id(), self.state, cmd)
         self.pending_commands.append(cmd)
 
         if len(self.pending_commands) > self.max_line_buffer:
