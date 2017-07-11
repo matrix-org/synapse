@@ -610,6 +610,8 @@ class FederationVersionServlet(BaseFederationServlet):
 
 
 class FederationGroupsProfileServlet(BaseFederationServlet):
+    """Get the basic profile of a group on behalf of a user
+    """
     PATH = "/groups/(?P<group_id>[^/]*)/profile$"
 
     @defer.inlineCallbacks
@@ -626,6 +628,8 @@ class FederationGroupsProfileServlet(BaseFederationServlet):
 
 
 class FederationGroupsRoomsServlet(BaseFederationServlet):
+    """Get the rooms in a group on behalf of a user
+    """
     PATH = "/groups/(?P<group_id>[^/]*)/rooms$"
 
     @defer.inlineCallbacks
@@ -642,6 +646,8 @@ class FederationGroupsRoomsServlet(BaseFederationServlet):
 
 
 class FederationGroupsUsersServlet(BaseFederationServlet):
+    """Get the users in a group on behalf of a user
+    """
     PATH = "/groups/(?P<group_id>[^/]*)/users$"
 
     @defer.inlineCallbacks
@@ -658,6 +664,8 @@ class FederationGroupsUsersServlet(BaseFederationServlet):
 
 
 class FederationGroupsInviteServlet(BaseFederationServlet):
+    """Ask a group server to invite someone to the group
+    """
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite$"
 
     @defer.inlineCallbacks
@@ -674,6 +682,8 @@ class FederationGroupsInviteServlet(BaseFederationServlet):
 
 
 class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
+    """Accept an invitation from the group server
+    """
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/accept_invite$"
 
     @defer.inlineCallbacks
@@ -689,6 +699,8 @@ class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
 
 
 class FederationGroupsRemoveUserServlet(BaseFederationServlet):
+    """Leave or kick a user from the group
+    """
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove$"
 
     @defer.inlineCallbacks
@@ -705,6 +717,8 @@ class FederationGroupsRemoveUserServlet(BaseFederationServlet):
 
 
 class FederationGroupsRenewAttestaionServlet(BaseFederationServlet):
+    """A group or user's server renews their attestation
+    """
     PATH = "/groups/(?P<group_id>[^/]*)/renew_attestation/(?P<user_id>[^/]*)$"
 
     @defer.inlineCallbacks

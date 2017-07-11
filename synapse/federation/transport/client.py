@@ -474,6 +474,10 @@ class TransportLayerClient(object):
 
     @log_function
     def invite_to_group_notification(self, destination, group_id, user_id, content):
+        """Sent by group server to inform a user's server that they have been
+        invited.
+        """
+
         path = PREFIX + "/groups/local/%s/users/%s/invite" % (group_id, user_id)
 
         return self.client.post_json(
@@ -486,6 +490,10 @@ class TransportLayerClient(object):
     @log_function
     def remove_user_from_group_notification(self, destination, group_id, user_id,
                                             content):
+        """Sent by group server to inform a user's server that they have been
+        kicked from the group.
+        """
+
         path = PREFIX + "/groups/local/%s/users/%s/remove" % (group_id, user_id)
 
         return self.client.post_json(
@@ -497,6 +505,10 @@ class TransportLayerClient(object):
 
     @log_function
     def renew_group_attestation(self, destination, group_id, user_id, content):
+        """Sent by either a group server or a user's server to periodically update
+        the attestations
+        """
+
         path = PREFIX + "/groups/%s/renew_attestation/%s" % (group_id, user_id)
 
         return self.client.post_json(
