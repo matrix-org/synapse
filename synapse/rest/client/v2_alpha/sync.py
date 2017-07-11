@@ -164,27 +164,34 @@ class SyncRestServlet(RestServlet):
             )
 
         time_now = self.clock.time_msec()
-
-        joined = self.encode_joined(
-            sync_result.joined, time_now, requester.access_token_id, filter.event_fields
+        response_content = self.encode_response(
+            time_now, sync_result, requester.access_token_id, filter
         )
 
-        invited = self.encode_invited(
-            sync_result.invited, time_now, requester.access_token_id
+        defer.returnValue((200, response_content))
+
+    @staticmethod
+    def encode_response(time_now, sync_result, access_token_id, filter):
+        joined = SyncRestServlet.encode_joined(
+            sync_result.joined, time_now, access_token_id, filter.event_fields
         )
 
-        archived = self.encode_archived(
-            sync_result.archived, time_now, requester.access_token_id,
+        invited = SyncRestServlet.encode_invited(
+            sync_result.invited, time_now, access_token_id,
+        )
+
+        archived = SyncRestServlet.encode_archived(
+            sync_result.archived, time_now, access_token_id,
             filter.event_fields,
         )
 
-        response_content = {
+        return {
             "account_data": {"events": sync_result.account_data},
             "to_device": {"events": sync_result.to_device},
             "device_lists": {
                 "changed": list(sync_result.device_lists),
             },
-            "presence": self.encode_presence(
+            "presence": SyncRestServlet.encode_presence(
                 sync_result.presence, time_now
             ),
             "rooms": {
@@ -196,9 +203,8 @@ class SyncRestServlet(RestServlet):
             "next_batch": sync_result.next_batch.to_string(),
         }
 
-        defer.returnValue((200, response_content))
-
-    def encode_presence(self, events, time_now):
+    @staticmethod
+    def encode_presence(events, time_now):
         return {
             "events": [
                 {
@@ -212,7 +218,8 @@ class SyncRestServlet(RestServlet):
             ]
         }
 
-    def encode_joined(self, rooms, time_now, token_id, event_fields):
+    @staticmethod
+    def encode_joined(rooms, time_now, token_id, event_fields):
         """
         Encode the joined rooms in a sync result
 
@@ -231,13 +238,14 @@ class SyncRestServlet(RestServlet):
         """
         joined = {}
         for room in rooms:
-            joined[room.room_id] = self.encode_room(
+            joined[room.room_id] = SyncRestServlet.encode_room(
                 room, time_now, token_id, only_fields=event_fields
             )
 
         return joined
 
-    def encode_invited(self, rooms, time_now, token_id):
+    @staticmethod
+    def encode_invited(rooms, time_now, token_id):
         """
         Encode the invited rooms in a sync result
 
@@ -270,7 +278,8 @@ class SyncRestServlet(RestServlet):
 
         return invited
 
-    def encode_archived(self, rooms, time_now, token_id, event_fields):
+    @staticmethod
+    def encode_archived(rooms, time_now, token_id, event_fields):
         """
         Encode the archived rooms in a sync result
 
@@ -289,7 +298,7 @@ class SyncRestServlet(RestServlet):
         """
         joined = {}
         for room in rooms:
-            joined[room.room_id] = self.encode_room(
+            joined[room.room_id] = SyncRestServlet.encode_room(
                 room, time_now, token_id, joined=False, only_fields=event_fields
             )
 
