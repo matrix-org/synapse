@@ -86,7 +86,7 @@ class GroupAttestionRenewer(object):
         self.store = hs.get_datastore()
         self.assestations = hs.get_groups_attestation_signing()
         self.transport_client = hs.get_federation_transport_client()
-        self.is_mine_id = hs.is_mind_id
+        self.is_mine_id = hs.is_mine_id
 
         self._renew_attestations_loop = self.clock.looping_call(
             self._renew_attestations, 30 * 60 * 1000,
