@@ -19,7 +19,6 @@ from synapse.api.errors import SynapseError
 from synapse.types import UserID, get_domain_from_id
 
 
-import functools
 import logging
 
 logger = logging.getLogger(__name__)
@@ -31,28 +30,6 @@ logger = logging.getLogger(__name__)
 # TODO: Audit log for admins (profile updates, membership changes, users who tried
 #       to join but were rejected, etc)
 # TODO: Flairs
-
-
-UPDATE_ATTESTATION_TIME_MS = 1 * 24 * 60 * 60 * 1000
-
-
-def check_group_is_ours(and_exists=False):
-    def g(func):
-        @functools.wraps(func)
-        @defer.inlineCallbacks
-        def h(self, group_id, *args, **kwargs):
-            if not self.is_mine_id(group_id):
-                raise SynapseError(400, "Group not on this server")
-            if and_exists:
-                group = yield self.store.get_group(group_id)
-                if not group:
-                    raise SynapseError(404, "Unknown group")
-
-            res = yield func(self, group_id, *args, **kwargs)
-            defer.returnValue(res)
-
-        return h
-    return g
 
 
 class GroupsServerHandler(object):
@@ -72,9 +49,28 @@ class GroupsServerHandler(object):
         # Ensure attestations get renewed
         hs.get_groups_attestation_renewer()
 
-    @check_group_is_ours()
+    @defer.inlineCallbacks
+    def check_group_is_ours(self, group_id, and_exists=False):
+        """Check that the group is ours, and optionally if it exists.
+
+        If group does exist then return group.
+        """
+        if not self.is_mine_id(group_id):
+            raise SynapseError(400, "Group not on this server")
+
+        group = yield self.store.get_group(group_id)
+        if and_exists and not group:
+            raise SynapseError(404, "Unknown group")
+
+        defer.returnValue(group)
+
     @defer.inlineCallbacks
     def get_group_profile(self, group_id, requester_user_id):
+        """Get the group profile as seen by requester_user_id
+        """
+
+        yield self.check_group_is_ours(group_id)
+
         group_description = yield self.store.get_group(group_id)
 
         if group_description:
@@ -82,9 +78,13 @@ class GroupsServerHandler(object):
         else:
             raise SynapseError(404, "Unknown group")
 
-    @check_group_is_ours(and_exists=True)
     @defer.inlineCallbacks
     def get_users_in_group(self, group_id, requester_user_id):
+        """Get the users in group as seen by requester_user_id
+        """
+
+        yield self.check_group_is_ours(group_id, and_exists=True)
+
         is_user_in_group = yield self.store.is_user_in_group(requester_user_id, group_id)
 
         user_results = yield self.store.get_users_in_group(
@@ -123,9 +123,13 @@ class GroupsServerHandler(object):
             "total_user_count_estimate": len(user_results),
         })
 
-    @check_group_is_ours(and_exists=True)
     @defer.inlineCallbacks
     def get_rooms_in_group(self, group_id, requester_user_id):
+        """Get the rooms in group as seen by requester_user_id
+        """
+
+        yield self.check_group_is_ours(group_id, and_exists=True)
+
         is_user_in_group = yield self.store.is_user_in_group(requester_user_id, group_id)
 
         room_results = yield self.store.get_rooms_in_group(
@@ -158,9 +162,13 @@ class GroupsServerHandler(object):
             "total_room_count_estimate": len(room_results),
         })
 
-    @check_group_is_ours(and_exists=True)
     @defer.inlineCallbacks
     def add_room(self, group_id, requester_user_id, room_id, content):
+        """Add room to group
+        """
+
+        yield self.check_group_is_ours(group_id, and_exists=True)
+
         is_admin = yield self.store.is_user_admin_in_group(group_id, requester_user_id)
         if not is_admin:
             raise SynapseError(403, "User is not admin in group")
@@ -182,9 +190,13 @@ class GroupsServerHandler(object):
 
         defer.returnValue({})
 
-    @check_group_is_ours(and_exists=True)
     @defer.inlineCallbacks
     def invite_to_group(self, group_id, user_id, requester_user_id, content):
+        """Invite user to group
+        """
+
+        group = yield self.check_group_is_ours(group_id, and_exists=True)
+
         is_admin = yield self.store.is_user_admin_in_group(
             group_id, requester_user_id
         )
@@ -194,7 +206,6 @@ class GroupsServerHandler(object):
         # TODO: Check if user knocked
         # TODO: Check if user is already invited
 
-        group = yield self.store.get_group(group_id)
         content = {
             "profile": {
                 "name": group["name"],
@@ -248,9 +259,16 @@ class GroupsServerHandler(object):
         else:
             raise SynapseError(502, "Unknown state returned by HS")
 
-    @check_group_is_ours(and_exists=True)
     @defer.inlineCallbacks
     def accept_invite(self, group_id, user_id, content):
+        """User tries to accept an invite to the group.
+
+        This is different from them asking to join, and so should error if no
+        invite exists (and they're not a member of the group)
+        """
+
+        yield self.check_group_is_ours(group_id, and_exists=True)
+
         if not self.store.is_user_invited_to_local_group(group_id, user_id):
             raise SynapseError(403, "User not invited to group")
 
@@ -291,19 +309,33 @@ class GroupsServerHandler(object):
             "attestation": local_attestation,
         })
 
-    @check_group_is_ours(and_exists=True)
     @defer.inlineCallbacks
     def knock(self, group_id, user_id, content):
-        pass
+        """A user requests becoming a member of the group
+        """
+        yield self.check_group_is_ours(group_id, and_exists=True)
 
-    @check_group_is_ours(and_exists=True)
+        raise NotImplementedError()
+
     @defer.inlineCallbacks
     def accept_knock(self, group_id, user_id, content):
-        pass
+        """Accept a users knock to the room.
 
-    @check_group_is_ours(and_exists=True)
+        Errors if the user hasn't knocked, rather than inviting them.
+        """
+
+        yield self.check_group_is_ours(group_id, and_exists=True)
+
+        raise NotImplementedError()
+
     @defer.inlineCallbacks
     def remove_user_from_group(self, group_id, user_id, requester_user_id, content):
+        """Remove a user from the group; either a user is leaving or and admin
+        kicked htem.
+        """
+
+        yield self.check_group_is_ours(group_id, and_exists=True)
+
         is_kick = False
         if requester_user_id != user_id:
             is_admin = yield self.store.is_user_admin_in_group(
@@ -314,7 +346,7 @@ class GroupsServerHandler(object):
 
             is_kick = True
 
-        yield self.store.remove_user_to_group(
+        yield self.store.remove_user_from_group(
             group_id, user_id,
         )
 
@@ -328,11 +360,11 @@ class GroupsServerHandler(object):
 
         defer.returnValue({})
 
-    @check_group_is_ours()
     @defer.inlineCallbacks
     def create_group(self, group_id, user_id, content):
+        group = yield self.check_group_is_ours(group_id)
+
         logger.info("Attempting to create group with ID: %r", group_id)
-        group = yield self.store.get_group(group_id)
         if group:
             raise SynapseError(400, "Group already exists")
 

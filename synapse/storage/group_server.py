@@ -89,6 +89,8 @@ class GroupServerStore(SQLBaseStore):
         )
 
     def add_group_invite(self, group_id, user_id):
+        """Record that the group server has invited a user
+        """
         return self._simple_insert(
             table="group_invites",
             values={
@@ -99,6 +101,8 @@ class GroupServerStore(SQLBaseStore):
         )
 
     def is_user_invited_to_local_group(self, group_id, user_id):
+        """Has the group server invited a user?
+        """
         return self._simple_select_one_onecol(
             table="group_invites",
             keyvalues={
@@ -112,6 +116,19 @@ class GroupServerStore(SQLBaseStore):
 
     def add_user_to_group(self, group_id, user_id, is_admin=False, is_public=True,
                           local_attestation=None, remote_attestation=None):
+        """Add a user to the group server.
+
+        Args:
+            group_id (str)
+            user_id (str)
+            is_admin (bool)
+            is_public (bool)
+            local_attestation (dict): The attestation the GS created to give
+                to the remote server. Optional if the user and group are on the
+                same server
+            remote_attestation (dict): The attestation given to GS by remote
+                server. Optional if the user and group are on the same server
+        """
         def _add_user_to_group_txn(txn):
             self._simple_insert_txn(
                 txn,
@@ -159,8 +176,8 @@ class GroupServerStore(SQLBaseStore):
             "add_user_to_group", _add_user_to_group_txn
         )
 
-    def remove_user_to_group(self, group_id, user_id):
-        def _remove_user_to_group_txn(txn):
+    def remove_user_from_group(self, group_id, user_id):
+        def _remove_user_from_group_txn(txn):
             self._simple_delete_txn(
                 txn,
                 table="group_users",
@@ -193,7 +210,7 @@ class GroupServerStore(SQLBaseStore):
                     "user_id": user_id,
                 },
             )
-        return self.runInteraction("remove_user_to_group", _remove_user_to_group_txn)
+        return self.runInteraction("remove_user_from_group", _remove_user_from_group_txn)
 
     def add_room_to_group(self, group_id, room_id, is_public):
         return self._simple_insert(
@@ -222,6 +239,8 @@ class GroupServerStore(SQLBaseStore):
         )
 
     def get_attestations_need_renewals(self, valid_until_ms):
+        """Get all attestations that need to be renewed until givent time
+        """
         def _get_attestations_need_renewals_txn(txn):
             sql = """
                 SELECT group_id, user_id FROM group_attestations_renewals
@@ -234,6 +253,8 @@ class GroupServerStore(SQLBaseStore):
         )
 
     def update_attestation_renewal(self, group_id, user_id, attestation):
+        """Update an attestation that we have renewed
+        """
         return self._simple_update_one(
             table="group_attestations_renewals",
             keyvalues={
@@ -247,6 +268,8 @@ class GroupServerStore(SQLBaseStore):
         )
 
     def update_remote_attestion(self, group_id, user_id, attestation):
+        """Update an attestation that a remote has renewed
+        """
         return self._simple_update_one(
             table="group_attestations_remote",
             keyvalues={
@@ -262,6 +285,9 @@ class GroupServerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_remote_attestation(self, group_id, user_id):
+        """Get the attestation that proves the remote agrees that the user is
+        in the group.
+        """
         row = yield self._simple_select_one(
             table="group_attestations_remote",
             keyvalues={

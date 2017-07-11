@@ -28,6 +28,8 @@ UPDATE_ATTESTATION_TIME_MS = 1 * 24 * 60 * 60 * 1000
 
 
 class GroupAttestationSigning(object):
+    """Creates and verifies group attestations.
+    """
     def __init__(self, hs):
         self.keyring = hs.get_keyring()
         self.clock = hs.get_clock()
@@ -36,11 +38,20 @@ class GroupAttestationSigning(object):
 
     @defer.inlineCallbacks
     def verify_attestation(self, attestation, group_id, user_id, server_name=None):
+        """Verifies that the given attestation matches the given paramaters.
+
+        An optional server_name can be supplied to explicitly set which server's
+        signature is expected. Otherwise assumes that either the group_id or user_id
+        is local and uses the other's server as the one to check.
+        """
+
         if not server_name:
             if get_domain_from_id(group_id) == self.server_name:
                 server_name = get_domain_from_id(user_id)
-            else:
+            elif get_domain_from_id(user_id) == self.server_name:
                 server_name = get_domain_from_id(group_id)
+            else:
+                raise Exception("Expected eitehr group_id or user_id to be local")
 
         if user_id != attestation["user_id"]:
             raise SynapseError(400, "Attestation has incorrect user_id")
@@ -48,6 +59,7 @@ class GroupAttestationSigning(object):
         if group_id != attestation["group_id"]:
             raise SynapseError(400, "Attestation has incorrect group_id")
 
+        # TODO:
         valid_until_ms = attestation["valid_until_ms"]
         if valid_until_ms - self.clock.time_msec() < MIN_ATTESTATION_LENGTH_MS:
             raise SynapseError(400, "Attestation not valid for long enough")
@@ -55,6 +67,9 @@ class GroupAttestationSigning(object):
         yield self.keyring.verify_json_for_server(server_name, attestation)
 
     def create_attestation(self, group_id, user_id):
+        """Create an attestation for the group_id and user_id with default
+        validity length.
+        """
         return sign_json({
             "group_id": group_id,
             "user_id": user_id,
@@ -63,11 +78,15 @@ class GroupAttestationSigning(object):
 
 
 class GroupAttestionRenewer(object):
+    """Responsible for sending and receiving attestation updates.
+    """
+
     def __init__(self, hs):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.assestations = hs.get_groups_attestation_signing()
         self.transport_client = hs.get_federation_transport_client()
+        self.is_mine_id = hs.is_mind_id
 
         self._renew_attestations_loop = self.clock.looping_call(
             self._renew_attestations, 30 * 60 * 1000,
@@ -75,7 +94,12 @@ class GroupAttestionRenewer(object):
 
     @defer.inlineCallbacks
     def on_renew_attestation(self, group_id, user_id, content):
+        """When a remote updates an attestation
+        """
         attestation = content["attestation"]
+
+        if not self.is_mine_id(group_id) and not self.is_mine_id(user_id):
+            raise SynapseError(400, "Neither user not group are on this server")
 
         yield self.attestations.verify_attestation(
             attestation,
@@ -89,6 +113,9 @@ class GroupAttestionRenewer(object):
 
     @defer.inlineCallbacks
     def _renew_attestations(self):
+        """Called periodically to check if we need to update any of our attestations
+        """
+
         now = self.clock.time_msec()
 
         rows = yield self.store.get_attestations_need_renewals(
