@@ -2,6 +2,7 @@ from twisted.internet import defer, reactor
 from autobahn.twisted.websocket import WebSocketServerProtocol, \
     WebSocketServerFactory
 from autobahn.websocket.util import create_url
+from autobahn.websocket.compress import PerMessageDeflateOffer, PerMessageDeflateOfferAccept
 from synapse.api.errors import AuthError, Codes
 from synapse.api.filtering import FilterCollection, DEFAULT_FILTER_COLLECTION
 from synapse.rest.client.v2_alpha._base import set_timeline_upper_limit
@@ -318,6 +319,7 @@ class SynapseWebsocketFactory(WebSocketServerFactory):
         ws_address = create_url(address[0], port=address[1], isSecure=False)
         super(SynapseWebsocketFactory, self).__init__(ws_address)
         self.protocol = SynapseWebsocketProtocol
+        self.setProtocolOptions(perMessageCompressionAccept=self.accept)
         self.hs = hs
         self.clock = hs.get_clock()
         self.filtering = hs.get_filtering()
@@ -327,3 +329,9 @@ class SynapseWebsocketFactory(WebSocketServerFactory):
         self.read_marker_handler = hs.get_read_marker_handler()
         self.typing_handler = hs.get_typing_handler()
         self.clients = []
+
+    @staticmethod
+    def accept(offers):
+        for offer in offers:
+            if isinstance(offer, PerMessageDeflateOffer):
+                return PerMessageDeflateOfferAccept(offer)
