@@ -22,8 +22,10 @@ from synapse.util.logcontext import preserve_fn
 from signedjson.sign import sign_json
 
 
+# Default validity duration for new attestations we create
 DEFAULT_ATTESTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
-MIN_ATTESTATION_LENGTH_MS = 1 * 60 * 60 * 1000
+
+# Start trying to update our attestations when they come this close to expiring
 UPDATE_ATTESTATION_TIME_MS = 1 * 24 * 60 * 60 * 1000
 
 
@@ -58,11 +60,12 @@ class GroupAttestationSigning(object):
 
         if group_id != attestation["group_id"]:
             raise SynapseError(400, "Attestation has incorrect group_id")
-
-        # TODO:
         valid_until_ms = attestation["valid_until_ms"]
-        if valid_until_ms - self.clock.time_msec() < MIN_ATTESTATION_LENGTH_MS:
-            raise SynapseError(400, "Attestation not valid for long enough")
+
+        # TODO: We also want to check that *new* attestations that people give
+        # us to store are valid for at least a little while.
+        if valid_until_ms < self.clock.time_msec():
+            raise SynapseError(400, "Attestation expired")
 
         yield self.keyring.verify_json_for_server(server_name, attestation)
 
