@@ -350,9 +350,10 @@ class GroupsServerHandler(object):
         if group:
             raise SynapseError(400, "Group already exists")
 
+        # TODO: Add config to enforce that only server admins can create rooms
         is_admin = yield self.auth.is_server_admin(UserID.from_string(user_id))
-        if not is_admin and not group_id.startswith("+u/"):
-            raise SynapseError(403, "Group ID must start with '+u/' or be a server admin")
+        if not is_admin:
+            raise SynapseError(403, "Only server admin can create group on this server")
 
         profile = content.get("profile", {})
         name = profile.get("name")
