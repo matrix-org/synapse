@@ -645,6 +645,24 @@ class FederationGroupsRoomsServlet(BaseFederationServlet):
         defer.returnValue((200, new_content))
 
 
+class FederationGroupsAddRoomsServlet(BaseFederationServlet):
+    """Add room to group
+    """
+    PATH = "/groups/(?P<group_id>[^/]*)/room/(?<room_id>)$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id, room_id):
+        requester_user_id = content["requester_user_id"]
+        if get_domain_from_id(requester_user_id) != origin:
+            raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        new_content = yield self.handler.add_room(
+            group_id, requester_user_id, room_id, content
+        )
+
+        defer.returnValue((200, new_content))
+
+
 class FederationGroupsUsersServlet(BaseFederationServlet):
     """Get the users in a group on behalf of a user
     """
