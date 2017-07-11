@@ -168,7 +168,7 @@ class GroupServerStore(SQLBaseStore):
                         "group_id": group_id,
                         "user_id": user_id,
                         "valid_until_ms": remote_attestation["valid_until_ms"],
-                        "attestation": json.dumps(remote_attestation),
+                        "attestation_json": json.dumps(remote_attestation),
                     },
                 )
 
@@ -278,7 +278,7 @@ class GroupServerStore(SQLBaseStore):
             },
             updatevalues={
                 "valid_until_ms": attestation["valid_until_ms"],
-                "attestation": json.dumps(attestation)
+                "attestation_json": json.dumps(attestation)
             },
             desc="update_remote_attestion",
         )
@@ -294,13 +294,13 @@ class GroupServerStore(SQLBaseStore):
                 "group_id": group_id,
                 "user_id": user_id,
             },
-            retcols=("valid_until_ms", "attestation"),
+            retcols=("valid_until_ms", "attestation_json"),
             desc="get_remote_attestation",
             allow_none=True,
         )
 
         now = int(self._clock.time_msec())
         if row and now < row["valid_until_ms"]:
-            defer.returnValue(json.loads(row["attestation"]))
+            defer.returnValue(json.loads(row["attestation_json"]))
 
         defer.returnValue(None)

@@ -73,7 +73,7 @@ CREATE TABLE group_attestations_remote (
     group_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     valid_until_ms BIGINT NOT NULL,
-    attestation TEXT NOT NULL
+    attestation_json TEXT NOT NULL
 );
 
 CREATE INDEX group_attestations_remote_g_idx ON group_attestations_remote(group_id, user_id);
