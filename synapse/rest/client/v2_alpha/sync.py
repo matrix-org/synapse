@@ -183,46 +183,64 @@ class SyncRestServlet(RestServlet):
         else:
             raise Exception("Unknown event format %s" % (filter.event_format, ))
 
-        joined = SyncRestServlet.encode_joined(
-            sync_result.joined, time_now, access_token_id,
-            filter.event_fields,
-            event_formatter,
-        )
-
-        invited = SyncRestServlet.encode_invited(
-            sync_result.invited, time_now, access_token_id,
-            event_formatter,
-        )
-
-        archived = SyncRestServlet.encode_archived(
-            sync_result.archived, time_now, access_token_id,
-            filter.event_fields,
-            event_formatter,
-        )
-
-        return {
-            "account_data": {"events": sync_result.account_data},
-            "to_device": {"events": sync_result.to_device},
-            "device_lists": {
-                "changed": list(sync_result.device_lists.changed),
-                "left": list(sync_result.device_lists.left),
-            },
-            "presence": SyncRestServlet.encode_presence(
-                sync_result.presence, time_now
-            ),
-            "rooms": {
-                "join": joined,
-                "invite": invited,
-                "leave": archived,
-            },
-            "groups": {
-                "join": sync_result.groups.join,
-                "invite": sync_result.groups.invite,
-                "leave": sync_result.groups.leave,
-            },
+        response = {
             "device_one_time_keys_count": sync_result.device_one_time_keys_count,
             "next_batch": sync_result.next_batch.to_string(),
         }
+        if sync_result.account_data:
+            response["account_data"] = {"events": sync_result.account_data}
+        if sync_result.to_device:
+            response["to_device"] = {"events": sync_result.to_device}
+        if sync_result.device_lists:
+            device_lists = {}
+            if sync_result.device_lists.changed:
+                device_lists["changed"] = list(sync_result.device_lists.changed)
+            if sync_result.device_lists.left:
+                device_lists["left"] = list(sync_result.device_lists.left)
+
+            if device_lists:
+                response["device_lists"] = device_lists
+
+        if sync_result.presence:
+            response["presence"] = SyncRestServlet.encode_presence(
+                sync_result.presence, time_now
+            )
+
+        rooms = {}
+        if sync_result.joined:
+            rooms["join"] = SyncRestServlet.encode_joined(
+                sync_result.joined, time_now, access_token_id,
+                filter.event_fields,
+                event_formatter,
+            )
+        if sync_result.invited:
+            rooms["invite"] = SyncRestServlet.encode_invited(
+                sync_result.invited, time_now, access_token_id,
+                event_formatter,
+            )
+        if sync_result.archived:
+            rooms["leave"] = SyncRestServlet.encode_archived(
+                sync_result.archived, time_now, access_token_id,
+                filter.event_fields,
+                event_formatter,
+            )
+
+        if rooms:
+            response["rooms"] = rooms
+
+        if sync_result.groups:
+            groups = {}
+            if sync_result.groups.join:
+                groups["join"] = sync_result.groups.join
+            if sync_result.groups.join:
+                groups["invite"] = sync_result.groups.invite
+            if sync_result.groups.join:
+                groups["leave"] = sync_result.groups.leave
+
+            if groups:
+                response["groups"] = groups
+
+        return response
 
     @staticmethod
     def encode_presence(events, time_now):
