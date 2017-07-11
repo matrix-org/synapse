@@ -1413,7 +1413,7 @@ class FederationHandler(BaseHandler):
             auth_events=auth_events,
         )
 
-        if not event.internal_metadata.is_outlier():
+        if not event.internal_metadata.is_outlier() and not backfilled:
             yield self.action_generator.handle_push_actions_for_event(
                 event, context
             )
