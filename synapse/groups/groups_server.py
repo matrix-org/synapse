@@ -50,7 +50,7 @@ class GroupsServerHandler(object):
         hs.get_groups_attestation_renewer()
 
     @defer.inlineCallbacks
-    def check_group_is_ours(self, group_id, and_exists=False):
+    def check_group_is_ours(self, group_id, and_exists=False, and_is_admin=None):
         """Check that the group is ours, and optionally if it exists.
 
         If group does exist then return group.
@@ -61,6 +61,11 @@ class GroupsServerHandler(object):
         group = yield self.store.get_group(group_id)
         if and_exists and not group:
             raise SynapseError(404, "Unknown group")
+
+        if and_is_admin:
+            is_admin = yield self.store.is_user_admin_in_group(group_id, and_is_admin)
+            if not is_admin:
+                raise SynapseError(403, "User is not admin in group")
 
         defer.returnValue(group)
 
@@ -128,11 +133,7 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def update_group_summary_room(self, group_id, user_id, room_id, category_id, content):
-        yield self.check_group_is_ours(group_id, and_exists=True)
-
-        is_admin = yield self.store.is_user_admin_in_group(group_id, user_id)
-        if not is_admin:
-            raise SynapseError(403, "User is not admin in group")
+        yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         order = content.get("order", None)
 
@@ -150,11 +151,7 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def delete_group_summary_room(self, group_id, user_id, room_id, category_id):
-        yield self.check_group_is_ours(group_id, and_exists=True)
-
-        is_admin = yield self.store.is_user_admin_in_group(group_id, user_id)
-        if not is_admin:
-            raise SynapseError(403, "User is not admin in group")
+        yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         yield self.store.remove_room_from_summary(
             group_id=group_id,
@@ -186,11 +183,7 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def update_group_category(self, group_id, user_id, category_id, content):
-        yield self.check_group_is_ours(group_id, and_exists=True)
-
-        is_admin = yield self.store.is_user_admin_in_group(group_id, user_id)
-        if not is_admin:
-            raise SynapseError(403, "User is not admin in group")
+        yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         is_public = _parse_visibility_from_contents(content)
         profile = content.get("profile")
@@ -206,11 +199,7 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def delete_group_category(self, group_id, user_id, category_id):
-        yield self.check_group_is_ours(group_id, and_exists=True)
-
-        is_admin = yield self.store.is_user_admin_in_group(group_id, user_id)
-        if not is_admin:
-            raise SynapseError(403, "User is not admin in group")
+        yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         yield self.store.remove_group_category(
             group_id=group_id,
@@ -240,11 +229,7 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def update_group_role(self, group_id, user_id, role_id, content):
-        yield self.check_group_is_ours(group_id, and_exists=True)
-
-        is_admin = yield self.store.is_user_admin_in_group(group_id, user_id)
-        if not is_admin:
-            raise SynapseError(403, "User is not admin in group")
+        yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         is_public = _parse_visibility_from_contents(content)
 
@@ -261,11 +246,7 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def delete_group_role(self, group_id, user_id, role_id):
-        yield self.check_group_is_ours(group_id, and_exists=True)
-
-        is_admin = yield self.store.is_user_admin_in_group(group_id, user_id)
-        if not is_admin:
-            raise SynapseError(403, "User is not admin in group")
+        yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         yield self.store.remove_group_role(
             group_id=group_id,
@@ -277,11 +258,7 @@ class GroupsServerHandler(object):
     @defer.inlineCallbacks
     def update_group_summary_user(self, group_id, requester_user_id, user_id, role_id,
                                   content):
-        yield self.check_group_is_ours(group_id, and_exists=True)
-
-        is_admin = yield self.store.is_user_admin_in_group(group_id, requester_user_id)
-        if not is_admin:
-            raise SynapseError(403, "User is not admin in group")
+        yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         order = content.get("order", None)
 
@@ -299,11 +276,7 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def delete_group_summary_user(self, group_id, requester_user_id, user_id, role_id):
-        yield self.check_group_is_ours(group_id, and_exists=True)
-
-        is_admin = yield self.store.is_user_admin_in_group(group_id, requester_user_id)
-        if not is_admin:
-            raise SynapseError(403, "User is not admin in group")
+        yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         yield self.store.remove_user_from_summary(
             group_id=group_id,
@@ -419,12 +392,9 @@ class GroupsServerHandler(object):
     def add_room(self, group_id, requester_user_id, room_id, content):
         """Add room to group
         """
-
-        yield self.check_group_is_ours(group_id, and_exists=True)
-
-        is_admin = yield self.store.is_user_admin_in_group(group_id, requester_user_id)
-        if not is_admin:
-            raise SynapseError(403, "User is not admin in group")
+        yield self.check_group_is_ours(
+            group_id, and_exists=True, and_is_admin=requester_user_id
+        )
 
         # TODO: Check if room has already been added
 
@@ -439,13 +409,9 @@ class GroupsServerHandler(object):
         """Invite user to group
         """
 
-        group = yield self.check_group_is_ours(group_id, and_exists=True)
-
-        is_admin = yield self.store.is_user_admin_in_group(
-            group_id, requester_user_id
+        group = yield self.check_group_is_ours(
+            group_id, and_exists=True, and_is_admin=requester_user_id
         )
-        if not is_admin:
-            raise SynapseError(403, "User is not admin in group")
 
         # TODO: Check if user knocked
         # TODO: Check if user is already invited
