@@ -394,24 +394,26 @@ class SyncRestServlet(RestServlet):
                     event.event_id, room.room_id, event.room_id,
                 )
 
-        serialized_state = [serialize(e) for e in state_events]
-        serialized_timeline = [serialize(e) for e in timeline_events]
-
         account_data = room.account_data
 
-        result = {
-            "timeline": {
+        result = {}
+        if timeline_events:
+            serialized_timeline = [serialize(e) for e in timeline_events]
+            result["timeline"] = {
                 "events": serialized_timeline,
                 "prev_batch": room.timeline.prev_batch.to_string(),
                 "limited": room.timeline.limited,
-            },
-            "state": {"events": serialized_state},
-            "account_data": {"events": account_data},
-        }
+            }
+        if state_events:
+            serialized_state = [serialize(e) for e in state_events]
+            result["state"] = {"events": serialized_state}
+        if account_data:
+            result["account_data"] = {"events": account_data}
 
         if joined:
             ephemeral_events = room.ephemeral
-            result["ephemeral"] = {"events": ephemeral_events}
+            if ephemeral_events:
+                result["ephemeral"] = {"events": ephemeral_events}
             result["unread_notifications"] = room.unread_notifications
             result["summary"] = room.summary
 
