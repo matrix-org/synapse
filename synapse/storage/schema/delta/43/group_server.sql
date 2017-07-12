@@ -15,7 +15,7 @@
 
 CREATE TABLE groups (
     group_id TEXT NOT NULL,
-    name TEXT,
+    name TEXT,  -- the display name of the room
     avatar_url TEXT,
     short_description TEXT,
     long_description TEXT
