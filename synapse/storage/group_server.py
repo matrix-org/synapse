@@ -22,6 +22,8 @@ from ._base import SQLBaseStore
 import ujson as json
 
 
+# The category ID for the "default" category. We don't store as null in the
+# database to avoid the fun of null != null
 _DEFAULT_CATEGORY_ID = "default"
 
 
@@ -70,6 +72,10 @@ class GroupServerStore(SQLBaseStore):
         )
 
     def get_rooms_for_summary_by_category(self, group_id, include_private=False):
+        """Get the rooms and categories that should be included in a summary request
+
+        Returns ([rooms], [categories])
+        """
         def _get_rooms_for_summary_txn(txn):
             keyvalues = {
                 "group_id": group_id,
@@ -134,6 +140,14 @@ class GroupServerStore(SQLBaseStore):
 
     def _add_room_to_summary_txn(self, txn, group_id, room_id, category_id, order,
                                  is_public):
+        """Add room to summary.
+
+        This automatically adds the room to the end of the list of rooms to be
+        included in the summary response. If a role is given then user will
+        be added under that category (the category will automatically be added tothe
+        the summary if a user is listed under that role in the summary).
+        """
+
         if category_id is None:
             category_id = _DEFAULT_CATEGORY_ID
         else:
@@ -278,6 +292,8 @@ class GroupServerStore(SQLBaseStore):
         defer.returnValue(category)
 
     def upsert_group_category(self, group_id, category_id, profile, is_public):
+        """Add/update room category for group
+        """
         insertion_values = {}
         update_values = {"category_id": category_id}  # This cannot be empty
 
@@ -348,6 +364,8 @@ class GroupServerStore(SQLBaseStore):
         defer.returnValue(role)
 
     def upsert_group_role(self, group_id, role_id, profile, is_public):
+        """Add/remove user role
+        """
         insertion_values = {}
         update_values = {"role_id": role_id}  # This cannot be empty
 
@@ -390,6 +408,13 @@ class GroupServerStore(SQLBaseStore):
 
     def _add_user_to_summary_txn(self, txn, group_id, user_id, role_id, order,
                                  is_public):
+        """Add user to summary.
+
+        This automatically adds the user to the end of the list of users to be
+        included in the summary response. If a role is given then user will
+        be added under that role (the role will automatically be added to the
+        summary if a user is listed under that role in the summary).
+        """
         if role_id is None:
             role_id = _DEFAULT_CATEGORY_ID
         else:
@@ -499,6 +524,10 @@ class GroupServerStore(SQLBaseStore):
         )
 
     def get_users_for_summary_by_role(self, group_id, include_private=False):
+        """Get the users and roles that should be included in a summary request
+
+        Returns ([users], [roles])
+        """
         def _get_users_for_summary_txn(txn):
             keyvalues = {
                 "group_id": group_id,

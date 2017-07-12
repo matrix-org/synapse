@@ -54,6 +54,12 @@ class GroupsServerHandler(object):
         """Check that the group is ours, and optionally if it exists.
 
         If group does exist then return group.
+
+        Args:
+            group_id (str)
+            and_exists (bool): whether to also check if group exists
+            and_is_admin (str): whether to also check if given str is a user_id
+                that is an admin
         """
         if not self.is_mine_id(group_id):
             raise SynapseError(400, "Group not on this server")
@@ -71,6 +77,14 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def get_group_summary(self, group_id, requester_user_id):
+        """Get the summary for a group as seen by requester_user_id.
+
+        The group summary consists of the profile of the room, and a curated
+        list of users and rooms. These list *may* be organised by role/category.
+        The roles/categories are ordered, and so are the users/rooms within them.
+
+        A user/room may appear in multiple roles/categories.
+        """
         yield self.check_group_is_ours(group_id, and_exists=True)
 
         is_user_in_group = yield self.store.is_user_in_group(requester_user_id, group_id)
@@ -133,6 +147,8 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def update_group_summary_room(self, group_id, user_id, room_id, category_id, content):
+        """Add/update a room to the group summary
+        """
         yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         order = content.get("order", None)
@@ -151,6 +167,8 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def delete_group_summary_room(self, group_id, user_id, room_id, category_id):
+        """Remove a room from the summary
+        """
         yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         yield self.store.remove_room_from_summary(
@@ -163,6 +181,8 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def get_group_categories(self, group_id, user_id):
+        """Get all categories in a group (as seen by user)
+        """
         yield self.check_group_is_ours(group_id, and_exists=True)
 
         categories = yield self.store.get_group_categories(
@@ -172,6 +192,8 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def get_group_category(self, group_id, user_id, category_id):
+        """Get a specific category in a group (as seen by user)
+        """
         yield self.check_group_is_ours(group_id, and_exists=True)
 
         res = yield self.store.get_group_category(
@@ -183,6 +205,8 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def update_group_category(self, group_id, user_id, category_id, content):
+        """Add/Update a group category
+        """
         yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         is_public = _parse_visibility_from_contents(content)
@@ -199,6 +223,8 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def delete_group_category(self, group_id, user_id, category_id):
+        """Delete a group category
+        """
         yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         yield self.store.remove_group_category(
@@ -210,6 +236,8 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def get_group_roles(self, group_id, user_id):
+        """Get all roles in a group (as seen by user)
+        """
         yield self.check_group_is_ours(group_id, and_exists=True)
 
         roles = yield self.store.get_group_roles(
@@ -219,6 +247,8 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def get_group_role(self, group_id, user_id, role_id):
+        """Get a specific role in a group (as seen by user)
+        """
         yield self.check_group_is_ours(group_id, and_exists=True)
 
         res = yield self.store.get_group_role(
@@ -229,6 +259,8 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def update_group_role(self, group_id, user_id, role_id, content):
+        """Add/update a role in a group
+        """
         yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         is_public = _parse_visibility_from_contents(content)
@@ -246,6 +278,8 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def delete_group_role(self, group_id, user_id, role_id):
+        """Remove role from group
+        """
         yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         yield self.store.remove_group_role(
@@ -258,6 +292,8 @@ class GroupsServerHandler(object):
     @defer.inlineCallbacks
     def update_group_summary_user(self, group_id, requester_user_id, user_id, role_id,
                                   content):
+        """Add/update a users entry in the group summary
+        """
         yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         order = content.get("order", None)
@@ -276,6 +312,8 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def delete_group_summary_user(self, group_id, requester_user_id, user_id, role_id):
+        """Remove a user from the group summary
+        """
         yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
 
         yield self.store.remove_user_from_summary(
