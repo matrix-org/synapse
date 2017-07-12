@@ -579,18 +579,17 @@ class SyncHandler(object):
         since_token = sync_result_builder.since_token
 
         if since_token and since_token.device_list_key:
-            room_ids = yield self.store.get_rooms_for_user(user_id)
-
-            user_ids_changed = set()
             changed = yield self.store.get_user_whose_devices_changed(
                 since_token.device_list_key
             )
-            for other_user_id in changed:
-                other_room_ids = yield self.store.get_rooms_for_user(other_user_id)
-                if room_ids.intersection(other_room_ids):
-                    user_ids_changed.add(other_user_id)
+            if not changed:
+                defer.returnValue([])
 
-            defer.returnValue(user_ids_changed)
+            users_who_share_room = yield self.store.get_users_who_share_room_with_user(
+                user_id
+            )
+
+            defer.returnValue(users_who_share_room & changed)
         else:
             defer.returnValue([])
 
