@@ -810,6 +810,8 @@ class FederationGroupsSummaryRoomsServlet(BaseFederationServlet):
 
 
 class FederationGroupsCategoriesServlet(BaseFederationServlet):
+    """Get all categories for a group
+    """
     PATH = (
         "/groups/(?P<group_id>[^/]*)/categories/$"
     )
@@ -828,6 +830,8 @@ class FederationGroupsCategoriesServlet(BaseFederationServlet):
 
 
 class FederationGroupsCategoryServlet(BaseFederationServlet):
+    """Add/remove/get a category in a group
+    """
     PATH = (
         "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)$"
     )
@@ -870,6 +874,8 @@ class FederationGroupsCategoryServlet(BaseFederationServlet):
 
 
 class FederationGroupsRolesServlet(BaseFederationServlet):
+    """Get roles in a group
+    """
     PATH = (
         "/groups/(?P<group_id>[^/]*)/roles/$"
     )
@@ -888,6 +894,8 @@ class FederationGroupsRolesServlet(BaseFederationServlet):
 
 
 class FederationGroupsRoleServlet(BaseFederationServlet):
+    """Add/remove/get a role in a group
+    """
     PATH = (
         "/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)$"
     )

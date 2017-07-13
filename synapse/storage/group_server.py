@@ -140,12 +140,16 @@ class GroupServerStore(SQLBaseStore):
 
     def _add_room_to_summary_txn(self, txn, group_id, room_id, category_id, order,
                                  is_public):
-        """Add room to summary.
+        """Add (or update) room's entry in summary.
 
-        This automatically adds the room to the end of the list of rooms to be
-        included in the summary response. If a role is given then user will
-        be added under that category (the category will automatically be added tothe
-        the summary if a user is listed under that role in the summary).
+        Args:
+            group_id (str)
+            room_id (str)
+            category_id (str): If not None then adds the category to the end of
+                the summary if its not already there. [Optional]
+            order (int): If not None inserts the room at that position, e.g.
+                an order of 1 will put the room first. Otherwise, the room gets
+                added to the end.
         """
 
         if category_id is None:
@@ -164,7 +168,7 @@ class GroupServerStore(SQLBaseStore):
             if not cat_exists:
                 raise SynapseError(400, "Category doesn't exist")
 
-            # TODO: Check room is part of group already
+            # TODO: Check category is part of summary already
             cat_exists = self._simple_select_one_onecol_txn(
                 txn,
                 table="group_summary_room_categories",
@@ -176,6 +180,7 @@ class GroupServerStore(SQLBaseStore):
                 allow_none=True,
             )
             if not cat_exists:
+                # If not, add it with an order larger than all others
                 txn.execute("""
                     INSERT INTO group_summary_room_categories
                     (group_id, category_id, cat_order)
@@ -197,6 +202,7 @@ class GroupServerStore(SQLBaseStore):
         )
 
         if order is not None:
+            # Shuffle other room orders that come after the given order
             sql = """
                 UPDATE group_summary_rooms SET room_order = room_order + 1
                 WHERE group_id = ? AND category_id = ? AND room_order >= ?
@@ -408,12 +414,16 @@ class GroupServerStore(SQLBaseStore):
 
     def _add_user_to_summary_txn(self, txn, group_id, user_id, role_id, order,
                                  is_public):
-        """Add user to summary.
+        """Add (or update) user's entry in summary.
 
-        This automatically adds the user to the end of the list of users to be
-        included in the summary response. If a role is given then user will
-        be added under that role (the role will automatically be added to the
-        summary if a user is listed under that role in the summary).
+        Args:
+            group_id (str)
+            user_id (str)
+            role_id (str): If not None then adds the role to the end of
+                the summary if its not already there. [Optional]
+            order (int): If not None inserts the user at that position, e.g.
+                an order of 1 will put the user first. Otherwise, the user gets
+                added to the end.
         """
         if role_id is None:
             role_id = _DEFAULT_CATEGORY_ID
@@ -431,7 +441,7 @@ class GroupServerStore(SQLBaseStore):
             if not role_exists:
                 raise SynapseError(400, "Role doesn't exist")
 
-            # TODO: Check room is part of group already
+            # TODO: Check role is part of the summary already
             role_exists = self._simple_select_one_onecol_txn(
                 txn,
                 table="group_summary_roles",
@@ -443,6 +453,7 @@ class GroupServerStore(SQLBaseStore):
                 allow_none=True,
             )
             if not role_exists:
+                # If not, add it with an order larger than all others
                 txn.execute("""
                     INSERT INTO group_summary_roles
                     (group_id, role_id, role_order)
@@ -464,6 +475,7 @@ class GroupServerStore(SQLBaseStore):
         )
 
         if order is not None:
+            # Shuffle other users orders that come after the given order
             sql = """
                 UPDATE group_summary_users SET user_order = user_order + 1
                 WHERE group_id = ? AND role_id = ? AND user_order >= ?
