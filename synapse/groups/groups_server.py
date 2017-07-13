@@ -96,7 +96,6 @@ class GroupsServerHandler(object):
         )
 
         # TODO: Add profiles to users
-        # TODO: Add assestations to users
 
         rooms, categories = yield self.store.get_rooms_for_summary_by_category(
             group_id, include_private=is_user_in_group,
