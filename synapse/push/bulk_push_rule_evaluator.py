@@ -213,6 +213,10 @@ class RulesForRoom(object):
         """
         state_group = context.state_group
 
+        if state_group and self.state_group == state_group:
+            logger.debug("Using cached rules for %r", self.room_id)
+            defer.returnValue(self.rules_by_user)
+
         with (yield self.linearizer.queue(())):
             if state_group and self.state_group == state_group:
                 logger.debug("Using cached rules for %r", self.room_id)
