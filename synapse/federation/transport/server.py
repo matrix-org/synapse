@@ -785,6 +785,9 @@ class FederationGroupsSummaryRoomsServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
+        if category_id == "":
+            raise SynapseError(400, "category_id cannot be empty string")
+
         resp = yield self.handler.update_group_summary_room(
             group_id, requester_user_id,
             room_id=room_id,
@@ -799,6 +802,9 @@ class FederationGroupsSummaryRoomsServlet(BaseFederationServlet):
         requester_user_id = query["requester_user_id"]
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        if category_id == "":
+            raise SynapseError(400, "category_id cannot be empty string")
 
         resp = yield self.handler.delete_group_summary_room(
             group_id, requester_user_id,
@@ -854,6 +860,9 @@ class FederationGroupsCategoryServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
+        if category_id == "":
+            raise SynapseError(400, "category_id cannot be empty string")
+
         resp = yield self.handler.upsert_group_category(
             group_id, requester_user_id, category_id, content,
         )
@@ -865,6 +874,9 @@ class FederationGroupsCategoryServlet(BaseFederationServlet):
         requester_user_id = query["requester_user_id"]
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        if category_id == "":
+            raise SynapseError(400, "category_id cannot be empty string")
 
         resp = yield self.handler.delete_group_category(
             group_id, requester_user_id, category_id,
@@ -918,6 +930,9 @@ class FederationGroupsRoleServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
+        if role_id == "":
+            raise SynapseError(400, "role_id cannot be empty string")
+
         resp = yield self.handler.update_group_role(
             group_id, requester_user_id, role_id, content,
         )
@@ -929,6 +944,9 @@ class FederationGroupsRoleServlet(BaseFederationServlet):
         requester_user_id = query["requester_user_id"]
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        if role_id == "":
+            raise SynapseError(400, "role_id cannot be empty string")
 
         resp = yield self.handler.delete_group_role(
             group_id, requester_user_id, role_id,
@@ -956,6 +974,9 @@ class FederationGroupsSummaryUsersServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
+        if role_id == "":
+            raise SynapseError(400, "role_id cannot be empty string")
+
         resp = yield self.handler.update_group_summary_user(
             group_id, requester_user_id,
             user_id=user_id,
@@ -970,6 +991,9 @@ class FederationGroupsSummaryUsersServlet(BaseFederationServlet):
         requester_user_id = query["requester_user_id"]
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        if role_id == "":
+            raise SynapseError(400, "role_id cannot be empty string")
 
         resp = yield self.handler.delete_group_summary_user(
             group_id, requester_user_id,
