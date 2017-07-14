@@ -184,7 +184,7 @@ class GroupServerStore(SQLBaseStore):
                 txn.execute("""
                     INSERT INTO group_summary_room_categories
                     (group_id, category_id, cat_order)
-                    SELECT ?, ?, COALESCE(MAX(cat_order), 1)
+                    SELECT ?, ?, COALESCE(MAX(cat_order), 0) + 1
                     FROM group_summary_room_categories
                     WHERE group_id = ? AND category_id = ?
                 """, (group_id, category_id, group_id, category_id))
@@ -457,7 +457,7 @@ class GroupServerStore(SQLBaseStore):
                 txn.execute("""
                     INSERT INTO group_summary_roles
                     (group_id, role_id, role_order)
-                    SELECT ?, ?, COALESCE(MAX(role_order), 1)
+                    SELECT ?, ?, COALESCE(MAX(role_order), 0) + 1
                     FROM group_summary_roles
                     WHERE group_id = ? AND role_id = ?
                 """, (group_id, role_id, group_id, role_id))
