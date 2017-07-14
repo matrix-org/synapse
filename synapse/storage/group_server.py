@@ -24,7 +24,8 @@ import ujson as json
 
 # The category ID for the "default" category. We don't store as null in the
 # database to avoid the fun of null != null
-_DEFAULT_CATEGORY_ID = "default"
+_DEFAULT_CATEGORY_ID = ""
+_DEFAULT_ROLE_ID = ""
 
 
 class GroupServerStore(SQLBaseStore):
@@ -426,7 +427,7 @@ class GroupServerStore(SQLBaseStore):
                 added to the end.
         """
         if role_id is None:
-            role_id = _DEFAULT_CATEGORY_ID
+            role_id = _DEFAULT_ROLE_ID
         else:
             role_exists = self._simple_select_one_onecol_txn(
                 txn,
@@ -523,7 +524,7 @@ class GroupServerStore(SQLBaseStore):
 
     def remove_user_from_summary(self, group_id, user_id, role_id):
         if role_id is None:
-            role_id = _DEFAULT_CATEGORY_ID
+            role_id = _DEFAULT_ROLE_ID
 
         return self._simple_delete(
             table="group_summary_users",
@@ -563,7 +564,7 @@ class GroupServerStore(SQLBaseStore):
                 {
                     "user_id": row[0],
                     "is_public": row[1],
-                    "role_id": row[2] if row[2] != _DEFAULT_CATEGORY_ID else None,
+                    "role_id": row[2] if row[2] != _DEFAULT_ROLE_ID else None,
                     "order": row[3],
                 }
                 for row in txn
