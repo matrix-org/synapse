@@ -316,6 +316,14 @@ class RulesForRoom(object):
                 yield self._update_rules_with_member_event_ids(
                     ret_rules_by_user, missing_member_event_ids, state_group, event
                 )
+            else:
+                # The push rules didn't change but lets update the cache anyway
+                self.update_cache(
+                    self.sequence,
+                    members={},  # There were no membership changes
+                    rules_by_user=ret_rules_by_user,
+                    state_group=state_group
+                )
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(
