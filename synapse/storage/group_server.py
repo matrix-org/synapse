@@ -762,6 +762,20 @@ class GroupServerStore(SQLBaseStore):
                                        local_attestation=None,
                                        remote_attestation=None,
                                        ):
+        """Registers that a local user is a member of a (local or remote) group.
+
+        Args:
+            group_id (str)
+            user_id (str)
+            membership (str)
+            is_admin (bool)
+            content (dict): Content of the membership, e.g. includes the inviter
+                if the user has been invited.
+            local_attestation (dict): If remote group then store the fact that we
+                have given out an attestation, else None.
+            remote_attestation (dict): If remote group then store the remote
+                attestation from the group, else None.
+        """
         def _register_user_group_membership_txn(txn, next_id):
             # TODO: Upsert?
             self._simple_delete_txn(
