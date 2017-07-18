@@ -868,61 +868,6 @@ class GroupServerStore(SQLBaseStore):
             desc="create_group",
         )
 
-    def get_joined_groups(self, user_id):
-        return self._simple_select_onecol(
-            table="local_group_membership",
-            keyvalues={
-                "user_id": user_id,
-                "membership": "join",
-            },
-            retcol="group_id",
-            desc="get_joined_groups",
-        )
-
-    def get_all_groups_for_user(self, user_id, now_token):
-        def _get_all_groups_for_user_txn(txn):
-            sql = """
-                SELECT group_id, type, membership, u.content
-                FROM local_group_updates AS u
-                INNER JOIN local_group_membership USING (group_id, user_id)
-                WHERE user_id = ? AND membership != 'leave'
-                    AND stream_id <= ?
-            """
-            txn.execute(sql, (user_id, now_token,))
-            return self.cursor_to_dict(txn)
-        return self.runInteraction(
-            "get_all_groups_for_user", _get_all_groups_for_user_txn,
-        )
-
-    def get_groups_changes_for_user(self, user_id, from_token, to_token):
-        from_token = int(from_token)
-        has_changed = self._group_updates_stream_cache.has_entity_changed(
-            user_id, from_token,
-        )
-        if not has_changed:
-            return []
-
-        def _get_groups_changes_for_user_txn(txn):
-            sql = """
-                SELECT group_id, membership, type, u.content
-                FROM local_group_updates AS u
-                INNER JOIN local_group_membership USING (group_id, user_id)
-                WHERE user_id = ? AND ? < stream_id AND stream_id <= ?
-            """
-            txn.execute(sql, (user_id, from_token, to_token,))
-            return [{
-                "group_id": group_id,
-                "membership": membership,
-                "type": gtype,
-                "content": json.loads(content_json),
-            } for group_id, membership, gtype, content_json in txn]
-        return self.runInteraction(
-            "get_groups_changes_for_user", _get_groups_changes_for_user_txn,
-        )
-
-    def get_group_stream_token(self):
-        return self._group_updates_id_gen.get_current_token()
-
     def get_attestations_need_renewals(self, valid_until_ms):
         """Get all attestations that need to be renewed until givent time
         """
