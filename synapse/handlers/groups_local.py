@@ -16,6 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
+from synapse.types import get_domain_from_id
 
 import logging
 
@@ -41,8 +42,11 @@ def _create_rerouter(func_name):
             return getattr(self.groups_server_handler, func_name)(
                 group_id, *args, **kwargs
             )
-
-        return getattr(self.transport_client, func_name)(group_id, *args, **kwargs)
+        else:
+            destination = get_domain_from_id(group_id)
+            return getattr(self.transport_client, func_name)(
+                destination, group_id, *args, **kwargs
+            )
     return f
 
 
@@ -98,7 +102,9 @@ class GroupsLocalHandler(object):
             )
             defer.returnValue(res)
 
-        res = yield self.transport_client.get_group_summary(group_id, requester_user_id)
+        res = yield self.transport_client.get_group_summary(
+            get_domain_from_id(group_id), group_id, requester_user_id,
+        )
 
         # Loop through the users and validate the attestations.
         chunk = res["users_section"]["users"]
@@ -131,7 +137,9 @@ class GroupsLocalHandler(object):
                 group_id, user_id, content
             )
 
-        return self.transport_client.create_group(group_id, user_id, content)  # TODO
+        return self.transport_client.create_group(
+            get_domain_from_id(group_id), group_id, user_id, content,
+        )  # TODO
 
     def add_room(self, group_id, user_id, room_id, content):
         if self.is_mine_id(group_id):
@@ -140,8 +148,8 @@ class GroupsLocalHandler(object):
             )
 
         return self.transport_client.add_room_to_group(
-            group_id, user_id, room_id, content,
-        )  # TODO
+            get_domain_from_id(group_id), group_id, user_id, room_id, content,
+        )
 
     @defer.inlineCallbacks
     def get_users_in_group(self, group_id, requester_user_id):
@@ -151,9 +159,9 @@ class GroupsLocalHandler(object):
             )
             defer.returnValue(res)
 
-        res = yield self.transport_client.get_users_in_group(
-            group_id, requester_user_id,
-        )  # TODO
+        res = yield self.transport_client.get_group_users(
+            get_domain_from_id(group_id), group_id, requester_user_id,
+        )
 
         chunk = res["chunk"]
         valid_entries = []
@@ -191,7 +199,7 @@ class GroupsLocalHandler(object):
             content["attestation"] = local_attestation
 
             res = yield self.transport_client.accept_group_invite(
-                group_id, user_id, content,
+                get_domain_from_id(group_id), group_id, user_id, content,
             )
 
             remote_attestation = res["attestation"]
@@ -224,7 +232,8 @@ class GroupsLocalHandler(object):
             )
         else:
             res = yield self.transport_client.invite_to_group(
-                group_id, user_id, requester_user_id, content,
+                get_domain_from_id(group_id), group_id, user_id, requester_user_id,
+                content,
             )
 
         defer.returnValue(res)
@@ -269,8 +278,8 @@ class GroupsLocalHandler(object):
         else:
             content["requester_user_id"] = requester_user_id
             res = yield self.transport_client.remove_user_from_group(
-                group_id, user_id, content
-            )  # TODO
+                get_domain_from_id(group_id), group_id, user_id, content
+            )
 
         defer.returnValue(res)
 
