@@ -715,21 +715,6 @@ class FederationGroupsInviteServlet(BaseFederationServlet):
         defer.returnValue((200, new_content))
 
 
-class FederationGroupsLocalInviteServlet(BaseFederationServlet):
-    PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite$"
-
-    @defer.inlineCallbacks
-    def on_POST(self, origin, content, query, group_id, user_id):
-        if get_domain_from_id(group_id) != origin:
-            raise SynapseError(403, "group_id doesn't match origin")
-
-        new_content = yield self.handler.on_invite(
-            group_id, user_id, content,
-        )
-
-        defer.returnValue((200, new_content))
-
-
 class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
     """Accept an invitation from the group server
     """
@@ -765,7 +750,26 @@ class FederationGroupsRemoveUserServlet(BaseFederationServlet):
         defer.returnValue((200, new_content))
 
 
+class FederationGroupsLocalInviteServlet(BaseFederationServlet):
+    """A group server has invited a local user
+    """
+    PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id, user_id):
+        if get_domain_from_id(group_id) != origin:
+            raise SynapseError(403, "group_id doesn't match origin")
+
+        new_content = yield self.handler.on_invite(
+            group_id, user_id, content,
+        )
+
+        defer.returnValue((200, new_content))
+
+
 class FederationGroupsRemoveLocalUserServlet(BaseFederationServlet):
+    """A group server has removed a local user
+    """
     PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove$"
 
     @defer.inlineCallbacks

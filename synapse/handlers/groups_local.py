@@ -64,6 +64,9 @@ class GroupsLocalHandler(object):
         # Ensure attestations get renewed
         hs.get_groups_attestation_renewer()
 
+    # The following functions merely route the query to the local groups server
+    # or federation depending on if the group is local or remote
+
     get_group_profile = _create_rerouter("get_group_profile")
     get_rooms_in_group = _create_rerouter("get_rooms_in_group")
 
