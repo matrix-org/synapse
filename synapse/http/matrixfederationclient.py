@@ -347,7 +347,7 @@ class MatrixFederationHttpClient(object):
 
     @defer.inlineCallbacks
     def post_json(self, destination, path, data={}, long_retries=False,
-                  timeout=None, ignore_backoff=False):
+                  timeout=None, ignore_backoff=False, args={}):
         """ Sends the specifed json data using POST
 
         Args:
@@ -383,6 +383,7 @@ class MatrixFederationHttpClient(object):
             destination,
             "POST",
             path,
+            query_bytes=encode_query_args(args),
             body_callback=body_callback,
             headers_dict={"Content-Type": ["application/json"]},
             long_retries=long_retries,
@@ -427,13 +428,6 @@ class MatrixFederationHttpClient(object):
         """
         logger.debug("get_json args: %s", args)
 
-        encoded_args = {}
-        for k, vs in args.items():
-            if isinstance(vs, basestring):
-                vs = [vs]
-            encoded_args[k] = [v.encode("UTF-8") for v in vs]
-
-        query_bytes = urllib.urlencode(encoded_args, True)
         logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
 
         def body_callback(method, url_bytes, headers_dict):
@@ -444,7 +438,7 @@ class MatrixFederationHttpClient(object):
             destination,
             "GET",
             path,
-            query_bytes=query_bytes,
+            query_bytes=encode_query_args(args),
             body_callback=body_callback,
             retry_on_dns_fail=retry_on_dns_fail,
             timeout=timeout,
@@ -610,3 +604,15 @@ def check_content_type_is_json(headers):
         raise RuntimeError(
             "Content-Type not application/json: was '%s'" % c_type
         )
+
+
+def encode_query_args(args):
+    encoded_args = {}
+    for k, vs in args.items():
+        if isinstance(vs, basestring):
+            vs = [vs]
+        encoded_args[k] = [v.encode("UTF-8") for v in vs]
+
+    query_bytes = urllib.urlencode(encoded_args, True)
+
+    return query_bytes
