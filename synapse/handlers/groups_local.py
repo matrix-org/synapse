@@ -224,7 +224,7 @@ class GroupsLocalHandler(object):
             )
         else:
             res = yield self.transport_client.invite_to_group(
-                group_id, user_id, content,
+                group_id, user_id, requester_user_id, content,
             )
 
         defer.returnValue(res)

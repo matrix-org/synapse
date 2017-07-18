@@ -476,10 +476,10 @@ class TransportLayerClient(object):
     def get_group_profile(self, destination, group_id, requester_user_id):
         path = PREFIX + "/groups/%s/profile" % (group_id,)
 
-        return self.client.post_json(
+        return self.client.get_json(
             destination=destination,
             path=path,
-            data={"requester_user_id": requester_user_id},
+            args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
 
@@ -487,10 +487,10 @@ class TransportLayerClient(object):
     def get_group_summary(self, destination, group_id, requester_user_id):
         path = PREFIX + "/groups/%s/summary" % (group_id,)
 
-        return self.client.post_json(
+        return self.client.get_json(
             destination=destination,
             path=path,
-            data={"requester_user_id": requester_user_id},
+            args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
 
@@ -498,10 +498,22 @@ class TransportLayerClient(object):
     def get_group_rooms(self, destination, group_id, requester_user_id):
         path = PREFIX + "/groups/%s/rooms" % (group_id,)
 
+        return self.client.get_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
+    def add_room_to_group(self, destination, group_id, requester_user_id, room_id,
+                          content):
+        path = PREFIX + "/groups/%s/room/%s" % (group_id, room_id,)
+
         return self.client.post_json(
             destination=destination,
             path=path,
-            data={"requester_user_id": requester_user_id},
+            args={"requester_user_id": requester_user_id},
+            data=content,
             ignore_backoff=True,
         )
 
@@ -509,10 +521,10 @@ class TransportLayerClient(object):
     def get_group_users(self, destination, group_id, requester_user_id):
         path = PREFIX + "/groups/%s/users" % (group_id,)
 
-        return self.client.post_json(
+        return self.client.get_json(
             destination=destination,
             path=path,
-            data={"requester_user_id": requester_user_id},
+            args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
 
@@ -528,12 +540,13 @@ class TransportLayerClient(object):
         )
 
     @log_function
-    def invite_to_group(self, destination, group_id, user_id, content):
+    def invite_to_group(self, destination, group_id, user_id, requester_user_id, content):
         path = PREFIX + "/groups/%s/users/%s/invite" % (group_id, user_id)
 
         return self.client.post_json(
             destination=destination,
             path=path,
+            args=requester_user_id,
             data=content,
             ignore_backoff=True,
         )
@@ -554,12 +567,14 @@ class TransportLayerClient(object):
         )
 
     @log_function
-    def remove_user_from_group(self, destination, group_id, user_id, content):
+    def remove_user_from_group(self, destination, group_id, requester_user_id,
+                               user_id, content):
         path = PREFIX + "/groups/%s/users/%s/remove" % (group_id, user_id)
 
         return self.client.post_json(
             destination=destination,
             path=path,
+            args={"requester_user_id": requester_user_id},
             data=content,
             ignore_backoff=True,
         )
@@ -592,5 +607,168 @@ class TransportLayerClient(object):
             destination=destination,
             path=path,
             data=content,
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def update_group_summary_room(self, destination, group_id, user_id, room_id,
+                                  category_id, content):
+        if category_id:
+            path = PREFIX + "/groups/%s/summary/categories/%s/rooms/%s" % (
+                group_id, category_id, room_id,
+            )
+        else:
+            path = PREFIX + "/groups/%s/summary/rooms/%s" % (group_id, room_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": user_id},
+            data=content,
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def delete_group_summary_room(self, destination, group_id, user_id, room_id,
+                                  category_id):
+        if category_id:
+            path = PREFIX + "/groups/%s/summary/categories/%s/rooms/%s" % (
+                group_id, category_id, room_id,
+            )
+        else:
+            path = PREFIX + "/groups/%s/summary/rooms/%s" % (group_id, room_id,)
+
+        return self.client.delete_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": user_id},
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def get_group_categories(self, destination, group_id, requester_user_id):
+        path = PREFIX + "/groups/%s/categories" % (group_id,)
+
+        return self.client.get_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def get_group_category(self, destination, group_id, requester_user_id, category_id):
+        path = PREFIX + "/groups/%s/categories/%s" % (group_id, category_id,)
+
+        return self.client.get_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def update_group_category(self, destination, group_id, requester_user_id, category_id,
+                              content):
+        path = PREFIX + "/groups/%s/categories/%s" % (group_id, category_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            data=content,
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def delete_group_category(self, destination, group_id, requester_user_id,
+                              category_id):
+        path = PREFIX + "/groups/%s/categories/%s" % (group_id, category_id,)
+
+        return self.client.delete_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def get_group_roles(self, destination, group_id, requester_user_id):
+        path = PREFIX + "/groups/%s/roles" % (group_id,)
+
+        return self.client.get_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def get_group_role(self, destination, group_id, requester_user_id, role_id):
+        path = PREFIX + "/groups/%s/roles/%s" % (group_id, role_id,)
+
+        return self.client.get_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def update_group_role(self, destination, group_id, requester_user_id, role_id,
+                          content):
+        path = PREFIX + "/groups/%s/roles/%s" % (group_id, role_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            data=content,
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def delete_group_role(self, destination, group_id, requester_user_id, role_id):
+        path = PREFIX + "/groups/%s/roles/%s" % (group_id, role_id,)
+
+        return self.client.delete_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def update_group_summary_user(self, destination, group_id, requester_user_id,
+                                  user_id, role_id, content):
+        if role_id:
+            path = PREFIX + "/groups/%s/summary/roles/%s/users/%s" % (
+                group_id, role_id, user_id,
+            )
+        else:
+            path = PREFIX + "/groups/%s/summary/users/%s" % (group_id, user_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            data=content,
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def delete_group_summary_user(self, destination, group_id, requester_user_id,
+                                  user_id, role_id):
+        if role_id:
+            path = PREFIX + "/groups/%s/summary/roles/%s/users/%s" % (
+                group_id, role_id, user_id,
+            )
+        else:
+            path = PREFIX + "/groups/%s/summary/users/%s" % (group_id, user_id,)
+
+        return self.client.delete_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
