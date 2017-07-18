@@ -783,26 +783,6 @@ class GroupServerStore(SQLBaseStore):
                     "content": json.dumps(content),
                 },
             )
-            self._simple_delete_txn(
-                txn,
-                table="local_group_updates",
-                keyvalues={
-                    "group_id": group_id,
-                    "user_id": user_id,
-                    "type": "membership",
-                },
-            )
-            self._simple_insert_txn(
-                txn,
-                table="local_group_updates",
-                values={
-                    "stream_id": next_id,
-                    "group_id": group_id,
-                    "user_id": user_id,
-                    "type": "membership",
-                    "content": json.dumps({"membership": membership, "content": content}),
-                }
-            )
             self._group_updates_stream_cache.entity_has_changed(user_id, next_id)
 
             # TODO: Insert profile to ensuer it comes down stream if its a join.
