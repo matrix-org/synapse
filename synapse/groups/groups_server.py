@@ -293,7 +293,9 @@ class GroupsServerHandler(object):
                                   content):
         """Add/update a users entry in the group summary
         """
-        yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
+        yield self.check_group_is_ours(
+            group_id, and_exists=True, and_is_admin=requester_user_id,
+        )
 
         order = content.get("order", None)
 
@@ -313,7 +315,9 @@ class GroupsServerHandler(object):
     def delete_group_summary_user(self, group_id, requester_user_id, user_id, role_id):
         """Remove a user from the group summary
         """
-        yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
+        yield self.check_group_is_ours(
+            group_id, and_exists=True, and_is_admin=requester_user_id,
+        )
 
         yield self.store.remove_user_from_summary(
             group_id=group_id,
