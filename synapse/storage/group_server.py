@@ -776,7 +776,7 @@ class GroupServerStore(SQLBaseStore):
             remote_attestation (dict): If remote group then store the remote
                 attestation from the group, else None.
         """
-        def _register_user_group_membership_txn(txn, next_id):
+        def _register_user_group_membership_txn(txn):
             # TODO: Upsert?
             self._simple_delete_txn(
                 txn,
@@ -797,7 +797,6 @@ class GroupServerStore(SQLBaseStore):
                     "content": json.dumps(content),
                 },
             )
-            self._group_updates_stream_cache.entity_has_changed(user_id, next_id)
 
             # TODO: Insert profile to ensuer it comes down stream if its a join.
 
@@ -820,7 +819,7 @@ class GroupServerStore(SQLBaseStore):
                             "group_id": group_id,
                             "user_id": user_id,
                             "valid_until_ms": remote_attestation["valid_until_ms"],
-                            "attestation": json.dumps(remote_attestation),
+                            "attestation_json": json.dumps(remote_attestation),
                         }
                     )
             else:
@@ -841,11 +840,10 @@ class GroupServerStore(SQLBaseStore):
                     },
                 )
 
-        with self._group_updates_id_gen.get_next() as next_id:
-            yield self.runInteraction(
-                "register_user_group_membership",
-                _register_user_group_membership_txn, next_id,
-            )
+        yield self.runInteraction(
+            "register_user_group_membership",
+            _register_user_group_membership_txn,
+        )
 
     @defer.inlineCallbacks
     def create_group(self, group_id, user_id, name, avatar_url, short_description,
@@ -928,3 +926,14 @@ class GroupServerStore(SQLBaseStore):
             defer.returnValue(json.loads(row["attestation_json"]))
 
         defer.returnValue(None)
+
+    def get_joined_groups(self, user_id):
+        return self._simple_select_onecol(
+            table="local_group_membership",
+            keyvalues={
+                "user_id": user_id,
+                "membership": "join",
+            },
+            retcol="group_id",
+            desc="get_joined_groups",
+        )

@@ -495,7 +495,7 @@ class TransportLayerClient(object):
         )
 
     @log_function
-    def get_group_rooms(self, destination, group_id, requester_user_id):
+    def get_rooms_in_group(self, destination, group_id, requester_user_id):
         path = PREFIX + "/groups/%s/rooms" % (group_id,)
 
         return self.client.get_json(
@@ -518,7 +518,7 @@ class TransportLayerClient(object):
         )
 
     @log_function
-    def get_group_users(self, destination, group_id, requester_user_id):
+    def get_users_in_group(self, destination, group_id, requester_user_id):
         path = PREFIX + "/groups/%s/users" % (group_id,)
 
         return self.client.get_json(

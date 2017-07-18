@@ -159,7 +159,7 @@ class GroupsLocalHandler(object):
             )
             defer.returnValue(res)
 
-        res = yield self.transport_client.get_group_users(
+        res = yield self.transport_client.get_users_in_group(
             get_domain_from_id(group_id), group_id, requester_user_id,
         )
 
@@ -278,7 +278,8 @@ class GroupsLocalHandler(object):
         else:
             content["requester_user_id"] = requester_user_id
             res = yield self.transport_client.remove_user_from_group(
-                get_domain_from_id(group_id), group_id, user_id, content
+                get_domain_from_id(group_id), group_id, requester_user_id,
+                user_id, content,
             )
 
         defer.returnValue(res)
