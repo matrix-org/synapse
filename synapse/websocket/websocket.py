@@ -105,8 +105,8 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         else:
             try:
                 logger.info("Text message received: {0}".format(payload.decode('utf8')))
-            except Exception as ex:
-                logger.info("Text message received (unparseable)", ex)
+            except Exception:
+                logger.info("Text message received (unparseable)")
 
         msg = {}
         try:
@@ -117,6 +117,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
 
         supported_methods = {
             "ping": self._handle_ping,
+            "presence": self._handle_presence,
             "read_markers": self._handle_read_markers,
             "send": self._handle_send,
             "typing": self._handle_typing,
@@ -126,12 +127,32 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             msg["method"],
             lambda msg: json.dumps({
                 "id": msg["id"],
-                "errorcode": "M_BAD_JSON",
-                "error": "Unknown method"
+                "error": {
+                    "errcode": "M_BAD_JSON",
+                    "error": "Unknown method",
+                }
             })
         )
-        result = yield method(msg)
-        self.sendMessage(result)
+
+        try:
+            result = yield method(msg)
+            self.sendMessage(result)
+        except SynapseError as ex:
+            self.sendMessage(json.dumps({
+                "id": msg["id"],
+                "error": {
+                    "errcode": ex.errcode,
+                    "error": ex.msg,
+                }
+            }))
+        except Exception as ex:
+            self.sendMessage(json.dumps({
+                "id": msg["id"],
+                "error": {
+                    "errcode": "M_UNKNOWN",
+                    "error": ex,
+                }
+            }))
 
     def onClose(self, wasClean, code, reason):
         logger.info("WebSocket connection closed: {0} {1}".format(code, reason))
@@ -198,6 +219,32 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
     @defer.inlineCallbacks
     def _handle_ping(self, msg):
         yield logger.debug("Execute _handle_ping")
+        defer.returnValue(bytes('{"id":"' + msg["id"] + '","result":{}}'))
+
+    @defer.inlineCallbacks
+    def _handle_presence(self, msg):
+        yield logger.debug("Execute _handle_presence")
+
+        state = {}
+
+        content = msg["params"]
+
+        try:
+            state["presence"] = content.pop("presence")
+
+            if "status_msg" in content:
+                state["status_msg"] = content.pop("status_msg")
+                if not isinstance(state["status_msg"], basestring):
+                    raise SynapseError(400, "status_msg must be a string.")
+
+            if content:
+                raise KeyError()
+        except SynapseError as e:
+            raise e
+        except:
+            raise SynapseError(400, "Unable to parse state")
+
+        yield self.presence_handler.set_state(self.requester.user, state)
         defer.returnValue(bytes('{"id":"' + msg["id"] + '","result":{}}'))
 
     @defer.inlineCallbacks
