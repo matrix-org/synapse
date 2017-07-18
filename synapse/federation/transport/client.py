@@ -474,6 +474,8 @@ class TransportLayerClient(object):
 
     @log_function
     def get_group_profile(self, destination, group_id, requester_user_id):
+        """Get a group profile
+        """
         path = PREFIX + "/groups/%s/profile" % (group_id,)
 
         return self.client.get_json(
@@ -485,6 +487,8 @@ class TransportLayerClient(object):
 
     @log_function
     def get_group_summary(self, destination, group_id, requester_user_id):
+        """Get a group summary
+        """
         path = PREFIX + "/groups/%s/summary" % (group_id,)
 
         return self.client.get_json(
@@ -496,6 +500,8 @@ class TransportLayerClient(object):
 
     @log_function
     def get_rooms_in_group(self, destination, group_id, requester_user_id):
+        """Get all rooms in a group
+        """
         path = PREFIX + "/groups/%s/rooms" % (group_id,)
 
         return self.client.get_json(
@@ -507,6 +513,8 @@ class TransportLayerClient(object):
 
     def add_room_to_group(self, destination, group_id, requester_user_id, room_id,
                           content):
+        """Add a room to a group
+        """
         path = PREFIX + "/groups/%s/room/%s" % (group_id, room_id,)
 
         return self.client.post_json(
@@ -519,6 +527,8 @@ class TransportLayerClient(object):
 
     @log_function
     def get_users_in_group(self, destination, group_id, requester_user_id):
+        """Get users in a group
+        """
         path = PREFIX + "/groups/%s/users" % (group_id,)
 
         return self.client.get_json(
@@ -530,6 +540,8 @@ class TransportLayerClient(object):
 
     @log_function
     def accept_group_invite(self, destination, group_id, user_id, content):
+        """Accept a group invite
+        """
         path = PREFIX + "/groups/%s/users/%s/accept_invite" % (group_id, user_id)
 
         return self.client.post_json(
@@ -541,6 +553,8 @@ class TransportLayerClient(object):
 
     @log_function
     def invite_to_group(self, destination, group_id, user_id, requester_user_id, content):
+        """Invite a user to a group
+        """
         path = PREFIX + "/groups/%s/users/%s/invite" % (group_id, user_id)
 
         return self.client.post_json(
@@ -569,6 +583,8 @@ class TransportLayerClient(object):
     @log_function
     def remove_user_from_group(self, destination, group_id, requester_user_id,
                                user_id, content):
+        """Remove a user fron a group
+        """
         path = PREFIX + "/groups/%s/users/%s/remove" % (group_id, user_id)
 
         return self.client.post_json(
@@ -613,6 +629,8 @@ class TransportLayerClient(object):
     @log_function
     def update_group_summary_room(self, destination, group_id, user_id, room_id,
                                   category_id, content):
+        """Update a room entry in a group summary
+        """
         if category_id:
             path = PREFIX + "/groups/%s/summary/categories/%s/rooms/%s" % (
                 group_id, category_id, room_id,
@@ -631,6 +649,8 @@ class TransportLayerClient(object):
     @log_function
     def delete_group_summary_room(self, destination, group_id, user_id, room_id,
                                   category_id):
+        """Delete a room entry in a group summary
+        """
         if category_id:
             path = PREFIX + "/groups/%s/summary/categories/%s/rooms/%s" % (
                 group_id, category_id, room_id,
@@ -647,6 +667,8 @@ class TransportLayerClient(object):
 
     @log_function
     def get_group_categories(self, destination, group_id, requester_user_id):
+        """Get all categories in a group
+        """
         path = PREFIX + "/groups/%s/categories" % (group_id,)
 
         return self.client.get_json(
@@ -658,6 +680,8 @@ class TransportLayerClient(object):
 
     @log_function
     def get_group_category(self, destination, group_id, requester_user_id, category_id):
+        """Get category info in a group
+        """
         path = PREFIX + "/groups/%s/categories/%s" % (group_id, category_id,)
 
         return self.client.get_json(
@@ -670,6 +694,8 @@ class TransportLayerClient(object):
     @log_function
     def update_group_category(self, destination, group_id, requester_user_id, category_id,
                               content):
+        """Update a category in a group
+        """
         path = PREFIX + "/groups/%s/categories/%s" % (group_id, category_id,)
 
         return self.client.post_json(
@@ -683,6 +709,8 @@ class TransportLayerClient(object):
     @log_function
     def delete_group_category(self, destination, group_id, requester_user_id,
                               category_id):
+        """Delete a category in a group
+        """
         path = PREFIX + "/groups/%s/categories/%s" % (group_id, category_id,)
 
         return self.client.delete_json(
@@ -694,6 +722,8 @@ class TransportLayerClient(object):
 
     @log_function
     def get_group_roles(self, destination, group_id, requester_user_id):
+        """Get all roles in a group
+        """
         path = PREFIX + "/groups/%s/roles" % (group_id,)
 
         return self.client.get_json(
@@ -705,6 +735,8 @@ class TransportLayerClient(object):
 
     @log_function
     def get_group_role(self, destination, group_id, requester_user_id, role_id):
+        """Get a roles info
+        """
         path = PREFIX + "/groups/%s/roles/%s" % (group_id, role_id,)
 
         return self.client.get_json(
@@ -717,6 +749,8 @@ class TransportLayerClient(object):
     @log_function
     def update_group_role(self, destination, group_id, requester_user_id, role_id,
                           content):
+        """Update a role in a group
+        """
         path = PREFIX + "/groups/%s/roles/%s" % (group_id, role_id,)
 
         return self.client.post_json(
@@ -729,6 +763,8 @@ class TransportLayerClient(object):
 
     @log_function
     def delete_group_role(self, destination, group_id, requester_user_id, role_id):
+        """Delete a role in a group
+        """
         path = PREFIX + "/groups/%s/roles/%s" % (group_id, role_id,)
 
         return self.client.delete_json(
@@ -741,6 +777,8 @@ class TransportLayerClient(object):
     @log_function
     def update_group_summary_user(self, destination, group_id, requester_user_id,
                                   user_id, role_id, content):
+        """Update a users entry in a group
+        """
         if role_id:
             path = PREFIX + "/groups/%s/summary/roles/%s/users/%s" % (
                 group_id, role_id, user_id,
@@ -759,6 +797,8 @@ class TransportLayerClient(object):
     @log_function
     def delete_group_summary_user(self, destination, group_id, requester_user_id,
                                   user_id, role_id):
+        """Delete a users entry in a group
+        """
         if role_id:
             path = PREFIX + "/groups/%s/summary/roles/%s/users/%s" % (
                 group_id, role_id, user_id,
