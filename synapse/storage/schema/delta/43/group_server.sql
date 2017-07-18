@@ -163,10 +163,3 @@ CREATE TABLE local_group_updates (
     type TEXT NOT NULL,
     content TEXT NOT NULL
 );
-
-
-CREATE TABLE local_group_profiles (
-    group_id TEXT NOT NULL,
-    name TEXT,
-    avatar_url TEXT
-);
