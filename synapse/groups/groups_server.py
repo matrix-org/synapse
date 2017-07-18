@@ -430,7 +430,7 @@ class GroupsServerHandler(object):
         })
 
     @defer.inlineCallbacks
-    def add_room(self, group_id, requester_user_id, room_id, content):
+    def add_room_to_group(self, group_id, requester_user_id, room_id, content):
         """Add room to group
         """
         yield self.check_group_is_ours(

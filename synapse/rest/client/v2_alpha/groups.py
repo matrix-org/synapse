@@ -405,7 +405,9 @@ class GroupAdminRoomsServlet(RestServlet):
         user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.add_room(group_id, user_id, room_id, content)
+        result = yield self.groups_handler.add_room_to_group(
+            group_id, user_id, room_id, content,
+        )
 
         defer.returnValue((200, result))
 

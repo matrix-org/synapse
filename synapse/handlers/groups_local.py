@@ -74,6 +74,8 @@ class GroupsLocalHandler(object):
     get_group_profile = _create_rerouter("get_group_profile")
     get_rooms_in_group = _create_rerouter("get_rooms_in_group")
 
+    add_room_to_group = _create_rerouter("add_room_to_group")
+
     update_group_summary_room = _create_rerouter("update_group_summary_room")
     delete_group_summary_room = _create_rerouter("delete_group_summary_room")
 
@@ -130,6 +132,9 @@ class GroupsLocalHandler(object):
         defer.returnValue(res)
 
     def create_group(self, group_id, user_id, content):
+        """Create a group
+        """
+
         logger.info("Asking to create group with ID: %r", group_id)
 
         if self.is_mine_id(group_id):
@@ -141,18 +146,10 @@ class GroupsLocalHandler(object):
             get_domain_from_id(group_id), group_id, user_id, content,
         )  # TODO
 
-    def add_room(self, group_id, user_id, room_id, content):
-        if self.is_mine_id(group_id):
-            return self.groups_server_handler.add_room(
-                group_id, user_id, room_id, content
-            )
-
-        return self.transport_client.add_room_to_group(
-            get_domain_from_id(group_id), group_id, user_id, room_id, content,
-        )
-
     @defer.inlineCallbacks
     def get_users_in_group(self, group_id, requester_user_id):
+        """Get users in a group
+        """
         if self.is_mine_id(group_id):
             res = yield self.groups_server_handler.get_users_in_group(
                 group_id, requester_user_id
@@ -184,10 +181,14 @@ class GroupsLocalHandler(object):
 
     @defer.inlineCallbacks
     def join_group(self, group_id, user_id, content):
+        """Request to join a group
+        """
         raise NotImplementedError()  # TODO
 
     @defer.inlineCallbacks
     def accept_invite(self, group_id, user_id, content):
+        """Accept an invite to a group
+        """
         if self.is_mine_id(group_id):
             yield self.groups_server_handler.accept_invite(
                 group_id, user_id, content
@@ -222,6 +223,8 @@ class GroupsLocalHandler(object):
 
     @defer.inlineCallbacks
     def invite(self, group_id, user_id, requester_user_id, config):
+        """Invite a user to a group
+        """
         content = {
             "requester_user_id": requester_user_id,
             "config": config,
@@ -240,6 +243,8 @@ class GroupsLocalHandler(object):
 
     @defer.inlineCallbacks
     def on_invite(self, group_id, user_id, content):
+        """One of our users were invited to a group
+        """
         # TODO: Support auto join and rejection
 
         if not self.is_mine_id(user_id):
@@ -262,6 +267,8 @@ class GroupsLocalHandler(object):
 
     @defer.inlineCallbacks
     def remove_user_from_group(self, group_id, user_id, requester_user_id, content):
+        """Remove a user from a group
+        """
         if user_id == requester_user_id:
             yield self.store.register_user_group_membership(
                 group_id, user_id,
@@ -286,6 +293,8 @@ class GroupsLocalHandler(object):
 
     @defer.inlineCallbacks
     def user_removed_from_group(self, group_id, user_id, content):
+        """One of our users was removed/kicked from a group
+        """
         # TODO: Check if user in group
         yield self.store.register_user_group_membership(
             group_id, user_id,
