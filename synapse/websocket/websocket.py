@@ -3,7 +3,7 @@ from autobahn.twisted.websocket import WebSocketServerProtocol, \
     WebSocketServerFactory
 from autobahn.websocket.compress import PerMessageDeflateOffer, \
     PerMessageDeflateOfferAccept
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, PresenceState
 from synapse.api.errors import AuthError, SynapseError
 from synapse.api.filtering import FilterCollection, DEFAULT_FILTER_COLLECTION
 from synapse.handlers.sync import SyncConfig
@@ -90,6 +90,17 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
                 )
             self.filter_id = filter_id
 
+        presence = request.params.get("presence", [PresenceState.ONLINE])
+        if presence and presence[0]:
+            presence = presence[0]
+
+        logger.debug("Presence should be: %s" % presence)
+        if presence in [PresenceState.ONLINE, PresenceState.UNAVAILABLE]:
+            yield self.factory.presence_handler.set_state(
+                user['user'], {"presence": presence}, True
+            )
+        self.presence = presence
+
         defer.returnValue(("m.json"))
 
     def onOpen(self):
@@ -150,7 +161,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
                 "id": msg["id"],
                 "error": {
                     "errcode": "M_UNKNOWN",
-                    "error": ex,
+                    "error": ex.__str__(),
                 }
             }))
 
@@ -236,7 +247,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
                 state["status_msg"] = content.pop("status_msg")
                 if not isinstance(state["status_msg"], basestring):
                     raise SynapseError(400, "status_msg must be a string.")
-
+            self.presence = state["presence"]
             if content:
                 raise KeyError()
         except SynapseError as e:
@@ -244,7 +255,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         except:
             raise SynapseError(400, "Unable to parse state")
 
-        yield self.presence_handler.set_state(self.requester.user, state)
+        yield self.factory.presence_handler.set_state(self.requester.user, state)
         defer.returnValue(bytes('{"id":"' + msg["id"] + '","result":{}}'))
 
     @defer.inlineCallbacks
@@ -278,6 +289,8 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
     def _handle_send(self, msg):
         logger.debug("Execute _handle_send")
         params = msg["params"]
+
+        yield self.factory.presence_handler.bump_presence_active_time(self.requester.user)
 
         event = yield self.factory.message_handler.create_and_send_nonmember_event(
             self.requester,
@@ -347,7 +360,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         # Limit timeout to stop people from setting silly typing timeouts.
         timeout = min(params.get("timeout", 30000), 120000)
 
-        self.factory.presence_handler.bump_presence_active_time(self.requester.user)
+        yield self.factory.presence_handler.bump_presence_active_time(self.requester.user)
 
         if params["typing"]:
             yield self.factory.typing_handler.started_typing(
