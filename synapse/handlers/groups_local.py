@@ -63,6 +63,7 @@ class GroupsLocalHandler(object):
         self.is_mine_id = hs.is_mine_id
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
+        self.notifier = hs.get_notifier()
         self.attestations = hs.get_groups_attestation_signing()
 
         # Ensure attestations get renewed
