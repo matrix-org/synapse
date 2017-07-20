@@ -50,6 +50,7 @@ from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.user_directory import UserDirectoyHandler
+from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.groups.groups_server import GroupsServerHandler
 from synapse.groups.attestations import GroupAttestionRenewer, GroupAttestationSigning
 from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
@@ -141,6 +142,7 @@ class HomeServer(object):
         'read_marker_handler',
         'action_generator',
         'user_directory_handler',
+        'groups_local_handler',
         'groups_server_handler',
         'groups_attestation_signing',
         'groups_attestation_renewer',
@@ -313,6 +315,9 @@ class HomeServer(object):
 
     def build_user_directory_handler(self):
         return UserDirectoyHandler(self)
+
+    def build_groups_local_handler(self):
+        return GroupsLocalHandler(self)
 
     def build_groups_server_handler(self):
         return GroupsServerHandler(self)

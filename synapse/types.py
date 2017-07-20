@@ -156,6 +156,11 @@ class EventID(DomainSpecificString):
     SIGIL = "$"
 
 
+class GroupID(DomainSpecificString):
+    """Structure representing a group ID."""
+    SIGIL = "+"
+
+
 class StreamToken(
     namedtuple("Token", (
         "room_key",

@@ -293,7 +293,9 @@ class GroupsServerHandler(object):
                                   content):
         """Add/update a users entry in the group summary
         """
-        yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
+        yield self.check_group_is_ours(
+            group_id, and_exists=True, and_is_admin=requester_user_id,
+        )
 
         order = content.get("order", None)
 
@@ -313,7 +315,9 @@ class GroupsServerHandler(object):
     def delete_group_summary_user(self, group_id, requester_user_id, user_id, role_id):
         """Remove a user from the group summary
         """
-        yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
+        yield self.check_group_is_ours(
+            group_id, and_exists=True, and_is_admin=requester_user_id,
+        )
 
         yield self.store.remove_user_from_summary(
             group_id=group_id,
@@ -426,7 +430,7 @@ class GroupsServerHandler(object):
         })
 
     @defer.inlineCallbacks
-    def add_room(self, group_id, requester_user_id, room_id, content):
+    def add_room_to_group(self, group_id, requester_user_id, room_id, content):
         """Add room to group
         """
         yield self.check_group_is_ours(
@@ -462,7 +466,9 @@ class GroupsServerHandler(object):
         }
 
         if self.hs.is_mine_id(user_id):
-            raise NotImplementedError()
+            groups_local = self.hs.get_groups_local_handler()
+            res = yield groups_local.on_invite(group_id, user_id, content)
+            local_attestation = None
         else:
             local_attestation = self.attestations.create_attestation(group_id, user_id)
             content.update({
@@ -590,7 +596,8 @@ class GroupsServerHandler(object):
 
         if is_kick:
             if self.hs.is_mine_id(user_id):
-                raise NotImplementedError()
+                groups_local = self.hs.get_groups_local_handler()
+                yield groups_local.user_removed_from_group(group_id, user_id, {})
             else:
                 yield self.transport_client.remove_user_from_group_notification(
                     get_domain_from_id(user_id), group_id, user_id, {}

@@ -616,7 +616,7 @@ class FederationGroupsProfileServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -632,7 +632,7 @@ class FederationGroupsSummaryServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -650,7 +650,7 @@ class FederationGroupsRoomsServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -668,11 +668,11 @@ class FederationGroupsAddRoomsServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, room_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        new_content = yield self.handler.add_room(
+        new_content = yield self.handler.add_room_to_group(
             group_id, requester_user_id, room_id, content
         )
 
@@ -686,7 +686,7 @@ class FederationGroupsUsersServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -704,7 +704,7 @@ class FederationGroupsInviteServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -739,12 +739,46 @@ class FederationGroupsRemoveUserServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
         new_content = yield self.handler.remove_user_from_group(
             group_id, user_id, requester_user_id, content,
+        )
+
+        defer.returnValue((200, new_content))
+
+
+class FederationGroupsLocalInviteServlet(BaseFederationServlet):
+    """A group server has invited a local user
+    """
+    PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id, user_id):
+        if get_domain_from_id(group_id) != origin:
+            raise SynapseError(403, "group_id doesn't match origin")
+
+        new_content = yield self.handler.on_invite(
+            group_id, user_id, content,
+        )
+
+        defer.returnValue((200, new_content))
+
+
+class FederationGroupsRemoveLocalUserServlet(BaseFederationServlet):
+    """A group server has removed a local user
+    """
+    PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id, user_id):
+        if get_domain_from_id(group_id) != origin:
+            raise SynapseError(403, "user_id doesn't match origin")
+
+        new_content = yield self.handler.user_removed_from_group(
+            group_id, user_id, content,
         )
 
         defer.returnValue((200, new_content))
@@ -781,7 +815,7 @@ class FederationGroupsSummaryRoomsServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, category_id, room_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -799,7 +833,7 @@ class FederationGroupsSummaryRoomsServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_DELETE(self, origin, content, query, group_id, category_id, room_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -824,7 +858,7 @@ class FederationGroupsCategoriesServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -844,7 +878,7 @@ class FederationGroupsCategoryServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id, category_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -856,7 +890,7 @@ class FederationGroupsCategoryServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, category_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -871,7 +905,7 @@ class FederationGroupsCategoryServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_DELETE(self, origin, content, query, group_id, category_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -894,7 +928,7 @@ class FederationGroupsRolesServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -914,7 +948,7 @@ class FederationGroupsRoleServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id, role_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -926,7 +960,7 @@ class FederationGroupsRoleServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, role_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -941,7 +975,7 @@ class FederationGroupsRoleServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_DELETE(self, origin, content, query, group_id, role_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -970,7 +1004,7 @@ class FederationGroupsSummaryUsersServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, role_id, user_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -988,7 +1022,7 @@ class FederationGroupsSummaryUsersServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_DELETE(self, origin, content, query, group_id, role_id, user_id):
-        requester_user_id = query["requester_user_id"]
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1053,6 +1087,12 @@ GROUP_SERVER_SERVLET_CLASSES = (
 )
 
 
+GROUP_LOCAL_SERVLET_CLASSES = (
+    FederationGroupsLocalInviteServlet,
+    FederationGroupsRemoveLocalUserServlet,
+)
+
+
 GROUP_ATTESTATION_SERVLET_CLASSES = (
     FederationGroupsRenewAttestaionServlet,
 )
@@ -1078,6 +1118,14 @@ def register_servlets(hs, resource, authenticator, ratelimiter):
     for servletclass in GROUP_SERVER_SERVLET_CLASSES:
         servletclass(
             handler=hs.get_groups_server_handler(),
+            authenticator=authenticator,
+            ratelimiter=ratelimiter,
+            server_name=hs.hostname,
+        ).register(resource)
+
+    for servletclass in GROUP_LOCAL_SERVLET_CLASSES:
+        servletclass(
+            handler=hs.get_groups_local_handler(),
             authenticator=authenticator,
             ratelimiter=ratelimiter,
             server_name=hs.hostname,
