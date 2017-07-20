@@ -860,6 +860,17 @@ class GroupServerStore(SQLBaseStore):
             desc="create_group",
         )
 
+    @defer.inlineCallbacks
+    def update_group_profile(self, group_id, profile,):
+        yield self._simple_update_one(
+            table="groups",
+            keyvalues={
+                "group_id": group_id,
+            },
+            updatevalues=profile,
+            desc="create_group",
+        )
+
     def get_attestations_need_renewals(self, valid_until_ms):
         """Get all attestations that need to be renewed until givent time
         """

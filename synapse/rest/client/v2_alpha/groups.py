@@ -45,6 +45,18 @@ class GroupServlet(RestServlet):
 
         defer.returnValue((200, group_description))
 
+    @defer.inlineCallbacks
+    def on_POST(self, request, group_id, content):
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        content = parse_json_object_from_request(request)
+        yield self.groups_handler.update_group_profile(
+            group_id, user_id, content,
+        )
+
+        defer.returnValue((200, {}))
+
 
 class GroupSummaryServlet(RestServlet):
     """Get the full group summary

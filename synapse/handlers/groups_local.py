@@ -72,6 +72,7 @@ class GroupsLocalHandler(object):
     # or federation depending on if the group is local or remote
 
     get_group_profile = _create_rerouter("get_group_profile")
+    update_group_profile = _create_rerouter("update_group_profile")
     get_rooms_in_group = _create_rerouter("get_rooms_in_group")
 
     add_room_to_group = _create_rerouter("add_room_to_group")
