@@ -353,7 +353,10 @@ class GroupsServerHandler(object):
         for keyname in ("name", "avatar_url", "short_description",
                         "long_description"):
             if keyname in content:
-                profile[keyname] = content[keyname]
+                value = content[keyname]
+                if not isinstance(value, basestring):
+                    raise SynapseError(400, "%r value is not a string" % (keyname,))
+                profile[keyname] = value
 
         yield self.store.update_group_profile(group_id, profile)
 
