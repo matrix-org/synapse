@@ -868,7 +868,7 @@ class GroupServerStore(SQLBaseStore):
                 "group_id": group_id,
             },
             updatevalues=profile,
-            desc="create_group",
+            desc="update_group_profile",
         )
 
     def get_attestations_need_renewals(self, valid_until_ms):
