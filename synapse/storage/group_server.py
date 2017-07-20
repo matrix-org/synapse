@@ -853,6 +853,8 @@ class GroupServerStore(SQLBaseStore):
                     },
                 )
 
+            return next_id
+
         with self._group_updates_id_gen.get_next() as next_id:
             yield self.runInteraction(
                 "register_user_group_membership",
@@ -991,6 +993,27 @@ class GroupServerStore(SQLBaseStore):
             } for group_id, membership, gtype, content_json in txn]
         return self.runInteraction(
             "get_groups_changes_for_user", _get_groups_changes_for_user_txn,
+        )
+
+    def get_all_groups_changes(self, from_token, to_token, limit):
+        from_token = int(from_token)
+        has_changed = self._group_updates_stream_cache.has_any_entity_changed(
+            from_token,
+        )
+        if not has_changed:
+            return []
+
+        def _get_all_groups_changes_txn(txn):
+            sql = """
+                SELECT stream_id, group_id, user_id, type, content
+                FROM local_group_updates
+                WHERE ? < stream_id AND stream_id <= ?
+                LIMIT ?
+            """
+            txn.execute(sql, (from_token, to_token, limit,))
+            return txn.fetchall()
+        return self.runInteraction(
+            "get_all_groups_changes", _get_all_groups_changes_txn,
         )
 
     def get_group_stream_token(self):
