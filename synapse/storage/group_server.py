@@ -798,7 +798,7 @@ class GroupServerStore(SQLBaseStore):
                 },
             )
 
-            # TODO: Insert profile to ensuer it comes down stream if its a join.
+            # TODO: Insert profile to ensure it comes down stream if its a join.
 
             if membership == "join":
                 if local_attestation:
