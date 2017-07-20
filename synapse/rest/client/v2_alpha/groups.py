@@ -46,7 +46,7 @@ class GroupServlet(RestServlet):
         defer.returnValue((200, group_description))
 
     @defer.inlineCallbacks
-    def on_POST(self, request, group_id, content):
+    def on_POST(self, request, group_id):
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
