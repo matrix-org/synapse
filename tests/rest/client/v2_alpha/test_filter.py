@@ -118,7 +118,7 @@ class FilterTestCase(unittest.TestCase):
         (code, response) = yield self.mock_resource.trigger_get(
             "/user/%s/filter/12382148321" % (self.USER_ID)
         )
-        self.assertEquals(400, code)
+        self.assertEquals(404, code)
         self.assertEquals(response['errcode'], Codes.NOT_FOUND)
 
     # Currently invalid params do not have an appropriate errcode
