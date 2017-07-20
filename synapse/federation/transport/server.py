@@ -642,6 +642,18 @@ class FederationGroupsSummaryServlet(BaseFederationServlet):
 
         defer.returnValue((200, new_content))
 
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id):
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        if get_domain_from_id(requester_user_id) != origin:
+            raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        new_content = yield self.handler.update_group_profile(
+            group_id, requester_user_id, content
+        )
+
+        defer.returnValue((200, new_content))
+
 
 class FederationGroupsRoomsServlet(BaseFederationServlet):
     """Get the rooms in a group on behalf of a user

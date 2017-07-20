@@ -342,6 +342,25 @@ class GroupsServerHandler(object):
             raise SynapseError(404, "Unknown group")
 
     @defer.inlineCallbacks
+    def update_group_profile(self, group_id, requester_user_id, content):
+        """Update the group profile
+        """
+        yield self.check_group_is_ours(
+            group_id, and_exists=True, and_is_admin=requester_user_id,
+        )
+
+        profile = {}
+        for keyname in ("name", "avatar_url", "short_description",
+                        "long_description"):
+            if keyname in content:
+                value = content[keyname]
+                if not isinstance(value, basestring):
+                    raise SynapseError(400, "%r value is not a string" % (keyname,))
+                profile[keyname] = value
+
+        yield self.store.update_group_profile(group_id, profile)
+
+    @defer.inlineCallbacks
     def get_users_in_group(self, group_id, requester_user_id):
         """Get the users in group as seen by requester_user_id.
 
