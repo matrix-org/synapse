@@ -262,7 +262,8 @@ class Porter(object):
             return
 
         if table == "user_directory_stream_pos":
-            # We need to make sure there is a single row, `(X, null)`
+            # We need to make sure there is a single row, `(X, null), as that is
+            # what synapse expects to be there.
             yield self.postgres_store._simple_insert(
                 table=table,
                 values={"stream_id": None},
