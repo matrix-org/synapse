@@ -116,7 +116,7 @@ class GroupsSyncResult(collections.namedtuple("GroupsSyncResult", [
     __slots__ = []
 
     def __nonzero__(self):
-        return self.join or self.invite or self.leave
+        return bool(self.join or self.invite or self.leave)
 
 
 class SyncResult(collections.namedtuple("SyncResult", [
