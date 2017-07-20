@@ -61,7 +61,7 @@ class GetFilterRestServlet(RestServlet):
 
             defer.returnValue((200, filter.get_filter_json()))
         except (KeyError, StoreError):
-            raise SynapseError(400, "No such filter", errcode=Codes.NOT_FOUND)
+            raise SynapseError(404, "No such filter", errcode=Codes.NOT_FOUND)
 
 
 class CreateFilterRestServlet(RestServlet):
