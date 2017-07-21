@@ -63,6 +63,7 @@ class GroupsLocalHandler(object):
         self.is_mine_id = hs.is_mine_id
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
+        self.notifier = hs.get_notifier()
         self.attestations = hs.get_groups_attestation_signing()
 
         # Ensure attestations get renewed
@@ -212,12 +213,15 @@ class GroupsLocalHandler(object):
                 user_id=user_id,
             )
 
-        yield self.store.register_user_group_membership(
+        token = yield self.store.register_user_group_membership(
             group_id, user_id,
             membership="join",
             is_admin=False,
             local_attestation=local_attestation,
             remote_attestation=remote_attestation,
+        )
+        self.notifier.on_new_event(
+            "groups_key", token, users=[user_id],
         )
 
         defer.returnValue({})
@@ -258,10 +262,13 @@ class GroupsLocalHandler(object):
             if "avatar_url" in content["profile"]:
                 local_profile["avatar_url"] = content["profile"]["avatar_url"]
 
-        yield self.store.register_user_group_membership(
+        token = yield self.store.register_user_group_membership(
             group_id, user_id,
             membership="invite",
             content={"profile": local_profile, "inviter": content["inviter"]},
+        )
+        self.notifier.on_new_event(
+            "groups_key", token, users=[user_id],
         )
 
         defer.returnValue({"state": "invite"})
@@ -271,9 +278,12 @@ class GroupsLocalHandler(object):
         """Remove a user from a group
         """
         if user_id == requester_user_id:
-            yield self.store.register_user_group_membership(
+            token = yield self.store.register_user_group_membership(
                 group_id, user_id,
                 membership="leave",
+            )
+            self.notifier.on_new_event(
+                "groups_key", token, users=[user_id],
             )
 
             # TODO: Should probably remember that we tried to leave so that we can
@@ -297,9 +307,12 @@ class GroupsLocalHandler(object):
         """One of our users was removed/kicked from a group
         """
         # TODO: Check if user in group
-        yield self.store.register_user_group_membership(
+        token = yield self.store.register_user_group_membership(
             group_id, user_id,
             membership="leave",
+        )
+        self.notifier.on_new_event(
+            "groups_key", token, users=[user_id],
         )
 
     @defer.inlineCallbacks

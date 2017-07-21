@@ -155,3 +155,12 @@ CREATE TABLE local_group_membership (
 
 CREATE INDEX local_group_membership_u_idx ON local_group_membership(user_id, group_id);
 CREATE INDEX local_group_membership_g_idx ON local_group_membership(group_id);
+
+
+CREATE TABLE local_group_updates (
+    stream_id BIGINT NOT NULL,
+    group_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    content TEXT NOT NULL
+);

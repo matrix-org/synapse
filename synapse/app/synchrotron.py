@@ -41,6 +41,7 @@ from synapse.replication.slave.storage.presence import SlavedPresenceStore
 from synapse.replication.slave.storage.deviceinbox import SlavedDeviceInboxStore
 from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.room import RoomStore
+from synapse.replication.slave.storage.groups import SlavedGroupServerStore
 from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
@@ -75,6 +76,7 @@ class SynchrotronSlavedStore(
     SlavedRegistrationStore,
     SlavedFilteringStore,
     SlavedPresenceStore,
+    SlavedGroupServerStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
     SlavedClientIpStore,
@@ -409,6 +411,10 @@ class SyncReplicationHandler(ReplicationClientHandler):
             )
         elif stream_name == "presence":
             yield self.presence_handler.process_replication_rows(token, rows)
+        elif stream_name == "receipts":
+            self.notifier.on_new_event(
+                "groups_key", token, users=[row.user_id for row in rows],
+            )
 
 
 def start(config_options):
