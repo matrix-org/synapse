@@ -25,7 +25,7 @@ from synapse.events.utils import (
     serialize_event, format_event_for_client_v2_without_room_id,
 )
 from synapse.api.filtering import FilterCollection, DEFAULT_FILTER_COLLECTION
-from synapse.api.errors import SynapseError
+from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.api.constants import PresenceState
 from ._base import client_v2_patterns
 from ._base import set_timeline_upper_limit
@@ -130,9 +130,15 @@ class SyncRestServlet(RestServlet):
                 self.filtering.check_valid_filter(filter_object)
                 filter = FilterCollection(filter_object)
             else:
-                filter = yield self.filtering.get_user_filter(
-                    user.localpart, filter_id
-                )
+                try:
+                    filter = yield self.filtering.get_user_filter(
+                        user.localpart, filter_id
+                    )
+                except StoreError as err:
+                    if err.code == 404 and err.errcode == Codes.UNKNOWN:
+                        raise SynapseError(404, "No such filter", errcode=Codes.NOT_FOUND)
+                    else:
+                        raise err
         else:
             filter = DEFAULT_FILTER_COLLECTION
 
