@@ -643,7 +643,7 @@ class GroupServerStore(SQLBaseStore):
             },
             retcol="is_admin",
             allow_none=True,
-            desc="is_user_adim_in_group",
+            desc="is_user_admin_in_group",
         )
 
     def add_group_invite(self, group_id, user_id):
@@ -672,14 +672,13 @@ class GroupServerStore(SQLBaseStore):
             allow_none=True,
         )
 
-    @defer.inlineCallbacks
     def get_users_membership_info_in_group(self, group_id, user_id):
-        """Get a dict describing the memebrship of a user in a group.
+        """Get a dict describing the membership of a user in a group.
 
         Example if joined:
 
             {
-                "memebrship": "joined",
+                "membership": "joined",
                 "is_public": True,
                 "is_privileged": False,
             }
@@ -688,6 +687,7 @@ class GroupServerStore(SQLBaseStore):
         """
         def _get_users_membership_in_group_txn(txn):
             row = self._simple_select_one_txn(
+                txn,
                 table="group_users",
                 keyvalues={
                     "group_id": group_id,
@@ -695,30 +695,29 @@ class GroupServerStore(SQLBaseStore):
                 },
                 retcols=("is_admin", "is_public"),
                 allow_none=True,
-                desc="is_user_adim_in_group",
             )
 
             if row:
                 return {
-                    "memebrship": "joined",
+                    "membership": "joined",
                     "is_public": row["is_public"],
                     "is_privileged": row["is_admin"],
                 }
 
             row = self._simple_select_one_onecol_txn(
+                txn,
                 table="group_invites",
                 keyvalues={
                     "group_id": group_id,
                     "user_id": user_id,
                 },
                 retcol="user_id",
-                desc="is_user_invited_to_local_group",
                 allow_none=True,
             )
 
             if row:
                 return {
-                    "memebrship": "invited",
+                    "membership": "invited",
                 }
 
             return {}
