@@ -152,6 +152,18 @@ class GroupServerStore(SQLBaseStore):
                 an order of 1 will put the room first. Otherwise, the room gets
                 added to the end.
         """
+        room_in_group = self._simple_select_one_onecol_txn(
+            txn,
+            table="group_rooms",
+            keyvalues={
+                "group_id": group_id,
+                "room_id": room_id,
+            },
+            retcol="room_id",
+            allow_none=True,
+        )
+        if not room_in_group:
+            raise SynapseError(400, "room not in group")
 
         if category_id is None:
             category_id = _DEFAULT_CATEGORY_ID
@@ -426,6 +438,19 @@ class GroupServerStore(SQLBaseStore):
                 an order of 1 will put the user first. Otherwise, the user gets
                 added to the end.
         """
+        user_in_group = self._simple_select_one_onecol_txn(
+            txn,
+            table="group_users",
+            keyvalues={
+                "group_id": group_id,
+                "user_id": user_id,
+            },
+            retcol="user_id",
+            allow_none=True,
+        )
+        if not user_in_group:
+            raise SynapseError(400, "user not in group")
+
         if role_id is None:
             role_id = _DEFAULT_ROLE_ID
         else:
@@ -618,7 +643,7 @@ class GroupServerStore(SQLBaseStore):
             },
             retcol="is_admin",
             allow_none=True,
-            desc="is_user_adim_in_group",
+            desc="is_user_admin_in_group",
         )
 
     def add_group_invite(self, group_id, user_id):
@@ -645,6 +670,60 @@ class GroupServerStore(SQLBaseStore):
             retcol="user_id",
             desc="is_user_invited_to_local_group",
             allow_none=True,
+        )
+
+    def get_users_membership_info_in_group(self, group_id, user_id):
+        """Get a dict describing the membership of a user in a group.
+
+        Example if joined:
+
+            {
+                "membership": "join",
+                "is_public": True,
+                "is_privileged": False,
+            }
+
+        Returns an empty dict if the user is not join/invite/etc
+        """
+        def _get_users_membership_in_group_txn(txn):
+            row = self._simple_select_one_txn(
+                txn,
+                table="group_users",
+                keyvalues={
+                    "group_id": group_id,
+                    "user_id": user_id,
+                },
+                retcols=("is_admin", "is_public"),
+                allow_none=True,
+            )
+
+            if row:
+                return {
+                    "membership": "join",
+                    "is_public": row["is_public"],
+                    "is_privileged": row["is_admin"],
+                }
+
+            row = self._simple_select_one_onecol_txn(
+                txn,
+                table="group_invites",
+                keyvalues={
+                    "group_id": group_id,
+                    "user_id": user_id,
+                },
+                retcol="user_id",
+                allow_none=True,
+            )
+
+            if row:
+                return {
+                    "membership": "invite",
+                }
+
+            return {}
+
+        return self.runInteraction(
+            "get_users_membership_info_in_group", _get_users_membership_in_group_txn,
         )
 
     def add_user_to_group(self, group_id, user_id, is_admin=False, is_public=True,
