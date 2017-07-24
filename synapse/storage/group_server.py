@@ -152,6 +152,18 @@ class GroupServerStore(SQLBaseStore):
                 an order of 1 will put the room first. Otherwise, the room gets
                 added to the end.
         """
+        room_in_group = self._simple_select_one_onecol_txn(
+            txn,
+            table="group_rooms",
+            keyvalues={
+                "group_id": group_id,
+                "room_id": room_id,
+            },
+            retcol="room_id",
+            allow_none=True,
+        )
+        if not room_in_group:
+            raise SynapseError(400, "room not in group")
 
         if category_id is None:
             category_id = _DEFAULT_CATEGORY_ID
@@ -426,6 +438,19 @@ class GroupServerStore(SQLBaseStore):
                 an order of 1 will put the user first. Otherwise, the user gets
                 added to the end.
         """
+        user_in_group = self._simple_select_one_onecol_txn(
+            txn,
+            table="group_users",
+            keyvalues={
+                "group_id": group_id,
+                "user_id": user_id,
+            },
+            retcol="user_id",
+            allow_none=True,
+        )
+        if not user_in_group:
+            raise SynapseError(400, "user not in group")
+
         if role_id is None:
             role_id = _DEFAULT_ROLE_ID
         else:
