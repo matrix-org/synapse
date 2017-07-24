@@ -130,6 +130,10 @@ class GroupsServerHandler(object):
 
         users.sort(key=lambda e: e.get("order", 0))
 
+        membership_info = yield self.store.get_users_membership_info_in_group(
+            group_id, requester_user_id,
+        )
+
         defer.returnValue({
             "profile": profile,
             "users_section": {
@@ -142,6 +146,7 @@ class GroupsServerHandler(object):
                 "categories": categories,
                 "total_room_count_estimate": 0,  # TODO
             },
+            "user": membership_info,
         })
 
     @defer.inlineCallbacks

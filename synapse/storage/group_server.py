@@ -672,6 +672,61 @@ class GroupServerStore(SQLBaseStore):
             allow_none=True,
         )
 
+    @defer.inlineCallbacks
+    def get_users_membership_info_in_group(self, group_id, user_id):
+        """Get a dict describing the memebrship of a user in a group.
+
+        Example if joined:
+
+            {
+                "memebrship": "joined",
+                "is_public": True,
+                "is_privileged": False,
+            }
+
+        Returns an empty dict if the user is not joined/invited/etc
+        """
+        def _get_users_membership_in_group_txn(txn):
+            row = self._simple_select_one_txn(
+                table="group_users",
+                keyvalues={
+                    "group_id": group_id,
+                    "user_id": user_id,
+                },
+                retcols=("is_admin", "is_public"),
+                allow_none=True,
+                desc="is_user_adim_in_group",
+            )
+
+            if row:
+                return {
+                    "memebrship": "joined",
+                    "is_public": row["is_public"],
+                    "is_privileged": row["is_admin"],
+                }
+
+            row = self._simple_select_one_onecol_txn(
+                table="group_invites",
+                keyvalues={
+                    "group_id": group_id,
+                    "user_id": user_id,
+                },
+                retcol="user_id",
+                desc="is_user_invited_to_local_group",
+                allow_none=True,
+            )
+
+            if row:
+                return {
+                    "memebrship": "invited",
+                }
+
+            return {}
+
+        return self.runInteraction(
+            "get_users_membership_info_in_group", _get_users_membership_in_group_txn,
+        )
+
     def add_user_to_group(self, group_id, user_id, is_admin=False, is_public=True,
                           local_attestation=None, remote_attestation=None):
         """Add a user to the group server.
