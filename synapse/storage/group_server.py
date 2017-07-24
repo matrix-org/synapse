@@ -678,12 +678,12 @@ class GroupServerStore(SQLBaseStore):
         Example if joined:
 
             {
-                "membership": "joined",
+                "membership": "join",
                 "is_public": True,
                 "is_privileged": False,
             }
 
-        Returns an empty dict if the user is not joined/invited/etc
+        Returns an empty dict if the user is not join/invite/etc
         """
         def _get_users_membership_in_group_txn(txn):
             row = self._simple_select_one_txn(
