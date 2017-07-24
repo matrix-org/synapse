@@ -699,7 +699,7 @@ class GroupServerStore(SQLBaseStore):
 
             if row:
                 return {
-                    "membership": "joined",
+                    "membership": "join",
                     "is_public": row["is_public"],
                     "is_privileged": row["is_admin"],
                 }
@@ -717,7 +717,7 @@ class GroupServerStore(SQLBaseStore):
 
             if row:
                 return {
-                    "membership": "invited",
+                    "membership": "invite",
                 }
 
             return {}
