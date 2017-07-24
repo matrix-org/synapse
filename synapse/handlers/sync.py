@@ -616,7 +616,7 @@ class SyncHandler(object):
             if membership == "join":
                 if gtype == "membership":
                     content.pop("membership", None)
-                    invited[group_id] = content["content"]
+                    joined[group_id] = content["content"]
                 else:
                     joined.setdefault(group_id, {})[gtype] = content
             elif membership == "invite":
