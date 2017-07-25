@@ -258,6 +258,14 @@ class SynapseHomeServer(HomeServer):
         if name == "replication":
             resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
 
+        if name == "websocket":
+            ws_factory = SynapseWebsocketFactory(self, listener_config, compress)
+            ws_factory.startFactory()
+            websocket_resource = WebSocketResource(ws_factory)
+            resources.update({
+                "/_matrix/client/ws/r0": websocket_resource,
+            })
+
         return resources
 
     def start_listening(self, listeners):
