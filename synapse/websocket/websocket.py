@@ -4,7 +4,7 @@ from autobahn.twisted.websocket import WebSocketServerProtocol, \
 from autobahn.websocket.compress import PerMessageDeflateOffer, \
     PerMessageDeflateOfferAccept
 from synapse.api.constants import EventTypes, PresenceState
-from synapse.api.errors import AuthError, SynapseError
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.api.filtering import FilterCollection, DEFAULT_FILTER_COLLECTION
 from synapse.handlers.sync import SyncConfig
 from synapse.rest.client.v2_alpha._base import set_timeline_upper_limit
@@ -95,7 +95,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             presence = presence[0]
 
         logger.debug("Presence should be: %s" % presence)
-        if presence in [PresenceState.ONLINE, PresenceState.UNAVAILABLE]:
+        if presence != PresenceState.OFFLINE:
             yield self.factory.presence_handler.set_state(
                 user['user'], {"presence": presence}, True
             )
@@ -197,15 +197,25 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         )
 
         logger.debug("Syncing with %s" % str(self.since))
-        sync = sync_handler.wait_for_sync_for_user(
-            sync_config,
-            since_token=self.since,
-            timeout=0 if initial else SYNC_TIMEOUT,
-            full_state=self.full_state if initial else False
-        ))
-        sync.addCallback(
-            lambda result: self._sync_callback(result)
-        )
+
+        affect_presence = self.presence != PresenceState.OFFLINE
+
+        @defer.inlineCallbacks
+        def sync_with_presence_context():
+            context = yield self.factory.presence_handler.user_syncing(
+                self.requester.user.to_string(), affect_presence=affect_presence,
+            )
+            with context:
+                sync_result = yield sync_handler.wait_for_sync_for_user(
+                    sync_config,
+                    since_token=self.since,
+                    timeout=0 if initial else SYNC_TIMEOUT,
+                    full_state=self.full_state if initial else False
+                )
+                defer.returnValue(sync_result)
+
+        sync = defer.maybeDeferred(sync_with_presence_context)
+        sync.addCallback(self._sync_callback)
         logger.debug("Returning from _sync")
         self.currentSync = sync
 
@@ -213,9 +223,9 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         logger.debug("Got sync")
         if self.shouldSync:
             self.since = result.next_batch
-            logger.debug("Sending sync")
             time_now = self.factory.clock.time_msec()
 
+            logger.debug("Sending sync")
             self.sendMessage(json.dumps(SyncRestServlet.encode_response(
                 time_now,
                 result,
@@ -223,7 +233,8 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
                 self.filter
             )), False)
 
-            reactor.callLater(0, lambda: self._sync())
+            # start new call of _sync - use reactor to avoid endless recursion
+            reactor.callLater(0, self._sync)
 
             logger.debug("Returning from _sync_callback")
 
@@ -237,18 +248,17 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         yield logger.debug("Execute _handle_presence")
 
         state = {}
-
-        content = msg["params"]
+        params = msg["params"]
 
         try:
-            state["presence"] = content.pop("presence")
+            state["presence"] = params.pop("presence")
 
-            if "status_msg" in content:
-                state["status_msg"] = content.pop("status_msg")
+            if "status_msg" in params:
+                state["status_msg"] = params.pop("status_msg")
                 if not isinstance(state["status_msg"], basestring):
                     raise SynapseError(400, "status_msg must be a string.")
-            if content:
-                raise KeyError()
+            if params:
+                raise SynapseError(400, "Too many keys", errcode=Codes.BAD_JSON)
         except SynapseError as e:
             raise e
         except:
@@ -262,16 +272,9 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
     def _handle_read_markers(self, msg):
         yield logger.debug("Execute _handle_read_markers")
 
-        if self.presence == PresenceState.UNAVAILABLE:
-            self.presence = PresenceState.ONLINE
-        if self.presence == PresenceState.ONLINE:
-            yield self.factory.presence_handler.set_state(
-                self.requester.user, {"presence": self.presence}, True
-            )
         yield self.factory.presence_handler.bump_presence_active_time(self.requester.user)
 
         params = msg["params"]
-
         read_event_id = params.get("m.read", None)
         if read_event_id:
             yield self.factory.receipts_handler.received_client_receipt(
@@ -296,12 +299,6 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         logger.debug("Execute _handle_send")
         params = msg["params"]
 
-        if self.presence == PresenceState.UNAVAILABLE:
-            self.presence = PresenceState.ONLINE
-        if self.presence == PresenceState.ONLINE:
-            yield self.factory.presence_handler.set_state(
-                self.requester.user, {"presence": self.presence}, True
-            )
         yield self.factory.presence_handler.bump_presence_active_time(self.requester.user)
 
         event = yield self.factory.message_handler.create_and_send_nonmember_event(
@@ -326,12 +323,6 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
     def _handle_state(self, msg):
         logger.debug("Execute _handle_state")
 
-        if self.presence == PresenceState.UNAVAILABLE:
-            self.presence = PresenceState.ONLINE
-        if self.presence == PresenceState.ONLINE:
-            yield self.factory.presence_handler.set_state(
-                self.requester.user, {"presence": self.presence}, True
-            )
         yield self.factory.presence_handler.bump_presence_active_time(self.requester.user)
 
         params = msg["params"]
@@ -380,12 +371,6 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         # Limit timeout to stop people from setting silly typing timeouts.
         timeout = min(params.get("timeout", 30000), 120000)
 
-        if self.presence == PresenceState.UNAVAILABLE:
-            self.presence = PresenceState.ONLINE
-        if self.presence == PresenceState.ONLINE:
-            yield self.factory.presence_handler.set_state(
-                self.requester.user, {"presence": self.presence}, True
-            )
         yield self.factory.presence_handler.bump_presence_active_time(self.requester.user)
 
         if params["typing"]:
