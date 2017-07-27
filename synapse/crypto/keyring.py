@@ -305,7 +305,7 @@ class Keyring(object):
                     if not missing_keys:
                         break
 
-                for verify_request in requests_missing_keys.values():
+                for verify_request in requests_missing_keys:
                     verify_request.deferred.errback(SynapseError(
                         401,
                         "No key for %s with id %s" % (
