@@ -93,9 +93,8 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             since = since[0].decode('utf-8')
             self.since = StreamToken.from_string(since)
 
-        filter_id = request.params.get("filter", [None])
-        if filter_id[0]:
-            filter_id = filter_id[0]
+        filter_id = request.params.get("filter", [None])[0]
+        if filter_id:
             if filter_id.startswith('{'):
                 try:
                     filter_object = json.loads(filter_id)

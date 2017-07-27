@@ -76,6 +76,10 @@ from synapse.util.module_loader import load_module
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
 
+from autobahn.twisted.resource import WebSocketResource
+from synapse.websocket.websocket import SynapseWebsocketFactory
+
+
 logger = logging.getLogger("synapse.app.homeserver")
 
 
