@@ -18,10 +18,11 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError, NotFoundError, StoreError, SynapseError
+from synapse.api.filtering import set_timeline_upper_limit
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import UserID
 
-from ._base import client_patterns, set_timeline_upper_limit
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 

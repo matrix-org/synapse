@@ -21,7 +21,7 @@ from jsonschema import FormatChecker
 from twisted.internet import defer
 
 from synapse.api.constants import EventContentFields
-from synapse.api.errors import SynapseError
+from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.storage.presence import UserPresenceState
 from synapse.types import RoomID, UserID
 
@@ -133,6 +133,7 @@ class Filtering(object):
     def __init__(self, hs):
         super(Filtering, self).__init__()
         self.store = hs.get_datastore()
+        self.filter_timeline_limit = hs.config.filter_timeline_limit
 
     @defer.inlineCallbacks
     def get_user_filter(self, user_localpart, filter_id):
@@ -142,6 +143,34 @@ class Filtering(object):
     def add_user_filter(self, user_localpart, user_filter):
         self.check_valid_filter(user_filter)
         return self.store.add_user_filter(user_localpart, user_filter)
+
+    @defer.inlineCallbacks
+    def parse_filter(self, filter_data, user_localpart=None):
+        filter_collection = DEFAULT_FILTER_COLLECTION
+        if filter_data:
+            if filter_data.startswith('{'):
+                try:
+                    filter_object = json.loads(filter_data)
+                    set_timeline_upper_limit(
+                        filter_object, self.filter_timeline_limit
+                    )
+                except:
+                    raise SynapseError(400, "Invalid filter JSON")
+                self.check_valid_filter(filter_object)
+                filter_collection = FilterCollection(filter_object)
+            else:
+                if not user_localpart:
+                    raise SynapseError(400, "user_localpart is undefined")
+                try:
+                    filter_collection = yield self.get_user_filter(
+                        user_localpart, filter_data
+                    )
+                except StoreError as err:
+                    if err.code != 404:
+                        raise
+                    # fix up the description and errcode to be more useful
+                    raise SynapseError(400, "No such filter", errcode=Codes.INVALID_PARAM)
+        defer.returnValue(filter_collection)
 
     # TODO(paul): surely we should probably add a delete_user_filter or
     #   replace_user_filter at some point? There's no REST API specified for
@@ -397,6 +426,16 @@ def _matches_wildcard(actual_value, filter_value):
         return actual_value.startswith(type_prefix)
     else:
         return actual_value == filter_value
+
+
+def set_timeline_upper_limit(filter_json, filter_timeline_limit):
+    if filter_timeline_limit < 0:
+        return  # no upper limits
+    timeline = filter_json.get("room", {}).get("timeline", {})
+    if "limit" in timeline:
+        filter_json["room"]["timeline"]["limit"] = min(
+            filter_json["room"]["timeline"]["limit"], filter_timeline_limit
+        )
 
 
 DEFAULT_FILTER_COLLECTION = FilterCollection({})

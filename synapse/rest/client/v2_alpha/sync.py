@@ -32,7 +32,7 @@ from synapse.handlers.sync import SyncConfig
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.types import StreamToken
 
-from ._base import client_patterns, set_timeline_upper_limit
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -124,28 +124,7 @@ class SyncRestServlet(RestServlet):
 
         request_key = (user, timeout, since, filter_id, full_state, device_id)
 
-        if filter_id is None:
-            filter_collection = DEFAULT_FILTER_COLLECTION
-        elif filter_id.startswith("{"):
-            try:
-                filter_object = json.loads(filter_id)
-                set_timeline_upper_limit(
-                    filter_object, self.hs.config.filter_timeline_limit
-                )
-            except Exception:
-                raise SynapseError(400, "Invalid filter JSON")
-            self.filtering.check_valid_filter(filter_object)
-            filter_collection = FilterCollection(filter_object)
-        else:
-            try:
-                filter_collection = yield self.filtering.get_user_filter(
-                    user.localpart, filter_id
-                )
-            except StoreError as err:
-                if err.code != 404:
-                    raise
-                # fix up the description and errcode to be more useful
-                raise SynapseError(400, "No such filter", errcode=Codes.INVALID_PARAM)
+        filter_collection = yield self.filtering.parse_filter(filter_id, user.localpart)
 
         sync_config = SyncConfig(
             user=user,
