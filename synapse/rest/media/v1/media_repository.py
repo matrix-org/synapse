@@ -280,8 +280,11 @@ class MediaRepository(object):
 
     @defer.inlineCallbacks
     def generate_local_exact_thumbnail(self, media_id, t_width, t_height,
-                                       t_method, t_type):
-        input_path = self.filepaths.local_media_filepath(media_id)
+                                       t_method, t_type, url_cache=False):
+        if url_cache:
+            input_path = self.filepaths.url_cache_filepath(media_id)
+        else:
+            input_path = self.filepaths.local_media_filepath(media_id)
 
         t_path = self.filepaths.local_media_thumbnail(
             media_id, t_width, t_height, t_type, t_method
