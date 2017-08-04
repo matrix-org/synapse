@@ -23,16 +23,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# TODO: Validate attestations
-# TODO: Allow users to "knock" or simpkly join depending on rules
-# TODO: is_priveged flag to users and is_public to users and rooms
-# TODO: Roles
-# TODO: Audit log for admins (profile updates, membership changes, users who tried
-#       to join but were rejected, etc)
-# TODO: Flairs
-# TODO: Add group memebership  /sync
-
-
 def _create_rerouter(func_name):
     """Returns a function that looks at the group id and calls the function
     on federation or the local group server if the group is local
