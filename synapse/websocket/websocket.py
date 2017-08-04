@@ -169,6 +169,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             "presence": self._handle_presence,
             "read_markers": self._handle_read_markers,
             "send": self._handle_send,
+            "state": self._handle_state,
             "typing": self._handle_typing,
         }
 
