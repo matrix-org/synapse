@@ -168,7 +168,7 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
 
     DEFAULT_MESSAGE = (
         "Sharing illegal content on this server is not permitted and rooms in"
-        " violatation will be blocked."
+        " violation will be blocked."
     )
 
     def __init__(self, hs):
