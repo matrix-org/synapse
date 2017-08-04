@@ -129,7 +129,17 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             )
         self.presence = presence
 
-        defer.returnValue(("m.json"))
+        if request.protocols:
+            if "m.json" in request.protocols:
+                defer.returnValue(("m.json"))
+            else:
+                msg = "None of the passed websocket protocols is allowed ({0})".format(
+                    json.dumps(request.protocols)
+                )
+                raise Exception(msg)
+        else:
+            # No protocol was passed so just allow handling
+            defer.returnValue(None)
 
     def onOpen(self):
         logger.info("New connection.")
