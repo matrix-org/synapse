@@ -203,12 +203,16 @@ class GroupsLocalHandler(object):
                 user_id=user_id,
             )
 
+        # TODO: Check that the group is public and we're being added publically
+        is_publicised = content.get("publicise", False)
+
         token = yield self.store.register_user_group_membership(
             group_id, user_id,
             membership="join",
             is_admin=False,
             local_attestation=local_attestation,
             remote_attestation=remote_attestation,
+            is_publicised=is_publicised,
         )
         self.notifier.on_new_event(
             "groups_key", token, users=[user_id],

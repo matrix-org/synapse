@@ -840,6 +840,7 @@ class GroupServerStore(SQLBaseStore):
                                        is_admin=False, content={},
                                        local_attestation=None,
                                        remote_attestation=None,
+                                       is_publicised=False,
                                        ):
         """Registers that a local user is a member of a (local or remote) group.
 
@@ -873,6 +874,7 @@ class GroupServerStore(SQLBaseStore):
                     "user_id": user_id,
                     "is_admin": is_admin,
                     "membership": membership,
+                    "is_publicised": is_publicised,
                     "content": json.dumps(content),
                 },
             )
