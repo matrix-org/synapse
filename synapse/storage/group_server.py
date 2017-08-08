@@ -835,6 +835,21 @@ class GroupServerStore(SQLBaseStore):
             desc="add_room_to_group",
         )
 
+    def update_group_publicity(self, group_id, user_id, publicise):
+        """Update whether the user is publicising their membership of the group
+        """
+        return self._simple_update_one(
+            table="local_group_membership",
+            keyvalues={
+                "group_id": group_id,
+                "user_id": user_id,
+            },
+            updatevalues={
+                "is_publicised": publicise,
+            },
+            desc="update_group_publicity"
+        )
+
     @defer.inlineCallbacks
     def register_user_group_membership(self, group_id, user_id, membership,
                                        is_admin=False, content={},
