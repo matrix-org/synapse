@@ -1050,6 +1050,22 @@ class FederationGroupsSummaryUsersServlet(BaseFederationServlet):
         defer.returnValue((200, resp))
 
 
+class FederationGroupsBulkPublicisedServlet(BaseFederationServlet):
+    """Get roles in a group
+    """
+    PATH = (
+        "/get_groups_publicised$"
+    )
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query):
+        resp = yield self.handler.bulk_get_publicised_groups(
+            content["user_ids"], proxy=False,
+        )
+
+        defer.returnValue((200, resp))
+
+
 FEDERATION_SERVLET_CLASSES = (
     FederationSendServlet,
     FederationPullServlet,
@@ -1102,6 +1118,7 @@ GROUP_SERVER_SERVLET_CLASSES = (
 GROUP_LOCAL_SERVLET_CLASSES = (
     FederationGroupsLocalInviteServlet,
     FederationGroupsRemoveLocalUserServlet,
+    FederationGroupsBulkPublicisedServlet,
 )
 
 

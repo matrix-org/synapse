@@ -313,3 +313,45 @@ class GroupsLocalHandler(object):
     def get_joined_groups(self, user_id):
         group_ids = yield self.store.get_joined_groups(user_id)
         defer.returnValue({"groups": group_ids})
+
+    @defer.inlineCallbacks
+    def get_publicised_groups_for_user(self, user_id):
+        if self.hs.is_mine_id(user_id):
+            result = yield self.store.get_publicised_groups_for_user(user_id)
+            defer.returnValue({"groups": result})
+        else:
+            result = yield self.transport_client.get_publicised_groups_for_user(
+                get_domain_from_id(user_id), user_id
+            )
+            # TODO: Verify attestations
+            defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def bulk_get_publicised_groups(self, user_ids, proxy=True):
+        destinations = {}
+        locals = []
+
+        for user_id in user_ids:
+            if self.hs.is_mine_id(user_id):
+                locals.append(user_id)
+            else:
+                destinations.setdefault(
+                    get_domain_from_id(user_id), []
+                ).append(user_id)
+
+        if not proxy and destinations:
+            raise SynapseError(400, "Some user_ids are not local")
+
+        results = {}
+        for destination, dest_user_ids in destinations.iteritems():
+            r = yield self.transport_client.bulk_get_publicised_groups(
+                destination, dest_user_ids,
+            )
+            results.update(r)
+
+        for uid in locals:
+            results[uid] = yield self.store.get_publicised_groups_for_user(
+                uid
+            )
+
+        defer.returnValue({"users": results})
