@@ -681,3 +681,4 @@ def register_servlets(hs, http_server):
     GroupSelfUpdatePublicityServlet(hs).register(http_server)
     GroupSummaryUsersRoleServlet(hs).register(http_server)
     PublicisedGroupsForUserServlet(hs).register(http_server)
+    PublicisedGroupsForUsersServlet(hs).register(http_server)

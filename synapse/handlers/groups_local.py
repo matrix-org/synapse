@@ -329,27 +329,31 @@ class GroupsLocalHandler(object):
     @defer.inlineCallbacks
     def bulk_get_publicised_groups(self, user_ids, proxy=True):
         destinations = {}
-        locals = []
+        local_users = set()
 
         for user_id in user_ids:
             if self.hs.is_mine_id(user_id):
-                locals.append(user_id)
+                local_users.add(user_id)
             else:
                 destinations.setdefault(
-                    get_domain_from_id(user_id), []
-                ).append(user_id)
+                    get_domain_from_id(user_id), set()
+                ).add(user_id)
 
         if not proxy and destinations:
             raise SynapseError(400, "Some user_ids are not local")
 
         results = {}
+        failed_results = []
         for destination, dest_user_ids in destinations.iteritems():
-            r = yield self.transport_client.bulk_get_publicised_groups(
-                destination, dest_user_ids,
-            )
-            results.update(r)
+            try:
+                r = yield self.transport_client.bulk_get_publicised_groups(
+                    destination, list(dest_user_ids),
+                )
+                results.update(r["users"])
+            except Exception:
+                failed_results.extend(dest_user_ids)
 
-        for uid in locals:
+        for uid in local_users:
             results[uid] = yield self.store.get_publicised_groups_for_user(
                 uid
             )
