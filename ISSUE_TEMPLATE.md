@@ -1,8 +1,7 @@
 <!-- 
 
 **IF YOU HAVE SUPPORT QUESTIONS ABOUT RUNNING OR CONFIGURING YOUR OWN HOME SERVER**: 
-Please don't file a bug; you will likely get better support more quickly if you 
-ask in #matrix:matrix.org ;)
+You will likely get better support more quickly if you ask in ** #matrix:matrix.org ** ;)
 
 
 This is a bug report template. By following the instructions below and
@@ -13,6 +12,7 @@ You can also preview your report before submitting it. You may remove sections
 that aren't relevant to your particular case.
 
 Text between <!-- and --​> marks will be invisible in the report.
+
 -->
 
 ### Description
