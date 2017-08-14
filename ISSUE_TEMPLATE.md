@@ -1,7 +1,7 @@
 <!-- 
 
 **IF YOU HAVE SUPPORT QUESTIONS ABOUT RUNNING OR CONFIGURING YOUR OWN HOME SERVER**: 
-PLease don't file a bug; you will likely get better support more quickly if you 
+Please don't file a bug; you will likely get better support more quickly if you 
 ask in #matrix:matrix.org ;)
 
 
