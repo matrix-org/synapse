@@ -15,6 +15,7 @@
 import gc
 import logging
 
+import affinity
 from daemonize import Daemonize
 from synapse.util import PreserveLoggingContext
 from synapse.util.rlimit import change_resource_limit
@@ -40,7 +41,8 @@ def start_worker_reactor(appname, config):
         config.gc_thresholds,
         config.worker_pid_file,
         config.worker_daemonize,
-        logger
+        config.worker_cpu_affinity,
+        logger,
     )
 
 
@@ -50,6 +52,7 @@ def start_reactor(
         gc_thresholds,
         pid_file,
         daemonize,
+        cpu_affinity,
         logger,
 ):
     """ Run the reactor in the main process
@@ -63,6 +66,7 @@ def start_reactor(
         gc_thresholds:
         pid_file (str): name of pid file to write to if daemonize is True
         daemonize (bool): true to run the reactor in a background process
+        cpu_affinity (int|None): cpu affinity mask
         logger (logging.Logger): logger instance to pass to Daemonize
     """
 
@@ -73,6 +77,9 @@ def start_reactor(
         # between the sentinel and `run` logcontexts.
         with PreserveLoggingContext():
             logger.info("Running")
+            if cpu_affinity is not None:
+                logger.info("Setting CPU affinity to %s" % cpu_affinity)
+                affinity.set_process_affinity_mask(0, cpu_affinity)
             change_resource_limit(soft_file_limit)
             if gc_thresholds:
                 gc.set_threshold(*gc_thresholds)
