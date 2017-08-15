@@ -29,6 +29,7 @@ class ServerConfig(Config):
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.public_baseurl = config.get("public_baseurl")
+        self.cpu_affinity = config.get("cpu_affinity")
 
         # Whether to send federation traffic out in this process. This only
         # applies to some federation traffic, and so shouldn't be used to
@@ -146,6 +147,17 @@ class ServerConfig(Config):
 
         # When running as a daemon, the file to store the pid in
         pid_file: %(pid_file)s
+
+        # CPU affinity mask. Setting this restricts the CPUs on which the process
+        # will be scheduled. It is represented as a bitmask, with the lowest order
+        # bit corresponding to the first logical CPU and the highest order bit
+        # corresponding to the last logical CPU. Not all CPUs may exist on a
+        # given system but a mask may specify more CPUs than are present.
+        # For example:
+        #    0x00000001  is processor #0,
+        #    0x00000003  is processors #0 and #1,
+        #    0xFFFFFFFF  is all processors (#0 through #31).
+        # cpu_affinity: 0xFFFFFFFF
 
         # Whether to serve a web client from the HTTP/HTTPS root resource.
         web_client: True
