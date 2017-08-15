@@ -153,10 +153,18 @@ class ServerConfig(Config):
         # bit corresponding to the first logical CPU and the highest order bit
         # corresponding to the last logical CPU. Not all CPUs may exist on a
         # given system but a mask may specify more CPUs than are present.
+        #
         # For example:
         #    0x00000001  is processor #0,
         #    0x00000003  is processors #0 and #1,
         #    0xFFFFFFFF  is all processors (#0 through #31).
+        #
+        # This is desirable for Synapse processes (especially workers), which are
+        # inherently single-threaded due to the GIL and can suffer a 30-40% slowdown
+        # due to cache blow-out and thread context switching if the scheduler happens
+        # to schedule the underlying threads across different cores.
+        # See https://www.mirantis.com/blog/improve-performance-python-programs-restricting-single-cpu/
+        #
         # cpu_affinity: 0xFFFFFFFF
 
         # Whether to serve a web client from the HTTP/HTTPS root resource.
