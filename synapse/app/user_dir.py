@@ -233,7 +233,7 @@ def start(config_options):
 
     reactor.callWhenRunning(start)
 
-    _base.start_worker_reactor("synapse-user-dir")
+    _base.start_worker_reactor("synapse-user-dir", config)
 
 
 if __name__ == '__main__':
