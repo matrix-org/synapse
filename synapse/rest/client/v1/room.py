@@ -294,7 +294,7 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
             # In both cases we call the auth function, as that has the side
             # effect of logging who issued this request if an access token was
             # provided.
-            if server:
+            if server or self.hs.config.require_auth_for_room_directory:
                 raise e
             else:
                 pass

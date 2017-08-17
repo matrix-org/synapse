@@ -43,6 +43,9 @@ class ServerConfig(Config):
 
         self.filter_timeline_limit = config.get("filter_timeline_limit", -1)
 
+        self.require_auth_for_room_directory = \
+            config.get("require_auth_for_room_directory", False)
+
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
                 self.public_baseurl += '/'
@@ -193,6 +196,11 @@ class ServerConfig(Config):
         # Set the limit on the returned events in the timeline in the get
         # and sync operations. The default value is -1, means no upper limit.
         # filter_timeline_limit: 5000
+
+        # Set whether this server's public room directory is restricted to
+        # local authenticated users, or visible to the wider world.
+        # Default is to be visible to the wider world.
+        require_auth_for_room_directory: False
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.
