@@ -37,7 +37,11 @@ those here (please be careful to remove any personal or private data):
 - **Homeserver**: Was this issue identified on matrix.org or another homeserver?
 
 If not matrix.org:
-- **Version**:        What version of Synapse is running?
+- **Version**:        What version of Synapse is running? <!-- 
+You can find the Synapse version by inspecting the server headers (replace matrix.org with
+your own homeserver domain):
+$ curl -v https://matrix.org/_matrix/client/versions 2>&1 | grep "Server:"
+-->
 - **Install method**: package manager/git clone/pip      
 - **Platform**:       Tell us about the environment in which your homeserver is operating
                       - distro, hardware, if it's running in a vm/container, etc.
