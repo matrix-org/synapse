@@ -27,10 +27,17 @@ Describe here the problem that you are experiencing, or the feature you are requ
 
 Describe how what happens differs from what you expected.
 
+If you can identify any relevant log snippets from _homeserver.log_, please include
+those here (please be careful to remove any personal or private data):
+
 ### Version information
 
 <!-- IMPORTANT: please answer the following questions, to help us narrow down the problem -->
 
-- **Homeserver**: was this issue identified on matrix.org or another homeserver?
-- **Platform**:   tell us about the environment in which your homeserver is operating
-                  - distro, hardware, if it's running in a vm/container, etc.
+- **Homeserver**: Was this issue identified on matrix.org or another homeserver?
+
+If not matrix.org:
+- **Version**:        What version of Synapse is running?
+- **Install method**: package manager/git clone/pip      
+- **Platform**:       Tell us about the environment in which your homeserver is operating
+                      - distro, hardware, if it's running in a vm/container, etc.
