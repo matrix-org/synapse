@@ -835,11 +835,41 @@ class GroupServerStore(SQLBaseStore):
             desc="add_room_to_group",
         )
 
+    def get_publicised_groups_for_user(self, user_id):
+        """Get all groups a user is publicising
+        """
+        return self._simple_select_onecol(
+            table="local_group_membership",
+            keyvalues={
+                "user_id": user_id,
+                "membership": "join",
+                "is_publicised": True,
+            },
+            retcol="group_id",
+            desc="get_publicised_groups_for_user",
+        )
+
+    def update_group_publicity(self, group_id, user_id, publicise):
+        """Update whether the user is publicising their membership of the group
+        """
+        return self._simple_update_one(
+            table="local_group_membership",
+            keyvalues={
+                "group_id": group_id,
+                "user_id": user_id,
+            },
+            updatevalues={
+                "is_publicised": publicise,
+            },
+            desc="update_group_publicity"
+        )
+
     @defer.inlineCallbacks
     def register_user_group_membership(self, group_id, user_id, membership,
                                        is_admin=False, content={},
                                        local_attestation=None,
                                        remote_attestation=None,
+                                       is_publicised=False,
                                        ):
         """Registers that a local user is a member of a (local or remote) group.
 
@@ -873,6 +903,7 @@ class GroupServerStore(SQLBaseStore):
                     "user_id": user_id,
                     "is_admin": is_admin,
                     "membership": membership,
+                    "is_publicised": is_publicised,
                     "content": json.dumps(content),
                 },
             )

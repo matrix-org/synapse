@@ -150,6 +150,7 @@ CREATE TABLE local_group_membership (
     user_id TEXT NOT NULL,
     is_admin BOOLEAN NOT NULL,
     membership TEXT NOT NULL,
+    is_publicised BOOLEAN NOT NULL,  -- if the user is publicising their membership
     content TEXT NOT NULL
 );
 

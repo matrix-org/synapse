@@ -557,6 +557,86 @@ class GroupSelfAcceptInviteServlet(RestServlet):
         defer.returnValue((200, result))
 
 
+class GroupSelfUpdatePublicityServlet(RestServlet):
+    """Update whether we publicise a users membership of a group
+    """
+    PATTERNS = client_v2_patterns(
+        "/groups/(?P<group_id>[^/]*)/self/update_publicity$"
+    )
+
+    def __init__(self, hs):
+        super(GroupSelfUpdatePublicityServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, group_id):
+        requester = yield self.auth.get_user_by_req(request)
+        requester_user_id = requester.user.to_string()
+
+        content = parse_json_object_from_request(request)
+        publicise = content["publicise"]
+        yield self.store.update_group_publicity(
+            group_id, requester_user_id, publicise,
+        )
+
+        defer.returnValue((200, {}))
+
+
+class PublicisedGroupsForUserServlet(RestServlet):
+    """Get the list of groups a user is advertising
+    """
+    PATTERNS = client_v2_patterns(
+        "/publicised_groups/(?P<user_id>[^/]*)$"
+    )
+
+    def __init__(self, hs):
+        super(PublicisedGroupsForUserServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastore()
+        self.groups_handler = hs.get_groups_local_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, user_id):
+        yield self.auth.get_user_by_req(request)
+
+        result = yield self.groups_handler.get_publicised_groups_for_user(
+            user_id
+        )
+
+        defer.returnValue((200, result))
+
+
+class PublicisedGroupsForUsersServlet(RestServlet):
+    """Get the list of groups a user is advertising
+    """
+    PATTERNS = client_v2_patterns(
+        "/publicised_groups$"
+    )
+
+    def __init__(self, hs):
+        super(PublicisedGroupsForUsersServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastore()
+        self.groups_handler = hs.get_groups_local_handler()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        yield self.auth.get_user_by_req(request)
+
+        content = parse_json_object_from_request(request)
+        user_ids = content["user_ids"]
+
+        result = yield self.groups_handler.bulk_get_publicised_groups(
+            user_ids
+        )
+
+        defer.returnValue((200, result))
+
+
 class GroupsForUserServlet(RestServlet):
     """Get all groups the logged in user is joined to
     """
@@ -598,4 +678,7 @@ def register_servlets(hs, http_server):
     GroupSummaryRoomsCatServlet(hs).register(http_server)
     GroupRoleServlet(hs).register(http_server)
     GroupRolesServlet(hs).register(http_server)
+    GroupSelfUpdatePublicityServlet(hs).register(http_server)
     GroupSummaryUsersRoleServlet(hs).register(http_server)
+    PublicisedGroupsForUserServlet(hs).register(http_server)
+    PublicisedGroupsForUsersServlet(hs).register(http_server)

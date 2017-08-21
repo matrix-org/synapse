@@ -203,12 +203,16 @@ class GroupsLocalHandler(object):
                 user_id=user_id,
             )
 
+        # TODO: Check that the group is public and we're being added publically
+        is_publicised = content.get("publicise", False)
+
         token = yield self.store.register_user_group_membership(
             group_id, user_id,
             membership="join",
             is_admin=False,
             local_attestation=local_attestation,
             remote_attestation=remote_attestation,
+            is_publicised=is_publicised,
         )
         self.notifier.on_new_event(
             "groups_key", token, users=[user_id],
@@ -309,3 +313,49 @@ class GroupsLocalHandler(object):
     def get_joined_groups(self, user_id):
         group_ids = yield self.store.get_joined_groups(user_id)
         defer.returnValue({"groups": group_ids})
+
+    @defer.inlineCallbacks
+    def get_publicised_groups_for_user(self, user_id):
+        if self.hs.is_mine_id(user_id):
+            result = yield self.store.get_publicised_groups_for_user(user_id)
+            defer.returnValue({"groups": result})
+        else:
+            result = yield self.transport_client.get_publicised_groups_for_user(
+                get_domain_from_id(user_id), user_id
+            )
+            # TODO: Verify attestations
+            defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def bulk_get_publicised_groups(self, user_ids, proxy=True):
+        destinations = {}
+        local_users = set()
+
+        for user_id in user_ids:
+            if self.hs.is_mine_id(user_id):
+                local_users.add(user_id)
+            else:
+                destinations.setdefault(
+                    get_domain_from_id(user_id), set()
+                ).add(user_id)
+
+        if not proxy and destinations:
+            raise SynapseError(400, "Some user_ids are not local")
+
+        results = {}
+        failed_results = []
+        for destination, dest_user_ids in destinations.iteritems():
+            try:
+                r = yield self.transport_client.bulk_get_publicised_groups(
+                    destination, list(dest_user_ids),
+                )
+                results.update(r["users"])
+            except Exception:
+                failed_results.extend(dest_user_ids)
+
+        for uid in local_users:
+            results[uid] = yield self.store.get_publicised_groups_for_user(
+                uid
+            )
+
+        defer.returnValue({"users": results})

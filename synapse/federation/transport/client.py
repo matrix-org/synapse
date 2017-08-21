@@ -812,3 +812,18 @@ class TransportLayerClient(object):
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
+
+    def bulk_get_publicised_groups(self, destination, user_ids):
+        """Get the groups a list of users are publicising
+        """
+
+        path = PREFIX + "/get_groups_publicised"
+
+        content = {"user_ids": user_ids}
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data=content,
+            ignore_backoff=True,
+        )
