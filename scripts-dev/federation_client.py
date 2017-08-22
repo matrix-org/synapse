@@ -161,11 +161,22 @@ def main():
     )
 
     parser.add_argument(
+        "-N", "--server-name",
+        help="Name to give as the local homeserver. If unspecified, will be "
+             "read from the config file.",
+    )
+
+    parser.add_argument(
+        "-k", "--signing-key-path",
+        help="Path to the file containing the private ed25519 key to sign the "
+             "request with.",
+    )
+
+    parser.add_argument(
         "-c", "--config",
-        type=argparse.FileType('r'),
         default="homeserver.yaml",
-        help="Path to server config file. Used to read in server name and key "
-             "file",
+        help="Path to server config file. Ignored if --server-name and "
+             "--signing-key-path are both given.",
     )
 
     parser.add_argument(
@@ -182,19 +193,28 @@ def main():
 
     args = parser.parse_args()
 
-    config = yaml.safe_load(args.config)
-    origin_name = config['server_name']
-    keyfile = config['signing_key_path']
+    if not args.server_name or not args.signing_key_path:
+        read_args_from_config(args)
 
-    with open(keyfile) as f:
+    with open(args.signing_key_path) as f:
         key = read_signing_keys(f)[0]
 
     result = get_json(
-        origin_name, key, args.destination, "/_matrix/federation/v1/" + args.path
+        args.server_name, key, args.destination, "/_matrix/federation/v1/" + args.path
     )
 
     json.dump(result, sys.stdout)
     print ("")
+
+
+def read_args_from_config(args):
+    with open(args.config, 'r') as fh:
+        config = yaml.safe_load(fh)
+        if not args.server_name:
+            args.server_name = config['server_name']
+        if not args.signing_key_path:
+            args.signing_key_path = config['signing_key_path']
+
 
 if __name__ == "__main__":
     main()
