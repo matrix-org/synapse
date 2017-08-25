@@ -56,6 +56,8 @@ class GroupsLocalHandler(object):
         self.notifier = hs.get_notifier()
         self.attestations = hs.get_groups_attestation_signing()
 
+        self.profile_handler = hs.get_profile_handler()
+
         # Ensure attestations get renewed
         hs.get_groups_attestation_renewer()
 
@@ -123,6 +125,7 @@ class GroupsLocalHandler(object):
 
         defer.returnValue(res)
 
+    @defer.inlineCallbacks
     def create_group(self, group_id, user_id, content):
         """Create a group
         """
@@ -130,13 +133,16 @@ class GroupsLocalHandler(object):
         logger.info("Asking to create group with ID: %r", group_id)
 
         if self.is_mine_id(group_id):
-            return self.groups_server_handler.create_group(
+            res = yield self.groups_server_handler.create_group(
                 group_id, user_id, content
             )
+            defer.returnValue(res)
 
-        return self.transport_client.create_group(
+        content["user_profile"] = yield self.profile_handler.get_profile(user_id)
+        res = yield self.transport_client.create_group(
             get_domain_from_id(group_id), group_id, user_id, content,
-        )  # TODO
+        )
+        defer.returnValue(res)
 
     @defer.inlineCallbacks
     def get_users_in_group(self, group_id, requester_user_id):
@@ -265,7 +271,9 @@ class GroupsLocalHandler(object):
             "groups_key", token, users=[user_id],
         )
 
-        defer.returnValue({"state": "invite"})
+        user_profile = yield self.profile_handler.get_profile(user_id)
+
+        defer.returnValue({"state": "invite", "user_profile": user_profile})
 
     @defer.inlineCallbacks
     def remove_user_from_group(self, group_id, user_id, requester_user_id, content):

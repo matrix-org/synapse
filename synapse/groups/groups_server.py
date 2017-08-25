@@ -503,6 +503,13 @@ class GroupsServerHandler(object):
                 get_domain_from_id(user_id), group_id, user_id, content
             )
 
+            user_profile = res.get("user_profile", {})
+            yield self.store.add_remote_profile_cache(
+                user_id,
+                displayname=user_profile.get("displayname"),
+                avatar_url=user_profile.get("avatar_url"),
+            )
+
         if res["state"] == "join":
             if not self.hs.is_mine_id(user_id):
                 remote_attestation = res["attestation"]
@@ -627,6 +634,9 @@ class GroupsServerHandler(object):
                     get_domain_from_id(user_id), group_id, user_id, {}
                 )
 
+        if not self.hs.is_mine_id(user_id):
+            yield self.store.maybe_delete_remote_profile_cache(user_id)
+
         defer.returnValue({})
 
     @defer.inlineCallbacks
@@ -647,6 +657,7 @@ class GroupsServerHandler(object):
         avatar_url = profile.get("avatar_url")
         short_description = profile.get("short_description")
         long_description = profile.get("long_description")
+        user_profile = content.get("user_profile", {})
 
         yield self.store.create_group(
             group_id,
@@ -678,6 +689,13 @@ class GroupsServerHandler(object):
             local_attestation=local_attestation,
             remote_attestation=remote_attestation,
         )
+
+        if not self.hs.is_mine_id(user_id):
+            yield self.store.add_remote_profile_cache(
+                user_id,
+                displayname=user_profile.get("displayname"),
+                avatar_url=user_profile.get("avatar_url"),
+            )
 
         defer.returnValue({
             "group_id": group_id,

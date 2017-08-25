@@ -36,6 +36,7 @@ class RegistrationHandler(BaseHandler):
         super(RegistrationHandler, self).__init__(hs)
 
         self.auth = hs.get_auth()
+        self.profile_handler = hs.get_profile_handler()
         self.captcha_client = CaptchaServerHttpClient(hs)
 
         self._next_generated_user_id = None
@@ -423,8 +424,7 @@ class RegistrationHandler(BaseHandler):
 
         if displayname is not None:
             logger.info("setting user display name: %s -> %s", user_id, displayname)
-            profile_handler = self.hs.get_handlers().profile_handler
-            yield profile_handler.set_displayname(
+            yield self.profile_handler.set_displayname(
                 user, requester, displayname, by_admin=True,
             )
 
