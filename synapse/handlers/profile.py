@@ -22,18 +22,21 @@ from synapse.api.errors import SynapseError, AuthError, CodeMessageException
 from synapse.types import UserID, get_domain_from_id
 from ._base import BaseHandler
 
-
 logger = logging.getLogger(__name__)
 
 
-class ProfileHandler(BaseHandler):
+class ProfileHandler(object):
     PROFILE_UPDATE_MS = 60 * 1000
     PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
 
     def __init__(self, hs):
-        super(ProfileHandler, self).__init__(hs)
-
+        self.hs = hs
+        self.store = hs.get_datastore()
         self.clock = hs.get_clock()
+        self.ratelimiter = hs.get_ratelimiter()
+
+        # AWFUL hack to get at BaseHandler.ratelimit
+        self.base_handler = BaseHandler(hs)
 
         self.federation = hs.get_replication_layer()
         self.federation.register_query_handler(
@@ -194,7 +197,7 @@ class ProfileHandler(BaseHandler):
         if not self.hs.is_mine(user):
             return
 
-        yield self.ratelimit(requester)
+        yield self.base_handler.ratelimit(requester)
 
         room_ids = yield self.store.get_rooms_for_user(
             user.to_string(),

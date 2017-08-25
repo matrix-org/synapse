@@ -56,8 +56,7 @@ class GroupsLocalHandler(object):
         self.notifier = hs.get_notifier()
         self.attestations = hs.get_groups_attestation_signing()
 
-        handlers = hs.get_handlers()
-        self.profile_handler = handlers.profile_handler
+        self.profile_handler = hs.get_profile_handler()
 
         # Ensure attestations get renewed
         hs.get_groups_attestation_renewer()

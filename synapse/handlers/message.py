@@ -47,6 +47,7 @@ class MessageHandler(BaseHandler):
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
         self.validator = EventValidator()
+        self.profile_handler = hs.get_profile_handler()
 
         self.pagination_lock = ReadWriteLock()
 
@@ -210,7 +211,7 @@ class MessageHandler(BaseHandler):
 
                 if membership in {Membership.JOIN, Membership.INVITE}:
                     # If event doesn't include a display name, add one.
-                    profile = self.hs.get_handlers().profile_handler
+                    profile = self.profile_handler
                     content = builder.content
 
                     try:
