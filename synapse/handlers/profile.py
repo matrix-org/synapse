@@ -25,18 +25,12 @@ from ._base import BaseHandler
 logger = logging.getLogger(__name__)
 
 
-class ProfileHandler(object):
+class ProfileHandler(BaseHandler):
     PROFILE_UPDATE_MS = 60 * 1000
     PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
 
     def __init__(self, hs):
-        self.hs = hs
-        self.store = hs.get_datastore()
-        self.clock = hs.get_clock()
-        self.ratelimiter = hs.get_ratelimiter()
-
-        # AWFUL hack to get at BaseHandler.ratelimit
-        self.base_handler = BaseHandler(hs)
+        super(ProfileHandler, self).__init__(hs)
 
         self.federation = hs.get_replication_layer()
         self.federation.register_query_handler(
@@ -197,7 +191,7 @@ class ProfileHandler(object):
         if not self.hs.is_mine(user):
             return
 
-        yield self.base_handler.ratelimit(requester)
+        yield self.ratelimit(requester)
 
         room_ids = yield self.store.get_rooms_for_user(
             user.to_string(),
@@ -225,7 +219,7 @@ class ProfileHandler(object):
                 )
 
     def _update_remote_profile_cache(self):
-        """Called periodically to check profiles of remote users we havent'
+        """Called periodically to check profiles of remote users we haven't
         checked in a while.
         """
         entries = yield self.store.get_remote_profile_cache_entries_that_expire(
@@ -233,10 +227,10 @@ class ProfileHandler(object):
         )
 
         for user_id, displayname, avatar_url in entries:
-            is_subcscribed = yield self.store.is_subscribed_remote_profile_for_user(
+            is_subscribed = yield self.store.is_subscribed_remote_profile_for_user(
                 user_id,
             )
-            if not is_subcscribed:
+            if not is_subscribed:
                 yield self.store.maybe_delete_remote_profile_cache(user_id)
                 continue
 
