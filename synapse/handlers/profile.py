@@ -72,6 +72,29 @@ class ProfileHandler(BaseHandler):
                 raise
 
     @defer.inlineCallbacks
+    def get_profile_from_cache(self, user_id):
+        """Get the profile information from our local cache. If the user is
+        ours then the profile information will always be corect. Otherwise,
+        it may be out of date/missing.
+        """
+        target_user = UserID.from_string(user_id)
+        if self.hs.is_mine(target_user):
+            displayname = yield self.store.get_profile_displayname(
+                target_user.localpart
+            )
+            avatar_url = yield self.store.get_profile_avatar_url(
+                target_user.localpart
+            )
+
+            defer.returnValue({
+                "displayname": displayname,
+                "avatar_url": avatar_url,
+            })
+        else:
+            profile = yield self.store.get_from_remote_profile_cache(user_id)
+            defer.returnValue(profile or {})
+
+    @defer.inlineCallbacks
     def get_displayname(self, target_user):
         if self.hs.is_mine(target_user):
             displayname = yield self.store.get_profile_displayname(

@@ -62,7 +62,7 @@ class ProfileStore(SQLBaseStore):
         return self._simple_select_one(
             table="remote_profile_cache",
             keyvalues={"user_id": user_id},
-            retcols=("displayname", "avatar_url", "last_check"),
+            retcols=("displayname", "avatar_url",),
             allow_none=True,
             desc="get_from_remote_profile_cache",
         )

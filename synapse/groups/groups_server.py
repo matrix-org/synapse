@@ -45,6 +45,7 @@ class GroupsServerHandler(object):
         self.server_name = hs.hostname
         self.attestations = hs.get_groups_attestation_signing()
         self.transport_client = hs.get_federation_transport_client()
+        self.profile_handler = hs.get_profile_handler()
 
         # Ensure attestations get renewed
         hs.get_groups_attestation_renewer()
@@ -127,6 +128,9 @@ class GroupsServerHandler(object):
                 entry["attestation"] = self.attestations.create_attestation(
                     group_id, user_id,
                 )
+
+            user_profile = yield self.profile_handler.get_profile_from_cache(user_id)
+            entry.update(user_profile)
 
         users.sort(key=lambda e: e.get("order", 0))
 
@@ -387,7 +391,8 @@ class GroupsServerHandler(object):
 
             entry = {"user_id": g_user_id}
 
-            # TODO: Get profile information
+            profile = yield self.profile_handler.get_profile_from_cache(g_user_id)
+            entry.update(profile)
 
             if not is_public:
                 entry["is_public"] = False
