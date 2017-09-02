@@ -58,6 +58,7 @@ from twisted.internet import defer, reactor
 from twisted.web.resource import EncodingResourceWrapper, Resource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
+from twisted.internet import error
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -131,29 +132,36 @@ class SynapseHomeServer(HomeServer):
 
         if tls:
             for address in bind_addresses:
-                reactor.listenSSL(
-                    port,
-                    SynapseSite(
-                        "synapse.access.https.%s" % (site_tag,),
-                        site_tag,
-                        listener_config,
-                        root_resource,
-                    ),
-                    self.tls_server_context_factory,
-                    interface=address
-                )
+                try:
+                    reactor.listenSSL(
+                        port,
+                        SynapseSite(
+                            "synapse.access.https.%s" % (site_tag,),
+                            site_tag,
+                            listener_config,
+                            root_resource,
+                        ),
+                        self.tls_server_context_factory,
+                        interface=address
+                    )
+                except error.CannotListenError as e:
+                    check_bind_error(e, address, bind_addresses)
+
         else:
             for address in bind_addresses:
-                reactor.listenTCP(
-                    port,
-                    SynapseSite(
-                        "synapse.access.http.%s" % (site_tag,),
-                        site_tag,
-                        listener_config,
-                        root_resource,
-                    ),
-                    interface=address
-                )
+                try:
+                    reactor.listenTCP(
+                        port,
+                        SynapseSite(
+                            "synapse.access.http.%s" % (site_tag,),
+                            site_tag,
+                            listener_config,
+                            root_resource,
+                        ),
+                        interface=address
+                    )
+                except error.CannotListenError as e:
+                    check_bind_error(e, address, bind_addresses)
         logger.info("Synapse now listening on port %d", port)
 
     def _configure_named_resource(self, name, compress=False):
@@ -232,25 +240,31 @@ class SynapseHomeServer(HomeServer):
                 bind_addresses = listener["bind_addresses"]
 
                 for address in bind_addresses:
-                    reactor.listenTCP(
-                        listener["port"],
-                        manhole(
-                            username="matrix",
-                            password="rabbithole",
-                            globals={"hs": self},
-                        ),
-                        interface=address
-                    )
+                    try:
+                        reactor.listenTCP(
+                            listener["port"],
+                            manhole(
+                                username="matrix",
+                                password="rabbithole",
+                                globals={"hs": self},
+                            ),
+                            interface=address
+                        )
+                    except error.CannotListenError as e:
+                        check_bind_error(e, address, bind_addresses)
             elif listener["type"] == "replication":
                 bind_addresses = listener["bind_addresses"]
                 for address in bind_addresses:
-                    factory = ReplicationStreamProtocolFactory(self)
-                    server_listener = reactor.listenTCP(
-                        listener["port"], factory, interface=address
-                    )
-                    reactor.addSystemEventTrigger(
-                        "before", "shutdown", server_listener.stopListening,
-                    )
+                    try:
+                        factory = ReplicationStreamProtocolFactory(self)
+                        server_listener = reactor.listenTCP(
+                            listener["port"], factory, interface=address
+                        )
+                        reactor.addSystemEventTrigger(
+                            "before", "shutdown", server_listener.stopListening,
+                        )
+                    except error.CannotListenError as e:
+                        check_bind_error(e, address, bind_addresses)
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -282,6 +296,13 @@ class SynapseHomeServer(HomeServer):
         if run_new_connection:
             self.database_engine.on_new_connection(db_conn)
         return db_conn
+
+
+def check_bind_error(e, address, bind_addresses):
+    if address == '0.0.0.0' and '::' in bind_addresses:
+        logger.warn('Failed to listen on 0.0.0.0, continuing because listening on [::]')
+    else:
+        raise e
 
 
 def setup(config_options):

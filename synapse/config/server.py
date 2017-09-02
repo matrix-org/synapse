@@ -220,14 +220,12 @@ class ServerConfig(Config):
             port: %(bind_port)s
 
             # Local addresses to listen on.
-            # On Linux and Mac OS, this will listen on all IPv4 and IPv6
+            # On Linux and Mac OS, `::` will listen on all IPv4 and IPv6
             # addresses by default. For most other OSes, this will only listen
             # on IPv6.
             bind_addresses:
               - '::'
-              # For systems other than Linux or Mac OS, uncomment the next line
-              # to also listen on IPv4.
-              #- '0.0.0.0'
+              - '0.0.0.0'
 
             # This is a 'http' listener, allows us to specify 'resources'.
             type: http
@@ -265,7 +263,7 @@ class ServerConfig(Config):
           # For when matrix traffic passes through loadbalancer that unwraps TLS.
           - port: %(unsecure_port)s
             tls: false
-            bind_addresses: ['::']
+            bind_addresses: ['::', '0.0.0.0']
             type: http
 
             x_forwarded: false
