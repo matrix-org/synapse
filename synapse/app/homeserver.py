@@ -131,37 +131,31 @@ class SynapseHomeServer(HomeServer):
         root_resource = create_resource_tree(resources, root_resource)
 
         if tls:
-            for address in bind_addresses:
-                try:
-                    reactor.listenSSL(
-                        port,
-                        SynapseSite(
-                            "synapse.access.https.%s" % (site_tag,),
-                            site_tag,
-                            listener_config,
-                            root_resource,
-                        ),
-                        self.tls_server_context_factory,
-                        interface=address
-                    )
-                except error.CannotListenError as e:
-                    check_bind_error(e, address, bind_addresses)
+            _base.listen_ssl(
+                logger,
+                bind_addresses,
+                port,
+                SynapseSite(
+                    "synapse.access.https.%s" % (site_tag,),
+                    site_tag,
+                    listener_config,
+                    root_resource,
+                ),
+                self.tls_server_context_factory,
+            )
 
         else:
-            for address in bind_addresses:
-                try:
-                    reactor.listenTCP(
-                        port,
-                        SynapseSite(
-                            "synapse.access.http.%s" % (site_tag,),
-                            site_tag,
-                            listener_config,
-                            root_resource,
-                        ),
-                        interface=address
-                    )
-                except error.CannotListenError as e:
-                    check_bind_error(e, address, bind_addresses)
+            _base.listen_tcp(
+                logger,
+                bind_addresses,
+                port,
+                SynapseSite(
+                    "synapse.access.http.%s" % (site_tag,),
+                    site_tag,
+                    listener_config,
+                    root_resource,
+                )
+            )
         logger.info("Synapse now listening on port %d", port)
 
     def _configure_named_resource(self, name, compress=False):
@@ -239,19 +233,16 @@ class SynapseHomeServer(HomeServer):
             elif listener["type"] == "manhole":
                 bind_addresses = listener["bind_addresses"]
 
-                for address in bind_addresses:
-                    try:
-                        reactor.listenTCP(
-                            listener["port"],
-                            manhole(
-                                username="matrix",
-                                password="rabbithole",
-                                globals={"hs": self},
-                            ),
-                            interface=address
-                        )
-                    except error.CannotListenError as e:
-                        check_bind_error(e, address, bind_addresses)
+                _base.listen_tcp(
+                    logger,
+                    bind_addresses,
+                    listener["port"],
+                    manhole(
+                        username="matrix",
+                        password="rabbithole",
+                        globals={"hs": self},
+                    )
+                )
             elif listener["type"] == "replication":
                 bind_addresses = listener["bind_addresses"]
                 for address in bind_addresses:
@@ -264,7 +255,7 @@ class SynapseHomeServer(HomeServer):
                             "before", "shutdown", server_listener.stopListening,
                         )
                     except error.CannotListenError as e:
-                        check_bind_error(e, address, bind_addresses)
+                        _base.check_bind_error(logger, e, address, bind_addresses)
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -296,13 +287,6 @@ class SynapseHomeServer(HomeServer):
         if run_new_connection:
             self.database_engine.on_new_connection(db_conn)
         return db_conn
-
-
-def check_bind_error(e, address, bind_addresses):
-    if address == '0.0.0.0' and '::' in bind_addresses:
-        logger.warn('Failed to listen on 0.0.0.0, continuing because listening on [::]')
-    else:
-        raise e
 
 
 def setup(config_options):
