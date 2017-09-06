@@ -27,6 +27,7 @@ from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logutils import log_function
 from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
 from synapse.events import FrozenEvent, builder
+from synapse.types import get_domain_from_id
 import synapse.metrics
 
 from synapse.util.retryutils import NotRetryingDestination
@@ -836,3 +837,63 @@ class FederationClient(FederationBase):
                 )
 
         raise RuntimeError("Failed to send to any server.")
+
+    def get_group_profile(self, group_id, requester_user_id):
+        destination = get_domain_from_id(group_id)
+        return self.transport_layer.get_group_profile(
+            destination, group_id, requester_user_id,
+        )
+
+    def get_group_summary(self, group_id, requester_user_id):
+        destination = get_domain_from_id(group_id)
+        return self.transport_layer.get_group_summary(
+            destination, group_id, requester_user_id,
+        )
+
+    def get_rooms_in_group(self, group_id, requester_user_id):
+        destination = get_domain_from_id(group_id)
+        return self.transport_layer.get_group_rooms(
+            destination, group_id, requester_user_id,
+        )
+
+    def get_users_in_group(self, group_id, requester_user_id):
+        destination = get_domain_from_id(group_id)
+        return self.transport_layer.get_group_users(
+            destination, group_id, requester_user_id,
+        )
+
+    def accept_group_invite(self, group_id, user_id, content):
+        destination = get_domain_from_id(group_id)
+        return self.transport_layer.accept_group_invite(
+            destination, group_id, user_id, content,
+        )
+
+    def invite_to_group(self, group_id, user_id, content):
+        if self.hs.is_mine_id(group_id):
+            destination = get_domain_from_id(user_id)
+        else:
+            destination = get_domain_from_id(group_id)
+
+        return self.transport_layer.invite_to_group(
+            destination, group_id, user_id, content,
+        )
+
+    def remove_user_from_group(self, group_id, user_id, content):
+        if self.hs.is_mine_id(group_id):
+            destination = get_domain_from_id(user_id)
+        else:
+            destination = get_domain_from_id(group_id)
+
+        return self.transport_layer.remove_user_from_group(
+            destination, group_id, user_id, content,
+        )
+
+    def renew_group_attestation(self, group_id, user_id, attestation):
+        if self.hs.is_mine_id(group_id):
+            destination = get_domain_from_id(user_id)
+        else:
+            destination = get_domain_from_id(group_id)
+
+        return self.transport_layer.renew_group_attestation(
+            destination, group_id, user_id, content={"attestation": attestation},
+        )

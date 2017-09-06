@@ -471,3 +471,114 @@ class TransportLayerClient(object):
         )
 
         defer.returnValue(content)
+
+    @log_function
+    def get_group_profile(self, destination, group_id, requester_user_id):
+        path = PREFIX + "/groups/%s/profile" % (group_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def get_group_summary(self, destination, group_id, requester_user_id):
+        path = PREFIX + "/groups/%s/summary" % (group_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def get_group_rooms(self, destination, group_id, requester_user_id):
+        path = PREFIX + "/groups/%s/rooms" % (group_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def get_group_users(self, destination, group_id, requester_user_id):
+        path = PREFIX + "/groups/%s/users" % (group_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def accept_group_invite(self, destination, group_id, user_id, content):
+        path = PREFIX + "/groups/%s/users/%s/accept_invite" % (group_id, user_id)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data=content,
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def invite_to_group(self, destination, group_id, user_id, content):
+        path = PREFIX + "/groups/%s/users/%s/invite" % (group_id, user_id)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data=content,
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def invite_to_group_notification(self, destination, group_id, user_id, content):
+        path = PREFIX + "/groups/local/%s/users/%s/invite" % (group_id, user_id)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data=content,
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def remove_user_from_group(self, destination, group_id, user_id, content):
+        path = PREFIX + "/groups/%s/users/%s/remove" % (group_id, user_id)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data=content,
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def remove_user_from_group_notification(self, destination, group_id, user_id,
+                                            content):
+        path = PREFIX + "/groups/local/%s/users/%s/remove" % (group_id, user_id)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data=content,
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def renew_group_attestation(self, destination, group_id, user_id, content):
+        path = PREFIX + "/groups/%s/renew_attestation/%s" % (group_id, user_id)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data=content,
+            ignore_backoff=True,
+        )

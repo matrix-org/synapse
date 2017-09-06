@@ -45,6 +45,7 @@ class EventSources(object):
         push_rules_key, _ = self.store.get_push_rules_stream_token()
         to_device_key = self.store.get_to_device_stream_token()
         device_list_key = self.store.get_device_stream_token()
+        groups_key = self.store.get_group_stream_token()
 
         token = StreamToken(
             room_key=(
@@ -65,6 +66,7 @@ class EventSources(object):
             push_rules_key=push_rules_key,
             to_device_key=to_device_key,
             device_list_key=device_list_key,
+            groups_key=groups_key,
         )
         defer.returnValue(token)
 

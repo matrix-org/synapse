@@ -58,6 +58,9 @@ class FederationServer(FederationBase):
         # come in waves.
         self._state_resp_cache = ResponseCache(hs, timeout_ms=30000)
 
+        self.groups_server_handler = hs.get_groups_server_handler()
+        self.groups_local_handler = hs.get_groups_local_handler()
+
     def set_handler(self, handler):
         """Sets the handler that the replication layer will use to communicate
         receipt of new PDUs from other home servers. The required methods are
