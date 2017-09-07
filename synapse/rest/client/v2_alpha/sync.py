@@ -189,7 +189,8 @@ class SyncRestServlet(RestServlet):
             "account_data": {"events": sync_result.account_data},
             "to_device": {"events": sync_result.to_device},
             "device_lists": {
-                "changed": list(sync_result.device_lists),
+                "changed": list(sync_result.device_lists.changed),
+                "left": list(sync_result.device_lists.left),
             },
             "presence": SyncRestServlet.encode_presence(
                 sync_result.presence, time_now
