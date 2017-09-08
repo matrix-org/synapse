@@ -949,7 +949,7 @@ class SyncHandler(object):
         newly_joined_rooms = []
         room_entries = []
         invited = []
-        for room_id, events in mem_change_events_by_room_id.items():
+        for room_id, events in mem_change_events_by_room_id.iteritems():
             non_joins = [e for e in events if e.membership != Membership.JOIN]
             has_join = len(non_joins) != len(events)
 
