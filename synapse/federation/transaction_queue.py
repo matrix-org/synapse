@@ -435,6 +435,12 @@ class TransactionQueue(object):
 
                 # END CRITICAL SECTION
 
+                if len(pending_pdus) > 10:
+                    logger.info("Sending %d pdus to %r", len(pending_pdus), destination)
+
+                if len(pending_edus) > 10:
+                    logger.info("Sending %d edus to %r", len(pending_edus), destination)
+
                 success = yield self._send_new_transaction(
                     destination, pending_pdus, pending_edus, pending_failures,
                 )
@@ -494,6 +500,12 @@ class TransactionQueue(object):
             for content in contents
         ]
 
+        if len(contents) > 10:
+            logger.info(
+                "Sending %d direct to device messages to %r",
+                len(contents), destination,
+            )
+
         last_device_list = self.last_device_list_stream_id_by_dest.get(destination, 0)
         now_stream_id, results = yield self.store.get_devices_by_remote(
             destination, last_device_list
@@ -507,6 +519,10 @@ class TransactionQueue(object):
             )
             for content in results
         )
+
+        if len(results) > 10:
+            logger.info("Sending %d device list updates to %r", len(results), destination)
+
         defer.returnValue((edus, stream_id, now_stream_id))
 
     @measure_func("_send_new_transaction")
