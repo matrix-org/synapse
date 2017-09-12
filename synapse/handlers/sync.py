@@ -599,11 +599,19 @@ class SyncHandler(object):
                 since_token.device_list_key
             )
 
+            # TODO: Be more clever than this, i.e. remove users who we already
+            # share a room with?
+            for room_id in newly_joined_rooms:
+                joined_users = yield self.state.get_current_user_in_room(room_id)
+                newly_joined_users.update(joined_users)
+
+            for room_id in newly_left_rooms:
+                left_users = yield self.state.get_current_user_in_room(room_id)
+                newly_left_users.update(left_users)
+
             # TODO: Check that these users are actually new, i.e. either they
             # weren't in the previous sync *or* they left and rejoined.
             changed.update(newly_joined_users)
-
-            # TODO: Add the members from newly_*_rooms
 
             if not changed and not newly_left_users:
                 defer.returnValue(DeviceLists(
