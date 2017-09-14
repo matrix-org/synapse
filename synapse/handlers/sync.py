@@ -545,7 +545,8 @@ class SyncHandler(object):
         res = yield self._generate_sync_entry_for_rooms(
             sync_result_builder, account_data_by_room
         )
-        newly_joined_rooms, newly_joined_users, _, newly_left_users = res
+        newly_joined_rooms, newly_joined_users, _, _ = res
+        _, _, newly_left_rooms, newly_left_users = res
 
         block_all_presence_data = (
             since_token is None and
@@ -562,7 +563,7 @@ class SyncHandler(object):
             sync_result_builder,
             newly_joined_rooms=newly_joined_rooms,
             newly_joined_users=newly_joined_users,
-            newly_left_rooms=[],
+            newly_left_rooms=newly_left_rooms,
             newly_left_users=newly_left_users,
         )
 
