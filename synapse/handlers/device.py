@@ -338,7 +338,7 @@ class DeviceHandler(BaseHandler):
                         etype, state_key = key
                         if etype != EventTypes.Member:
                             continue
-                        possibly_changed.append(state_key)
+                        possibly_changed.add(state_key)
                     break
 
             # If there has been any change in membership, include them in the
