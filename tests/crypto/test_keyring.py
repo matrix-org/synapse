@@ -19,7 +19,7 @@ from tests import utils, unittest
 from twisted.internet import defer
 
 
-class EventSigningTestCase(unittest.TestCase):
+class KeyringTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         self.hs = yield utils.setup_test_homeserver(handlers=None)
