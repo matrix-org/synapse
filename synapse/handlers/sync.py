@@ -293,6 +293,11 @@ class SyncHandler(object):
             timeline_limit = sync_config.filter_collection.timeline_limit()
             block_all_timeline = sync_config.filter_collection.blocks_all_room_timeline()
 
+            # Pull out the current state, as we always want to include those events
+            # in the timeline if they're there.
+            current_state_ids = yield self.state.get_current_state_ids(room_id)
+            current_state_ids = frozenset(current_state_ids.itervalues())
+
             if recents is None or newly_joined_room or timeline_limit < len(recents):
                 limited = True
             else:
@@ -304,6 +309,7 @@ class SyncHandler(object):
                     self.store,
                     sync_config.user.to_string(),
                     recents,
+                    always_include_ids=current_state_ids,
                 )
             else:
                 recents = []
@@ -339,6 +345,7 @@ class SyncHandler(object):
                     self.store,
                     sync_config.user.to_string(),
                     loaded_recents,
+                    always_include_ids=current_state_ids,
                 )
                 loaded_recents.extend(recents)
                 recents = loaded_recents
