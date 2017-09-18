@@ -292,12 +292,18 @@ class DeviceHandler(BaseHandler):
         ).stream
 
         possibly_changed = set(changed)
-        possibly_left_rooms = set()
+        possibly_left = set()
         for room_id in rooms_changed:
+            current_state_ids = yield self.store.get_current_state_ids(room_id)
+
             # The user may have left the room
             # TODO: Check if they actually did or if we were just invited.
             if room_id not in room_ids:
-                possibly_left_rooms.add(room_id)
+                for key, event_id in current_state_ids.iteritems():
+                    etype, state_key = key
+                    if etype != EventTypes.Member:
+                        continue
+                    possibly_left.add(state_key)
                 continue
 
             # Fetch the current state at the time.
@@ -309,8 +315,6 @@ class DeviceHandler(BaseHandler):
                 # we have purged the stream_ordering index since the stream
                 # ordering: treat it the same as a new room
                 event_ids = []
-
-            current_state_ids = yield self.store.get_current_state_ids(room_id)
 
             # special-case for an empty prev state: include all members
             # in the changed list
@@ -354,16 +358,11 @@ class DeviceHandler(BaseHandler):
                 for state_dict in prev_state_ids.itervalues():
                     prev_event_id = state_dict.get(key, None)
                     if not prev_event_id or prev_event_id != event_id:
-                        possibly_changed.add(state_key)
-                        if state_key == user_id:
-                            for key, event_id in current_state_ids.iteritems():
-                                etype, state_key = key
-                                if etype != EventTypes.Member:
-                                    continue
-                                possibly_changed.add(room_id)
+                        if state_key != user_id:
+                            possibly_changed.add(state_key)
                         break
 
-        if possibly_changed:
+        if possibly_changed or possibly_left:
             users_who_share_room = yield self.store.get_users_who_share_room_with_user(
                 user_id
             )
@@ -371,7 +370,7 @@ class DeviceHandler(BaseHandler):
             # Take the intersection of the users whose devices may have changed
             # and those that actually still share a room with the user
             possibly_joined = possibly_changed & users_who_share_room
-            possibly_left = possibly_changed - users_who_share_room
+            possibly_left = (possibly_changed | possibly_left) - users_who_share_room
         else:
             possibly_joined = []
             possibly_left = []
