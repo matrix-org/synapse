@@ -248,6 +248,7 @@ class HttpPusher(object):
             d = {
                 'notification': {
                     'event_id': event.event_id,
+                    'room_id': event.room_id,
                     'counts': {
                         'unread': badge,
                     },
