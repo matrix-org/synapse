@@ -270,6 +270,8 @@ class DeviceHandler(BaseHandler):
             user_id (str)
             from_token (StreamToken)
         """
+        now_token = yield self.hs.get_event_sources().get_current_token()
+
         room_ids = yield self.store.get_rooms_for_user(user_id)
 
         # First we check if any devices have changed
@@ -280,11 +282,24 @@ class DeviceHandler(BaseHandler):
         # Then work out if any users have since joined
         rooms_changed = self.store.get_rooms_that_changed(room_ids, from_token.room_key)
 
+        member_events = yield self.store.get_membership_changes_for_user(
+            user_id, from_token.room_key, now_token.room_key
+        )
+        rooms_changed.update(event.room_id for event in member_events)
+
         stream_ordering = RoomStreamToken.parse_stream_token(
-            from_token.room_key).stream
+            from_token.room_key
+        ).stream
 
         possibly_changed = set(changed)
+        possibly_left_rooms = set()
         for room_id in rooms_changed:
+            # The user may have left the room
+            # TODO: Check if they actually did or if we were just invited.
+            if room_id not in room_ids:
+                possibly_left_rooms.add(room_id)
+                continue
+
             # Fetch the current state at the time.
             try:
                 event_ids = yield self.store.get_forward_extremeties_for_room(
@@ -307,8 +322,24 @@ class DeviceHandler(BaseHandler):
                     possibly_changed.add(state_key)
                 continue
 
+            current_member_id = current_state_ids.get((EventTypes.Member, user_id))
+            if not current_member_id:
+                continue
+
             # mapping from event_id -> state_dict
             prev_state_ids = yield self.store.get_state_ids_for_events(event_ids)
+
+            # Check if we've joined the room? If so we just blindly add all the users to
+            # the "possibly changed" users.
+            for state_dict in prev_state_ids.itervalues():
+                member_event = state_dict.get((EventTypes.Member, user_id), None)
+                if not member_event or member_event != current_member_id:
+                    for key, event_id in current_state_ids.iteritems():
+                        etype, state_key = key
+                        if etype != EventTypes.Member:
+                            continue
+                        possibly_changed.add(state_key)
+                    break
 
             # If there has been any change in membership, include them in the
             # possibly changed list. We'll check if they are joined below,
@@ -320,19 +351,35 @@ class DeviceHandler(BaseHandler):
 
                 # check if this member has changed since any of the extremities
                 # at the stream_ordering, and add them to the list if so.
-                for state_dict in prev_state_ids.values():
+                for state_dict in prev_state_ids.itervalues():
                     prev_event_id = state_dict.get(key, None)
                     if not prev_event_id or prev_event_id != event_id:
                         possibly_changed.add(state_key)
+                        if state_key == user_id:
+                            for key, event_id in current_state_ids.iteritems():
+                                etype, state_key = key
+                                if etype != EventTypes.Member:
+                                    continue
+                                possibly_changed.add(room_id)
                         break
 
-        users_who_share_room = yield self.store.get_users_who_share_room_with_user(
-            user_id
-        )
+        if possibly_changed:
+            users_who_share_room = yield self.store.get_users_who_share_room_with_user(
+                user_id
+            )
 
-        # Take the intersection of the users whose devices may have changed
-        # and those that actually still share a room with the user
-        defer.returnValue(users_who_share_room & possibly_changed)
+            # Take the intersection of the users whose devices may have changed
+            # and those that actually still share a room with the user
+            possibly_joined = possibly_changed & users_who_share_room
+            possibly_left = possibly_changed - users_who_share_room
+        else:
+            possibly_joined = []
+            possibly_left = []
+
+        defer.returnValue({
+            "changed": list(possibly_joined),
+            "left": list(possibly_left),
+        })
 
     @defer.inlineCallbacks
     def on_federation_query_user_devices(self, user_id):
