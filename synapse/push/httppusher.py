@@ -244,7 +244,7 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def _build_notification_dict(self, event, tweaks, badge):
-        if 'format' in self.data and self.data['format'] == 'event_id_only':
+        if self.data.get('format') == 'event_id_only':
             d = {
                 'notification': {
                     'event_id': event.event_id,
