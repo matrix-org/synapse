@@ -15,5 +15,6 @@ export SYNAPSE_CACHE_FACTOR=1
 ./sytest/jenkins/prep_sytest_for_postgres.sh
 
 ./sytest/jenkins/install_and_run.sh \
+    --python $WORKSPACE/.tox/py27/bin/python \
     --synapse-directory $WORKSPACE \
     --dendron $WORKSPACE/dendron/bin/dendron \

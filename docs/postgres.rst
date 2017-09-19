@@ -1,6 +1,8 @@
 Using Postgres
 --------------
 
+Postgres version 9.4 or later is known to work.
+
 Set up database
 ===============
 

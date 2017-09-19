@@ -188,13 +188,11 @@ class KeyChangesServlet(RestServlet):
 
         user_id = requester.user.to_string()
 
-        changed = yield self.device_handler.get_user_ids_changed(
+        results = yield self.device_handler.get_user_ids_changed(
             user_id, from_token,
         )
 
-        defer.returnValue((200, {
-            "changed": list(changed),
-        }))
+        defer.returnValue((200, results))
 
 
 class OneTimeKeyServlet(RestServlet):

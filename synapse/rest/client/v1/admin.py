@@ -168,7 +168,7 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
 
     DEFAULT_MESSAGE = (
         "Sharing illegal content on this server is not permitted and rooms in"
-        " violatation will be blocked."
+        " violation will be blocked."
     )
 
     def __init__(self, hs):
@@ -296,7 +296,7 @@ class QuarantineMediaInRoom(ClientV1RestServlet):
 
 class ResetPasswordRestServlet(ClientV1RestServlet):
     """Post request to allow an administrator reset password for a user.
-    This need a user have a administrator access in Synapse.
+    This needs user to have administrator access in Synapse.
         Example:
             http://localhost:8008/_matrix/client/api/v1/admin/reset_password/
             @user:to_reset_password?access_token=admin_access_token
@@ -319,7 +319,7 @@ class ResetPasswordRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, target_user_id):
         """Post request to allow an administrator reset password for a user.
-        This need a user have a administrator access in Synapse.
+        This needs user to have administrator access in Synapse.
         """
         UserID.from_string(target_user_id)
         requester = yield self.auth.get_user_by_req(request)
@@ -343,7 +343,7 @@ class ResetPasswordRestServlet(ClientV1RestServlet):
 
 class GetUsersPaginatedRestServlet(ClientV1RestServlet):
     """Get request to get specific number of users from Synapse.
-    This need a user have a administrator access in Synapse.
+    This needs user to have administrator access in Synapse.
         Example:
             http://localhost:8008/_matrix/client/api/v1/admin/users_paginate/
             @admin:user?access_token=admin_access_token&start=0&limit=10
@@ -362,7 +362,7 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, target_user_id):
         """Get request to get specific number of users from Synapse.
-        This need a user have a administrator access in Synapse.
+        This needs user to have administrator access in Synapse.
         """
         target_user = UserID.from_string(target_user_id)
         requester = yield self.auth.get_user_by_req(request)
@@ -395,7 +395,7 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, target_user_id):
         """Post request to get specific number of users from Synapse..
-        This need a user have a administrator access in Synapse.
+        This needs user to have administrator access in Synapse.
         Example:
             http://localhost:8008/_matrix/client/api/v1/admin/users_paginate/
             @admin:user?access_token=admin_access_token
@@ -433,7 +433,7 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
 class SearchUsersRestServlet(ClientV1RestServlet):
     """Get request to search user table for specific users according to
     search term.
-    This need a user have a administrator access in Synapse.
+    This needs user to have administrator access in Synapse.
         Example:
             http://localhost:8008/_matrix/client/api/v1/admin/search_users/
             @admin:user?access_token=admin_access_token&term=alice
@@ -453,7 +453,7 @@ class SearchUsersRestServlet(ClientV1RestServlet):
     def on_GET(self, request, target_user_id):
         """Get request to search user table for specific users according to
         search term.
-        This need a user have a administrator access in Synapse.
+        This needs user to have a administrator access in Synapse.
         """
         target_user = UserID.from_string(target_user_id)
         requester = yield self.auth.get_user_by_req(request)
