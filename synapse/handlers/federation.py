@@ -2090,6 +2090,14 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     @log_function
     def on_exchange_third_party_invite_request(self, origin, room_id, event_dict):
+        """Handle an exchange_third_party_invite request from a remote server
+
+        The remote server will call this when it wants to turn a 3pid invite
+        into a normal m.room.member invite.
+
+        Returns:
+            Deferred: resolves (to None)
+        """
         builder = self.event_builder_factory.new(event_dict)
 
         message_handler = self.hs.get_handlers().message_handler
@@ -2108,9 +2116,12 @@ class FederationHandler(BaseHandler):
             raise e
         yield self._check_signature(event, context)
 
+        # XXX we send the invite here, but send_membership_event also sends it,
+        # so we end up making two requests. I think this is redundant.
         returned_invite = yield self.send_invite(origin, event)
         # TODO: Make sure the signatures actually are correct.
         event.signatures.update(returned_invite.signatures)
+
         member_handler = self.hs.get_handlers().room_member_handler
         yield member_handler.send_membership_event(None, event, context)
 
