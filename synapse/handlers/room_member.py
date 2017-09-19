@@ -212,8 +212,9 @@ class RoomMemberHandler(BaseHandler):
 
         if (effective_membership_state == "invite" and
                 self.hs.config.block_non_admin_invites):
-            is_requester_admin = \
-                yield self.auth.is_server_admin(requester.user)
+            is_requester_admin = yield self.auth.is_server_admin(
+                requester.user,
+            )
             if not is_requester_admin:
                 raise SynapseError(
                     403, "Invites have been disabled on this server",
@@ -483,8 +484,9 @@ class RoomMemberHandler(BaseHandler):
             txn_id
     ):
         if self.hs.config.block_non_admin_invites:
-            is_requester_admin = \
-                yield self.auth.is_server_admin(requester.user)
+            is_requester_admin = yield self.auth.is_server_admin(
+                requester.user,
+            )
             if not is_requester_admin:
                 raise SynapseError(
                     403, "Invites have been disabled on this server",
