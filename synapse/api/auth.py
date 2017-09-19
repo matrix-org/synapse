@@ -519,6 +519,14 @@ class Auth(object):
             )
 
     def is_server_admin(self, user):
+        """ Check if the given user is a local server admin.
+
+        Args:
+            user (str): mxid of user to check
+
+        Returns:
+            bool: True if the user is an admin
+        """
         return self.store.is_server_admin(user)
 
     @defer.inlineCallbacks
