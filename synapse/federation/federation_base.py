@@ -12,21 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
-from twisted.internet import defer
-
-from synapse.events.utils import prune_event
-
-from synapse.crypto.event_signing import check_event_content_hash
-
-from synapse.api.errors import SynapseError
-
-from synapse.util import unwrapFirstError
-from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
-
 import logging
 
+from synapse.api.errors import SynapseError
+from synapse.crypto.event_signing import check_event_content_hash
+from synapse.events import spamcheck
+from synapse.events.utils import prune_event
+from synapse.util import unwrapFirstError
+from synapse.util.logcontext import preserve_context_over_deferred, preserve_fn
+from twisted.internet import defer
 
 logger = logging.getLogger(__name__)
 
@@ -117,12 +111,18 @@ class FederationBase(object):
         return self._check_sigs_and_hashes([pdu])[0]
 
     def _check_sigs_and_hashes(self, pdus):
-        """Throws a SynapseError if a PDU does not have the correct
-        signatures.
+        """Checks that each of the received events is correctly signed by the
+        sending server.
+
+        Args:
+            pdus (list[FrozenEvent]): the events to be checked
 
         Returns:
-            FrozenEvent: Either the given event or it redacted if it failed the
-            content hash check.
+            list[Deferred]: for each input event, a deferred which:
+              * returns the original event if the checks pass
+              * returns a redacted version of the event (if the signature
+                matched but the hash did not)
+              * throws a SynapseError if the signature check failed.
         """
 
         redacted_pdus = [
@@ -142,6 +142,14 @@ class FederationBase(object):
                     pdu.event_id, pdu.get_pdu_json()
                 )
                 return redacted
+
+            if spamcheck.check_event_for_spam(pdu):
+                logger.warn(
+                    "Event contains spam, redacting %s: %s",
+                    pdu.event_id, pdu.get_pdu_json()
+                )
+                return redacted
+
             return pdu
 
         def errback(failure, pdu):
