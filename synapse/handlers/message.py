@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from synapse.events import spamcheck
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
@@ -321,6 +321,12 @@ class MessageHandler(BaseHandler):
             token_id=requester.access_token_id,
             txn_id=txn_id
         )
+
+        if spamcheck.check_event_for_spam(event):
+            raise SynapseError(
+                403, "Spam is not permitted here", Codes.FORBIDDEN
+            )
+
         yield self.send_nonmember_event(
             requester,
             event,
