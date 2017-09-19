@@ -12,17 +12,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import signedjson
+from mock import Mock
+from synapse.api.errors import SynapseError
 from synapse.crypto import keyring
+from synapse.util import async
 from synapse.util.logcontext import LoggingContext
-from tests import utils, unittest
+from tests import unittest, utils
 from twisted.internet import defer
 
 
 class KeyringTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield utils.setup_test_homeserver(handlers=None)
+        self.http_client = Mock()
+        self.hs = yield utils.setup_test_homeserver(
+            handlers=None,
+            http_client=self.http_client,
+        )
+        self.hs.config.perspectives = {
+            "persp_server": {"k": "v"}
+        }
 
     @defer.inlineCallbacks
     def test_wait_for_previous_lookups(self):
@@ -72,3 +82,45 @@ class KeyringTestCase(unittest.TestCase):
             # now the second wait should complete and restore our
             # loggingcontext.
             yield wait_2_deferred
+
+    @defer.inlineCallbacks
+    def test_verify_json_objects_for_server_awaits_previous_requests(self):
+        key1 = signedjson.key.generate_signing_key(1)
+
+        kr = keyring.Keyring(self.hs)
+        json1 = {}
+        signedjson.sign.sign_json(json1, "server1", key1)
+
+        self.http_client.post_json.return_value = defer.Deferred()
+
+        # start off a first set of lookups
+        res_deferreds = kr.verify_json_objects_for_server(
+            [("server1", json1),
+             ("server2", {})
+             ]
+        )
+
+        # the unsigned json should be rejected pretty quickly
+        try:
+            yield res_deferreds[1]
+            self.assertFalse("unsigned json didn't cause a failure")
+        except SynapseError:
+            pass
+
+        self.assertFalse(res_deferreds[0].called)
+
+        # wait a tick for it to send the request to the perspectives server
+        # (it first tries the datastore)
+        yield async.sleep(0.005)
+        self.http_client.post_json.assert_called_once()
+
+        # a second request for a server with outstanding requests should
+        # block rather than start a second call
+        self.http_client.post_json.reset_mock()
+        self.http_client.post_json.return_value = defer.Deferred()
+
+        kr.verify_json_objects_for_server(
+            [("server1", json1)],
+        )
+        yield async.sleep(0.005)
+        self.http_client.post_json.assert_not_called()
