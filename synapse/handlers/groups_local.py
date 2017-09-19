@@ -136,12 +136,38 @@ class GroupsLocalHandler(object):
             res = yield self.groups_server_handler.create_group(
                 group_id, user_id, content
             )
-            defer.returnValue(res)
+            local_attestation = None
+            remote_attestation = None
+        else:
+            local_attestation = self.attestations.create_attestation(group_id, user_id)
+            content["attestation"] = local_attestation
 
-        content["user_profile"] = yield self.profile_handler.get_profile(user_id)
-        res = yield self.transport_client.create_group(
-            get_domain_from_id(group_id), group_id, user_id, content,
+            content["user_profile"] = yield self.profile_handler.get_profile(user_id)
+
+            res = yield self.transport_client.create_group(
+                get_domain_from_id(group_id), group_id, user_id, content,
+            )
+
+            remote_attestation = res["attestation"]
+            yield self.attestations.verify_attestation(
+                remote_attestation,
+                group_id=group_id,
+                user_id=user_id,
+            )
+
+        is_publicised = content.get("publicise", False)
+        token = yield self.store.register_user_group_membership(
+            group_id, user_id,
+            membership="join",
+            is_admin=True,
+            local_attestation=local_attestation,
+            remote_attestation=remote_attestation,
+            is_publicised=is_publicised,
         )
+        self.notifier.on_new_event(
+            "groups_key", token, users=[user_id],
+        )
+
         defer.returnValue(res)
 
     @defer.inlineCallbacks

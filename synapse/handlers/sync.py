@@ -637,6 +637,7 @@ class SyncHandler(object):
 
             if membership == "join":
                 if gtype == "membership":
+                    # TODO: Add profile
                     content.pop("membership", None)
                     joined[group_id] = content["content"]
                 else:
