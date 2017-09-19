@@ -201,7 +201,9 @@ class Keyring(object):
                 server_name = verify_request.server_name
                 request_id = id(verify_request)
                 server_to_request_ids.setdefault(server_name, set()).add(request_id)
-                deferred.addBoth(remove_deferreds, server_name, verify_request)
+                verify_request.deferred.addBoth(
+                    remove_deferreds, server_name, verify_request,
+                )
 
         # Pass those keys to handle_key_deferred so that the json object
         # signatures can be verified
