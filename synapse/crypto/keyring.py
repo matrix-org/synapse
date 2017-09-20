@@ -140,6 +140,12 @@ class Keyring(object):
         Args:
             verify_requests (List[VerifyKeyRequest]):
         """
+
+        # create a deferred for each server we're going to look up the keys
+        # for; we'll resolve them once we have completed our lookups.
+        # These will be passed into wait_for_previous_lookups to block
+        # any other lookups until we have finished.
+        # The deferreds are called with no logcontext.
         server_to_deferred = {
             rq.server_name: defer.Deferred()
             for rq in verify_requests
@@ -162,6 +168,8 @@ class Keyring(object):
             # When we've finished fetching all the keys for a given server_name,
             # resolve the deferred passed to `wait_for_previous_lookups` so that
             # any lookups waiting will proceed.
+            #
+            # map from server name to a set of request ids
             server_to_request_ids = {}
 
             def remove_deferreds(res, server_name, verify_request):
