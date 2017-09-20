@@ -1085,7 +1085,15 @@ class GroupServerStore(SQLBaseStore):
                     AND stream_id <= ?
             """
             txn.execute(sql, (user_id, now_token,))
-            return self.cursor_to_dict(txn)
+            return [
+                {
+                    "group_id": row[0],
+                    "type": row[1],
+                    "membership": row[2],
+                    "content": json.loads(row[3]),
+                }
+                for row in txn
+            ]
         return self.runInteraction(
             "get_all_groups_for_user", _get_all_groups_for_user_txn,
         )
