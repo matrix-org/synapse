@@ -19,7 +19,7 @@ from synapse.crypto.event_signing import check_event_content_hash
 from synapse.events import spamcheck
 from synapse.events.utils import prune_event
 from synapse.util import unwrapFirstError
-from synapse.util.logcontext import preserve_context_over_deferred, preserve_fn
+from synapse.util.logcontext import preserve_context_over_deferred
 from twisted.internet import defer
 
 logger = logging.getLogger(__name__)
@@ -130,7 +130,7 @@ class FederationBase(object):
             for pdu in pdus
         ]
 
-        deferreds = preserve_fn(self.keyring.verify_json_objects_for_server)([
+        deferreds = self.keyring.verify_json_objects_for_server([
             (p.origin, p.get_pdu_json())
             for p in redacted_pdus
         ])
