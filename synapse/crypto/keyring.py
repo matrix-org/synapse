@@ -123,8 +123,8 @@ class Keyring(object):
             verify_requests.append(verify_request)
 
         server_to_deferred = {
-            server_name: defer.Deferred()
-            for server_name, _ in server_and_json
+            rq.server_name: defer.Deferred()
+            for rq in verify_requests
         }
 
         with PreserveLoggingContext():
@@ -132,7 +132,7 @@ class Keyring(object):
             # We want to wait for any previous lookups to complete before
             # proceeding.
             wait_on_deferred = self.wait_for_previous_lookups(
-                [server_name for server_name, _ in server_and_json],
+                [rq.server_name for rq in verify_requests],
                 server_to_deferred,
             )
 
