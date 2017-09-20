@@ -966,10 +966,11 @@ class GroupServerStore(SQLBaseStore):
             return next_id
 
         with self._group_updates_id_gen.get_next() as next_id:
-            yield self.runInteraction(
+            res = yield self.runInteraction(
                 "register_user_group_membership",
                 _register_user_group_membership_txn, next_id,
             )
+        defer.returnValue(res)
 
     @defer.inlineCallbacks
     def create_group(self, group_id, user_id, name, avatar_url, short_description,
