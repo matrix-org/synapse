@@ -144,7 +144,7 @@ class Keyring(object):
                 )
                 raise SynapseError(
                     401,
-                    "No key for %s with id %s" % (server_name, key_ids),
+                    "No key for %s with id %s" % (server_name, verify_request.key_ids),
                     Codes.UNAUTHORIZED,
                 )
 
