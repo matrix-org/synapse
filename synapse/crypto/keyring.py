@@ -122,6 +122,23 @@ class Keyring(object):
 
             verify_requests.append(verify_request)
 
+        self._start_key_lookups(verify_requests)
+
+        # Pass those keys to handle_key_deferred so that the json object
+        # signatures can be verified
+        return [
+            preserve_context_over_fn(_handle_key_deferred, rq)
+            for rq in verify_requests
+        ]
+
+    def _start_key_lookups(self, verify_requests):
+        """Sets off the key fetches for each verify request
+
+        Once each fetch completes, verify_request.deferred will be resolved.
+
+        Args:
+            verify_requests (List[VerifyKeyRequest]):
+        """
         server_to_deferred = {
             rq.server_name: defer.Deferred()
             for rq in verify_requests
@@ -162,13 +179,6 @@ class Keyring(object):
                 verify_request.deferred.addBoth(
                     remove_deferreds, server_name, verify_request,
                 )
-
-        # Pass those keys to handle_key_deferred so that the json object
-        # signatures can be verified
-        return [
-            preserve_context_over_fn(_handle_key_deferred, verify_request)
-            for verify_request in verify_requests
-        ]
 
     @defer.inlineCallbacks
     def wait_for_previous_lookups(self, server_names, server_to_deferred):
