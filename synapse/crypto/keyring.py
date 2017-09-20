@@ -172,7 +172,13 @@ class Keyring(object):
             # map from server name to a set of request ids
             server_to_request_ids = {}
 
-            def remove_deferreds(res, server_name, verify_request):
+            for verify_request in verify_requests:
+                server_name = verify_request.server_name
+                request_id = id(verify_request)
+                server_to_request_ids.setdefault(server_name, set()).add(request_id)
+
+            def remove_deferreds(res, verify_request):
+                server_name = verify_request.server_name
                 request_id = id(verify_request)
                 server_to_request_ids[server_name].discard(request_id)
                 if not server_to_request_ids[server_name]:
@@ -182,11 +188,8 @@ class Keyring(object):
                 return res
 
             for verify_request in verify_requests:
-                server_name = verify_request.server_name
-                request_id = id(verify_request)
-                server_to_request_ids.setdefault(server_name, set()).add(request_id)
                 verify_request.deferred.addBoth(
-                    remove_deferreds, server_name, verify_request,
+                    remove_deferreds, verify_request,
                 )
 
     @defer.inlineCallbacks
