@@ -18,7 +18,7 @@ from synapse.crypto.keyclient import fetch_server_key
 from synapse.api.errors import SynapseError, Codes
 from synapse.util import unwrapFirstError, logcontext
 from synapse.util.logcontext import (
-    preserve_context_over_fn, PreserveLoggingContext,
+    PreserveLoggingContext,
     preserve_fn
 )
 from synapse.util.metrics import Measure
@@ -83,9 +83,11 @@ class Keyring(object):
         self.key_downloads = {}
 
     def verify_json_for_server(self, server_name, json_object):
-        return self.verify_json_objects_for_server(
-            [(server_name, json_object)]
-        )[0]
+        return logcontext.make_deferred_yieldable(
+            self.verify_json_objects_for_server(
+                [(server_name, json_object)]
+            )[0]
+        )
 
     def verify_json_objects_for_server(self, server_and_json):
         """Bulk verifies signatures of json objects, bulk fetching keys as
@@ -95,8 +97,10 @@ class Keyring(object):
             server_and_json (list): List of pairs of (server_name, json_object)
 
         Returns:
-            list of deferreds indicating success or failure to verify each
-            json object's signature for the given server_name.
+            List<Deferred>: for each input pair, a deferred indicating success
+                or failure to verify each json object's signature for the given
+                server_name. The deferreds run their callbacks in the sentinel
+                logcontext.
         """
         verify_requests = []
 
@@ -127,9 +131,9 @@ class Keyring(object):
 
         # Pass those keys to handle_key_deferred so that the json object
         # signatures can be verified
+        handle = preserve_fn(_handle_key_deferred)
         return [
-            preserve_context_over_fn(_handle_key_deferred, rq)
-            for rq in verify_requests
+            handle(rq) for rq in verify_requests
         ]
 
     @defer.inlineCallbacks
