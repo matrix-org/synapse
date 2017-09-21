@@ -822,6 +822,14 @@ class GroupServerStore(SQLBaseStore):
                     "user_id": user_id,
                 },
             )
+            self._simple_delete_txn(
+                txn,
+                table="group_summary_users",
+                keyvalues={
+                    "group_id": group_id,
+                    "user_id": user_id,
+                },
+            )
         return self.runInteraction("remove_user_from_group", _remove_user_from_group_txn)
 
     def add_room_to_group(self, group_id, room_id, is_public):
