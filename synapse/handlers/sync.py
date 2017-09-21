@@ -984,6 +984,8 @@ class SyncHandler(object):
             if room_id in joined_room_ids and non_joins:
                 # Always include if the user (re)joined the room, especially
                 # important so that device list changes are calculated correctly.
+                # If there are non join member events, but we are still in the room,
+                # then the user must have joined (or left and joined)
                 newly_joined_rooms.append(room_id)
             elif room_id in joined_room_ids or has_join:
                 old_state_ids = yield self.get_state_at(room_id, since_token)
