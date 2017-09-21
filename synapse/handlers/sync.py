@@ -980,6 +980,7 @@ class SyncHandler(object):
             # We want to figure out if we joined the room at some point since
             # the last sync (even if we have since left). This is to make sure
             # we do send down the room, and with full state, where necessary
+
             old_state_ids = None
             if room_id in joined_room_ids and non_joins:
                 # Always include if the user (re)joined the room, especially
@@ -987,7 +988,11 @@ class SyncHandler(object):
                 # If there are non join member events, but we are still in the room,
                 # then the user must have joined (or left and joined)
                 newly_joined_rooms.append(room_id)
-            elif room_id in joined_room_ids or has_join:
+
+                # User is in the room so we don't need to do the invite/leave checks
+                continue
+
+            if room_id in joined_room_ids or has_join:
                 old_state_ids = yield self.get_state_at(room_id, since_token)
                 old_mem_ev_id = old_state_ids.get((EventTypes.Member, user_id), None)
                 old_mem_ev = None
@@ -998,6 +1003,7 @@ class SyncHandler(object):
                 if not old_mem_ev or old_mem_ev.membership != Membership.JOIN:
                     newly_joined_rooms.append(room_id)
 
+            # If user is in the room then we don't need to do the invite/leave checks
             if room_id in joined_room_ids:
                 continue
 
