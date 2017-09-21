@@ -981,11 +981,11 @@ class SyncHandler(object):
             # the last sync (even if we have since left). This is to make sure
             # we do send down the room, and with full state, where necessary
             old_state_ids = None
-            if room_id in joined_room_ids or has_join:
-                # Always include if the user (re)joined the room
-                if room_id in joined_room_ids and non_joins:
-                    newly_joined_rooms.append(room_id)
-
+            if room_id in joined_room_ids and non_joins:
+                # Always include if the user (re)joined the room, especially
+                # important so that device list changes are calculated correctly.
+                newly_joined_rooms.append(room_id)
+            elif room_id in joined_room_ids or has_join:
                 old_state_ids = yield self.get_state_at(room_id, since_token)
                 old_mem_ev_id = old_state_ids.get((EventTypes.Member, user_id), None)
                 old_mem_ev = None
@@ -996,8 +996,8 @@ class SyncHandler(object):
                 if not old_mem_ev or old_mem_ev.membership != Membership.JOIN:
                     newly_joined_rooms.append(room_id)
 
-                if room_id in joined_room_ids:
-                    continue
+            if room_id in joined_room_ids:
+                continue
 
             if not non_joins:
                 continue
