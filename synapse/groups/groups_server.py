@@ -109,7 +109,6 @@ class GroupsServerHandler(object):
                 room_id, len(joined_users),
                 with_alias=False, allow_private=True,
             )
-            entry.pop("room_id", None)
 
             room_entry["profile"] = entry
 
