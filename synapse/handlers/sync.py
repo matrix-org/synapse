@@ -982,6 +982,10 @@ class SyncHandler(object):
             # we do send down the room, and with full state, where necessary
             old_state_ids = None
             if room_id in joined_room_ids or has_join:
+                # Always include if the user (re)joined the room
+                if room_id in joined_room_ids and non_joins:
+                    newly_joined_rooms.append(room_id)
+
                 old_state_ids = yield self.get_state_at(room_id, since_token)
                 old_mem_ev_id = old_state_ids.get((EventTypes.Member, user_id), None)
                 old_mem_ev = None
