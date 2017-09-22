@@ -19,7 +19,7 @@ def check_event_for_spam(event):
 
     If the server considers an event spammy, then it will be rejected if
     sent by a local user. If it is sent by a user on another server, then
-    users
+    users receive a blank event.
 
     Args:
         event (synapse.events.EventBase): the event to be checked
