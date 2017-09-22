@@ -986,7 +986,7 @@ class SyncHandler(object):
                 # Always include if the user (re)joined the room, especially
                 # important so that device list changes are calculated correctly.
                 # If there are non join member events, but we are still in the room,
-                # then the user must have joined (or left and joined)
+                # then the user must have left and joined
                 newly_joined_rooms.append(room_id)
 
                 # User is in the room so we don't need to do the invite/leave checks
