@@ -9,9 +9,9 @@ Description=Synapse Matrix homeserver
 Type=simple
 User=synapse
 Group=synapse
-EnvironmentFile=-/etc/sysconfig/synapse
 WorkingDirectory=/var/lib/synapse
-ExecStart=/usr/bin/python2.7 -m synapse.app.homeserver --config-path=/etc/synapse/homeserver.yaml --log-config=/etc/synapse/log_config.yaml
+ExecStart=/usr/bin/synctl start /etc/synapse/homeserver.yaml
+ExecStop=/usr/bin/synctl stop /etc/synapse/homeserver.yaml
 
 [Install]
 WantedBy=multi-user.target
