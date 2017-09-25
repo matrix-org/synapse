@@ -200,18 +200,20 @@ different. See `the spec`__ for more information on key management.)
 .. __: `key_management`_
 
 The default configuration exposes two HTTP ports: 8008 and 8448. Port 8008 is
-configured without TLS; it is not recommended this be exposed outside your
-local network. Port 8448 is configured to use TLS with a self-signed
-certificate. This is fine for testing with but, to avoid your clients
-complaining about the certificate, you will almost certainly want to use
-another certificate for production purposes. (Note that a self-signed
+configured without TLS; it should be behind a reverse proxy for TLS/SSL
+termination on port 443 which in turn should be used for clients. Port 8448
+is configured to use TLS with a self-signed certificate. If you would like
+to do initial test with a client without having to setup a reverse proxy,
+you can temporarly use another certificate. (Note that a self-signed
 certificate is fine for `Federation`_). You can do so by changing
 ``tls_certificate_path``, ``tls_private_key_path`` and ``tls_dh_params_path``
-in ``homeserver.yaml``; alternatively, you can use a reverse-proxy, but be sure
-to read `Using a reverse proxy with Synapse`_ when doing so.
+in ``homeserver.yaml``;
 
 Apart from port 8448 using TLS, both ports are the same in the default
 configuration.
+
+See https://github.com/matrix-org/synapse/issues/2438 for the recommended
+production configuration.
 
 Registering a user
 ------------------
@@ -283,9 +285,15 @@ Connecting to Synapse from a client
 The easiest way to try out your new Synapse installation is by connecting to it
 from a web client. The easiest option is probably the one at
 http://riot.im/app. You will need to specify a "Custom server" when you log on
-or register: set this to ``https://localhost:8448`` - remember to specify the
-port (``:8448``) unless you changed the configuration. (Leave the identity
+or register: set this to ``https://domain.tld`` if you setup a reverse proxy
+following the recommended setup, or ``https://localhost:8448`` - remember to specify the
+port (``:8448``) if not ``:443`` unless you changed the configuration. (Leave the identity
 server as the default - see `Identity servers`_.)
+
+If using port 8448 you will run into errors until you accept the self-signed
+certificate. You can easily do this by going to ``https://localhost:8448``
+directly with your browser and accept the presented certificate. You can then
+go back in your web client and proceed further.
 
 If all goes well you should at least be able to log in, create a room, and
 start sending messages.
@@ -593,8 +601,9 @@ you to run your server on a machine that might not have the same name as your
 domain name. For example, you might want to run your server at
 ``synapse.example.com``, but have your Matrix user-ids look like
 ``@user:example.com``. (A SRV record also allows you to change the port from
-the default 8448. However, if you are thinking of using a reverse-proxy, be
-sure to read `Reverse-proxying the federation port`_ first.)
+the default 8448. However, if you are thinking of using a reverse-proxy on the
+federation port, which is highly not recommended, be sure to read
+`Reverse-proxying the federation port`_ first.)
 
 To use a SRV record, first create your SRV record and publish it in DNS. This
 should have the format ``_matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port>
@@ -674,7 +683,7 @@ For information on how to install and use PostgreSQL, please see
 Using a reverse proxy with Synapse
 ==================================
 
-It is possible to put a reverse proxy such as
+It is recommended to put a reverse proxy such as
 `nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
 `Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_ or
 `HAProxy <http://www.haproxy.org/>`_ in front of Synapse. One advantage of
@@ -692,9 +701,9 @@ federation port has a number of pitfalls. It is possible, but be sure to read
 `Reverse-proxying the federation port`_.
 
 The recommended setup is therefore to configure your reverse-proxy on port 443
-for client connections, but to also expose port 8448 for server-server
-connections. All the Matrix endpoints begin ``/_matrix``, so an example nginx
-configuration might look like::
+to port 8008 of synapse for client connections, but to also directly expose port
+8448 for server-server connections. All the Matrix endpoints begin ``/_matrix``,
+so an example nginx configuration might look like::
 
   server {
       listen 443 ssl;
