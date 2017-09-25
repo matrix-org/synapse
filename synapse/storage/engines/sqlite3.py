@@ -43,6 +43,9 @@ class Sqlite3Engine(object):
     def lock_table(self, txn, table):
         return
 
+    def set_user_schema(self, db_conn, db_schema_name, db_user):
+        pass
+
 
 # Following functions taken from: https://github.com/coleifer/peewee
 

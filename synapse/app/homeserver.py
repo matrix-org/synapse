@@ -259,6 +259,11 @@ class SynapseHomeServer(HomeServer):
 
         if run_new_connection:
             self.database_engine.on_new_connection(db_conn)
+
+        db_schema = self.db_config.get("db_schema", None)
+        db_user = db_params.get("user", None)
+        if db_schema and db_user:
+            self.database_engine.set_user_schema(db_conn, db_schema, db_user)
         return db_conn
 
 

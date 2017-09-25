@@ -62,3 +62,8 @@ class PostgresEngine(object):
 
     def lock_table(self, txn, table):
         txn.execute("LOCK TABLE %s in EXCLUSIVE MODE" % (table,))
+
+    def set_user_schema(self, db_conn, db_schema_name, db_user):
+        cursor = db_conn.cursor()
+        cursor.execute("ALTER USER " + db_user + " SET SEARCH_PATH TO " + db_schema_name)
+        cursor.close()
