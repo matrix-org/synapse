@@ -1,10 +1,30 @@
+#!/usr/bin/env python
+#
+# Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2017 New Vector Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from __future__ import print_function
+
+import argparse
 import nacl.signing
 import json
 import base64
 import requests
 import sys
 import srvlookup
-
+import yaml
 
 def encode_base64(input_bytes):
     """Encode bytes as a base64 string without any padding."""
@@ -120,11 +140,13 @@ def get_json(origin_name, origin_key, destination, path):
             origin_name, key, sig,
         )
         authorization_headers.append(bytes(header))
-        sys.stderr.write(header)
-        sys.stderr.write("\n")
+        print ("Authorization: %s" % header, file=sys.stderr)
+
+    dest = lookup(destination, path)
+    print ("Requesting %s" % dest, file=sys.stderr)
 
     result = requests.get(
-        lookup(destination, path),
+        dest,
         headers={"Authorization": authorization_headers[0]},
         verify=False,
     )
@@ -133,17 +155,66 @@ def get_json(origin_name, origin_key, destination, path):
 
 
 def main():
-    origin_name, keyfile, destination, path = sys.argv[1:]
+    parser = argparse.ArgumentParser(
+        description=
+            "Signs and sends a federation request to a matrix homeserver",
+    )
 
-    with open(keyfile) as f:
+    parser.add_argument(
+        "-N", "--server-name",
+        help="Name to give as the local homeserver. If unspecified, will be "
+             "read from the config file.",
+    )
+
+    parser.add_argument(
+        "-k", "--signing-key-path",
+        help="Path to the file containing the private ed25519 key to sign the "
+             "request with.",
+    )
+
+    parser.add_argument(
+        "-c", "--config",
+        default="homeserver.yaml",
+        help="Path to server config file. Ignored if --server-name and "
+             "--signing-key-path are both given.",
+    )
+
+    parser.add_argument(
+        "-d", "--destination",
+        default="matrix.org",
+        help="name of the remote homeserver. We will do SRV lookups and "
+             "connect appropriately.",
+    )
+
+    parser.add_argument(
+        "path",
+        help="request path. We will add '/_matrix/federation/v1/' to this."
+    )
+
+    args = parser.parse_args()
+
+    if not args.server_name or not args.signing_key_path:
+        read_args_from_config(args)
+
+    with open(args.signing_key_path) as f:
         key = read_signing_keys(f)[0]
 
     result = get_json(
-        origin_name, key, destination, "/_matrix/federation/v1/" + path
+        args.server_name, key, args.destination, "/_matrix/federation/v1/" + args.path
     )
 
     json.dump(result, sys.stdout)
-    print ""
+    print ("")
+
+
+def read_args_from_config(args):
+    with open(args.config, 'r') as fh:
+        config = yaml.safe_load(fh)
+        if not args.server_name:
+            args.server_name = config['server_name']
+        if not args.signing_key_path:
+            args.signing_key_path = config['signing_key_path']
+
 
 if __name__ == "__main__":
     main()
