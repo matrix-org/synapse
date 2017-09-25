@@ -1,3 +1,27 @@
+Changes in synapse v0.23.0-rc1 (2017-09-25)
+===========================================
+
+Changes:
+
+* Use bcrypt module instead of py-bcrypt (PR #2288) Thanks to @kyrias!
+* Improve performance of generating push notifications (PR #2343, #2357, #2365,
+  #2366, #2371)
+* Add a frontend proxy worker (PR #2344)
+* Improve DB performance for device list handling in sync (PR #2362)
+* Add sample prometheus config (PR #2416)
+* Document known to work postgres version (PR #2433) Thanks to @ptman!
+* Add support for event_id_only push format (PR #2450)
+
+
+Bug fixes:
+
+* Fix caching error in the push evaluator (PR #2332)
+* Fix bug where pusherpool didn't start and broke some rooms (PR #2342)
+* Fix port script for user directory tables (PR #2375)
+* Fix device lists notifications when user rejoins a room (PR #2443, #2449)
+* Fix sync to always send down current state events in timeline (PR #2451)
+
+
 Changes in synapse v0.22.1 (2017-07-06)
 =======================================
 
