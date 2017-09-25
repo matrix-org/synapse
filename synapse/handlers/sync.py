@@ -293,11 +293,6 @@ class SyncHandler(object):
             timeline_limit = sync_config.filter_collection.timeline_limit()
             block_all_timeline = sync_config.filter_collection.blocks_all_room_timeline()
 
-            # Pull out the current state, as we always want to include those events
-            # in the timeline if they're there.
-            current_state_ids = yield self.state.get_current_state_ids(room_id)
-            current_state_ids = frozenset(current_state_ids.itervalues())
-
             if recents is None or newly_joined_room or timeline_limit < len(recents):
                 limited = True
             else:
@@ -305,6 +300,15 @@ class SyncHandler(object):
 
             if recents:
                 recents = sync_config.filter_collection.filter_room_timeline(recents)
+
+                # We check if there are any state events, if there are then we pass
+                # all current state events to the filter_events function. This is to
+                # ensure that we always include current state in the timeline
+                current_state_ids = frozenset()
+                if any(e.is_state() for e in recents):
+                    current_state_ids = yield self.state.get_current_state_ids(room_id)
+                    current_state_ids = frozenset(current_state_ids.itervalues())
+
                 recents = yield filter_events_for_client(
                     self.store,
                     sync_config.user.to_string(),
@@ -341,6 +345,15 @@ class SyncHandler(object):
                 loaded_recents = sync_config.filter_collection.filter_room_timeline(
                     events
                 )
+
+                # We check if there are any state events, if there are then we pass
+                # all current state events to the filter_events function. This is to
+                # ensure that we always include current state in the timeline
+                current_state_ids = frozenset()
+                if any(e.is_state() for e in loaded_recents):
+                    current_state_ids = yield self.state.get_current_state_ids(room_id)
+                    current_state_ids = frozenset(current_state_ids.itervalues())
+
                 loaded_recents = yield filter_events_for_client(
                     self.store,
                     sync_config.user.to_string(),
