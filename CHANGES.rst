@@ -1,16 +1,22 @@
 Changes in synapse v0.23.0-rc1 (2017-09-25)
 ===========================================
 
+Features:
+
+* Add a frontend proxy worker (PR #2344)
+* Add support for event_id_only push format (PR #2450)
+* Add a PoC for filtering spammy events (PR #2456)
+* Add a config option to block all room invites (PR #2457)
+
+
 Changes:
 
 * Use bcrypt module instead of py-bcrypt (PR #2288) Thanks to @kyrias!
 * Improve performance of generating push notifications (PR #2343, #2357, #2365,
   #2366, #2371)
-* Add a frontend proxy worker (PR #2344)
 * Improve DB performance for device list handling in sync (PR #2362)
-* Add sample prometheus config (PR #2416)
+* Include a sample prometheus config (PR #2416)
 * Document known to work postgres version (PR #2433) Thanks to @ptman!
-* Add support for event_id_only push format (PR #2450)
 
 
 Bug fixes:
@@ -20,6 +26,8 @@ Bug fixes:
 * Fix port script for user directory tables (PR #2375)
 * Fix device lists notifications when user rejoins a room (PR #2443, #2449)
 * Fix sync to always send down current state events in timeline (PR #2451)
+* Fix bug where guest users were incorrectly kicked (PR #2453)
+* Fix bug talking to IPv6 only servers using SRV records (PR #2462)
 
 
 Changes in synapse v0.22.1 (2017-07-06)
