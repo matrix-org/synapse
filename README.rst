@@ -207,13 +207,11 @@ to do initial test with a client without having to setup a reverse proxy,
 you can temporarly use another certificate. (Note that a self-signed
 certificate is fine for `Federation`_). You can do so by changing
 ``tls_certificate_path``, ``tls_private_key_path`` and ``tls_dh_params_path``
-in ``homeserver.yaml``;
+in ``homeserver.yaml``; alternatively, you can use a reverse-proxy, but be sure
+to read `Using a reverse proxy with Synapse`_ when doing so.
 
 Apart from port 8448 using TLS, both ports are the same in the default
 configuration.
-
-See https://github.com/matrix-org/synapse/issues/2438 for the recommended
-production configuration.
 
 Registering a user
 ------------------
@@ -602,7 +600,7 @@ domain name. For example, you might want to run your server at
 ``synapse.example.com``, but have your Matrix user-ids look like
 ``@user:example.com``. (A SRV record also allows you to change the port from
 the default 8448. However, if you are thinking of using a reverse-proxy on the
-federation port, which is highly not recommended, be sure to read
+federation port, which is not recommended, be sure to read
 `Reverse-proxying the federation port`_ first.)
 
 To use a SRV record, first create your SRV record and publish it in DNS. This
