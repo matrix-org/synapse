@@ -31,7 +31,7 @@ REQUIREMENTS = {
     "pyyaml": ["yaml"],
     "pyasn1": ["pyasn1"],
     "daemonize": ["daemonize"],
-    "py-bcrypt": ["bcrypt"],
+    "bcrypt": ["bcrypt"],
     "pillow": ["PIL"],
     "pydenticon": ["pydenticon"],
     "ujson": ["ujson"],

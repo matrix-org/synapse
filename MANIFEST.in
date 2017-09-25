@@ -27,4 +27,5 @@ exclude jenkins*.sh
 exclude jenkins*
 recursive-exclude jenkins *.sh
 
+prune .github
 prune demo/etc
