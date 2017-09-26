@@ -52,7 +52,7 @@ CREATE TABLE group_rooms (
     is_public BOOLEAN NOT NULL  -- whether the room can be seen by everyone
 );
 
-CREATE INDEX groups_rooms_g_idx ON group_rooms(group_id, room_id);
+CREATE UNIQUE INDEX groups_rooms_g_idx ON group_rooms(group_id, room_id);
 CREATE INDEX groups_rooms_r_idx ON group_rooms(room_id);
 
 

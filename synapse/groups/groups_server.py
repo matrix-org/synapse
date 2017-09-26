@@ -466,8 +466,6 @@ class GroupsServerHandler(object):
             group_id, and_exists=True, and_is_admin=requester_user_id
         )
 
-        # TODO: Check if room has already been added
-
         is_public = _parse_visibility_from_contents(content)
 
         yield self.store.add_room_to_group(group_id, room_id, is_public=is_public)
