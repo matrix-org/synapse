@@ -473,6 +473,18 @@ class GroupsServerHandler(object):
         defer.returnValue({})
 
     @defer.inlineCallbacks
+    def remove_room_from_group(self, group_id, requester_user_id, room_id):
+        """Remove room from group
+        """
+        yield self.check_group_is_ours(
+            group_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        yield self.store.remove_room_from_group(group_id, room_id)
+
+        defer.returnValue({})
+
+    @defer.inlineCallbacks
     def invite_to_group(self, group_id, user_id, requester_user_id, content):
         """Invite user to group
         """
