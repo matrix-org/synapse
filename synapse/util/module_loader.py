@@ -38,4 +38,4 @@ def load_module(provider):
             "Failed to parse config for %r: %r" % (provider['module'], e)
         )
 
-    return (provider_class, provider_config)
+    return provider_class, provider_config
