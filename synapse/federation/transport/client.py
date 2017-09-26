@@ -525,6 +525,18 @@ class TransportLayerClient(object):
             ignore_backoff=True,
         )
 
+    def remove_room_from_group(self, destination, group_id, requester_user_id, room_id):
+        """Remove a room from a group
+        """
+        path = PREFIX + "/groups/%s/room/%s" % (group_id, room_id,)
+
+        return self.client.delete_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
     @log_function
     def get_users_in_group(self, destination, group_id, requester_user_id):
         """Get users in a group

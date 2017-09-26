@@ -843,6 +843,29 @@ class GroupServerStore(SQLBaseStore):
             desc="add_room_to_group",
         )
 
+    def remove_room_from_group(self, group_id, room_id):
+        def _remove_room_from_group_txn(txn):
+            self._simple_delete_txn(
+                txn,
+                table="group_rooms",
+                keyvalues={
+                    "group_id": group_id,
+                    "room_id": room_id,
+                },
+            )
+
+            self._simple_delete_txn(
+                txn,
+                table="group_summary_rooms",
+                keyvalues={
+                    "group_id": group_id,
+                    "room_id": room_id,
+                },
+            )
+        return self.runInteraction(
+            "remove_room_from_group", _remove_room_from_group_txn,
+        )
+
     def get_publicised_groups_for_user(self, user_id):
         """Get all groups a user is publicising
         """

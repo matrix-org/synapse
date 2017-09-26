@@ -423,6 +423,17 @@ class GroupAdminRoomsServlet(RestServlet):
 
         defer.returnValue((200, result))
 
+    @defer.inlineCallbacks
+    def on_DELETE(self, request, group_id, room_id):
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        result = yield self.groups_handler.remove_room_from_group(
+            group_id, user_id, room_id,
+        )
+
+        defer.returnValue((200, result))
+
 
 class GroupAdminUsersInviteServlet(RestServlet):
     """Invite a user to the group

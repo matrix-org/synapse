@@ -466,11 +466,21 @@ class GroupsServerHandler(object):
             group_id, and_exists=True, and_is_admin=requester_user_id
         )
 
-        # TODO: Check if room has already been added
-
         is_public = _parse_visibility_from_contents(content)
 
         yield self.store.add_room_to_group(group_id, room_id, is_public=is_public)
+
+        defer.returnValue({})
+
+    @defer.inlineCallbacks
+    def remove_room_from_group(self, group_id, requester_user_id, room_id):
+        """Remove room from group
+        """
+        yield self.check_group_is_ours(
+            group_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        yield self.store.remove_room_from_group(group_id, room_id)
 
         defer.returnValue({})
 

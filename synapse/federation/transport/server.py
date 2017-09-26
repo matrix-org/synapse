@@ -674,7 +674,7 @@ class FederationGroupsRoomsServlet(BaseFederationServlet):
 
 
 class FederationGroupsAddRoomsServlet(BaseFederationServlet):
-    """Add room to group
+    """Add/remove room from group
     """
     PATH = "/groups/(?P<group_id>[^/]*)/room/(?<room_id>)$"
 
@@ -686,6 +686,18 @@ class FederationGroupsAddRoomsServlet(BaseFederationServlet):
 
         new_content = yield self.handler.add_room_to_group(
             group_id, requester_user_id, room_id, content
+        )
+
+        defer.returnValue((200, new_content))
+
+    @defer.inlineCallbacks
+    def on_DELETE(self, origin, content, query, group_id, room_id):
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        if get_domain_from_id(requester_user_id) != origin:
+            raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        new_content = yield self.handler.remove_room_from_group(
+            group_id, requester_user_id, room_id,
         )
 
         defer.returnValue((200, new_content))

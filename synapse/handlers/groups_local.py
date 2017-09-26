@@ -69,6 +69,7 @@ class GroupsLocalHandler(object):
     get_rooms_in_group = _create_rerouter("get_rooms_in_group")
 
     add_room_to_group = _create_rerouter("add_room_to_group")
+    remove_room_from_group = _create_rerouter("remove_room_from_group")
 
     update_group_summary_room = _create_rerouter("update_group_summary_room")
     delete_group_summary_room = _create_rerouter("delete_group_summary_room")
