@@ -15,12 +15,14 @@
 
 from ._base import Config, ConfigError
 
-import importlib
+from synapse.util.module_loader import load_module
 
 
 class PasswordAuthProviderConfig(Config):
     def read_config(self, config):
         self.password_providers = []
+
+        provider_config = None
 
         # We want to be backwards compatible with the old `ldap_config`
         # param.
@@ -38,19 +40,15 @@ class PasswordAuthProviderConfig(Config):
             if provider['module'] == "synapse.util.ldap_auth_provider.LdapAuthProvider":
                 from ldap_auth_provider import LdapAuthProvider
                 provider_class = LdapAuthProvider
+                try:
+                    provider_config = provider_class.parse_config(provider["config"])
+                except Exception as e:
+                    raise ConfigError(
+                        "Failed to parse config for %r: %r" % (provider['module'], e)
+                    )
             else:
-                # We need to import the module, and then pick the class out of
-                # that, so we split based on the last dot.
-                module, clz = provider['module'].rsplit(".", 1)
-                module = importlib.import_module(module)
-                provider_class = getattr(module, clz)
+                (provider_class, provider_config) = load_module(provider)
 
-            try:
-                provider_config = provider_class.parse_config(provider["config"])
-            except Exception as e:
-                raise ConfigError(
-                    "Failed to parse config for %r: %r" % (provider['module'], e)
-                )
             self.password_providers.append((provider_class, provider_config))
 
     def default_config(self, **kwargs):
