@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.events import spamcheck
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
@@ -57,6 +56,8 @@ class MessageHandler(BaseHandler):
         self.limiter = Limiter(max_count=5)
 
         self.action_generator = hs.get_action_generator()
+
+        self.spam_checker = hs.get_spam_checker()
 
     @defer.inlineCallbacks
     def purge_history(self, room_id, event_id):
@@ -322,7 +323,7 @@ class MessageHandler(BaseHandler):
             txn_id=txn_id
         )
 
-        if spamcheck.check_event_for_spam(event):
+        if self.spam_checker.check_event_for_spam(event):
             raise SynapseError(
                 403, "Spam is not permitted here", Codes.FORBIDDEN
             )
