@@ -1,3 +1,11 @@
+Changes in synapse v0.23.0-rc2 (2017-09-26)
+===========================================
+
+Bug fixes:
+
+* Fix regression in performance of syncs (PR #2470)
+
+
 Changes in synapse v0.23.0-rc1 (2017-09-25)
 ===========================================
 
