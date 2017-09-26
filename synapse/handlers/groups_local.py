@@ -96,32 +96,38 @@ class GroupsLocalHandler(object):
             res = yield self.groups_server_handler.get_group_summary(
                 group_id, requester_user_id
             )
-            defer.returnValue(res)
+        else:
+            res = yield self.transport_client.get_group_summary(
+                get_domain_from_id(group_id), group_id, requester_user_id,
+            )
 
-        res = yield self.transport_client.get_group_summary(
-            get_domain_from_id(group_id), group_id, requester_user_id,
-        )
+            # Loop through the users and validate the attestations.
+            chunk = res["users_section"]["users"]
+            valid_users = []
+            for entry in chunk:
+                g_user_id = entry["user_id"]
+                attestation = entry.pop("attestation")
+                try:
+                    yield self.attestations.verify_attestation(
+                        attestation,
+                        group_id=group_id,
+                        user_id=g_user_id,
+                    )
+                    valid_users.append(entry)
+                except Exception as e:
+                    logger.info("Failed to verify user is in group: %s", e)
 
-        # Loop through the users and validate the attestations.
-        chunk = res["users_section"]["users"]
-        valid_users = []
-        for entry in chunk:
-            g_user_id = entry["user_id"]
-            attestation = entry.pop("attestation")
-            try:
-                yield self.attestations.verify_attestation(
-                    attestation,
-                    group_id=group_id,
-                    user_id=g_user_id,
-                )
-                valid_users.append(entry)
-            except Exception as e:
-                logger.info("Failed to verify user is in group: %s", e)
+            res["users_section"]["users"] = valid_users
 
-        res["users_section"]["users"] = valid_users
+            res["users_section"]["users"].sort(key=lambda e: e.get("order", 0))
+            res["rooms_section"]["rooms"].sort(key=lambda e: e.get("order", 0))
 
-        res["users_section"]["users"].sort(key=lambda e: e.get("order", 0))
-        res["rooms_section"]["rooms"].sort(key=lambda e: e.get("order", 0))
+        # Add `is_publicised` flag to indicate whether the user has publicised their
+        # membership of the group on their profile
+        result = yield self.store.get_publicised_groups_for_user(requester_user_id)
+        is_publicised = group_id in result
+
+        res.setdefault("user", {})["is_publicised"] = is_publicised
 
         defer.returnValue(res)
 
