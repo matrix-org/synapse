@@ -18,8 +18,14 @@ class SpamChecker(object):
     def __init__(self, hs):
         self.spam_checker = None
 
-        if hs.config.spam_checker is not None:
+        module = None
+        config = None
+        try:
             module, config = hs.config.spam_checker
+        except:
+            pass
+
+        if module is not None:
             self.spam_checker = module(config=config)
 
     def check_event_for_spam(self, event):
