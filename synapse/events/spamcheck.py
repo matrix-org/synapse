@@ -20,7 +20,6 @@ class SpamChecker(object):
 
         if hs.config.spam_checker is not None:
             module, config = hs.config.spam_checker
-            print("cfg %r", config)
             self.spam_checker = module(config=config)
 
     def check_event_for_spam(self, event):
