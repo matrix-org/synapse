@@ -17,6 +17,7 @@ import importlib
 
 from synapse.config._base import ConfigError
 
+
 def load_module(provider):
     """ Loads a module with its config
     Take a dict with keys 'module' (the module name) and 'config'
