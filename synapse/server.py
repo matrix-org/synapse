@@ -31,6 +31,7 @@ from synapse.appservice.api import ApplicationServiceApi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
+from synapse.events.spamcheck import SpamChecker
 from synapse.federation import initialize_http_replication
 from synapse.federation.send_queue import FederationRemoteSendQueue
 from synapse.federation.transport.client import TransportLayerClient
@@ -139,6 +140,7 @@ class HomeServer(object):
         'read_marker_handler',
         'action_generator',
         'user_directory_handler',
+        'spam_checker',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -308,6 +310,9 @@ class HomeServer(object):
 
     def build_user_directory_handler(self):
         return UserDirectoyHandler(self)
+
+    def build_spam_checker(self):
+        return SpamChecker(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
