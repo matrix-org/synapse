@@ -419,6 +419,37 @@ class MessageHandler(BaseHandler):
             [serialize_event(c, now) for c in room_state.values()]
         )
 
+    @defer.inlineCallbacks
+    def get_joined_members(self, user_id, room_id):
+        """Get all the joined members in the room and their profile information.
+
+        If the user has left the room return the state events from when they left.
+
+        Args:
+            user_id(str): The user requesting state events.
+            room_id(str): The room ID to get all state events from.
+        Returns:
+            A dict of user_id to profile info
+        """
+        membership, membership_event_id = yield self._check_in_room_or_world_readable(
+            room_id, user_id
+        )
+
+        if membership == Membership.JOIN:
+            users_with_profile = yield self.state.get_current_user_in_room(room_id)
+        else:
+            raise NotImplementedError(
+                "Getting joined members after leaving is not implemented"
+            )
+
+        defer.returnValue({
+            user_id: {
+                "avatar_url": profile.avatar_url,
+                "display_name": profile.display_name,
+            }
+            for user_id, profile in users_with_profile.iteritems()
+        })
+
     @measure_func("_create_new_client_event")
     @defer.inlineCallbacks
     def _create_new_client_event(self, builder, requester=None, prev_event_ids=None):
