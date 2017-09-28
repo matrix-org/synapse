@@ -137,7 +137,7 @@ class PreviewUrlResource(Resource):
         cache_result = yield self.store.get_url_cache(url, ts)
         if (
             cache_result and
-            cache_result["download_ts"] + cache_result["expires"] > ts and
+            cache_result["expires_ts"] > ts and
             cache_result["response_code"] / 100 == 2
         ):
             respond_with_json_bytes(
@@ -246,7 +246,7 @@ class PreviewUrlResource(Resource):
             url,
             media_info["response_code"],
             media_info["etag"],
-            media_info["expires"],
+            media_info["expires"] + media_info["created_ts"],
             json.dumps(og),
             media_info["filesystem_id"],
             media_info["created_ts"],
