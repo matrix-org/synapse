@@ -355,21 +355,27 @@ def _get_hosts_for_srv_record(dns_client, host):
         return res[0]
 
     def eb(res, record_type):
-        if not res.check(DNSNameError):
-            # we log errors that occur here, but otherwise treat them as an
-            # empty result, which means we'll fall back to the A record if the
-            # AAAA record lookup fails, etc. (Which happens when people
-            # mess up their DNSSEC deployments)
-            logger.warn("Error looking up %s for %s: %s",
-                        record_type, host, res, res.value)
-        return []
+        if res.check(DNSNameError):
+            return []
+        logger.warn("Error looking up %s for %s: %s",
+                    record_type, host, res, res.value)
+        return res
 
     # no logcontexts here, so we can safely fire these off and gatherResults
     d1 = dns_client.lookupAddress(host).addCallbacks(cb, eb)
     d2 = dns_client.lookupIPV6Address(host).addCallbacks(cb, eb)
-    results = yield defer.gatherResults([d1, d2], consumeErrors=True)
+    results = yield defer.DeferredList(
+        [d1, d2], consumeErrors=True)
 
-    for result in results:
+    # if all of the lookups failed, raise an exception rather than blowing out
+    # the cache with an empty result.
+    if results and all(s == defer.FAILURE for (s, _) in results):
+        defer.returnValue(results[0][1])
+
+    for (success, result) in results:
+        if success == defer.FAILURE:
+            continue
+
         for answer in result:
             if not answer.payload:
                 continue
