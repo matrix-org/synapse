@@ -244,7 +244,7 @@ class MediaRepositoryStore(SQLBaseStore):
             "SELECT media_id FROM local_media_repository_url_cache"
             " WHERE expires_ts < ?"
             " ORDER BY expires_ts ASC"
-            " LIMIT 100"
+            " LIMIT 500"
         )
 
         def _get_expired_url_cache_txn(txn):
@@ -269,7 +269,7 @@ class MediaRepositoryStore(SQLBaseStore):
             "SELECT media_id FROM local_media_repository"
             " WHERE created_ts < ? AND url_cache IS NOT NULL"
             " ORDER BY created_ts ASC"
-            " LIMIT 100"
+            " LIMIT 500"
         )
 
         def _get_url_cache_media_before_txn(txn):
