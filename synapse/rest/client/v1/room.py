@@ -403,10 +403,9 @@ class JoinedRoomMemberListRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
 
         users_with_profile = yield self.message_handler.get_joined_members(
-            user_id, room_id,
+            requester, room_id,
         )
 
         defer.returnValue((200, {
