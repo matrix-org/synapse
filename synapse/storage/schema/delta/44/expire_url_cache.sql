@@ -14,4 +14,4 @@
  */
 
 CREATE INDEX local_media_repository_url_idx ON local_media_repository(created_ts) WHERE url_cache IS NOT NULL;
-CREATE INDEX local_media_repository_url_cache_expires_idx ON local_media_repository_url_cache(download_ts + expires);
+CREATE INDEX local_media_repository_url_cache_expires_idx ON local_media_repository_url_cache((download_ts + expires));
