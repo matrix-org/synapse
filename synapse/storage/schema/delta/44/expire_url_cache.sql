@@ -34,3 +34,5 @@ DROP TABLE local_media_repository_url_cache;
 ALTER TABLE local_media_repository_url_cache_new RENAME TO local_media_repository_url_cache;
 
 CREATE INDEX local_media_repository_url_cache_expires_idx ON local_media_repository_url_cache(expires_ts);
+CREATE INDEX local_media_repository_url_cache_by_url_download_ts ON local_media_repository_url_cache(url, download_ts);
+CREATE INDEX local_media_repository_url_cache_media_idx ON local_media_repository_url_cache(media_id);
