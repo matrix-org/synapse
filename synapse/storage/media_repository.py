@@ -260,7 +260,7 @@ class MediaRepositoryStore(SQLBaseStore):
         )
 
         def _delete_url_cache_txn(txn):
-            txn.executemany(sql, [(media_id) for media_id in media_ids])
+            txn.executemany(sql, [(media_id,) for media_id in media_ids])
 
         return self.runInteraction("delete_url_cache", _delete_url_cache_txn)
 
@@ -287,14 +287,14 @@ class MediaRepositoryStore(SQLBaseStore):
                 " WHERE media_id = ?"
             )
 
-            txn.executemany(sql, [(media_id) for media_id in media_ids])
+            txn.executemany(sql, [(media_id,) for media_id in media_ids])
 
             sql = (
                 "DELETE FROM local_media_repository_thumbnails"
                 " WHERE media_id = ?"
             )
 
-            txn.executemany(sql, [(media_id) for media_id in media_ids])
+            txn.executemany(sql, [(media_id,) for media_id in media_ids])
 
         return self.runInteraction(
             "delete_url_cache_media", _delete_url_cache_media_txn,
