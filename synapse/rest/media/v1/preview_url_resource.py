@@ -74,7 +74,7 @@ class PreviewUrlResource(Resource):
         self.downloads = {}
 
         self._cleaner_loop = self.clock.looping_call(
-            self._expire_url_cache_data, 30 * 1000
+            self._expire_url_cache_data, 10 * 1000
         )
 
     def render_GET(self, request):
