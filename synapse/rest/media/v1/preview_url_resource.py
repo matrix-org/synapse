@@ -372,7 +372,7 @@ class PreviewUrlResource(Resource):
         # may have a room open with a preview url thing open).
         # So we wait a couple of days before deleting, just in case.
         expire_before = now - 2 * 24 * 60 * 60 * 1000
-        yield self.store.get_url_cache_media_before(expire_before)
+        media_ids = yield self.store.get_url_cache_media_before(expire_before)
 
         removed_media = []
         for media_id in media_ids:
