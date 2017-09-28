@@ -16,7 +16,6 @@ import logging
 
 from synapse.api.errors import SynapseError
 from synapse.crypto.event_signing import check_event_content_hash
-from synapse.events import spamcheck
 from synapse.events.utils import prune_event
 from synapse.util import unwrapFirstError, logcontext
 from twisted.internet import defer
@@ -26,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 class FederationBase(object):
     def __init__(self, hs):
-        pass
+        self.spam_checker = hs.get_spam_checker()
 
     @defer.inlineCallbacks
     def _check_sigs_and_hash_and_fetch(self, origin, pdus, outlier=False,
@@ -144,7 +143,7 @@ class FederationBase(object):
                     )
                     return redacted
 
-                if spamcheck.check_event_for_spam(pdu):
+                if self.spam_checker.check_event_for_spam(pdu):
                     logger.warn(
                         "Event contains spam, redacting %s: %s",
                         pdu.event_id, pdu.get_pdu_json()

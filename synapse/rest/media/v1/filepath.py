@@ -14,6 +14,9 @@
 # limitations under the License.
 
 import os
+import re
+
+NEW_FORMAT_ID_RE = re.compile(r"^\d\d\d\d-\d\d-\d\d")
 
 
 class MediaFilePaths(object):
@@ -73,19 +76,105 @@ class MediaFilePaths(object):
         )
 
     def url_cache_filepath(self, media_id):
-        return os.path.join(
-            self.base_path, "url_cache",
-            media_id[0:2], media_id[2:4], media_id[4:]
-        )
+        if NEW_FORMAT_ID_RE.match(media_id):
+            # Media id is of the form <DATE><RANDOM_STRING>
+            # E.g.: 2017-09-28-fsdRDt24DS234dsf
+            return os.path.join(
+                self.base_path, "url_cache",
+                media_id[:10], media_id[11:]
+            )
+        else:
+            return os.path.join(
+                self.base_path, "url_cache",
+                media_id[0:2], media_id[2:4], media_id[4:],
+            )
+
+    def url_cache_filepath_dirs_to_delete(self, media_id):
+        "The dirs to try and remove if we delete the media_id file"
+        if NEW_FORMAT_ID_RE.match(media_id):
+            return [
+                os.path.join(
+                    self.base_path, "url_cache",
+                    media_id[:10],
+                ),
+            ]
+        else:
+            return [
+                os.path.join(
+                    self.base_path, "url_cache",
+                    media_id[0:2], media_id[2:4],
+                ),
+                os.path.join(
+                    self.base_path, "url_cache",
+                    media_id[0:2],
+                ),
+            ]
 
     def url_cache_thumbnail(self, media_id, width, height, content_type,
                             method):
+        # Media id is of the form <DATE><RANDOM_STRING>
+        # E.g.: 2017-09-28-fsdRDt24DS234dsf
+
         top_level_type, sub_type = content_type.split("/")
         file_name = "%i-%i-%s-%s-%s" % (
             width, height, top_level_type, sub_type, method
         )
-        return os.path.join(
-            self.base_path, "url_cache_thumbnails",
-            media_id[0:2], media_id[2:4], media_id[4:],
-            file_name
-        )
+
+        if NEW_FORMAT_ID_RE.match(media_id):
+            return os.path.join(
+                self.base_path, "url_cache_thumbnails",
+                media_id[:10], media_id[11:],
+                file_name
+            )
+        else:
+            return os.path.join(
+                self.base_path, "url_cache_thumbnails",
+                media_id[0:2], media_id[2:4], media_id[4:],
+                file_name
+            )
+
+    def url_cache_thumbnail_directory(self, media_id):
+        # Media id is of the form <DATE><RANDOM_STRING>
+        # E.g.: 2017-09-28-fsdRDt24DS234dsf
+
+        if NEW_FORMAT_ID_RE.match(media_id):
+            return os.path.join(
+                self.base_path, "url_cache_thumbnails",
+                media_id[:10], media_id[11:],
+            )
+        else:
+            return os.path.join(
+                self.base_path, "url_cache_thumbnails",
+                media_id[0:2], media_id[2:4], media_id[4:],
+            )
+
+    def url_cache_thumbnail_dirs_to_delete(self, media_id):
+        "The dirs to try and remove if we delete the media_id thumbnails"
+        # Media id is of the form <DATE><RANDOM_STRING>
+        # E.g.: 2017-09-28-fsdRDt24DS234dsf
+        if NEW_FORMAT_ID_RE.match(media_id):
+            return [
+                os.path.join(
+                    self.base_path, "url_cache_thumbnails",
+                    media_id[:10], media_id[11:],
+                ),
+                os.path.join(
+                    self.base_path, "url_cache_thumbnails",
+                    media_id[:10],
+                ),
+            ]
+        else:
+            return [
+                os.path.join(
+                    self.base_path, "url_cache_thumbnails",
+                    media_id[0:2], media_id[2:4], media_id[4:],
+                ),
+                os.path.join(
+                    self.base_path, "url_cache_thumbnails",
+                    media_id[0:2], media_id[2:4],
+                ),
+                os.path.join(
+                    self.base_path, "url_cache_thumbnails",
+                    media_id[0:2],
+                ),
+            ]
