@@ -1,0 +1,39 @@
+# Copyright 2017 Vector Creations Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: '3'
+
+services:
+    postgres:
+        image: postgres:9.6.5-alpine
+        environment:
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+            POSTGRES_DB: synapse
+        expose:
+            - 5432
+        restart: unless-stopped
+        volumes:
+            - postgres-data:/var/lib/postgresql/data/
+
+    synapse:
+        image: matrix-org/synapse:develop
+        ports:
+            - 8008:8008
+            - 8448:8448
+        restart: unless-stopped
+        volumes:
+            - ${CONFIG_PATH}:/synapse/config/
+
+volumes:
+    postgres-data:
