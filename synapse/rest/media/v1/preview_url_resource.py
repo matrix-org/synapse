@@ -36,6 +36,9 @@ import cgi
 import ujson as json
 import urlparse
 import itertools
+import datetime
+import errno
+import shutil
 
 import logging
 logger = logging.getLogger(__name__)
@@ -69,6 +72,10 @@ class PreviewUrlResource(Resource):
         self.cache.start()
 
         self.downloads = {}
+
+        self._cleaner_loop = self.clock.looping_call(
+            self._expire_url_cache_data, 30 * 10000
+        )
 
     def render_GET(self, request):
         self._async_render_GET(request)
@@ -253,8 +260,7 @@ class PreviewUrlResource(Resource):
         # we're most likely being explicitly triggered by a human rather than a
         # bot, so are we really a robot?
 
-        # XXX: horrible duplication with base_resource's _download_remote_file()
-        file_id = random_string(24)
+        file_id = datetime.date.today().isoformat() + '_' + random_string(16)
 
         fname = self.filepaths.url_cache_filepath(file_id)
         self.media_repo._makedirs(fname)
@@ -327,6 +333,86 @@ class PreviewUrlResource(Resource):
             "expires": 60 * 60 * 1000,
             "etag": headers["ETag"][0] if "ETag" in headers else None,
         })
+
+    @defer.inlineCallbacks
+    def _expire_url_cache_data(self):
+        """Clean up expired url cache content, media and thumbnails.
+        """
+        now = self.clock.time_msec()
+
+        # First we delete expired url cache entries
+        media_ids = yield self.store.get_expired_url_cache(now)
+
+        removed_media = []
+        for media_id in media_ids:
+            fname = self.filepaths.url_cache_filepath(media_id)
+            try:
+                os.remove(fname)
+            except OSError as e:
+                # If the path doesn't exist, meh
+                if e.errno != errno.ENOENT:
+                    logger.warn("Failed to remove media: %r: %s", media_id, e)
+                    continue
+
+            removed_media.append(media_id)
+
+            try:
+                dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
+                for dir in dirs:
+                    os.rmdir(dir)
+            except:
+                pass
+
+        yield self.store.delete_url_cache(removed_media)
+
+        logger.info("Deleted %d entries from url cache", len(removed_media))
+
+        # Now we delete old images associated with the url cache.
+        # These may be cached for a bit on the client (i.e., they
+        # may have a room open with a preview url thing open).
+        # So we wait a couple of days before deleting, just in case.
+        expire_before = now - 2 * 24 * 60 * 60 * 1000
+        yield self.store.get_url_cache_media_before(expire_before)
+
+        removed_media = []
+        for media_id in media_ids:
+            fname = self.filepaths.url_cache_filepath(media_id)
+            try:
+                os.remove(fname)
+            except OSError as e:
+                # If the path doesn't exist, meh
+                if e.errno != errno.ENOENT:
+                    logger.warn("Failed to remove media: %r: %s", media_id, e)
+                    continue
+
+            try:
+                dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
+                for dir in dirs:
+                    os.rmdir(dir)
+            except:
+                pass
+
+            thumbnail_dir = self.filepaths.url_cache_thumbnail_directory(media_id)
+            try:
+                shutil.rmtree(thumbnail_dir)
+            except OSError as e:
+                # If the path doesn't exist, meh
+                if e.errno != errno.ENOENT:
+                    logger.warn("Failed to remove media: %r: %s", media_id, e)
+                    continue
+
+            removed_media.append(media_id)
+
+            try:
+                dirs = self.filepaths.url_cache_thumbnail_dirs_to_delete(media_id)
+                for dir in dirs:
+                    os.rmdir(dir)
+            except:
+                pass
+
+        yield self.store.delete_url_cache_media(removed_media)
+
+        logger.info("Deleted %d media from url cache", len(removed_media))
 
 
 def decode_and_calc_og(body, media_uri, request_encoding=None):
