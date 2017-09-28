@@ -365,7 +365,8 @@ class PreviewUrlResource(Resource):
 
         yield self.store.delete_url_cache(removed_media)
 
-        logger.info("Deleted %d entries from url cache", len(removed_media))
+        if removed_media:
+            logger.info("Deleted %d entries from url cache", len(removed_media))
 
         # Now we delete old images associated with the url cache.
         # These may be cached for a bit on the client (i.e., they
@@ -412,7 +413,8 @@ class PreviewUrlResource(Resource):
 
         yield self.store.delete_url_cache_media(removed_media)
 
-        logger.info("Deleted %d media from url cache", len(removed_media))
+        if removed_media:
+            logger.info("Deleted %d media from url cache", len(removed_media))
 
 
 def decode_and_calc_og(body, media_uri, request_encoding=None):
