@@ -267,7 +267,7 @@ class MediaRepositoryStore(SQLBaseStore):
     def get_url_cache_media_before(self, before_ts):
         sql = (
             "SELECT media_id FROM local_media_repository"
-            " WHERE created_ts < ?"
+            " WHERE created_ts < ? AND url_cache IS NOT NULL"
             " ORDER BY created_ts ASC"
             " LIMIT 100"
         )
