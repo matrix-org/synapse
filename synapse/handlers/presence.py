@@ -445,6 +445,7 @@ class PresenceHandler(object):
         Returns:
             set(str): A set of user_id strings.
         """
+        return set()
         syncing_user_ids = {
             user_id for user_id, count in self.user_to_num_current_syncs.items()
             if count
