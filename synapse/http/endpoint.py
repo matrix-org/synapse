@@ -354,8 +354,14 @@ def _get_hosts_for_srv_record(dns_client, host):
 
         return res[0]
 
-    def eb(res):
-        res.trap(DNSNameError)
+    def eb(res, record_type):
+        if not res.check(DNSNameError):
+            # we log errors that occur here, but otherwise treat them as an
+            # empty result, which means we'll fall back to the A record if the
+            # AAAA record lookup fails, etc. (Which happens when people
+            # mess up their DNSSEC deployments)
+            logger.warn("Error looking up %s for %s: %s",
+                        record_type, host, res, res.value)
         return []
 
     # no logcontexts here, so we can safely fire these off and gatherResults
