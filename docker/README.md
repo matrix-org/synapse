@@ -5,10 +5,10 @@
 Build the docker image with the `docker build` command from the root of the synapse repository.
 
 ```
-docker build -t matrix-org/synapse:v0.22.1 .
+docker build -t matrixdotorg/synapse:v0.22.1 .
 ```
 
-The `-t` option sets the image tag. Official images are tagged `matrix-org/synapse:<version>` where `<version>` is the same as the release tag in the synapse git repository.
+The `-t` option sets the image tag. Official images are tagged `matrixdotorg/synapse:<version>` where `<version>` is the same as the release tag in the synapse git repository.
 
 ## Configure
 
@@ -35,7 +35,7 @@ docker run \
     -e REPORT_STATS=yes \
     -e SERVER_NAME=example.com \
     -v ${CONFIG_PATH}:/synapse/config/ \
-    matrix-org/synapse:develop
+    matrixdotorg/synapse:v0.22.1
 ```
 
 This will create a temporary container from the image and use the synapse code for generating configuration files and TLS keys and certificates for the specified `SERVER_NAME` domain. The files are written to `CONFIG_PATH`.
@@ -66,5 +66,5 @@ docker run \
     -d \
     --name synapse \
     -v ${CONFIG_PATH}:/synapse/config/ \
-    matrix-org/synapse:v0.22.1
+    matrixdotorg/synapse:v0.22.1
 ```

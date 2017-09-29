@@ -27,7 +27,7 @@ services:
             - postgres-data:/var/lib/postgresql/data/
 
     synapse:
-        image: matrix-org/synapse:develop
+        image: matrixdotorg/synapse:v0.22.1
         ports:
             - 8008:8008
             - 8448:8448
