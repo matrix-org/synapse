@@ -40,7 +40,6 @@ REQUIREMENTS = {
     "pymacaroons-pynacl": ["pymacaroons"],
     "msgpack-python>=0.3.0": ["msgpack"],
     "phonenumbers>=8.2.0": ["phonenumbers"],
-    "affinity": ["affinity"],
 }
 CONDITIONAL_REQUIREMENTS = {
     "web_client": {
@@ -58,6 +57,9 @@ CONDITIONAL_REQUIREMENTS = {
     },
     "psutil": {
         "psutil>=2.0.0": ["psutil>=2.0.0"],
+    },
+    "affinity": {
+        "affinity": ["affinity"],
     },
 }
 
