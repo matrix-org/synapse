@@ -15,9 +15,6 @@
 
 from twisted.internet import defer
 
-import synapse.server
-import synapse.storage
-import synapse.types
 import tests.unittest
 import tests.utils
 
@@ -39,7 +36,7 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
         self.clock.now = 12345678
         user_id = "@user:id"
         yield self.store.insert_client_ip(
-            synapse.types.UserID.from_string(user_id),
+            user_id,
             "access_token", "ip", "user_agent", "device_id",
         )
 

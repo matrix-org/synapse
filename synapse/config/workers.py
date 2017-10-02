@@ -32,6 +32,9 @@ class WorkerConfig(Config):
         self.worker_replication_port = config.get("worker_replication_port", None)
         self.worker_name = config.get("worker_name", self.worker_app)
 
+        self.worker_main_http_uri = config.get("worker_main_http_uri", None)
+        self.worker_cpu_affinity = config.get("worker_cpu_affinity")
+
         if self.worker_listeners:
             for listener in self.worker_listeners:
                 bind_address = listener.pop("bind_address", None)

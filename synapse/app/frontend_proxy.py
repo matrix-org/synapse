@@ -18,52 +18,100 @@ import sys
 
 import synapse
 from synapse import events
+from synapse.api.errors import SynapseError
 from synapse.app import _base
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.crypto import context_factory
 from synapse.http.server import JsonResource
+from synapse.http.servlet import (
+    RestServlet, parse_json_object_from_request,
+)
 from synapse.http.site import SynapseSite
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
-from synapse.replication.slave.storage.directory import DirectoryStore
-from synapse.replication.slave.storage.events import SlavedEventStore
-from synapse.replication.slave.storage.keys import SlavedKeyStore
+from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
-from synapse.replication.slave.storage.room import RoomStore
-from synapse.replication.slave.storage.transactions import TransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
-from synapse.rest.client.v1.room import PublicRoomListRestServlet
+from synapse.rest.client.v2_alpha._base import client_v2_patterns
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
-from twisted.internet import reactor
+from twisted.internet import defer, reactor
 from twisted.web.resource import Resource
 
-logger = logging.getLogger("synapse.app.client_reader")
+logger = logging.getLogger("synapse.app.frontend_proxy")
 
 
-class ClientReaderSlavedStore(
-    SlavedEventStore,
-    SlavedKeyStore,
-    RoomStore,
-    DirectoryStore,
+class KeyUploadServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/keys/upload(/(?P<device_id>[^/]+))?$",
+                                  releases=())
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(KeyUploadServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+        self.http_client = hs.get_simple_http_client()
+        self.main_uri = hs.config.worker_main_http_uri
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, device_id):
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+        user_id = requester.user.to_string()
+        body = parse_json_object_from_request(request)
+
+        if device_id is not None:
+            # passing the device_id here is deprecated; however, we allow it
+            # for now for compatibility with older clients.
+            if (requester.device_id is not None and
+                    device_id != requester.device_id):
+                logger.warning("Client uploading keys for a different device "
+                               "(logged in as %s, uploading for %s)",
+                               requester.device_id, device_id)
+        else:
+            device_id = requester.device_id
+
+        if device_id is None:
+            raise SynapseError(
+                400,
+                "To upload keys, you must pass device_id when authenticating"
+            )
+
+        if body:
+            # They're actually trying to upload something, proxy to main synapse.
+            result = yield self.http_client.post_json_get_json(
+                self.main_uri + request.uri,
+                body,
+            )
+
+            defer.returnValue((200, result))
+        else:
+            # Just interested in counts.
+            result = yield self.store.count_e2e_one_time_keys(user_id, device_id)
+            defer.returnValue((200, {"one_time_key_counts": result}))
+
+
+class FrontendProxySlavedStore(
+    SlavedDeviceStore,
+    SlavedClientIpStore,
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
-    TransactionStore,
-    SlavedClientIpStore,
     BaseSlavedStore,
 ):
     pass
 
 
-class ClientReaderServer(HomeServer):
+class FrontendProxyServer(HomeServer):
     def get_db_conn(self, run_new_connection=True):
         # Any param beginning with cp_ is a parameter for adbapi, and should
         # not be passed to the database engine.
@@ -79,7 +127,7 @@ class ClientReaderServer(HomeServer):
 
     def setup(self):
         logger.info("Setting up.")
-        self.datastore = ClientReaderSlavedStore(self.get_db_conn(), self)
+        self.datastore = FrontendProxySlavedStore(self.get_db_conn(), self)
         logger.info("Finished setting up.")
 
     def _listen_http(self, listener_config):
@@ -93,7 +141,7 @@ class ClientReaderServer(HomeServer):
                     resources[METRICS_PREFIX] = MetricsResource(self)
                 elif name == "client":
                     resource = JsonResource(self, canonical_json=False)
-                    PublicRoomListRestServlet(self).register(resource)
+                    KeyUploadServlet(self).register(resource)
                     resources.update({
                         "/_matrix/client/r0": resource,
                         "/_matrix/client/unstable": resource,
@@ -146,13 +194,15 @@ class ClientReaderServer(HomeServer):
 def start(config_options):
     try:
         config = HomeServerConfig.load_config(
-            "Synapse client reader", config_options
+            "Synapse frontend proxy", config_options
         )
     except ConfigError as e:
         sys.stderr.write("\n" + e.message + "\n")
         sys.exit(1)
 
-    assert config.worker_app == "synapse.app.client_reader"
+    assert config.worker_app == "synapse.app.frontend_proxy"
+
+    assert config.worker_main_http_uri is not None
 
     setup_logging(config, use_worker_options=True)
 
@@ -162,7 +212,7 @@ def start(config_options):
 
     tls_server_context_factory = context_factory.ServerContextFactory(config)
 
-    ss = ClientReaderServer(
+    ss = FrontendProxyServer(
         config.server_name,
         db_config=config.database_config,
         tls_server_context_factory=tls_server_context_factory,
@@ -181,7 +231,7 @@ def start(config_options):
 
     reactor.callWhenRunning(start)
 
-    _base.start_worker_reactor("synapse-client-reader", config)
+    _base.start_worker_reactor("synapse-frontend-proxy", config)
 
 
 if __name__ == '__main__':

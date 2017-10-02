@@ -43,7 +43,8 @@ MEMBERSHIP_PRIORITY = (
 
 
 @defer.inlineCallbacks
-def filter_events_for_clients(store, user_tuples, events, event_id_to_state):
+def filter_events_for_clients(store, user_tuples, events, event_id_to_state,
+                              always_include_ids=frozenset()):
     """ Returns dict of user_id -> list of events that user is allowed to
     see.
 
@@ -54,6 +55,8 @@ def filter_events_for_clients(store, user_tuples, events, event_id_to_state):
             * the user has not been a member of the room since the
             given events
         events ([synapse.events.EventBase]): list of events to filter
+        always_include_ids (set(event_id)): set of event ids to specifically
+            include (unless sender is ignored)
     """
     forgotten = yield preserve_context_over_deferred(defer.gatherResults([
         defer.maybeDeferred(
@@ -90,6 +93,9 @@ def filter_events_for_clients(store, user_tuples, events, event_id_to_state):
         """
         if not event.is_state() and event.sender in ignore_list:
             return False
+
+        if event.event_id in always_include_ids:
+            return True
 
         state = event_id_to_state[event.event_id]
 
@@ -189,26 +195,8 @@ def filter_events_for_clients(store, user_tuples, events, event_id_to_state):
 
 
 @defer.inlineCallbacks
-def filter_events_for_clients_context(store, user_tuples, events, event_id_to_context):
-    user_ids = set(u[0] for u in user_tuples)
-    event_id_to_state = {}
-    for event_id, context in event_id_to_context.items():
-        state = yield store.get_events([
-            e_id
-            for key, e_id in context.current_state_ids.iteritems()
-            if key == (EventTypes.RoomHistoryVisibility, "")
-            or (key[0] == EventTypes.Member and key[1] in user_ids)
-        ])
-        event_id_to_state[event_id] = state
-
-    res = yield filter_events_for_clients(
-        store, user_tuples, events, event_id_to_state
-    )
-    defer.returnValue(res)
-
-
-@defer.inlineCallbacks
-def filter_events_for_client(store, user_id, events, is_peeking=False):
+def filter_events_for_client(store, user_id, events, is_peeking=False,
+                             always_include_ids=frozenset()):
     """
     Check which events a user is allowed to see
 
@@ -232,6 +220,7 @@ def filter_events_for_client(store, user_id, events, is_peeking=False):
         types=types
     )
     res = yield filter_events_for_clients(
-        store, [(user_id, is_peeking)], events, event_id_to_state
+        store, [(user_id, is_peeking)], events, event_id_to_state,
+        always_include_ids=always_include_ids,
     )
     defer.returnValue(res.get(user_id, []))

@@ -209,7 +209,7 @@ class Auth(object):
             )[0]
             if user and access_token and ip_addr:
                 self.store.insert_client_ip(
-                    user=user,
+                    user_id=user.to_string(),
                     access_token=access_token,
                     ip=ip_addr,
                     user_agent=user_agent,
@@ -519,6 +519,14 @@ class Auth(object):
             )
 
     def is_server_admin(self, user):
+        """ Check if the given user is a local server admin.
+
+        Args:
+            user (str): mxid of user to check
+
+        Returns:
+            bool: True if the user is an admin
+        """
         return self.store.is_server_admin(user)
 
     @defer.inlineCallbacks
