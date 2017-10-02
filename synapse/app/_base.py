@@ -12,10 +12,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import gc
 import logging
+import sys
 
-import affinity
+try:
+    import affinity
+except:
+    affinity = None
+
 from daemonize import Daemonize
 from synapse.util import PreserveLoggingContext
 from synapse.util.rlimit import change_resource_limit
@@ -78,6 +84,13 @@ def start_reactor(
         with PreserveLoggingContext():
             logger.info("Running")
             if cpu_affinity is not None:
+                if not affinity:
+                    quit_with_error(
+                        "Missing package 'affinity' required for cpu_affinity\n"
+                        "option\n\n"
+                        "Install by running:\n\n"
+                        "   pip install affinity\n\n"
+                    )
                 logger.info("Setting CPU affinity to %s" % cpu_affinity)
                 affinity.set_process_affinity_mask(0, cpu_affinity)
             change_resource_limit(soft_file_limit)
