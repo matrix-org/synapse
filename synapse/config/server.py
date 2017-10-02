@@ -43,6 +43,12 @@ class ServerConfig(Config):
 
         self.filter_timeline_limit = config.get("filter_timeline_limit", -1)
 
+        # Whether we should block invites sent to users on this server
+        # (other than those sent by local server admins)
+        self.block_non_admin_invites = config.get(
+            "block_non_admin_invites", False,
+        )
+
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
                 self.public_baseurl += '/'
@@ -193,6 +199,10 @@ class ServerConfig(Config):
         # Set the limit on the returned events in the timeline in the get
         # and sync operations. The default value is -1, means no upper limit.
         # filter_timeline_limit: 5000
+
+        # Whether room invites to users on this server should be blocked
+        # (except those sent by local server admins). The default is False.
+        # block_non_admin_invites: True
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.

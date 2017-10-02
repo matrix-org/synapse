@@ -204,18 +204,15 @@ class MatrixFederationHttpClient(object):
                             raise
 
                         logger.warn(
-                            "{%s} Sending request failed to %s: %s %s: %s - %s",
+                            "{%s} Sending request failed to %s: %s %s: %s",
                             txn_id,
                             destination,
                             method,
                             url_bytes,
-                            type(e).__name__,
                             _flatten_response_never_received(e),
                         )
 
-                        log_result = "%s - %s" % (
-                            type(e).__name__, _flatten_response_never_received(e),
-                        )
+                        log_result = _flatten_response_never_received(e)
 
                         if retries_left and not timeout:
                             if long_retries:
@@ -618,12 +615,14 @@ class _JsonProducer(object):
 
 def _flatten_response_never_received(e):
     if hasattr(e, "reasons"):
-        return ", ".join(
+        reasons = ", ".join(
             _flatten_response_never_received(f.value)
             for f in e.reasons
         )
+
+        return "%s:[%s]" % (type(e).__name__, reasons)
     else:
-        return "%s: %s" % (type(e).__name__, e.message,)
+        return repr(e)
 
 
 def check_content_type_is_json(headers):
