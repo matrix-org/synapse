@@ -97,3 +97,13 @@ def start_reactor(
         daemon.start()
     else:
         run()
+
+
+def quit_with_error(error_string):
+    message_lines = error_string.split("\n")
+    line_length = max([len(l) for l in message_lines if len(l) < 80]) + 2
+    sys.stderr.write("*" * line_length + '\n')
+    for line in message_lines:
+        sys.stderr.write(" %s\n" % (line.rstrip(),))
+    sys.stderr.write("*" * line_length + '\n')
+    sys.exit(1)
