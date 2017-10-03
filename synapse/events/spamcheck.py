@@ -45,3 +45,19 @@ class SpamChecker(object):
             return False
 
         return self.spam_checker.check_event_for_spam(event)
+
+    def user_may_invite(self, userid):
+        """Checks if a given user may send an invite
+
+        If this method returns false, the invite will be rejected.
+
+        Args:
+            userid (string): The sender's user ID
+
+        Returns:
+            bool: True if the user may send an invite, otherwise False
+        """
+        if self.spam_checker is None:
+            return True
+
+        return self.spam_checker.user_may_invite(userid)
