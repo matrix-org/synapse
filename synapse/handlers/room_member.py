@@ -218,14 +218,14 @@ class RoomMemberHandler(BaseHandler):
             )
             if not is_requester_admin:
                 if self.hs.config.block_non_admin_invites:
-                    logger.debug(
+                    logger.info(
                         "Blocking invite: user is not admin and non-admin "
                         "invites disabled"
                     )
                     block_invite = True
 
                 if not self.spam_checker.user_may_invite(requester.user):
-                    logger.debug("Blocking invite due to spam checker")
+                    logger.info("Blocking invite due to spam checker")
                     block_invite = True
 
             if block_invite:
