@@ -536,6 +536,13 @@ class RoomMemberStore(SQLBaseStore):
     @cachedInlineCallbacks()
     def was_host_joined(self, room_id, host):
         """Check whether the server is or ever was in the room.
+
+        Args:
+            room_id (str)
+            host (str)
+
+        Returns:
+            bool: whether the host is/was in the room or not
         """
         if '%' in host or '_' in host:
             raise Exception("Invalid host name")
