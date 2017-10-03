@@ -48,6 +48,7 @@ class RoomMemberHandler(BaseHandler):
         self.member_linearizer = Linearizer(name="member")
 
         self.clock = hs.get_clock()
+        self.spam_checker = hs.get_spam_checker()
 
         self.distributor = hs.get_distributor()
         self.distributor.declare("user_joined_room")
@@ -210,12 +211,19 @@ class RoomMemberHandler(BaseHandler):
             if is_blocked:
                 raise SynapseError(403, "This room has been blocked on this server")
 
-        if (effective_membership_state == "invite" and
-                self.hs.config.block_non_admin_invites):
-            is_requester_admin = yield self.auth.is_server_admin(
-                requester.user,
-            )
-            if not is_requester_admin:
+        if effective_membership_state == "invite":
+            block_invite = False
+            if self.hs.config.block_non_admin_invites:
+                is_requester_admin = yield self.auth.is_server_admin(
+                    requester.user,
+                )
+                if not is_requester_admin:
+                    block_invite = True
+
+            if not self.spam_checker.user_may_invite(requester.user):
+                block_invite = True
+
+            if block_invite:
                 raise SynapseError(
                     403, "Invites have been disabled on this server",
                 )

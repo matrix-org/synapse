@@ -77,6 +77,7 @@ class FederationHandler(BaseHandler):
         self.action_generator = hs.get_action_generator()
         self.is_mine_id = hs.is_mine_id
         self.pusher_pool = hs.get_pusherpool()
+        self.spam_checker = hs.get_spam_checker()
 
         self.replication_layer.set_handler(self)
 
@@ -1076,6 +1077,9 @@ class FederationHandler(BaseHandler):
 
         if self.hs.config.block_non_admin_invites:
             raise SynapseError(403, "This server does not accept room invites")
+
+        if not self.spam_checker.user_may_invite(requester.user):
+            raise SynapseError(403, "This user is not permitted to send invites to this server")
 
         membership = event.content.get("membership")
         if event.type != EventTypes.Member or membership != Membership.INVITE:
