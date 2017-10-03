@@ -213,15 +213,15 @@ class RoomMemberHandler(BaseHandler):
 
         if effective_membership_state == "invite":
             block_invite = False
-            if self.hs.config.block_non_admin_invites:
-                is_requester_admin = yield self.auth.is_server_admin(
-                    requester.user,
-                )
-                if not is_requester_admin:
+            is_requester_admin = yield self.auth.is_server_admin(
+                requester.user,
+            )
+            if not is_requester_admin:
+                if (
+                    self.hs.config.block_non_admin_invites or
+                    not self.spam_checker.user_may_invite(requester.user)
+                ):
                     block_invite = True
-
-            if not self.spam_checker.user_may_invite(requester.user):
-                block_invite = True
 
             if block_invite:
                 raise SynapseError(
