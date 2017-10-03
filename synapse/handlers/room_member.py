@@ -224,7 +224,7 @@ class RoomMemberHandler(BaseHandler):
                     )
                     block_invite = True
 
-                if not self.spam_checker.user_may_invite(requester.user):
+                if not self.spam_checker.user_may_invite(requester.user.to_string()):
                     logger.info("Blocking invite due to spam checker")
                     block_invite = True
 
