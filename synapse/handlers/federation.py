@@ -125,6 +125,23 @@ class FederationHandler(BaseHandler):
             self.room_queues[pdu.room_id].append((pdu, origin))
             return
 
+        # Otherwise we're not joining the room, and so if we don't think we're
+        # in the room, ditch the packet entirely.
+        #
+        # This stops a chain reaction of requesting missing events when we receive
+        # a rogue event over federation for a room we are no longer participating in,
+        # which empirically can take 20 minutes and acquire the linearise lock
+        # for receiving PDUs for that room for the whole duration - e.g.
+        # https://matrix.org/~matthew/train-wreck.log
+        is_in_room = yield self.auth.check_host_in_room(
+            pdu.room_id,
+            self.server_name
+        )
+        if not is_in_room:
+            logger.info("Ignoring PDU %s for room %s from %s as not in room!",
+                        pdu.event_id, pdu.room_id, origin)
+            return
+
         state = None
 
         auth_chain = []
