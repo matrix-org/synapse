@@ -139,7 +139,6 @@ class FederationHandler(BaseHandler):
         if not is_in_room:
             was_in_room = yield self.store.was_host_joined(
                 pdu.room_id, self.server_name,
-
             )
             if was_in_room:
                 logger.info(
