@@ -61,3 +61,35 @@ class SpamChecker(object):
             return True
 
         return self.spam_checker.user_may_invite(userid, room_id)
+
+    def user_may_create_room(self, userid):
+        """Checks if a given user may create a room
+
+        If this method returns false, the creation request will be rejected.
+
+        Args:
+            userid (string): The sender's user ID
+
+        Returns:
+            bool: True if the user may create a room, otherwise False
+        """
+        if self.spam_checker is None:
+            return True
+
+        return self.spam_checker.user_may_create_room(userid)
+
+    def user_may_create_room_alias(self, userid, room_alias):
+        """Checks if a given user may create a room alias
+
+        If this method returns false, the association request will be rejected.
+
+        Args:
+            userid (string): The sender's user ID
+
+        Returns:
+            bool: True if the user may create a room alias, otherwise False
+        """
+        if self.spam_checker is None:
+            return True
+
+        return self.spam_checker.user_may_create_room_alias(userid, room_alias)

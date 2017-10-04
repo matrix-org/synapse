@@ -40,6 +40,8 @@ class DirectoryHandler(BaseHandler):
             "directory", self.on_directory_query
         )
 
+        self.spam_checker = hs.get_spam_checker()
+
     @defer.inlineCallbacks
     def _create_association(self, room_alias, room_id, servers=None, creator=None):
         # general association creation for both human users and app services
@@ -72,6 +74,11 @@ class DirectoryHandler(BaseHandler):
     def create_association(self, user_id, room_alias, room_id, servers=None):
         # association creation for human users
         # TODO(erikj): Do user auth.
+
+        if not self.spam_checker.user_may_create_room_alias(user_id, room_alias):
+            raise SynapseError(
+                403, "This user is not permitted to create this alias",
+            )
 
         can_create = yield self.can_modify_alias(
             room_alias,
