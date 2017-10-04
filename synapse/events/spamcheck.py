@@ -85,6 +85,7 @@ class SpamChecker(object):
 
         Args:
             userid (string): The sender's user ID
+            room_alias (string): The alias to be created
 
         Returns:
             bool: True if the user may create a room alias, otherwise False
@@ -93,3 +94,20 @@ class SpamChecker(object):
             return True
 
         return self.spam_checker.user_may_create_room_alias(userid, room_alias)
+
+    def user_may_publish_room(self, userid, room_id):
+        """Checks if a given user may publish a room to the directory
+
+        If this method returns false, the publish request will be rejected.
+
+        Args:
+            userid (string): The sender's user ID
+            room_id (string): The ID of the room that would be published
+
+        Returns:
+            bool: True if the user may publish the room, otherwise False
+        """
+        if self.spam_checker is None:
+            return True
+
+        return self.spam_checker.user_may_publish_room(userid, room_id)

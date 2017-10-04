@@ -334,6 +334,14 @@ class DirectoryHandler(BaseHandler):
         room_id (str)
         visibility (str): "public" or "private"
         """
+        if not self.spam_checker.user_may_publish_room(
+            requester.user.to_string(), room_id
+        ):
+            raise AuthError(
+                403,
+                "This user is not permitted to publish rooms to the room list"
+            )
+
         if requester.is_guest:
             raise AuthError(403, "Guests cannot edit the published room list")
 
