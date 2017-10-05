@@ -1071,6 +1071,9 @@ class FederationHandler(BaseHandler):
         """
         event = pdu
 
+        if event.state_key is None:
+            raise SynapseError(400, "The invite event did not have a state key")
+
         is_blocked = yield self.store.is_room_blocked(event.room_id)
         if is_blocked:
             raise SynapseError(403, "This room has been blocked on this server")
@@ -1078,9 +1081,11 @@ class FederationHandler(BaseHandler):
         if self.hs.config.block_non_admin_invites:
             raise SynapseError(403, "This server does not accept room invites")
 
-        if not self.spam_checker.user_may_invite(event.sender, event.room_id):
+        if not self.spam_checker.user_may_invite(
+            event.sender, event.state_key, event.room_id,
+        ):
             raise SynapseError(
-                403, "This user is not permitted to send invites to this server"
+                403, "This user is not permitted to send invites to this server/user"
             )
 
         membership = event.content.get("membership")
@@ -1090,9 +1095,6 @@ class FederationHandler(BaseHandler):
         sender_domain = get_domain_from_id(event.sender)
         if sender_domain != origin:
             raise SynapseError(400, "The invite event was not from the server sending it")
-
-        if event.state_key is None:
-            raise SynapseError(400, "The invite event did not have a state key")
 
         if not self.is_mine_id(event.state_key):
             raise SynapseError(400, "The invite event must be for this server")
