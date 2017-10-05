@@ -183,7 +183,7 @@ def _glob_to_re(glob, word_boundary):
             r,
         )
         if word_boundary:
-            r = r"\b%s\b" % (r,)
+            r = _re_word_boundary(r)
 
             return re.compile(r, flags=re.IGNORECASE)
         else:
@@ -192,12 +192,24 @@ def _glob_to_re(glob, word_boundary):
             return re.compile(r, flags=re.IGNORECASE)
     elif word_boundary:
         r = re.escape(glob)
-        r = r"\b%s\b" % (r,)
+        r = _re_word_boundary(r)
 
         return re.compile(r, flags=re.IGNORECASE)
     else:
         r = "^" + re.escape(glob) + "$"
         return re.compile(r, flags=re.IGNORECASE)
+
+
+def _re_word_boundary(r):
+    """
+    Adds word boundary characters to the start and end of an
+    expression to require that the match occur as a whole word,
+    but do so respecting the fact that strings starting or ending
+    with non-word characters will change word boundaries.
+    """
+    # we can't use \b as it chokes on unicode. however \W seems to be okay
+    # as shorthand for [^0-9A-Za-z_].
+    return r"(^|\W)%s(\W|$)" % (r,)
 
 
 def _flatten_dict(d, prefix=[], result=None):
