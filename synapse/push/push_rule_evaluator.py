@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 GLOB_REGEX = re.compile(r'\\\[(\\\!|)(.*)\\\]')
 IS_GLOB = re.compile(r'[\?\*\[\]]')
 INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
+STARTS_WITH_WORD_CHAR_REGEX = re.compile(r"^\w")
+ENDS_WITH_WORD_CHAR_REGEX = re.compile(r"\w$")
 
 
 def _room_member_count(ev, condition, room_member_count):
@@ -183,7 +185,7 @@ def _glob_to_re(glob, word_boundary):
             r,
         )
         if word_boundary:
-            r = r"\b%s\b" % (r,)
+            r = _re_word_boundary(r)
 
             return re.compile(r, flags=re.IGNORECASE)
         else:
@@ -192,12 +194,29 @@ def _glob_to_re(glob, word_boundary):
             return re.compile(r, flags=re.IGNORECASE)
     elif word_boundary:
         r = re.escape(glob)
-        r = r"\b%s\b" % (r,)
+        r = _re_word_boundary(r)
 
         return re.compile(r, flags=re.IGNORECASE)
     else:
         r = "^" + re.escape(glob) + "$"
         return re.compile(r, flags=re.IGNORECASE)
+
+def _re_word_boundary(r):
+    """
+    Adds word boundary characters to the start and end of an
+    expression to require that the match occur as a whole word,
+    but do so respecting the fact that strings starting or ending
+    with non-word characters will change word boundaries.
+    """
+    # Matching a regex string aginst a regex, since by definition
+    # \b is the boundary between a \w and a \W, so match \w at the
+    # start or end of the expression (although this will miss, eg.
+    # "[dl]og")
+    if STARTS_WITH_WORD_CHAR_REGEX.search(r):
+        r = r"\b%s" % (r,)
+    if ENDS_WITH_WORD_CHAR_REGEX.search(r):
+        r = r"%s\b" % (r,)
+    return r
 
 
 def _flatten_dict(d, prefix=[], result=None):
