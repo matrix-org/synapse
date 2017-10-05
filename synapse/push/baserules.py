@@ -240,7 +240,7 @@ BASE_APPEND_OVERRIDE_RULES = [
         ]
     },
     {
-        'rule_id': 'global/underride/.m.rule.channelnotif',
+        'rule_id': 'global/override/.m.rule.channelnotif',
         'conditions': [
             {
                 'kind': 'event_match',
