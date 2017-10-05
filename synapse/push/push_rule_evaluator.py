@@ -32,8 +32,10 @@ INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 def _room_member_count(ev, condition, room_member_count):
     return _test_ineq_condition(condition, room_member_count)
 
+
 def _sender_power_level(ev, condition, power_level):
     return _test_ineq_condition(condition, power_level)
+
 
 def _test_ineq_condition(condition, number):
     if 'is' not in condition:
@@ -59,6 +61,7 @@ def _test_ineq_condition(condition, number):
         return number <= rhs
     else:
         return False
+
 
 def tweaks_for_actions(actions):
     tweaks = {}
