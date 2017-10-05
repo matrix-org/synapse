@@ -19,6 +19,7 @@ from twisted.internet import defer
 
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
+from synapse.event_auth import get_user_power_level
 from synapse.api.constants import EventTypes, Membership
 from synapse.metrics import get_metrics_for
 from synapse.util.caches import metrics as cache_metrics
@@ -59,6 +60,7 @@ class BulkPushRuleEvaluator(object):
     def __init__(self, hs):
         self.hs = hs
         self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
 
         self.room_push_rule_cache_metrics = cache_metrics.register_cache(
             "cache",
@@ -109,6 +111,17 @@ class BulkPushRuleEvaluator(object):
         )
 
     @defer.inlineCallbacks
+    def _get_sender_power_level(self, event, context):
+        auth_events_ids = yield self.auth.compute_auth_events(
+            event, context.prev_state_ids, for_verification=False,
+        )
+        auth_events = yield self.store.get_events(auth_events_ids)
+        auth_events = {
+            (e.type, e.state_key): e for e in auth_events.values()
+        }
+        defer.returnValue(get_user_power_level(event.sender, auth_events))
+
+    @defer.inlineCallbacks
     def action_for_event_by_user(self, event, context):
         """Given an event and context, evaluate the push rules and return
         the results
@@ -123,7 +136,11 @@ class BulkPushRuleEvaluator(object):
             event, context
         )
 
-        evaluator = PushRuleEvaluatorForEvent(event, len(room_members))
+        sender_power_level = yield self._get_sender_power_level(event, context)
+
+        evaluator = PushRuleEvaluatorForEvent(
+            event, len(room_members), sender_power_level
+        )
 
         condition_cache = {}
 

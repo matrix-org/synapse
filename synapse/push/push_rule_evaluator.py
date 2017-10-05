@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2015 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,6 +30,12 @@ INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
 
 def _room_member_count(ev, condition, room_member_count):
+    return _test_ineq_condition(condition, room_member_count)
+
+def _sender_power_level(ev, condition, power_level):
+    return _test_ineq_condition(condition, power_level)
+
+def _test_ineq_condition(condition, number):
     if 'is' not in condition:
         return False
     m = INEQUALITY_EXPR.match(condition['is'])
@@ -41,18 +48,17 @@ def _room_member_count(ev, condition, room_member_count):
     rhs = int(rhs)
 
     if ineq == '' or ineq == '==':
-        return room_member_count == rhs
+        return number == rhs
     elif ineq == '<':
-        return room_member_count < rhs
+        return number < rhs
     elif ineq == '>':
-        return room_member_count > rhs
+        return number > rhs
     elif ineq == '>=':
-        return room_member_count >= rhs
+        return number >= rhs
     elif ineq == '<=':
-        return room_member_count <= rhs
+        return number <= rhs
     else:
         return False
-
 
 def tweaks_for_actions(actions):
     tweaks = {}
@@ -65,9 +71,10 @@ def tweaks_for_actions(actions):
 
 
 class PushRuleEvaluatorForEvent(object):
-    def __init__(self, event, room_member_count):
+    def __init__(self, event, room_member_count, sender_power_level):
         self._event = event
         self._room_member_count = room_member_count
+        self._sender_power_level = sender_power_level
 
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
@@ -80,6 +87,10 @@ class PushRuleEvaluatorForEvent(object):
         elif condition['kind'] == 'room_member_count':
             return _room_member_count(
                 self._event, condition, self._room_member_count
+            )
+        elif condition['kind'] == 'sender_power_level':
+            return _sender_power_level(
+                self._event, condition, self._sender_power_level
             )
         else:
             return True
