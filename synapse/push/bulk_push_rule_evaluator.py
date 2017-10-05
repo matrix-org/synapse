@@ -112,11 +112,11 @@ class BulkPushRuleEvaluator(object):
 
     @defer.inlineCallbacks
     def _get_sender_power_level(self, event, context):
-        pl_event_key = (EventTypes.PowerLevels, "", )
-        if pl_event_key in context.prev_state_ids:
+        pl_event_id = context.prev_state_ids.get((EventTypes.PowerLevels, "",))
+        if pl_event_id:
             # fastpath: if there's a power level event, that's all we need, and
             # not having a power level event is an extreme edge case
-            auth_events_ids = [context.prev_state_ids[pl_event_key]]
+            auth_events_ids = [pl_event_id]
         else:
             auth_events_ids = yield self.auth.compute_auth_events(
                 event, context.prev_state_ids, for_verification=False,
