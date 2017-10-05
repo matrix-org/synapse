@@ -26,8 +26,6 @@ logger = logging.getLogger(__name__)
 GLOB_REGEX = re.compile(r'\\\[(\\\!|)(.*)\\\]')
 IS_GLOB = re.compile(r'[\?\*\[\]]')
 INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
-STARTS_WITH_WORD_CHAR_REGEX = re.compile(r"^\w")
-ENDS_WITH_WORD_CHAR_REGEX = re.compile(r"\w$")
 
 
 def _room_member_count(ev, condition, room_member_count):
@@ -209,15 +207,9 @@ def _re_word_boundary(r):
     but do so respecting the fact that strings starting or ending
     with non-word characters will change word boundaries.
     """
-    # Matching a regex string aginst a regex, since by definition
-    # \b is the boundary between a \w and a \W, so match \w at the
-    # start or end of the expression (although this will miss, eg.
-    # "[dl]og")
-    if STARTS_WITH_WORD_CHAR_REGEX.search(r):
-        r = r"\b%s" % (r,)
-    if ENDS_WITH_WORD_CHAR_REGEX.search(r):
-        r = r"%s\b" % (r,)
-    return r
+    # we can't use \b as it chokes on unicode. however \W seems to be okay
+    # as shorthand for [^0-9A-Za-z_].
+    return r"(^|\W)%s(\W|$)" % (r,)
 
 
 def _flatten_dict(d, prefix=[], result=None):
