@@ -240,18 +240,18 @@ BASE_APPEND_OVERRIDE_RULES = [
         ]
     },
     {
-        'rule_id': 'global/override/.m.rule.channelnotif',
+        'rule_id': 'global/override/.m.rule.roomnotif',
         'conditions': [
             {
                 'kind': 'event_match',
                 'key': 'content.body',
-                'pattern': '*@channel*',
-                '_id': '_channelnotif_content',
+                'pattern': '*@room*',
+                '_id': '_roomnotif_content',
             },
             {
                 'kind': 'sender_power_level',
                 'is': '>=50',
-                '_id': '_channelnotif_pl',
+                '_id': '_roomnotif_pl',
             },
         ],
         'actions': [
