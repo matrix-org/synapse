@@ -201,6 +201,7 @@ def _glob_to_re(glob, word_boundary):
         r = "^" + re.escape(glob) + "$"
         return re.compile(r, flags=re.IGNORECASE)
 
+
 def _re_word_boundary(r):
     """
     Adds word boundary characters to the start and end of an
