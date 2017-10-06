@@ -19,7 +19,7 @@ from twisted.internet import defer, reactor
 from .logcontext import (
     PreserveLoggingContext, preserve_fn, preserve_context_over_deferred,
 )
-from synapse.util import unwrapFirstError
+from synapse.util import logcontext, unwrapFirstError
 
 from contextlib import contextmanager
 
@@ -155,7 +155,7 @@ def concurrently_execute(func, args, limit):
         except StopIteration:
             pass
 
-    return preserve_context_over_deferred(defer.gatherResults([
+    return logcontext.make_deferred_yieldable(defer.gatherResults([
         preserve_fn(_concurrently_execute_inner)()
         for _ in xrange(limit)
     ], consumeErrors=True)).addErrback(unwrapFirstError)
