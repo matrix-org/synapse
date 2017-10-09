@@ -20,7 +20,7 @@ import logging
 import re
 import time
 
-ACCESS_TOKEN_RE = re.compile(r'(\?.*access(_|%5[Ff])token=)[^&]*(.*)$')
+ACCESS_TOKEN_RE = re.compile(r'(\?\S*?access(_|%5[Ff])token=).*?(&|\s|$)')
 
 
 class SynapseRequest(Request):
