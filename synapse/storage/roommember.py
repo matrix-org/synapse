@@ -542,7 +542,8 @@ class RoomMemberStore(SQLBaseStore):
             host (str)
 
         Returns:
-            bool: whether the host is/was in the room or not
+            Deferred: Resolves to True if the host is/was in the room, otherwise
+            False.
         """
         if '%' in host or '_' in host:
             raise Exception("Invalid host name")
