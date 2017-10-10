@@ -131,7 +131,9 @@ class BulkPushRuleEvaluator(object):
 
         sender_level = get_user_power_level(event.sender, auth_events)
 
-        defer.returnValue((auth_events[POWER_KEY].content, sender_level))
+        pl_event = auth_events.get(POWER_KEY)
+
+        defer.returnValue((pl_event.content if pl_event else {}, sender_level))
 
     @defer.inlineCallbacks
     def action_for_event_by_user(self, event, context):
