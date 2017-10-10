@@ -45,3 +45,69 @@ class SpamChecker(object):
             return False
 
         return self.spam_checker.check_event_for_spam(event)
+
+    def user_may_invite(self, inviter_userid, invitee_userid, room_id):
+        """Checks if a given user may send an invite
+
+        If this method returns false, the invite will be rejected.
+
+        Args:
+            userid (string): The sender's user ID
+
+        Returns:
+            bool: True if the user may send an invite, otherwise False
+        """
+        if self.spam_checker is None:
+            return True
+
+        return self.spam_checker.user_may_invite(inviter_userid, invitee_userid, room_id)
+
+    def user_may_create_room(self, userid):
+        """Checks if a given user may create a room
+
+        If this method returns false, the creation request will be rejected.
+
+        Args:
+            userid (string): The sender's user ID
+
+        Returns:
+            bool: True if the user may create a room, otherwise False
+        """
+        if self.spam_checker is None:
+            return True
+
+        return self.spam_checker.user_may_create_room(userid)
+
+    def user_may_create_room_alias(self, userid, room_alias):
+        """Checks if a given user may create a room alias
+
+        If this method returns false, the association request will be rejected.
+
+        Args:
+            userid (string): The sender's user ID
+            room_alias (string): The alias to be created
+
+        Returns:
+            bool: True if the user may create a room alias, otherwise False
+        """
+        if self.spam_checker is None:
+            return True
+
+        return self.spam_checker.user_may_create_room_alias(userid, room_alias)
+
+    def user_may_publish_room(self, userid, room_id):
+        """Checks if a given user may publish a room to the directory
+
+        If this method returns false, the publish request will be rejected.
+
+        Args:
+            userid (string): The sender's user ID
+            room_id (string): The ID of the room that would be published
+
+        Returns:
+            bool: True if the user may publish the room, otherwise False
+        """
+        if self.spam_checker is None:
+            return True
+
+        return self.spam_checker.user_may_publish_room(userid, room_id)

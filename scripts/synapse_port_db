@@ -376,10 +376,13 @@ class Porter(object):
                         " VALUES (?,?,?,?,to_tsvector('english', ?),?,?)"
                     )
 
-                    rows_dict = [
-                        dict(zip(headers, row))
-                        for row in rows
-                    ]
+                    rows_dict = []
+                    for row in rows:
+                        d = dict(zip(headers, row))
+                        if "\0" in d['value']:
+                            logger.warn('dropping search row %s', d)
+                        else:
+                            rows_dict.append(d)
 
                     txn.executemany(sql, [
                         (

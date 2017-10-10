@@ -25,6 +25,7 @@ from synapse.api.urls import CONTENT_REPO_PREFIX, FEDERATION_PREFIX, \
     LEGACY_MEDIA_PREFIX, MEDIA_PREFIX, SERVER_KEY_PREFIX, SERVER_KEY_V2_PREFIX, \
     STATIC_PREFIX, WEB_CLIENT_PREFIX
 from synapse.app import _base
+from synapse.app._base import quit_with_error
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
@@ -247,16 +248,6 @@ class SynapseHomeServer(HomeServer):
         if run_new_connection:
             self.database_engine.on_new_connection(db_conn)
         return db_conn
-
-
-def quit_with_error(error_string):
-    message_lines = error_string.split("\n")
-    line_length = max([len(l) for l in message_lines if len(l) < 80]) + 2
-    sys.stderr.write("*" * line_length + '\n')
-    for line in message_lines:
-        sys.stderr.write(" %s\n" % (line.rstrip(),))
-    sys.stderr.write("*" * line_length + '\n')
-    sys.exit(1)
 
 
 def setup(config_options):

@@ -288,6 +288,9 @@ class StateHandler(object):
         """
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
+        # map from state group id to the state in that state group (where
+        # 'state' is a map from state key to event id)
+        # dict[int, dict[(str, str), str]]
         state_groups_ids = yield self.store.get_state_groups_ids(
             room_id, event_ids
         )
@@ -320,11 +323,15 @@ class StateHandler(object):
                 "Resolving state for %s with %d groups", room_id, len(state_groups_ids)
             )
 
+            # build a map from state key to the event_ids which set that state.
+            # dict[(str, str), set[str])
             state = {}
             for st in state_groups_ids.values():
                 for key, e_id in st.items():
                     state.setdefault(key, set()).add(e_id)
 
+            # build a map from state key to the event_ids which set that state,
+            # including only those where there are state keys in conflict.
             conflicted_state = {
                 k: list(v)
                 for k, v in state.items()
@@ -494,8 +501,14 @@ def _resolve_with_state_fac(unconflicted_state, conflicted_state,
 
     logger.info("Asking for %d conflicted events", len(needed_events))
 
+    # dict[str, FrozenEvent]: a map from state event id to event. Only includes
+    # the state events which are in conflict.
     state_map = yield state_map_factory(needed_events)
 
+    # get the ids of the auth events which allow us to authenticate the
+    # conflicted state, picking only from the unconflicting state.
+    #
+    # dict[(str, str), str]: a map from state key to event id
     auth_events = _create_auth_events_from_maps(
         unconflicted_state, conflicted_state, state_map
     )
