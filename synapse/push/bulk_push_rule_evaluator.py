@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015 OpenMarket Ltd
+# Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +26,7 @@ from synapse.metrics import get_metrics_for
 from synapse.util.caches import metrics as cache_metrics
 from synapse.util.caches.descriptors import cached
 from synapse.util.async import Linearizer
+from synapse.state import POWER_KEY
 
 from collections import namedtuple
 
@@ -112,13 +114,12 @@ class BulkPushRuleEvaluator(object):
 
     @defer.inlineCallbacks
     def _get_sender_power_level(self, event, context):
-        pl_event_key = (EventTypes.PowerLevels, "", )
-        pl_event_id = context.prev_state_ids.get(pl_event_key)
+        pl_event_id = context.prev_state_ids.get(POWER_KEY)
         if pl_event_id:
             # fastpath: if there's a power level event, that's all we need, and
             # not having a power level event is an extreme edge case
             pl_event = yield self.store.get_event(pl_event_id)
-            auth_events = { pl_event_key: pl_event }
+            auth_events = { POWER_KEY: pl_event }
         else:
             auth_events_ids = yield self.auth.compute_auth_events(
                 event, context.prev_state_ids, for_verification=False,
