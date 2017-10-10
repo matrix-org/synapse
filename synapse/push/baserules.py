@@ -249,8 +249,8 @@ BASE_APPEND_OVERRIDE_RULES = [
                 '_id': '_roomnotif_content',
             },
             {
-                'kind': 'sender_power_level',
-                'is': '>=50',
+                'kind': 'sender_notification_permission',
+                'key': 'room',
                 '_id': '_roomnotif_pl',
             },
         ],
