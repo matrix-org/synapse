@@ -184,7 +184,6 @@ class RoomMemberHandler(BaseHandler):
             ratelimit=True,
             content=None,
     ):
-        content_specified = bool(content)
         if content is None:
             content = {}
 
@@ -283,8 +282,9 @@ class RoomMemberHandler(BaseHandler):
                 content["membership"] = Membership.JOIN
 
                 profile = self.hs.get_handlers().profile_handler
-                if not content_specified:
+                if content.get("displayname") is None:
                     content["displayname"] = yield profile.get_displayname(target)
+                if content.get("avatar_url") is None:
                     content["avatar_url"] = yield profile.get_avatar_url(target)
 
                 if requester.is_guest:

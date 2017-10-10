@@ -15,9 +15,8 @@
 
 import logging
 
+from synapse.api.constants import EventTypes
 from twisted.internet import defer
-
-import synapse.types
 from synapse.api.errors import SynapseError, AuthError, CodeMessageException
 from synapse.types import UserID
 from ._base import BaseHandler
@@ -78,11 +77,13 @@ class ProfileHandler(BaseHandler):
         if new_displayname == '':
             new_displayname = None
 
+        old_profile = yield self.store.get_profile(target_user.localpart)
+
         yield self.store.set_profile_displayname(
             target_user.localpart, new_displayname
         )
 
-        yield self._update_join_states(requester)
+        yield self._update_join_states(requester, old_profile)
 
     @defer.inlineCallbacks
     def get_avatar_url(self, target_user):
@@ -122,11 +123,13 @@ class ProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
 
+        old_profile = yield self.store.get_profile(target_user.localpart)
+
         yield self.store.set_profile_avatar_url(
             target_user.localpart, new_avatar_url
         )
 
-        yield self._update_join_states(requester)
+        yield self._update_join_states(requester, old_profile)
 
     @defer.inlineCallbacks
     def on_profile_query(self, args):
@@ -137,21 +140,23 @@ class ProfileHandler(BaseHandler):
         just_field = args.get("field", None)
 
         response = {}
-
-        if just_field is None or just_field == "displayname":
+        if just_field == "displayname":
             response["displayname"] = yield self.store.get_profile_displayname(
                 user.localpart
             )
-
-        if just_field is None or just_field == "avatar_url":
+        elif just_field == "avatar_url":
             response["avatar_url"] = yield self.store.get_profile_avatar_url(
+                user.localpart
+            )
+        else:
+            response = yield self.store.get_profile(
                 user.localpart
             )
 
         defer.returnValue(response)
 
     @defer.inlineCallbacks
-    def _update_join_states(self, requester):
+    def _update_join_states(self, requester, old_profile):
         user = requester.user
         if not self.hs.is_mine(user):
             return
@@ -164,18 +169,33 @@ class ProfileHandler(BaseHandler):
 
         for room_id in room_ids:
             handler = self.hs.get_handlers().room_member_handler
+            member_event = yield self.hs.get_handlers().state_handler.get_current_state(
+                room_id=room_id,
+                event_type=EventTypes.Member,
+                state_key=user.to_string()
+            )
+            # This will be populated by update_membership for missing values.
+            content = {}
+            logger.info("Setting member event for " + room_id)
+            if member_event:
+                member_content = member_event.content
+                # Don't overwrite custom changes to displayname or avatar_url
+                if member_content.get("displayname") != old_profile.get("displayname"):
+                    logger.debug("Ignoring displayname for '%s'", user.to_string())
+                    content["displayname"] = member_content.get("displayname")
+                if member_content.get("avatar_url") != old_profile.get("avatar_url"):
+                    logger.debug("Ignoring avatar_url, for '%s'", user.to_string())
+                    content["avatar_url"] = member_content.get("avatar_url")
             try:
                 # Assume the user isn't a guest because we don't let guests set
                 # profile or avatar data.
-                # XXX why are we recreating `requester` here for each room?
-                # what was wrong with the `requester` we were passed?
-                requester = synapse.types.create_requester(user)
                 yield handler.update_membership(
                     requester,
                     user,
                     room_id,
                     "join",  # We treat a profile update like a join.
                     ratelimit=False,  # Try to hide that these events aren't atomic.
+                    content=content,
                 )
             except Exception as e:
                 logger.warn(
