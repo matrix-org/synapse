@@ -119,7 +119,7 @@ class BulkPushRuleEvaluator(object):
             # fastpath: if there's a power level event, that's all we need, and
             # not having a power level event is an extreme edge case
             pl_event = yield self.store.get_event(pl_event_id)
-            auth_events = { POWER_KEY: pl_event }
+            auth_events = {POWER_KEY: pl_event}
         else:
             auth_events_ids = yield self.auth.compute_auth_events(
                 event, context.prev_state_ids, for_verification=False,
@@ -150,7 +150,9 @@ class BulkPushRuleEvaluator(object):
             event, context
         )
 
-        (power_levels, sender_power_level) = yield self._get_power_levels_and_sender_level(event, context)
+        (power_levels, sender_power_level) = (
+            yield self._get_power_levels_and_sender_level(event, context)
+        )
 
         evaluator = PushRuleEvaluatorForEvent(
             event, len(room_members), sender_power_level, power_levels,

@@ -41,7 +41,7 @@ def _sender_notification_permission(ev, condition, sender_power_level, power_lev
     notif_levels = power_levels.get('notifications', {})
     room_notif_level = notif_levels.get(notif_level_key, 50)
 
-    return sender_power_level >= room_notif_level;
+    return sender_power_level >= room_notif_level
 
 
 def _test_ineq_condition(condition, number):
