@@ -112,19 +112,22 @@ class BulkPushRuleEvaluator(object):
 
     @defer.inlineCallbacks
     def _get_sender_power_level(self, event, context):
-        pl_event_id = context.prev_state_ids.get((EventTypes.PowerLevels, "",))
+        pl_event_key = (EventTypes.PowerLevels, "", )
+        pl_event_id = context.prev_state_ids.get(pl_event_key)
         if pl_event_id:
             # fastpath: if there's a power level event, that's all we need, and
             # not having a power level event is an extreme edge case
-            auth_events_ids = [pl_event_id]
+            pl_event = yield self.store.get_event(pl_event_id)
+            auth_events = { pl_event_key: pl_event }
         else:
             auth_events_ids = yield self.auth.compute_auth_events(
                 event, context.prev_state_ids, for_verification=False,
             )
-        auth_events = yield self.store.get_events(auth_events_ids)
-        auth_events = {
-            (e.type, e.state_key): e for e in auth_events.values()
-        }
+            auth_events = yield self.store.get_events(auth_events_ids)
+            auth_events = {
+                (e.type, e.state_key): e for e in auth_events.itervalues()
+            }
+
         defer.returnValue(get_user_power_level(event.sender, auth_events))
 
     @defer.inlineCallbacks
