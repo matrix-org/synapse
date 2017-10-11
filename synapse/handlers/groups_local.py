@@ -109,7 +109,7 @@ class GroupsLocalHandler(object):
             valid_users = []
             for entry in chunk:
                 g_user_id = entry["user_id"]
-                attestation = entry.pop("attestation")
+                attestation = entry.pop("attestation", {})
                 try:
                     if get_domain_from_id(g_user_id) != group_server_name:
                         yield self.attestations.verify_attestation(
@@ -202,7 +202,7 @@ class GroupsLocalHandler(object):
         valid_entries = []
         for entry in chunk:
             g_user_id = entry["user_id"]
-            attestation = entry.pop("attestation")
+            attestation = entry.pop("attestation", {})
             try:
                 if get_domain_from_id(g_user_id) != group_server_name:
                     yield self.attestations.verify_attestation(
