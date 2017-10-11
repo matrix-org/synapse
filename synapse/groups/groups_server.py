@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.types import UserID, get_domain_from_id
+from synapse.types import UserID, get_domain_from_id, RoomID
 
 
 import logging
@@ -159,6 +159,8 @@ class GroupsServerHandler(object):
         """Add/update a room to the group summary
         """
         yield self.check_group_is_ours(group_id, and_exists=True, and_is_admin=user_id)
+
+        RoomID.from_string(room_id)  # Ensure valid room id
 
         order = content.get("order", None)
 
@@ -463,6 +465,8 @@ class GroupsServerHandler(object):
     def add_room_to_group(self, group_id, requester_user_id, room_id, content):
         """Add room to group
         """
+        RoomID.from_string(room_id)  # Ensure valid room id
+
         yield self.check_group_is_ours(
             group_id, and_exists=True, and_is_admin=requester_user_id
         )
