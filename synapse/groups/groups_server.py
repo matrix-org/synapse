@@ -400,7 +400,7 @@ class GroupsServerHandler(object):
             if not is_public:
                 entry["is_public"] = False
 
-            if not self.is_mine_id(requester_user_id):
+            if not self.is_mine_id(g_user_id):
                 attestation = yield self.store.get_remote_attestation(group_id, g_user_id)
                 if not attestation:
                     continue

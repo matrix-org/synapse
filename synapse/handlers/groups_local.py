@@ -102,6 +102,8 @@ class GroupsLocalHandler(object):
                 get_domain_from_id(group_id), group_id, requester_user_id,
             )
 
+            group_server_name = get_domain_from_id(group_id)
+
             # Loop through the users and validate the attestations.
             chunk = res["users_section"]["users"]
             valid_users = []
@@ -109,11 +111,13 @@ class GroupsLocalHandler(object):
                 g_user_id = entry["user_id"]
                 attestation = entry.pop("attestation")
                 try:
-                    yield self.attestations.verify_attestation(
-                        attestation,
-                        group_id=group_id,
-                        user_id=g_user_id,
-                    )
+                    if get_domain_from_id(g_user_id) != group_server_name:
+                        yield self.attestations.verify_attestation(
+                            attestation,
+                            group_id=group_id,
+                            user_id=g_user_id,
+                            server_name=get_domain_from_id(g_user_id),
+                        )
                     valid_users.append(entry)
                 except Exception as e:
                     logger.info("Failed to verify user is in group: %s", e)
@@ -160,6 +164,7 @@ class GroupsLocalHandler(object):
                 remote_attestation,
                 group_id=group_id,
                 user_id=user_id,
+                server_name=get_domain_from_id(group_id),
             )
 
         is_publicised = content.get("publicise", False)
@@ -187,6 +192,8 @@ class GroupsLocalHandler(object):
             )
             defer.returnValue(res)
 
+        group_server_name = get_domain_from_id(group_id)
+
         res = yield self.transport_client.get_users_in_group(
             get_domain_from_id(group_id), group_id, requester_user_id,
         )
@@ -197,11 +204,13 @@ class GroupsLocalHandler(object):
             g_user_id = entry["user_id"]
             attestation = entry.pop("attestation")
             try:
-                yield self.attestations.verify_attestation(
-                    attestation,
-                    group_id=group_id,
-                    user_id=g_user_id,
-                )
+                if get_domain_from_id(g_user_id) != group_server_name:
+                    yield self.attestations.verify_attestation(
+                        attestation,
+                        group_id=group_id,
+                        user_id=g_user_id,
+                        server_name=get_domain_from_id(g_user_id),
+                    )
                 valid_entries.append(entry)
             except Exception as e:
                 logger.info("Failed to verify user is in group: %s", e)
@@ -240,6 +249,7 @@ class GroupsLocalHandler(object):
                 remote_attestation,
                 group_id=group_id,
                 user_id=user_id,
+                server_name=get_domain_from_id(group_id),
             )
 
         # TODO: Check that the group is public and we're being added publically
