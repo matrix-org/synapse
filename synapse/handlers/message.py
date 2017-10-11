@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
+# Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -325,9 +326,12 @@ class MessageHandler(BaseHandler):
             txn_id=txn_id
         )
 
-        if self.spam_checker.check_event_for_spam(event):
+        spam_error = self.spam_checker.check_event_for_spam(event)
+        if spam_error:
+            if not isinstance(spam_error, (str, basestring)):
+                spam_error = "Spam is not permitted here"
             raise SynapseError(
-                403, "Spam is not permitted here", Codes.FORBIDDEN
+                403, spam_error, Codes.FORBIDDEN
             )
 
         yield self.send_nonmember_event(
