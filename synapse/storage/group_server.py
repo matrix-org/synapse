@@ -1172,13 +1172,13 @@ class GroupServerStore(SQLBaseStore):
                 LIMIT ?
             """
             txn.execute(sql, (from_token, to_token, limit,))
-            return [{
-                "stream_id": stream_id,
-                "group_id": group_id,
-                "user_id": user_id,
-                "type": gtype,
-                "content": json.loads(content_json),
-            } for stream_id, group_id, user_id, gtype, content_json in txn]
+            return [(
+                stream_id,
+                group_id,
+                user_id,
+                gtype,
+                json.loads(content_json),
+             ) for stream_id, group_id, user_id, gtype, content_json in txn]
         return self.runInteraction(
             "get_all_groups_changes", _get_all_groups_changes_txn,
         )
