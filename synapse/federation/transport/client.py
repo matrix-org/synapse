@@ -572,7 +572,7 @@ class TransportLayerClient(object):
         return self.client.post_json(
             destination=destination,
             path=path,
-            args=requester_user_id,
+            args={"requester_user_id": requester_user_id},
             data=content,
             ignore_backoff=True,
         )
