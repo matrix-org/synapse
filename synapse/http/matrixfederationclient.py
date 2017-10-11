@@ -344,7 +344,7 @@ class MatrixFederationHttpClient(object):
 
     @defer.inlineCallbacks
     def post_json(self, destination, path, data={}, long_retries=False,
-                  timeout=None, ignore_backoff=False):
+                  timeout=None, ignore_backoff=False, args={}):
         """ Sends the specifed json data using POST
 
         Args:
@@ -380,6 +380,7 @@ class MatrixFederationHttpClient(object):
             destination,
             "POST",
             path,
+            query_bytes=encode_query_args(args),
             body_callback=body_callback,
             headers_dict={"Content-Type": ["application/json"]},
             long_retries=long_retries,
@@ -424,13 +425,6 @@ class MatrixFederationHttpClient(object):
         """
         logger.debug("get_json args: %s", args)
 
-        encoded_args = {}
-        for k, vs in args.items():
-            if isinstance(vs, basestring):
-                vs = [vs]
-            encoded_args[k] = [v.encode("UTF-8") for v in vs]
-
-        query_bytes = urllib.urlencode(encoded_args, True)
         logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
 
         def body_callback(method, url_bytes, headers_dict):
@@ -441,9 +435,55 @@ class MatrixFederationHttpClient(object):
             destination,
             "GET",
             path,
-            query_bytes=query_bytes,
+            query_bytes=encode_query_args(args),
             body_callback=body_callback,
             retry_on_dns_fail=retry_on_dns_fail,
+            timeout=timeout,
+            ignore_backoff=ignore_backoff,
+        )
+
+        if 200 <= response.code < 300:
+            # We need to update the transactions table to say it was sent?
+            check_content_type_is_json(response.headers)
+
+        with logcontext.PreserveLoggingContext():
+            body = yield readBody(response)
+
+        defer.returnValue(json.loads(body))
+
+    @defer.inlineCallbacks
+    def delete_json(self, destination, path, long_retries=False,
+                    timeout=None, ignore_backoff=False, args={}):
+        """Send a DELETE request to the remote expecting some json response
+
+        Args:
+            destination (str): The remote server to send the HTTP request
+                to.
+            path (str): The HTTP path.
+            long_retries (bool): A boolean that indicates whether we should
+                retry for a short or long time.
+            timeout(int): How long to try (in ms) the destination for before
+                giving up. None indicates no timeout.
+            ignore_backoff (bool): true to ignore the historical backoff data and
+                try the request anyway.
+        Returns:
+            Deferred: Succeeds when we get a 2xx HTTP response. The result
+            will be the decoded JSON body.
+
+            Fails with ``HTTPRequestException`` if we get an HTTP response
+            code >= 300.
+
+            Fails with ``NotRetryingDestination`` if we are not yet ready
+            to retry this server.
+        """
+
+        response = yield self._request(
+            destination,
+            "DELETE",
+            path,
+            query_bytes=encode_query_args(args),
+            headers_dict={"Content-Type": ["application/json"]},
+            long_retries=long_retries,
             timeout=timeout,
             ignore_backoff=ignore_backoff,
         )
@@ -609,3 +649,15 @@ def check_content_type_is_json(headers):
         raise RuntimeError(
             "Content-Type not application/json: was '%s'" % c_type
         )
+
+
+def encode_query_args(args):
+    encoded_args = {}
+    for k, vs in args.items():
+        if isinstance(vs, basestring):
+            vs = [vs]
+        encoded_args[k] = [v.encode("UTF-8") for v in vs]
+
+    query_bytes = urllib.urlencode(encoded_args, True)
+
+    return query_bytes

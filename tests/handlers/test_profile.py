@@ -62,8 +62,6 @@ class ProfileTestCase(unittest.TestCase):
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
 
-        hs.handlers = ProfileHandlers(hs)
-
         self.store = hs.get_datastore()
 
         self.frank = UserID.from_string("@1234ABCD:test")
@@ -72,7 +70,7 @@ class ProfileTestCase(unittest.TestCase):
 
         yield self.store.create_profile(self.frank.localpart)
 
-        self.handler = hs.get_handlers().profile_handler
+        self.handler = hs.get_profile_handler()
 
     @defer.inlineCallbacks
     def test_get_my_name(self):

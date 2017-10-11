@@ -145,7 +145,9 @@ def wrap_request_handler(request_handler, include_metrics=False):
                                 "error": "Internal server error",
                                 "errcode": Codes.UNKNOWN,
                             },
-                            send_cors=True
+                            send_cors=True,
+                            pretty_print=_request_user_agent_is_curl(request),
+                            version_string=self.version_string,
                         )
                     finally:
                         try:

@@ -25,6 +25,7 @@ from synapse.types import (
 from synapse.util.async import run_on_reactor, ReadWriteLock, Limiter
 from synapse.util.logcontext import preserve_fn
 from synapse.util.metrics import measure_func
+from synapse.util.frozenutils import unfreeze
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -46,6 +47,7 @@ class MessageHandler(BaseHandler):
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
         self.validator = EventValidator()
+        self.profile_handler = hs.get_profile_handler()
 
         self.pagination_lock = ReadWriteLock()
 
@@ -211,7 +213,7 @@ class MessageHandler(BaseHandler):
 
                 if membership in {Membership.JOIN, Membership.INVITE}:
                     # If event doesn't include a display name, add one.
-                    profile = self.hs.get_handlers().profile_handler
+                    profile = self.profile_handler
                     content = builder.content
 
                     try:
@@ -555,7 +557,7 @@ class MessageHandler(BaseHandler):
 
         # Ensure that we can round trip before trying to persist in db
         try:
-            dump = ujson.dumps(event.content)
+            dump = ujson.dumps(unfreeze(event.content))
             ujson.loads(dump)
         except:
             logger.exception("Failed to encode content: %r", event.content)

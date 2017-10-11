@@ -108,6 +108,17 @@ class InvitedSyncResult(collections.namedtuple("InvitedSyncResult", [
         return True
 
 
+class GroupsSyncResult(collections.namedtuple("GroupsSyncResult", [
+    "join",
+    "invite",
+    "leave",
+])):
+    __slots__ = []
+
+    def __nonzero__(self):
+        return bool(self.join or self.invite or self.leave)
+
+
 class DeviceLists(collections.namedtuple("DeviceLists", [
     "changed",   # list of user_ids whose devices may have changed
     "left",      # list of user_ids whose devices we no longer track
@@ -129,6 +140,7 @@ class SyncResult(collections.namedtuple("SyncResult", [
     "device_lists",  # List of user_ids whose devices have chanegd
     "device_one_time_keys_count",  # Dict of algorithm to count for one time keys
                                    # for this device
+    "groups",
 ])):
     __slots__ = []
 
@@ -144,7 +156,8 @@ class SyncResult(collections.namedtuple("SyncResult", [
             self.archived or
             self.account_data or
             self.to_device or
-            self.device_lists
+            self.device_lists or
+            self.groups
         )
 
 
@@ -595,6 +608,8 @@ class SyncHandler(object):
                 user_id, device_id
             )
 
+        yield self._generate_sync_entry_for_groups(sync_result_builder)
+
         defer.returnValue(SyncResult(
             presence=sync_result_builder.presence,
             account_data=sync_result_builder.account_data,
@@ -603,9 +618,56 @@ class SyncHandler(object):
             archived=sync_result_builder.archived,
             to_device=sync_result_builder.to_device,
             device_lists=device_lists,
+            groups=sync_result_builder.groups,
             device_one_time_keys_count=one_time_key_counts,
             next_batch=sync_result_builder.now_token,
         ))
+
+    @measure_func("_generate_sync_entry_for_groups")
+    @defer.inlineCallbacks
+    def _generate_sync_entry_for_groups(self, sync_result_builder):
+        user_id = sync_result_builder.sync_config.user.to_string()
+        since_token = sync_result_builder.since_token
+        now_token = sync_result_builder.now_token
+
+        if since_token and since_token.groups_key:
+            results = yield self.store.get_groups_changes_for_user(
+                user_id, since_token.groups_key, now_token.groups_key,
+            )
+        else:
+            results = yield self.store.get_all_groups_for_user(
+                user_id, now_token.groups_key,
+            )
+
+        invited = {}
+        joined = {}
+        left = {}
+        for result in results:
+            membership = result["membership"]
+            group_id = result["group_id"]
+            gtype = result["type"]
+            content = result["content"]
+
+            if membership == "join":
+                if gtype == "membership":
+                    # TODO: Add profile
+                    content.pop("membership", None)
+                    joined[group_id] = content["content"]
+                else:
+                    joined.setdefault(group_id, {})[gtype] = content
+            elif membership == "invite":
+                if gtype == "membership":
+                    content.pop("membership", None)
+                    invited[group_id] = content["content"]
+            else:
+                if gtype == "membership":
+                    left[group_id] = content["content"]
+
+        sync_result_builder.groups = GroupsSyncResult(
+            join=joined,
+            invite=invited,
+            leave=left,
+        )
 
     @measure_func("_generate_sync_entry_for_device_list")
     @defer.inlineCallbacks
@@ -1368,6 +1430,7 @@ class SyncResultBuilder(object):
         self.invited = []
         self.archived = []
         self.device = []
+        self.groups = None
         self.to_device = []
 
 

@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -238,6 +239,28 @@ BASE_APPEND_OVERRIDE_RULES = [
             }
         ]
     },
+    {
+        'rule_id': 'global/override/.m.rule.roomnotif',
+        'conditions': [
+            {
+                'kind': 'event_match',
+                'key': 'content.body',
+                'pattern': '*@room*',
+                '_id': '_roomnotif_content',
+            },
+            {
+                'kind': 'sender_notification_permission',
+                'key': 'room',
+                '_id': '_roomnotif_pl',
+            },
+        ],
+        'actions': [
+            'notify', {
+                'set_tweak': 'highlight',
+                'value': True,
+            }
+        ]
+    }
 ]
 
 

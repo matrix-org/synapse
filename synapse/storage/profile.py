@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
 from ._base import SQLBaseStore
 
 
@@ -55,3 +57,99 @@ class ProfileStore(SQLBaseStore):
             updatevalues={"avatar_url": new_avatar_url},
             desc="set_profile_avatar_url",
         )
+
+    def get_from_remote_profile_cache(self, user_id):
+        return self._simple_select_one(
+            table="remote_profile_cache",
+            keyvalues={"user_id": user_id},
+            retcols=("displayname", "avatar_url",),
+            allow_none=True,
+            desc="get_from_remote_profile_cache",
+        )
+
+    def add_remote_profile_cache(self, user_id, displayname, avatar_url):
+        """Ensure we are caching the remote user's profiles.
+
+        This should only be called when `is_subscribed_remote_profile_for_user`
+        would return true for the user.
+        """
+        return self._simple_upsert(
+            table="remote_profile_cache",
+            keyvalues={"user_id": user_id},
+            values={
+                "displayname": displayname,
+                "avatar_url": avatar_url,
+                "last_check": self._clock.time_msec(),
+            },
+            desc="add_remote_profile_cache",
+        )
+
+    def update_remote_profile_cache(self, user_id, displayname, avatar_url):
+        return self._simple_update(
+            table="remote_profile_cache",
+            keyvalues={"user_id": user_id},
+            values={
+                "displayname": displayname,
+                "avatar_url": avatar_url,
+                "last_check": self._clock.time_msec(),
+            },
+            desc="update_remote_profile_cache",
+        )
+
+    @defer.inlineCallbacks
+    def maybe_delete_remote_profile_cache(self, user_id):
+        """Check if we still care about the remote user's profile, and if we
+        don't then remove their profile from the cache
+        """
+        subscribed = yield self.is_subscribed_remote_profile_for_user(user_id)
+        if not subscribed:
+            yield self._simple_delete(
+                table="remote_profile_cache",
+                keyvalues={"user_id": user_id},
+                desc="delete_remote_profile_cache",
+            )
+
+    def get_remote_profile_cache_entries_that_expire(self, last_checked):
+        """Get all users who haven't been checked since `last_checked`
+        """
+        def _get_remote_profile_cache_entries_that_expire_txn(txn):
+            sql = """
+                SELECT user_id, displayname, avatar_url
+                FROM remote_profile_cache
+                WHERE last_check < ?
+            """
+
+            txn.execute(sql, (last_checked,))
+
+            return self.cursor_to_dict(txn)
+
+        return self.runInteraction(
+            "get_remote_profile_cache_entries_that_expire",
+            _get_remote_profile_cache_entries_that_expire_txn,
+        )
+
+    @defer.inlineCallbacks
+    def is_subscribed_remote_profile_for_user(self, user_id):
+        """Check whether we are interested in a remote user's profile.
+        """
+        res = yield self._simple_select_one_onecol(
+            table="group_users",
+            keyvalues={"user_id": user_id},
+            retcol="user_id",
+            allow_none=True,
+            desc="should_update_remote_profile_cache_for_user",
+        )
+
+        if res:
+            defer.returnValue(True)
+
+        res = yield self._simple_select_one_onecol(
+            table="group_invites",
+            keyvalues={"user_id": user_id},
+            retcol="user_id",
+            allow_none=True,
+            desc="should_update_remote_profile_cache_for_user",
+        )
+
+        if res:
+            defer.returnValue(True)

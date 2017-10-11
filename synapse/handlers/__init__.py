@@ -20,7 +20,6 @@ from .room import (
 from .room_member import RoomMemberHandler
 from .message import MessageHandler
 from .federation import FederationHandler
-from .profile import ProfileHandler
 from .directory import DirectoryHandler
 from .admin import AdminHandler
 from .identity import IdentityHandler
@@ -52,7 +51,6 @@ class Handlers(object):
         self.room_creation_handler = RoomCreationHandler(hs)
         self.room_member_handler = RoomMemberHandler(hs)
         self.federation_handler = FederationHandler(hs)
-        self.profile_handler = ProfileHandler(hs)
         self.directory_handler = DirectoryHandler(hs)
         self.admin_handler = AdminHandler(hs)
         self.identity_handler = IdentityHandler(hs)
