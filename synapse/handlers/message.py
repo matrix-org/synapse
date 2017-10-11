@@ -328,7 +328,7 @@ class MessageHandler(BaseHandler):
 
         spam_error = self.spam_checker.check_event_for_spam(event)
         if spam_error:
-            if not isinstance(spam_error, (str, basestring)):
+            if not isinstance(spam_error, basestring):
                 spam_error = "Spam is not permitted here"
             raise SynapseError(
                 403, spam_error, Codes.FORBIDDEN
