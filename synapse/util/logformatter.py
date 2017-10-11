@@ -33,9 +33,17 @@ class LogFormatter(logging.Formatter):
 
     def formatException(self, ei):
         sio = StringIO.StringIO()
-        sio.write("Capture point (most recent call last):\n")
-        traceback.print_stack(ei[2].tb_frame.f_back, None, sio)
-        traceback.print_exception(ei[0], ei[1], ei[2], None, sio)
+        (typ, val, tb) = ei
+
+        # log the stack above the exception capture point if possible, but
+        # check that we actually have an f_back attribute to work around
+        # https://twistedmatrix.com/trac/ticket/9305
+
+        if tb and hasattr(tb.tb_frame, 'f_back'):
+            sio.write("Capture point (most recent call last):\n")
+            traceback.print_stack(tb.tb_frame.f_back, None, sio)
+
+        traceback.print_exception(typ, val, tb, None, sio)
         s = sio.getvalue()
         sio.close()
         if s[-1:] == "\n":
