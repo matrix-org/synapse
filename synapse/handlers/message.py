@@ -25,6 +25,7 @@ from synapse.types import (
 from synapse.util.async import run_on_reactor, ReadWriteLock, Limiter
 from synapse.util.logcontext import preserve_fn
 from synapse.util.metrics import measure_func
+from synapse.util.frozenutils import unfreeze
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -555,7 +556,7 @@ class MessageHandler(BaseHandler):
 
         # Ensure that we can round trip before trying to persist in db
         try:
-            dump = ujson.dumps(event.content)
+            dump = ujson.dumps(unfreeze(event.content))
             ujson.loads(dump)
         except:
             logger.exception("Failed to encode content: %r", event.content)
