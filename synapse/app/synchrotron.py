@@ -40,6 +40,7 @@ from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.room import RoomStore
+from synapse.replication.slave.storage.groups import SlavedGroupServerStore
 from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.rest.client.v1 import events
 from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
@@ -69,6 +70,7 @@ class SynchrotronSlavedStore(
     SlavedRegistrationStore,
     SlavedFilteringStore,
     SlavedPresenceStore,
+    SlavedGroupServerStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
     SlavedClientIpStore,
@@ -403,6 +405,10 @@ class SyncReplicationHandler(ReplicationClientHandler):
             )
         elif stream_name == "presence":
             yield self.presence_handler.process_replication_rows(token, rows)
+        elif stream_name == "receipts":
+            self.notifier.on_new_event(
+                "groups_key", token, users=[row.user_id for row in rows],
+            )
 
 
 def start(config_options):

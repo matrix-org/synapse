@@ -45,6 +45,8 @@ class RoomMemberHandler(BaseHandler):
     def __init__(self, hs):
         super(RoomMemberHandler, self).__init__(hs)
 
+        self.profile_handler = hs.get_profile_handler()
+
         self.member_linearizer = Linearizer(name="member")
 
         self.clock = hs.get_clock()
@@ -282,7 +284,7 @@ class RoomMemberHandler(BaseHandler):
 
                 content["membership"] = Membership.JOIN
 
-                profile = self.hs.get_handlers().profile_handler
+                profile = self.profile_handler
                 if not content_specified:
                     content["displayname"] = yield profile.get_displayname(target)
                     content["avatar_url"] = yield profile.get_avatar_url(target)
