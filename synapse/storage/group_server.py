@@ -1178,7 +1178,7 @@ class GroupServerStore(SQLBaseStore):
                 user_id,
                 gtype,
                 json.loads(content_json),
-             ) for stream_id, group_id, user_id, gtype, content_json in txn]
+            ) for stream_id, group_id, user_id, gtype, content_json in txn]
         return self.runInteraction(
             "get_all_groups_changes", _get_all_groups_changes_txn,
         )
