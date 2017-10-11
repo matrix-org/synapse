@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015 OpenMarket Ltd
+# Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,11 +20,13 @@ from twisted.internet import defer
 
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
+from synapse.event_auth import get_user_power_level
 from synapse.api.constants import EventTypes, Membership
 from synapse.metrics import get_metrics_for
 from synapse.util.caches import metrics as cache_metrics
 from synapse.util.caches.descriptors import cached
 from synapse.util.async import Linearizer
+from synapse.state import POWER_KEY
 
 from collections import namedtuple
 
@@ -59,6 +62,7 @@ class BulkPushRuleEvaluator(object):
     def __init__(self, hs):
         self.hs = hs
         self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
 
         self.room_push_rule_cache_metrics = cache_metrics.register_cache(
             "cache",
@@ -109,6 +113,29 @@ class BulkPushRuleEvaluator(object):
         )
 
     @defer.inlineCallbacks
+    def _get_power_levels_and_sender_level(self, event, context):
+        pl_event_id = context.prev_state_ids.get(POWER_KEY)
+        if pl_event_id:
+            # fastpath: if there's a power level event, that's all we need, and
+            # not having a power level event is an extreme edge case
+            pl_event = yield self.store.get_event(pl_event_id)
+            auth_events = {POWER_KEY: pl_event}
+        else:
+            auth_events_ids = yield self.auth.compute_auth_events(
+                event, context.prev_state_ids, for_verification=False,
+            )
+            auth_events = yield self.store.get_events(auth_events_ids)
+            auth_events = {
+                (e.type, e.state_key): e for e in auth_events.itervalues()
+            }
+
+        sender_level = get_user_power_level(event.sender, auth_events)
+
+        pl_event = auth_events.get(POWER_KEY)
+
+        defer.returnValue((pl_event.content if pl_event else {}, sender_level))
+
+    @defer.inlineCallbacks
     def action_for_event_by_user(self, event, context):
         """Given an event and context, evaluate the push rules and return
         the results
@@ -123,7 +150,13 @@ class BulkPushRuleEvaluator(object):
             event, context
         )
 
-        evaluator = PushRuleEvaluatorForEvent(event, len(room_members))
+        (power_levels, sender_power_level) = (
+            yield self._get_power_levels_and_sender_level(event, context)
+        )
+
+        evaluator = PushRuleEvaluatorForEvent(
+            event, len(room_members), sender_power_level, power_levels,
+        )
 
         condition_cache = {}
 
