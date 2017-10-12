@@ -97,15 +97,19 @@ class MediaRepository(object):
             os.makedirs(dirname)
 
     @staticmethod
-    def write_file_synchronously(source, fname):
+    def _write_file_synchronously(source, fname):
         source.seek(0)  # Ensure we read from the start of the file
         with open(fname, "wb") as f:
             shutil.copyfileobj(source, f)
+
+        source.close()
 
     @defer.inlineCallbacks
     def write_to_file(self, source, path):
         """Write `source` to the on disk media store, and also the backup store
         if configured.
+
+        Will close source once finished.
 
         Args:
             source: A file like object that should be written
@@ -120,7 +124,7 @@ class MediaRepository(object):
         # Write to the main repository
         yield preserve_context_over_fn(
             threads.deferToThread,
-            self.write_file_synchronously, source, fname,
+            self._write_file_synchronously, source, fname,
         )
 
         # Write to backup repository
@@ -130,6 +134,10 @@ class MediaRepository(object):
 
     @defer.inlineCallbacks
     def copy_to_backup(self, source, path):
+        """Copy file like object source to the backup media store, if configured.
+
+        Will close source after its done.
+        """
         if self.backup_base_path:
             backup_fname = os.path.join(self.backup_base_path, path)
             self._makedirs(backup_fname)
@@ -139,12 +147,14 @@ class MediaRepository(object):
             if self.synchronous_backup_media_store:
                 yield preserve_context_over_fn(
                     threads.deferToThread,
-                    self.write_file_synchronously, source, backup_fname,
+                    self._write_file_synchronously, source, backup_fname,
                 )
             else:
                 preserve_fn(threads.deferToThread)(
-                    self.write_file_synchronously, source, backup_fname,
+                    self._write_file_synchronously, source, backup_fname,
                 )
+        else:
+            source.close()
 
     @defer.inlineCallbacks
     def create_content(self, media_type, upload_name, content, content_length,
@@ -248,8 +258,8 @@ class MediaRepository(object):
                                      server_name, media_id)
                     raise SynapseError(502, "Failed to fetch remote media")
 
-            with open(fname) as f:
-                yield self.copy_to_backup(f, fpath)
+             # Will close the file after its done
+            yield self.copy_to_backup(open(fname), fpath)
 
             media_type = headers["Content-Type"][0]
             time_now_ms = self.clock.time_msec()
