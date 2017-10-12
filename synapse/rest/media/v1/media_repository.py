@@ -359,6 +359,8 @@ class MediaRepository(object):
         )
 
         if t_byte_source:
+            t_len = len(t_byte_source.getvalue())
+
             output_path = yield self.write_to_file(
                 t_byte_source,
                 self.filepaths.local_media_thumbnail_rel(
@@ -368,8 +370,7 @@ class MediaRepository(object):
             logger.info("Stored thumbnail in file %r", output_path)
 
             yield self.store.store_local_thumbnail_rel(
-                media_id, t_width, t_height, t_type, t_method,
-                len(t_byte_source.getvalue())
+                media_id, t_width, t_height, t_type, t_method, t_len
             )
 
             defer.returnValue(output_path)
@@ -387,6 +388,7 @@ class MediaRepository(object):
         )
 
         if t_byte_source:
+            t_len = len(t_byte_source.getvalue())
             output_path = yield self.write_to_file(
                 t_byte_source,
                 self.filepaths.remote_media_thumbnail_rel(
@@ -397,7 +399,7 @@ class MediaRepository(object):
 
             yield self.store.store_remote_media_thumbnail_rel(
                 server_name, media_id, file_id,
-                t_width, t_height, t_type, t_method, len(t_byte_source.getvalue())
+                t_width, t_height, t_type, t_method, t_len
             )
 
             defer.returnValue(output_path)
@@ -449,11 +451,12 @@ class MediaRepository(object):
                     media_id, t_width, t_height, t_type, t_method
                 )
 
+            t_len = len(t_byte_source.getvalue())
+
             yield self.write_to_file(t_byte_source, file_path)
 
             yield self.store.store_local_thumbnail(
-                media_id, t_width, t_height, t_type, t_method,
-                len(t_byte_source.getvalue())
+                media_id, t_width, t_height, t_type, t_method, t_len
             )
 
         defer.returnValue({
@@ -500,11 +503,13 @@ class MediaRepository(object):
                 server_name, file_id, t_width, t_height, t_type, t_method
             )
 
+            t_len = len(t_byte_source.getvalue())
+
             yield self.write_to_file(t_byte_source, file_path)
 
             yield self.store.store_remote_media_thumbnail(
                 server_name, media_id, file_id,
-                t_width, t_height, t_type, t_method, len(t_byte_source.getvalue())
+                t_width, t_height, t_type, t_method, t_len
             )
 
         defer.returnValue({
