@@ -459,9 +459,6 @@ class MediaRepository(object):
 
         yield preserve_context_over_fn(threads.deferToThread, generate_thumbnails)
 
-        for r in remote_thumbnails:
-            yield self.store.store_remote_media_thumbnail(*r)
-
         for t_width, t_height, t_method, t_type, t_byte_source in remote_thumbnails:
             def path_name_func(f):
                 return f.remote_media_thumbnail(
