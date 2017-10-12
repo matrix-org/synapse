@@ -65,6 +65,8 @@ class MediaRepository(object):
         if hs.config.backup_media_store_path:
             self.backup_filepaths = MediaFilePaths(hs.config.backup_media_store_path)
 
+        self.synchronous_backup_media_store = hs.config.synchronous_backup_media_store
+
         self.dynamic_thumbnails = hs.config.dynamic_thumbnails
         self.thumbnail_requirements = hs.config.thumbnail_requirements
 
@@ -112,12 +114,12 @@ class MediaRepository(object):
 
             # We can either wait for successful writing to the backup repository
             # or write in the background and immediately return
-            if hs.config.synchronous_backup_media_store:
+            if self.synchronous_backup_media_store:
                 yield preserve_context_over_fn(
                     threads.deferToThread, write_file_thread, backup_fname,
                 )
             else:
-                preserve_fn(threads.deferToThread)(write_file, backup_fname)
+                preserve_fn(threads.deferToThread)(write_file_thread, backup_fname)
 
         defer.returnValue(fname)
 
@@ -321,7 +323,7 @@ class MediaRepository(object):
 
         if t_byte_source:
             output_path = yield self._write_to_file(
-                content,
+                t_byte_source,
                 lambda f: f.local_media_thumbnail(
                     media_id, t_width, t_height, t_type, t_method
                 )
@@ -329,10 +331,11 @@ class MediaRepository(object):
             logger.info("Stored thumbnail in file %r", output_path)
 
             yield self.store.store_local_thumbnail(
-                media_id, t_width, t_height, t_type, t_method, len(t_byte_source.getvalue())
+                media_id, t_width, t_height, t_type, t_method,
+                len(t_byte_source.getvalue())
             )
 
-            defer.returnValue(t_path)
+            defer.returnValue(output_path)
 
     @defer.inlineCallbacks
     def generate_remote_exact_thumbnail(self, server_name, file_id, media_id,
@@ -348,7 +351,7 @@ class MediaRepository(object):
 
         if t_byte_source:
             output_path = yield self._write_to_file(
-                content,
+                t_byte_source,
                 lambda f: f.remote_media_thumbnail(
                     server_name, file_id, t_width, t_height, t_type, t_method
                 )
@@ -360,7 +363,7 @@ class MediaRepository(object):
                 t_width, t_height, t_type, t_method, len(t_byte_source.getvalue())
             )
 
-            defer.returnValue(t_path)
+            defer.returnValue(output_path)
 
     @defer.inlineCallbacks
     def _generate_local_thumbnails(self, media_id, media_info, url_cache=False):
@@ -400,19 +403,21 @@ class MediaRepository(object):
         yield preserve_context_over_fn(threads.deferToThread, generate_thumbnails)
 
         for t_width, t_height, t_method, t_type, t_byte_source in local_thumbnails:
-            if url_cache:
-                path_name_func = lambda f: f.url_cache_thumbnail(
-                    media_id, t_width, t_height, t_type, t_method
-                )
-            else:
-                path_name_func = lambda f: f.local_media_thumbnail(
-                    media_id, t_width, t_height, t_type, t_method
-                )
+            def path_name_func(f):
+                if url_cache:
+                    return f.url_cache_thumbnail(
+                        media_id, t_width, t_height, t_type, t_method
+                    )
+                else:
+                    return f.local_media_thumbnail(
+                        media_id, t_width, t_height, t_type, t_method
+                    )
 
             yield self._write_to_file(t_byte_source, path_name_func)
 
             yield self.store.store_local_thumbnail(
-                media_id, t_width, t_height, t_type, t_method, len(t_byte_source.getvalue())
+                media_id, t_width, t_height, t_type, t_method,
+                len(t_byte_source.getvalue())
             )
 
         defer.returnValue({
@@ -457,10 +462,11 @@ class MediaRepository(object):
         for r in remote_thumbnails:
             yield self.store.store_remote_media_thumbnail(*r)
 
-        for t_width, t_height, t_method, t_type, t_byte_source in local_thumbnails:
-            path_name_func = lambda f: f.remote_media_thumbnail(
-                server_name, media_id, file_id, t_width, t_height, t_type, t_method
-            )
+        for t_width, t_height, t_method, t_type, t_byte_source in remote_thumbnails:
+            def path_name_func(f):
+                return f.remote_media_thumbnail(
+                    server_name, media_id, file_id, t_width, t_height, t_type, t_method
+                )
 
             yield self._write_to_file(t_byte_source, path_name_func)
 
