@@ -60,10 +60,12 @@ class MediaRepository(object):
         self.max_upload_size = hs.config.max_upload_size
         self.max_image_pixels = hs.config.max_image_pixels
 
-        self.filepaths = MediaFilePaths(hs.config.media_store_path)
-        self.backup_filepaths = None
+        self.primary_base_path = hs.config.media_store_path
+        self.filepaths = MediaFilePaths(self.primary_base_path)
+
+        self.backup_base_path = None
         if hs.config.backup_media_store_path:
-            self.backup_filepaths = MediaFilePaths(hs.config.backup_media_store_path)
+            self.backup_base_path = hs.config.backup_media_store_path
 
         self.synchronous_backup_media_store = hs.config.synchronous_backup_media_store
 
@@ -94,42 +96,63 @@ class MediaRepository(object):
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
-    @defer.inlineCallbacks
-    def _write_to_file(self, source, file_name_func):
-        def write_file_thread(file_name):
-            source.seek(0)  # Ensure we read from the start of the file
-            with open(file_name, "wb") as f:
-                shutil.copyfileobj(source, f)
+    @staticmethod
+    def write_file_synchronously(source, fname):
+        source.seek(0)  # Ensure we read from the start of the file
+        with open(fname, "wb") as f:
+            shutil.copyfileobj(source, f)
 
-        fname = file_name_func(self.filepaths)
+    @defer.inlineCallbacks
+    def write_to_file(self, source, path):
+        """Write `source` to the on disk media store, and also the backup store
+        if configured.
+
+        Args:
+            source: A file like object that should be written
+            path: Relative path to write file to
+
+        Returns:
+            string: the file path written to in the primary media store
+        """
+        fname = os.path.join(self.primary_base_path, path)
         self._makedirs(fname)
 
         # Write to the main repository
-        yield preserve_context_over_fn(threads.deferToThread, write_file_thread, fname)
+        yield preserve_context_over_fn(
+            threads.deferToThread,
+            self.write_file_synchronously, source, fname,
+        )
 
         # Write to backup repository
-        if self.backup_filepaths:
-            backup_fname = file_name_func(self.backup_filepaths)
+        yield self.copy_to_backup(source, path)
+
+        defer.returnValue(fname)
+
+    @defer.inlineCallbacks
+    def copy_to_backup(self, source, path):
+        if self.backup_base_path:
+            backup_fname = os.path.join(self.backup_base_path, path)
             self._makedirs(backup_fname)
 
             # We can either wait for successful writing to the backup repository
             # or write in the background and immediately return
             if self.synchronous_backup_media_store:
                 yield preserve_context_over_fn(
-                    threads.deferToThread, write_file_thread, backup_fname,
+                    threads.deferToThread,
+                    self.write_file_synchronously, source, backup_fname,
                 )
             else:
-                preserve_fn(threads.deferToThread)(write_file_thread, backup_fname)
-
-        defer.returnValue(fname)
+                preserve_fn(threads.deferToThread)(
+                    self.write_file_synchronously, source, backup_fname,
+                )
 
     @defer.inlineCallbacks
     def create_content(self, media_type, upload_name, content, content_length,
                        auth_user):
         media_id = random_string(24)
 
-        fname = yield self._write_to_file(
-            content, lambda f: f.local_media_filepath(media_id)
+        fname = yield self.write_to_file(
+            content, self.filepaths.local_media_filepath_rel(media_id)
         )
 
         logger.info("Stored local media in file %r", fname)
@@ -180,9 +203,10 @@ class MediaRepository(object):
     def _download_remote_file(self, server_name, media_id):
         file_id = random_string(24)
 
-        fname = self.filepaths.remote_media_filepath(
+        fpath = self.filepaths.remote_media_filepath_rel(
             server_name, file_id
         )
+        fname = os.path.join(self.primary_base_path, fpath)
         self._makedirs(fname)
 
         try:
@@ -223,6 +247,9 @@ class MediaRepository(object):
                     logger.exception("Failed to fetch remote media %s/%s",
                                      server_name, media_id)
                     raise SynapseError(502, "Failed to fetch remote media")
+
+            with open(fname) as f:
+                yield self.copy_to_backup(f, fpath)
 
             media_type = headers["Content-Type"][0]
             time_now_ms = self.clock.time_msec()
@@ -322,15 +349,15 @@ class MediaRepository(object):
         )
 
         if t_byte_source:
-            output_path = yield self._write_to_file(
+            output_path = yield self.write_to_file(
                 t_byte_source,
-                lambda f: f.local_media_thumbnail(
+                self.filepaths.local_media_thumbnail_rel(
                     media_id, t_width, t_height, t_type, t_method
                 )
             )
             logger.info("Stored thumbnail in file %r", output_path)
 
-            yield self.store.store_local_thumbnail(
+            yield self.store.store_local_thumbnail_rel(
                 media_id, t_width, t_height, t_type, t_method,
                 len(t_byte_source.getvalue())
             )
@@ -350,15 +377,15 @@ class MediaRepository(object):
         )
 
         if t_byte_source:
-            output_path = yield self._write_to_file(
+            output_path = yield self.write_to_file(
                 t_byte_source,
-                lambda f: f.remote_media_thumbnail(
+                self.filepaths.remote_media_thumbnail_rel(
                     server_name, file_id, t_width, t_height, t_type, t_method
                 )
             )
             logger.info("Stored thumbnail in file %r", output_path)
 
-            yield self.store.store_remote_media_thumbnail(
+            yield self.store.store_remote_media_thumbnail_rel(
                 server_name, media_id, file_id,
                 t_width, t_height, t_type, t_method, len(t_byte_source.getvalue())
             )
@@ -403,17 +430,16 @@ class MediaRepository(object):
         yield preserve_context_over_fn(threads.deferToThread, generate_thumbnails)
 
         for t_width, t_height, t_method, t_type, t_byte_source in local_thumbnails:
-            def path_name_func(f):
-                if url_cache:
-                    return f.url_cache_thumbnail(
-                        media_id, t_width, t_height, t_type, t_method
-                    )
-                else:
-                    return f.local_media_thumbnail(
-                        media_id, t_width, t_height, t_type, t_method
-                    )
+            if url_cache:
+                file_path = self.filepaths.url_cache_thumbnail_rel(
+                    media_id, t_width, t_height, t_type, t_method
+                )
+            else:
+                file_path = self.filepaths.local_media_thumbnail_rel(
+                    media_id, t_width, t_height, t_type, t_method
+                )
 
-            yield self._write_to_file(t_byte_source, path_name_func)
+            yield self.write_to_file(t_byte_source, file_path)
 
             yield self.store.store_local_thumbnail(
                 media_id, t_width, t_height, t_type, t_method,
@@ -460,12 +486,11 @@ class MediaRepository(object):
         yield preserve_context_over_fn(threads.deferToThread, generate_thumbnails)
 
         for t_width, t_height, t_method, t_type, t_byte_source in remote_thumbnails:
-            def path_name_func(f):
-                return f.remote_media_thumbnail(
-                    server_name, file_id, t_width, t_height, t_type, t_method
-                )
+            file_path = self.filepaths.remote_media_thumbnail_rel(
+                server_name, file_id, t_width, t_height, t_type, t_method
+            )
 
-            yield self._write_to_file(t_byte_source, path_name_func)
+            yield self.write_to_file(t_byte_source, file_path)
 
             yield self.store.store_remote_media_thumbnail(
                 server_name, media_id, file_id,
@@ -490,6 +515,8 @@ class MediaRepository(object):
             key = (origin, media_id)
 
             logger.info("Deleting: %r", key)
+
+            # TODO: Should we delete from the backup store
 
             with (yield self.remote_media_linearizer.queue(key)):
                 full_path = self.filepaths.remote_media_filepath(origin, file_id)

@@ -51,7 +51,11 @@ class Thumbnailer(object):
             return ((max_height * self.width) // self.height, max_height)
 
     def scale(self, width, height, output_type):
-        """Rescales the image to the given dimensions"""
+        """Rescales the image to the given dimensions.
+
+        Returns:
+            BytesIO: the bytes of the encoded image ready to be written to disk
+        """
         scaled = self.image.resize((width, height), Image.ANTIALIAS)
         return self._encode_image(scaled, output_type)
 
@@ -65,6 +69,9 @@ class Thumbnailer(object):
         Args:
             max_width: The largest possible width.
             max_height: The larget possible height.
+
+        Returns:
+            BytesIO: the bytes of the encoded image ready to be written to disk
         """
         if width * self.height > height * self.width:
             scaled_height = (width * self.height) // self.width

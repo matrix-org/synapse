@@ -59,6 +59,7 @@ class PreviewUrlResource(Resource):
         self.store = hs.get_datastore()
         self.client = SpiderHttpClient(hs)
         self.media_repo = media_repo
+        self.primary_base_path = media_repo.primary_base_path
 
         self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
 
@@ -262,7 +263,8 @@ class PreviewUrlResource(Resource):
 
         file_id = datetime.date.today().isoformat() + '_' + random_string(16)
 
-        fname = self.filepaths.url_cache_filepath(file_id)
+        fpath = self.filepaths.url_cache_filepath_rel(file_id)
+        fname = os.path.join(self.primary_base_path, fpath)
         self.media_repo._makedirs(fname)
 
         try:
@@ -272,6 +274,9 @@ class PreviewUrlResource(Resource):
                     url, output_stream=f, max_size=self.max_spider_size,
                 )
                 # FIXME: pass through 404s and other error messages nicely
+
+            with open(fname) as f:
+                yield self.media_repo.copy_to_backup(f, fpath)
 
             media_type = headers["Content-Type"][0]
             time_now_ms = self.clock.time_msec()

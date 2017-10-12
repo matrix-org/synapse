@@ -75,7 +75,9 @@ class ContentRepositoryConfig(Config):
 
         self.backup_media_store_path = config.get("backup_media_store_path")
         if self.backup_media_store_path:
-            self.ensure_directory(self.backup_media_store_path)
+            self.backup_media_store_path = self.ensure_directory(
+                self.backup_media_store_path
+            )
 
         self.synchronous_backup_media_store = config.get(
             "synchronous_backup_media_store", False
