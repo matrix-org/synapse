@@ -50,12 +50,12 @@ class Thumbnailer(object):
         else:
             return ((max_height * self.width) // self.height, max_height)
 
-    def scale(self, output_path, width, height, output_type):
+    def scale(self, width, height, output_type):
         """Rescales the image to the given dimensions"""
         scaled = self.image.resize((width, height), Image.ANTIALIAS)
-        return self.save_image(scaled, output_type, output_path)
+        return self._encode_image(scaled, output_type)
 
-    def crop(self, output_path, width, height, output_type):
+    def crop(self, width, height, output_type):
         """Rescales and crops the image to the given dimensions preserving
         aspect::
             (w_in / h_in) = (w_scaled / h_scaled)
@@ -82,13 +82,9 @@ class Thumbnailer(object):
             crop_left = (scaled_width - width) // 2
             crop_right = width + crop_left
             cropped = scaled_image.crop((crop_left, 0, crop_right, height))
-        return self.save_image(cropped, output_type, output_path)
+        return self._encode_image(cropped, output_type)
 
-    def save_image(self, output_image, output_type, output_path):
+    def _encode_image(self, output_image, output_type):
         output_bytes_io = BytesIO()
         output_image.save(output_bytes_io, self.FORMATS[output_type], quality=80)
-        output_bytes = output_bytes_io.getvalue()
-        with open(output_path, "wb") as output_file:
-            output_file.write(output_bytes)
-        logger.info("Stored thumbnail in file %r", output_path)
-        return len(output_bytes)
+        return output_bytes_io
