@@ -343,6 +343,9 @@ class PreviewUrlResource(Resource):
     def _expire_url_cache_data(self):
         """Clean up expired url cache content, media and thumbnails.
         """
+
+        # TODO: Delete from backup media store
+
         now = self.clock.time_msec()
 
         # First we delete expired url cache entries

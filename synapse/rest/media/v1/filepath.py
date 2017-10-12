@@ -35,7 +35,7 @@ def _wrap_in_base_path(func):
 class MediaFilePaths(object):
     """Describes where files are stored on disk.
 
-    Most of the function have a `*_rel` variant which returns a file path that
+    Most of the functions have a `*_rel` variant which returns a file path that
     is relative to the base media store path. This is mainly used when we want
     to write to the backup media store (when one is configured)
     """
