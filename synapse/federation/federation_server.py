@@ -211,8 +211,9 @@ class FederationServer(FederationBase):
                     edu.content
                 )
 
-            for failure in getattr(transaction, "pdu_failures", []):
-                logger.info("Got failure %r", failure)
+        pdu_failures = getattr(transaction, "pdu_failures", [])
+        for failure in pdu_failures:
+            logger.info("Got failure %r", failure)
 
         response = {
             "pdus": pdu_results,
