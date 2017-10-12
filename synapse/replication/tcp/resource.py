@@ -160,7 +160,11 @@ class ReplicationStreamer(object):
                             "Getting stream: %s: %s -> %s",
                             stream.NAME, stream.last_token, stream.upto_token
                         )
-                        updates, current_token = yield stream.get_updates()
+                        try:
+                            updates, current_token = yield stream.get_updates()
+                        except:
+                            logger.info("Failed to handle stream %s", stream.NAME)
+                            raise
 
                         logger.debug(
                             "Sending %d updates to %d connections",
