@@ -97,12 +97,13 @@ class MediaRepository(object):
             os.makedirs(dirname)
 
     @staticmethod
-    def _write_file_synchronously(source, fname):
+    def _write_file_synchronously(source, fname, close_source=False):
         source.seek(0)  # Ensure we read from the start of the file
         with open(fname, "wb") as f:
             shutil.copyfileobj(source, f)
 
-        source.close()
+        if close_source:
+            source.close()
 
     @defer.inlineCallbacks
     def write_to_file(self, source, path):
@@ -148,10 +149,12 @@ class MediaRepository(object):
                 yield preserve_context_over_fn(
                     threads.deferToThread,
                     self._write_file_synchronously, source, backup_fname,
+                    close_source=True,
                 )
             else:
                 preserve_fn(threads.deferToThread)(
                     self._write_file_synchronously, source, backup_fname,
+                    close_source=True,
                 )
         else:
             source.close()
