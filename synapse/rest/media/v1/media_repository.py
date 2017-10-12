@@ -462,7 +462,7 @@ class MediaRepository(object):
         for t_width, t_height, t_method, t_type, t_byte_source in remote_thumbnails:
             def path_name_func(f):
                 return f.remote_media_thumbnail(
-                    server_name, media_id, file_id, t_width, t_height, t_type, t_method
+                    server_name, file_id, t_width, t_height, t_type, t_method
                 )
 
             yield self._write_to_file(t_byte_source, path_name_func)
