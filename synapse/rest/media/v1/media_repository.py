@@ -107,7 +107,7 @@ class MediaRepository(object):
 
         # Write to backup repository
         if self.backup_filepaths:
-            backup_fname = file_name_func(backup_filepaths)
+            backup_fname = file_name_func(self.backup_filepaths)
             self._makedirs(backup_fname)
 
             # We can either wait for successful writing to the backup repository
