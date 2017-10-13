@@ -34,7 +34,7 @@ import jinja2
 import bleach
 
 import time
-import urllib
+import urllib.request, urllib.parse, urllib.error
 
 import logging
 logger = logging.getLogger(__name__)
@@ -229,7 +229,7 @@ class Mailer(object):
                 if room_vars['notifs'] and 'messages' in room_vars['notifs'][-1]:
                     prev_messages = room_vars['notifs'][-1]['messages']
                     for message in notifvars['messages']:
-                        pm = filter(lambda pm: pm['id'] == message['id'], prev_messages)
+                        pm = [pm for pm in prev_messages if pm['id'] == message['id']]
                         if pm:
                             if not message["is_historical"]:
                                 pm[0]["is_historical"] = False
@@ -330,7 +330,7 @@ class Mailer(object):
                           notif_events, user_id, reason):
         if len(notifs_by_room) == 1:
             # Only one room has new stuff
-            room_id = notifs_by_room.keys()[0]
+            room_id = list(notifs_by_room.keys())[0]
 
             # If the room has some kind of name, use it, but we don't
             # want the generated-from-names one here otherwise we'll
@@ -406,7 +406,7 @@ class Mailer(object):
                     ])
 
                     defer.returnValue(MESSAGES_FROM_PERSON % {
-                        "person": descriptor_from_member_events(member_events.values()),
+                        "person": descriptor_from_member_events(list(member_events.values())),
                         "app": self.app_name,
                     })
         else:
@@ -432,7 +432,7 @@ class Mailer(object):
                 ])
 
                 defer.returnValue(MESSAGES_FROM_PERSON_AND_OTHERS % {
-                    "person": descriptor_from_member_events(member_events.values()),
+                    "person": descriptor_from_member_events(list(member_events.values())),
                     "app": self.app_name,
                 })
 
@@ -472,7 +472,7 @@ class Mailer(object):
         # XXX: make r0 once API is stable
         return "%s_matrix/client/unstable/pushers/remove?%s" % (
             self.hs.config.public_baseurl,
-            urllib.urlencode(params),
+            urllib.parse.urlencode(params),
         )
 
 
@@ -559,7 +559,7 @@ def _create_mxc_to_http_filter(config):
         return "%s_matrix/media/v1/thumbnail/%s?%s%s" % (
             config.public_baseurl,
             serverAndMediaId,
-            urllib.urlencode(params),
+            urllib.parse.urlencode(params),
             fragment or "",
         )
 

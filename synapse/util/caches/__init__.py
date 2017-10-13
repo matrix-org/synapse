@@ -15,6 +15,7 @@
 
 import synapse.metrics
 import os
+import sys
 
 CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.5))
 
@@ -67,7 +68,7 @@ def intern_string(string):
 
     try:
         string = string.encode("ascii")
-        return intern(string)
+        return sys.intern(string)
     except UnicodeEncodeError:
         return string
 
@@ -77,7 +78,7 @@ def intern_dict(dictionary):
     """
     return {
         KNOWN_KEYS.get(key, key): _intern_known_values(key, value)
-        for key, value in dictionary.items()
+        for key, value in list(dictionary.items())
     }
 
 

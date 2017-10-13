@@ -53,12 +53,12 @@ from twisted.internet import defer
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
 
-from commands import (
+from .commands import (
     COMMAND_MAP, VALID_CLIENT_COMMANDS, VALID_SERVER_COMMANDS,
     ErrorCommand, ServerCommand, RdataCommand, PositionCommand, PingCommand,
     NameCommand, ReplicateCommand, UserSyncCommand, SyncCommand,
 )
-from streams import STREAMS_MAP
+from .streams import STREAMS_MAP
 
 from synapse.util.stringutils import random_string
 from synapse.metrics.metric import CounterMetric
@@ -392,7 +392,7 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
         if stream_name == "ALL":
             # Subscribe to all streams we're publishing to.
-            for stream in self.streamer.streams_by_name.iterkeys():
+            for stream in list(self.streamer.streams_by_name.keys()):
                 self.subscribe_to_stream(stream, token)
         else:
             self.subscribe_to_stream(stream_name, token)
@@ -498,7 +498,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         BaseReplicationStreamProtocol.connectionMade(self)
 
         # Once we've connected subscribe to the necessary streams
-        for stream_name, token in self.handler.get_streams_to_replicate().iteritems():
+        for stream_name, token in list(self.handler.get_streams_to_replicate().items()):
             self.replicate(stream_name, token)
 
         # Tell the server if we have any users currently syncing (should only
@@ -630,7 +630,7 @@ metrics.register_callback(
     lambda: {
         (k[0], p.name, p.conn_id): count
         for p in connected_connections
-        for k, count in p.inbound_commands_counter.counts.iteritems()
+        for k, count in list(p.inbound_commands_counter.counts.items())
     },
     labels=["command", "name", "conn_id"],
 )
@@ -640,7 +640,7 @@ metrics.register_callback(
     lambda: {
         (k[0], p.name, p.conn_id): count
         for p in connected_connections
-        for k, count in p.outbound_commands_counter.counts.iteritems()
+        for k, count in list(p.outbound_commands_counter.counts.items())
     },
     labels=["command", "name", "conn_id"],
 )

@@ -141,7 +141,7 @@ class PasswordRestServlet(RestServlet):
                 raise SynapseError(404, "Email address not found", Codes.NOT_FOUND)
             user_id = threepid_user_id
         else:
-            logger.error("Auth succeeded but no known type!", result.keys())
+            logger.error("Auth succeeded but no known type!", list(result.keys()))
             raise SynapseError(500, "", Codes.UNKNOWN)
 
         if 'new_password' not in params:
@@ -189,7 +189,7 @@ class DeactivateAccountRestServlet(RestServlet):
             if user_id != result[LoginType.PASSWORD]:
                 raise LoginError(400, "", Codes.UNKNOWN)
         else:
-            logger.error("Auth succeeded but no known type!", result.keys())
+            logger.error("Auth succeeded but no known type!", list(result.keys()))
             raise SynapseError(500, "", Codes.UNKNOWN)
 
         # FIXME: Theoretically there is a race here wherein user resets password

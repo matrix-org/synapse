@@ -66,7 +66,7 @@ class Auth(object):
         )
         auth_events = yield self.store.get_events(auth_events_ids)
         auth_events = {
-            (e.type, e.state_key): e for e in auth_events.values()
+            (e.type, e.state_key): e for e in list(auth_events.values())
         }
         self.check(event, auth_events=auth_events, do_sig_check=do_sig_check)
 

@@ -78,9 +78,9 @@ def filter_events_for_clients(store, user_tuples, events, event_id_to_state,
     # FIXME: This will explode if people upload something incorrect.
     ignore_dict = {
         user_id: frozenset(
-            content.get("ignored_users", {}).keys() if content else []
+            list(content.get("ignored_users", {}).keys()) if content else []
         )
-        for user_id, content in ignore_dict_content.items()
+        for user_id, content in list(ignore_dict_content.items())
     }
 
     def allowed(event, user_id, is_peeking, ignore_list):

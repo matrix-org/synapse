@@ -209,7 +209,7 @@ class ApplicationServicesHandler(object):
 
             return combined
 
-        for p in protocols.keys():
+        for p in list(protocols.keys()):
             protocols[p] = _merge_instances(protocols[p])
 
         defer.returnValue(protocols)

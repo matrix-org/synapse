@@ -121,7 +121,7 @@ class ExpiringCache(object):
 
         keys_to_delete = set()
 
-        for key, cache_entry in self._cache.items():
+        for key, cache_entry in list(self._cache.items()):
             if now - cache_entry.time > self._expiry_ms:
                 keys_to_delete.add(key)
 

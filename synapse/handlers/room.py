@@ -359,7 +359,7 @@ class RoomCreationHandler(BaseHandler):
                     content={"guest_access": "can_join"}
                 )
 
-        for (etype, state_key), content in initial_state.items():
+        for (etype, state_key), content in list(initial_state.items()):
             yield send(
                 etype=etype,
                 state_key=state_key,
@@ -428,7 +428,7 @@ class RoomContextHandler(BaseHandler):
         state = yield self.store.get_state_for_events(
             [last_event_id], None
         )
-        results["state"] = state[last_event_id].values()
+        results["state"] = list(state[last_event_id].values())
 
         results["start"] = now_token.copy_and_replace(
             "room_key", results["start"]
@@ -488,7 +488,7 @@ class RoomEventSource(object):
             )
 
             events = list(room_events)
-            events.extend(e for evs, _ in room_to_events.values() for e in evs)
+            events.extend(e for evs, _ in list(room_to_events.values()) for e in evs)
 
             events.sort(key=lambda e: e.internal_metadata.order)
 

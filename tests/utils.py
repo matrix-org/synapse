@@ -30,8 +30,8 @@ from twisted.enterprise.adbapi import ConnectionPool
 from collections import namedtuple
 from mock import patch, Mock
 import hashlib
-import urllib
-import urlparse
+import urllib.request, urllib.parse, urllib.error
+import urllib.parse
 
 from inspect import getcallargs
 
@@ -181,7 +181,7 @@ class MockHttpResource(HttpServer):
 
         # add in query params to the right place
         try:
-            mock_request.args = urlparse.parse_qs(path.split('?')[1])
+            mock_request.args = urllib.parse.parse_qs(path.split('?')[1])
             mock_request.path = path.split('?')[0]
             path = mock_request.path
         except:
@@ -195,7 +195,7 @@ class MockHttpResource(HttpServer):
             if matcher:
                 try:
                     args = [
-                        urllib.unquote(u).decode("UTF-8")
+                        urllib.parse.unquote(u).decode("UTF-8")
                         for u in matcher.groups()
                     ]
 
@@ -355,7 +355,7 @@ class MemoryDataStore(object):
         )
 
     def register(self, user_id, token, password_hash):
-        if user_id in self.tokens_to_users.values():
+        if user_id in list(self.tokens_to_users.values()):
             raise StoreError(400, "User in use.")
         self.tokens_to_users[token] = user_id
 
@@ -390,15 +390,15 @@ class MemoryDataStore(object):
     def get_room_members(self, room_id, membership=None):
         if membership:
             return [
-                v for k, v in self.members.get(room_id, {}).items()
+                v for k, v in list(self.members.get(room_id, {}).items())
                 if v.membership == membership
             ]
         else:
-            return self.members.get(room_id, {}).values()
+            return list(self.members.get(room_id, {}).values())
 
     def get_rooms_for_user_where_membership_is(self, user_id, membership_list):
         return [
-            m[user_id] for m in self.members.values()
+            m[user_id] for m in list(self.members.values())
             if user_id in m and m[user_id].membership in membership_list
         ]
 
@@ -465,7 +465,7 @@ class MemoryDataStore(object):
 def _format_call(args, kwargs):
     return ", ".join(
         ["%r" % (a) for a in args] +
-        ["%s=%r" % (k, v) for k, v in kwargs.items()]
+        ["%s=%r" % (k, v) for k, v in list(kwargs.items())]
     )
 
 

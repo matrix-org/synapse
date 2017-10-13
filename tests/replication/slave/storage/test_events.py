@@ -221,7 +221,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
         if state is not None:
             state_ids = {
-                key: e.event_id for key, e in state.items()
+                key: e.event_id for key, e in list(state.items())
             }
             context = EventContext()
             context.current_state_ids = state_ids

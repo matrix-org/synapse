@@ -66,9 +66,9 @@ class ProfileTestCase(unittest.TestCase):
             "GET", "/profile/%s/displayname" % (myid), None
         )
 
-        self.assertEquals(200, code)
-        self.assertEquals({"displayname": "Frank"}, response)
-        self.assertEquals(mocked_get.call_args[0][0].localpart, "1234ABCD")
+        self.assertEqual(200, code)
+        self.assertEqual({"displayname": "Frank"}, response)
+        self.assertEqual(mocked_get.call_args[0][0].localpart, "1234ABCD")
 
     @defer.inlineCallbacks
     def test_set_my_name(self):
@@ -81,10 +81,10 @@ class ProfileTestCase(unittest.TestCase):
             '{"displayname": "Frank Jr."}'
         )
 
-        self.assertEquals(200, code)
-        self.assertEquals(mocked_set.call_args[0][0].localpart, "1234ABCD")
-        self.assertEquals(mocked_set.call_args[0][1].user.localpart, "1234ABCD")
-        self.assertEquals(mocked_set.call_args[0][2], "Frank Jr.")
+        self.assertEqual(200, code)
+        self.assertEqual(mocked_set.call_args[0][0].localpart, "1234ABCD")
+        self.assertEqual(mocked_set.call_args[0][1].user.localpart, "1234ABCD")
+        self.assertEqual(mocked_set.call_args[0][2], "Frank Jr.")
 
     @defer.inlineCallbacks
     def test_set_my_name_noauth(self):
@@ -110,8 +110,8 @@ class ProfileTestCase(unittest.TestCase):
             "GET", "/profile/%s/displayname" % ("@opaque:elsewhere"), None
         )
 
-        self.assertEquals(200, code)
-        self.assertEquals({"displayname": "Bob"}, response)
+        self.assertEqual(200, code)
+        self.assertEqual({"displayname": "Bob"}, response)
 
     @defer.inlineCallbacks
     def test_set_other_name(self):
@@ -137,9 +137,9 @@ class ProfileTestCase(unittest.TestCase):
             "GET", "/profile/%s/avatar_url" % (myid), None
         )
 
-        self.assertEquals(200, code)
-        self.assertEquals({"avatar_url": "http://my.server/me.png"}, response)
-        self.assertEquals(mocked_get.call_args[0][0].localpart, "1234ABCD")
+        self.assertEqual(200, code)
+        self.assertEqual({"avatar_url": "http://my.server/me.png"}, response)
+        self.assertEqual(mocked_get.call_args[0][0].localpart, "1234ABCD")
 
     @defer.inlineCallbacks
     def test_set_my_avatar(self):
@@ -152,7 +152,7 @@ class ProfileTestCase(unittest.TestCase):
             '{"avatar_url": "http://my.server/pic.gif"}'
         )
 
-        self.assertEquals(200, code)
-        self.assertEquals(mocked_set.call_args[0][0].localpart, "1234ABCD")
-        self.assertEquals(mocked_set.call_args[0][1].user.localpart, "1234ABCD")
-        self.assertEquals(mocked_set.call_args[0][2], "http://my.server/pic.gif")
+        self.assertEqual(200, code)
+        self.assertEqual(mocked_set.call_args[0][0].localpart, "1234ABCD")
+        self.assertEqual(mocked_set.call_args[0][1].user.localpart, "1234ABCD")
+        self.assertEqual(mocked_set.call_args[0][2], "http://my.server/pic.gif")

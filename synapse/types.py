@@ -188,7 +188,7 @@ class StreamToken(
     def room_stream_id(self):
         # TODO(markjh): Awful hack to work around hacks in the presence tests
         # which assume that the keys are integers.
-        if type(self.room_key) is int:
+        if isinstance(self.room_key, int):
             return self.room_key
         else:
             return int(self.room_key[1:].split("-")[-1])

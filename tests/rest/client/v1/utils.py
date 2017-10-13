@@ -48,7 +48,7 @@ class RestTestCase(unittest.TestCase):
         if tok:
             path = path + "?access_token=%s" % tok
         (code, response) = yield self.mock_resource.trigger("POST", path, content)
-        self.assertEquals(200, code, msg=str(response))
+        self.assertEqual(200, code, msg=str(response))
         self.auth_user_id = temp_id
         defer.returnValue(response["room_id"])
 
@@ -87,7 +87,7 @@ class RestTestCase(unittest.TestCase):
         (code, response) = yield self.mock_resource.trigger(
             "PUT", path, json.dumps(data)
         )
-        self.assertEquals(
+        self.assertEqual(
             expect_code, code,
             msg="Expected: %d, got: %d, resp: %r" % (expect_code, code, response)
         )
@@ -104,7 +104,7 @@ class RestTestCase(unittest.TestCase):
                 "password": "test",
                 "type": "m.login.password"
             }))
-        self.assertEquals(200, code)
+        self.assertEqual(200, code)
         defer.returnValue(response)
 
     @defer.inlineCallbacks
@@ -121,7 +121,7 @@ class RestTestCase(unittest.TestCase):
             path = path + "?access_token=%s" % tok
 
         (code, response) = yield self.mock_resource.trigger("PUT", path, content)
-        self.assertEquals(expect_code, code, msg=str(response))
+        self.assertEqual(expect_code, code, msg=str(response))
 
     def assert_dict(self, required, actual):
         """Does a partial assert of a dict.
@@ -131,5 +131,5 @@ class RestTestCase(unittest.TestCase):
             actual (dict): The test result. Extra keys will not be checked.
         """
         for key in required:
-            self.assertEquals(required[key], actual[key],
+            self.assertEqual(required[key], actual[key],
                               msg="%s mismatch. %s" % (key, actual))

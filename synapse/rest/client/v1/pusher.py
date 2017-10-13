@@ -57,7 +57,7 @@ class PushersRestServlet(ClientV1RestServlet):
         ]
 
         for p in pushers:
-            for k, v in p.items():
+            for k, v in list(p.items()):
                 if k not in allowed_keys:
                     del p[k]
 

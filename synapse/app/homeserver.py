@@ -80,7 +80,7 @@ def build_resource_for_web_client(hs):
                 "\n"
                 "You can also disable hosting of the webclient via the\n"
                 "configuration option `web_client`\n"
-                % {"dep": CONDITIONAL_REQUIREMENTS["web_client"].keys()[0]}
+                % {"dep": list(CONDITIONAL_REQUIREMENTS["web_client"].keys())[0]}
             )
         syweb_path = os.path.dirname(syweb.__file__)
         webclient_path = os.path.join(syweb_path, "webclient")
@@ -240,7 +240,7 @@ class SynapseHomeServer(HomeServer):
         # Any param beginning with cp_ is a parameter for adbapi, and should
         # not be passed to the database engine.
         db_params = {
-            k: v for k, v in self.db_config.get("args", {}).items()
+            k: v for k, v in list(self.db_config.get("args", {}).items())
             if not k.startswith("cp_")
         }
         db_conn = self.database_engine.module.connect(**db_params)
@@ -425,7 +425,7 @@ def run(hs):
         clock.call_later(5 * 60, phone_stats_home)
 
     if hs.config.daemonize and hs.config.print_pidfile:
-        print (hs.config.pid_file)
+        print((hs.config.pid_file))
 
     _base.start_reactor(
         "synapse-homeserver",

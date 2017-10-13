@@ -37,8 +37,8 @@ import simplejson as json
 import logging
 import random
 import sys
-import urllib
-import urlparse
+import urllib.request, urllib.parse, urllib.error
+import urllib.parse
 
 
 logger = logging.getLogger(__name__)
@@ -98,7 +98,7 @@ class MatrixFederationHttpClient(object):
         self._next_id = 1
 
     def _create_url(self, destination, path_bytes, param_bytes, query_bytes):
-        return urlparse.urlunparse(
+        return urllib.parse.urlunparse(
             ("matrix", destination, path_bytes, param_bytes, query_bytes, "")
         )
 
@@ -147,7 +147,7 @@ class MatrixFederationHttpClient(object):
             )
 
             txn_id = "%s-O-%s" % (method, self._next_id)
-            self._next_id = (self._next_id + 1) % (sys.maxint - 1)
+            self._next_id = (self._next_id + 1) % (sys.maxsize - 1)
 
             outbound_logger.info(
                 "{%s} [%s] Sending request: %s %s",
@@ -161,7 +161,7 @@ class MatrixFederationHttpClient(object):
             else:
                 retries_left = MAX_SHORT_RETRIES
 
-            http_url_bytes = urlparse.urlunparse(
+            http_url_bytes = urllib.parse.urlunparse(
                 ("", "", path_bytes, param_bytes, query_bytes, "")
             )
 
@@ -268,7 +268,7 @@ class MatrixFederationHttpClient(object):
 
         auth_headers = []
 
-        for key, sig in request["signatures"][self.server_name].items():
+        for key, sig in list(request["signatures"][self.server_name].items()):
             auth_headers.append(bytes(
                 "X-Matrix origin=%s,key=\"%s\",sig=\"%s\"" % (
                     self.server_name, key, sig,
@@ -428,12 +428,12 @@ class MatrixFederationHttpClient(object):
         logger.debug("get_json args: %s", args)
 
         encoded_args = {}
-        for k, vs in args.items():
-            if isinstance(vs, basestring):
+        for k, vs in list(args.items()):
+            if isinstance(vs, str):
                 vs = [vs]
             encoded_args[k] = [v.encode("UTF-8") for v in vs]
 
-        query_bytes = urllib.urlencode(encoded_args, True)
+        query_bytes = urllib.parse.urlencode(encoded_args, True)
         logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
 
         def body_callback(method, url_bytes, headers_dict):
@@ -484,12 +484,12 @@ class MatrixFederationHttpClient(object):
         """
 
         encoded_args = {}
-        for k, vs in args.items():
-            if isinstance(vs, basestring):
+        for k, vs in list(args.items()):
+            if isinstance(vs, str):
                 vs = [vs]
             encoded_args[k] = [v.encode("UTF-8") for v in vs]
 
-        query_bytes = urllib.urlencode(encoded_args, True)
+        query_bytes = urllib.parse.urlencode(encoded_args, True)
         logger.debug("Query bytes: %s Retry DNS: %s", query_bytes, retry_on_dns_fail)
 
         def body_callback(method, url_bytes, headers_dict):

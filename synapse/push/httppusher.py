@@ -19,8 +19,8 @@ from twisted.internet import defer, reactor
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
 import logging
-import push_rule_evaluator
-import push_tools
+from . import push_rule_evaluator
+from . import push_tools
 
 from synapse.util.logcontext import LoggingContext
 from synapse.util.metrics import Measure
@@ -256,7 +256,7 @@ class HttpPusher(object):
                         {
                             'app_id': self.app_id,
                             'pushkey': self.pushkey,
-                            'pushkey_ts': long(self.pushkey_ts / 1000),
+                            'pushkey_ts': int(self.pushkey_ts / 1000),
                             'data': self.data_minus_url,
                         }
                     ]
@@ -285,7 +285,7 @@ class HttpPusher(object):
                     {
                         'app_id': self.app_id,
                         'pushkey': self.pushkey,
-                        'pushkey_ts': long(self.pushkey_ts / 1000),
+                        'pushkey_ts': int(self.pushkey_ts / 1000),
                         'data': self.data_minus_url,
                         'tweaks': tweaks
                     }
@@ -337,7 +337,7 @@ class HttpPusher(object):
                     {
                         'app_id': self.app_id,
                         'pushkey': self.pushkey,
-                        'pushkey_ts': long(self.pushkey_ts / 1000),
+                        'pushkey_ts': int(self.pushkey_ts / 1000),
                         'data': self.data_minus_url,
                     }
                 ]

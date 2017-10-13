@@ -85,7 +85,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
     def _update_client_ips_batch_txn(self, txn, to_update):
         self.database_engine.lock_table(txn, "user_ips")
 
-        for entry in to_update.iteritems():
+        for entry in list(to_update.items()):
             (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
 
             self._simple_upsert_txn(
@@ -217,5 +217,5 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                 "user_agent": user_agent,
                 "last_seen": last_seen,
             }
-            for (access_token, ip), (user_agent, last_seen) in results.iteritems()
+            for (access_token, ip), (user_agent, last_seen) in list(results.items())
         ))

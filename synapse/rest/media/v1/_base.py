@@ -26,8 +26,8 @@ from synapse.util.stringutils import is_ascii
 import os
 
 import logging
-import urllib
-import urlparse
+import urllib.request, urllib.parse, urllib.error
+import urllib.parse
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ def parse_media_id(request):
         file_name = None
         if len(request.postpath) > 2:
             try:
-                file_name = urlparse.unquote(request.postpath[-1]).decode("utf-8")
+                file_name = urllib.parse.unquote(request.postpath[-1]).decode("utf-8")
             except UnicodeDecodeError:
                 pass
         return server_name, media_id, file_name
@@ -75,14 +75,14 @@ def respond_with_file(request, media_type, file_path,
                 request.setHeader(
                     b"Content-Disposition",
                     b"inline; filename=%s" % (
-                        urllib.quote(upload_name.encode("utf-8")),
+                        urllib.parse.quote(upload_name.encode("utf-8")),
                     ),
                 )
             else:
                 request.setHeader(
                     b"Content-Disposition",
                     b"inline; filename*=utf-8''%s" % (
-                        urllib.quote(upload_name.encode("utf-8")),
+                        urllib.parse.quote(upload_name.encode("utf-8")),
                     ),
                 )
 

@@ -34,7 +34,7 @@ from twisted.web.util import redirectTo
 
 import collections
 import logging
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import ujson
 
 logger = logging.getLogger(__name__)
@@ -248,8 +248,8 @@ class JsonResource(HttpServer, resource.Resource):
             callback = path_entry.callback
 
             kwargs = intern_dict({
-                name: urllib.unquote(value).decode("UTF-8") if value else value
-                for name, value in m.groupdict().items()
+                name: urllib.parse.unquote(value).decode("UTF-8") if value else value
+                for name, value in list(m.groupdict().items())
             })
 
             callback_return = yield callback(request, **kwargs)

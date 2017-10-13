@@ -552,7 +552,7 @@ class RoomMemberHandler(BaseHandler):
     def verify_any_signature(self, data, server_hostname):
         if server_hostname not in data["signatures"]:
             raise AuthError(401, "No signature from server %s" % (server_hostname,))
-        for key_name, signature in data["signatures"][server_hostname].items():
+        for key_name, signature in list(data["signatures"][server_hostname].items()):
             key_data = yield self.hs.get_simple_http_client().get_json(
                 "%s%s/_matrix/identity/api/v1/pubkey/%s" %
                 (id_server_scheme, server_hostname, key_name,),

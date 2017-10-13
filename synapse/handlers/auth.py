@@ -157,7 +157,7 @@ class AuthHandler(BaseHandler):
                 if result:
                     creds[login_type] = result
                     self._save_session(session)
-            except LoginError, e:
+            except LoginError as e:
                 if login_type == LoginType.EMAIL_IDENTITY:
                     # riot used to have a bug where it would request a new
                     # validation token (thus sending a new email) each time it
@@ -181,12 +181,12 @@ class AuthHandler(BaseHandler):
                 # and is not sensitive).
                 logger.info(
                     "Auth completed with creds: %r. Client dict has keys: %r",
-                    creds, clientdict.keys()
+                    creds, list(clientdict.keys())
                 )
                 defer.returnValue((True, creds, clientdict, session['id']))
 
         ret = self._auth_dict_for_flows(flows, session)
-        ret['completed'] = creds.keys()
+        ret['completed'] = list(creds.keys())
         ret.update(errordict)
         defer.returnValue((False, ret, clientdict, session['id']))
 
@@ -497,7 +497,7 @@ class AuthHandler(BaseHandler):
             logger.warn(
                 "Attempted to login as %s but it matches more than one user "
                 "inexactly: %r",
-                user_id, user_infos.keys()
+                user_id, list(user_infos.keys())
             )
         defer.returnValue(result)
 

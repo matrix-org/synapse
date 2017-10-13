@@ -134,7 +134,7 @@ class EventBase(object):
         return field in self._event_dict
 
     def items(self):
-        return self._event_dict.items()
+        return list(self._event_dict.items())
 
 
 class FrozenEvent(EventBase):
@@ -144,8 +144,8 @@ class FrozenEvent(EventBase):
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
-            name: {sig_id: sig for sig_id, sig in sigs.items()}
-            for name, sigs in event_dict.pop("signatures", {}).items()
+            name: {sig_id: sig for sig_id, sig in list(sigs.items())}
+            for name, sigs in list(event_dict.pop("signatures", {}).items())
         }
 
         unsigned = dict(event_dict.pop("unsigned", {}))

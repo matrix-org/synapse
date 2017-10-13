@@ -195,7 +195,7 @@ class InitialSyncHandler(BaseHandler):
 
                 d["state"] = [
                     serialize_event(c, time_now, as_client_event)
-                    for c in current_state.values()
+                    for c in list(current_state.values())
                 ]
 
                 account_data_events = []
@@ -207,7 +207,7 @@ class InitialSyncHandler(BaseHandler):
                     })
 
                 account_data = account_data_by_room.get(event.room_id, {})
-                for account_data_type, content in account_data.items():
+                for account_data_type, content in list(account_data.items()):
                     account_data_events.append({
                         "type": account_data_type,
                         "content": content,
@@ -220,7 +220,7 @@ class InitialSyncHandler(BaseHandler):
         yield concurrently_execute(handle_room, room_list, 10)
 
         account_data_events = []
-        for account_data_type, content in account_data.items():
+        for account_data_type, content in list(account_data.items()):
             account_data_events.append({
                 "type": account_data_type,
                 "content": content,
@@ -287,7 +287,7 @@ class InitialSyncHandler(BaseHandler):
             })
 
         account_data = yield self.store.get_account_data_for_room(user_id, room_id)
-        for account_data_type, content in account_data.items():
+        for account_data_type, content in list(account_data.items()):
             account_data_events.append({
                 "type": account_data_type,
                 "content": content,
@@ -337,7 +337,7 @@ class InitialSyncHandler(BaseHandler):
                 "start": start_token.to_string(),
                 "end": end_token.to_string(),
             },
-            "state": [serialize_event(s, time_now) for s in room_state.values()],
+            "state": [serialize_event(s, time_now) for s in list(room_state.values())],
             "presence": [],
             "receipts": [],
         })
@@ -353,7 +353,7 @@ class InitialSyncHandler(BaseHandler):
         time_now = self.clock.time_msec()
         state = [
             serialize_event(x, time_now)
-            for x in current_state.values()
+            for x in list(current_state.values())
         ]
 
         now_token = yield self.hs.get_event_sources().get_current_token()
@@ -363,7 +363,7 @@ class InitialSyncHandler(BaseHandler):
             limit = 10
 
         room_members = [
-            m for m in current_state.values()
+            m for m in list(current_state.values())
             if m.type == EventTypes.Member
             and m.content["membership"] == Membership.JOIN
         ]

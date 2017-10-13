@@ -117,7 +117,7 @@ class PresenceStore(SQLBaseStore):
 
         batches = (
             presence_states[i:i + 50]
-            for i in xrange(0, len(presence_states), 50)
+            for i in range(0, len(presence_states), 50)
         )
         for states in batches:
             args = [stream_id]

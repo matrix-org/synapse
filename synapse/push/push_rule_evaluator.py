@@ -203,8 +203,8 @@ def _glob_to_re(glob, word_boundary):
 def _flatten_dict(d, prefix=[], result=None):
     if result is None:
         result = {}
-    for key, value in d.items():
-        if isinstance(value, basestring):
+    for key, value in list(d.items()):
+        if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
         elif hasattr(value, "items"):
             _flatten_dict(value, prefix=(prefix + [key]), result=result)

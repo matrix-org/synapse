@@ -39,8 +39,8 @@ class DefinitionVisitor(ast.NodeVisitor):
 
 
 def non_empty(defs):
-    functions = {name: non_empty(f) for name, f in defs['def'].items()}
-    classes = {name: non_empty(f) for name, f in defs['class'].items()}
+    functions = {name: non_empty(f) for name, f in list(defs['def'].items())}
+    classes = {name: non_empty(f) for name, f in list(defs['class'].items())}
     result = {}
     if functions: result['def'] = functions
     if classes: result['class'] = classes
@@ -70,20 +70,20 @@ def definitions_in_file(filepath):
 
 
 def defined_names(prefix, defs, names):
-    for name, funcs in defs.get('def', {}).items():
+    for name, funcs in list(defs.get('def', {}).items()):
         names.setdefault(name, {'defined': []})['defined'].append(prefix + name)
         defined_names(prefix + name + ".", funcs, names)
 
-    for name, funcs in defs.get('class', {}).items():
+    for name, funcs in list(defs.get('class', {}).items()):
         names.setdefault(name, {'defined': []})['defined'].append(prefix + name)
         defined_names(prefix + name + ".", funcs, names)
 
 
 def used_names(prefix, item, defs, names):
-    for name, funcs in defs.get('def', {}).items():
+    for name, funcs in list(defs.get('def', {}).items()):
         used_names(prefix + name + ".", name, funcs, names)
 
-    for name, funcs in defs.get('class', {}).items():
+    for name, funcs in list(defs.get('class', {}).items()):
         used_names(prefix + name + ".", name, funcs, names)
 
     path = prefix.rstrip('.')
@@ -135,17 +135,17 @@ if __name__ == '__main__':
                     definitions[filepath] = definitions_in_file(filepath)
 
     names = {}
-    for filepath, defs in definitions.items():
+    for filepath, defs in list(definitions.items()):
         defined_names(filepath + ":", defs, names)
 
-    for filepath, defs in definitions.items():
+    for filepath, defs in list(definitions.items()):
         used_names(filepath + ":", None, defs, names)
 
     patterns = [re.compile(pattern) for pattern in args.pattern or ()]
     ignore = [re.compile(pattern) for pattern in args.ignore or ()]
 
     result = {}
-    for name, definition in names.items():
+    for name, definition in list(names.items()):
         if patterns and not any(pattern.match(name) for pattern in patterns):
             continue
         if ignore and any(pattern.match(name) for pattern in ignore):
@@ -158,10 +158,10 @@ if __name__ == '__main__':
     referrers = set()
     while referrer_depth:
         referrer_depth -= 1
-        for entry in result.values():
+        for entry in list(result.values()):
             for used_by in entry.get("used", ()):
                 referrers.add(used_by)
-        for name, definition in names.items():
+        for name, definition in list(names.items()):
             if not name in referrers:
                 continue
             if ignore and any(pattern.match(name) for pattern in ignore):
@@ -172,10 +172,10 @@ if __name__ == '__main__':
     referred = set()
     while referred_depth:
         referred_depth -= 1
-        for entry in result.values():
+        for entry in list(result.values()):
             for uses in entry.get("uses", ()):
                 referred.add(uses)
-        for name, definition in names.items():
+        for name, definition in list(names.items()):
             if not name in referred:
                 continue
             if ignore and any(pattern.match(name) for pattern in ignore):
@@ -185,12 +185,12 @@ if __name__ == '__main__':
     if args.format == 'yaml':
         yaml.dump(result, sys.stdout, default_flow_style=False)
     elif args.format == 'dot':
-        print "digraph {"
-        for name, entry in result.items():
-            print name
+        print("digraph {")
+        for name, entry in list(result.items()):
+            print(name)
             for used_by in entry.get("used", ()):
                 if used_by in result:
-                    print used_by, "->", name
-        print "}"
+                    print((used_by, "->", name))
+        print("}")
     else:
         raise ValueError("Unknown format %r" % (args.format))

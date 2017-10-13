@@ -21,7 +21,7 @@ def row_type_for_columns(name, column_names):
 def parse_response(content):
     streams = json.loads(content)
     result = {}
-    for name, value in streams.items():
+    for name, value in list(streams.items()):
         row_type = row_type_for_columns(name, value["field_names"])
         position = value["position"]
         rows = [row_type(*row) for row in value["rows"]]
@@ -56,7 +56,7 @@ def main():
         except:
             sys.stdout.write("connection_lost("+ repr(streams) + ")\n")
             break
-        for update in results.values():
+        for update in list(results.values()):
             for row in update.rows:
                 sys.stdout.write(repr(row) + "\n")
             streams[update.name] = update.position

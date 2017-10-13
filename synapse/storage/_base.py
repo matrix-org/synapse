@@ -139,7 +139,7 @@ class PerformanceCounters(object):
 
     def interval(self, interval_duration, limit=3):
         counters = []
-        for name, (count, cum_time) in self.current_counters.iteritems():
+        for name, (count, cum_time) in list(self.current_counters.items()):
             prev_count, prev_time = self.previous_counters.get(name, (0, 0))
             counters.append((
                 (cum_time - prev_time) / interval_duration,
@@ -228,7 +228,7 @@ class SQLBaseStore(object):
 
         # We don't really need these to be unique, so lets stop it from
         # growing really large.
-        self._TXN_ID = (self._TXN_ID + 1) % (sys.maxint - 1)
+        self._TXN_ID = (self._TXN_ID + 1) % (sys.maxsize - 1)
 
         name = "%s-%x" % (desc, txn_id, )
 
@@ -368,9 +368,9 @@ class SQLBaseStore(object):
         Returns:
             A list of dicts where the key is the column header.
         """
-        col_headers = list(intern(column[0]) for column in cursor.description)
+        col_headers = list(sys.intern(column[0]) for column in cursor.description)
         results = list(
-            dict(zip(col_headers, row)) for row in cursor
+            dict(list(zip(col_headers, row))) for row in cursor
         )
         return results
 
@@ -425,7 +425,7 @@ class SQLBaseStore(object):
 
     @staticmethod
     def _simple_insert_txn(txn, table, values):
-        keys, vals = zip(*values.items())
+        keys, vals = list(zip(*list(values.items())))
 
         sql = "INSERT INTO %s (%s) VALUES(%s)" % (
             table,
@@ -453,13 +453,13 @@ class SQLBaseStore(object):
         #
         # The sort is to ensure that we don't rely on dictionary iteration
         # order.
-        keys, vals = zip(*[
-            zip(
-                *(sorted(i.items(), key=lambda kv: kv[0]))
-            )
+        keys, vals = list(zip(*[
+            list(zip(
+                *(sorted(list(i.items()), key=lambda kv: kv[0]))
+            ))
             for i in values
             if i
-        ])
+        ]))
 
         for k in keys:
             if k != keys[0]:
@@ -505,7 +505,7 @@ class SQLBaseStore(object):
             ", ".join("%s = ?" % (k,) for k in values),
             " AND ".join("%s = ?" % (k,) for k in keyvalues)
         )
-        sqlargs = values.values() + keyvalues.values()
+        sqlargs = list(values.values()) + list(keyvalues.values())
 
         txn.execute(sql, sqlargs)
         if txn.rowcount == 0:
@@ -520,7 +520,7 @@ class SQLBaseStore(object):
                 ", ".join(k for k in allvalues),
                 ", ".join("?" for _ in allvalues)
             )
-            txn.execute(sql, allvalues.values())
+            txn.execute(sql, list(allvalues.values()))
 
             return True
         else:
@@ -583,7 +583,7 @@ class SQLBaseStore(object):
     @staticmethod
     def _simple_select_onecol_txn(txn, table, keyvalues, retcol):
         if keyvalues:
-            where = "WHERE %s" % " AND ".join("%s = ?" % k for k in keyvalues.iterkeys())
+            where = "WHERE %s" % " AND ".join("%s = ?" % k for k in list(keyvalues.keys()))
         else:
             where = ""
 
@@ -595,7 +595,7 @@ class SQLBaseStore(object):
             "where": where,
         }
 
-        txn.execute(sql, keyvalues.values())
+        txn.execute(sql, list(keyvalues.values()))
 
         return [r[0] for r in txn]
 
@@ -657,7 +657,7 @@ class SQLBaseStore(object):
                 table,
                 " AND ".join("%s = ?" % (k, ) for k in keyvalues)
             )
-            txn.execute(sql, keyvalues.values())
+            txn.execute(sql, list(keyvalues.values()))
         else:
             sql = "SELECT %s FROM %s" % (
                 ", ".join(retcols),
@@ -690,7 +690,7 @@ class SQLBaseStore(object):
 
         chunks = [
             iterable[i:i + batch_size]
-            for i in xrange(0, len(iterable), batch_size)
+            for i in range(0, len(iterable), batch_size)
         ]
         for chunk in chunks:
             rows = yield self.runInteraction(
@@ -730,7 +730,7 @@ class SQLBaseStore(object):
         )
         values.extend(iterable)
 
-        for key, value in keyvalues.iteritems():
+        for key, value in list(keyvalues.items()):
             clauses.append("%s = ?" % (key,))
             values.append(value)
 
@@ -771,7 +771,7 @@ class SQLBaseStore(object):
     @staticmethod
     def _simple_update_one_txn(txn, table, keyvalues, updatevalues):
         if keyvalues:
-            where = "WHERE %s" % " AND ".join("%s = ?" % k for k in keyvalues.iterkeys())
+            where = "WHERE %s" % " AND ".join("%s = ?" % k for k in list(keyvalues.keys()))
         else:
             where = ""
 
@@ -783,7 +783,7 @@ class SQLBaseStore(object):
 
         txn.execute(
             update_sql,
-            updatevalues.values() + keyvalues.values()
+            list(updatevalues.values()) + list(keyvalues.values())
         )
 
         if txn.rowcount == 0:
@@ -800,7 +800,7 @@ class SQLBaseStore(object):
             " AND ".join("%s = ?" % (k,) for k in keyvalues)
         )
 
-        txn.execute(select_sql, keyvalues.values())
+        txn.execute(select_sql, list(keyvalues.values()))
 
         row = txn.fetchone()
         if not row:
@@ -810,7 +810,7 @@ class SQLBaseStore(object):
         if txn.rowcount > 1:
             raise StoreError(500, "More than one row matched")
 
-        return dict(zip(retcols, row))
+        return dict(list(zip(retcols, row)))
 
     def _simple_delete_one(self, table, keyvalues, desc="_simple_delete_one"):
         """Executes a DELETE query on the named table, expecting to delete a
@@ -838,7 +838,7 @@ class SQLBaseStore(object):
             " AND ".join("%s = ?" % (k, ) for k in keyvalues)
         )
 
-        txn.execute(sql, keyvalues.values())
+        txn.execute(sql, list(keyvalues.values()))
         if txn.rowcount == 0:
             raise StoreError(404, "No row found")
         if txn.rowcount > 1:
@@ -856,7 +856,7 @@ class SQLBaseStore(object):
             " AND ".join("%s = ?" % (k, ) for k in keyvalues)
         )
 
-        return txn.execute(sql, keyvalues.values())
+        return txn.execute(sql, list(keyvalues.values()))
 
     def _simple_delete_many(self, table, column, iterable, keyvalues, desc):
         return self.runInteraction(
@@ -888,7 +888,7 @@ class SQLBaseStore(object):
         )
         values.extend(iterable)
 
-        for key, value in keyvalues.iteritems():
+        for key, value in list(keyvalues.items()):
             clauses.append("%s = ?" % (key,))
             values.append(value)
 
@@ -928,7 +928,7 @@ class SQLBaseStore(object):
         txn.close()
 
         if cache:
-            min_val = min(cache.itervalues())
+            min_val = min(cache.values())
         else:
             min_val = max_value
 
@@ -1042,7 +1042,7 @@ class SQLBaseStore(object):
                 " AND ".join("%s = ?" % (k,) for k in keyvalues),
                 " ? ASC LIMIT ? OFFSET ?"
             )
-            txn.execute(sql, keyvalues.values() + pagevalues)
+            txn.execute(sql, list(keyvalues.values()) + pagevalues)
         else:
             sql = "SELECT %s FROM %s ORDER BY %s" % (
                 ", ".join(retcols),

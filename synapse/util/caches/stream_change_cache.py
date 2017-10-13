@@ -40,13 +40,13 @@ class StreamChangeCache(object):
         self.name = name
         self.metrics = register_cache(self.name, self._cache)
 
-        for entity, stream_pos in prefilled_cache.items():
+        for entity, stream_pos in list(prefilled_cache.items()):
             self.entity_has_changed(entity, stream_pos)
 
     def has_entity_changed(self, entity, stream_pos):
         """Returns True if the entity may have been updated since stream_pos
         """
-        assert type(stream_pos) is int or type(stream_pos) is long
+        assert isinstance(stream_pos, int) or isinstance(stream_pos, int)
 
         if stream_pos < self._earliest_known_stream_pos:
             self.metrics.inc_misses()
@@ -68,10 +68,10 @@ class StreamChangeCache(object):
         """Returns subset of entities that have had new things since the
         given position. If the position is too old it will just return the given list.
         """
-        assert type(stream_pos) is int
+        assert isinstance(stream_pos, int)
 
         if stream_pos >= self._earliest_known_stream_pos:
-            keys = self._cache.keys()
+            keys = list(self._cache.keys())
             i = keys.bisect_right(stream_pos)
 
             result = set(
@@ -88,11 +88,11 @@ class StreamChangeCache(object):
     def has_any_entity_changed(self, stream_pos):
         """Returns if any entity has changed
         """
-        assert type(stream_pos) is int
+        assert isinstance(stream_pos, int)
 
         if stream_pos >= self._earliest_known_stream_pos:
             self.metrics.inc_hits()
-            keys = self._cache.keys()
+            keys = list(self._cache.keys())
             i = keys.bisect_right(stream_pos)
 
             return i < len(keys)
@@ -104,10 +104,10 @@ class StreamChangeCache(object):
         """Returns all entites that have had new things since the given
         position. If the position is too old it will return None.
         """
-        assert type(stream_pos) is int
+        assert isinstance(stream_pos, int)
 
         if stream_pos >= self._earliest_known_stream_pos:
-            keys = self._cache.keys()
+            keys = list(self._cache.keys())
             i = keys.bisect_right(stream_pos)
 
             return [self._cache[k] for k in keys[i:]]
@@ -118,7 +118,7 @@ class StreamChangeCache(object):
         """Informs the cache that the entity has been changed at the given
         position.
         """
-        assert type(stream_pos) is int
+        assert isinstance(stream_pos, int)
 
         if stream_pos > self._earliest_known_stream_pos:
             old_pos = self._entity_to_key.get(entity, None)

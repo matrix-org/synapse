@@ -239,10 +239,10 @@ class _CacheDescriptorBase(object):
         # self.arg_defaults is a map of arg name to its default value for each
         # argument that has a default value
         if arg_spec.defaults:
-            self.arg_defaults = dict(zip(
+            self.arg_defaults = dict(list(zip(
                 all_args[-len(arg_spec.defaults):],
                 arg_spec.defaults
-            ))
+            )))
         else:
             self.arg_defaults = {}
 
@@ -378,7 +378,7 @@ class CacheDescriptor(_CacheDescriptorBase):
 
                 # If our cache_key is a string, try to convert to ascii to save
                 # a bit of space in large caches
-                if isinstance(cache_key, basestring):
+                if isinstance(cache_key, str):
                     cache_key = to_ascii(cache_key)
 
                 result_d = ObservableDeferred(ret, consumeErrors=True)
@@ -549,7 +549,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
                     return results
 
                 return logcontext.make_deferred_yieldable(defer.gatherResults(
-                    cached_defers.values(),
+                    list(cached_defers.values()),
                     consumeErrors=True,
                 ).addCallback(update_results_dict).addErrback(
                     unwrapFirstError

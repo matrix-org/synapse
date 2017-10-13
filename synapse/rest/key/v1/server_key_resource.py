@@ -68,9 +68,9 @@ class LocalKey(Resource):
             server_config.tls_certificate
         )
         json_object = {
-            u"server_name": server_config.server_name,
-            u"verify_keys": verify_keys,
-            u"tls_certificate": encode_base64(x509_certificate_bytes)
+            "server_name": server_config.server_name,
+            "verify_keys": verify_keys,
+            "tls_certificate": encode_base64(x509_certificate_bytes)
         }
         for key in server_config.signing_key:
             json_object = sign_json(

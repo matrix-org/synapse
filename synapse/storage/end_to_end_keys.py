@@ -81,8 +81,8 @@ class EndToEndKeyStore(SQLBaseStore):
             query_list, include_all_devices,
         )
 
-        for user_id, device_keys in results.iteritems():
-            for device_id, device_info in device_keys.iteritems():
+        for user_id, device_keys in list(results.items()):
+            for device_id, device_info in list(device_keys.items()):
                 device_info["keys"] = json.loads(device_info.pop("key_json"))
 
         defer.returnValue(results)

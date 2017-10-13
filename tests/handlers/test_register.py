@@ -56,8 +56,8 @@ class RegistrationTestCase(unittest.TestCase):
         requester = create_requester("@as:test")
         result_user_id, result_token = yield self.handler.get_or_create_user(
             requester, local_part, display_name)
-        self.assertEquals(result_user_id, user_id)
-        self.assertEquals(result_token, 'secret')
+        self.assertEqual(result_user_id, user_id)
+        self.assertEqual(result_token, 'secret')
 
     @defer.inlineCallbacks
     def test_if_user_exists(self):
@@ -73,5 +73,5 @@ class RegistrationTestCase(unittest.TestCase):
         requester = create_requester("@as:test")
         result_user_id, result_token = yield self.handler.get_or_create_user(
             requester, local_part, display_name)
-        self.assertEquals(result_user_id, user_id)
-        self.assertEquals(result_token, 'secret')
+        self.assertEqual(result_user_id, user_id)
+        self.assertEqual(result_token, 'secret')

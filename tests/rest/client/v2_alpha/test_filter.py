@@ -74,21 +74,21 @@ class FilterTestCase(unittest.TestCase):
         (code, response) = yield self.mock_resource.trigger(
             "POST", "/user/%s/filter" % (self.USER_ID), self.EXAMPLE_FILTER_JSON
         )
-        self.assertEquals(200, code)
-        self.assertEquals({"filter_id": "0"}, response)
+        self.assertEqual(200, code)
+        self.assertEqual({"filter_id": "0"}, response)
         filter = yield self.store.get_user_filter(
             user_localpart='apple',
             filter_id=0,
         )
-        self.assertEquals(filter, self.EXAMPLE_FILTER)
+        self.assertEqual(filter, self.EXAMPLE_FILTER)
 
     @defer.inlineCallbacks
     def test_add_filter_for_other_user(self):
         (code, response) = yield self.mock_resource.trigger(
             "POST", "/user/%s/filter" % ('@watermelon:test'), self.EXAMPLE_FILTER_JSON
         )
-        self.assertEquals(403, code)
-        self.assertEquals(response['errcode'], Codes.FORBIDDEN)
+        self.assertEqual(403, code)
+        self.assertEqual(response['errcode'], Codes.FORBIDDEN)
 
     @defer.inlineCallbacks
     def test_add_filter_non_local_user(self):
@@ -98,8 +98,8 @@ class FilterTestCase(unittest.TestCase):
             "POST", "/user/%s/filter" % (self.USER_ID), self.EXAMPLE_FILTER_JSON
         )
         self.hs.is_mine = _is_mine
-        self.assertEquals(403, code)
-        self.assertEquals(response['errcode'], Codes.FORBIDDEN)
+        self.assertEqual(403, code)
+        self.assertEqual(response['errcode'], Codes.FORBIDDEN)
 
     @defer.inlineCallbacks
     def test_get_filter(self):
@@ -110,16 +110,16 @@ class FilterTestCase(unittest.TestCase):
         (code, response) = yield self.mock_resource.trigger_get(
             "/user/%s/filter/%s" % (self.USER_ID, filter_id)
         )
-        self.assertEquals(200, code)
-        self.assertEquals(self.EXAMPLE_FILTER, response)
+        self.assertEqual(200, code)
+        self.assertEqual(self.EXAMPLE_FILTER, response)
 
     @defer.inlineCallbacks
     def test_get_filter_non_existant(self):
         (code, response) = yield self.mock_resource.trigger_get(
             "/user/%s/filter/12382148321" % (self.USER_ID)
         )
-        self.assertEquals(400, code)
-        self.assertEquals(response['errcode'], Codes.NOT_FOUND)
+        self.assertEqual(400, code)
+        self.assertEqual(response['errcode'], Codes.NOT_FOUND)
 
     # Currently invalid params do not have an appropriate errcode
     # in errors.py
@@ -128,7 +128,7 @@ class FilterTestCase(unittest.TestCase):
         (code, response) = yield self.mock_resource.trigger_get(
             "/user/%s/filter/foobar" % (self.USER_ID)
         )
-        self.assertEquals(400, code)
+        self.assertEqual(400, code)
 
     # No ID also returns an invalid_id error
     @defer.inlineCallbacks
@@ -136,4 +136,4 @@ class FilterTestCase(unittest.TestCase):
         (code, response) = yield self.mock_resource.trigger_get(
             "/user/%s/filter/" % (self.USER_ID)
         )
-        self.assertEquals(400, code)
+        self.assertEqual(400, code)

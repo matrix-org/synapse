@@ -332,7 +332,7 @@ class SyncRestServlet(RestServlet):
         state_dict = room.state
         timeline_events = room.timeline.events
 
-        state_events = state_dict.values()
+        state_events = list(state_dict.values())
 
         for event in itertools.chain(state_events, timeline_events):
             # We've had bug reports that events were coming down under the

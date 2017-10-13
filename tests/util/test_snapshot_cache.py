@@ -28,7 +28,7 @@ class SnapshotCacheTestCase(unittest.TestCase):
 
     def test_get_set(self):
         # Check that getting a missing key returns None
-        self.assertEquals(self.cache.get(0, "key"), None)
+        self.assertEqual(self.cache.get(0, "key"), None)
 
         # Check that setting a key with a deferred returns
         # a deferred that resolves when the initial deferred does

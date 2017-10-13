@@ -85,7 +85,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def STALE_test_room_name(self):
-        name = u"A-Room-Name"
+        name = "A-Room-Name"
 
         yield self.inject_room_event(
             etype=EventTypes.Name,
@@ -98,7 +98,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
             room_id=self.room.to_string()
         )
 
-        self.assertEquals(1, len(state))
+        self.assertEqual(1, len(state))
         self.assertObjectHasAttributes(
             {"type": "m.room.name",
              "room_id": self.room.to_string(),
@@ -108,7 +108,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def STALE_test_room_topic(self):
-        topic = u"A place for things"
+        topic = "A place for things"
 
         yield self.inject_room_event(
             etype=EventTypes.Topic,
@@ -121,7 +121,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
             room_id=self.room.to_string()
         )
 
-        self.assertEquals(1, len(state))
+        self.assertEqual(1, len(state))
         self.assertObjectHasAttributes(
             {"type": "m.room.topic",
              "room_id": self.room.to_string(),

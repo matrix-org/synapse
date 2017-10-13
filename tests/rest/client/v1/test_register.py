@@ -68,7 +68,7 @@ class CreateUserServletTestCase(unittest.TestCase):
         )
 
         (code, result) = yield self.servlet.on_POST(self.request)
-        self.assertEquals(code, 200)
+        self.assertEqual(code, 200)
 
         det_data = {
             "user_id": user_id,

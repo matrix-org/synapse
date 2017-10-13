@@ -97,7 +97,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             retcol="retcol"
         )
 
-        self.assertEquals("Value", value)
+        self.assertEqual("Value", value)
         self.mock_txn.execute.assert_called_with(
             "SELECT retcol FROM tablename WHERE keycol = ?", ["TheKey"]
         )
@@ -113,7 +113,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             retcols=["colA", "colB", "colC"]
         )
 
-        self.assertEquals({"colA": 1, "colB": 2, "colC": 3}, ret)
+        self.assertEqual({"colA": 1, "colB": 2, "colC": 3}, ret)
         self.mock_txn.execute.assert_called_with(
             "SELECT colA, colB, colC FROM tablename WHERE keycol = ?",
             ["TheKey"]
@@ -147,7 +147,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             retcols=["colA"],
         )
 
-        self.assertEquals([{"colA": 1}, {"colA": 2}, {"colA": 3}], ret)
+        self.assertEqual([{"colA": 1}, {"colA": 2}, {"colA": 3}], ret)
         self.mock_txn.execute.assert_called_with(
             "SELECT colA FROM tablename WHERE keycol = ?",
             ["A set"]

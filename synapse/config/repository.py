@@ -61,7 +61,7 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         requirements.setdefault("image/png", []).append(png_thumbnail)
     return {
         media_type: tuple(thumbnails)
-        for media_type, thumbnails in requirements.items()
+        for media_type, thumbnails in list(requirements.items())
     }
 
 

@@ -377,7 +377,7 @@ class UserDirectoyHandler(object):
 
         if change:
             users_with_profile = yield self.state.get_current_user_in_room(room_id)
-            for user_id, profile in users_with_profile.iteritems():
+            for user_id, profile in list(users_with_profile.items()):
                 yield self._handle_new_user(room_id, user_id, profile)
         else:
             users = yield self.store.get_users_in_public_due_to_room(room_id)

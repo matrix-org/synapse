@@ -24,7 +24,7 @@ def enumerate_leaves(node, depth):
     if depth == 0:
         yield node
     else:
-        for n in node.values():
+        for n in list(node.values()):
             for m in enumerate_leaves(n, depth - 1):
                 yield m
 
@@ -185,7 +185,7 @@ class LruCache(object):
         def cache_clear():
             list_root.next_node = list_root
             list_root.prev_node = list_root
-            for node in cache.values():
+            for node in list(cache.values()):
                 for cb in node.callbacks:
                     cb()
             cache.clear()

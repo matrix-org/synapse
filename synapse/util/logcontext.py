@@ -83,7 +83,7 @@ class LoggingContext(object):
         def add_database_transaction(self, duration_ms):
             pass
 
-        def __nonzero__(self):
+        def __bool__(self):
             return False
 
     sentinel = Sentinel()
@@ -156,7 +156,7 @@ class LoggingContext(object):
 
     def copy_to(self, record):
         """Copy fields from this context to the record"""
-        for key, value in self.__dict__.items():
+        for key, value in list(self.__dict__.items()):
             setattr(record, key, value)
 
         record.ru_utime, record.ru_stime = self.get_resource_usage()
@@ -213,7 +213,7 @@ class LoggingContextFilter(logging.Filter):
             True to include the record in the log output.
         """
         context = LoggingContext.current_context()
-        for key, value in self.defaults.items():
+        for key, value in list(self.defaults.items()):
             setattr(record, key, value)
         context.copy_to(record)
         return True

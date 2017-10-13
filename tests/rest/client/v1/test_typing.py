@@ -111,14 +111,14 @@ class RoomTypingTestCase(RestTestCase):
             "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             '{"typing": true, "timeout": 30000}'
         )
-        self.assertEquals(200, code)
+        self.assertEqual(200, code)
 
-        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEqual(self.event_source.get_current_key(), 1)
         events = yield self.event_source.get_new_events(
             from_key=0,
             room_ids=[self.room_id],
         )
-        self.assertEquals(events[0], [{
+        self.assertEqual(events[0], [{
             "type": "m.typing",
             "room_id": self.room_id,
             "content": {
@@ -132,7 +132,7 @@ class RoomTypingTestCase(RestTestCase):
             "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             '{"typing": false}'
         )
-        self.assertEquals(200, code)
+        self.assertEqual(200, code)
 
     @defer.inlineCallbacks
     def test_typing_timeout(self):
@@ -140,18 +140,18 @@ class RoomTypingTestCase(RestTestCase):
             "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             '{"typing": true, "timeout": 30000}'
         )
-        self.assertEquals(200, code)
+        self.assertEqual(200, code)
 
-        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEqual(self.event_source.get_current_key(), 1)
 
         self.clock.advance_time(36)
 
-        self.assertEquals(self.event_source.get_current_key(), 2)
+        self.assertEqual(self.event_source.get_current_key(), 2)
 
         (code, _) = yield self.mock_resource.trigger(
             "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             '{"typing": true, "timeout": 30000}'
         )
-        self.assertEquals(200, code)
+        self.assertEqual(200, code)
 
-        self.assertEquals(self.event_source.get_current_key(), 3)
+        self.assertEqual(self.event_source.get_current_key(), 3)

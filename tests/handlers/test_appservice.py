@@ -131,8 +131,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             interested_service,
             room_alias_str
         )
-        self.assertEquals(result.room_id, room_id)
-        self.assertEquals(result.servers, servers)
+        self.assertEqual(result.room_id, room_id)
+        self.assertEqual(result.servers, servers)
 
     def _mkservice(self, is_interested):
         service = Mock()

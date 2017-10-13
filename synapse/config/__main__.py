@@ -16,7 +16,7 @@ from synapse.config._base import ConfigError
 
 if __name__ == "__main__":
     import sys
-    from homeserver import HomeServerConfig
+    from .homeserver import HomeServerConfig
 
     action = sys.argv[1]
 
@@ -28,7 +28,7 @@ if __name__ == "__main__":
             sys.stderr.write("\n" + e.message + "\n")
             sys.exit(1)
 
-        print (getattr(config, key))
+        print((getattr(config, key)))
         sys.exit(0)
     else:
         sys.stderr.write("Unknown command %r\n" % (action,))

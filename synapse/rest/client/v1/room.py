@@ -28,7 +28,7 @@ from synapse.http.servlet import (
 )
 
 import logging
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import ujson as json
 
 logger = logging.getLogger(__name__)
@@ -412,7 +412,7 @@ class JoinedRoomMemberListRestServlet(ClientV1RestServlet):
                     "avatar_url": profile.avatar_url,
                     "display_name": profile.display_name,
                 }
-                for user_id, profile in users_with_profile.iteritems()
+                for user_id, profile in list(users_with_profile.items())
             }
         }))
 
@@ -434,7 +434,7 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
         as_client_event = "raw" not in request.args
         filter_bytes = request.args.get("filter", None)
         if filter_bytes:
-            filter_json = urllib.unquote(filter_bytes[-1]).decode("UTF-8")
+            filter_json = urllib.parse.unquote(filter_bytes[-1]).decode("UTF-8")
             event_filter = Filter(json.loads(filter_json))
         else:
             event_filter = None
@@ -692,8 +692,8 @@ class RoomTypingRestServlet(ClientV1RestServlet):
     def on_PUT(self, request, room_id, user_id):
         requester = yield self.auth.get_user_by_req(request)
 
-        room_id = urllib.unquote(room_id)
-        target_user = UserID.from_string(urllib.unquote(user_id))
+        room_id = urllib.parse.unquote(room_id)
+        target_user = UserID.from_string(urllib.parse.unquote(user_id))
 
         content = parse_json_object_from_request(request)
 

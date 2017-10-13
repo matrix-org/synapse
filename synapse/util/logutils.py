@@ -30,8 +30,8 @@ def _log_debug_as_f(f, msg, msg_args):
     logger = logging.getLogger(name)
 
     if logger.isEnabledFor(logging.DEBUG):
-        lineno = f.func_code.co_firstlineno
-        pathname = f.func_code.co_filename
+        lineno = f.__code__.co_firstlineno
+        pathname = f.__code__.co_filename
 
         record = logging.LogRecord(
             name=name,
@@ -67,7 +67,7 @@ def log_function(f):
                 return r
 
             func_args = [
-                "%s=%s" % (k, format(v)) for k, v in bound_args.items()
+                "%s=%s" % (k, format(v)) for k, v in list(bound_args.items())
             ]
 
             msg_args = {
@@ -121,8 +121,8 @@ def time_function(f):
 
 def trace_function(f):
     func_name = f.__name__
-    linenum = f.func_code.co_firstlineno
-    pathname = f.func_code.co_filename
+    linenum = f.__code__.co_firstlineno
+    pathname = f.__code__.co_filename
 
     @wraps(f)
     def wrapped(*args, **kwargs):

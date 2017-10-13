@@ -151,7 +151,7 @@ class RoomListHandler(BaseHandler):
 
         yield concurrently_execute(get_order_for_room, room_ids, 10)
 
-        sorted_entries = sorted(rooms_to_order_value.items(), key=lambda e: e[1])
+        sorted_entries = sorted(list(rooms_to_order_value.items()), key=lambda e: e[1])
         sorted_rooms = [room_id for room_id, _ in sorted_entries]
 
         # `sorted_rooms` should now be a list of all public room ids that is
@@ -181,7 +181,7 @@ class RoomListHandler(BaseHandler):
         chunk = []
         if limit and not search_filter:
             step = limit + 1
-            for i in xrange(0, len(rooms_to_scan), step):
+            for i in range(0, len(rooms_to_scan), step):
                 # We iterate here because the vast majority of cases we'll stop
                 # at first iteration, but occaisonally _append_room_entry_to_chunk
                 # won't append to the chunk and so we need to loop again.
@@ -295,7 +295,7 @@ class RoomListHandler(BaseHandler):
         )
 
         event_map = yield self.store.get_events([
-            event_id for key, event_id in current_state_ids.iteritems()
+            event_id for key, event_id in list(current_state_ids.items())
             if key[0] in (
                 EventTypes.JoinRules,
                 EventTypes.Name,
@@ -309,7 +309,7 @@ class RoomListHandler(BaseHandler):
 
         current_state = {
             (ev.type, ev.state_key): ev
-            for ev in event_map.values()
+            for ev in list(event_map.values())
         }
 
         # Double check that this is actually a public room.
@@ -432,19 +432,19 @@ class RoomListNextBatch(namedtuple("RoomListNextBatch", (
         "direction_is_forward": "d",
     }
 
-    REVERSE_KEY_DICT = {v: k for k, v in KEY_DICT.items()}
+    REVERSE_KEY_DICT = {v: k for k, v in list(KEY_DICT.items())}
 
     @classmethod
     def from_token(cls, token):
         return RoomListNextBatch(**{
             cls.REVERSE_KEY_DICT[key]: val
-            for key, val in msgpack.loads(decode_base64(token)).items()
+            for key, val in list(msgpack.loads(decode_base64(token)).items())
         })
 
     def to_token(self):
         return encode_base64(msgpack.dumps({
             self.KEY_DICT[key]: val
-            for key, val in self._asdict().items()
+            for key, val in list(self._asdict().items())
         }))
 
     def copy_and_replace(self, **kwds):

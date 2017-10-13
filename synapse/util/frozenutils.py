@@ -19,12 +19,12 @@ from frozendict import frozendict
 def freeze(o):
     t = type(o)
     if t is dict:
-        return frozendict({k: freeze(v) for k, v in o.items()})
+        return frozendict({k: freeze(v) for k, v in list(o.items())})
 
     if t is frozendict:
         return o
 
-    if t is str or t is unicode:
+    if t is str or t is str:
         return o
 
     try:
@@ -38,9 +38,9 @@ def freeze(o):
 def unfreeze(o):
     t = type(o)
     if t is dict or t is frozendict:
-        return dict({k: unfreeze(v) for k, v in o.items()})
+        return dict({k: unfreeze(v) for k, v in list(o.items())})
 
-    if t is str or t is unicode:
+    if t is str or t is str:
         return o
 
     try:

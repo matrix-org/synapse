@@ -25,19 +25,19 @@ class CounterMetricTestCase(unittest.TestCase):
     def test_scalar(self):
         counter = CounterMetric("scalar")
 
-        self.assertEquals(counter.render(), [
+        self.assertEqual(counter.render(), [
             'scalar 0',
         ])
 
         counter.inc()
 
-        self.assertEquals(counter.render(), [
+        self.assertEqual(counter.render(), [
             'scalar 1',
         ])
 
         counter.inc_by(2)
 
-        self.assertEquals(counter.render(), [
+        self.assertEqual(counter.render(), [
             'scalar 3'
         ])
 
@@ -45,18 +45,18 @@ class CounterMetricTestCase(unittest.TestCase):
         counter = CounterMetric("vector", labels=["method"])
 
         # Empty counter doesn't yet know what values it has
-        self.assertEquals(counter.render(), [])
+        self.assertEqual(counter.render(), [])
 
         counter.inc("GET")
 
-        self.assertEquals(counter.render(), [
+        self.assertEqual(counter.render(), [
             'vector{method="GET"} 1',
         ])
 
         counter.inc("GET")
         counter.inc("PUT")
 
-        self.assertEquals(counter.render(), [
+        self.assertEqual(counter.render(), [
             'vector{method="GET"} 2',
             'vector{method="PUT"} 1',
         ])
@@ -69,13 +69,13 @@ class CallbackMetricTestCase(unittest.TestCase):
 
         metric = CallbackMetric("size", lambda: len(d))
 
-        self.assertEquals(metric.render(), [
+        self.assertEqual(metric.render(), [
             'size 0',
         ])
 
         d["key"] = "value"
 
-        self.assertEquals(metric.render(), [
+        self.assertEqual(metric.render(), [
             'size 1',
         ])
 
@@ -84,13 +84,13 @@ class CallbackMetricTestCase(unittest.TestCase):
 
         metric = CallbackMetric("values", lambda: vals, labels=["type"])
 
-        self.assertEquals(metric.render(), [])
+        self.assertEqual(metric.render(), [])
 
         # Keys have to be tuples, even if they're 1-element
         vals[("foo",)] = 1
         vals[("bar",)] = 2
 
-        self.assertEquals(metric.render(), [
+        self.assertEqual(metric.render(), [
             'values{type="bar"} 2',
             'values{type="foo"} 1',
         ])
@@ -101,14 +101,14 @@ class DistributionMetricTestCase(unittest.TestCase):
     def test_scalar(self):
         metric = DistributionMetric("thing")
 
-        self.assertEquals(metric.render(), [
+        self.assertEqual(metric.render(), [
             'thing:count 0',
             'thing:total 0',
         ])
 
         metric.inc_by(500)
 
-        self.assertEquals(metric.render(), [
+        self.assertEqual(metric.render(), [
             'thing:count 1',
             'thing:total 500',
         ])
@@ -116,13 +116,13 @@ class DistributionMetricTestCase(unittest.TestCase):
     def test_vector(self):
         metric = DistributionMetric("queries", labels=["verb"])
 
-        self.assertEquals(metric.render(), [])
+        self.assertEqual(metric.render(), [])
 
         metric.inc_by(300, "SELECT")
         metric.inc_by(200, "SELECT")
         metric.inc_by(800, "INSERT")
 
-        self.assertEquals(metric.render(), [
+        self.assertEqual(metric.render(), [
             'queries:count{verb="INSERT"} 1',
             'queries:count{verb="SELECT"} 2',
             'queries:total{verb="INSERT"} 800',
@@ -137,7 +137,7 @@ class CacheMetricTestCase(unittest.TestCase):
 
         metric = CacheMetric("cache", lambda: len(d), "cache_name")
 
-        self.assertEquals(metric.render(), [
+        self.assertEqual(metric.render(), [
             'cache:hits{name="cache_name"} 0',
             'cache:total{name="cache_name"} 0',
             'cache:size{name="cache_name"} 0',
@@ -146,7 +146,7 @@ class CacheMetricTestCase(unittest.TestCase):
         metric.inc_misses()
         d["key"] = "value"
 
-        self.assertEquals(metric.render(), [
+        self.assertEqual(metric.render(), [
             'cache:hits{name="cache_name"} 0',
             'cache:total{name="cache_name"} 1',
             'cache:size{name="cache_name"} 1',
@@ -154,7 +154,7 @@ class CacheMetricTestCase(unittest.TestCase):
 
         metric.inc_hits()
 
-        self.assertEquals(metric.render(), [
+        self.assertEqual(metric.render(), [
             'cache:hits{name="cache_name"} 1',
             'cache:total{name="cache_name"} 2',
             'cache:size{name="cache_name"} 1',

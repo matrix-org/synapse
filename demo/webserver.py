@@ -1,12 +1,12 @@
 import argparse
-import BaseHTTPServer
+import http.server
 import os
-import SimpleHTTPServer
+import http.server
 import cgi, logging
 
 from daemonize import Daemonize
 
-class SimpleHTTPRequestHandlerWithPOST(SimpleHTTPServer.SimpleHTTPRequestHandler):
+class SimpleHTTPRequestHandlerWithPOST(http.server.SimpleHTTPRequestHandler):
     UPLOAD_PATH = "upload"
 
     """
@@ -40,7 +40,7 @@ def setup():
     os.chdir(args.directory)
     dr = os.getcwd()
 
-    httpd = BaseHTTPServer.HTTPServer(
+    httpd = http.server.HTTPServer(
         ('', args.port),
         SimpleHTTPRequestHandlerWithPOST
     )

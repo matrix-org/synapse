@@ -37,13 +37,13 @@ def main():
 
     for alg_name in event_json.hashes:
         if check_event_content_hash(event_json, algorithms[alg_name]):
-            print "PASS content hash %s" % (alg_name,)
+            print(("PASS content hash %s" % (alg_name,)))
         else:
-            print "FAIL content hash %s" % (alg_name,)
+            print(("FAIL content hash %s" % (alg_name,)))
 
-    for algorithm in algorithms.values():
+    for algorithm in list(algorithms.values()):
         name, h_bytes = compute_event_reference_hash(event_json, algorithm)
-        print "Reference hash %s: %s" % (name, encode_base64(h_bytes))
+        print(("Reference hash %s: %s" % (name, encode_base64(h_bytes))))
 
 if __name__=="__main__":
     main()

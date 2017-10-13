@@ -15,7 +15,7 @@
 
 """Contains functions for registering clients."""
 import logging
-import urllib
+import urllib.request, urllib.parse, urllib.error
 
 from twisted.internet import defer
 
@@ -47,7 +47,7 @@ class RegistrationHandler(BaseHandler):
                        assigned_user_id=None):
         yield run_on_reactor()
 
-        if urllib.quote(localpart.encode('utf-8')) != localpart:
+        if urllib.parse.quote(localpart.encode('utf-8')) != localpart:
             raise SynapseError(
                 400,
                 "User ID can only contain characters a-z, 0-9, or '_-./'",
@@ -253,7 +253,7 @@ class RegistrationHandler(BaseHandler):
         """
         Registers email_id as SAML2 Based Auth.
         """
-        if urllib.quote(localpart) != localpart:
+        if urllib.parse.quote(localpart) != localpart:
             raise SynapseError(
                 400,
                 "User ID must only contain characters which do not"

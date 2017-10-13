@@ -48,6 +48,6 @@ class KeyStoreTestCase(tests.unittest.TestCase):
         res = yield self.store.get_server_verify_keys(
             "server1", ["ed25519:key1", "ed25519:key2", "ed25519:key3"])
 
-        self.assertEqual(len(res.keys()), 2)
+        self.assertEqual(len(list(res.keys())), 2)
         self.assertEqual(res["ed25519:key1"].version, "key1")
         self.assertEqual(res["ed25519:key2"].version, "key2")

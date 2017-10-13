@@ -48,7 +48,7 @@ def run_upgrade(cur, database_engine, config, *args, **kwargs):
         user_id = row[0]
         for appservice in appservices:
             if appservice.is_exclusive_user(user_id):
-                if user_id in owned.keys():
+                if user_id in list(owned.keys()):
                     logger.error(
                         "user_id %s was owned by more than one application"
                         " service (IDs %s and %s); assigning arbitrarily to %s" %
@@ -56,9 +56,9 @@ def run_upgrade(cur, database_engine, config, *args, **kwargs):
                     )
                 owned.setdefault(appservice.id, []).append(user_id)
 
-    for as_id, user_ids in owned.items():
+    for as_id, user_ids in list(owned.items()):
         n = 100
-        user_chunks = (user_ids[i:i + 100] for i in xrange(0, len(user_ids), n))
+        user_chunks = (user_ids[i:i + 100] for i in range(0, len(user_ids), n))
         for chunk in user_chunks:
             cur.execute(
                 database_engine.convert_param_style(

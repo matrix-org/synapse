@@ -118,11 +118,10 @@ class StreamIdGenerator(object):
                 # ... persist events ...
         """
         with self._lock:
-            next_ids = range(
+            next_ids = list(range(
                 self._current + self._step,
                 self._current + self._step * (n + 1),
-                self._step
-            )
+                self._step))
             self._current += n * self._step
 
             for next_id in next_ids:

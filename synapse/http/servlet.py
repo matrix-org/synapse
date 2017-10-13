@@ -185,7 +185,7 @@ def parse_json_object_from_request(request):
     """
     content = parse_json_value_from_request(request)
 
-    if type(content) != dict:
+    if not isinstance(content, dict):
         message = "Content must be a JSON object."
         raise SynapseError(400, message, errcode=Codes.BAD_JSON)
 

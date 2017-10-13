@@ -36,7 +36,7 @@ class EventSources(object):
     def __init__(self, hs):
         self.sources = {
             name: cls(hs)
-            for name, cls in EventSources.SOURCE_TYPES.items()
+            for name, cls in list(EventSources.SOURCE_TYPES.items())
         }
         self.store = hs.get_datastore()
 

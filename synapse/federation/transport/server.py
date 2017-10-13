@@ -338,7 +338,7 @@ class FederationQueryServlet(BaseFederationServlet):
     def on_GET(self, origin, content, query, query_type):
         return self.handler.on_query_request(
             query_type,
-            {k: v[0].decode("utf-8") for k, v in query.items()}
+            {k: v[0].decode("utf-8") for k, v in list(query.items())}
         )
 
 

@@ -117,7 +117,7 @@ def make_graph(db_name, room_id, file_prefix, limit):
             edge = pydot.Edge(node_map[event.event_id], end_node)
             graph.add_edge(edge)
 
-    for group, event_ids in state_groups.items():
+    for group, event_ids in list(state_groups.items()):
         if len(event_ids) <= 1:
             continue
 

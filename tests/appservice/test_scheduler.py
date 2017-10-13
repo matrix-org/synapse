@@ -57,7 +57,7 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         self.store.create_appservice_txn.assert_called_once_with(
             service=service, events=events  # txn made and saved
         )
-        self.assertEquals(0, len(self.txnctrl.recoverers))  # no recoverer made
+        self.assertEqual(0, len(self.txnctrl.recoverers))  # no recoverer made
         txn.complete.assert_called_once_with(self.store)  # txn completed
 
     def test_single_service_down(self):
@@ -80,8 +80,8 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         self.store.create_appservice_txn.assert_called_once_with(
             service=service, events=events  # txn made and saved
         )
-        self.assertEquals(0, txn.send.call_count)  # txn not sent though
-        self.assertEquals(0, txn.complete.call_count)  # or completed
+        self.assertEqual(0, txn.send.call_count)  # txn not sent though
+        self.assertEqual(0, txn.complete.call_count)  # or completed
 
     def test_single_service_up_txn_not_sent(self):
         # Test: The AS is up and the txn is not sent. A Recoverer is made and
@@ -107,10 +107,10 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         self.store.create_appservice_txn.assert_called_once_with(
             service=service, events=events
         )
-        self.assertEquals(1, self.recoverer_fn.call_count)  # recoverer made
-        self.assertEquals(1, self.recoverer.recover.call_count)  # and invoked
-        self.assertEquals(1, len(self.txnctrl.recoverers))  # and stored
-        self.assertEquals(0, txn.complete.call_count)  # txn not completed
+        self.assertEqual(1, self.recoverer_fn.call_count)  # recoverer made
+        self.assertEqual(1, self.recoverer.recover.call_count)  # and invoked
+        self.assertEqual(1, len(self.txnctrl.recoverers))  # and stored
+        self.assertEqual(0, txn.complete.call_count)  # txn not completed
         self.store.set_appservice_state.assert_called_once_with(
             service, ApplicationServiceState.DOWN  # service marked as down
         )
@@ -143,16 +143,16 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
 
         self.recoverer.recover()
         # shouldn't have called anything prior to waiting for exp backoff
-        self.assertEquals(0, self.store.get_oldest_unsent_txn.call_count)
+        self.assertEqual(0, self.store.get_oldest_unsent_txn.call_count)
         txn.send = Mock(return_value=True)
         # wait for exp backoff
         self.clock.advance_time(2)
-        self.assertEquals(1, txn.send.call_count)
-        self.assertEquals(1, txn.complete.call_count)
+        self.assertEqual(1, txn.send.call_count)
+        self.assertEqual(1, txn.complete.call_count)
         # 2 because it needs to get None to know there are no more txns
-        self.assertEquals(2, self.store.get_oldest_unsent_txn.call_count)
+        self.assertEqual(2, self.store.get_oldest_unsent_txn.call_count)
         self.callback.assert_called_once_with(self.recoverer)
-        self.assertEquals(self.recoverer.service, self.service)
+        self.assertEqual(self.recoverer.service, self.service)
 
     def test_recover_retry_txn(self):
         txn = Mock()
@@ -167,25 +167,25 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.store.get_oldest_unsent_txn = Mock(side_effect=take_txn)
 
         self.recoverer.recover()
-        self.assertEquals(0, self.store.get_oldest_unsent_txn.call_count)
+        self.assertEqual(0, self.store.get_oldest_unsent_txn.call_count)
         txn.send = Mock(return_value=False)
         self.clock.advance_time(2)
-        self.assertEquals(1, txn.send.call_count)
-        self.assertEquals(0, txn.complete.call_count)
-        self.assertEquals(0, self.callback.call_count)
+        self.assertEqual(1, txn.send.call_count)
+        self.assertEqual(0, txn.complete.call_count)
+        self.assertEqual(0, self.callback.call_count)
         self.clock.advance_time(4)
-        self.assertEquals(2, txn.send.call_count)
-        self.assertEquals(0, txn.complete.call_count)
-        self.assertEquals(0, self.callback.call_count)
+        self.assertEqual(2, txn.send.call_count)
+        self.assertEqual(0, txn.complete.call_count)
+        self.assertEqual(0, self.callback.call_count)
         self.clock.advance_time(8)
-        self.assertEquals(3, txn.send.call_count)
-        self.assertEquals(0, txn.complete.call_count)
-        self.assertEquals(0, self.callback.call_count)
+        self.assertEqual(3, txn.send.call_count)
+        self.assertEqual(0, txn.complete.call_count)
+        self.assertEqual(0, self.callback.call_count)
         txn.send = Mock(return_value=True)  # successfully send the txn
         pop_txn = True  # returns the txn the first time, then no more.
         self.clock.advance_time(16)
-        self.assertEquals(1, txn.send.call_count)  # new mock reset call count
-        self.assertEquals(1, txn.complete.call_count)
+        self.assertEqual(1, txn.send.call_count)  # new mock reset call count
+        self.assertEqual(1, txn.complete.call_count)
         self.callback.assert_called_once_with(self.recoverer)
 
 
@@ -215,11 +215,11 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         self.queuer.enqueue(service, event2)
         self.queuer.enqueue(service, event3)
         self.txn_ctrl.send.assert_called_with(service, [event])
-        self.assertEquals(1, self.txn_ctrl.send.call_count)
+        self.assertEqual(1, self.txn_ctrl.send.call_count)
         # Resolve the send event: expect the queued events to be sent
         d.callback(service)
         self.txn_ctrl.send.assert_called_with(service, [event2, event3])
-        self.assertEquals(2, self.txn_ctrl.send.call_count)
+        self.assertEqual(2, self.txn_ctrl.send.call_count)
 
     def test_multiple_service_queues(self):
         # Tests that each service has its own queue, and that they don't block
@@ -249,4 +249,4 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         # service
         srv_2_defer.callback(srv2)
         self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event2])
-        self.assertEquals(3, self.txn_ctrl.send.call_count)
+        self.assertEqual(3, self.txn_ctrl.send.call_count)

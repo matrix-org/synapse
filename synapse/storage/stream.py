@@ -233,14 +233,14 @@ class StreamStore(SQLBaseStore):
 
         results = {}
         room_ids = list(room_ids)
-        for rm_ids in (room_ids[i:i + 20] for i in xrange(0, len(room_ids), 20)):
+        for rm_ids in (room_ids[i:i + 20] for i in range(0, len(room_ids), 20)):
             res = yield preserve_context_over_deferred(defer.gatherResults([
                 preserve_fn(self.get_room_events_stream_for_room)(
                     room_id, from_key, to_key, limit, order=order,
                 )
                 for room_id in rm_ids
             ]))
-            results.update(dict(zip(rm_ids, res)))
+            results.update(dict(list(zip(rm_ids, res))))
 
         defer.returnValue(results)
 

@@ -33,7 +33,7 @@ class PusherStore(SQLBaseStore):
             dataJson = r['data']
             r['data'] = None
             try:
-                if isinstance(dataJson, types.BufferType):
+                if isinstance(dataJson, memoryview):
                     dataJson = str(dataJson).decode("UTF8")
 
                 r['data'] = json.loads(dataJson)
@@ -44,7 +44,7 @@ class PusherStore(SQLBaseStore):
                 )
                 pass
 
-            if isinstance(r['pushkey'], types.BufferType):
+            if isinstance(r['pushkey'], memoryview):
                 r['pushkey'] = str(r['pushkey']).decode("UTF8")
 
         return rows

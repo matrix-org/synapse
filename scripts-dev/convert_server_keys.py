@@ -49,7 +49,7 @@ def convert_v1_to_v2(server_name, valid_until, keys, certificate):
         "server_name": server_name,
         "verify_keys": {
             key_id: {"key": key}
-            for key_id, key in keys.items()
+            for key_id, key in list(keys.items())
         },
         "valid_until_ts": valid_until,
         "tls_fingerprints": [fingerprint(certificate)],
@@ -97,7 +97,7 @@ def main():
     yaml.safe_dump(result, sys.stdout, default_flow_style=False)
 
     rows = list(
-        row for server, json in result.items()
+        row for server, json in list(result.items())
         for row in rows_v2(server, json)
     )
 

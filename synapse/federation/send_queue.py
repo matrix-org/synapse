@@ -100,7 +100,7 @@ class FederationRemoteSendQueue(object):
         FIVE_MINUTES_AGO = 5 * 60 * 1000
         now = self.clock.time_msec()
 
-        keys = self.pos_time.keys()
+        keys = list(self.pos_time.keys())
         time = keys.bisect_left(now - FIVE_MINUTES_AGO)
         if not keys[:time]:
             return
@@ -115,14 +115,14 @@ class FederationRemoteSendQueue(object):
         """Clear all the queues from before a given position"""
         with Measure(self.clock, "send_queue._clear"):
             # Delete things out of presence maps
-            keys = self.presence_changed.keys()
+            keys = list(self.presence_changed.keys())
             i = keys.bisect_left(position_to_delete)
             for key in keys[:i]:
                 del self.presence_changed[key]
 
             user_ids = set(
                 user_id
-                for uids in self.presence_changed.itervalues()
+                for uids in list(self.presence_changed.values())
                 for user_id in uids
             )
 
@@ -133,13 +133,13 @@ class FederationRemoteSendQueue(object):
                 del self.presence_map[user_id]
 
             # Delete things out of keyed edus
-            keys = self.keyed_edu_changed.keys()
+            keys = list(self.keyed_edu_changed.keys())
             i = keys.bisect_left(position_to_delete)
             for key in keys[:i]:
                 del self.keyed_edu_changed[key]
 
             live_keys = set()
-            for edu_key in self.keyed_edu_changed.values():
+            for edu_key in list(self.keyed_edu_changed.values()):
                 live_keys.add(edu_key)
 
             to_del = [edu_key for edu_key in self.keyed_edu if edu_key not in live_keys]
@@ -147,19 +147,19 @@ class FederationRemoteSendQueue(object):
                 del self.keyed_edu[edu_key]
 
             # Delete things out of edu map
-            keys = self.edus.keys()
+            keys = list(self.edus.keys())
             i = keys.bisect_left(position_to_delete)
             for key in keys[:i]:
                 del self.edus[key]
 
             # Delete things out of failure map
-            keys = self.failures.keys()
+            keys = list(self.failures.keys())
             i = keys.bisect_left(position_to_delete)
             for key in keys[:i]:
                 del self.failures[key]
 
             # Delete things out of device map
-            keys = self.device_messages.keys()
+            keys = list(self.device_messages.keys())
             i = keys.bisect_left(position_to_delete)
             for key in keys[:i]:
                 del self.device_messages[key]
@@ -200,7 +200,7 @@ class FederationRemoteSendQueue(object):
 
         # We only want to send presence for our own users, so lets always just
         # filter here just in case.
-        local_states = filter(lambda s: self.is_mine_id(s.user_id), states)
+        local_states = [s for s in states if self.is_mine_id(s.user_id)]
 
         self.presence_map.update({state.user_id: state for state in local_states})
         self.presence_changed[pos] = [state.user_id for state in local_states]
@@ -253,7 +253,7 @@ class FederationRemoteSendQueue(object):
             self._clear_queue_before_pos(federation_ack)
 
         # Fetch changed presence
-        keys = self.presence_changed.keys()
+        keys = list(self.presence_changed.keys())
         i = keys.bisect_right(from_token)
         j = keys.bisect_right(to_token) + 1
         dest_user_ids = [
@@ -268,7 +268,7 @@ class FederationRemoteSendQueue(object):
             )))
 
         # Fetch changes keyed edus
-        keys = self.keyed_edu_changed.keys()
+        keys = list(self.keyed_edu_changed.keys())
         i = keys.bisect_right(from_token)
         j = keys.bisect_right(to_token) + 1
         # We purposefully clobber based on the key here, python dict comprehensions
@@ -276,14 +276,14 @@ class FederationRemoteSendQueue(object):
         # stream position.
         keyed_edus = {self.keyed_edu_changed[k]: k for k in keys[i:j]}
 
-        for ((destination, edu_key), pos) in keyed_edus.iteritems():
+        for ((destination, edu_key), pos) in list(keyed_edus.items()):
             rows.append((pos, KeyedEduRow(
                 key=edu_key,
                 edu=self.keyed_edu[(destination, edu_key)],
             )))
 
         # Fetch changed edus
-        keys = self.edus.keys()
+        keys = list(self.edus.keys())
         i = keys.bisect_right(from_token)
         j = keys.bisect_right(to_token) + 1
         edus = ((k, self.edus[k]) for k in keys[i:j])
@@ -292,7 +292,7 @@ class FederationRemoteSendQueue(object):
             rows.append((pos, EduRow(edu)))
 
         # Fetch changed failures
-        keys = self.failures.keys()
+        keys = list(self.failures.keys())
         i = keys.bisect_right(from_token)
         j = keys.bisect_right(to_token) + 1
         failures = ((k, self.failures[k]) for k in keys[i:j])
@@ -304,12 +304,12 @@ class FederationRemoteSendQueue(object):
             )))
 
         # Fetch changed device messages
-        keys = self.device_messages.keys()
+        keys = list(self.device_messages.keys())
         i = keys.bisect_right(from_token)
         j = keys.bisect_right(to_token) + 1
         device_messages = {self.device_messages[k]: k for k in keys[i:j]}
 
-        for (destination, pos) in device_messages.iteritems():
+        for (destination, pos) in list(device_messages.items()):
             rows.append((pos, DeviceRow(
                 destination=destination,
             )))
@@ -528,19 +528,19 @@ def process_rows_for_federation(transaction_queue, rows):
     if buff.presence:
         transaction_queue.send_presence(buff.presence)
 
-    for destination, edu_map in buff.keyed_edus.iteritems():
-        for key, edu in edu_map.items():
+    for destination, edu_map in list(buff.keyed_edus.items()):
+        for key, edu in list(edu_map.items()):
             transaction_queue.send_edu(
                 edu.destination, edu.edu_type, edu.content, key=key,
             )
 
-    for destination, edu_list in buff.edus.iteritems():
+    for destination, edu_list in list(buff.edus.items()):
         for edu in edu_list:
             transaction_queue.send_edu(
                 edu.destination, edu.edu_type, edu.content, key=None,
             )
 
-    for destination, failure_list in buff.failures.iteritems():
+    for destination, failure_list in list(buff.failures.items()):
         for failure in failure_list:
             transaction_queue.send_failure(destination, failure)
 

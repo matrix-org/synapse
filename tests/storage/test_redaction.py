@@ -76,7 +76,7 @@ class RedactionTestCase(unittest.TestCase):
             "sender": user.to_string(),
             "state_key": user.to_string(),
             "room_id": room.to_string(),
-            "content": {"body": body, "msgtype": u"message"},
+            "content": {"body": body, "msgtype": "message"},
         })
 
         event, context = yield self.message_handler._create_new_client_event(
@@ -110,7 +110,7 @@ class RedactionTestCase(unittest.TestCase):
             self.room1, self.u_alice, Membership.JOIN
         )
 
-        msg_event = yield self.inject_message(self.room1, self.u_alice, u"t")
+        msg_event = yield self.inject_message(self.room1, self.u_alice, "t")
 
         # Check event has not been redacted:
         event = yield self.store.get_event(msg_event.event_id)

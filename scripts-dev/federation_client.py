@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
+
 
 import argparse
 import nacl.signing
@@ -135,7 +135,7 @@ def get_json(origin_name, origin_key, destination, path):
 
     authorization_headers = []
 
-    for key, sig in signed_json["signatures"][origin_name].items():
+    for key, sig in list(signed_json["signatures"][origin_name].items()):
         header = "X-Matrix origin=%s,key=\"%s\",sig=\"%s\"" % (
             origin_name, key, sig,
         )

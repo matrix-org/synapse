@@ -19,4 +19,4 @@ PRIORITY_CLASS_MAP = {
     'content': 4,
     'override': 5,
 }
-PRIORITY_CLASS_INVERSE_MAP = {v: k for k, v in PRIORITY_CLASS_MAP.items()}
+PRIORITY_CLASS_INVERSE_MAP = {v: k for k, v in list(PRIORITY_CLASS_MAP.items())}

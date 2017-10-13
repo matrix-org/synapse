@@ -24,19 +24,19 @@ from synapse.util.frozenutils import unfreeze
 
 
 def make_graph(file_name, room_id, file_prefix, limit):
-    print "Reading lines"
+    print("Reading lines")
     with open(file_name) as f:
         lines = f.readlines()
 
-    print "Read lines"
+    print("Read lines")
 
     events = [FrozenEvent(json.loads(line)) for line in lines]
 
-    print "Loaded events."
+    print("Loaded events.")
 
     events.sort(key=lambda e: e.depth)
 
-    print "Sorted events"
+    print("Sorted events")
 
     if limit:
         events = events[-int(limit):]
@@ -53,12 +53,12 @@ def make_graph(file_name, room_id, file_prefix, limit):
         content = json.dumps(unfreeze(event.get_dict()["content"]), indent=4)
         content = content.replace("\n", "<br/>\n")
 
-        print content
+        print(content)
         content = []
-        for key, value in unfreeze(event.get_dict()["content"]).items():
+        for key, value in list(unfreeze(event.get_dict()["content"]).items()):
             if value is None:
                 value = "<null>"
-            elif isinstance(value, basestring):
+            elif isinstance(value, str):
                 pass
             else:
                 value = json.dumps(value)
@@ -72,7 +72,7 @@ def make_graph(file_name, room_id, file_prefix, limit):
 
         content = "<br/>\n".join(content)
 
-        print content
+        print(content)
 
         label = (
             "<"
@@ -100,7 +100,7 @@ def make_graph(file_name, room_id, file_prefix, limit):
         node_map[event.event_id] = node
         graph.add_node(node)
 
-    print "Created Nodes"
+    print("Created Nodes")
 
     for event in events:
         for prev_id, _ in event.prev_events:
@@ -118,15 +118,15 @@ def make_graph(file_name, room_id, file_prefix, limit):
             edge = pydot.Edge(node_map[event.event_id], end_node)
             graph.add_edge(edge)
 
-    print "Created edges"
+    print("Created edges")
 
     graph.write('%s.dot' % file_prefix, format='raw', prog='dot')
 
-    print "Created Dot"
+    print("Created Dot")
 
     graph.write_svg("%s.svg" % file_prefix, prog='dot')
 
-    print "Created svg"
+    print("Created svg")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

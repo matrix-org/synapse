@@ -67,7 +67,7 @@ CONDITIONAL_REQUIREMENTS = {
 def requirements(config=None, include_conditional=False):
     reqs = REQUIREMENTS.copy()
     if include_conditional:
-        for _, req in CONDITIONAL_REQUIREMENTS.items():
+        for _, req in list(CONDITIONAL_REQUIREMENTS.items()):
             reqs.update(req)
     return reqs
 
@@ -91,7 +91,7 @@ def check_requirements(config=None):
     """Checks that all the modules needed by synapse have been correctly
     installed and are at the correct version"""
     for dependency, module_requirements in (
-            requirements(config, include_conditional=False).items()):
+            list(requirements(config, include_conditional=False).items())):
         for module_requirement in module_requirements:
             if ">=" in module_requirement:
                 module_name, required_version = module_requirement.split(">=")
@@ -150,7 +150,7 @@ def check_requirements(config=None):
 def list_requirements():
     result = []
     linked = []
-    for link in DEPENDENCY_LINKS.values():
+    for link in list(DEPENDENCY_LINKS.values()):
         egg = link.split("#egg=")[1]
         linked.append(egg.split('-')[0])
         result.append(link)

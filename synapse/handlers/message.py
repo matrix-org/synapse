@@ -415,7 +415,7 @@ class MessageHandler(BaseHandler):
 
         now = self.clock.time_msec()
         defer.returnValue(
-            [serialize_event(c, now) for c in room_state.values()]
+            [serialize_event(c, now) for c in list(room_state.values())]
         )
 
     @measure_func("_create_new_client_event")
@@ -545,7 +545,7 @@ class MessageHandler(BaseHandler):
 
                 state_to_include_ids = [
                     e_id
-                    for k, e_id in context.current_state_ids.iteritems()
+                    for k, e_id in list(context.current_state_ids.items())
                     if k[0] in self.hs.config.room_invite_state_types
                     or k == (EventTypes.Member, event.sender)
                 ]
@@ -559,7 +559,7 @@ class MessageHandler(BaseHandler):
                         "content": e.content,
                         "sender": e.sender,
                     }
-                    for e in state_to_include.itervalues()
+                    for e in list(state_to_include.values())
                 ]
 
                 invitee = UserID.from_string(event.state_key)
@@ -586,7 +586,7 @@ class MessageHandler(BaseHandler):
             )
             auth_events = yield self.store.get_events(auth_events_ids)
             auth_events = {
-                (e.type, e.state_key): e for e in auth_events.values()
+                (e.type, e.state_key): e for e in list(auth_events.values())
             }
             if self.auth.check_redaction(event, auth_events=auth_events):
                 original_event = yield self.store.get_event(

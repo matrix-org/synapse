@@ -17,7 +17,7 @@ from ._base import Config, ConfigError
 from synapse.appservice import ApplicationService
 from synapse.types import UserID
 
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import yaml
 import logging
 
@@ -89,21 +89,21 @@ def _load_appservice(hostname, as_info, config_filename):
         "id", "as_token", "hs_token", "sender_localpart"
     ]
     for field in required_string_fields:
-        if not isinstance(as_info.get(field), basestring):
+        if not isinstance(as_info.get(field), str):
             raise KeyError("Required string field: '%s' (%s)" % (
                 field, config_filename,
             ))
 
     # 'url' must either be a string or explicitly null, not missing
     # to avoid accidentally turning off push for ASes.
-    if (not isinstance(as_info.get("url"), basestring) and
+    if (not isinstance(as_info.get("url"), str) and
             as_info.get("url", "") is not None):
         raise KeyError(
             "Required string field or explicit null: 'url' (%s)" % (config_filename,)
         )
 
     localpart = as_info["sender_localpart"]
-    if urllib.quote(localpart) != localpart:
+    if urllib.parse.quote(localpart) != localpart:
         raise ValueError(
             "sender_localpart needs characters which are not URL encoded."
         )
@@ -128,7 +128,7 @@ def _load_appservice(hostname, as_info, config_filename):
                         "Expected namespace entry in %s to be an object,"
                         " but got %s", ns, regex_obj
                     )
-                if not isinstance(regex_obj.get("regex"), basestring):
+                if not isinstance(regex_obj.get("regex"), str):
                     raise ValueError(
                         "Missing/bad type 'regex' key in %s", regex_obj
                     )

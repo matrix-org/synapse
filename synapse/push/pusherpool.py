@@ -129,7 +129,7 @@ class PusherPool:
 
             for u in users_affected:
                 if u in self.pushers:
-                    for p in self.pushers[u].values():
+                    for p in list(self.pushers[u].values()):
                         deferreds.append(
                             preserve_fn(p.on_new_notifications)(
                                 min_stream_id, max_stream_id
@@ -156,7 +156,7 @@ class PusherPool:
 
             for u in users_affected:
                 if u in self.pushers:
-                    for p in self.pushers[u].values():
+                    for p in list(self.pushers[u].values()):
                         deferreds.append(
                             preserve_fn(p.on_new_receipts)(min_stream_id, max_stream_id)
                         )

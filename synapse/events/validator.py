@@ -49,7 +49,7 @@ class EventValidator(object):
             strings.append("state_key")
 
         for s in strings:
-            if not isinstance(getattr(event, s), basestring):
+            if not isinstance(getattr(event, s), str):
                 raise SynapseError(400, "Not '%s' a string type" % (s,))
 
         if event.type == EventTypes.Member:
@@ -88,5 +88,5 @@ class EventValidator(object):
         for s in keys:
             if s not in d:
                 raise SynapseError(400, "'%s' not in content" % (s,))
-            if not isinstance(d[s], basestring):
+            if not isinstance(d[s], str):
                 raise SynapseError(400, "Not '%s' a string type" % (s,))

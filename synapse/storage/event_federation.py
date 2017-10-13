@@ -21,7 +21,7 @@ from synapse.util.caches.descriptors import cached
 from unpaddedbase64 import encode_base64
 
 import logging
-from Queue import PriorityQueue, Empty
+from queue import PriorityQueue, Empty
 
 
 logger = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ class EventFederationStore(SQLBaseStore):
             front_list = list(front)
             chunks = [
                 front_list[x:x + 100]
-                for x in xrange(0, len(front), 100)
+                for x in range(0, len(front), 100)
             ]
             for chunk in chunks:
                 txn.execute(
@@ -185,7 +185,7 @@ class EventFederationStore(SQLBaseStore):
         for event_id, depth in txn.fetchall():
             hashes = self._get_event_reference_hashes_txn(txn, event_id)
             prev_hashes = {
-                k: encode_base64(v) for k, v in hashes.items()
+                k: encode_base64(v) for k, v in list(hashes.items())
                 if k == "sha256"
             }
             results.append((event_id, prev_hashes, depth))
