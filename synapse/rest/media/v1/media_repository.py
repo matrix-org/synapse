@@ -206,7 +206,7 @@ class MediaRepository(object):
             "media_length": content_length,
         }
 
-        yield self._generate_local_thumbnails(media_id, media_info)
+        yield self._generate_thumbnails(None, media_id, media_info)
 
         defer.returnValue("mxc://%s/%s" % (self.server_name, media_id))
 
@@ -339,7 +339,7 @@ class MediaRepository(object):
             "filesystem_id": file_id,
         }
 
-        yield self._generate_remote_thumbnails(
+        yield self._generate_thumbnails(
             server_name, media_id, media_info
         )
 
@@ -385,6 +385,8 @@ class MediaRepository(object):
         )
 
         if t_byte_source:
+            t_width, t_height = t_byte_source.dimensions
+
             output_path = yield self.write_to_file(
                 t_byte_source,
                 self.filepaths.local_media_thumbnail_rel(
@@ -414,6 +416,8 @@ class MediaRepository(object):
         )
 
         if t_byte_source:
+            t_width, t_height = t_byte_source.dimensions
+
             output_path = yield self.write_to_file(
                 t_byte_source,
                 self.filepaths.remote_media_thumbnail_rel(
@@ -432,13 +436,28 @@ class MediaRepository(object):
             defer.returnValue(output_path)
 
     @defer.inlineCallbacks
-    def _generate_local_thumbnails(self, media_id, media_info, url_cache=False):
+    def _generate_thumbnails(self, server_name, media_id, media_info, url_cache=False):
+        """Generate and store thumbnails for an image.
+
+        Args:
+            server_name(str|None): The server name if remote media, else None if local
+            media_id(str)
+            media_info(dict)
+            url_cache(bool): If we are thumbnailing images downloaded for the URL cache,
+                used exclusively by the url previewer
+
+        Returns:
+            Deferred[dict]: Dict with "width" and "height" keys of original image
+        """
         media_type = media_info["media_type"]
+        file_id = media_info.get("filesystem_id")
         requirements = self._get_thumbnail_requirements(media_type)
         if not requirements:
             return
 
-        if url_cache:
+        if server_name:
+            input_path = self.filepaths.remote_media_filepath(server_name, file_id)
+        elif url_cache:
             input_path = self.filepaths.url_cache_filepath(media_id)
         else:
             input_path = self.filepaths.local_media_filepath(media_id)
@@ -454,22 +473,40 @@ class MediaRepository(object):
             )
             return
 
-        local_thumbnails = []
+        # We deduplicate the thumbnail sizes by ignoring the cropped versions if
+        # they have the same dimensions of a scaled one.
+        thumbnails = {}
+        for r_width, r_height, r_method, r_type in requirements:
+            if r_method == "crop":
+                thumbnails.setdefault[(r_width, r_height)] = (r_method, r_type)
+            elif r_method == "scale":
+                t_width, t_height = thumbnailer.aspect(t_width, t_height)
+                t_width = min(m_width, t_width)
+                t_height = min(m_height, t_height)
+                thumbnails[(t_width, t_height)] = (r_method, r_type)
 
-        def generate_thumbnails():
-            for r_width, r_height, r_method, r_type in requirements:
-                t_byte_source = self._generate_thumbnail(
-                    thumbnailer, r_width, r_height, r_method, r_type,
+        # Now we generate the thumbnails for each dimension, store it
+        for (r_width, r_height), (r_method, r_type) in thumbnails.iteritems():
+            t_byte_source = thumbnailer.crop(t_width, t_height, t_type)
+
+            if r_type == "crop":
+                t_byte_source = yield make_deferred_yieldable(
+                    threads.deferToThread, thumbnailer.crop,
+                    r_width, r_height, r_type,
+                )
+            else:
+                t_byte_source = yield make_deferred_yieldable(
+                    threads.deferToThread, thumbnailer.scale,
+                    r_width, r_height, r_type,
                 )
 
-                local_thumbnails.append((
-                    r_width, r_height, r_method, r_type, t_byte_source
-                ))
+            t_width, t_height = t_byte_source.dimensions
 
-        yield make_deferred_yieldable(threads.deferToThread, generate_thumbnails)
-
-        for t_width, t_height, t_method, t_type, t_byte_source in local_thumbnails:
-            if url_cache:
+            if server_name:
+                file_path = self.filepaths.remote_media_thumbnail_rel(
+                server_name, file_id, t_width, t_height, t_type, t_method
+            )
+            elif url_cache:
                 file_path = self.filepaths.url_cache_thumbnail_rel(
                     media_id, t_width, t_height, t_type, t_method
                 )
@@ -481,61 +518,15 @@ class MediaRepository(object):
             output_path = yield self.write_to_file(t_byte_source, file_path)
             t_len = os.path.getsize(output_path)
 
-            yield self.store.store_local_thumbnail(
-                media_id, t_width, t_height, t_type, t_method, t_len
-            )
-
-        defer.returnValue({
-            "width": m_width,
-            "height": m_height,
-        })
-
-    @defer.inlineCallbacks
-    def _generate_remote_thumbnails(self, server_name, media_id, media_info):
-        media_type = media_info["media_type"]
-        file_id = media_info["filesystem_id"]
-        requirements = self._get_thumbnail_requirements(media_type)
-        if not requirements:
-            return
-
-        remote_thumbnails = []
-
-        input_path = self.filepaths.remote_media_filepath(server_name, file_id)
-        thumbnailer = Thumbnailer(input_path)
-        m_width = thumbnailer.width
-        m_height = thumbnailer.height
-
-        def generate_thumbnails():
-            if m_width * m_height >= self.max_image_pixels:
-                logger.info(
-                    "Image too large to thumbnail %r x %r > %r",
-                    m_width, m_height, self.max_image_pixels
-                )
-                return
-
-            for r_width, r_height, r_method, r_type in requirements:
-                t_byte_source = self._generate_thumbnail(
-                    thumbnailer, r_width, r_height, r_method, r_type,
-                )
-
-                remote_thumbnails.append((
-                    r_width, r_height, r_method, r_type, t_byte_source
-                ))
-
-        yield make_deferred_yieldable(threads.deferToThread, generate_thumbnails)
-
-        for t_width, t_height, t_method, t_type, t_byte_source in remote_thumbnails:
-            file_path = self.filepaths.remote_media_thumbnail_rel(
-                server_name, file_id, t_width, t_height, t_type, t_method
-            )
-
-            output_path = yield self.write_to_file(t_byte_source, file_path)
-            t_len = os.path.getsize(output_path)
-
-            yield self.store.store_remote_media_thumbnail(
+            if server_name:
+                yield self.store.store_remote_media_thumbnail(
                 server_name, media_id, file_id,
                 t_width, t_height, t_type, t_method, t_len
             )
+            else:
+                yield self.store.store_local_thumbnail(
+                    media_id, t_width, t_height, t_type, t_method, t_len
+                )
 
         defer.returnValue({
             "width": m_width,

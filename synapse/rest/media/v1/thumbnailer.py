@@ -54,7 +54,7 @@ class Thumbnailer(object):
         """Rescales the image to the given dimensions.
 
         Returns:
-            BytesIO: the bytes of the encoded image ready to be written to disk
+            ImageIO: the bytes of the encoded image ready to be written to disk
         """
         scaled = self.image.resize((width, height), Image.ANTIALIAS)
         return self._encode_image(scaled, output_type)
@@ -71,7 +71,7 @@ class Thumbnailer(object):
             max_height: The larget possible height.
 
         Returns:
-            BytesIO: the bytes of the encoded image ready to be written to disk
+            ImageIO: the bytes of the encoded image ready to be written to disk
         """
         if width * self.height > height * self.width:
             scaled_height = (width * self.height) // self.width
@@ -92,6 +92,13 @@ class Thumbnailer(object):
         return self._encode_image(cropped, output_type)
 
     def _encode_image(self, output_image, output_type):
-        output_bytes_io = BytesIO()
+        output_bytes_io = ImageIO(output_image.size)
         output_image.save(output_bytes_io, self.FORMATS[output_type], quality=80)
+        output_image.close()
         return output_bytes_io
+
+
+class ImageIO(BytesIO):
+    def __init__(self, dimensions):
+        super(ImageIO, self).__init__()
+        self.dimensions = dimensions
