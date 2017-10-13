@@ -60,7 +60,7 @@ class ProfileHandler(BaseHandler):
                     logger.exception("Failed to get displayname")
 
                 raise
-            except:
+            except BaseException:
                 logger.exception("Failed to get displayname")
             else:
                 defer.returnValue(result["displayname"])
@@ -107,7 +107,7 @@ class ProfileHandler(BaseHandler):
                 if e.code != 404:
                     logger.exception("Failed to get avatar_url")
                 raise
-            except:
+            except BaseException:
                 logger.exception("Failed to get avatar_url")
 
             defer.returnValue(result["avatar_url"])

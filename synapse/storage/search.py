@@ -81,7 +81,7 @@ class SearchStore(BackgroundUpdateStore):
                     etype = row["type"]
                     try:
                         content = json.loads(row["content"])
-                    except:
+                    except BaseException:
                         continue
 
                     if etype == "m.room.message":
@@ -98,7 +98,7 @@ class SearchStore(BackgroundUpdateStore):
                     # skip over it.
                     continue
 
-                if not isinstance(value, basestring):
+                if not isinstance(value, str):
                     # If the event body, name or topic isn't a string
                     # then skip over it
                     continue
@@ -326,7 +326,7 @@ class SearchStore(BackgroundUpdateStore):
             "search_msgs", self.cursor_to_dict, sql, *args
         )
 
-        results = filter(lambda row: row["room_id"] in room_ids, results)
+        results = [row for row in results if row["room_id"] in room_ids]
 
         events = yield self._get_events([r["event_id"] for r in results])
 
@@ -407,7 +407,7 @@ class SearchStore(BackgroundUpdateStore):
                 origin_server_ts, stream = pagination_token.split(",")
                 origin_server_ts = int(origin_server_ts)
                 stream = int(stream)
-            except:
+            except BaseException:
                 raise SynapseError(400, "Invalid pagination token")
 
             clauses.append(
@@ -481,7 +481,7 @@ class SearchStore(BackgroundUpdateStore):
             "search_rooms", self.cursor_to_dict, sql, *args
         )
 
-        results = filter(lambda row: row["room_id"] in room_ids, results)
+        results = [row for row in results if row["room_id"] in room_ids]
 
         events = yield self._get_events([r["event_id"] for r in results])
 
@@ -585,7 +585,7 @@ class SearchStore(BackgroundUpdateStore):
 
 def _to_postgres_options(options_dict):
     return "'%s'" % (
-        ",".join("%s=%s" % (k, v) for k, v in options_dict.items()),
+        ",".join("%s=%s" % (k, v) for k, v in list(options_dict.items())),
     )
 
 

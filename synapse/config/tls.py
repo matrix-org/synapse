@@ -56,7 +56,7 @@ class TlsConfig(Config):
         sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
         sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
         if sha256_fingerprint not in sha256_fingerprints:
-            self.tls_fingerprints.append({u"sha256": sha256_fingerprint})
+            self.tls_fingerprints.append({"sha256": sha256_fingerprint})
 
         # This config option applies to non-federation HTTP clients
         # (e.g. for talking to recaptcha, identity servers, and such)
@@ -127,7 +127,7 @@ class TlsConfig(Config):
         tls_dh_params_path = config["tls_dh_params_path"]
 
         if not os.path.exists(tls_private_key_path):
-            with open(tls_private_key_path, "w") as private_key_file:
+            with open(tls_private_key_path, "wb") as private_key_file:
                 tls_private_key = crypto.PKey()
                 tls_private_key.generate_key(crypto.TYPE_RSA, 2048)
                 private_key_pem = crypto.dump_privatekey(
@@ -142,7 +142,7 @@ class TlsConfig(Config):
                 )
 
         if not os.path.exists(tls_certificate_path):
-            with open(tls_certificate_path, "w") as certificate_file:
+            with open(tls_certificate_path, "wb") as certificate_file:
                 cert = crypto.X509()
                 subject = cert.get_subject()
                 subject.CN = config["server_name"]

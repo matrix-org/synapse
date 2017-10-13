@@ -82,7 +82,7 @@ class ProfileTestCase(unittest.TestCase):
 
         displayname = yield self.handler.get_displayname(self.frank)
 
-        self.assertEquals("Frank", displayname)
+        self.assertEqual("Frank", displayname)
 
     @defer.inlineCallbacks
     def test_set_my_name(self):
@@ -92,7 +92,7 @@ class ProfileTestCase(unittest.TestCase):
             "Frank Jr."
         )
 
-        self.assertEquals(
+        self.assertEqual(
             (yield self.store.get_profile_displayname(self.frank.localpart)),
             "Frank Jr."
         )
@@ -115,7 +115,7 @@ class ProfileTestCase(unittest.TestCase):
 
         displayname = yield self.handler.get_displayname(self.alice)
 
-        self.assertEquals(displayname, "Alice")
+        self.assertEqual(displayname, "Alice")
         self.mock_federation.make_query.assert_called_with(
             destination="remote",
             query_type="profile",
@@ -132,7 +132,7 @@ class ProfileTestCase(unittest.TestCase):
             {"user_id": "@caroline:test", "field": "displayname"}
         )
 
-        self.assertEquals({"displayname": "Caroline"}, response)
+        self.assertEqual({"displayname": "Caroline"}, response)
 
     @defer.inlineCallbacks
     def test_get_my_avatar(self):
@@ -142,7 +142,7 @@ class ProfileTestCase(unittest.TestCase):
 
         avatar_url = yield self.handler.get_avatar_url(self.frank)
 
-        self.assertEquals("http://my.server/me.png", avatar_url)
+        self.assertEqual("http://my.server/me.png", avatar_url)
 
     @defer.inlineCallbacks
     def test_set_my_avatar(self):
@@ -151,7 +151,7 @@ class ProfileTestCase(unittest.TestCase):
             "http://my.server/pic.gif"
         )
 
-        self.assertEquals(
+        self.assertEqual(
             (yield self.store.get_profile_avatar_url(self.frank.localpart)),
             "http://my.server/pic.gif"
         )

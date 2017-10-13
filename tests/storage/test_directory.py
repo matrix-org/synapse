@@ -42,7 +42,7 @@ class DirectoryStoreTestCase(unittest.TestCase):
             servers=["test"],
         )
 
-        self.assertEquals(
+        self.assertEqual(
             ["#my-room:test"],
             (yield self.store.get_aliases_for_room(self.room.to_string()))
         )

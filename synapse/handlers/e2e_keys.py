@@ -69,7 +69,7 @@ class E2eKeysHandler(object):
         local_query = {}
         remote_queries = {}
 
-        for user_id, device_ids in device_keys_query.items():
+        for user_id, device_ids in list(device_keys_query.items()):
             if self.is_mine_id(user_id):
                 local_query[user_id] = device_ids
             else:
@@ -80,7 +80,7 @@ class E2eKeysHandler(object):
         results = {}
         if local_query:
             local_result = yield self.query_local_devices(local_query)
-            for user_id, keys in local_result.items():
+            for user_id, keys in list(local_result.items()):
                 if user_id in local_query:
                     results[user_id] = keys
 
@@ -88,7 +88,7 @@ class E2eKeysHandler(object):
         remote_queries_not_in_cache = {}
         if remote_queries:
             query_list = []
-            for user_id, device_ids in remote_queries.iteritems():
+            for user_id, device_ids in list(remote_queries.items()):
                 if device_ids:
                     query_list.extend((user_id, device_id) for device_id in device_ids)
                 else:
@@ -99,9 +99,9 @@ class E2eKeysHandler(object):
                     query_list
                 )
             )
-            for user_id, devices in remote_results.iteritems():
+            for user_id, devices in list(remote_results.items()):
                 user_devices = results.setdefault(user_id, {})
-                for device_id, device in devices.iteritems():
+                for device_id, device in list(devices.items()):
                     keys = device.get("keys", None)
                     device_display_name = device.get("device_display_name", None)
                     if keys:
@@ -127,7 +127,7 @@ class E2eKeysHandler(object):
                     timeout=timeout
                 )
 
-                for user_id, keys in remote_result["device_keys"].items():
+                for user_id, keys in list(remote_result["device_keys"].items()):
                     if user_id in destination_query:
                         results[user_id] = keys
 
@@ -169,7 +169,7 @@ class E2eKeysHandler(object):
         local_query = []
 
         result_dict = {}
-        for user_id, device_ids in query.items():
+        for user_id, device_ids in list(query.items()):
             if not self.is_mine_id(user_id):
                 logger.warning("Request for keys for non-local user %s",
                                user_id)
@@ -188,8 +188,8 @@ class E2eKeysHandler(object):
 
         # Build the result structure, un-jsonify the results, and add the
         # "unsigned" section
-        for user_id, device_keys in results.items():
-            for device_id, device_info in device_keys.items():
+        for user_id, device_keys in list(results.items()):
+            for device_id, device_info in list(device_keys.items()):
                 r = dict(device_info["keys"])
                 r["unsigned"] = {}
                 display_name = device_info["device_display_name"]
@@ -212,9 +212,9 @@ class E2eKeysHandler(object):
         local_query = []
         remote_queries = {}
 
-        for user_id, device_keys in query.get("one_time_keys", {}).items():
+        for user_id, device_keys in list(query.get("one_time_keys", {}).items()):
             if self.is_mine_id(user_id):
-                for device_id, algorithm in device_keys.items():
+                for device_id, algorithm in list(device_keys.items()):
                     local_query.append((user_id, device_id, algorithm))
             else:
                 domain = get_domain_from_id(user_id)
@@ -224,9 +224,9 @@ class E2eKeysHandler(object):
 
         json_result = {}
         failures = {}
-        for user_id, device_keys in results.items():
-            for device_id, keys in device_keys.items():
-                for key_id, json_bytes in keys.items():
+        for user_id, device_keys in list(results.items()):
+            for device_id, keys in list(device_keys.items()):
+                for key_id, json_bytes in list(keys.items()):
                     json_result.setdefault(user_id, {})[device_id] = {
                         key_id: json.loads(json_bytes)
                     }
@@ -240,7 +240,7 @@ class E2eKeysHandler(object):
                     {"one_time_keys": device_keys},
                     timeout=timeout
                 )
-                for user_id, keys in remote_result["one_time_keys"].items():
+                for user_id, keys in list(remote_result["one_time_keys"].items()):
                     if user_id in device_keys:
                         json_result[user_id] = keys
             except CodeMessageException as e:
@@ -266,9 +266,9 @@ class E2eKeysHandler(object):
             "Claimed one-time-keys: %s",
             ",".join((
                 "%s for %s:%s" % (key_id, user_id, device_id)
-                for user_id, user_keys in json_result.iteritems()
-                for device_id, device_keys in user_keys.iteritems()
-                for key_id, _ in device_keys.iteritems()
+                for user_id, user_keys in list(json_result.items())
+                for device_id, device_keys in list(user_keys.items())
+                for key_id, _ in list(device_keys.items())
             )),
         )
 
@@ -318,12 +318,12 @@ class E2eKeysHandler(object):
                                        one_time_keys):
         logger.info(
             "Adding one_time_keys %r for device %r for user %r at %d",
-            one_time_keys.keys(), device_id, user_id, time_now,
+            list(one_time_keys.keys()), device_id, user_id, time_now,
         )
 
         # make a list of (alg, id, key) tuples
         key_list = []
-        for key_id, key_obj in one_time_keys.items():
+        for key_id, key_obj in list(one_time_keys.items()):
             algorithm, key_id = key_id.split(":")
             key_list.append((
                 algorithm, key_id, key_obj

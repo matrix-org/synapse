@@ -39,7 +39,7 @@ def create_resource_tree(desired_tree, root_resource):
     # instead, we'll store a copy of this mapping so we can actually add
     # extra resources to existing nodes. See self._resource_id for the key.
     resource_mappings = {}
-    for full_path, res in desired_tree.items():
+    for full_path, res in list(desired_tree.items()):
         logger.info("Attaching %s to path %s", res, full_path)
         last_resource = root_resource
         for path_seg in full_path.split('/')[1:-1]:

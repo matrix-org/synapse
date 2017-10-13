@@ -19,7 +19,9 @@ import cgi
 import json
 import datetime
 import argparse
-import urllib2
+import urllib.request
+import urllib.error
+import urllib.parse
 
 
 def make_name(pdu_id, origin):
@@ -47,8 +49,8 @@ def make_graph(pdus, room, filename_prefix):
         try:
             c = colors.pop()
             color_map[o] = c
-        except:
-            print "Run out of colours!"
+        except BaseException:
+            print("Run out of colours!")
             color_map[o] = "black"
 
     graph = pydot.Dot(graph_name="Test")
@@ -93,7 +95,7 @@ def make_graph(pdus, room, filename_prefix):
             end_name = make_name(i, o)
 
             if end_name not in node_map:
-                print "%s not in nodes" % end_name
+                print(("%s not in nodes" % end_name))
                 continue
 
             edge = pydot.Edge(node_map[start_name], node_map[end_name])
@@ -119,7 +121,7 @@ def make_graph(pdus, room, filename_prefix):
 
 def get_pdus(host, room):
     transaction = json.loads(
-        urllib2.urlopen(
+        urllib.request.urlopen(
             "http://%s/_matrix/federation/v1/context/%s/" % (host, room)
         ).read()
     )

@@ -315,8 +315,8 @@ class HomeServer(object):
     def should_send_federation(self):
         "Should this server be sending federation traffic directly?"
         return self.config.send_federation and (
-            not self.config.worker_app
-            or self.config.worker_app == "synapse.app.federation_sender"
+            not self.config.worker_app or
+            self.config.worker_app == "synapse.app.federation_sender"
         )
 
 

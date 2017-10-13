@@ -51,14 +51,14 @@ class DeviceMessageHandler(object):
             )
         message_type = content["type"]
         message_id = content["message_id"]
-        for user_id, by_device in content["messages"].items():
+        for user_id, by_device in list(content["messages"].items()):
             messages_by_device = {
                 device_id: {
                     "content": message_content,
                     "type": message_type,
                     "sender": sender_user_id,
                 }
-                for device_id, message_content in by_device.items()
+                for device_id, message_content in list(by_device.items())
             }
             if messages_by_device:
                 local_messages[user_id] = messages_by_device
@@ -68,7 +68,7 @@ class DeviceMessageHandler(object):
         )
 
         self.notifier.on_new_event(
-            "to_device_key", stream_id, users=local_messages.keys()
+            "to_device_key", stream_id, users=list(local_messages.keys())
         )
 
     @defer.inlineCallbacks
@@ -76,7 +76,7 @@ class DeviceMessageHandler(object):
 
         local_messages = {}
         remote_messages = {}
-        for user_id, by_device in messages.items():
+        for user_id, by_device in list(messages.items()):
             if self.is_mine_id(user_id):
                 messages_by_device = {
                     device_id: {
@@ -84,7 +84,7 @@ class DeviceMessageHandler(object):
                         "type": message_type,
                         "sender": sender_user_id,
                     }
-                    for device_id, message_content in by_device.items()
+                    for device_id, message_content in list(by_device.items())
                 }
                 if messages_by_device:
                     local_messages[user_id] = messages_by_device
@@ -95,7 +95,7 @@ class DeviceMessageHandler(object):
         message_id = random_string(16)
 
         remote_edu_contents = {}
-        for destination, messages in remote_messages.items():
+        for destination, messages in list(remote_messages.items()):
             remote_edu_contents[destination] = {
                 "messages": messages,
                 "sender": sender_user_id,
@@ -108,10 +108,10 @@ class DeviceMessageHandler(object):
         )
 
         self.notifier.on_new_event(
-            "to_device_key", stream_id, users=local_messages.keys()
+            "to_device_key", stream_id, users=list(local_messages.keys())
         )
 
-        for destination in remote_messages.keys():
+        for destination in list(remote_messages.keys()):
             # Enqueue a new federation transaction to send the new
             # device messages to each remote destination.
             self.federation.send_device_messages(destination)

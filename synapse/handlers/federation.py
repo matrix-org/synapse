@@ -109,8 +109,8 @@ class FederationHandler(BaseHandler):
 
         already_seen = (
             existing and (
-                not existing.internal_metadata.is_outlier()
-                or pdu.internal_metadata.is_outlier()
+                not existing.internal_metadata.is_outlier() or
+                pdu.internal_metadata.is_outlier()
             )
         )
         if already_seen:
@@ -177,7 +177,7 @@ class FederationHandler(BaseHandler):
                         # Update the set of things we've seen after trying to
                         # fetch the missing stuff
                         have_seen = yield self.store.have_events(prevs)
-                        seen = set(have_seen.iterkeys())
+                        seen = set(have_seen.keys())
 
                         if not prevs - seen:
                             logger.info(
@@ -208,7 +208,7 @@ class FederationHandler(BaseHandler):
                 state, auth_chain = yield self.replication_layer.get_state_for_room(
                     origin, pdu.room_id, pdu.event_id,
                 )
-            except:
+            except BaseException:
                 logger.exception("Failed to get state for event: %s", pdu.event_id)
 
         yield self._process_received_pdu(
@@ -442,25 +442,25 @@ class FederationHandler(BaseHandler):
         def check_match(id):
             try:
                 return server_name == get_domain_from_id(id)
-            except:
+            except BaseException:
                 return False
 
         # Parses mapping `event_id -> (type, state_key) -> state event_id`
         # to get all state ids that we're interested in.
         event_map = yield self.store.get_events([
             e_id
-            for key_to_eid in event_to_state_ids.values()
-            for key, e_id in key_to_eid.items()
+            for key_to_eid in list(event_to_state_ids.values())
+            for key, e_id in list(key_to_eid.items())
             if key[0] != EventTypes.Member or check_match(key[1])
         ])
 
         event_to_state = {
             e_id: {
                 key: event_map[inner_e_id]
-                for key, inner_e_id in key_to_eid.items()
+                for key, inner_e_id in list(key_to_eid.items())
                 if inner_e_id in event_map
             }
-            for e_id, key_to_eid in event_to_state_ids.items()
+            for e_id, key_to_eid in list(event_to_state_ids.items())
         }
 
         def redact_disallowed(event, state):
@@ -475,12 +475,12 @@ class FederationHandler(BaseHandler):
                     # membership states for the requesting server to determine
                     # if the server is either in the room or has been invited
                     # into the room.
-                    for ev in state.values():
+                    for ev in list(state.values()):
                         if ev.type != EventTypes.Member:
                             continue
                         try:
                             domain = get_domain_from_id(ev.state_key)
-                        except:
+                        except BaseException:
                             continue
 
                         if domain != server_name:
@@ -564,7 +564,7 @@ class FederationHandler(BaseHandler):
 
         required_auth = set(
             a_id
-            for event in events + state_events.values() + auth_events.values()
+            for event in events + list(state_events.values()) + list(auth_events.values())
             for a_id, _ in event.auth_events
         )
         auth_events.update({
@@ -581,7 +581,7 @@ class FederationHandler(BaseHandler):
             auth_events.update(ret_events)
 
             required_auth.update(
-                a_id for event in ret_events.values() for a_id, _ in event.auth_events
+                a_id for event in list(ret_events.values()) for a_id, _ in event.auth_events
             )
             missing_auth = required_auth - set(auth_events)
 
@@ -618,7 +618,7 @@ class FederationHandler(BaseHandler):
         )
 
         ev_infos = []
-        for a in auth_events.values():
+        for a in list(auth_events.values()):
             if a.event_id in seen_events:
                 continue
             a.internal_metadata.outlier = True
@@ -679,7 +679,7 @@ class FederationHandler(BaseHandler):
 
         # Check if we reached a point where we should start backfilling.
         sorted_extremeties_tuple = sorted(
-            extremities.items(),
+            list(extremities.items()),
             key=lambda e: -int(e[1])
         )
         max_depth = sorted_extremeties_tuple[0][1]
@@ -705,9 +705,9 @@ class FederationHandler(BaseHandler):
         def get_domains_from_state(state):
             joined_users = [
                 (state_key, int(event.depth))
-                for (e_type, state_key), event in state.items()
-                if e_type == EventTypes.Member
-                and event.membership == Membership.JOIN
+                for (e_type, state_key), event in list(state.items())
+                if e_type == EventTypes.Member and
+                event.membership == Membership.JOIN
             ]
 
             joined_domains = {}
@@ -719,10 +719,10 @@ class FederationHandler(BaseHandler):
                         joined_domains[dom] = min(d, old_d)
                     else:
                         joined_domains[dom] = d
-                except:
+                except BaseException:
                     pass
 
-            return sorted(joined_domains.items(), key=lambda d: d[1])
+            return sorted(list(joined_domains.items()), key=lambda d: d[1])
 
         curr_domains = get_domains_from_state(curr_state)
 
@@ -739,7 +739,7 @@ class FederationHandler(BaseHandler):
                     yield self.backfill(
                         dom, room_id,
                         limit=100,
-                        extremities=[e for e in extremities.keys()]
+                        extremities=[e for e in list(extremities.keys())]
                     )
                     # If this succeeded then we probably already have the
                     # appropriate stuff.
@@ -789,18 +789,18 @@ class FederationHandler(BaseHandler):
             preserve_fn(self.state_handler.resolve_state_groups)(room_id, [e])
             for e in event_ids
         ]))
-        states = dict(zip(event_ids, [s.state for s in states]))
+        states = dict(list(zip(event_ids, [s.state for s in states])))
 
         state_map = yield self.store.get_events(
-            [e_id for ids in states.values() for e_id in ids],
+            [e_id for ids in list(states.values()) for e_id in ids],
             get_prev_content=False
         )
         states = {
             key: {
                 k: state_map[e_id]
-                for k, e_id in state_dict.items()
+                for k, e_id in list(state_dict.items())
                 if e_id in state_map
-            } for key, state_dict in states.items()
+            } for key, state_dict in list(states.items())
         }
 
         for e_id, _ in sorted_extremeties_tuple:
@@ -917,7 +917,7 @@ class FederationHandler(BaseHandler):
                     room_creator_user_id="",
                     is_public=False
                 )
-            except:
+            except BaseException:
                 # FIXME
                 pass
 
@@ -1052,13 +1052,13 @@ class FederationHandler(BaseHandler):
                 user = UserID.from_string(event.state_key)
                 yield user_joined_room(self.distributor, user, event.room_id)
 
-        state_ids = context.prev_state_ids.values()
+        state_ids = list(context.prev_state_ids.values())
         auth_chain = yield self.store.get_auth_chain(state_ids)
 
-        state = yield self.store.get_events(context.prev_state_ids.values())
+        state = yield self.store.get_events(list(context.prev_state_ids.values()))
 
         defer.returnValue({
-            "state": state.values(),
+            "state": list(state.values()),
             "auth_chain": auth_chain,
         })
 
@@ -1279,7 +1279,7 @@ class FederationHandler(BaseHandler):
         )
 
         if state_groups:
-            _, state = state_groups.items().pop()
+            _, state = list(state_groups.items()).pop()
             results = {
                 (e.type, e.state_key): e for e in state
             }
@@ -1295,7 +1295,7 @@ class FederationHandler(BaseHandler):
                 else:
                     del results[(event.type, event.state_key)]
 
-            res = results.values()
+            res = list(results.values())
             for event in res:
                 # We sign these again because there was a bug where we
                 # incorrectly signed things the first time round
@@ -1323,7 +1323,7 @@ class FederationHandler(BaseHandler):
         )
 
         if state_groups:
-            _, state = state_groups.items().pop()
+            _, state = list(state_groups.items()).pop()
             results = state
 
             event = yield self.store.get_event(event_id)
@@ -1336,7 +1336,7 @@ class FederationHandler(BaseHandler):
                 else:
                     results.pop((event.type, event.state_key), None)
 
-            defer.returnValue(results.values())
+            defer.returnValue(list(results.values()))
         else:
             defer.returnValue([])
 
@@ -1458,7 +1458,7 @@ class FederationHandler(BaseHandler):
         yield self.store.persist_events(
             [
                 (ev_info["event"], context)
-                for ev_info, context in itertools.izip(event_infos, contexts)
+                for ev_info, context in zip(event_infos, contexts)
             ],
             backfilled=backfilled,
         )
@@ -1583,7 +1583,7 @@ class FederationHandler(BaseHandler):
             )
             auth_events = yield self.store.get_events(auth_events_ids)
             auth_events = {
-                (e.type, e.state_key): e for e in auth_events.values()
+                (e.type, e.state_key): e for e in list(auth_events.values())
             }
 
         # This is a hack to fix some old rooms where the initial join event
@@ -1679,7 +1679,7 @@ class FederationHandler(BaseHandler):
     @log_function
     def do_auth(self, origin, event, context, auth_events):
         # Check if we have all the auth events.
-        current_state = set(e.event_id for e in auth_events.values())
+        current_state = set(e.event_id for e in list(auth_events.values()))
         event_auth_events = set(e_id for e_id, _ in event.auth_events)
 
         if event.is_state():
@@ -1696,7 +1696,7 @@ class FederationHandler(BaseHandler):
 
         have_events.update({
             e.event_id: ""
-            for e in auth_events.values()
+            for e in list(auth_events.values())
         })
 
         seen_events = set(have_events.keys())
@@ -1716,7 +1716,7 @@ class FederationHandler(BaseHandler):
                 )
 
                 for e in remote_auth_chain:
-                    if e.event_id in seen_remotes.keys():
+                    if e.event_id in list(seen_remotes.keys()):
                         continue
 
                     if e.event_id == event.event_id:
@@ -1747,13 +1747,13 @@ class FederationHandler(BaseHandler):
                     [e_id for e_id, _ in event.auth_events]
                 )
                 seen_events = set(have_events.keys())
-            except:
+            except BaseException:
                 # FIXME:
                 logger.exception("Failed to get auth chain")
 
         # FIXME: Assumes we have and stored all the state for all the
         # prev_events
-        current_state = set(e.event_id for e in auth_events.values())
+        current_state = set(e.event_id for e in list(auth_events.values()))
         different_auth = event_auth_events - current_state
 
         if different_auth and not event.internal_metadata.is_outlier():
@@ -1781,23 +1781,23 @@ class FederationHandler(BaseHandler):
                 })
 
                 new_state = self.state_handler.resolve_events(
-                    [local_view.values(), remote_view.values()],
+                    [list(local_view.values()), list(remote_view.values())],
                     event
                 )
 
                 auth_events.update(new_state)
 
-                current_state = set(e.event_id for e in auth_events.values())
+                current_state = set(e.event_id for e in list(auth_events.values()))
                 different_auth = event_auth_events - current_state
 
                 context.current_state_ids = dict(context.current_state_ids)
                 context.current_state_ids.update({
-                    k: a.event_id for k, a in auth_events.items()
+                    k: a.event_id for k, a in list(auth_events.items())
                     if k != event_key
                 })
                 context.prev_state_ids = dict(context.prev_state_ids)
                 context.prev_state_ids.update({
-                    k: a.event_id for k, a in auth_events.items()
+                    k: a.event_id for k, a in list(auth_events.items())
                 })
                 context.state_group = self.store.get_next_state_group()
 
@@ -1842,7 +1842,7 @@ class FederationHandler(BaseHandler):
 
                     # 3. Process any remote auth chain events we haven't seen.
                     for ev in result["auth_chain"]:
-                        if ev.event_id in seen_remotes.keys():
+                        if ev.event_id in list(seen_remotes.keys()):
                             continue
 
                         if ev.event_id == event.event_id:
@@ -1853,8 +1853,8 @@ class FederationHandler(BaseHandler):
                             auth = {
                                 (e.type, e.state_key): e
                                 for e in result["auth_chain"]
-                                if e.event_id in auth_ids
-                                or event.type == EventTypes.Create
+                                if e.event_id in auth_ids or
+                                event.type == EventTypes.Create
                             }
                             ev.internal_metadata.outlier = True
 
@@ -1872,7 +1872,7 @@ class FederationHandler(BaseHandler):
                         except AuthError:
                             pass
 
-                except:
+                except BaseException:
                     # FIXME:
                     logger.exception("Failed to query auth chain")
 
@@ -1881,12 +1881,12 @@ class FederationHandler(BaseHandler):
 
                 context.current_state_ids = dict(context.current_state_ids)
                 context.current_state_ids.update({
-                    k: a.event_id for k, a in auth_events.items()
+                    k: a.event_id for k, a in list(auth_events.items())
                     if k != event_key
                 })
                 context.prev_state_ids = dict(context.prev_state_ids)
                 context.prev_state_ids.update({
-                    k: a.event_id for k, a in auth_events.items()
+                    k: a.event_id for k, a in list(auth_events.items())
                 })
                 context.state_group = self.store.get_next_state_group()
 
@@ -1938,8 +1938,8 @@ class FederationHandler(BaseHandler):
 
         def get_next(it, opt=None):
             try:
-                return it.next()
-            except:
+                return next(it)
+            except BaseException:
                 return opt
 
         current_local = get_next(local_iter)
@@ -2190,8 +2190,8 @@ class FederationHandler(BaseHandler):
         last_exception = None
         for public_key_object in self.hs.get_auth().get_public_keys(invite_event):
             try:
-                for server, signature_block in signed["signatures"].items():
-                    for key_name, encoded_signature in signature_block.items():
+                for server, signature_block in list(signed["signatures"].items()):
+                    for key_name, encoded_signature in list(signature_block.items()):
                         if not key_name.startswith("ed25519:"):
                             continue
 

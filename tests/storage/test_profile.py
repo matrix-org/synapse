@@ -43,7 +43,7 @@ class ProfileStoreTestCase(unittest.TestCase):
             self.u_frank.localpart, "Frank"
         )
 
-        self.assertEquals(
+        self.assertEqual(
             "Frank",
             (yield self.store.get_profile_displayname(self.u_frank.localpart))
         )
@@ -58,7 +58,7 @@ class ProfileStoreTestCase(unittest.TestCase):
             self.u_frank.localpart, "http://my.site/here"
         )
 
-        self.assertEquals(
+        self.assertEqual(
             "http://my.site/here",
             (yield self.store.get_profile_avatar_url(self.u_frank.localpart))
         )

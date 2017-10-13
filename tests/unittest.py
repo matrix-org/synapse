@@ -80,11 +80,11 @@ class TestCase(unittest.TestCase):
     def assertObjectHasAttributes(self, attrs, obj):
         """Asserts that the given object has each of the attributes given, and
         that the value of each matches according to assertEquals."""
-        for (key, value) in attrs.items():
+        for (key, value) in list(attrs.items()):
             if not hasattr(obj, key):
                 raise AssertionError("Expected obj to have a '.%s'" % key)
             try:
-                self.assertEquals(attrs[key], getattr(obj, key))
+                self.assertEqual(attrs[key], getattr(obj, key))
             except AssertionError as e:
                 raise (type(e))(e.message + " for '.%s'" % key)
 

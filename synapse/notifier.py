@@ -142,7 +142,7 @@ class _NotifierUserStream(object):
 
 
 class EventStreamResult(namedtuple("EventStreamResult", ("events", "tokens"))):
-    def __nonzero__(self):
+    def __bool__(self):
         return bool(self.events)
 
 
@@ -187,9 +187,9 @@ class Notifier(object):
         def count_listeners():
             all_user_streams = set()
 
-            for x in self.room_to_user_streams.values():
+            for x in list(self.room_to_user_streams.values()):
                 all_user_streams |= x
-            for x in self.user_to_user_stream.values():
+            for x in list(self.user_to_user_stream.values()):
                 all_user_streams.add(x)
 
             return sum(stream.count_listeners() for stream in all_user_streams)
@@ -197,7 +197,7 @@ class Notifier(object):
 
         metrics.register_callback(
             "rooms",
-            lambda: count(bool, self.room_to_user_streams.values()),
+            lambda: count(bool, list(self.room_to_user_streams.values())),
         )
         metrics.register_callback(
             "users",
@@ -289,7 +289,7 @@ class Notifier(object):
                 for user_stream in user_streams:
                     try:
                         user_stream.notify(stream_key, new_token, time_now_ms)
-                    except:
+                    except BaseException:
                         logger.exception("Failed to notify listener")
 
                 self.notify_replication()
@@ -393,7 +393,7 @@ class Notifier(object):
             events = []
             end_token = from_token
 
-            for name, source in self.event_sources.sources.items():
+            for name, source in list(self.event_sources.sources.items()):
                 keyname = "%s_key" % name
                 before_id = getattr(before_token, keyname)
                 after_id = getattr(after_token, keyname)
@@ -485,7 +485,7 @@ class Notifier(object):
         time_now_ms = self.clock.time_msec()
         expired_streams = []
         expire_before_ts = time_now_ms - self.UNUSED_STREAM_EXPIRY_MS
-        for stream in self.user_to_user_stream.values():
+        for stream in list(self.user_to_user_stream.values()):
             if stream.count_listeners():
                 continue
             if stream.last_notified_ms < expire_before_ts:

@@ -360,10 +360,10 @@ class DeviceStore(SQLBaseStore):
             return (now_stream_id, [])
 
         if len(query_map) >= 20:
-            now_stream_id = max(stream_id for stream_id in query_map.itervalues())
+            now_stream_id = max(stream_id for stream_id in list(query_map.values()))
 
         devices = self._get_e2e_device_keys_txn(
-            txn, query_map.keys(), include_all_devices=True
+            txn, list(query_map.keys()), include_all_devices=True
         )
 
         prev_sent_id_sql = """
@@ -373,13 +373,13 @@ class DeviceStore(SQLBaseStore):
         """
 
         results = []
-        for user_id, user_devices in devices.iteritems():
+        for user_id, user_devices in list(devices.items()):
             # The prev_id for the first row is always the last row before
             # `from_stream_id`
             txn.execute(prev_sent_id_sql, (destination, user_id, from_stream_id))
             rows = txn.fetchall()
             prev_id = rows[0][0]
-            for device_id, device in user_devices.iteritems():
+            for device_id, device in list(user_devices.items()):
                 stream_id = query_map[(user_id, device_id)]
                 result = {
                     "user_id": user_id,
@@ -417,7 +417,7 @@ class DeviceStore(SQLBaseStore):
         user_ids = set(user_id for user_id, _ in query_list)
         user_map = yield self.get_device_list_last_stream_id_for_remotes(list(user_ids))
         user_ids_in_cache = set(
-            user_id for user_id, stream_id in user_map.items() if stream_id
+            user_id for user_id, stream_id in list(user_map.items()) if stream_id
         )
         user_ids_not_in_cache = user_ids - user_ids_in_cache
 
@@ -483,7 +483,7 @@ class DeviceStore(SQLBaseStore):
         if devices:
             user_devices = devices[user_id]
             results = []
-            for device_id, device in user_devices.iteritems():
+            for device_id, device in list(user_devices.items()):
                 result = {
                     "device_id": device_id,
                 }

@@ -34,6 +34,7 @@ class DictionaryEntry(namedtuple("DictionaryEntry", ("full", "known_absent", "va
             there.
         value (dict): The full or partial dict value
     """
+
     def __len__(self):
         return len(self.value)
 

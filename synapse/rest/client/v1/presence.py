@@ -71,14 +71,14 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
 
             if "status_msg" in content:
                 state["status_msg"] = content.pop("status_msg")
-                if not isinstance(state["status_msg"], basestring):
+                if not isinstance(state["status_msg"], str):
                     raise SynapseError(400, "status_msg must be a string.")
 
             if content:
                 raise KeyError()
         except SynapseError as e:
             raise e
-        except:
+        except BaseException:
             raise SynapseError(400, "Unable to parse state")
 
         yield self.presence_handler.set_state(user, state)
@@ -129,7 +129,7 @@ class PresenceListRestServlet(ClientV1RestServlet):
 
         if "invite" in content:
             for u in content["invite"]:
-                if not isinstance(u, basestring):
+                if not isinstance(u, str):
                     raise SynapseError(400, "Bad invite value.")
                 if len(u) == 0:
                     continue
@@ -140,7 +140,7 @@ class PresenceListRestServlet(ClientV1RestServlet):
 
         if "drop" in content:
             for u in content["drop"]:
-                if not isinstance(u, basestring):
+                if not isinstance(u, str):
                     raise SynapseError(400, "Bad drop value.")
                 if len(u) == 0:
                     continue

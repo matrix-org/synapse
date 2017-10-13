@@ -70,7 +70,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
     def test_one_member(self):
         yield self.inject_room_member(self.room, self.u_alice, Membership.JOIN)
 
-        self.assertEquals(
+        self.assertEqual(
             [self.room.to_string()],
             [m.room_id for m in (
                 yield self.store.get_rooms_for_user_where_membership_is(

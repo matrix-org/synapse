@@ -191,9 +191,9 @@ class FederationServer(FederationBase):
         logger.debug("Returning: %s", str(results))
 
         response = {
-            "pdus": dict(zip(
+            "pdus": dict(list(zip(
                 (p.event_id for p in pdu_list), results
-            )),
+            ))),
         }
 
         yield self.transaction_actions.set_response(
@@ -426,16 +426,16 @@ class FederationServer(FederationBase):
     @log_function
     def on_claim_client_keys(self, origin, content):
         query = []
-        for user_id, device_keys in content.get("one_time_keys", {}).items():
-            for device_id, algorithm in device_keys.items():
+        for user_id, device_keys in list(content.get("one_time_keys", {}).items()):
+            for device_id, algorithm in list(device_keys.items()):
                 query.append((user_id, device_id, algorithm))
 
         results = yield self.store.claim_e2e_one_time_keys(query)
 
         json_result = {}
-        for user_id, device_keys in results.items():
-            for device_id, keys in device_keys.items():
-                for key_id, json_bytes in keys.items():
+        for user_id, device_keys in list(results.items()):
+            for device_id, keys in list(device_keys.items()):
+                for key_id, json_bytes in list(keys.items()):
                     json_result.setdefault(user_id, {})[device_id] = {
                         key_id: json.loads(json_bytes)
                     }
@@ -444,9 +444,9 @@ class FederationServer(FederationBase):
             "Claimed one-time-keys: %s",
             ",".join((
                 "%s for %s:%s" % (key_id, user_id, device_id)
-                for user_id, user_keys in json_result.iteritems()
-                for device_id, device_keys in user_keys.iteritems()
-                for key_id, _ in device_keys.iteritems()
+                for user_id, user_keys in list(json_result.items())
+                for device_id, device_keys in list(user_keys.items())
+                for key_id, _ in list(device_keys.items())
             )),
         )
 

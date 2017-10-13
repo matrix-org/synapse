@@ -11,6 +11,7 @@ from canonicaljson import encode_canonical_json
 import sqlite3
 import sys
 
+
 class Store(object):
     _get_pdu_tuples = PduStore.__dict__["_get_pdu_tuples"]
     _get_pdu_content_hashes_txn = SignatureStore.__dict__["_get_pdu_content_hashes_txn"]
@@ -41,23 +42,24 @@ def select_pdus(cursor):
     for pdu in pdus:
         try:
             if pdu.prev_pdus:
-                print "PROCESS", pdu.pdu_id, pdu.origin, pdu.prev_pdus
+                print(("PROCESS", pdu.pdu_id, pdu.origin, pdu.prev_pdus))
                 for pdu_id, origin, hashes in pdu.prev_pdus:
                     ref_alg, ref_hsh = reference_hashes[(pdu_id, origin)]
                     hashes[ref_alg] = encode_base64(ref_hsh)
-                    store._store_prev_pdu_hash_txn(cursor,  pdu.pdu_id, pdu.origin, pdu_id, origin, ref_alg, ref_hsh)
-                print "SUCCESS", pdu.pdu_id, pdu.origin, pdu.prev_pdus
+                    store._store_prev_pdu_hash_txn(cursor, pdu.pdu_id, pdu.origin, pdu_id, origin, ref_alg, ref_hsh)
+                print(("SUCCESS", pdu.pdu_id, pdu.origin, pdu.prev_pdus))
             pdu = add_event_pdu_content_hash(pdu)
             ref_alg, ref_hsh = compute_pdu_event_reference_hash(pdu)
             reference_hashes[(pdu.pdu_id, pdu.origin)] = (ref_alg, ref_hsh)
             store._store_pdu_reference_hash_txn(cursor, pdu.pdu_id, pdu.origin, ref_alg, ref_hsh)
 
-            for alg, hsh_base64 in pdu.hashes.items():
-                print alg, hsh_base64
+            for alg, hsh_base64 in list(pdu.hashes.items()):
+                print((alg, hsh_base64))
                 store._store_pdu_content_hash_txn(cursor, pdu.pdu_id, pdu.origin, alg, decode_base64(hsh_base64))
 
-        except:
-            print "FAILED_", pdu.pdu_id, pdu.origin, pdu.prev_pdus
+        except BaseException:
+            print(("FAILED_", pdu.pdu_id, pdu.origin, pdu.prev_pdus))
+
 
 def main():
     conn = sqlite3.connect(sys.argv[1])
@@ -65,5 +67,6 @@ def main():
     select_pdus(cursor)
     conn.commit()
 
-if __name__=='__main__':
+
+if __name__ == '__main__':
     main()

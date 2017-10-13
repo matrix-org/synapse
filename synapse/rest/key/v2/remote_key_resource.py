@@ -136,7 +136,7 @@ class RemoteKey(Resource):
     def query_keys(self, request, query, query_remote_on_cache_miss=False):
         logger.info("Handling query for keys %r", query)
         store_queries = []
-        for server_name, key_ids in query.items():
+        for server_name, key_ids in list(query.items()):
             if not key_ids:
                 key_ids = (None,)
             for key_id in key_ids:
@@ -149,7 +149,7 @@ class RemoteKey(Resource):
         time_now_ms = self.clock.time_msec()
 
         cache_misses = dict()
-        for (server_name, key_id, from_server), results in cached.items():
+        for (server_name, key_id, from_server), results in list(cached.items()):
             results = [
                 (result["ts_added_ms"], result) for result in results
             ]
@@ -206,14 +206,14 @@ class RemoteKey(Resource):
                     json_results.add(bytes(result["key_json"]))
 
         if cache_misses and query_remote_on_cache_miss:
-            for server_name, key_ids in cache_misses.items():
+            for server_name, key_ids in list(cache_misses.items()):
                 try:
                     yield self.keyring.get_server_verify_key_v2_direct(
                         server_name, key_ids
                     )
                 except KeyLookupError as e:
                     logger.info("Failed to fetch key: %s", e)
-                except:
+                except BaseException:
                     logger.exception("Failed to get key for %r", server_name)
             yield self.query_keys(
                 request, query, query_remote_on_cache_miss=False

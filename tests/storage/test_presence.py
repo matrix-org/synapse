@@ -36,13 +36,13 @@ class PresenceStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_presence_list(self):
-        self.assertEquals(
+        self.assertEqual(
             [],
             (yield self.store.get_presence_list(
                 observer_localpart=self.u_apple.localpart,
             ))
         )
-        self.assertEquals(
+        self.assertEqual(
             [],
             (yield self.store.get_presence_list(
                 observer_localpart=self.u_apple.localpart,
@@ -55,13 +55,13 @@ class PresenceStoreTestCase(unittest.TestCase):
             observed_userid=self.u_banana.to_string(),
         )
 
-        self.assertEquals(
+        self.assertEqual(
             [{"observed_user_id": "@banana:test", "accepted": 0}],
             (yield self.store.get_presence_list(
                 observer_localpart=self.u_apple.localpart,
             ))
         )
-        self.assertEquals(
+        self.assertEqual(
             [],
             (yield self.store.get_presence_list(
                 observer_localpart=self.u_apple.localpart,
@@ -74,13 +74,13 @@ class PresenceStoreTestCase(unittest.TestCase):
             observed_userid=self.u_banana.to_string(),
         )
 
-        self.assertEquals(
+        self.assertEqual(
             [{"observed_user_id": "@banana:test", "accepted": 1}],
             (yield self.store.get_presence_list(
                 observer_localpart=self.u_apple.localpart,
             ))
         )
-        self.assertEquals(
+        self.assertEqual(
             [{"observed_user_id": "@banana:test", "accepted": 1}],
             (yield self.store.get_presence_list(
                 observer_localpart=self.u_apple.localpart,
@@ -93,13 +93,13 @@ class PresenceStoreTestCase(unittest.TestCase):
             observed_userid=self.u_banana.to_string(),
         )
 
-        self.assertEquals(
+        self.assertEqual(
             [],
             (yield self.store.get_presence_list(
                 observer_localpart=self.u_apple.localpart,
             ))
         )
-        self.assertEquals(
+        self.assertEqual(
             [],
             (yield self.store.get_presence_list(
                 observer_localpart=self.u_apple.localpart,

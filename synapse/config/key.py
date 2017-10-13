@@ -105,8 +105,8 @@ class KeyConfig(Config):
 
     def read_perspectives(self, perspectives_config):
         servers = {}
-        for server_name, server_config in perspectives_config["servers"].items():
-            for key_id, key_data in server_config["verify_keys"].items():
+        for server_name, server_config in list(perspectives_config["servers"].items()):
+            for key_id, key_data in list(server_config["verify_keys"].items()):
                 if is_signing_algorithm_supported(key_id):
                     key_base64 = key_data["key"]
                     key_bytes = decode_base64(key_base64)
@@ -126,7 +126,7 @@ class KeyConfig(Config):
 
     def read_old_signing_keys(self, old_signing_keys):
         keys = {}
-        for key_id, key_data in old_signing_keys.items():
+        for key_id, key_data in list(old_signing_keys.items()):
             if is_signing_algorithm_supported(key_id):
                 key_base64 = key_data["key"]
                 key_bytes = decode_base64(key_base64)

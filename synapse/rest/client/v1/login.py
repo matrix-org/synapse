@@ -24,8 +24,10 @@ from synapse.util.msisdn import phone_number_to_msisdn
 from .base import ClientV1RestServlet, client_path_patterns
 
 import simplejson as json
-import urllib
-import urlparse
+import urllib.request
+import urllib.parse
+import urllib.error
+import urllib.parse
 
 import logging
 from saml2 import BINDING_HTTP_POST
@@ -143,7 +145,7 @@ class LoginRestServlet(ClientV1RestServlet):
                                          LoginRestServlet.SAML2_TYPE):
                 relay_state = ""
                 if "relay_state" in login_submission:
-                    relay_state = "&RelayState=" + urllib.quote(
+                    relay_state = "&RelayState=" + urllib.parse.quote(
                                   login_submission["relay_state"])
                 result = {
                     "uri": "%s%s" % (self.idp_redirect_url, relay_state)
@@ -356,18 +358,18 @@ class SAML2RestServlet(ClientV1RestServlet):
             (user_id, token) = yield handler.register_saml2(username)
             # Forward to the RelayState callback along with ava
             if 'RelayState' in request.args:
-                request.redirect(urllib.unquote(
+                request.redirect(urllib.parse.unquote(
                                  request.args['RelayState'][0]) +
                                  '?status=authenticated&access_token=' +
                                  token + '&user_id=' + user_id + '&ava=' +
-                                 urllib.quote(json.dumps(saml2_auth.ava)))
+                                 urllib.parse.quote(json.dumps(saml2_auth.ava)))
                 finish_request(request)
                 defer.returnValue(None)
             defer.returnValue((200, {"status": "authenticated",
                                      "user_id": user_id, "token": token,
                                      "ava": saml2_auth.ava}))
         elif 'RelayState' in request.args:
-            request.redirect(urllib.unquote(
+            request.redirect(urllib.parse.unquote(
                              request.args['RelayState'][0]) +
                              '?status=not_authenticated')
             finish_request(request)
@@ -387,11 +389,11 @@ class CasRedirectServlet(ClientV1RestServlet):
         args = request.args
         if "redirectUrl" not in args:
             return (400, "Redirect URL not specified for CAS auth")
-        client_redirect_url_param = urllib.urlencode({
+        client_redirect_url_param = urllib.parse.urlencode({
             "redirectUrl": args["redirectUrl"][0]
         })
         hs_redirect_url = self.cas_service_url + "/_matrix/client/api/v1/login/cas/ticket"
-        service_param = urllib.urlencode({
+        service_param = urllib.parse.urlencode({
             "service": "%s?%s" % (hs_redirect_url, client_redirect_url_param)
         })
         request.redirect("%s/login?%s" % (self.cas_server_url, service_param))
@@ -432,7 +434,7 @@ class CasTicketServlet(ClientV1RestServlet):
     def handle_cas_response(self, request, cas_response_body, client_redirect_url):
         user, attributes = self.parse_cas_response(cas_response_body)
 
-        for required_attribute, required_value in self.cas_required_attributes.items():
+        for required_attribute, required_value in list(self.cas_required_attributes.items()):
             # If required attribute was not in CAS Response - Forbidden
             if required_attribute not in attributes:
                 raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
@@ -461,11 +463,11 @@ class CasTicketServlet(ClientV1RestServlet):
         finish_request(request)
 
     def add_login_token_to_redirect_url(self, url, token):
-        url_parts = list(urlparse.urlparse(url))
-        query = dict(urlparse.parse_qsl(url_parts[4]))
+        url_parts = list(urllib.parse.urlparse(url))
+        query = dict(urllib.parse.parse_qsl(url_parts[4]))
         query.update({"loginToken": token})
-        url_parts[4] = urllib.urlencode(query)
-        return urlparse.urlunparse(url_parts)
+        url_parts[4] = urllib.parse.urlencode(query)
+        return urllib.parse.urlunparse(url_parts)
 
     def parse_cas_response(self, cas_response_body):
         user = None

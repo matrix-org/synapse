@@ -57,6 +57,7 @@ class CodeMessageException(RuntimeError):
         code (int): HTTP error code
         msg (str): string describing the error
     """
+
     def __init__(self, code, msg):
         super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
         self.code = code
@@ -72,6 +73,7 @@ class MatrixCodeMessageException(CodeMessageException):
     Attributes:
         errcode (str): Matrix error code e.g 'M_FORBIDDEN'
     """
+
     def __init__(self, code, msg, errcode=Codes.UNKNOWN):
         super(MatrixCodeMessageException, self).__init__(code, msg)
         self.errcode = errcode
@@ -84,6 +86,7 @@ class SynapseError(CodeMessageException):
     Attributes:
         errcode (str): Matrix error code e.g 'M_FORBIDDEN'
     """
+
     def __init__(self, code, msg, errcode=Codes.UNKNOWN):
         """Constructs a synapse error.
 
@@ -142,6 +145,7 @@ class RegistrationError(SynapseError):
 
 class UnrecognizedRequestError(SynapseError):
     """An error indicating we don't understand the request you're trying to make"""
+
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.UNRECOGNIZED
@@ -159,6 +163,7 @@ class UnrecognizedRequestError(SynapseError):
 
 class NotFoundError(SynapseError):
     """An error indicating we can't find the thing you asked for"""
+
     def __init__(self, msg="Not found", errcode=Codes.NOT_FOUND):
         super(NotFoundError, self).__init__(
             404,
@@ -187,6 +192,7 @@ class EventSizeError(SynapseError):
 
 class EventStreamError(SynapseError):
     """An error raised when there a problem with the event stream."""
+
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.BAD_PAGINATION
@@ -220,6 +226,7 @@ class InvalidCaptchaError(SynapseError):
 class LimitExceededError(SynapseError):
     """A client has sent too many requests and is being throttled.
     """
+
     def __init__(self, code=429, msg="Too Many Requests", retry_after_ms=None,
                  errcode=Codes.LIMIT_EXCEEDED):
         super(LimitExceededError, self).__init__(code, msg, errcode)
@@ -253,7 +260,7 @@ def cs_error(msg, code=Codes.UNKNOWN, **kwargs):
         A dict representing the error response JSON.
     """
     err = {"error": msg, "errcode": code}
-    for key, value in kwargs.iteritems():
+    for key, value in list(kwargs.items()):
         err[key] = value
     return err
 
@@ -299,6 +306,7 @@ class HttpResponseException(CodeMessageException):
     Attributes:
         response (str): body of response
     """
+
     def __init__(self, code, msg, response):
         """
 

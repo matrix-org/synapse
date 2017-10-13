@@ -19,8 +19,8 @@ from twisted.internet import defer, reactor
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
 import logging
-import push_rule_evaluator
-import push_tools
+from . import push_rule_evaluator
+from . import push_tools
 
 from synapse.util.logcontext import LoggingContext
 from synapse.util.metrics import Measure
@@ -131,7 +131,7 @@ class HttpPusher(object):
                         starting_max_ordering = self.max_stream_ordering
                         try:
                             yield self._unsafe_process()
-                        except:
+                        except BaseException:
                             logger.exception("Exception processing notifs")
                         if self.max_stream_ordering == starting_max_ordering:
                             break
@@ -256,7 +256,7 @@ class HttpPusher(object):
                         {
                             'app_id': self.app_id,
                             'pushkey': self.pushkey,
-                            'pushkey_ts': long(self.pushkey_ts / 1000),
+                            'pushkey_ts': int(self.pushkey_ts / 1000),
                             'data': self.data_minus_url,
                         }
                     ]
@@ -285,7 +285,7 @@ class HttpPusher(object):
                     {
                         'app_id': self.app_id,
                         'pushkey': self.pushkey,
-                        'pushkey_ts': long(self.pushkey_ts / 1000),
+                        'pushkey_ts': int(self.pushkey_ts / 1000),
                         'data': self.data_minus_url,
                         'tweaks': tweaks
                     }
@@ -314,7 +314,7 @@ class HttpPusher(object):
             defer.returnValue([])
         try:
             resp = yield self.http_client.post_json_get_json(self.url, notification_dict)
-        except:
+        except BaseException:
             logger.warn("Failed to push %s ", self.url)
             defer.returnValue(False)
         rejected = []
@@ -337,7 +337,7 @@ class HttpPusher(object):
                     {
                         'app_id': self.app_id,
                         'pushkey': self.pushkey,
-                        'pushkey_ts': long(self.pushkey_ts / 1000),
+                        'pushkey_ts': int(self.pushkey_ts / 1000),
                         'data': self.data_minus_url,
                     }
                 ]
@@ -345,7 +345,7 @@ class HttpPusher(object):
         }
         try:
             resp = yield self.http_client.post_json_get_json(self.url, d)
-        except:
+        except BaseException:
             logger.exception("Failed to push %s ", self.url)
             defer.returnValue(False)
         rejected = []

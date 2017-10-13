@@ -34,7 +34,7 @@ class JWTConfig(Config):
             self.jwt_algorithm = jwt_config["algorithm"]
 
             try:
-                import jwt
+                from . import jwt
                 jwt  # To stop unused lint.
             except ImportError:
                 raise ConfigError(MISSING_JWT)

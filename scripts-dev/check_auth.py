@@ -35,12 +35,13 @@ def check_auth(auth, auth_chain, events):
         try:
             auth.check(e, auth_events=auth_events)
         except Exception as ex:
-            print "Failed:", e.event_id, e.type, e.state_key
-            print "Auth_events:", auth_events
-            print ex
-            print json.dumps(e.get_dict(), sort_keys=True, indent=4)
+            print(("Failed:", e.event_id, e.type, e.state_key))
+            print(("Auth_events:", auth_events))
+            print(ex)
+            print((json.dumps(e.get_dict(), sort_keys=True, indent=4)))
             # raise
-        print "Success:", e.event_id, e.type, e.state_key
+        print(("Success:", e.event_id, e.type, e.state_key))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

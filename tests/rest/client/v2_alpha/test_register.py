@@ -72,7 +72,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         )
 
         (code, result) = yield self.servlet.on_POST(self.request)
-        self.assertEquals(code, 200)
+        self.assertEqual(code, 200)
         det_data = {
             "user_id": user_id,
             "access_token": token,
@@ -90,7 +90,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         })
         self.appservice = None  # no application service exists
         result = yield self.servlet.on_POST(self.request)
-        self.assertEquals(result, (401, None))
+        self.assertEqual(result, (401, None))
 
     def test_POST_bad_password(self):
         self.request_data = json.dumps({
@@ -131,7 +131,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
             Mock(return_value=device_id)
 
         (code, result) = yield self.servlet.on_POST(self.request)
-        self.assertEquals(code, 200)
+        self.assertEqual(code, 200)
         det_data = {
             "user_id": user_id,
             "access_token": token,

@@ -68,7 +68,7 @@ class ClientReaderServer(HomeServer):
         # Any param beginning with cp_ is a parameter for adbapi, and should
         # not be passed to the database engine.
         db_params = {
-            k: v for k, v in self.db_config.get("args", {}).items()
+            k: v for k, v in list(self.db_config.get("args", {}).items())
             if not k.startswith("cp_")
         }
         db_conn = self.database_engine.module.connect(**db_params)

@@ -94,14 +94,14 @@ class TransactionQueue(object):
 
         metrics.register_callback(
             "pending_pdus",
-            lambda: sum(map(len, pdus.values())),
+            lambda: sum(map(len, list(pdus.values()))),
         )
         metrics.register_callback(
             "pending_edus",
             lambda: (
-                sum(map(len, edus.values()))
-                + sum(map(len, presence.values()))
-                + sum(map(len, edus_keyed.values()))
+                sum(map(len, list(edus.values()))) +
+                sum(map(len, list(presence.values()))) +
+                sum(map(len, list(edus_keyed.values())))
             ),
         )
 
@@ -273,7 +273,7 @@ class TransactionQueue(object):
                 if not states_map:
                     break
 
-                yield self._process_presence_inner(states_map.values())
+                yield self._process_presence_inner(list(states_map.values()))
         finally:
             self._processing_pending_presence = False
 
@@ -401,7 +401,7 @@ class TransactionQueue(object):
                 pending_failures = self.pending_failures_by_dest.pop(destination, [])
 
                 pending_edus.extend(
-                    self.pending_edus_keyed_by_dest.pop(destination, {}).values()
+                    list(self.pending_edus_keyed_by_dest.pop(destination, {}).values())
                 )
 
                 pending_edus.extend(device_message_edus)
@@ -416,7 +416,7 @@ class TransactionQueue(object):
                                     format_user_presence_state(
                                         presence, self.clock.time_msec()
                                     )
-                                    for presence in pending_presence.values()
+                                    for presence in list(pending_presence.values())
                                 ]
                             },
                         )
@@ -584,7 +584,7 @@ class TransactionQueue(object):
             code = 200
 
             if response:
-                for e_id, r in response.get("pdus", {}).items():
+                for e_id, r in list(response.get("pdus", {}).items()):
                     if "error" in r:
                         logger.warn(
                             "Transaction returned error for %s: %s",

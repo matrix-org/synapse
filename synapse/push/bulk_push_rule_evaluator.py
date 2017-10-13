@@ -127,7 +127,7 @@ class BulkPushRuleEvaluator(object):
 
         condition_cache = {}
 
-        for uid, rules in rules_by_user.iteritems():
+        for uid, rules in list(rules_by_user.items()):
             if event.sender == uid:
                 continue
 
@@ -328,7 +328,7 @@ class RulesForRoom(object):
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(
                 "Returning push rules for %r %r",
-                self.room_id, ret_rules_by_user.keys(),
+                self.room_id, list(ret_rules_by_user.keys()),
             )
         defer.returnValue(ret_rules_by_user)
 
@@ -351,7 +351,7 @@ class RulesForRoom(object):
         rows = yield self.store._simple_select_many_batch(
             table="room_memberships",
             column="event_id",
-            iterable=member_event_ids.values(),
+            iterable=list(member_event_ids.values()),
             retcols=('user_id', 'membership', 'event_id'),
             keyvalues={},
             batch_size=500,
@@ -366,15 +366,15 @@ class RulesForRoom(object):
         # If the event is a join event then it will be in current state evnts
         # map but not in the DB, so we have to explicitly insert it.
         if event.type == EventTypes.Member:
-            for event_id in member_event_ids.itervalues():
+            for event_id in list(member_event_ids.values()):
                 if event_id == event.event_id:
                     members[event_id] = (event.state_key, event.membership)
 
         if logger.isEnabledFor(logging.DEBUG):
-            logger.debug("Found members %r: %r", self.room_id, members.values())
+            logger.debug("Found members %r: %r", self.room_id, list(members.values()))
 
         interested_in_user_ids = set(
-            user_id for user_id, membership in members.itervalues()
+            user_id for user_id, membership in list(members.values())
             if membership == Membership.JOIN
         )
 
@@ -386,7 +386,7 @@ class RulesForRoom(object):
         )
 
         user_ids = set(
-            uid for uid, have_pusher in if_users_with_pushers.iteritems() if have_pusher
+            uid for uid, have_pusher in list(if_users_with_pushers.items()) if have_pusher
         )
 
         logger.debug("With pushers: %r", user_ids)
@@ -407,7 +407,7 @@ class RulesForRoom(object):
         )
 
         ret_rules_by_user.update(
-            item for item in rules_by_user.iteritems() if item[0] is not None
+            item for item in list(rules_by_user.items()) if item[0] is not None
         )
 
         self.update_cache(sequence, members, ret_rules_by_user, state_group)

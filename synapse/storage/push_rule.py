@@ -117,7 +117,7 @@ class PushRuleStore(SQLBaseStore):
 
         enabled_map_by_user = yield self.bulk_get_push_rules_enabled(user_ids)
 
-        for user_id, rules in results.items():
+        for user_id, rules in list(results.items()):
             results[user_id] = _load_rules(
                 rules, enabled_map_by_user.get(user_id, {})
             )
@@ -162,8 +162,8 @@ class PushRuleStore(SQLBaseStore):
         # know don't have pushers, nor even read receipts.
         local_users_in_room = set(
             u for u in users_in_room
-            if self.hs.is_mine_id(u)
-            and not self.get_if_app_services_interested_in_user(u)
+            if self.hs.is_mine_id(u) and
+            not self.get_if_app_services_interested_in_user(u)
         )
 
         # users in the room who have pushers need to get push rules run because
@@ -173,7 +173,7 @@ class PushRuleStore(SQLBaseStore):
             on_invalidate=cache_context.invalidate,
         )
         user_ids = set(
-            uid for uid, have_pusher in if_users_with_pushers.items() if have_pusher
+            uid for uid, have_pusher in list(if_users_with_pushers.items()) if have_pusher
         )
 
         users_with_receipts = yield self.get_users_with_read_receipts_in_room(
@@ -201,7 +201,7 @@ class PushRuleStore(SQLBaseStore):
             user_ids, on_invalidate=cache_context.invalidate,
         )
 
-        rules_by_user = {k: v for k, v in rules_by_user.items() if v is not None}
+        rules_by_user = {k: v for k, v in list(rules_by_user.items()) if v is not None}
 
         defer.returnValue(rules_by_user)
 

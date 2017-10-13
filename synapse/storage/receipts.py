@@ -148,7 +148,7 @@ class ReceiptsStore(SQLBaseStore):
             room_ids, to_key, from_key=from_key
         )
 
-        defer.returnValue([ev for res in results.values() for ev in res])
+        defer.returnValue([ev for res in list(results.values()) for ev in res])
 
     @cachedInlineCallbacks(num_args=3, tree=True)
     def get_linearized_receipts_for_room(self, room_id, to_key, from_key=None):

@@ -36,11 +36,13 @@ from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
 from twisted.web._newclient import ResponseDone
 
-from StringIO import StringIO
+from io import StringIO
 
 import simplejson as json
 import logging
-import urllib
+import urllib.request
+import urllib.parse
+import urllib.error
 
 
 logger = logging.getLogger(__name__)
@@ -62,6 +64,7 @@ class SimpleHttpClient(object):
     A simple, no-frills HTTP client with methods that wrap up common ways of
     using HTTP in Matrix
     """
+
     def __init__(self, hs):
         self.hs = hs
         # The default context factory in Twisted 14.0.0 (which we require) is
@@ -118,7 +121,7 @@ class SimpleHttpClient(object):
         # TODO: Do we ever want to log message contents?
         logger.debug("post_urlencoded_get_json args: %s", args)
 
-        query_bytes = urllib.urlencode(encode_urlencode_args(args), True)
+        query_bytes = urllib.parse.urlencode(encode_urlencode_args(args), True)
 
         response = yield self.request(
             "POST",
@@ -200,7 +203,7 @@ class SimpleHttpClient(object):
             On a non-2xx HTTP response.
         """
         if len(args):
-            query_bytes = urllib.urlencode(args, True)
+            query_bytes = urllib.parse.urlencode(args, True)
             uri = "%s?%s" % (uri, query_bytes)
 
         json_str = encode_canonical_json(json_body)
@@ -243,7 +246,7 @@ class SimpleHttpClient(object):
             error message.
         """
         if len(args):
-            query_bytes = urllib.urlencode(args, True)
+            query_bytes = urllib.parse.urlencode(args, True)
             uri = "%s?%s" % (uri, query_bytes)
 
         response = yield self.request(
@@ -382,7 +385,7 @@ class CaptchaServerHttpClient(SimpleHttpClient):
 
     @defer.inlineCallbacks
     def post_urlencoded_get_raw(self, url, args={}):
-        query_bytes = urllib.urlencode(encode_urlencode_args(args), True)
+        query_bytes = urllib.parse.urlencode(encode_urlencode_args(args), True)
 
         response = yield self.request(
             "POST",
@@ -437,6 +440,7 @@ class SpiderHttpClient(SimpleHttpClient):
 
     used by the preview_url endpoint in the content repo.
     """
+
     def __init__(self, hs):
         SimpleHttpClient.__init__(self, hs)
         # clobber the base class's agent and UA:
@@ -454,11 +458,11 @@ class SpiderHttpClient(SimpleHttpClient):
 
 
 def encode_urlencode_args(args):
-    return {k: encode_urlencode_arg(v) for k, v in args.items()}
+    return {k: encode_urlencode_arg(v) for k, v in list(args.items())}
 
 
 def encode_urlencode_arg(arg):
-    if isinstance(arg, unicode):
+    if isinstance(arg, str):
         return arg.encode('utf-8')
     elif isinstance(arg, list):
         return [encode_urlencode_arg(i) for i in arg]

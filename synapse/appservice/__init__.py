@@ -116,7 +116,7 @@ class ApplicationService(object):
                 namespaces[ns] = []
                 continue
 
-            if type(namespaces[ns]) != list:
+            if not isinstance(namespaces[ns], list):
                 raise ValueError("Bad namespace value for '%s'" % ns)
             for regex_obj in namespaces[ns]:
                 if not isinstance(regex_obj, dict):
@@ -126,7 +126,7 @@ class ApplicationService(object):
                         "Expected bool for 'exclusive' in ns '%s'" % ns
                     )
                 regex = regex_obj.get("regex")
-                if isinstance(regex, basestring):
+                if isinstance(regex, str):
                     regex_obj["regex"] = re.compile(regex)  # Pre-compile regex
                 else:
                     raise ValueError(
@@ -216,8 +216,8 @@ class ApplicationService(object):
 
     def is_interested_in_user(self, user_id):
         return (
-            self._matches_regex(user_id, ApplicationService.NS_USERS)
-            or user_id == self.sender
+            self._matches_regex(user_id, ApplicationService.NS_USERS) or
+            user_id == self.sender
         )
 
     def is_interested_in_alias(self, alias):
@@ -228,8 +228,8 @@ class ApplicationService(object):
 
     def is_exclusive_user(self, user_id):
         return (
-            self._is_exclusive(ApplicationService.NS_USERS, user_id)
-            or user_id == self.sender
+            self._is_exclusive(ApplicationService.NS_USERS, user_id) or
+            user_id == self.sender
         )
 
     def is_interested_in_protocol(self, protocol):

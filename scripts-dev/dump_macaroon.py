@@ -11,14 +11,14 @@ macaroon_string = sys.argv[1]
 key = sys.argv[2] if len(sys.argv) > 2 else None
 
 macaroon = pymacaroons.Macaroon.deserialize(macaroon_string)
-print macaroon.inspect()
+print((macaroon.inspect()))
 
-print ""
+print("")
 
 verifier = pymacaroons.Verifier()
 verifier.satisfy_general(lambda c: True)
 try:
     verifier.verify(macaroon, key)
-    print "Signature is correct"
+    print("Signature is correct")
 except Exception as e:
-    print e.message
+    print((e.message))

@@ -65,7 +65,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
         for f in self.as_yaml_files:
             try:
                 os.remove(f)
-            except:
+            except BaseException:
                 pass
 
     def _add_appservice(self, as_token, id, url, hs_token, sender):
@@ -78,31 +78,31 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
 
     def test_retrieve_unknown_service_token(self):
         service = self.store.get_app_service_by_token("invalid_token")
-        self.assertEquals(service, None)
+        self.assertEqual(service, None)
 
     def test_retrieval_of_service(self):
         stored_service = self.store.get_app_service_by_token(
             self.as_token
         )
-        self.assertEquals(stored_service.token, self.as_token)
-        self.assertEquals(stored_service.id, self.as_id)
-        self.assertEquals(stored_service.url, self.as_url)
-        self.assertEquals(
+        self.assertEqual(stored_service.token, self.as_token)
+        self.assertEqual(stored_service.id, self.as_id)
+        self.assertEqual(stored_service.url, self.as_url)
+        self.assertEqual(
             stored_service.namespaces[ApplicationService.NS_ALIASES],
             []
         )
-        self.assertEquals(
+        self.assertEqual(
             stored_service.namespaces[ApplicationService.NS_ROOMS],
             []
         )
-        self.assertEquals(
+        self.assertEqual(
             stored_service.namespaces[ApplicationService.NS_USERS],
             []
         )
 
     def test_retrieval_of_all_services(self):
         services = self.store.get_app_services()
-        self.assertEquals(len(services), 3)
+        self.assertEqual(len(services), 3)
 
 
 class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
@@ -185,7 +185,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
     def test_get_appservice_state_none(self):
         service = Mock(id=999)
         state = yield self.store.get_appservice_state(service)
-        self.assertEquals(None, state)
+        self.assertEqual(None, state)
 
     @defer.inlineCallbacks
     def test_get_appservice_state_up(self):
@@ -194,7 +194,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         )
         service = Mock(id=self.as_list[0]["id"])
         state = yield self.store.get_appservice_state(service)
-        self.assertEquals(ApplicationServiceState.UP, state)
+        self.assertEqual(ApplicationServiceState.UP, state)
 
     @defer.inlineCallbacks
     def test_get_appservice_state_down(self):
@@ -209,14 +209,14 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         )
         service = Mock(id=self.as_list[1]["id"])
         state = yield self.store.get_appservice_state(service)
-        self.assertEquals(ApplicationServiceState.DOWN, state)
+        self.assertEqual(ApplicationServiceState.DOWN, state)
 
     @defer.inlineCallbacks
     def test_get_appservices_by_state_none(self):
         services = yield self.store.get_appservices_by_state(
             ApplicationServiceState.DOWN
         )
-        self.assertEquals(0, len(services))
+        self.assertEqual(0, len(services))
 
     @defer.inlineCallbacks
     def test_set_appservices_state_down(self):
@@ -229,7 +229,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             "SELECT as_id FROM application_services_state WHERE state=?",
             (ApplicationServiceState.DOWN,)
         )
-        self.assertEquals(service.id, rows[0][0])
+        self.assertEqual(service.id, rows[0][0])
 
     @defer.inlineCallbacks
     def test_set_appservices_state_multiple_up(self):
@@ -250,16 +250,16 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             "SELECT as_id FROM application_services_state WHERE state=?",
             (ApplicationServiceState.UP,)
         )
-        self.assertEquals(service.id, rows[0][0])
+        self.assertEqual(service.id, rows[0][0])
 
     @defer.inlineCallbacks
     def test_create_appservice_txn_first(self):
         service = Mock(id=self.as_list[0]["id"])
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         txn = yield self.store.create_appservice_txn(service, events)
-        self.assertEquals(txn.id, 1)
-        self.assertEquals(txn.events, events)
-        self.assertEquals(txn.service, service)
+        self.assertEqual(txn.id, 1)
+        self.assertEqual(txn.events, events)
+        self.assertEqual(txn.service, service)
 
     @defer.inlineCallbacks
     def test_create_appservice_txn_older_last_txn(self):
@@ -269,9 +269,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         yield self._insert_txn(service.id, 9644, events)
         yield self._insert_txn(service.id, 9645, events)
         txn = yield self.store.create_appservice_txn(service, events)
-        self.assertEquals(txn.id, 9646)
-        self.assertEquals(txn.events, events)
-        self.assertEquals(txn.service, service)
+        self.assertEqual(txn.id, 9646)
+        self.assertEqual(txn.events, events)
+        self.assertEqual(txn.service, service)
 
     @defer.inlineCallbacks
     def test_create_appservice_txn_up_to_date_last_txn(self):
@@ -279,9 +279,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         yield self._set_last_txn(service.id, 9643)
         txn = yield self.store.create_appservice_txn(service, events)
-        self.assertEquals(txn.id, 9644)
-        self.assertEquals(txn.events, events)
-        self.assertEquals(txn.service, service)
+        self.assertEqual(txn.id, 9644)
+        self.assertEqual(txn.events, events)
+        self.assertEqual(txn.service, service)
 
     @defer.inlineCallbacks
     def test_create_appservice_txn_up_fuzzing(self):
@@ -300,9 +300,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         yield self._insert_txn(self.as_list[3]["id"], 9643, events)
 
         txn = yield self.store.create_appservice_txn(service, events)
-        self.assertEquals(txn.id, 9644)
-        self.assertEquals(txn.events, events)
-        self.assertEquals(txn.service, service)
+        self.assertEqual(txn.id, 9644)
+        self.assertEqual(txn.events, events)
+        self.assertEqual(txn.service, service)
 
     @defer.inlineCallbacks
     def test_complete_appservice_txn_first_txn(self):
@@ -317,14 +317,14 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             "SELECT last_txn FROM application_services_state WHERE as_id=?",
             (service.id,)
         )
-        self.assertEquals(1, len(res))
-        self.assertEquals(txn_id, res[0][0])
+        self.assertEqual(1, len(res))
+        self.assertEqual(txn_id, res[0][0])
 
         res = yield self.db_pool.runQuery(
             "SELECT * FROM application_services_txns WHERE txn_id=?",
             (txn_id,)
         )
-        self.assertEquals(0, len(res))
+        self.assertEqual(0, len(res))
 
     @defer.inlineCallbacks
     def test_complete_appservice_txn_existing_in_state_table(self):
@@ -340,22 +340,22 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             "as_id=?",
             (service.id,)
         )
-        self.assertEquals(1, len(res))
-        self.assertEquals(txn_id, res[0][0])
-        self.assertEquals(ApplicationServiceState.UP, res[0][1])
+        self.assertEqual(1, len(res))
+        self.assertEqual(txn_id, res[0][0])
+        self.assertEqual(ApplicationServiceState.UP, res[0][1])
 
         res = yield self.db_pool.runQuery(
             "SELECT * FROM application_services_txns WHERE txn_id=?",
             (txn_id,)
         )
-        self.assertEquals(0, len(res))
+        self.assertEqual(0, len(res))
 
     @defer.inlineCallbacks
     def test_get_oldest_unsent_txn_none(self):
         service = Mock(id=self.as_list[0]["id"])
 
         txn = yield self.store.get_oldest_unsent_txn(service)
-        self.assertEquals(None, txn)
+        self.assertEqual(None, txn)
 
     @defer.inlineCallbacks
     def test_get_oldest_unsent_txn(self):
@@ -372,9 +372,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         yield self._insert_txn(service.id, 12, other_events)
 
         txn = yield self.store.get_oldest_unsent_txn(service)
-        self.assertEquals(service, txn.service)
-        self.assertEquals(10, txn.id)
-        self.assertEquals(events, txn.events)
+        self.assertEqual(service, txn.service)
+        self.assertEqual(10, txn.id)
+        self.assertEqual(events, txn.events)
 
     @defer.inlineCallbacks
     def test_get_appservices_by_state_single(self):
@@ -388,8 +388,8 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         services = yield self.store.get_appservices_by_state(
             ApplicationServiceState.DOWN
         )
-        self.assertEquals(1, len(services))
-        self.assertEquals(self.as_list[0]["id"], services[0].id)
+        self.assertEqual(1, len(services))
+        self.assertEqual(self.as_list[0]["id"], services[0].id)
 
     @defer.inlineCallbacks
     def test_get_appservices_by_state_multiple(self):
@@ -409,8 +409,8 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         services = yield self.store.get_appservices_by_state(
             ApplicationServiceState.DOWN
         )
-        self.assertEquals(2, len(services))
-        self.assertEquals(
+        self.assertEqual(2, len(services))
+        self.assertEqual(
             set([self.as_list[2]["id"], self.as_list[0]["id"]]),
             set([services[0].id, services[1].id])
         )

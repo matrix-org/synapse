@@ -11,7 +11,7 @@ from synapse.util.logcontext import LoggingContext
 class LoggingContextTestCase(unittest.TestCase):
 
     def _check_test_key(self, value):
-        self.assertEquals(
+        self.assertEqual(
             LoggingContext.current_context().test_key, value
         )
 

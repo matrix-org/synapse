@@ -7,6 +7,7 @@ class TreeCache(object):
     efficiently.
     Keys must be tuples.
     """
+
     def __init__(self):
         self.size = 0
         self.root = {}
@@ -49,7 +50,7 @@ class TreeCache(object):
         if popped is SENTINEL:
             return default
 
-        node_and_keys = zip(nodes, key)
+        node_and_keys = list(zip(nodes, key))
         node_and_keys.reverse()
         node_and_keys.append((self.root, None))
 
@@ -76,7 +77,7 @@ def iterate_tree_cache_entry(d):
     can contain dicts.
     """
     if isinstance(d, dict):
-        for value_d in d.itervalues():
+        for value_d in list(d.values()):
             for value in iterate_tree_cache_entry(value_d):
                 yield value
     else:
@@ -101,7 +102,7 @@ def _strip_and_count_entires(d):
     """
     if isinstance(d, dict):
         cnt = 0
-        for key, value in d.items():
+        for key, value in list(d.items()):
             v, n = _strip_and_count_entires(value)
             d[key] = v
             cnt += n

@@ -34,7 +34,7 @@ import re
 import fnmatch
 import cgi
 import ujson as json
-import urlparse
+import urllib.parse
 import itertools
 
 import logging
@@ -86,7 +86,7 @@ class PreviewUrlResource(Resource):
         else:
             ts = self.clock.time_msec()
 
-        url_tuple = urlparse.urlsplit(url)
+        url_tuple = urllib.parse.urlsplit(url)
         for entry in self.url_preview_url_blacklist:
             match = True
             for attrib in entry:
@@ -288,7 +288,7 @@ class PreviewUrlResource(Resource):
                         download_name = download_name_ascii
 
                 if download_name:
-                    download_name = urlparse.unquote(download_name)
+                    download_name = urllib.parse.unquote(download_name)
                     try:
                         download_name = download_name.decode("utf-8")
                     except UnicodeDecodeError:
@@ -452,8 +452,8 @@ def _iterate_over_text(tree, *tags_to_ignore):
     # to be returned.
     elements = iter([tree])
     while True:
-        el = elements.next()
-        if isinstance(el, basestring):
+        el = next(elements)
+        if isinstance(el, str):
             yield el
         elif el is not None and el.tag not in tags_to_ignore:
             # el.text is the text before the first child, so we can immediately
@@ -475,15 +475,15 @@ def _iterate_over_text(tree, *tags_to_ignore):
 
 
 def _rebase_url(url, base):
-    base = list(urlparse.urlparse(base))
-    url = list(urlparse.urlparse(url))
+    base = list(urllib.parse.urlparse(base))
+    url = list(urllib.parse.urlparse(url))
     if not url[0]:  # fix up schema
         url[0] = base[0] or "http"
     if not url[1]:  # fix up hostname
         url[1] = base[1]
         if not url[2].startswith('/'):
             url[2] = re.sub(r'/[^/]+$', '/', base[2]) + url[2]
-    return urlparse.urlunparse(url)
+    return urllib.parse.urlunparse(url)
 
 
 def _is_media(content_type):
@@ -549,5 +549,5 @@ def summarize_paragraphs(text_nodes, min_size=200, max_size=500):
 
         # We always add an ellipsis because at the very least
         # we chopped mid paragraph.
-        description = new_desc.strip() + u"…"
+        description = new_desc.strip() + "…"
     return description if description else None

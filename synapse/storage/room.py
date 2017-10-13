@@ -372,9 +372,9 @@ class RoomStore(SQLBaseStore):
                                              network_tuple):
         return {
             rm
-            for rm, vis in self.get_published_at_stream_id_txn(
+            for rm, vis in list(self.get_published_at_stream_id_txn(
                 txn, stream_id, network_tuple=network_tuple
-            ).items()
+            ).items())
             if vis
         }
 
@@ -445,10 +445,10 @@ class RoomStore(SQLBaseStore):
             )
 
             now_rooms_visible = set(
-                rm for rm, vis in now_rooms_dict.items() if vis
+                rm for rm, vis in list(now_rooms_dict.items()) if vis
             )
             now_rooms_not_visible = set(
-                rm for rm, vis in now_rooms_dict.items() if not vis
+                rm for rm, vis in list(now_rooms_dict.items()) if not vis
             )
 
             newly_visible = now_rooms_visible - then_rooms

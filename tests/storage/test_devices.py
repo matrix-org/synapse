@@ -57,7 +57,7 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
         )
 
         res = yield self.store.get_devices_by_user("user_id")
-        self.assertEqual(2, len(res.keys()))
+        self.assertEqual(2, len(list(res.keys())))
         self.assertDictContainsSubset({
             "user_id": "user_id",
             "device_id": "device1",

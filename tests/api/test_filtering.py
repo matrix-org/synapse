@@ -441,7 +441,7 @@ class FilteringTestCase(unittest.TestCase):
         )
 
         results = user_filter.filter_presence(events=events)
-        self.assertEquals(events, results)
+        self.assertEqual(events, results)
 
     @defer.inlineCallbacks
     def test_filter_presence_no_match(self):
@@ -468,7 +468,7 @@ class FilteringTestCase(unittest.TestCase):
         )
 
         results = user_filter.filter_presence(events=events)
-        self.assertEquals([], results)
+        self.assertEqual([], results)
 
     @defer.inlineCallbacks
     def test_filter_room_state_match(self):
@@ -496,7 +496,7 @@ class FilteringTestCase(unittest.TestCase):
         )
 
         results = user_filter.filter_room_state(events=events)
-        self.assertEquals(events, results)
+        self.assertEqual(events, results)
 
     @defer.inlineCallbacks
     def test_filter_room_state_no_match(self):
@@ -524,7 +524,7 @@ class FilteringTestCase(unittest.TestCase):
         )
 
         results = user_filter.filter_room_state(events)
-        self.assertEquals([], results)
+        self.assertEqual([], results)
 
     def test_filter_rooms(self):
         definition = {
@@ -540,7 +540,7 @@ class FilteringTestCase(unittest.TestCase):
 
         filtered_room_ids = list(Filter(definition).filter_rooms(room_ids))
 
-        self.assertEquals(filtered_room_ids, ["!allowed:example.com"])
+        self.assertEqual(filtered_room_ids, ["!allowed:example.com"])
 
     @defer.inlineCallbacks
     def test_add_filter(self):
@@ -557,8 +557,8 @@ class FilteringTestCase(unittest.TestCase):
             user_filter=user_filter_json,
         )
 
-        self.assertEquals(filter_id, 0)
-        self.assertEquals(user_filter_json, (
+        self.assertEqual(filter_id, 0)
+        self.assertEqual(user_filter_json, (
             yield self.datastore.get_user_filter(
                 user_localpart=user_localpart,
                 filter_id=0,
@@ -585,6 +585,6 @@ class FilteringTestCase(unittest.TestCase):
             filter_id=filter_id,
         )
 
-        self.assertEquals(filter.get_filter_json(), user_filter_json)
+        self.assertEqual(filter.get_filter_json(), user_filter_json)
 
-        self.assertRegexpMatches(repr(filter), r"<FilterCollection \{.*\}>")
+        self.assertRegex(repr(filter), r"<FilterCollection \{.*\}>")

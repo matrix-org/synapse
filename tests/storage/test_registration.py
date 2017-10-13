@@ -41,7 +41,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
     def test_register(self):
         yield self.store.register(self.user_id, self.tokens[0], self.pwhash)
 
-        self.assertEquals(
+        self.assertEqual(
             # TODO(paul): Surely this field should be 'user_id', not 'name'
             #  Additionally surely it shouldn't come in a 1-element list
             {"name": self.user_id, "password_hash": self.pwhash, "is_guest": 0},
@@ -111,4 +111,4 @@ class TokenGenerator:
 
     def generate(self, user_id):
         self._last_issued_token += 1
-        return u"%s-%d" % (user_id, self._last_issued_token,)
+        return "%s-%d" % (user_id, self._last_issued_token,)

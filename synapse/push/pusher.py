@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from httppusher import HttpPusher
+from .httppusher import HttpPusher
 
 import logging
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 try:
     from synapse.push.emailpusher import EmailPusher
     from synapse.push.mailer import Mailer, load_jinja2_templates
-except:
+except BaseException:
     pass
 
 

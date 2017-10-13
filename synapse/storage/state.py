@@ -158,7 +158,7 @@ class StateStore(SQLBaseStore):
             event_ids,
         )
 
-        groups = set(event_to_groups.itervalues())
+        groups = set(event_to_groups.values())
         group_to_state = yield self._get_state_for_groups(groups)
 
         defer.returnValue(group_to_state)
@@ -176,18 +176,18 @@ class StateStore(SQLBaseStore):
 
         state_event_map = yield self.get_events(
             [
-                ev_id for group_ids in group_to_ids.itervalues()
-                for ev_id in group_ids.itervalues()
+                ev_id for group_ids in list(group_to_ids.values())
+                for ev_id in list(group_ids.values())
             ],
             get_prev_content=False
         )
 
         defer.returnValue({
             group: [
-                state_event_map[v] for v in event_id_map.itervalues()
+                state_event_map[v] for v in list(event_id_map.values())
                 if v in state_event_map
             ]
-            for group, event_id_map in group_to_ids.iteritems()
+            for group, event_id_map in list(group_to_ids.items())
         })
 
     def _have_persisted_state_group_txn(self, txn, state_group):
@@ -272,7 +272,7 @@ class StateStore(SQLBaseStore):
                             "state_key": key[1],
                             "event_id": state_id,
                         }
-                        for key, state_id in context.delta_ids.iteritems()
+                        for key, state_id in list(context.delta_ids.items())
                     ],
                 )
             else:
@@ -287,7 +287,7 @@ class StateStore(SQLBaseStore):
                             "state_key": key[1],
                             "event_id": state_id,
                         }
-                        for key, state_id in context.current_state_ids.iteritems()
+                        for key, state_id in list(context.current_state_ids.items())
                     ],
                 )
 
@@ -311,11 +311,11 @@ class StateStore(SQLBaseStore):
                     "state_group": state_group_id,
                     "event_id": event_id,
                 }
-                for event_id, state_group_id in state_groups.iteritems()
+                for event_id, state_group_id in list(state_groups.items())
             ],
         )
 
-        for event_id, state_group_id in state_groups.iteritems():
+        for event_id, state_group_id in list(state_groups.items()):
             txn.call_after(
                 self._get_state_group_for_event.prefill,
                 (event_id,), state_group_id
@@ -368,7 +368,7 @@ class StateStore(SQLBaseStore):
         """
         results = {}
 
-        chunks = [groups[i:i + 100] for i in xrange(0, len(groups), 100)]
+        chunks = [groups[i:i + 100] for i in range(0, len(groups), 100)]
         for chunk in chunks:
             res = yield self.runInteraction(
                 "_get_state_groups_from_groups",
@@ -509,21 +509,21 @@ class StateStore(SQLBaseStore):
             event_ids,
         )
 
-        groups = set(event_to_groups.itervalues())
+        groups = set(event_to_groups.values())
         group_to_state = yield self._get_state_for_groups(groups, types)
 
         state_event_map = yield self.get_events(
-            [ev_id for sd in group_to_state.itervalues() for ev_id in sd.itervalues()],
+            [ev_id for sd in list(group_to_state.values()) for ev_id in list(sd.values())],
             get_prev_content=False
         )
 
         event_to_state = {
             event_id: {
                 k: state_event_map[v]
-                for k, v in group_to_state[group].iteritems()
+                for k, v in list(group_to_state[group].items())
                 if v in state_event_map
             }
-            for event_id, group in event_to_groups.iteritems()
+            for event_id, group in list(event_to_groups.items())
         }
 
         defer.returnValue({event: event_to_state[event] for event in event_ids})
@@ -546,12 +546,12 @@ class StateStore(SQLBaseStore):
             event_ids,
         )
 
-        groups = set(event_to_groups.itervalues())
+        groups = set(event_to_groups.values())
         group_to_state = yield self._get_state_for_groups(groups, types)
 
         event_to_state = {
             event_id: group_to_state[group]
-            for event_id, group in event_to_groups.iteritems()
+            for event_id, group in list(event_to_groups.items())
         }
 
         defer.returnValue({event: event_to_state[event] for event in event_ids})
@@ -665,7 +665,7 @@ class StateStore(SQLBaseStore):
         got_all = is_all or not missing_types
 
         return {
-            k: v for k, v in state_dict_ids.iteritems()
+            k: v for k, v in list(state_dict_ids.items())
             if include(k[0], k[1])
         }, missing_types, got_all
 
@@ -724,12 +724,12 @@ class StateStore(SQLBaseStore):
 
             # Now we want to update the cache with all the things we fetched
             # from the database.
-            for group, group_state_dict in group_to_state_dict.iteritems():
+            for group, group_state_dict in list(group_to_state_dict.items()):
                 state_dict = results[group]
 
                 state_dict.update(
                     ((intern_string(k[0]), intern_string(k[1])), to_ascii(v))
-                    for k, v in group_state_dict.iteritems()
+                    for k, v in list(group_state_dict.items())
                 )
 
                 self._state_group_cache.update(
@@ -767,7 +767,7 @@ class StateStore(SQLBaseStore):
 
         def reindex_txn(txn):
             new_last_state_group = last_state_group
-            for count in xrange(batch_size):
+            for count in range(batch_size):
                 txn.execute(
                     "SELECT id, room_id FROM state_groups"
                     " WHERE ? < id AND id <= ?"
@@ -825,7 +825,7 @@ class StateStore(SQLBaseStore):
                         # of keys
 
                         delta_state = {
-                            key: value for key, value in curr_state.iteritems()
+                            key: value for key, value in list(curr_state.items())
                             if prev_state.get(key, None) != value
                         }
 
@@ -865,7 +865,7 @@ class StateStore(SQLBaseStore):
                                     "state_key": key[1],
                                     "event_id": state_id,
                                 }
-                                for key, state_id in delta_state.iteritems()
+                                for key, state_id in list(delta_state.items())
                             ],
                         )
 

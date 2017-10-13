@@ -67,7 +67,7 @@ class SynapseRequest(Request):
             ru_utime, ru_stime = context.get_resource_usage()
             db_txn_count = context.db_txn_count
             db_txn_duration = context.db_txn_duration
-        except:
+        except BaseException:
             ru_utime, ru_stime = (0, 0)
             db_txn_count, db_txn_duration = (0, 0)
 
@@ -106,6 +106,7 @@ class XForwardedForRequest(SynapseRequest):
     Add a layer on top of another request that only uses the value of an
     X-Forwarded-For header as the result of C{getClientIP}.
     """
+
     def getClientIP(self):
         """
         @return: The client address (the first address) in the value of the
@@ -133,6 +134,7 @@ class SynapseSite(Site):
     Subclass of a twisted http Site that does access logging with python's
     standard logging
     """
+
     def __init__(self, logger_name, site_tag, config, resource, *args, **kwargs):
         Site.__init__(self, resource, *args, **kwargs)
 

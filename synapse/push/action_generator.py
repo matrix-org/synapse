@@ -45,5 +45,5 @@ class ActionGenerator(object):
             )
 
         context.push_actions = [
-            (uid, actions) for uid, actions in actions_by_user.iteritems()
+            (uid, actions) for uid, actions in list(actions_by_user.items())
         ]

@@ -20,7 +20,9 @@ from twisted.internet import defer, reactor
 from pprint import pformat
 
 import json
-import urllib
+import urllib.request
+import urllib.parse
+import urllib.error
 
 
 class HttpClient(object):
@@ -83,7 +85,7 @@ class TwistedHttpClient(HttpClient):
     def get_json(self, url, args=None):
         if args:
             # generates a list of strings of form "k=v".
-            qs = urllib.urlencode(args, True)
+            qs = urllib.parse.urlencode(args, True)
             url = "%s?%s" % (url, qs)
         response = yield self._create_get_request(url)
         body = yield readBody(response)
@@ -116,18 +118,18 @@ class TwistedHttpClient(HttpClient):
     @defer.inlineCallbacks
     def do_request(self, method, url, data=None, qparams=None, jsonreq=True, headers={}):
         if qparams:
-            url = "%s?%s" % (url, urllib.urlencode(qparams, True))
+            url = "%s?%s" % (url, urllib.parse.urlencode(qparams, True))
 
         if jsonreq:
             prod = _JsonProducer(data)
-            headers['Content-Type'] = ["application/json"];
+            headers['Content-Type'] = ["application/json"]
         else:
             prod = _RawProducer(data)
 
         if method in ["POST", "PUT"]:
             response = yield self._create_request(method, url,
-                    producer=prod,
-                    headers_dict=headers)
+                                                  producer=prod,
+                                                  headers_dict=headers)
         else:
             response = yield self._create_request(method, url)
 
@@ -141,15 +143,15 @@ class TwistedHttpClient(HttpClient):
         headers_dict["User-Agent"] = ["Synapse Cmd Client"]
 
         retries_left = 5
-        print "%s to %s with headers %s" % (method, url, headers_dict)
+        print(("%s to %s with headers %s" % (method, url, headers_dict)))
         if self.verbose and producer:
             if "password" in producer.data:
                 temp = producer.data["password"]
                 producer.data["password"] = "[REDACTED]"
-                print json.dumps(producer.data, indent=4)
+                print((json.dumps(producer.data, indent=4)))
                 producer.data["password"] = temp
             else:
-                print json.dumps(producer.data, indent=4)
+                print((json.dumps(producer.data, indent=4)))
 
         while True:
             try:
@@ -161,7 +163,7 @@ class TwistedHttpClient(HttpClient):
                 )
                 break
             except Exception as e:
-                print "uh oh: %s" % e
+                print(("uh oh: %s" % e))
                 if retries_left:
                     yield self.sleep(2 ** (5 - retries_left))
                     retries_left -= 1
@@ -169,14 +171,15 @@ class TwistedHttpClient(HttpClient):
                     raise e
 
         if self.verbose:
-            print "Status %s %s" % (response.code, response.phrase)
-            print pformat(list(response.headers.getAllRawHeaders()))
+            print(("Status %s %s" % (response.code, response.phrase)))
+            print((pformat(list(response.headers.getAllRawHeaders()))))
         defer.returnValue(response)
 
     def sleep(self, seconds):
         d = defer.Deferred()
         reactor.callLater(seconds, d.callback, seconds)
         return d
+
 
 class _RawProducer(object):
     def __init__(self, data):
@@ -194,9 +197,11 @@ class _RawProducer(object):
     def stopProducing(self):
         pass
 
+
 class _JsonProducer(object):
     """ Used by the twisted http client to create the HTTP body from json
     """
+
     def __init__(self, jsn):
         self.data = jsn
         self.body = json.dumps(jsn).encode("utf8")

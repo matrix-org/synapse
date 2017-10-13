@@ -89,7 +89,7 @@ def prune_event(event):
 
     allowed_fields = {
         k: v
-        for k, v in event_dict.items()
+        for k, v in list(event_dict.items())
         if k in allowed_keys
     }
 
@@ -248,7 +248,7 @@ def serialize_event(e, time_now_ms, as_client_event=True,
     time_now_ms = int(time_now_ms)
 
     # Should this strip out None's?
-    d = {k: v for k, v in e.get_dict().items()}
+    d = {k: v for k, v in list(e.get_dict().items())}
 
     if "age_ts" in d["unsigned"]:
         d["unsigned"]["age"] = time_now_ms - d["unsigned"]["age_ts"]
@@ -277,7 +277,7 @@ def serialize_event(e, time_now_ms, as_client_event=True,
 
     if only_event_fields:
         if (not isinstance(only_event_fields, list) or
-                not all(isinstance(f, basestring) for f in only_event_fields)):
+                not all(isinstance(f, str) for f in only_event_fields)):
             raise TypeError("only_event_fields must be a list of strings")
         d = only_fields(d, only_event_fields)
 

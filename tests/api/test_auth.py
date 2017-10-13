@@ -61,7 +61,7 @@ class AuthTestCase(unittest.TestCase):
         request.args["access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = yield self.auth.get_user_by_req(request)
-        self.assertEquals(requester.user.to_string(), self.test_user)
+        self.assertEqual(requester.user.to_string(), self.test_user)
 
     def test_get_user_by_req_user_bad_token(self):
         self.store.get_user_by_access_token = Mock(return_value=None)
@@ -94,7 +94,7 @@ class AuthTestCase(unittest.TestCase):
         request.args["access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = yield self.auth.get_user_by_req(request)
-        self.assertEquals(requester.user.to_string(), self.test_user)
+        self.assertEqual(requester.user.to_string(), self.test_user)
 
     def test_get_user_by_req_appservice_bad_token(self):
         self.store.get_app_service_by_token = Mock(return_value=None)
@@ -129,7 +129,7 @@ class AuthTestCase(unittest.TestCase):
         request.args["user_id"] = [masquerading_user_id]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = yield self.auth.get_user_by_req(request)
-        self.assertEquals(requester.user.to_string(), masquerading_user_id)
+        self.assertEqual(requester.user.to_string(), masquerading_user_id)
 
     def test_get_user_by_req_appservice_valid_token_bad_user_id(self):
         masquerading_user_id = "@doppelganger:matrix.org"

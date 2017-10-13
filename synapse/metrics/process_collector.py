@@ -55,7 +55,7 @@ def update_resource_metrics():
             # line is PID (command) more stats go here ...
             raw_stats = line.split(") ", 1)[1].split(" ")
 
-            for (name, index) in STAT_FIELDS.iteritems():
+            for (name, index) in list(STAT_FIELDS.items()):
                 # subtract 3 from the index, because proc(5) is 1-based, and
                 # we've lost the first two fields in PID and COMMAND above
                 stats[name] = int(raw_stats[index - 3])

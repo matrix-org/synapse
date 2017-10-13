@@ -129,7 +129,7 @@ class PusherPool:
 
             for u in users_affected:
                 if u in self.pushers:
-                    for p in self.pushers[u].values():
+                    for p in list(self.pushers[u].values()):
                         deferreds.append(
                             preserve_fn(p.on_new_notifications)(
                                 min_stream_id, max_stream_id
@@ -137,7 +137,7 @@ class PusherPool:
                         )
 
             yield preserve_context_over_deferred(defer.gatherResults(deferreds))
-        except:
+        except BaseException:
             logger.exception("Exception in pusher on_new_notifications")
 
     @defer.inlineCallbacks
@@ -156,13 +156,13 @@ class PusherPool:
 
             for u in users_affected:
                 if u in self.pushers:
-                    for p in self.pushers[u].values():
+                    for p in list(self.pushers[u].values()):
                         deferreds.append(
                             preserve_fn(p.on_new_receipts)(min_stream_id, max_stream_id)
                         )
 
             yield preserve_context_over_deferred(defer.gatherResults(deferreds))
-        except:
+        except BaseException:
             logger.exception("Exception in pusher on_new_receipts")
 
     @defer.inlineCallbacks
@@ -188,7 +188,7 @@ class PusherPool:
         for pusherdict in pushers:
             try:
                 p = self.pusher_factory.create_pusher(pusherdict)
-            except:
+            except BaseException:
                 logger.exception("Couldn't start a pusher: caught Exception")
                 continue
             if p:

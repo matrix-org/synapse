@@ -49,9 +49,9 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
         event_id_domain = get_domain_from_id(event.event_id)
 
         is_invite_via_3pid = (
-            event.type == EventTypes.Member
-            and event.membership == Membership.INVITE
-            and "third_party_invite" in event.content
+            event.type == EventTypes.Member and
+            event.membership == Membership.INVITE and
+            "third_party_invite" in event.content
         )
 
         # Check the sender's domain has signed the event
@@ -123,7 +123,7 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
             "Auth events: %s",
-            [a.event_id for a in auth_events.values()]
+            [a.event_id for a in list(auth_events.values())]
         )
 
     if event.type == EventTypes.Member:
@@ -268,9 +268,9 @@ def _is_membership_change_allowed(event, auth_events):
         return True
 
     if Membership.JOIN != membership:
-        if (caller_invited
-                and Membership.LEAVE == membership
-                and target_user_id == event.user_id):
+        if (caller_invited and
+            Membership.LEAVE == membership and
+                target_user_id == event.user_id):
             return True
 
         if not caller_in_room:  # caller isn't joined
@@ -440,15 +440,15 @@ def check_redaction(event, auth_events):
 def _check_power_levels(event, auth_events):
     user_list = event.content.get("users", {})
     # Validate users
-    for k, v in user_list.items():
+    for k, v in list(user_list.items()):
         try:
             UserID.from_string(k)
-        except:
+        except BaseException:
             raise SynapseError(400, "Not a valid user_id: %s" % (k,))
 
         try:
             int(v)
-        except:
+        except BaseException:
             raise SynapseError(400, "Not a valid power level: %s" % (v,))
 
     key = (event.type, event.state_key, )
@@ -471,14 +471,14 @@ def _check_power_levels(event, auth_events):
     ]
 
     old_list = current_state.content.get("users")
-    for user in set(old_list.keys() + user_list.keys()):
+    for user in set(list(old_list.keys()) + list(user_list.keys())):
         levels_to_check.append(
             (user, "users")
         )
 
     old_list = current_state.content.get("events")
     new_list = event.content.get("events")
-    for ev_id in set(old_list.keys() + new_list.keys()):
+    for ev_id in set(list(old_list.keys()) + list(new_list.keys())):
         levels_to_check.append(
             (ev_id, "events")
         )
@@ -610,8 +610,8 @@ def _verify_third_party_invite(event, auth_events):
     for public_key_object in get_public_keys(invite_event):
         public_key = public_key_object["public_key"]
         try:
-            for server, signature_block in signed["signatures"].items():
-                for key_name, encoded_signature in signature_block.items():
+            for server, signature_block in list(signed["signatures"].items()):
+                for key_name, encoded_signature in list(signature_block.items()):
                     if not key_name.startswith("ed25519:"):
                         continue
                     verify_key = decode_verify_key_bytes(

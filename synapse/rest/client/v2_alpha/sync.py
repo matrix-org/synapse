@@ -125,7 +125,7 @@ class SyncRestServlet(RestServlet):
                     filter_object = json.loads(filter_id)
                     set_timeline_upper_limit(filter_object,
                                              self.hs.config.filter_timeline_limit)
-                except:
+                except BaseException:
                     raise SynapseError(400, "Invalid filter JSON")
                 self.filtering.check_valid_filter(filter_object)
                 filter = FilterCollection(filter_object)
@@ -332,7 +332,7 @@ class SyncRestServlet(RestServlet):
         state_dict = room.state
         timeline_events = room.timeline.events
 
-        state_events = state_dict.values()
+        state_events = list(state_dict.values())
 
         for event in itertools.chain(state_events, timeline_events):
             # We've had bug reports that events were coming down under the

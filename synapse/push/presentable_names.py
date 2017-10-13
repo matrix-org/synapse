@@ -70,7 +70,7 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
     # right then, any aliases at all?
     if "m.room.aliases" in room_state_bytype_ids:
         m_room_aliases = room_state_bytype_ids["m.room.aliases"]
-        for alias_id in m_room_aliases.values():
+        for alias_id in list(m_room_aliases.values()):
             alias_event = yield store.get_event(
                 alias_id, allow_none=True
             )
@@ -113,10 +113,10 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
     # so find out who is in the room that isn't the user.
     if "m.room.member" in room_state_bytype_ids:
         member_events = yield store.get_events(
-            room_state_bytype_ids["m.room.member"].values()
+            list(room_state_bytype_ids["m.room.member"].values())
         )
         all_members = [
-            ev for ev in member_events.values()
+            ev for ev in list(member_events.values())
             if ev.content['membership'] == "join" or ev.content['membership'] == "invite"
         ]
         # Sort the member events oldest-first so the we name people in the
@@ -135,7 +135,7 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
             if all_members[0].sender == user_id:
                 if "m.room.third_party_invite" in room_state_bytype_ids:
                     third_party_invites = (
-                        room_state_bytype_ids["m.room.third_party_invite"].values()
+                        list(room_state_bytype_ids["m.room.third_party_invite"].values())
                     )
 
                     if len(third_party_invites) > 0:
@@ -189,7 +189,7 @@ def name_from_member_event(member_event):
 
 def _state_as_two_level_dict(state):
     ret = {}
-    for k, v in state.items():
+    for k, v in list(state.items()):
         ret.setdefault(k[0], {})[k[1]] = v
     return ret
 

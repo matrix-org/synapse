@@ -80,7 +80,7 @@ def register_new_user(user, password, server_location, shared_secret, admin):
     if not user:
         try:
             default_user = getpass.getuser()
-        except:
+        except BaseException:
             default_user = None
 
         if default_user:

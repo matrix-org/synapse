@@ -1,17 +1,20 @@
 import argparse
-import BaseHTTPServer
+import http.server
 import os
-import SimpleHTTPServer
-import cgi, logging
+import http.server
+import cgi
+import logging
 
 from daemonize import Daemonize
 
-class SimpleHTTPRequestHandlerWithPOST(SimpleHTTPServer.SimpleHTTPRequestHandler):
+
+class SimpleHTTPRequestHandlerWithPOST(http.server.SimpleHTTPRequestHandler):
     UPLOAD_PATH = "upload"
 
     """
     Accept all post request as file upload
     """
+
     def do_POST(self):
 
         path = os.path.join(self.UPLOAD_PATH, os.path.basename(self.path))
@@ -40,7 +43,7 @@ def setup():
     os.chdir(args.directory)
     dr = os.getcwd()
 
-    httpd = BaseHTTPServer.HTTPServer(
+    httpd = http.server.HTTPServer(
         ('', args.port),
         SimpleHTTPRequestHandlerWithPOST
     )
@@ -50,13 +53,14 @@ def setup():
         httpd.serve_forever()
 
     daemon = Daemonize(
-            app="synapse-webclient",
-            pid=args.pid,
-            action=run,
-            auto_close_fds=False,
-        )
+        app="synapse-webclient",
+        pid=args.pid,
+        action=run,
+        auto_close_fds=False,
+    )
 
     daemon.start()
+
 
 if __name__ == '__main__':
     setup()

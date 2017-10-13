@@ -36,7 +36,9 @@ from unpaddedbase64 import decode_base64, encode_base64
 from OpenSSL import crypto
 
 from collections import namedtuple
-import urllib
+import urllib.request
+import urllib.parse
+import urllib.error
 import hashlib
 import logging
 
@@ -224,7 +226,7 @@ class Keyring(object):
             self.key_downloads.pop(server_name_, None)
             return r
 
-        for server_name, deferred in server_to_deferred.items():
+        for server_name, deferred in list(server_to_deferred.items()):
             self.key_downloads[server_name] = deferred
             deferred.addBoth(rm, server_name)
 
@@ -261,7 +263,7 @@ class Keyring(object):
                     )
 
                 for fn in key_fetch_fns:
-                    results = yield fn(missing_keys.items())
+                    results = yield fn(list(missing_keys.items()))
                     merged_results.update(results)
 
                     # We now need to figure out which verify requests we have keys
@@ -359,14 +361,14 @@ class Keyring(object):
         results = yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
                 preserve_fn(get_key)(p_name, p_keys)
-                for p_name, p_keys in self.perspective_servers.items()
+                for p_name, p_keys in list(self.perspective_servers.items())
             ],
             consumeErrors=True,
         ).addErrback(unwrapFirstError))
 
         union_of_keys = {}
         for result in results:
-            for server_name, keys in result.items():
+            for server_name, keys in list(result.items()):
                 union_of_keys.setdefault(server_name, {}).update(keys)
 
         defer.returnValue(union_of_keys)
@@ -410,7 +412,7 @@ class Keyring(object):
 
         defer.returnValue({
             server_name: keys
-            for server_name, keys in merged.items()
+            for server_name, keys in list(merged.items())
             if keys
         })
 
@@ -425,10 +427,10 @@ class Keyring(object):
             destination=perspective_name,
             path=b"/_matrix/key/v2/query",
             data={
-                u"server_keys": {
+                "server_keys": {
                     server_name: {
                         key_id: {
-                            u"minimum_valid_until_ts": 0
+                            "minimum_valid_until_ts": 0
                         } for key_id in key_ids
                     }
                     for server_name, key_ids in server_names_and_key_ids
@@ -442,15 +444,15 @@ class Keyring(object):
         responses = query_response["server_keys"]
 
         for response in responses:
-            if (u"signatures" not in response
-                    or perspective_name not in response[u"signatures"]):
+            if ("signatures" not in response or
+                    perspective_name not in response["signatures"]):
                 raise KeyLookupError(
                     "Key response not signed by perspective server"
                     " %r" % (perspective_name,)
                 )
 
             verified = False
-            for key_id in response[u"signatures"][perspective_name]:
+            for key_id in response["signatures"][perspective_name]:
                 if key_id in perspective_keys:
                     verify_signed_json(
                         response,
@@ -464,7 +466,7 @@ class Keyring(object):
                     "Response from perspective server %r not signed with a"
                     " known key, signed with: %r, known keys: %r",
                     perspective_name,
-                    list(response[u"signatures"][perspective_name]),
+                    list(response["signatures"][perspective_name]),
                     list(perspective_keys)
                 )
                 raise KeyLookupError(
@@ -476,7 +478,7 @@ class Keyring(object):
                 perspective_name, response, only_from_server=False
             )
 
-            for server_name, response_keys in processed_response.items():
+            for server_name, response_keys in list(processed_response.items()):
                 keys.setdefault(server_name, {}).update(response_keys)
 
         yield logcontext.make_deferred_yieldable(defer.gatherResults(
@@ -486,7 +488,7 @@ class Keyring(object):
                     from_server=perspective_name,
                     verify_keys=response_keys,
                 )
-                for server_name, response_keys in keys.items()
+                for server_name, response_keys in list(keys.items())
             ],
             consumeErrors=True
         ).addErrback(unwrapFirstError))
@@ -504,12 +506,12 @@ class Keyring(object):
             (response, tls_certificate) = yield fetch_server_key(
                 server_name, self.hs.tls_server_context_factory,
                 path=(b"/_matrix/key/v2/server/%s" % (
-                    urllib.quote(requested_key_id),
+                    urllib.parse.quote(requested_key_id),
                 )).encode("ascii"),
             )
 
-            if (u"signatures" not in response
-                    or server_name not in response[u"signatures"]):
+            if ("signatures" not in response or
+                    server_name not in response["signatures"]):
                 raise KeyLookupError("Key response not signed by remote server")
 
             if "tls_fingerprints" not in response:
@@ -522,9 +524,9 @@ class Keyring(object):
             sha256_fingerprint_b64 = encode_base64(sha256_fingerprint)
 
             response_sha256_fingerprints = set()
-            for fingerprint in response[u"tls_fingerprints"]:
-                if u"sha256" in fingerprint:
-                    response_sha256_fingerprints.add(fingerprint[u"sha256"])
+            for fingerprint in response["tls_fingerprints"]:
+                if "sha256" in fingerprint:
+                    response_sha256_fingerprints.add(fingerprint["sha256"])
 
             if sha256_fingerprint_b64 not in response_sha256_fingerprints:
                 raise KeyLookupError("TLS certificate not allowed by fingerprints")
@@ -544,7 +546,7 @@ class Keyring(object):
                     from_server=server_name,
                     verify_keys=verify_keys,
                 )
-                for key_server_name, verify_keys in keys.items()
+                for key_server_name, verify_keys in list(keys.items())
             ],
             consumeErrors=True
         ).addErrback(unwrapFirstError))
@@ -557,7 +559,7 @@ class Keyring(object):
         time_now_ms = self.clock.time_msec()
         response_keys = {}
         verify_keys = {}
-        for key_id, key_data in response_json["verify_keys"].items():
+        for key_id, key_data in list(response_json["verify_keys"].items()):
             if is_signing_algorithm_supported(key_id):
                 key_base64 = key_data["key"]
                 key_bytes = decode_base64(key_base64)
@@ -566,7 +568,7 @@ class Keyring(object):
                 verify_keys[key_id] = verify_key
 
         old_verify_keys = {}
-        for key_id, key_data in response_json["old_verify_keys"].items():
+        for key_id, key_data in list(response_json["old_verify_keys"].items()):
             if is_signing_algorithm_supported(key_id):
                 key_base64 = key_data["key"]
                 key_bytes = decode_base64(key_base64)
@@ -604,7 +606,7 @@ class Keyring(object):
         )
 
         signed_key_json_bytes = encode_canonical_json(signed_key_json)
-        ts_valid_until_ms = signed_key_json[u"valid_until_ts"]
+        ts_valid_until_ms = signed_key_json["valid_until_ts"]
 
         updated_key_ids = set(requested_ids)
         updated_key_ids.update(verify_keys)
@@ -652,8 +654,8 @@ class Keyring(object):
             crypto.FILETYPE_ASN1, tls_certificate
         )
 
-        if ("signatures" not in response
-                or server_name not in response["signatures"]):
+        if ("signatures" not in response or
+                server_name not in response["signatures"]):
             raise KeyLookupError("Key response not signed by remote server")
 
         if "tls_certificate" not in response:
@@ -669,7 +671,7 @@ class Keyring(object):
         time_now_ms = self.clock.time_msec()
 
         verify_keys = {}
-        for key_id, key_base64 in response["verify_keys"].items():
+        for key_id, key_base64 in list(response["verify_keys"].items()):
             if is_signing_algorithm_supported(key_id):
                 key_bytes = decode_base64(key_base64)
                 verify_key = decode_verify_key_bytes(key_id, key_bytes)
@@ -719,7 +721,7 @@ class Keyring(object):
                 preserve_fn(self.store.store_server_verify_key)(
                     server_name, server_name, key.time_added, key
                 )
-                for key_id, key in verify_keys.items()
+                for key_id, key in list(verify_keys.items())
             ],
             consumeErrors=True,
         ).addErrback(unwrapFirstError))
@@ -759,7 +761,7 @@ def _handle_key_deferred(verify_request):
     ))
     try:
         verify_signed_json(json_object, server_name, verify_key)
-    except:
+    except BaseException:
         raise SynapseError(
             401,
             "Invalid signature for server %s with key %s:%s" % (

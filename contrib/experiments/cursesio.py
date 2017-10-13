@@ -124,7 +124,7 @@ class CursesStdIO():
 
         self.stdscr.addstr(self.rows - 1, 0,
                            self.searchText + (' ' * (
-                           self.cols - len(self.searchText) - 2)))
+                               self.cols - len(self.searchText) - 2)))
 
         self.paintStatus(self.statusText + ' %d' % len(self.searchText))
         self.stdscr.move(self.rows - 1, len(self.searchText))

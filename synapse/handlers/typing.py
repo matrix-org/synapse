@@ -282,7 +282,7 @@ class TypingHandler(object):
             return []
 
         rows = []
-        for room_id, serial in self._room_serials.items():
+        for room_id, serial in list(self._room_serials.items()):
             if last_id < serial and serial <= current_id:
                 typing = self._room_typing[room_id]
                 rows.append((serial, room_id, list(typing)))

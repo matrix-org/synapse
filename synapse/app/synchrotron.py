@@ -145,7 +145,7 @@ class SynchrotronPresence(object):
         and haven't come back yet. If there are poke the master about them.
         """
         now = self.clock.time_msec()
-        for user_id, last_sync_ms in self.users_going_offline.items():
+        for user_id, last_sync_ms in list(self.users_going_offline.items()):
             if now - last_sync_ms > 10 * 1000:
                 self.users_going_offline.pop(user_id, None)
                 self.send_user_sync(user_id, False, last_sync_ms)
@@ -193,8 +193,8 @@ class SynchrotronPresence(object):
         room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(
-            "presence_key", stream_id, rooms=room_ids_to_states.keys(),
-            users=users_to_states.keys()
+            "presence_key", stream_id, rooms=list(room_ids_to_states.keys()),
+            users=list(users_to_states.keys())
         )
 
     @defer.inlineCallbacks
@@ -213,7 +213,7 @@ class SynchrotronPresence(object):
 
     def get_currently_syncing_users(self):
         return [
-            user_id for user_id, count in self.user_to_num_current_syncs.iteritems()
+            user_id for user_id, count in list(self.user_to_num_current_syncs.items())
             if count > 0
         ]
 
@@ -248,7 +248,7 @@ class SynchrotronServer(HomeServer):
         # Any param beginning with cp_ is a parameter for adbapi, and should
         # not be passed to the database engine.
         db_params = {
-            k: v for k, v in self.db_config.get("args", {}).items()
+            k: v for k, v in list(self.db_config.get("args", {}).items())
             if not k.startswith("cp_")
         }
         db_conn = self.database_engine.module.connect(**db_params)

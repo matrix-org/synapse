@@ -66,10 +66,10 @@ class FederationClient(FederationBase):
         old_dict = self.pdu_destination_tried
         self.pdu_destination_tried = {}
 
-        for event_id, destination_dict in old_dict.items():
+        for event_id, destination_dict in list(old_dict.items()):
             destination_dict = {
                 dest: time
-                for dest, time in destination_dict.items()
+                for dest, time in list(destination_dict.items())
                 if time + PDU_RETRY_TIME_MS > now
             }
             if destination_dict:
@@ -388,7 +388,7 @@ class FederationClient(FederationBase):
         """
         if return_local:
             seen_events = yield self.store.get_events(event_ids, allow_rejected=True)
-            signed_events = seen_events.values()
+            signed_events = list(seen_events.values())
         else:
             seen_events = yield self.store.have_events(event_ids)
             signed_events = []
@@ -409,7 +409,7 @@ class FederationClient(FederationBase):
 
         batch_size = 20
         missing_events = list(missing_events)
-        for i in xrange(0, len(missing_events), batch_size):
+        for i in range(0, len(missing_events), batch_size):
             batch = set(missing_events[i:i + batch_size])
 
             deferreds = [
@@ -585,7 +585,7 @@ class FederationClient(FederationBase):
                 }
 
                 valid_pdus = yield self._check_sigs_and_hash_and_fetch(
-                    destination, pdus.values(),
+                    destination, list(pdus.values()),
                     outlier=True,
                 )
 

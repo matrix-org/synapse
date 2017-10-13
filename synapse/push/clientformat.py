@@ -60,7 +60,7 @@ def format_push_rules_for_user(user, ruleslist):
 
 
 def _add_empty_priority_class_arrays(d):
-    for pc in PRIORITY_CLASS_MAP.keys():
+    for pc in list(PRIORITY_CLASS_MAP.keys()):
         d[pc] = []
     return d
 
@@ -86,7 +86,7 @@ def _rule_to_template(rule):
         templaterule["pattern"] = thecond["pattern"]
 
     if unscoped_rule_id:
-            templaterule['rule_id'] = unscoped_rule_id
+        templaterule['rule_id'] = unscoped_rule_id
     if 'default' in rule:
         templaterule['default'] = rule['default']
     return templaterule

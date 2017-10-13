@@ -17,7 +17,6 @@
 import glob
 import os
 from setuptools import setup, find_packages, Command
-import sys
 
 
 here = os.path.abspath(os.path.dirname(__file__))
@@ -58,9 +57,10 @@ class TestCommand(Command):
         pass
 
     def run(self):
-        print ("""Synapse's tests cannot be run via setup.py. To run them, try:
+        print("""Synapse's tests cannot be run via setup.py. To run them, try:
      PYTHONPATH="." trial tests
 """)
+
 
 def read_file(path_segments):
     """Read a file from the package. Takes a list of strings to join to
@@ -87,8 +87,8 @@ setup(
     version=version,
     packages=find_packages(exclude=["tests", "tests.*"]),
     description="Reference Synapse Home Server",
-    install_requires=dependencies['requirements'](include_conditional=True).keys(),
-    dependency_links=dependencies["DEPENDENCY_LINKS"].values(),
+    install_requires=list(dependencies['requirements'](include_conditional=True).keys()),
+    dependency_links=list(dependencies["DEPENDENCY_LINKS"].values()),
     include_package_data=True,
     zip_safe=False,
     long_description=long_description,

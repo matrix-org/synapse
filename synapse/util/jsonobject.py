@@ -54,7 +54,7 @@ class JsonEncodedObject(object):
                 raise RuntimeError("Key %s is required" % required_key)
 
         self.unrecognized_keys = {}  # Keys we were given not listed as valid
-        for k, v in kwargs.items():
+        for k, v in list(kwargs.items()):
             if k in self.valid_keys or k in self.internal_keys:
                 self.__dict__[k] = v
             else:
@@ -70,7 +70,7 @@ class JsonEncodedObject(object):
             dict
         """
         d = {
-            k: _encode(v) for (k, v) in self.__dict__.items()
+            k: _encode(v) for (k, v) in list(self.__dict__.items())
             if k in self.valid_keys and k not in self.internal_keys
         }
         d.update(self.unrecognized_keys)
@@ -78,7 +78,7 @@ class JsonEncodedObject(object):
 
     def get_internal_dict(self):
         d = {
-            k: _encode(v, internal=True) for (k, v) in self.__dict__.items()
+            k: _encode(v, internal=True) for (k, v) in list(self.__dict__.items())
             if k in self.valid_keys
         }
         d.update(self.unrecognized_keys)
@@ -89,7 +89,7 @@ class JsonEncodedObject(object):
 
 
 def _encode(obj, internal=False):
-    if type(obj) is list:
+    if isinstance(obj, list):
         return [_encode(o, internal=internal) for o in obj]
 
     if isinstance(obj, JsonEncodedObject):

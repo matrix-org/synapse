@@ -69,7 +69,7 @@ class DirectoryTestCase(unittest.TestCase):
 
         result = yield self.handler.get_association(self.my_room)
 
-        self.assertEquals({
+        self.assertEqual({
             "room_id": "!8765qwer:test",
             "servers": ["test"],
         }, result)
@@ -82,7 +82,7 @@ class DirectoryTestCase(unittest.TestCase):
 
         result = yield self.handler.get_association(self.remote_room)
 
-        self.assertEquals({
+        self.assertEqual({
             "room_id": "!8765qwer:test",
             "servers": ["test", "remote"],
         }, result)
@@ -106,7 +106,7 @@ class DirectoryTestCase(unittest.TestCase):
             {"room_alias": "#your-room:test"}
         )
 
-        self.assertEquals({
+        self.assertEqual({
             "room_id": "!8765asdf:test",
             "servers": ["test"],
         }, response)

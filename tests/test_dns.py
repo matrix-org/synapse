@@ -77,10 +77,10 @@ class DnsTestCase(unittest.TestCase):
         dns_client_mock.lookupAddress.assert_called_once_with(host_name)
         dns_client_mock.lookupIPV6Address.assert_called_once_with(host_name)
 
-        self.assertEquals(len(servers), 2)
-        self.assertEquals(servers, cache[service_name])
-        self.assertEquals(servers[0].host, ip_address)
-        self.assertEquals(servers[1].host, ip6_address)
+        self.assertEqual(len(servers), 2)
+        self.assertEqual(servers, cache[service_name])
+        self.assertEqual(servers[0].host, ip_address)
+        self.assertEqual(servers[1].host, ip6_address)
 
     @defer.inlineCallbacks
     def test_from_cache_expired_and_dns_fail(self):
@@ -102,8 +102,8 @@ class DnsTestCase(unittest.TestCase):
 
         dns_client_mock.lookupService.assert_called_once_with(service_name)
 
-        self.assertEquals(len(servers), 1)
-        self.assertEquals(servers, cache[service_name])
+        self.assertEqual(len(servers), 1)
+        self.assertEqual(servers, cache[service_name])
 
     @defer.inlineCallbacks
     def test_from_cache(self):
@@ -127,8 +127,8 @@ class DnsTestCase(unittest.TestCase):
 
         self.assertFalse(dns_client_mock.lookupService.called)
 
-        self.assertEquals(len(servers), 1)
-        self.assertEquals(servers, cache[service_name])
+        self.assertEqual(len(servers), 1)
+        self.assertEqual(servers, cache[service_name])
 
     @defer.inlineCallbacks
     def test_empty_cache(self):
@@ -159,5 +159,5 @@ class DnsTestCase(unittest.TestCase):
             service_name, dns_client=dns_client_mock, cache=cache
         )
 
-        self.assertEquals(len(servers), 0)
-        self.assertEquals(len(cache), 0)
+        self.assertEqual(len(servers), 0)
+        self.assertEqual(len(cache), 0)

@@ -61,7 +61,7 @@ class SearchHandler(BaseHandler):
                 assert batch_group is not None
                 assert batch_group_key is not None
                 assert batch_token is not None
-            except:
+            except BaseException:
                 raise SynapseError(400, "Invalid batch")
 
         try:
@@ -260,7 +260,7 @@ class SearchHandler(BaseHandler):
                         "all", "", pagination_token
                     ))
 
-                for room_id, group in room_groups.items():
+                for room_id, group in list(room_groups.items()):
                     group["next_batch"] = encode_base64("%s\n%s\n%s" % (
                         "room_id", room_id, pagination_token
                     ))
@@ -321,7 +321,7 @@ class SearchHandler(BaseHandler):
                             "displayname": s.content.get("displayname", None),
                             "avatar_url": s.content.get("avatar_url", None),
                         }
-                        for s in state.values()
+                        for s in list(state.values())
                         if s.type == EventTypes.Member and s.state_key in senders
                     }
 
@@ -333,7 +333,7 @@ class SearchHandler(BaseHandler):
 
         time_now = self.clock.time_msec()
 
-        for context in contexts.values():
+        for context in list(contexts.values()):
             context["events_before"] = [
                 serialize_event(e, time_now)
                 for e in context["events_before"]
@@ -348,9 +348,9 @@ class SearchHandler(BaseHandler):
             rooms = set(e.room_id for e in allowed_events)
             for room_id in rooms:
                 state = yield self.state_handler.get_current_state(room_id)
-                state_results[room_id] = state.values()
+                state_results[room_id] = list(state.values())
 
-            state_results.values()
+            list(state_results.values())
 
         # We're now about to serialize the events. We should not make any
         # blocking calls after this. Otherwise the 'age' will be wrong
@@ -373,7 +373,7 @@ class SearchHandler(BaseHandler):
         if state_results:
             rooms_cat_res["state"] = {
                 room_id: [serialize_event(e, time_now) for e in state]
-                for room_id, state in state_results.items()
+                for room_id, state in list(state_results.items())
             }
 
         if room_groups and "room_id" in group_keys:

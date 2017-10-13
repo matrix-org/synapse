@@ -67,7 +67,7 @@ class KeyringTestCase(unittest.TestCase):
         }
 
     def check_context(self, _, expected):
-        self.assertEquals(
+        self.assertEqual(
             getattr(LoggingContext.current_context(), "test_key", None),
             expected
         )
@@ -136,7 +136,7 @@ class KeyringTestCase(unittest.TestCase):
 
         @defer.inlineCallbacks
         def get_perspectives(**kwargs):
-            self.assertEquals(
+            self.assertEqual(
                 LoggingContext.current_context().test_key, "11",
             )
             with logcontext.PreserveLoggingContext():

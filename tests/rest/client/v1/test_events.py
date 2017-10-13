@@ -151,13 +151,13 @@ class EventStreamPermissionsTestCase(RestTestCase):
         (code, response) = yield self.mock_resource.trigger_get(
             "/events?access_token=%s" % ("invalid" + self.token, )
         )
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEqual(403, code, msg=str(response))
 
         # valid token, expect content
         (code, response) = yield self.mock_resource.trigger_get(
             "/events?access_token=%s&timeout=0" % (self.token,)
         )
-        self.assertEquals(200, code, msg=str(response))
+        self.assertEqual(200, code, msg=str(response))
         self.assertTrue("chunk" in response)
         self.assertTrue("start" in response)
         self.assertTrue("end" in response)
@@ -181,16 +181,16 @@ class EventStreamPermissionsTestCase(RestTestCase):
         (code, response) = yield self.mock_resource.trigger_get(
             "/events?access_token=%s&timeout=0" % (self.token,)
         )
-        self.assertEquals(200, code, msg=str(response))
+        self.assertEqual(200, code, msg=str(response))
 
         # We may get a presence event for ourselves down
-        self.assertEquals(
+        self.assertEqual(
             0,
             len([
                 c for c in response["chunk"]
                 if not (
-                    c.get("type") == "m.presence"
-                    and c["content"].get("user_id") == self.user_id
+                    c.get("type") == "m.presence" and
+                    c["content"].get("user_id") == self.user_id
                 )
             ])
         )

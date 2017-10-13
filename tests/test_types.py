@@ -26,9 +26,9 @@ class UserIDTestCase(unittest.TestCase):
     def test_parse(self):
         user = UserID.from_string("@1234abcd:my.domain")
 
-        self.assertEquals("1234abcd", user.localpart)
-        self.assertEquals("my.domain", user.domain)
-        self.assertEquals(True, mock_homeserver.is_mine(user))
+        self.assertEqual("1234abcd", user.localpart)
+        self.assertEqual("my.domain", user.domain)
+        self.assertEqual(True, mock_homeserver.is_mine(user))
 
     def test_pase_empty(self):
         with self.assertRaises(SynapseError):
@@ -37,7 +37,7 @@ class UserIDTestCase(unittest.TestCase):
     def test_build(self):
         user = UserID("5678efgh", "my.domain")
 
-        self.assertEquals(user.to_string(), "@5678efgh:my.domain")
+        self.assertEqual(user.to_string(), "@5678efgh:my.domain")
 
     def test_compare(self):
         userA = UserID.from_string("@userA:my.domain")
@@ -52,11 +52,11 @@ class RoomAliasTestCase(unittest.TestCase):
     def test_parse(self):
         room = RoomAlias.from_string("#channel:my.domain")
 
-        self.assertEquals("channel", room.localpart)
-        self.assertEquals("my.domain", room.domain)
-        self.assertEquals(True, mock_homeserver.is_mine(room))
+        self.assertEqual("channel", room.localpart)
+        self.assertEqual("my.domain", room.domain)
+        self.assertEqual(True, mock_homeserver.is_mine(room))
 
     def test_build(self):
         room = RoomAlias("channel", "my.domain")
 
-        self.assertEquals(room.to_string(), "#channel:my.domain")
+        self.assertEqual(room.to_string(), "#channel:my.domain")

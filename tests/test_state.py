@@ -111,7 +111,7 @@ class Graph(object):
         events = {}
         clobbered = set(events.keys())
 
-        for event_id, fields in nodes.items():
+        for event_id, fields in list(nodes.items()):
             refs = edges.get(event_id)
             if refs:
                 clobbered.difference_update(refs)
@@ -126,7 +126,7 @@ class Graph(object):
             )
 
         self._leaves = clobbered
-        self._events = sorted(events.values(), key=lambda e: e.depth)
+        self._events = sorted(list(events.values()), key=lambda e: e.depth)
 
     def walk(self):
         return iter(self._events)
@@ -261,7 +261,7 @@ class StateTestCase(unittest.TestCase):
 
         self.assertSetEqual(
             {"START", "A", "C"},
-            {e_id for e_id in context_store["D"].prev_state_ids.values()}
+            {e_id for e_id in list(context_store["D"].prev_state_ids.values())}
         )
 
     @defer.inlineCallbacks
@@ -327,7 +327,7 @@ class StateTestCase(unittest.TestCase):
 
         self.assertSetEqual(
             {"START", "A", "B", "C"},
-            {e for e in context_store["E"].prev_state_ids.values()}
+            {e for e in list(context_store["E"].prev_state_ids.values())}
         )
 
     @defer.inlineCallbacks
@@ -410,7 +410,7 @@ class StateTestCase(unittest.TestCase):
 
         self.assertSetEqual(
             {"A1", "A2", "A3", "A5", "B"},
-            {e for e in context_store["D"].prev_state_ids.values()}
+            {e for e in list(context_store["D"].prev_state_ids.values())}
         )
 
     def _add_depths(self, nodes, edges):

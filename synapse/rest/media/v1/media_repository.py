@@ -42,7 +42,7 @@ import shutil
 
 import cgi
 import logging
-import urlparse
+import urllib.parse
 
 logger = logging.getLogger(__name__)
 
@@ -213,7 +213,7 @@ class MediaRepository(object):
                         upload_name = upload_name_ascii
 
                 if upload_name:
-                    upload_name = urlparse.unquote(upload_name)
+                    upload_name = urllib.parse.unquote(upload_name)
                     try:
                         upload_name = upload_name.decode("utf-8")
                     except UnicodeDecodeError:
@@ -232,7 +232,7 @@ class MediaRepository(object):
                 media_length=length,
                 filesystem_id=file_id,
             )
-        except:
+        except BaseException:
             os.remove(fname)
             raise
 

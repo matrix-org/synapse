@@ -269,7 +269,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
                     keyvalues=keyvalues,
                 )
 
-            items = keyvalues.items()
+            items = list(keyvalues.items())
             where_clause = " AND ".join(k + " = ?" for k, _ in items)
             values = [v for _, v in items]
             if except_token_id:
@@ -475,7 +475,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
                 match = regex.search(user_id)
                 if match:
                     found.add(int(match.group(1)))
-            for i in xrange(len(found) + 1):
+            for i in range(len(found) + 1):
                 if i not in found:
                     return i
 

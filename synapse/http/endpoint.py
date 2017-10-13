@@ -147,6 +147,7 @@ class SpiderEndpoint(object):
     """An endpoint which refuses to connect to blacklisted IP addresses
     Implements twisted.internet.interfaces.IStreamClientEndpoint.
     """
+
     def __init__(self, reactor, host, port, blacklist, whitelist,
                  endpoint=HostnameEndpoint, endpoint_kw_args={}):
         self.reactor = reactor
@@ -285,10 +286,10 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
         except DNSNameError:
             defer.returnValue([])
 
-        if (len(answers) == 1
-                and answers[0].type == dns.SRV
-                and answers[0].payload
-                and answers[0].payload.target == dns.Name('.')):
+        if (len(answers) == 1 and
+            answers[0].type == dns.SRV and
+            answers[0].payload and
+                answers[0].payload.target == dns.Name('.')):
             raise ConnectError("Service %s unavailable" % service_name)
 
         for answer in answers:

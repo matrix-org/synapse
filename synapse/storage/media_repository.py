@@ -85,9 +85,9 @@ class MediaRepositoryStore(SQLBaseStore):
             if not row:
                 return None
 
-            return dict(zip((
+            return dict(list(zip((
                 'response_code', 'etag', 'expires', 'og', 'media_id', 'download_ts'
-            ), row))
+            ), row)))
 
         return self.runInteraction(
             "get_url_cache", get_url_cache_txn

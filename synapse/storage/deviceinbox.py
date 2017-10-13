@@ -84,7 +84,7 @@ class DeviceInboxStore(BackgroundUpdateStore):
                 " VALUES (?,?,?,?)"
             )
             rows = []
-            for destination, edu in remote_messages_by_destination.items():
+            for destination, edu in list(remote_messages_by_destination.items()):
                 edu_json = ujson.dumps(edu)
                 rows.append((destination, stream_id, now_ms, edu_json))
             txn.executemany(sql, rows)
@@ -97,11 +97,11 @@ class DeviceInboxStore(BackgroundUpdateStore):
                 now_ms,
                 stream_id,
             )
-            for user_id in local_messages_by_user_then_device.keys():
+            for user_id in list(local_messages_by_user_then_device.keys()):
                 self._device_inbox_stream_cache.entity_has_changed(
                     user_id, stream_id
                 )
-            for destination in remote_messages_by_destination.keys():
+            for destination in list(remote_messages_by_destination.keys()):
                 self._device_federation_outbox_stream_cache.entity_has_changed(
                     destination, stream_id
                 )
@@ -150,7 +150,7 @@ class DeviceInboxStore(BackgroundUpdateStore):
                 now_ms,
                 stream_id,
             )
-            for user_id in local_messages_by_user_then_device.keys():
+            for user_id in list(local_messages_by_user_then_device.keys()):
                 self._device_inbox_stream_cache.entity_has_changed(
                     user_id, stream_id
                 )
@@ -167,9 +167,9 @@ class DeviceInboxStore(BackgroundUpdateStore):
         txn.execute(sql, (stream_id, stream_id))
 
         local_by_user_then_device = {}
-        for user_id, messages_by_device in messages_by_user_then_device.items():
+        for user_id, messages_by_device in list(messages_by_user_then_device.items()):
             messages_json_for_user = {}
-            devices = messages_by_device.keys()
+            devices = list(messages_by_device.keys())
             if len(devices) == 1 and devices[0] == "*":
                 # Handle wildcard device_ids.
                 sql = (
@@ -188,9 +188,9 @@ class DeviceInboxStore(BackgroundUpdateStore):
                     continue
                 sql = (
                     "SELECT device_id FROM devices"
-                    " WHERE user_id = ? AND device_id IN ("
-                    + ",".join("?" * len(devices))
-                    + ")"
+                    " WHERE user_id = ? AND device_id IN (" +
+                    ",".join("?" * len(devices)) +
+                    ")"
                 )
                 # TODO: Maybe this needs to be done in batches if there are
                 # too many local devices for a given user.
@@ -214,8 +214,8 @@ class DeviceInboxStore(BackgroundUpdateStore):
             " VALUES (?,?,?,?)"
         )
         rows = []
-        for user_id, messages_by_device in local_by_user_then_device.items():
-            for device_id, message_json in messages_by_device.items():
+        for user_id, messages_by_device in list(local_by_user_then_device.items()):
+            for device_id, message_json in list(messages_by_device.items()):
                 rows.append((user_id, device_id, stream_id, message_json))
 
         txn.executemany(sql, rows)

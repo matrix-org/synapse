@@ -47,7 +47,7 @@ class TimelineBatch(collections.namedtuple("TimelineBatch", [
 ])):
     __slots__ = []
 
-    def __nonzero__(self):
+    def __bool__(self):
         """Make the result appear empty if there are no updates. This is used
         to tell if room needs to be part of the sync result.
         """
@@ -64,15 +64,15 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
 ])):
     __slots__ = []
 
-    def __nonzero__(self):
+    def __bool__(self):
         """Make the result appear empty if there are no updates. This is used
         to tell if room needs to be part of the sync result.
         """
         return bool(
-            self.timeline
-            or self.state
-            or self.ephemeral
-            or self.account_data
+            self.timeline or
+            self.state or
+            self.ephemeral or
+            self.account_data
             # nb the notification count does not, er, count: if there's nothing
             # else in the result, we don't need to send it.
         )
@@ -86,14 +86,14 @@ class ArchivedSyncResult(collections.namedtuple("ArchivedSyncResult", [
 ])):
     __slots__ = []
 
-    def __nonzero__(self):
+    def __bool__(self):
         """Make the result appear empty if there are no updates. This is used
         to tell if room needs to be part of the sync result.
         """
         return bool(
-            self.timeline
-            or self.state
-            or self.account_data
+            self.timeline or
+            self.state or
+            self.account_data
         )
 
 
@@ -103,7 +103,7 @@ class InvitedSyncResult(collections.namedtuple("InvitedSyncResult", [
 ])):
     __slots__ = []
 
-    def __nonzero__(self):
+    def __bool__(self):
         """Invited rooms should always be reported to the client"""
         return True
 
@@ -114,7 +114,7 @@ class DeviceLists(collections.namedtuple("DeviceLists", [
 ])):
     __slots__ = []
 
-    def __nonzero__(self):
+    def __bool__(self):
         return bool(self.changed or self.left)
 
 
@@ -132,7 +132,7 @@ class SyncResult(collections.namedtuple("SyncResult", [
 ])):
     __slots__ = []
 
-    def __nonzero__(self):
+    def __bool__(self):
         """Make the result appear empty if there are no updates. This is used
         to tell if the notifier needs to wait for more events when polling for
         events.
@@ -257,7 +257,7 @@ class SyncHandler(object):
                 # result returned by the event source is poor form (it might cache
                 # the object)
                 room_id = event["room_id"]
-                event_copy = {k: v for (k, v) in event.iteritems()
+                event_copy = {k: v for (k, v) in list(event.items())
                               if k != "room_id"}
                 ephemeral_by_room.setdefault(room_id, []).append(event_copy)
 
@@ -276,7 +276,7 @@ class SyncHandler(object):
             for event in receipts:
                 room_id = event["room_id"]
                 # exclude room id, as above
-                event_copy = {k: v for (k, v) in event.iteritems()
+                event_copy = {k: v for (k, v) in list(event.items())
                               if k != "room_id"}
                 ephemeral_by_room.setdefault(room_id, []).append(event_copy)
 
@@ -307,7 +307,7 @@ class SyncHandler(object):
                 current_state_ids = frozenset()
                 if any(e.is_state() for e in recents):
                     current_state_ids = yield self.state.get_current_state_ids(room_id)
-                    current_state_ids = frozenset(current_state_ids.itervalues())
+                    current_state_ids = frozenset(iter(list(current_state_ids.values())))
 
                 recents = yield filter_events_for_client(
                     self.store,
@@ -352,7 +352,7 @@ class SyncHandler(object):
                 current_state_ids = frozenset()
                 if any(e.is_state() for e in loaded_recents):
                     current_state_ids = yield self.state.get_current_state_ids(room_id)
-                    current_state_ids = frozenset(current_state_ids.itervalues())
+                    current_state_ids = frozenset(iter(list(current_state_ids.values())))
 
                 loaded_recents = yield filter_events_for_client(
                     self.store,
@@ -505,11 +505,11 @@ class SyncHandler(object):
 
         state = {}
         if state_ids:
-            state = yield self.store.get_events(state_ids.values())
+            state = yield self.store.get_events(list(state_ids.values()))
 
         defer.returnValue({
             (e.type, e.state_key): e
-            for e in sync_config.filter_collection.filter_room_state(state.values())
+            for e in sync_config.filter_collection.filter_room_state(list(state.values()))
         })
 
     @defer.inlineCallbacks
@@ -741,7 +741,7 @@ class SyncHandler(object):
 
         account_data_for_user = sync_config.filter_collection.filter_account_data([
             {"type": account_data_type, "content": content}
-            for account_data_type, content in account_data.items()
+            for account_data_type, content in list(account_data.items())
         ])
 
         sync_result_builder.account_data = account_data_for_user
@@ -798,7 +798,7 @@ class SyncHandler(object):
             presence.extend(states)
 
             # Deduplicate the presence entries so that there's at most one per user
-            presence = {p.user_id: p for p in presence}.values()
+            presence = list({p.user_id: p for p in presence}.values())
 
         presence = sync_config.filter_collection.filter_presence(
             presence
@@ -855,7 +855,7 @@ class SyncHandler(object):
         )
 
         if ignored_account_data:
-            ignored_users = ignored_account_data.get("ignored_users", {}).keys()
+            ignored_users = list(ignored_account_data.get("ignored_users", {}).keys())
         else:
             ignored_users = frozenset()
 
@@ -894,7 +894,7 @@ class SyncHandler(object):
         if since_token:
             for joined_sync in sync_result_builder.joined:
                 it = itertools.chain(
-                    joined_sync.timeline.events, joined_sync.state.itervalues()
+                    joined_sync.timeline.events, iter(list(joined_sync.state.values()))
                 )
                 for event in it:
                     if event.type == EventTypes.Member:
@@ -986,7 +986,7 @@ class SyncHandler(object):
         newly_left_rooms = []
         room_entries = []
         invited = []
-        for room_id, events in mem_change_events_by_room_id.iteritems():
+        for room_id, events in list(mem_change_events_by_room_id.items()):
             non_joins = [e for e in events if e.membership != Membership.JOIN]
             has_join = len(non_joins) != len(events)
 
@@ -1213,9 +1213,9 @@ class SyncHandler(object):
         """
         newly_joined = room_builder.newly_joined
         full_state = (
-            room_builder.full_state
-            or newly_joined
-            or sync_result_builder.full_state
+            room_builder.full_state or
+            newly_joined or
+            sync_result_builder.full_state
         )
         events = room_builder.events
 
@@ -1247,7 +1247,7 @@ class SyncHandler(object):
                 "content": {"tags": tags},
             })
 
-        for account_data_type, content in account_data.items():
+        for account_data_type, content in list(account_data.items()):
             account_data_events.append({
                 "type": account_data_type,
                 "content": content,
@@ -1328,17 +1328,17 @@ def _calculate_state(timeline_contains, timeline_start, previous, current):
     event_id_to_key = {
         e: key
         for key, e in itertools.chain(
-            timeline_contains.items(),
-            previous.items(),
-            timeline_start.items(),
-            current.items(),
+            list(timeline_contains.items()),
+            list(previous.items()),
+            list(timeline_start.items()),
+            list(current.items()),
         )
     }
 
-    c_ids = set(e for e in current.values())
-    tc_ids = set(e for e in timeline_contains.values())
-    p_ids = set(e for e in previous.values())
-    ts_ids = set(e for e in timeline_start.values())
+    c_ids = set(e for e in list(current.values()))
+    tc_ids = set(e for e in list(timeline_contains.values()))
+    p_ids = set(e for e in list(previous.values()))
+    ts_ids = set(e for e in list(timeline_start.values()))
 
     state_ids = ((c_ids | ts_ids) - p_ids) - tc_ids
 
@@ -1349,6 +1349,7 @@ def _calculate_state(timeline_contains, timeline_start, previous, current):
 
 class SyncResultBuilder(object):
     "Used to help build up a new SyncResult for a user"
+
     def __init__(self, sync_config, full_state, since_token, now_token):
         """
         Args:
@@ -1375,6 +1376,7 @@ class RoomSyncResultBuilder(object):
     """Stores information needed to create either a `JoinedSyncResult` or
     `ArchivedSyncResult`.
     """
+
     def __init__(self, room_id, rtype, events, newly_joined, full_state,
                  since_token, upto_token):
         """

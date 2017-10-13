@@ -68,7 +68,7 @@ class ObservableDeferred(object):
                 try:
                     # TODO: Handle errors here.
                     self._observers.pop().callback(r)
-                except:
+                except BaseException:
                     pass
             return r
 
@@ -78,7 +78,7 @@ class ObservableDeferred(object):
                 try:
                     # TODO: Handle errors here.
                     self._observers.pop().errback(f)
-                except:
+                except BaseException:
                     pass
 
             if consumeErrors:
@@ -151,13 +151,13 @@ def concurrently_execute(func, args, limit):
     def _concurrently_execute_inner():
         try:
             while True:
-                yield func(it.next())
+                yield func(next(it))
         except StopIteration:
             pass
 
     return preserve_context_over_deferred(defer.gatherResults([
         preserve_fn(_concurrently_execute_inner)()
-        for _ in xrange(limit)
+        for _ in range(limit)
     ], consumeErrors=True)).addErrback(unwrapFirstError)
 
 
@@ -171,6 +171,7 @@ class Linearizer(object):
             # do some work.
 
     """
+
     def __init__(self, name=None):
         if name is None:
             self.name = id(self)
@@ -200,7 +201,7 @@ class Linearizer(object):
             try:
                 with PreserveLoggingContext():
                     yield current_defer
-            except:
+            except BaseException:
                 logger.exception("Unexpected exception in Linearizer")
 
         logger.info("Acquired linearizer lock %r for key %r", self.name, key)
@@ -229,6 +230,7 @@ class Limiter(object):
             # do some work.
 
     """
+
     def __init__(self, max_count):
         """
         Args:

@@ -42,7 +42,7 @@ try:
 
     def get_thread_resource_usage():
         return resource.getrusage(RUSAGE_THREAD)
-except:
+except BaseException:
     # If the system doesn't support resource.getrusage(RUSAGE_THREAD) then we
     # won't track resource usage by returning None.
     def get_thread_resource_usage():
@@ -83,7 +83,7 @@ class LoggingContext(object):
         def add_database_transaction(self, duration_ms):
             pass
 
-        def __nonzero__(self):
+        def __bool__(self):
             return False
 
     sentinel = Sentinel()
@@ -156,7 +156,7 @@ class LoggingContext(object):
 
     def copy_to(self, record):
         """Copy fields from this context to the record"""
-        for key, value in self.__dict__.items():
+        for key, value in list(self.__dict__.items()):
             setattr(record, key, value)
 
         record.ru_utime, record.ru_stime = self.get_resource_usage()
@@ -204,6 +204,7 @@ class LoggingContextFilter(logging.Filter):
         **defaults: Default values to avoid formatters complaining about
             missing fields
     """
+
     def __init__(self, **defaults):
         self.defaults = defaults
 
@@ -213,7 +214,7 @@ class LoggingContextFilter(logging.Filter):
             True to include the record in the log output.
         """
         context = LoggingContext.current_context()
-        for key, value in self.defaults.items():
+        for key, value in list(self.defaults.items()):
             setattr(record, key, value)
         context.copy_to(record)
         return True
@@ -265,6 +266,7 @@ class _PreservingContextDeferred(defer.Deferred):
     """A deferred that ensures that all callbacks and errbacks are called with
     the given logging context.
     """
+
     def __init__(self, context):
         self._log_context = context
         defer.Deferred.__init__(self)

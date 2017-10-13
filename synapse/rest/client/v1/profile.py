@@ -52,7 +52,7 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
 
         try:
             new_name = content["displayname"]
-        except:
+        except BaseException:
             defer.returnValue((400, "Unable to parse name"))
 
         yield self.handlers.profile_handler.set_displayname(
@@ -94,7 +94,7 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
         content = parse_json_object_from_request(request)
         try:
             new_name = content["avatar_url"]
-        except:
+        except BaseException:
             defer.returnValue((400, "Unable to parse name"))
 
         yield self.handlers.profile_handler.set_avatar_url(

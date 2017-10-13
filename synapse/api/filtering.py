@@ -229,7 +229,7 @@ class FilterCollection(object):
         room_filter_json = self._filter_json.get("room", {})
 
         self._room_filter = Filter({
-            k: v for k, v in room_filter_json.items()
+            k: v for k, v in list(room_filter_json.items())
             if k in ("rooms", "not_rooms")
         })
 
@@ -372,7 +372,7 @@ class Filter(object):
             "types": lambda v: _matches_wildcard(event_type, v)
         }
 
-        for name, match_func in literal_keys.items():
+        for name, match_func in list(literal_keys.items()):
             not_name = "not_%s" % (name,)
             disallowed_values = getattr(self, not_name)
             if any(map(match_func, disallowed_values)):
@@ -411,7 +411,7 @@ class Filter(object):
         return room_ids
 
     def filter(self, events):
-        return filter(self.check, events)
+        return list(filter(self.check, events))
 
     def limit(self):
         return self.filter_json.get("limit", 10)

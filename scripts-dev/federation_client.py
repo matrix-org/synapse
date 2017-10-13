@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
 
 import argparse
 import nacl.signing
@@ -25,6 +24,7 @@ import requests
 import sys
 import srvlookup
 import yaml
+
 
 def encode_base64(input_bytes):
     """Encode bytes as a base64 string without any padding."""
@@ -50,15 +50,15 @@ def decode_base64(input_string):
 
 def encode_canonical_json(value):
     return json.dumps(
-         value,
-         # Encode code-points outside of ASCII as UTF-8 rather than \u escapes
-         ensure_ascii=False,
-         # Remove unecessary white space.
-         separators=(',',':'),
-         # Sort the keys of dictionaries.
-         sort_keys=True,
-         # Encode the resulting unicode as UTF-8 bytes.
-     ).encode("UTF-8")
+        value,
+        # Encode code-points outside of ASCII as UTF-8 rather than \u escapes
+        ensure_ascii=False,
+        # Remove unecessary white space.
+        separators=(',', ':'),
+        # Sort the keys of dictionaries.
+        sort_keys=True,
+        # Encode the resulting unicode as UTF-8 bytes.
+    ).encode("UTF-8")
 
 
 def sign_json(json_object, signing_key, signing_name):
@@ -79,6 +79,7 @@ def sign_json(json_object, signing_key, signing_name):
 
 
 NACL_ED25519 = "ed25519"
+
 
 def decode_signing_key_base64(algorithm, version, key_base64):
     """Decode a base64 encoded signing key
@@ -120,8 +121,9 @@ def lookup(destination, path):
         try:
             srv = srvlookup.lookup("matrix", "tcp", destination)[0]
             return "https://%s:%d%s" % (srv.host, srv.port, path)
-        except:
+        except BaseException:
             return "https://%s:%d%s" % (destination, 8448, path)
+
 
 def get_json(origin_name, origin_key, destination, path):
     request_json = {
@@ -135,15 +137,15 @@ def get_json(origin_name, origin_key, destination, path):
 
     authorization_headers = []
 
-    for key, sig in signed_json["signatures"][origin_name].items():
+    for key, sig in list(signed_json["signatures"][origin_name].items()):
         header = "X-Matrix origin=%s,key=\"%s\",sig=\"%s\"" % (
             origin_name, key, sig,
         )
         authorization_headers.append(bytes(header))
-        print ("Authorization: %s" % header, file=sys.stderr)
+        print("Authorization: %s" % header, file=sys.stderr)
 
     dest = lookup(destination, path)
-    print ("Requesting %s" % dest, file=sys.stderr)
+    print("Requesting %s" % dest, file=sys.stderr)
 
     result = requests.get(
         dest,
@@ -156,8 +158,7 @@ def get_json(origin_name, origin_key, destination, path):
 
 def main():
     parser = argparse.ArgumentParser(
-        description=
-            "Signs and sends a federation request to a matrix homeserver",
+        description="Signs and sends a federation request to a matrix homeserver",
     )
 
     parser.add_argument(
@@ -204,7 +205,7 @@ def main():
     )
 
     json.dump(result, sys.stdout)
-    print ("")
+    print("")
 
 
 def read_args_from_config(args):

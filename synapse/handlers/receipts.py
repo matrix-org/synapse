@@ -73,9 +73,9 @@ class ReceiptsHandler(BaseHandler):
                 "event_ids": user_values["event_ids"],
                 "data": user_values.get("data", {}),
             }
-            for room_id, room_values in content.items()
-            for receipt_type, users in room_values.items()
-            for user_id, user_values in users.items()
+            for room_id, room_values in list(content.items())
+            for receipt_type, users in list(room_values.items())
+            for user_id, user_values in list(users.items())
         ]
 
         yield self._handle_new_receipts(receipts)

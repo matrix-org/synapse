@@ -20,7 +20,7 @@ from itertools import chain
 # TODO(paul): I can't believe Python doesn't have one of these
 def map_concat(func, items):
     # flatten a list-of-lists
-    return list(chain.from_iterable(map(func, items)))
+    return list(chain.from_iterable(list(map(func, items))))
 
 
 class BaseMetric(object):

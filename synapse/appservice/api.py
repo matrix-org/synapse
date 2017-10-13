@@ -22,7 +22,9 @@ from synapse.util.caches.response_cache import ResponseCache
 from synapse.types import ThirdPartyInstanceID
 
 import logging
-import urllib
+import urllib.request
+import urllib.parse
+import urllib.error
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +58,7 @@ def _is_valid_3pe_result(r, field):
     fields = r["fields"]
     if not isinstance(fields, dict):
         return False
-    for k in fields.keys():
+    for k in list(fields.keys()):
         if not isinstance(fields[k], str):
             return False
 
@@ -78,7 +80,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     def query_user(self, service, user_id):
         if service.url is None:
             defer.returnValue(False)
-        uri = service.url + ("/users/%s" % urllib.quote(user_id))
+        uri = service.url + ("/users/%s" % urllib.parse.quote(user_id))
         response = None
         try:
             response = yield self.get_json(uri, {
@@ -99,7 +101,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     def query_alias(self, service, alias):
         if service.url is None:
             defer.returnValue(False)
-        uri = service.url + ("/rooms/%s" % urllib.quote(alias))
+        uri = service.url + ("/rooms/%s" % urllib.parse.quote(alias))
         response = None
         try:
             response = yield self.get_json(uri, {
@@ -133,7 +135,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             service.url,
             APP_SERVICE_PREFIX,
             kind,
-            urllib.quote(protocol)
+            urllib.parse.quote(protocol)
         )
         try:
             response = yield self.get_json(uri, fields)
@@ -168,7 +170,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             uri = "%s%s/thirdparty/protocol/%s" % (
                 service.url,
                 APP_SERVICE_PREFIX,
-                urllib.quote(protocol)
+                urllib.parse.quote(protocol)
             )
             try:
                 info = yield self.get_json(uri, {})
@@ -210,7 +212,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         txn_id = str(txn_id)
 
         uri = service.url + ("/transactions/%s" %
-                             urllib.quote(txn_id))
+                             urllib.parse.quote(txn_id))
         try:
             yield self.put_json(
                 uri=uri,

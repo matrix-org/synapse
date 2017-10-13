@@ -50,13 +50,13 @@ class SignatureStore(SQLBaseStore):
         )
         hashes = {
             e_id: {
-                k: encode_base64(v) for k, v in h.items()
+                k: encode_base64(v) for k, v in list(h.items())
                 if k == "sha256"
             }
-            for e_id, h in hashes.items()
+            for e_id, h in list(hashes.items())
         }
 
-        defer.returnValue(hashes.items())
+        defer.returnValue(list(hashes.items()))
 
     def _get_event_reference_hashes_txn(self, txn, event_id):
         """Get all the hashes for a given PDU.
