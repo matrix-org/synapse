@@ -70,7 +70,19 @@ class ContentRepositoryConfig(Config):
         self.max_upload_size = self.parse_size(config["max_upload_size"])
         self.max_image_pixels = self.parse_size(config["max_image_pixels"])
         self.max_spider_size = self.parse_size(config["max_spider_size"])
+
         self.media_store_path = self.ensure_directory(config["media_store_path"])
+
+        self.backup_media_store_path = config.get("backup_media_store_path")
+        if self.backup_media_store_path:
+            self.backup_media_store_path = self.ensure_directory(
+                self.backup_media_store_path
+            )
+
+        self.synchronous_backup_media_store = config.get(
+            "synchronous_backup_media_store", False
+        )
+
         self.uploads_path = self.ensure_directory(config["uploads_path"])
         self.dynamic_thumbnails = config["dynamic_thumbnails"]
         self.thumbnail_requirements = parse_thumbnail_requirements(
@@ -114,6 +126,14 @@ class ContentRepositoryConfig(Config):
         return """
         # Directory where uploaded images and attachments are stored.
         media_store_path: "%(media_store)s"
+
+        # A secondary directory where uploaded images and attachments are
+        # stored as a backup.
+        # backup_media_store_path: "%(media_store)s"
+
+        # Whether to wait for successful write to backup media store before
+        # returning successfully.
+        # synchronous_backup_media_store: false
 
         # Directory where in-progress uploads are stored.
         uploads_path: "%(uploads_path)s"

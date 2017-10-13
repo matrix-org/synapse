@@ -59,6 +59,7 @@ class PreviewUrlResource(Resource):
         self.store = hs.get_datastore()
         self.client = SpiderHttpClient(hs)
         self.media_repo = media_repo
+        self.primary_base_path = media_repo.primary_base_path
 
         self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
 
@@ -170,8 +171,8 @@ class PreviewUrlResource(Resource):
         logger.debug("got media_info of '%s'" % media_info)
 
         if _is_media(media_info['media_type']):
-            dims = yield self.media_repo._generate_local_thumbnails(
-                media_info['filesystem_id'], media_info, url_cache=True,
+            dims = yield self.media_repo._generate_thumbnails(
+                None, media_info['filesystem_id'], media_info, url_cache=True,
             )
 
             og = {
@@ -216,8 +217,8 @@ class PreviewUrlResource(Resource):
 
                 if _is_media(image_info['media_type']):
                     # TODO: make sure we don't choke on white-on-transparent images
-                    dims = yield self.media_repo._generate_local_thumbnails(
-                        image_info['filesystem_id'], image_info, url_cache=True,
+                    dims = yield self.media_repo._generate_thumbnails(
+                        None, image_info['filesystem_id'], image_info, url_cache=True,
                     )
                     if dims:
                         og["og:image:width"] = dims['width']
@@ -262,7 +263,8 @@ class PreviewUrlResource(Resource):
 
         file_id = datetime.date.today().isoformat() + '_' + random_string(16)
 
-        fname = self.filepaths.url_cache_filepath(file_id)
+        fpath = self.filepaths.url_cache_filepath_rel(file_id)
+        fname = os.path.join(self.primary_base_path, fpath)
         self.media_repo._makedirs(fname)
 
         try:
@@ -272,6 +274,8 @@ class PreviewUrlResource(Resource):
                     url, output_stream=f, max_size=self.max_spider_size,
                 )
                 # FIXME: pass through 404s and other error messages nicely
+
+            yield self.media_repo.copy_to_backup(fpath)
 
             media_type = headers["Content-Type"][0]
             time_now_ms = self.clock.time_msec()
@@ -338,6 +342,9 @@ class PreviewUrlResource(Resource):
     def _expire_url_cache_data(self):
         """Clean up expired url cache content, media and thumbnails.
         """
+
+        # TODO: Delete from backup media store
+
         now = self.clock.time_msec()
 
         # First we delete expired url cache entries
