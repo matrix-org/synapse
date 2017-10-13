@@ -115,7 +115,7 @@ class MediaRepository(object):
             source.close()
 
     @defer.inlineCallbacks
-    def write_to_file(self, source, path):
+    def write_to_file_and_backup(self, source, path):
         """Write `source` to the on disk media store, and also the backup store
         if configured.
 
@@ -185,7 +185,7 @@ class MediaRepository(object):
         """
         media_id = random_string(24)
 
-        fname = yield self.write_to_file(
+        fname = yield self.write_to_file_and_backup(
             content, self.filepaths.local_media_filepath_rel(media_id)
         )
 
@@ -384,7 +384,7 @@ class MediaRepository(object):
         if t_byte_source:
             t_width, t_height = t_byte_source.dimensions
 
-            output_path = yield self.write_to_file(
+            output_path = yield self.write_to_file_and_backup(
                 t_byte_source,
                 self.filepaths.local_media_thumbnail_rel(
                     media_id, t_width, t_height, t_type, t_method
@@ -414,7 +414,7 @@ class MediaRepository(object):
         if t_byte_source:
             t_width, t_height = t_byte_source.dimensions
 
-            output_path = yield self.write_to_file(
+            output_path = yield self.write_to_file_and_backup(
                 t_byte_source,
                 self.filepaths.remote_media_thumbnail_rel(
                     server_name, file_id, t_width, t_height, t_type, t_method
@@ -510,7 +510,7 @@ class MediaRepository(object):
                 )
 
             # Write to disk
-            output_path = yield self.write_to_file(t_byte_source, file_path)
+            output_path = yield self.write_to_file_and_backup(t_byte_source, file_path)
             t_len = os.path.getsize(output_path)
 
             # Write to database
