@@ -380,8 +380,6 @@ class MediaRepository(object):
         ))
 
         if t_byte_source:
-            t_width, t_height = t_byte_source.dimensions
-
             output_path = yield self.write_to_file_and_backup(
                 t_byte_source,
                 self.filepaths.local_media_thumbnail_rel(
@@ -410,8 +408,6 @@ class MediaRepository(object):
         ))
 
         if t_byte_source:
-            t_width, t_height = t_byte_source.dimensions
-
             output_path = yield self.write_to_file_and_backup(
                 t_byte_source,
                 self.filepaths.remote_media_thumbnail_rel(
