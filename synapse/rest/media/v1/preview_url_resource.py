@@ -275,8 +275,7 @@ class PreviewUrlResource(Resource):
                 )
                 # FIXME: pass through 404s and other error messages nicely
 
-            # Will close the file after its done
-            yield self.media_repo.copy_to_backup(open(fname), fpath)
+            yield self.media_repo.copy_to_backup(fpath)
 
             media_type = headers["Content-Type"][0]
             time_now_ms = self.clock.time_msec()
