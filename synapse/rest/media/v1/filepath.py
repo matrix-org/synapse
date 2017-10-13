@@ -172,12 +172,12 @@ class MediaFilePaths(object):
 
         if NEW_FORMAT_ID_RE.match(media_id):
             return os.path.join(
-                "url_cache_thumbnails",
+                self.primary_base_path, "url_cache_thumbnails",
                 media_id[:10], media_id[11:],
             )
         else:
             return os.path.join(
-                "url_cache_thumbnails",
+                self.primary_base_path, "url_cache_thumbnails",
                 media_id[0:2], media_id[2:4], media_id[4:],
             )
 
@@ -188,26 +188,26 @@ class MediaFilePaths(object):
         if NEW_FORMAT_ID_RE.match(media_id):
             return [
                 os.path.join(
-                    "url_cache_thumbnails",
+                    self.primary_base_path, "url_cache_thumbnails",
                     media_id[:10], media_id[11:],
                 ),
                 os.path.join(
-                    "url_cache_thumbnails",
+                    self.primary_base_path, "url_cache_thumbnails",
                     media_id[:10],
                 ),
             ]
         else:
             return [
                 os.path.join(
-                    "url_cache_thumbnails",
+                    self.primary_base_path, "url_cache_thumbnails",
                     media_id[0:2], media_id[2:4], media_id[4:],
                 ),
                 os.path.join(
-                    "url_cache_thumbnails",
+                    self.primary_base_path, "url_cache_thumbnails",
                     media_id[0:2], media_id[2:4],
                 ),
                 os.path.join(
-                    "url_cache_thumbnails",
+                    self.primary_base_path, "url_cache_thumbnails",
                     media_id[0:2],
                 ),
             ]
