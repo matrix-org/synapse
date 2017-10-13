@@ -24,7 +24,9 @@ from synapse.util.msisdn import phone_number_to_msisdn
 from .base import ClientV1RestServlet, client_path_patterns
 
 import simplejson as json
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
 import urllib.parse
 
 import logging

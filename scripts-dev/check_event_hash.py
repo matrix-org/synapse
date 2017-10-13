@@ -45,6 +45,6 @@ def main():
         name, h_bytes = compute_event_reference_hash(event_json, algorithm)
         print(("Reference hash %s: %s" % (name, encode_base64(h_bytes))))
 
-if __name__=="__main__":
-    main()
 
+if __name__ == "__main__":
+    main()

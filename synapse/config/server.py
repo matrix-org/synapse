@@ -303,7 +303,7 @@ def read_gc_thresholds(thresholds):
         return (
             int(thresholds[0]), int(thresholds[1]), int(thresholds[2]),
         )
-    except:
+    except BaseException:
         raise ConfigError(
             "Value of `gc_threshold` must be a list of three integers if set"
         )

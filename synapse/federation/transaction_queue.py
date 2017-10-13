@@ -99,9 +99,9 @@ class TransactionQueue(object):
         metrics.register_callback(
             "pending_edus",
             lambda: (
-                sum(map(len, list(edus.values())))
-                + sum(map(len, list(presence.values())))
-                + sum(map(len, list(edus_keyed.values())))
+                sum(map(len, list(edus.values()))) +
+                sum(map(len, list(presence.values()))) +
+                sum(map(len, list(edus_keyed.values())))
             ),
         )
 

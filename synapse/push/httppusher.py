@@ -131,7 +131,7 @@ class HttpPusher(object):
                         starting_max_ordering = self.max_stream_ordering
                         try:
                             yield self._unsafe_process()
-                        except:
+                        except BaseException:
                             logger.exception("Exception processing notifs")
                         if self.max_stream_ordering == starting_max_ordering:
                             break
@@ -314,7 +314,7 @@ class HttpPusher(object):
             defer.returnValue([])
         try:
             resp = yield self.http_client.post_json_get_json(self.url, notification_dict)
-        except:
+        except BaseException:
             logger.warn("Failed to push %s ", self.url)
             defer.returnValue(False)
         rejected = []
@@ -345,7 +345,7 @@ class HttpPusher(object):
         }
         try:
             resp = yield self.http_client.post_json_get_json(self.url, d)
-        except:
+        except BaseException:
             logger.exception("Failed to push %s ", self.url)
             defer.returnValue(False)
         rejected = []

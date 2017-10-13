@@ -14,13 +14,13 @@ RESULT = {
     "v2": PATTERNS_V2,
 }
 
+
 class CallVisitor(ast.NodeVisitor):
     def visit_Call(self, node):
         if isinstance(node.func, ast.Name):
             name = node.func.id
         else:
             return
-
 
         if name == "client_path_patterns":
             PATTERNS_V1.append(node.args[0].s)

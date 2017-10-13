@@ -214,7 +214,7 @@ class InitialSyncHandler(BaseHandler):
                     })
 
                 d["account_data"] = account_data_events
-            except:
+            except BaseException:
                 logger.exception("Failed to get snapshot")
 
         yield concurrently_execute(handle_room, room_list, 10)
@@ -364,8 +364,8 @@ class InitialSyncHandler(BaseHandler):
 
         room_members = [
             m for m in list(current_state.values())
-            if m.type == EventTypes.Member
-            and m.content["membership"] == Membership.JOIN
+            if m.type == EventTypes.Member and
+            m.content["membership"] == Membership.JOIN
         ]
 
         presence_handler = self.hs.get_presence_handler()

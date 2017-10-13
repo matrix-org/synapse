@@ -132,4 +132,4 @@ class RestTestCase(unittest.TestCase):
         """
         for key in required:
             self.assertEqual(required[key], actual[key],
-                              msg="%s mismatch. %s" % (key, actual))
+                             msg="%s mismatch. %s" % (key, actual))

@@ -3,12 +3,16 @@ from argparse import ArgumentParser
 import json
 import requests
 import sys
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
+
 
 def _mkurl(template, kws):
     for key in kws:
         template = template.replace(key, kws[key])
     return template
+
 
 def main(hs, room_id, access_token, user_id_prefix, why):
     if not why:
@@ -75,8 +79,7 @@ def main(hs, room_id, access_token, user_id_prefix, why):
                 print(("ERROR: HTTP %s" % res.status_code))
             if res.json().get("error"):
                 print(("ERROR: JSON %s" % res.json()))
-            
-    
+
 
 if __name__ == "__main__":
     parser = ArgumentParser("Kick members in a room matching a certain user ID prefix.")

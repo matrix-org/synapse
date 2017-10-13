@@ -31,6 +31,7 @@ def MockEvent(**kwargs):
 class PruneEventTestCase(unittest.TestCase):
     """ Asserts that a new event constructed with `evdict` will look like
     `matchdict` when it is redacted. """
+
     def run_test(self, evdict, matchdict):
         self.assertEqual(
             prune_event(FrozenEvent(evdict)).get_dict(),

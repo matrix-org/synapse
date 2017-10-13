@@ -112,7 +112,7 @@ class Authenticator(object):
                 key = strip_quotes(param_dict["key"])
                 sig = strip_quotes(param_dict["sig"])
                 return (origin, key, sig)
-            except:
+            except BaseException:
                 raise AuthenticationError(
                     400, "Malformed Authorization header", Codes.UNAUTHORIZED
                 )
@@ -177,7 +177,7 @@ class BaseFederationServlet(object):
                 if self.REQUIRE_AUTH:
                     logger.exception("authenticate_request failed")
                     raise
-            except:
+            except BaseException:
                 logger.exception("authenticate_request failed")
                 raise
 
@@ -270,7 +270,7 @@ class FederationSendServlet(BaseFederationServlet):
             code, response = yield self.handler.on_incoming_transaction(
                 transaction_data
             )
-        except:
+        except BaseException:
             logger.exception("on_incoming_transaction failed")
             raise
 

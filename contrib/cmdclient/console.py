@@ -26,7 +26,9 @@ import json
 import shlex
 import sys
 import time
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
 import urllib.parse
 
 import nacl.signing
@@ -39,6 +41,7 @@ CONFIG_JSON = "cmdclient_config.json"
 TRUSTED_ID_SERVERS = [
     'localhost:8001'
 ]
+
 
 class SynapseCmd(cmd.Cmd):
 
@@ -124,7 +127,7 @@ class SynapseCmd(cmd.Cmd):
             for key, valid_vals in config_rules:
                 if key == args["key"] and args["val"] not in valid_vals:
                     print(("%s value must be one of %s" % (args["key"],
-                                                          valid_vals)))
+                                                           valid_vals)))
                     return
 
             # toggle the http client verbosity
@@ -211,9 +214,9 @@ class SynapseCmd(cmd.Cmd):
                     domain = self._domain()
                     if domain:
                         user = "@" + user + ":" + domain
-                
+
                 reactor.callFromThread(self._do_login, user, p)
-                #print " got %s " % p
+                # print " got %s " % p
         except Exception as e:
             print(e)
 
@@ -248,12 +251,12 @@ class SynapseCmd(cmd.Cmd):
             print("Failed to find any login flows.")
             defer.returnValue(False)
 
-        flow = json_res["flows"][0] # assume first is the one we want.
+        flow = json_res["flows"][0]  # assume first is the one we want.
         if ("type" not in flow or "m.login.password" != flow["type"] or
                 "stages" in flow):
             fallback_url = self._url() + "/login/fallback"
             print(("Unable to login via the command line client. Please visit "
-                "%s to login." % fallback_url))
+                   "%s to login." % fallback_url))
             defer.returnValue(False)
         defer.returnValue(True)
 
@@ -271,7 +274,7 @@ class SynapseCmd(cmd.Cmd):
 
     @defer.inlineCallbacks
     def _do_emailrequest(self, args):
-        url = self._identityServerUrl()+"/_matrix/identity/api/v1/validate/email/requestToken"
+        url = self._identityServerUrl() + "/_matrix/identity/api/v1/validate/email/requestToken"
 
         json_res = yield self.http_client.do_request("POST", url, data=urllib.parse.urlencode(args), jsonreq=False,
                                                      headers={'Content-Type': ['application/x-www-form-urlencoded']})
@@ -287,13 +290,13 @@ class SynapseCmd(cmd.Cmd):
         """
         args = self._parse(line, ['sid', 'token', 'clientSecret'])
 
-        postArgs = { 'sid' : args['sid'], 'token' : args['token'], 'clientSecret': args['clientSecret'] }
+        postArgs = {'sid': args['sid'], 'token': args['token'], 'clientSecret': args['clientSecret']}
 
         reactor.callFromThread(self._do_emailvalidate, postArgs)
 
     @defer.inlineCallbacks
     def _do_emailvalidate(self, args):
-        url = self._identityServerUrl()+"/_matrix/identity/api/v1/validate/email/submitToken"
+        url = self._identityServerUrl() + "/_matrix/identity/api/v1/validate/email/submitToken"
 
         json_res = yield self.http_client.do_request("POST", url, data=urllib.parse.urlencode(args), jsonreq=False,
                                                      headers={'Content-Type': ['application/x-www-form-urlencoded']})
@@ -306,14 +309,14 @@ class SynapseCmd(cmd.Cmd):
         """
         args = self._parse(line, ['sid', 'clientSecret'])
 
-        postArgs = { 'sid' : args['sid'], 'clientSecret': args['clientSecret'] }
+        postArgs = {'sid': args['sid'], 'clientSecret': args['clientSecret']}
         postArgs['mxid'] = self.config["user"]
 
         reactor.callFromThread(self._do_3pidbind, postArgs)
 
     @defer.inlineCallbacks
     def _do_3pidbind(self, args):
-        url = self._identityServerUrl()+"/_matrix/identity/api/v1/3pid/bind"
+        url = self._identityServerUrl() + "/_matrix/identity/api/v1/3pid/bind"
 
         json_res = yield self.http_client.do_request("POST", url, data=urllib.parse.urlencode(args), jsonreq=False,
                                                      headers={'Content-Type': ['application/x-www-form-urlencoded']})
@@ -378,15 +381,15 @@ class SynapseCmd(cmd.Cmd):
     @defer.inlineCallbacks
     def _do_invite(self, roomid, userstring):
         if (not userstring.startswith('@') and
-                    self._is_on("complete_usernames")):
-            url = self._identityServerUrl()+"/_matrix/identity/api/v1/lookup"
+                self._is_on("complete_usernames")):
+            url = self._identityServerUrl() + "/_matrix/identity/api/v1/lookup"
 
-            json_res = yield self.http_client.do_request("GET", url, qparams={'medium':'email','address':userstring})
+            json_res = yield self.http_client.do_request("GET", url, qparams={'medium': 'email', 'address': userstring})
 
             mxid = None
 
             if 'mxid' in json_res and 'signatures' in json_res:
-                url = self._identityServerUrl()+"/_matrix/identity/api/v1/pubkey/ed25519"
+                url = self._identityServerUrl() + "/_matrix/identity/api/v1/pubkey/ed25519"
 
                 pubKey = None
                 pubKeyObj = yield self.http_client.do_request("GET", url)
@@ -405,7 +408,8 @@ class SynapseCmd(cmd.Cmd):
                             try:
                                 verify_signed_json(json_res, signame, pubKey)
                                 sigValid = True
-                                print(("Mapping %s -> %s correctly signed by %s" % (userstring, json_res['mxid'], signame)))
+                                print(("Mapping %s -> %s correctly signed by %s" %
+                                       (userstring, json_res['mxid'], signame)))
                                 break
                             except SignatureVerifyException as e:
                                 print(("Invalid signature from %s" % (signame)))
@@ -435,7 +439,7 @@ class SynapseCmd(cmd.Cmd):
         args = self._parse(line, ["roomid", "body"])
         txn_id = "txn%s" % int(time.time())
         path = "/rooms/%s/send/m.room.message/%s" % (urllib.parse.quote(args["roomid"]),
-                                             txn_id)
+                                                     txn_id)
         body_json = {
             "msgtype": "m.text",
             "body": args["body"]
@@ -452,7 +456,7 @@ class SynapseCmd(cmd.Cmd):
         "list messages <roomid> from=END&to=START&limit=3"
         """
         args = self._parse(line, ["type", "roomid", "qp"])
-        if not "type" in args or not "roomid" in args:
+        if "type" in args or not "roomid" not in args:
             print("Must specify type and room ID.")
             return
         if args["type"] not in ["members", "messages"]:
@@ -467,7 +471,7 @@ class SynapseCmd(cmd.Cmd):
                 try:
                     key_value = key_value_str.split("=")
                     qp[key_value[0]] = key_value[1]
-                except:
+                except BaseException:
                     print(("Bad query param: %s" % key_value))
                     return
 
@@ -537,13 +541,13 @@ class SynapseCmd(cmd.Cmd):
                 parsed_url = urllib.parse.urlparse(args["path"])
                 qp.update(urllib.parse.parse_qs(parsed_url.query))
                 args["path"] = parsed_url.path
-            except:
+            except BaseException:
                 pass
 
         reactor.callFromThread(self._run_and_pprint, args["method"],
-                                                     args["path"],
-                                                     args["data"],
-                                                     query_params=qp)
+                               args["path"],
+                               args["data"],
+                               query_params=qp)
 
     def do_stream(self, line):
         """Stream data from the server: "stream <longpoll timeout ms>" """
@@ -560,12 +564,12 @@ class SynapseCmd(cmd.Cmd):
     @defer.inlineCallbacks
     def _do_event_stream(self, timeout):
         res = yield self.http_client.get_json(
-                self._url() + "/events",
-                {
-                    "access_token": self._tok(),
-                    "timeout": str(timeout),
-                    "from": self.event_stream_token
-                })
+            self._url() + "/events",
+            {
+                "access_token": self._tok(),
+                "timeout": str(timeout),
+                "from": self.event_stream_token
+            })
         print((json.dumps(res, indent=4)))
 
         if "chunk" in res:
@@ -581,8 +585,8 @@ class SynapseCmd(cmd.Cmd):
 
     def _send_receipt(self, event, feedback_type):
         path = ("/rooms/%s/messages/%s/%s/feedback/%s/%s" %
-               (urllib.parse.quote(event["room_id"]), event["user_id"], event["msg_id"],
-                self._usr(), feedback_type))
+                (urllib.parse.quote(event["room_id"]), event["user_id"], event["msg_id"],
+                 self._usr(), feedback_type))
         data = {}
         reactor.callFromThread(self._run_and_pprint, "PUT", path, data=data,
                                alt_text="Sent receipt for %s" % event["msg_id"])
@@ -666,8 +670,8 @@ class SynapseCmd(cmd.Cmd):
             query_params["access_token"] = self._tok()
 
         json_res = yield self.http_client.do_request(method, url,
-                                                    data=data,
-                                                    qparams=query_params)
+                                                     data=data,
+                                                     qparams=query_params)
         if alt_text:
             print(alt_text)
         else:
@@ -703,10 +707,10 @@ def main(server_url, identity_server_url, username, token, config_path):
             syn_cmd.config = json.load(config)
             try:
                 http_client.verbose = "on" == syn_cmd.config["verbose"]
-            except:
+            except BaseException:
                 pass
             print(("Loaded config from %s" % config_path))
-    except:
+    except BaseException:
         pass
 
     # Twisted-specific: Runs the command processor in Twisted's event loop

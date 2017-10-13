@@ -3,13 +3,16 @@ from signedjson.sign import verify_signed_json
 from signedjson.key import decode_verify_key_bytes, write_signing_keys
 from unpaddedbase64 import decode_base64
 
-import urllib.request, urllib.error, urllib.parse
+import urllib.request
+import urllib.error
+import urllib.parse
 import json
 import sys
 import dns.resolver
 import pprint
 import argparse
 import logging
+
 
 def get_targets(server_name):
     if ":" in server_name:
@@ -23,6 +26,7 @@ def get_targets(server_name):
     except dns.resolver.NXDOMAIN:
         yield (server_name, 8448)
 
+
 def get_server_keys(server_name, target, port):
     url = "https://%s:%i/_matrix/key/v1" % (target, port)
     keys = json.load(urllib.request.urlopen(url))
@@ -32,6 +36,7 @@ def get_server_keys(server_name, target, port):
         verify_signed_json(keys, server_name, verify_key)
         verify_keys[key_id] = verify_key
     return verify_keys
+
 
 def main():
 
@@ -51,7 +56,7 @@ def main():
             print(("Using keys from https://%s:%s/_matrix/key/v1" % (target, port)))
             write_signing_keys(sys.stdout, list(keys.values()))
             break
-        except:
+        except BaseException:
             logging.exception("Error talking to %s:%s", target, port)
 
     json_to_check = json.load(args.input_json)
@@ -61,11 +66,10 @@ def main():
             key = keys[key_id]
             verify_signed_json(json_to_check, args.signature_name, key)
             print(("PASS %s" % (key_id,)))
-        except:
+        except BaseException:
             logging.exception("Check for key %s failed" % (key_id,))
             print(("FAIL %s" % (key_id,)))
 
 
 if __name__ == '__main__':
     main()
-

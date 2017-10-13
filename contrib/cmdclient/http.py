@@ -20,7 +20,9 @@ from twisted.internet import defer, reactor
 from pprint import pformat
 
 import json
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
 
 
 class HttpClient(object):
@@ -120,14 +122,14 @@ class TwistedHttpClient(HttpClient):
 
         if jsonreq:
             prod = _JsonProducer(data)
-            headers['Content-Type'] = ["application/json"];
+            headers['Content-Type'] = ["application/json"]
         else:
             prod = _RawProducer(data)
 
         if method in ["POST", "PUT"]:
             response = yield self._create_request(method, url,
-                    producer=prod,
-                    headers_dict=headers)
+                                                  producer=prod,
+                                                  headers_dict=headers)
         else:
             response = yield self._create_request(method, url)
 
@@ -178,6 +180,7 @@ class TwistedHttpClient(HttpClient):
         reactor.callLater(seconds, d.callback, seconds)
         return d
 
+
 class _RawProducer(object):
     def __init__(self, data):
         self.data = data
@@ -194,9 +197,11 @@ class _RawProducer(object):
     def stopProducing(self):
         pass
 
+
 class _JsonProducer(object):
     """ Used by the twisted http client to create the HTTP body from json
     """
+
     def __init__(self, jsn):
         self.data = jsn
         self.body = json.dumps(jsn).encode("utf8")

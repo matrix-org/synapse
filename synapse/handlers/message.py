@@ -511,7 +511,7 @@ class MessageHandler(BaseHandler):
         try:
             dump = ujson.dumps(event.content)
             ujson.loads(dump)
-        except:
+        except BaseException:
             logger.exception("Failed to encode content: %r", event.content)
             raise
 
@@ -546,8 +546,8 @@ class MessageHandler(BaseHandler):
                 state_to_include_ids = [
                     e_id
                     for k, e_id in list(context.current_state_ids.items())
-                    if k[0] in self.hs.config.room_invite_state_types
-                    or k == (EventTypes.Member, event.sender)
+                    if k[0] in self.hs.config.room_invite_state_types or
+                    k == (EventTypes.Member, event.sender)
                 ]
 
                 state_to_include = yield self.store.get_events(state_to_include_ids)

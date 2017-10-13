@@ -19,7 +19,9 @@ import cgi
 import json
 import datetime
 import argparse
-import urllib.request, urllib.error, urllib.parse
+import urllib.request
+import urllib.error
+import urllib.parse
 
 
 def make_name(pdu_id, origin):
@@ -47,7 +49,7 @@ def make_graph(pdus, room, filename_prefix):
         try:
             c = colors.pop()
             color_map[o] = c
-        except:
+        except BaseException:
             print("Run out of colours!")
             color_map[o] = "black"
 

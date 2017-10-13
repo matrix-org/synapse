@@ -55,6 +55,7 @@ class EmailPusher(object):
     This shares quite a bit of code with httpusher: it would be good to
     factor out the common parts
     """
+
     def __init__(self, hs, pusherdict, mailer):
         self.hs = hs
         self.mailer = mailer
@@ -121,7 +122,7 @@ class EmailPusher(object):
                         starting_max_ordering = self.max_stream_ordering
                         try:
                             yield self._unsafe_process()
-                        except:
+                        except BaseException:
                             logger.exception("Exception processing notifs")
                         if self.max_stream_ordering == starting_max_ordering:
                             break

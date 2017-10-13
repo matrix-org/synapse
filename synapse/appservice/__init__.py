@@ -216,8 +216,8 @@ class ApplicationService(object):
 
     def is_interested_in_user(self, user_id):
         return (
-            self._matches_regex(user_id, ApplicationService.NS_USERS)
-            or user_id == self.sender
+            self._matches_regex(user_id, ApplicationService.NS_USERS) or
+            user_id == self.sender
         )
 
     def is_interested_in_alias(self, alias):
@@ -228,8 +228,8 @@ class ApplicationService(object):
 
     def is_exclusive_user(self, user_id):
         return (
-            self._is_exclusive(ApplicationService.NS_USERS, user_id)
-            or user_id == self.sender
+            self._is_exclusive(ApplicationService.NS_USERS, user_id) or
+            user_id == self.sender
         )
 
     def is_interested_in_protocol(self, protocol):

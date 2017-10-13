@@ -278,7 +278,7 @@ class Config(object):
                     " certificates. Please review this file and customise it"
                     " to your needs."
                 ) % (config_path, server_name)))
-                print (
+                print(
                     "If this server name is incorrect, you will need to"
                     " regenerate the SSL certificates"
                 )

@@ -340,6 +340,7 @@ class SynapseService(service.Service):
     """A twisted Service class that will start synapse. Used to run synapse
     via twistd and a .tac.
     """
+
     def __init__(self, config):
         self.config = config
 

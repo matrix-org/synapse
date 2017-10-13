@@ -94,6 +94,7 @@ class Store(object):
 
     *All* database interactions should go through this object.
     """
+
     def __init__(self, db_pool, engine):
         self.db_pool = db_pool
         self.database_engine = engine
@@ -157,7 +158,7 @@ class Store(object):
 
         try:
             txn.executemany(sql, rows)
-        except:
+        except BaseException:
             logger.exception(
                 "Failed to insert: %s",
                 table,
@@ -521,8 +522,8 @@ class Porter(object):
                 [
                     self.setup_table(table)
                     for table in tables
-                    if table not in ["schema_version", "applied_schema_deltas"]
-                    and not table.startswith("sqlite_")
+                    if table not in ["schema_version", "applied_schema_deltas"] and
+                    not table.startswith("sqlite_")
                 ],
                 consumeErrors=True,
             )
@@ -537,7 +538,7 @@ class Porter(object):
             )
 
             self.progress.done()
-        except:
+        except BaseException:
             global end_error_exec_info
             end_error_exec_info = sys.exc_info()
             logger.exception("")
@@ -692,6 +693,7 @@ class Porter(object):
 class Progress(object):
     """Used to report progress of the port
     """
+
     def __init__(self):
         self.tables = {}
 
@@ -717,6 +719,7 @@ class Progress(object):
 class CursesProgress(Progress):
     """Reports progress to a curses window
     """
+
     def __init__(self, stdscr):
         self.stdscr = stdscr
 
@@ -847,6 +850,7 @@ class CursesProgress(Progress):
 class TerminalProgress(Progress):
     """Just prints progress to the terminal
     """
+
     def update(self, table, num_done):
         super(TerminalProgress, self).update(table, num_done)
 

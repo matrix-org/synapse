@@ -22,7 +22,7 @@ def run_create(cur, database_engine, *args, **kwargs):
     # NULL indicates user was not registered by an appservice.
     try:
         cur.execute("ALTER TABLE users ADD COLUMN appservice_id TEXT")
-    except:
+    except BaseException:
         # Maybe we already added the column? Hope so...
         pass
 

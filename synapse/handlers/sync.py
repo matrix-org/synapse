@@ -69,10 +69,10 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
         to tell if room needs to be part of the sync result.
         """
         return bool(
-            self.timeline
-            or self.state
-            or self.ephemeral
-            or self.account_data
+            self.timeline or
+            self.state or
+            self.ephemeral or
+            self.account_data
             # nb the notification count does not, er, count: if there's nothing
             # else in the result, we don't need to send it.
         )
@@ -91,9 +91,9 @@ class ArchivedSyncResult(collections.namedtuple("ArchivedSyncResult", [
         to tell if room needs to be part of the sync result.
         """
         return bool(
-            self.timeline
-            or self.state
-            or self.account_data
+            self.timeline or
+            self.state or
+            self.account_data
         )
 
 
@@ -1213,9 +1213,9 @@ class SyncHandler(object):
         """
         newly_joined = room_builder.newly_joined
         full_state = (
-            room_builder.full_state
-            or newly_joined
-            or sync_result_builder.full_state
+            room_builder.full_state or
+            newly_joined or
+            sync_result_builder.full_state
         )
         events = room_builder.events
 
@@ -1349,6 +1349,7 @@ def _calculate_state(timeline_contains, timeline_start, previous, current):
 
 class SyncResultBuilder(object):
     "Used to help build up a new SyncResult for a user"
+
     def __init__(self, sync_config, full_state, since_token, now_token):
         """
         Args:
@@ -1375,6 +1376,7 @@ class RoomSyncResultBuilder(object):
     """Stores information needed to create either a `JoinedSyncResult` or
     `ArchivedSyncResult`.
     """
+
     def __init__(self, room_id, rtype, events, newly_joined, full_state,
                  since_token, upto_token):
         """

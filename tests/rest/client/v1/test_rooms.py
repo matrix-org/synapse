@@ -24,7 +24,9 @@ from synapse.api.constants import Membership
 from synapse.types import UserID
 
 import json
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
 
 from ....utils import MockHttpResource, setup_test_homeserver
 from .utils import RestTestCase

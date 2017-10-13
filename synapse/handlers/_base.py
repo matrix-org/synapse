@@ -144,8 +144,8 @@ class BaseHandler(object):
                     continue
 
                 if (
-                    "kind" not in member_event.content
-                    or member_event.content["kind"] != "guest"
+                    "kind" not in member_event.content or
+                    member_event.content["kind"] != "guest"
                 ):
                     continue
 

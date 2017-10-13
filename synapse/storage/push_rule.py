@@ -162,8 +162,8 @@ class PushRuleStore(SQLBaseStore):
         # know don't have pushers, nor even read receipts.
         local_users_in_room = set(
             u for u in users_in_room
-            if self.hs.is_mine_id(u)
-            and not self.get_if_app_services_interested_in_user(u)
+            if self.hs.is_mine_id(u) and
+            not self.get_if_app_services_interested_in_user(u)
         )
 
         # users in the room who have pushers need to get push rules run because

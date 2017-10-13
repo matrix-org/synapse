@@ -702,6 +702,7 @@ class _AccountHandler(object):
     """A proxy object that gets passed to password auth providers so they
     can register new users etc if necessary.
     """
+
     def __init__(self, hs, check_user_exists):
         self.hs = hs
 

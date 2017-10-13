@@ -100,7 +100,7 @@ class RoomCreationHandler(BaseHandler):
         for i in invite_list:
             try:
                 UserID.from_string(i)
-            except:
+            except BaseException:
                 raise SynapseError(400, "Invalid user_id: %s" % (i,))
 
         invite_3pid_list = config.get("invite_3pid", [])

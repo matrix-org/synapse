@@ -82,8 +82,8 @@ class PushersSetRestServlet(ClientV1RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        if ('pushkey' in content and 'app_id' in content
-                and 'kind' in content and
+        if ('pushkey' in content and 'app_id' in content and
+            'kind' in content and
                 content['kind'] is None):
             yield self.pusher_pool.remove_pusher(
                 content['app_id'], content['pushkey'], user_id=user.to_string()

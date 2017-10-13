@@ -42,7 +42,7 @@ try:
 
     def get_thread_resource_usage():
         return resource.getrusage(RUSAGE_THREAD)
-except:
+except BaseException:
     # If the system doesn't support resource.getrusage(RUSAGE_THREAD) then we
     # won't track resource usage by returning None.
     def get_thread_resource_usage():
@@ -204,6 +204,7 @@ class LoggingContextFilter(logging.Filter):
         **defaults: Default values to avoid formatters complaining about
             missing fields
     """
+
     def __init__(self, **defaults):
         self.defaults = defaults
 
@@ -265,6 +266,7 @@ class _PreservingContextDeferred(defer.Deferred):
     """A deferred that ensures that all callbacks and errbacks are called with
     the given logging context.
     """
+
     def __init__(self, context):
         self._log_context = context
         defer.Deferred.__init__(self)

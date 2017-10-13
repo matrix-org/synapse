@@ -22,9 +22,9 @@ from twisted.internet import defer
 
 
 class UserPresenceState(namedtuple("UserPresenceState",
-                        ("user_id", "state", "last_active_ts",
-                            "last_federation_update_ts", "last_user_sync_ts",
-                            "status_msg", "currently_active"))):
+                                   ("user_id", "state", "last_active_ts",
+                                    "last_federation_update_ts", "last_user_sync_ts",
+                                    "status_msg", "currently_active"))):
     """Represents the current presence state of the user.
 
     user_id (str)

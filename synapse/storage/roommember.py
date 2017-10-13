@@ -89,8 +89,8 @@ class RoomMemberStore(SQLBaseStore):
             # The only current event that can also be an outlier is if its an
             # invite that has come in across federation.
             is_new_state = not backfilled and (
-                not event.internal_metadata.is_outlier()
-                or event.internal_metadata.is_invite_from_remote()
+                not event.internal_metadata.is_outlier() or
+                event.internal_metadata.is_invite_from_remote()
             )
             is_mine = self.hs.is_mine_id(event.state_key)
             if is_new_state and is_mine:
@@ -596,7 +596,7 @@ class RoomMemberStore(SQLBaseStore):
                 room_id = row["room_id"]
                 try:
                     content = json.loads(row["content"])
-                except:
+                except BaseException:
                     continue
 
                 display_name = content.get("displayname", None)

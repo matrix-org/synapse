@@ -82,7 +82,7 @@ class Clock(object):
     def cancel_call_later(self, timer, ignore_errs=False):
         try:
             timer.cancel()
-        except:
+        except BaseException:
             if not ignore_errs:
                 raise
 
@@ -97,12 +97,12 @@ class Clock(object):
 
             try:
                 ret_deferred.errback(e)
-            except:
+            except BaseException:
                 pass
 
             try:
                 given_deferred.cancel()
-            except:
+            except BaseException:
                 pass
 
         timer = None
@@ -110,7 +110,7 @@ class Clock(object):
         def cancel(res):
             try:
                 self.cancel_call_later(timer)
-            except:
+            except BaseException:
                 pass
             return res
 
@@ -119,7 +119,7 @@ class Clock(object):
         def success(res):
             try:
                 ret_deferred.callback(res)
-            except:
+            except BaseException:
                 pass
 
             return res
@@ -127,7 +127,7 @@ class Clock(object):
         def err(res):
             try:
                 ret_deferred.errback(res)
-            except:
+            except BaseException:
                 pass
 
         given_deferred.addCallbacks(callback=success, errback=err)

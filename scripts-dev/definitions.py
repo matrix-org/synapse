@@ -3,6 +3,7 @@
 import ast
 import yaml
 
+
 class DefinitionVisitor(ast.NodeVisitor):
     def __init__(self):
         super(DefinitionVisitor, self).__init__()
@@ -42,15 +43,18 @@ def non_empty(defs):
     functions = {name: non_empty(f) for name, f in list(defs['def'].items())}
     classes = {name: non_empty(f) for name, f in list(defs['class'].items())}
     result = {}
-    if functions: result['def'] = functions
-    if classes: result['class'] = classes
+    if functions:
+        result['def'] = functions
+    if classes:
+        result['class'] = classes
     names = defs['names']
     uses = []
     for name in names.get('Load', ()):
         if name not in names.get('Param', ()) and name not in names.get('Store', ()):
             uses.append(name)
     uses.extend(defs['attrs'])
-    if uses: result['uses'] = uses
+    if uses:
+        result['uses'] = uses
     result['names'] = names
     result['attrs'] = defs['attrs']
     return result
@@ -95,7 +99,10 @@ def used_names(prefix, item, defs, names):
 
 
 if __name__ == '__main__':
-    import sys, os, argparse, re
+    import sys
+    import os
+    import argparse
+    import re
 
     parser = argparse.ArgumentParser(description='Find definitions.')
     parser.add_argument(
@@ -162,7 +169,7 @@ if __name__ == '__main__':
             for used_by in entry.get("used", ()):
                 referrers.add(used_by)
         for name, definition in list(names.items()):
-            if not name in referrers:
+            if name not in referrers:
                 continue
             if ignore and any(pattern.match(name) for pattern in ignore):
                 continue
@@ -176,7 +183,7 @@ if __name__ == '__main__':
             for uses in entry.get("uses", ()):
                 referred.add(uses)
         for name, definition in list(names.items()):
-            if not name in referred:
+            if name not in referred:
                 continue
             if ignore and any(pattern.match(name) for pattern in ignore):
                 continue

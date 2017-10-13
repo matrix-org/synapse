@@ -121,9 +121,9 @@ class RegisterRestServlet(ClientV1RestServlet):
             is_using_shared_secret = login_type == LoginType.SHARED_SECRET
 
             can_register = (
-                self.enable_registration
-                or is_application_server
-                or is_using_shared_secret
+                self.enable_registration or
+                is_application_server or
+                is_using_shared_secret
             )
             if not can_register:
                 raise SynapseError(403, "Registration has been disabled")

@@ -65,7 +65,7 @@ class UserDirectorySearchRestServlet(RestServlet):
 
         try:
             search_term = body["search_term"]
-        except:
+        except BaseException:
             raise SynapseError(400, "`search_term` is required field")
 
         results = yield self.user_directory_handler.search_users(

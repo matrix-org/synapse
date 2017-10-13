@@ -93,7 +93,7 @@ class ClientDirectoryServer(ClientV1RestServlet):
                 )
             except SynapseError as e:
                 raise e
-            except:
+            except BaseException:
                 logger.exception("Failed to create association")
                 raise
         except AuthError:

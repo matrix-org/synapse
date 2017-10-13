@@ -109,8 +109,8 @@ class FederationHandler(BaseHandler):
 
         already_seen = (
             existing and (
-                not existing.internal_metadata.is_outlier()
-                or pdu.internal_metadata.is_outlier()
+                not existing.internal_metadata.is_outlier() or
+                pdu.internal_metadata.is_outlier()
             )
         )
         if already_seen:
@@ -208,7 +208,7 @@ class FederationHandler(BaseHandler):
                 state, auth_chain = yield self.replication_layer.get_state_for_room(
                     origin, pdu.room_id, pdu.event_id,
                 )
-            except:
+            except BaseException:
                 logger.exception("Failed to get state for event: %s", pdu.event_id)
 
         yield self._process_received_pdu(
@@ -442,7 +442,7 @@ class FederationHandler(BaseHandler):
         def check_match(id):
             try:
                 return server_name == get_domain_from_id(id)
-            except:
+            except BaseException:
                 return False
 
         # Parses mapping `event_id -> (type, state_key) -> state event_id`
@@ -480,7 +480,7 @@ class FederationHandler(BaseHandler):
                             continue
                         try:
                             domain = get_domain_from_id(ev.state_key)
-                        except:
+                        except BaseException:
                             continue
 
                         if domain != server_name:
@@ -706,8 +706,8 @@ class FederationHandler(BaseHandler):
             joined_users = [
                 (state_key, int(event.depth))
                 for (e_type, state_key), event in list(state.items())
-                if e_type == EventTypes.Member
-                and event.membership == Membership.JOIN
+                if e_type == EventTypes.Member and
+                event.membership == Membership.JOIN
             ]
 
             joined_domains = {}
@@ -719,7 +719,7 @@ class FederationHandler(BaseHandler):
                         joined_domains[dom] = min(d, old_d)
                     else:
                         joined_domains[dom] = d
-                except:
+                except BaseException:
                     pass
 
             return sorted(list(joined_domains.items()), key=lambda d: d[1])
@@ -917,7 +917,7 @@ class FederationHandler(BaseHandler):
                     room_creator_user_id="",
                     is_public=False
                 )
-            except:
+            except BaseException:
                 # FIXME
                 pass
 
@@ -1747,7 +1747,7 @@ class FederationHandler(BaseHandler):
                     [e_id for e_id, _ in event.auth_events]
                 )
                 seen_events = set(have_events.keys())
-            except:
+            except BaseException:
                 # FIXME:
                 logger.exception("Failed to get auth chain")
 
@@ -1853,8 +1853,8 @@ class FederationHandler(BaseHandler):
                             auth = {
                                 (e.type, e.state_key): e
                                 for e in result["auth_chain"]
-                                if e.event_id in auth_ids
-                                or event.type == EventTypes.Create
+                                if e.event_id in auth_ids or
+                                event.type == EventTypes.Create
                             }
                             ev.internal_metadata.outlier = True
 
@@ -1872,7 +1872,7 @@ class FederationHandler(BaseHandler):
                         except AuthError:
                             pass
 
-                except:
+                except BaseException:
                     # FIXME:
                     logger.exception("Failed to query auth chain")
 
@@ -1939,7 +1939,7 @@ class FederationHandler(BaseHandler):
         def get_next(it, opt=None):
             try:
                 return next(it)
-            except:
+            except BaseException:
                 return opt
 
         current_local = get_next(local_iter)

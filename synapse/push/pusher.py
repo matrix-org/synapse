@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 try:
     from synapse.push.emailpusher import EmailPusher
     from synapse.push.mailer import Mailer, load_jinja2_templates
-except:
+except BaseException:
     pass
 
 

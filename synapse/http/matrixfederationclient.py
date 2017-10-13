@@ -37,7 +37,9 @@ import simplejson as json
 import logging
 import random
 import sys
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
 import urllib.parse
 
 
@@ -513,7 +515,7 @@ class MatrixFederationHttpClient(object):
                 length = yield _readBodyToFile(
                     response, output_stream, max_size
                 )
-        except:
+        except BaseException:
             logger.exception("Failed to download body")
             raise
 
@@ -555,6 +557,7 @@ def _readBodyToFile(response, stream, max_size):
 class _JsonProducer(object):
     """ Used by the twisted http client to create the HTTP body from json
     """
+
     def __init__(self, jsn):
         self.reset(jsn)
 

@@ -26,7 +26,9 @@ from synapse.util.stringutils import is_ascii
 import os
 
 import logging
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
 import urllib.parse
 
 logger = logging.getLogger(__name__)
@@ -44,7 +46,7 @@ def parse_media_id(request):
             except UnicodeDecodeError:
                 pass
         return server_name, media_id, file_name
-    except:
+    except BaseException:
         raise SynapseError(
             404,
             "Invalid media id token %r" % (request.postpath,),

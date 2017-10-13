@@ -432,10 +432,10 @@ class RoomMemberHandler(BaseHandler):
         guest_access = yield self.store.get_event(guest_access_id)
 
         defer.returnValue(
-            guest_access
-            and guest_access.content
-            and "guest_access" in guest_access.content
-            and guest_access.content["guest_access"] == "can_join"
+            guest_access and
+            guest_access.content and
+            "guest_access" in guest_access.content and
+            guest_access.content["guest_access"] == "can_join"
         )
 
     @defer.inlineCallbacks

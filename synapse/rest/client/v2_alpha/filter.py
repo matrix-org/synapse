@@ -50,7 +50,7 @@ class GetFilterRestServlet(RestServlet):
 
         try:
             filter_id = int(filter_id)
-        except:
+        except BaseException:
             raise SynapseError(400, "Invalid filter_id")
 
         try:

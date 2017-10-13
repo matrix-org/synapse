@@ -45,7 +45,7 @@ def main():
         try:
             streams = {
                 row.name: row.position
-                for row in replicate(server, {"streams":"-1"})["streams"].rows
+                for row in replicate(server, {"streams": "-1"})["streams"].rows
             }
         except requests.exceptions.ConnectionError as e:
             time.sleep(0.1)
@@ -53,8 +53,8 @@ def main():
     while True:
         try:
             results = replicate(server, streams)
-        except:
-            sys.stdout.write("connection_lost("+ repr(streams) + ")\n")
+        except BaseException:
+            sys.stdout.write("connection_lost(" + repr(streams) + ")\n")
             break
         for update in list(results.values()):
             for row in update.rows:
@@ -62,6 +62,5 @@ def main():
             streams[update.name] = update.position
 
 
-
-if __name__=='__main__':
+if __name__ == '__main__':
     main()

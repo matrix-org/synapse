@@ -40,7 +40,9 @@ from io import StringIO
 
 import simplejson as json
 import logging
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
 
 
 logger = logging.getLogger(__name__)
@@ -62,6 +64,7 @@ class SimpleHttpClient(object):
     A simple, no-frills HTTP client with methods that wrap up common ways of
     using HTTP in Matrix
     """
+
     def __init__(self, hs):
         self.hs = hs
         # The default context factory in Twisted 14.0.0 (which we require) is
@@ -437,6 +440,7 @@ class SpiderHttpClient(SimpleHttpClient):
 
     used by the preview_url endpoint in the content repo.
     """
+
     def __init__(self, hs):
         SimpleHttpClient.__init__(self, hs)
         # clobber the base class's agent and UA:

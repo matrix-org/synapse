@@ -36,7 +36,9 @@ from unpaddedbase64 import decode_base64, encode_base64
 from OpenSSL import crypto
 
 from collections import namedtuple
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
 import hashlib
 import logging
 
@@ -442,8 +444,8 @@ class Keyring(object):
         responses = query_response["server_keys"]
 
         for response in responses:
-            if ("signatures" not in response
-                    or perspective_name not in response["signatures"]):
+            if ("signatures" not in response or
+                    perspective_name not in response["signatures"]):
                 raise KeyLookupError(
                     "Key response not signed by perspective server"
                     " %r" % (perspective_name,)
@@ -508,8 +510,8 @@ class Keyring(object):
                 )).encode("ascii"),
             )
 
-            if ("signatures" not in response
-                    or server_name not in response["signatures"]):
+            if ("signatures" not in response or
+                    server_name not in response["signatures"]):
                 raise KeyLookupError("Key response not signed by remote server")
 
             if "tls_fingerprints" not in response:
@@ -652,8 +654,8 @@ class Keyring(object):
             crypto.FILETYPE_ASN1, tls_certificate
         )
 
-        if ("signatures" not in response
-                or server_name not in response["signatures"]):
+        if ("signatures" not in response or
+                server_name not in response["signatures"]):
             raise KeyLookupError("Key response not signed by remote server")
 
         if "tls_certificate" not in response:
@@ -759,7 +761,7 @@ def _handle_key_deferred(verify_request):
     ))
     try:
         verify_signed_json(json_object, server_name, verify_key)
-    except:
+    except BaseException:
         raise SynapseError(
             401,
             "Invalid signature for server %s with key %s:%s" % (

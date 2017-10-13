@@ -126,7 +126,7 @@ class DomainSpecificString(
         try:
             cls.from_string(s)
             return True
-        except:
+        except BaseException:
             return False
 
     __str__ = to_string
@@ -178,7 +178,7 @@ class StreamToken(
                 # i.e. old token from before receipt_key
                 keys.append("0")
             return cls(*keys)
-        except:
+        except BaseException:
             raise SynapseError(400, "Invalid Token")
 
     def to_string(self):
@@ -196,14 +196,14 @@ class StreamToken(
     def is_after(self, other):
         """Does this token contain events that the other doesn't?"""
         return (
-            (other.room_stream_id < self.room_stream_id)
-            or (int(other.presence_key) < int(self.presence_key))
-            or (int(other.typing_key) < int(self.typing_key))
-            or (int(other.receipt_key) < int(self.receipt_key))
-            or (int(other.account_data_key) < int(self.account_data_key))
-            or (int(other.push_rules_key) < int(self.push_rules_key))
-            or (int(other.to_device_key) < int(self.to_device_key))
-            or (int(other.device_list_key) < int(self.device_list_key))
+            (other.room_stream_id < self.room_stream_id) or
+            (int(other.presence_key) < int(self.presence_key)) or
+            (int(other.typing_key) < int(self.typing_key)) or
+            (int(other.receipt_key) < int(self.receipt_key)) or
+            (int(other.account_data_key) < int(self.account_data_key)) or
+            (int(other.push_rules_key) < int(self.push_rules_key)) or
+            (int(other.to_device_key) < int(self.to_device_key)) or
+            (int(other.device_list_key) < int(self.device_list_key))
         )
 
     def copy_and_advance(self, key, new_value):
@@ -263,7 +263,7 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
             if string[0] == 't':
                 parts = string[1:].split('-', 1)
                 return cls(topological=int(parts[0]), stream=int(parts[1]))
-        except:
+        except BaseException:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
 
@@ -272,7 +272,7 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
         try:
             if string[0] == 's':
                 return cls(topological=None, stream=int(string[1:]))
-        except:
+        except BaseException:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
 

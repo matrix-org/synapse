@@ -77,6 +77,7 @@ class StreamIdGenerator(object):
         with stream_id_gen.get_next() as stream_id:
             # ... persist event ...
     """
+
     def __init__(self, db_conn, table, column, extra_tables=[], step=1):
         assert step != 0
         self._lock = threading.Lock()

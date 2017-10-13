@@ -72,6 +72,7 @@ class ReplicationClientHandler(object):
 
     By default proxies incoming replication data to the SlaveStore.
     """
+
     def __init__(self, store):
         self.store = store
 

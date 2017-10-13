@@ -189,8 +189,8 @@ class EventStreamPermissionsTestCase(RestTestCase):
             len([
                 c for c in response["chunk"]
                 if not (
-                    c.get("type") == "m.presence"
-                    and c["content"].get("user_id") == self.user_id
+                    c.get("type") == "m.presence" and
+                    c["content"].get("user_id") == self.user_id
                 )
             ])
         )

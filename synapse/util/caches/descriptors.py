@@ -287,6 +287,7 @@ class CacheDescriptor(_CacheDescriptorBase):
             ``cache_context``) to use as cache keys. Defaults to all named
             args of the function.
     """
+
     def __init__(self, orig, max_entries=1000, num_args=None, tree=False,
                  inlineCallbacks=False, cache_context=False, iterable=False):
 

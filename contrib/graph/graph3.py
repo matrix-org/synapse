@@ -106,7 +106,7 @@ def make_graph(file_name, room_id, file_prefix, limit):
         for prev_id, _ in event.prev_events:
             try:
                 end_node = node_map[prev_id]
-            except:
+            except BaseException:
                 end_node = pydot.Node(
                     name=prev_id,
                     label="<<b>%s</b>>" % (prev_id,),
@@ -127,6 +127,7 @@ def make_graph(file_name, room_id, file_prefix, limit):
     graph.write_svg("%s.svg" % file_prefix, prog='dot')
 
     print("Created svg")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

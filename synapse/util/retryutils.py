@@ -189,7 +189,7 @@ class RetryDestinationLimiter(object):
                 yield self.store.set_destination_retry_timings(
                     self.destination, retry_last_ts, self.retry_interval
                 )
-            except:
+            except BaseException:
                 logger.exception(
                     "Failed to store set_destination_retry_timings",
                 )

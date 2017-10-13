@@ -28,7 +28,9 @@ from synapse.http.servlet import (
 )
 
 import logging
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
 import ujson as json
 
 logger = logging.getLogger(__name__)
@@ -238,7 +240,7 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
 
         try:
             content = parse_json_object_from_request(request)
-        except:
+        except BaseException:
             # Turns out we used to ignore the body entirely, and some clients
             # cheekily send invalid bodies.
             content = {}
@@ -247,7 +249,7 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
             room_id = room_identifier
             try:
                 remote_room_hosts = request.args["server_name"]
-            except:
+            except BaseException:
                 remote_room_hosts = None
         elif RoomAlias.is_valid(room_identifier):
             handler = self.handlers.room_member_handler
@@ -591,7 +593,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
 
         try:
             content = parse_json_object_from_request(request)
-        except:
+        except BaseException:
             # Turns out we used to ignore the body entirely, and some clients
             # cheekily send invalid bodies.
             content = {}

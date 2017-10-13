@@ -49,6 +49,7 @@ class Auth(object):
     FIXME: This class contains a mix of functions for authenticating users
     of our client-server API and authenticating events added to room graphs.
     """
+
     def __init__(self, hs):
         self.hs = hs
         self.clock = hs.get_clock()

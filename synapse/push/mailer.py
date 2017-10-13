@@ -34,7 +34,9 @@ import jinja2
 import bleach
 
 import time
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
 
 import logging
 logger = logging.getLogger(__name__)

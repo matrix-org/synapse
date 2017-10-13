@@ -87,7 +87,7 @@ def main():
 
     result = {}
     for server in keys:
-        if not server in json:
+        if server not in json:
             v2_json = convert_v1_to_v2(
                 server, valid_until, keys[server], certificates[server]
             )

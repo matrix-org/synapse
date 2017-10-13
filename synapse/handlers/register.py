@@ -15,7 +15,9 @@
 
 """Contains functions for registering clients."""
 import logging
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
 
 from twisted.internet import defer
 
@@ -291,7 +293,7 @@ class RegistrationHandler(BaseHandler):
             try:
                 identity_handler = self.hs.get_handlers().identity_handler
                 threepid = yield identity_handler.threepid_from_creds(c)
-            except:
+            except BaseException:
                 logger.exception("Couldn't validate 3pid")
                 raise RegistrationError(400, "Couldn't validate 3pid")
 
@@ -319,8 +321,8 @@ class RegistrationHandler(BaseHandler):
         services = self.store.get_app_services()
         interested_services = [
             s for s in services
-            if s.is_interested_in_user(user_id)
-            and s != allowed_appservice
+            if s.is_interested_in_user(user_id) and
+            s != allowed_appservice
         ]
         for service in interested_services:
             if service.is_exclusive_user(user_id):

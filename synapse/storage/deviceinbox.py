@@ -188,9 +188,9 @@ class DeviceInboxStore(BackgroundUpdateStore):
                     continue
                 sql = (
                     "SELECT device_id FROM devices"
-                    " WHERE user_id = ? AND device_id IN ("
-                    + ",".join("?" * len(devices))
-                    + ")"
+                    " WHERE user_id = ? AND device_id IN (" +
+                    ",".join("?" * len(devices)) +
+                    ")"
                 )
                 # TODO: Maybe this needs to be done in batches if there are
                 # too many local devices for a given user.

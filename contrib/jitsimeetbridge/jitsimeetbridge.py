@@ -8,7 +8,7 @@ we set the remote SDP at which point the stream ends. Our video never gets to
 the bridge.
 
 Requires:
-npm install jquery jsdom 
+npm install jquery jsdom
 """
 
 import gevent
@@ -25,18 +25,19 @@ MATRIXBASE = 'https://matrix.org/_matrix/client/api/v1/'
 MYUSERNAME = '@davetest:matrix.org'
 
 HTTPBIND = 'https://meet.jit.si/http-bind'
-#HTTPBIND = 'https://jitsi.vuc.me/http-bind'
-#ROOMNAME = "matrix"
+# HTTPBIND = 'https://jitsi.vuc.me/http-bind'
+# ROOMNAME = "matrix"
 ROOMNAME = "pibble"
 
-HOST="guest.jit.si"
-#HOST="jitsi.vuc.me"
+HOST = "guest.jit.si"
+# HOST="jitsi.vuc.me"
 
-TURNSERVER="turn.guest.jit.si"
-#TURNSERVER="turn.jitsi.vuc.me"
+TURNSERVER = "turn.guest.jit.si"
+# TURNSERVER="turn.jitsi.vuc.me"
 
-ROOMDOMAIN="meet.jit.si"
-#ROOMDOMAIN="conference.jitsi.vuc.me"
+ROOMDOMAIN = "meet.jit.si"
+# ROOMDOMAIN="conference.jitsi.vuc.me"
+
 
 class TrivialMatrixClient:
     def __init__(self, access_token):
@@ -45,13 +46,13 @@ class TrivialMatrixClient:
 
     def getEvent(self):
         while True:
-            url = MATRIXBASE+'events?access_token='+self.access_token+"&timeout=60000"
+            url = MATRIXBASE + 'events?access_token=' + self.access_token + "&timeout=60000"
             if self.token:
-                url += "&from="+self.token
+                url += "&from=" + self.token
             req = grequests.get(url)
             resps = grequests.map([req])
             obj = json.loads(resps[0].content)
-            print "incoming from matrix",obj
+            print "incoming from matrix", obj
             if 'end' not in obj:
                 continue
             self.token = obj['end']
@@ -59,24 +60,23 @@ class TrivialMatrixClient:
                 return obj['chunk'][0]
 
     def joinRoom(self, roomId):
-        url = MATRIXBASE+'rooms/'+roomId+'/join?access_token='+self.access_token
+        url = MATRIXBASE + 'rooms/' + roomId + '/join?access_token=' + self.access_token
         print url
-        headers={ 'Content-Type': 'application/json' }
+        headers = {'Content-Type': 'application/json'}
         req = grequests.post(url, headers=headers, data='{}')
         resps = grequests.map([req])
         obj = json.loads(resps[0].content)
-        print "response: ",obj
+        print "response: ", obj
 
     def sendEvent(self, roomId, evType, event):
-        url = MATRIXBASE+'rooms/'+roomId+'/send/'+evType+'?access_token='+self.access_token
+        url = MATRIXBASE + 'rooms/' + roomId + '/send/' + evType + '?access_token=' + self.access_token
         print url
         print json.dumps(event)
-        headers={ 'Content-Type': 'application/json' }
+        headers = {'Content-Type': 'application/json'}
         req = grequests.post(url, headers=headers, data=json.dumps(event))
         resps = grequests.map([req])
         obj = json.loads(resps[0].content)
-        print "response: ",obj
-
+        print "response: ", obj
 
 
 xmppClients = {}
@@ -101,10 +101,10 @@ def matrixLoop():
             gevent.spawn(xmppClients[ev['room_id']].xmppLoop)
         elif ev['type'] == 'm.call.invite':
             print "Incoming call"
-            #sdp = ev['content']['offer']['sdp']
-            #print "sdp: %s" % (sdp)
-            #xmppClients[ev['room_id']] = TrivialXmppClient(ev['room_id'], ev['user_id'])
-            #gevent.spawn(xmppClients[ev['room_id']].xmppLoop)
+            # sdp = ev['content']['offer']['sdp']
+            # print "sdp: %s" % (sdp)
+            # xmppClients[ev['room_id']] = TrivialXmppClient(ev['room_id'], ev['user_id'])
+            # gevent.spawn(xmppClients[ev['room_id']].xmppLoop)
         elif ev['type'] == 'm.call.answer':
             print "Call answered"
             sdp = ev['content']['answer']['sdp']
@@ -118,6 +118,7 @@ def matrixLoop():
             if ev['room_id'] in xmppClients:
                 xmppClients[ev['room_id']].stop()
                 del xmppClients[ev['room_id']]
+
 
 class TrivialXmppClient:
     def __init__(self, matrixRoom, userId):
@@ -134,8 +135,9 @@ class TrivialXmppClient:
         return '%d' % (self.rid)
 
     def sendIq(self, xml):
-        fullXml = "<body rid='%s' xmlns='http://jabber.org/protocol/httpbind' sid='%s'>%s</body>" % (self.nextRid(), self.sid, xml)
-        #print "\t>>>%s" % (fullXml)
+        fullXml = "<body rid='%s' xmlns='http://jabber.org/protocol/httpbind' sid='%s'>%s</body>" % (
+            self.nextRid(), self.sid, xml)
+        # print "\t>>>%s" % (fullXml)
         return self.xmppPoke(fullXml)
 
     def xmppPoke(self, xml):
@@ -146,7 +148,7 @@ class TrivialXmppClient:
         return obj
 
     def sendAnswer(self, answer):
-        print "sdp from matrix client",answer
+        print "sdp from matrix client", answer
         p = subprocess.Popen(['node', 'unjingle/unjingle.js', '--sdp'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         jingle, out_err = p.communicate(answer)
         jingle = jingle % {
@@ -156,16 +158,16 @@ class TrivialXmppClient:
             'responder': self.jid,
             'sid': self.callsid
         }
-        print "answer jingle from sdp",jingle
+        print "answer jingle from sdp", jingle
         res = self.sendIq(jingle)
-        print "reply from answer: ",res
+        print "reply from answer: ", res
 
         self.ssrcs = {}
         jingleSoup = BeautifulSoup(jingle)
         for cont in jingleSoup.iq.jingle.findAll('content'):
             if cont.description:
                 self.ssrcs[cont['name']] = cont.description['ssrc']
-        print "my ssrcs:",self.ssrcs
+        print "my ssrcs:", self.ssrcs
 
         gevent.joinall([
                 gevent.spawn(self.advertiseSsrcs)
@@ -203,10 +205,10 @@ class TrivialXmppClient:
 
         res = self.sendIq("<iq type='set' id='_session_auth_2' xmlns='jabber:client'><session xmlns='urn:ietf:params:xml:ns:xmpp-session'/></iq>")
 
-        #randomthing = res.body.iq['to']
-        #whatsitpart = randomthing.split('-')[0]
+        # randomthing = res.body.iq['to']
+        # whatsitpart = randomthing.split('-')[0]
 
-        #print "other random bind thing: %s" % (randomthing)
+        # print "other random bind thing: %s" % (randomthing)
 
         # advertise preence to the jitsi room, with our nick
         res = self.sendIq("<iq type='get' to='%s' xmlns='jabber:client' id='1:sendIQ'><services xmlns='urn:xmpp:extdisco:1'><service host='%s'/></services></iq><presence to='%s@%s/d98f6c40' xmlns='jabber:client'><x xmlns='http://jabber.org/protocol/muc'/><c xmlns='http://jabber.org/protocol/caps' hash='sha-1' node='http://jitsi.org/jitsimeet' ver='0WkSdhFnAUxrz4ImQQLdB80GFlE='/><nick xmlns='http://jabber.org/protocol/nick'>%s</nick></presence>" % (HOST, TURNSERVER, ROOMNAME, ROOMDOMAIN, self.userId))

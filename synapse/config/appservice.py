@@ -17,7 +17,9 @@ from ._base import Config, ConfigError
 from synapse.appservice import ApplicationService
 from synapse.types import UserID
 
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
 import yaml
 import logging
 

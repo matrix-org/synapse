@@ -123,7 +123,7 @@ class _ServiceQueuer(object):
                 with Measure(self.clock, "servicequeuer.send"):
                     try:
                         yield self.txn_ctrl.send(service, events)
-                    except:
+                    except BaseException:
                         logger.exception("AS request failed")
         finally:
             self.requests_in_flight.discard(service.id)

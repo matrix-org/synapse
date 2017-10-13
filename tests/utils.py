@@ -30,7 +30,9 @@ from twisted.enterprise.adbapi import ConnectionPool
 from collections import namedtuple
 from mock import patch, Mock
 import hashlib
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
 import urllib.parse
 
 from inspect import getcallargs
@@ -184,7 +186,7 @@ class MockHttpResource(HttpServer):
             mock_request.args = urllib.parse.parse_qs(path.split('?')[1])
             mock_request.path = path.split('?')[0]
             path = mock_request.path
-        except:
+        except BaseException:
             pass
 
         for (method, pattern, func) in self.callbacks:
@@ -364,13 +366,13 @@ class MemoryDataStore(object):
             return {
                 "name": self.tokens_to_users[token],
             }
-        except:
+        except BaseException:
             raise StoreError(400, "User does not exist.")
 
     def get_room(self, room_id):
         try:
             return self.rooms[room_id]
-        except:
+        except BaseException:
             return None
 
     def store_room(self, room_id, room_creator_user_id, is_public):
@@ -499,7 +501,7 @@ class DeferredMockCallable(object):
         for _, _, d in self.expectations:
             try:
                 d.errback(failure)
-            except:
+            except BaseException:
                 pass
 
         raise failure

@@ -49,9 +49,9 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
         event_id_domain = get_domain_from_id(event.event_id)
 
         is_invite_via_3pid = (
-            event.type == EventTypes.Member
-            and event.membership == Membership.INVITE
-            and "third_party_invite" in event.content
+            event.type == EventTypes.Member and
+            event.membership == Membership.INVITE and
+            "third_party_invite" in event.content
         )
 
         # Check the sender's domain has signed the event
@@ -268,9 +268,9 @@ def _is_membership_change_allowed(event, auth_events):
         return True
 
     if Membership.JOIN != membership:
-        if (caller_invited
-                and Membership.LEAVE == membership
-                and target_user_id == event.user_id):
+        if (caller_invited and
+            Membership.LEAVE == membership and
+                target_user_id == event.user_id):
             return True
 
         if not caller_in_room:  # caller isn't joined
@@ -443,12 +443,12 @@ def _check_power_levels(event, auth_events):
     for k, v in list(user_list.items()):
         try:
             UserID.from_string(k)
-        except:
+        except BaseException:
             raise SynapseError(400, "Not a valid user_id: %s" % (k,))
 
         try:
             int(v)
-        except:
+        except BaseException:
             raise SynapseError(400, "Not a valid power level: %s" % (v,))
 
     key = (event.type, event.state_key, )

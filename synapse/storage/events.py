@@ -355,13 +355,13 @@ class EventsStore(SQLBaseStore):
                             new_forward_extremeties[room_id] = new_latest_event_ids
 
                             len_1 = (
-                                len(latest_event_ids) == 1
-                                and len(new_latest_event_ids) == 1
+                                len(latest_event_ids) == 1 and
+                                len(new_latest_event_ids) == 1
                             )
                             if len_1:
                                 all_single_prev_not_state = all(
-                                    len(event.prev_events) == 1
-                                    and not event.is_state()
+                                    len(event.prev_events) == 1 and
+                                    not event.is_state()
                                     for event, ctx in ev_ctx_rm
                                 )
                                 # Don't bother calculating state if they're just
@@ -720,78 +720,78 @@ class EventsStore(SQLBaseStore):
 
     def _update_current_state_txn(self, txn, state_delta_by_room, max_stream_order):
         for room_id, current_state_tuple in list(state_delta_by_room.items()):
-                to_delete, to_insert, _ = current_state_tuple
-                txn.executemany(
-                    "DELETE FROM current_state_events WHERE event_id = ?",
-                    [(ev_id,) for ev_id in list(to_delete.values())],
-                )
+            to_delete, to_insert, _ = current_state_tuple
+            txn.executemany(
+                "DELETE FROM current_state_events WHERE event_id = ?",
+                [(ev_id,) for ev_id in list(to_delete.values())],
+            )
 
-                self._simple_insert_many_txn(
-                    txn,
-                    table="current_state_events",
-                    values=[
-                        {
-                            "event_id": ev_id,
-                            "room_id": room_id,
-                            "type": key[0],
-                            "state_key": key[1],
-                        }
-                        for key, ev_id in list(to_insert.items())
-                    ],
-                )
+            self._simple_insert_many_txn(
+                txn,
+                table="current_state_events",
+                values=[
+                    {
+                        "event_id": ev_id,
+                        "room_id": room_id,
+                        "type": key[0],
+                        "state_key": key[1],
+                    }
+                    for key, ev_id in list(to_insert.items())
+                ],
+            )
 
-                state_deltas = {key: None for key in to_delete}
-                state_deltas.update(to_insert)
+            state_deltas = {key: None for key in to_delete}
+            state_deltas.update(to_insert)
 
-                self._simple_insert_many_txn(
-                    txn,
-                    table="current_state_delta_stream",
-                    values=[
-                        {
-                            "stream_id": max_stream_order,
-                            "room_id": room_id,
-                            "type": key[0],
-                            "state_key": key[1],
-                            "event_id": ev_id,
-                            "prev_event_id": to_delete.get(key, None),
-                        }
-                        for key, ev_id in list(state_deltas.items())
-                    ]
-                )
+            self._simple_insert_many_txn(
+                txn,
+                table="current_state_delta_stream",
+                values=[
+                    {
+                        "stream_id": max_stream_order,
+                        "room_id": room_id,
+                        "type": key[0],
+                        "state_key": key[1],
+                        "event_id": ev_id,
+                        "prev_event_id": to_delete.get(key, None),
+                    }
+                    for key, ev_id in list(state_deltas.items())
+                ]
+            )
 
-                self._curr_state_delta_stream_cache.entity_has_changed(
-                    room_id, max_stream_order,
-                )
+            self._curr_state_delta_stream_cache.entity_has_changed(
+                room_id, max_stream_order,
+            )
 
-                # Invalidate the various caches
+            # Invalidate the various caches
 
-                # Figure out the changes of membership to invalidate the
-                # `get_rooms_for_user` cache.
-                # We find out which membership events we may have deleted
-                # and which we have added, then we invlidate the caches for all
-                # those users.
-                members_changed = set(
-                    state_key for ev_type, state_key in state_deltas
-                    if ev_type == EventTypes.Member
-                )
+            # Figure out the changes of membership to invalidate the
+            # `get_rooms_for_user` cache.
+            # We find out which membership events we may have deleted
+            # and which we have added, then we invlidate the caches for all
+            # those users.
+            members_changed = set(
+                state_key for ev_type, state_key in state_deltas
+                if ev_type == EventTypes.Member
+            )
 
-                for member in members_changed:
-                    self._invalidate_cache_and_stream(
-                        txn, self.get_rooms_for_user, (member,)
-                    )
-
-                for host in set(get_domain_from_id(u) for u in members_changed):
-                    self._invalidate_cache_and_stream(
-                        txn, self.is_host_joined, (room_id, host)
-                    )
-
+            for member in members_changed:
                 self._invalidate_cache_and_stream(
-                    txn, self.get_users_in_room, (room_id,)
+                    txn, self.get_rooms_for_user, (member,)
                 )
 
+            for host in set(get_domain_from_id(u) for u in members_changed):
                 self._invalidate_cache_and_stream(
-                    txn, self.get_current_state_ids, (room_id,)
+                    txn, self.is_host_joined, (room_id, host)
                 )
+
+            self._invalidate_cache_and_stream(
+                txn, self.get_users_in_room, (room_id,)
+            )
+
+            self._invalidate_cache_and_stream(
+                txn, self.get_current_state_ids, (room_id,)
+            )
 
     def _update_forward_extremities_txn(self, txn, new_forward_extremities,
                                         max_stream_order):
@@ -1074,8 +1074,8 @@ class EventsStore(SQLBaseStore):
                     "received_ts": self._clock.time_msec(),
                     "sender": event.sender,
                     "contains_url": (
-                        "url" in event.content
-                        and isinstance(event.content["url"], str)
+                        "url" in event.content and
+                        isinstance(event.content["url"], str)
                     ),
                 }
                 for event, _ in events_and_contexts
@@ -1388,7 +1388,7 @@ class EventsStore(SQLBaseStore):
         defer.returnValue(events)
 
     def _invalidate_get_event_cache(self, event_id):
-            self._get_event_cache.invalidate((event_id,))
+        self._get_event_cache.invalidate((event_id,))
 
     def _get_events_from_cache(self, events, allow_rejected, update_metrics=True):
         """Fetch events from the caches
@@ -1468,7 +1468,7 @@ class EventsStore(SQLBaseStore):
                                         for i in ids
                                         if i in res
                                     ])
-                            except:
+                            except BaseException:
                                 logger.exception("Failed to callback")
                 with PreserveLoggingContext():
                     reactor.callFromThread(fire, event_list, row_dict)

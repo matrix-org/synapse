@@ -232,7 +232,7 @@ class MediaRepository(object):
                 media_length=length,
                 filesystem_id=file_id,
             )
-        except:
+        except BaseException:
             os.remove(fname)
             raise
 

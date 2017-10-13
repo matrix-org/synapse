@@ -289,7 +289,7 @@ class Notifier(object):
                 for user_stream in user_streams:
                     try:
                         user_stream.notify(stream_key, new_token, time_now_ms)
-                    except:
+                    except BaseException:
                         logger.exception("Failed to notify listener")
 
                 self.notify_replication()
