@@ -33,7 +33,7 @@ from synapse.api.errors import SynapseError, HttpResponseException, \
 
 from synapse.util.async import Linearizer
 from synapse.util.stringutils import is_ascii
-from synapse.util.logcontext import preserve_context_over_fn, preserve_fn
+from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
 from synapse.util.retryutils import NotRetryingDestination
 
 import os
@@ -123,7 +123,7 @@ class MediaRepository(object):
         self._makedirs(fname)
 
         # Write to the main repository
-        yield preserve_context_over_fn(
+        yield make_deferred_yieldable(
             threads.deferToThread,
             self._write_file_synchronously, source, fname,
         )
@@ -146,7 +146,7 @@ class MediaRepository(object):
             # We can either wait for successful writing to the backup repository
             # or write in the background and immediately return
             if self.synchronous_backup_media_store:
-                yield preserve_context_over_fn(
+                yield make_deferred_yieldable(
                     threads.deferToThread,
                     self._write_file_synchronously, source, backup_fname,
                     close_source=True,
@@ -355,7 +355,7 @@ class MediaRepository(object):
         input_path = self.filepaths.local_media_filepath(media_id)
 
         thumbnailer = Thumbnailer(input_path)
-        t_byte_source = yield preserve_context_over_fn(
+        t_byte_source = yield make_deferred_yieldable(
             threads.deferToThread,
             self._generate_thumbnail,
             thumbnailer, t_width, t_height, t_method, t_type
@@ -384,7 +384,7 @@ class MediaRepository(object):
         input_path = self.filepaths.remote_media_filepath(server_name, file_id)
 
         thumbnailer = Thumbnailer(input_path)
-        t_byte_source = yield preserve_context_over_fn(
+        t_byte_source = yield make_deferred_yieldable(
             threads.deferToThread,
             self._generate_thumbnail,
             thumbnailer, t_width, t_height, t_method, t_type
@@ -443,7 +443,7 @@ class MediaRepository(object):
                     r_width, r_height, r_method, r_type, t_byte_source
                 ))
 
-        yield preserve_context_over_fn(threads.deferToThread, generate_thumbnails)
+        yield make_deferred_yieldable(threads.deferToThread, generate_thumbnails)
 
         for t_width, t_height, t_method, t_type, t_byte_source in local_thumbnails:
             if url_cache:
@@ -499,7 +499,7 @@ class MediaRepository(object):
                     r_width, r_height, r_method, r_type, t_byte_source
                 ))
 
-        yield preserve_context_over_fn(threads.deferToThread, generate_thumbnails)
+        yield make_deferred_yieldable(threads.deferToThread, generate_thumbnails)
 
         for t_width, t_height, t_method, t_type, t_byte_source in remote_thumbnails:
             file_path = self.filepaths.remote_media_thumbnail_rel(
