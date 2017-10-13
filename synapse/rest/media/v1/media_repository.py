@@ -367,12 +367,16 @@ class MediaRepository(object):
         ))
 
         if t_byte_source:
-            output_path = yield self.write_to_file_and_backup(
-                t_byte_source,
-                self.filepaths.local_media_thumbnail_rel(
-                    media_id, t_width, t_height, t_type, t_method
+            try:
+                output_path = yield self.write_to_file_and_backup(
+                    t_byte_source,
+                    self.filepaths.local_media_thumbnail_rel(
+                        media_id, t_width, t_height, t_type, t_method
+                    )
                 )
-            )
+            finally:
+                t_byte_source.close()
+
             logger.info("Stored thumbnail in file %r", output_path)
 
             t_len = os.path.getsize(output_path)
@@ -395,12 +399,16 @@ class MediaRepository(object):
         ))
 
         if t_byte_source:
-            output_path = yield self.write_to_file_and_backup(
-                t_byte_source,
-                self.filepaths.remote_media_thumbnail_rel(
-                    server_name, file_id, t_width, t_height, t_type, t_method
+            try:
+                output_path = yield self.write_to_file_and_backup(
+                    t_byte_source,
+                    self.filepaths.remote_media_thumbnail_rel(
+                        server_name, file_id, t_width, t_height, t_type, t_method
+                    )
                 )
-            )
+            finally:
+                t_byte_source.close()
+
             logger.info("Stored thumbnail in file %r", output_path)
 
             t_len = os.path.getsize(output_path)
@@ -464,18 +472,6 @@ class MediaRepository(object):
 
         # Now we generate the thumbnails for each dimension, store it
         for (t_width, t_height, t_type), t_method in thumbnails.iteritems():
-            # Generate the thumbnail
-            if t_type == "crop":
-                t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
-                    thumbnailer.crop,
-                    r_width, r_height, t_type,
-                ))
-            else:
-                t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
-                    thumbnailer.scale,
-                    r_width, r_height, t_type,
-                ))
-
             # Work out the correct file name for thumbnail
             if server_name:
                 file_path = self.filepaths.remote_media_thumbnail_rel(
@@ -490,8 +486,29 @@ class MediaRepository(object):
                     media_id, t_width, t_height, t_type, t_method
                 )
 
-            # Write to disk
-            output_path = yield self.write_to_file_and_backup(t_byte_source, file_path)
+            # Generate the thumbnail
+            if t_type == "crop":
+                t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
+                    thumbnailer.crop,
+                    r_width, r_height, t_type,
+                ))
+            else:
+                t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
+                    thumbnailer.scale,
+                    r_width, r_height, t_type,
+                ))
+
+            if not t_byte_source:
+                continue
+
+            try:
+                # Write to disk
+                output_path = yield self.write_to_file_and_backup(
+                    t_byte_source, file_path,
+                )
+            finally:
+                t_byte_source.close()
+
             t_len = os.path.getsize(output_path)
 
             # Write to database
