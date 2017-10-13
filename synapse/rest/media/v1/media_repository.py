@@ -395,7 +395,7 @@ class MediaRepository(object):
 
             t_len = os.path.getsize(output_path)
 
-            yield self.store.store_local_thumbnail_rel(
+            yield self.store.store_local_thumbnail(
                 media_id, t_width, t_height, t_type, t_method, t_len
             )
 
