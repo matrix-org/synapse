@@ -121,7 +121,7 @@ class MediaRepository(object):
 
         Args:
             source: A file like object that should be written
-            path(str): Relative path to write file to
+            path (str): Relative path to write file to
 
         Returns:
             Deferred[str]: the file path written to in the primary media store
