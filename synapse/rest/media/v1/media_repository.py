@@ -98,6 +98,14 @@ class MediaRepository(object):
 
     @staticmethod
     def _write_file_synchronously(source, fname, close_source=False):
+        """Write `source` to the path `fname` synchronously. Should be called
+        from a thread.
+
+        Args:
+            source: A file like object to be written
+            fname (str): Path to write to
+            close_source (bool): Whether to close source after writing
+        """
         MediaRepository._makedirs(fname)
         source.seek(0)  # Ensure we read from the start of the file
         with open(fname, "wb") as f:
@@ -115,10 +123,10 @@ class MediaRepository(object):
 
         Args:
             source: A file like object that should be written
-            path: Relative path to write file to
+            path(str): Relative path to write file to
 
         Returns:
-            string: the file path written to in the primary media store
+            Deferred[str]: the file path written to in the primary media store
         """
         fname = os.path.join(self.primary_base_path, path)
 
@@ -138,6 +146,10 @@ class MediaRepository(object):
         """Copy file like object source to the backup media store, if configured.
 
         Will close source after its done.
+
+        Args:
+            source: A file like object that should be written
+            path(str): Relative path to write file to
         """
         if self.backup_base_path:
             backup_fname = os.path.join(self.backup_base_path, path)
@@ -161,6 +173,18 @@ class MediaRepository(object):
     @defer.inlineCallbacks
     def create_content(self, media_type, upload_name, content, content_length,
                        auth_user):
+        """Store uploaded content for a local user and return the mxc URL
+
+        Args:
+            media_type(str): The content type of the file
+            upload_name(str): The name of the file
+            content: A file like object that is the content to store
+            content_length(int): The length of the content
+            auth_user(str): The user_id of the uploader
+
+        Returns:
+            Deferred[str]: The mxc url of the stored content
+        """
         media_id = random_string(24)
 
         fname = yield self.write_to_file(
