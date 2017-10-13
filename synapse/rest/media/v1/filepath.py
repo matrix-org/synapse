@@ -100,7 +100,7 @@ class MediaFilePaths(object):
 
     def remote_media_thumbnail_dir(self, server_name, file_id):
         return os.path.join(
-            "remote_thumbnail", server_name,
+            self.primary_base_path, "remote_thumbnail", server_name,
             file_id[0:2], file_id[2:4], file_id[4:],
         )
 
@@ -125,18 +125,18 @@ class MediaFilePaths(object):
         if NEW_FORMAT_ID_RE.match(media_id):
             return [
                 os.path.join(
-                    "url_cache",
+                    self.primary_base_path, "url_cache",
                     media_id[:10],
                 ),
             ]
         else:
             return [
                 os.path.join(
-                    "url_cache",
+                    self.primary_base_path, "url_cache",
                     media_id[0:2], media_id[2:4],
                 ),
                 os.path.join(
-                    "url_cache",
+                    self.primary_base_path, "url_cache",
                     media_id[0:2],
                 ),
             ]
