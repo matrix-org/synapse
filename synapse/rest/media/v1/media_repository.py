@@ -63,9 +63,7 @@ class MediaRepository(object):
         self.primary_base_path = hs.config.media_store_path
         self.filepaths = MediaFilePaths(self.primary_base_path)
 
-        self.backup_base_path = None
-        if hs.config.backup_media_store_path:
-            self.backup_base_path = hs.config.backup_media_store_path
+        self.backup_base_path = hs.config.backup_media_store_path
 
         self.synchronous_backup_media_store = hs.config.synchronous_backup_media_store
 
