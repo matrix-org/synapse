@@ -131,10 +131,9 @@ class MediaRepository(object):
         fname = os.path.join(self.primary_base_path, path)
 
         # Write to the main repository
-        yield make_deferred_yieldable(
-            threads.deferToThread,
+        yield make_deferred_yieldable(threads.deferToThread(
             self._write_file_synchronously, source, fname,
-        )
+        ))
 
         # Write to backup repository
         yield self.copy_to_backup(source, path)
@@ -157,11 +156,10 @@ class MediaRepository(object):
             # We can either wait for successful writing to the backup repository
             # or write in the background and immediately return
             if self.synchronous_backup_media_store:
-                yield make_deferred_yieldable(
-                    threads.deferToThread,
+                yield make_deferred_yieldable(threads.deferToThread(
                     self._write_file_synchronously, source, backup_fname,
                     close_source=True,
-                )
+                ))
             else:
                 preserve_fn(threads.deferToThread)(
                     self._write_file_synchronously, source, backup_fname,
@@ -378,11 +376,10 @@ class MediaRepository(object):
         input_path = self.filepaths.local_media_filepath(media_id)
 
         thumbnailer = Thumbnailer(input_path)
-        t_byte_source = yield make_deferred_yieldable(
-            threads.deferToThread,
+        t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
             self._generate_thumbnail,
             thumbnailer, t_width, t_height, t_method, t_type
-        )
+        ))
 
         if t_byte_source:
             t_width, t_height = t_byte_source.dimensions
@@ -409,11 +406,10 @@ class MediaRepository(object):
         input_path = self.filepaths.remote_media_filepath(server_name, file_id)
 
         thumbnailer = Thumbnailer(input_path)
-        t_byte_source = yield make_deferred_yieldable(
-            threads.deferToThread,
+        t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
             self._generate_thumbnail,
             thumbnailer, t_width, t_height, t_method, t_type
-        )
+        ))
 
         if t_byte_source:
             t_width, t_height = t_byte_source.dimensions
@@ -478,34 +474,32 @@ class MediaRepository(object):
         thumbnails = {}
         for r_width, r_height, r_method, r_type in requirements:
             if r_method == "crop":
-                thumbnails.setdefault[(r_width, r_height)] = (r_method, r_type)
+                thumbnails.setdefault((r_width, r_height), (r_method, r_type))
             elif r_method == "scale":
-                t_width, t_height = thumbnailer.aspect(t_width, t_height)
+                t_width, t_height = thumbnailer.aspect(r_width, r_height)
                 t_width = min(m_width, t_width)
                 t_height = min(m_height, t_height)
                 thumbnails[(t_width, t_height)] = (r_method, r_type)
 
         # Now we generate the thumbnails for each dimension, store it
-        for (r_width, r_height), (r_method, r_type) in thumbnails.iteritems():
-            t_byte_source = thumbnailer.crop(t_width, t_height, t_type)
-
-            if r_type == "crop":
-                t_byte_source = yield make_deferred_yieldable(
-                    threads.deferToThread, thumbnailer.crop,
-                    r_width, r_height, r_type,
-                )
+        for (t_width, t_height), (t_method, t_type) in thumbnails.iteritems():
+            # Generate the thumbnail
+            if t_type == "crop":
+                t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
+                    thumbnailer.crop,
+                    r_width, r_height, t_type,
+                ))
             else:
-                t_byte_source = yield make_deferred_yieldable(
-                    threads.deferToThread, thumbnailer.scale,
-                    r_width, r_height, r_type,
-                )
+                t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
+                    thumbnailer.scale,
+                    r_width, r_height, t_type,
+                ))
 
-            t_width, t_height = t_byte_source.dimensions
-
+            # Work out the correct file name for thumbnail
             if server_name:
                 file_path = self.filepaths.remote_media_thumbnail_rel(
-                server_name, file_id, t_width, t_height, t_type, t_method
-            )
+                    server_name, file_id, t_width, t_height, t_type, t_method
+                )
             elif url_cache:
                 file_path = self.filepaths.url_cache_thumbnail_rel(
                     media_id, t_width, t_height, t_type, t_method
@@ -515,14 +509,16 @@ class MediaRepository(object):
                     media_id, t_width, t_height, t_type, t_method
                 )
 
+            # Write to disk
             output_path = yield self.write_to_file(t_byte_source, file_path)
             t_len = os.path.getsize(output_path)
 
+            # Write to database
             if server_name:
                 yield self.store.store_remote_media_thumbnail(
-                server_name, media_id, file_id,
-                t_width, t_height, t_type, t_method, t_len
-            )
+                    server_name, media_id, file_id,
+                    t_width, t_height, t_type, t_method, t_len
+                )
             else:
                 yield self.store.store_local_thumbnail(
                     media_id, t_width, t_height, t_type, t_method, t_len
