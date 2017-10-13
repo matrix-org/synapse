@@ -98,6 +98,7 @@ class MediaRepository(object):
 
     @staticmethod
     def _write_file_synchronously(source, fname, close_source=False):
+        MediaRepository._makedirs(fname)
         source.seek(0)  # Ensure we read from the start of the file
         with open(fname, "wb") as f:
             shutil.copyfileobj(source, f)
@@ -120,7 +121,6 @@ class MediaRepository(object):
             string: the file path written to in the primary media store
         """
         fname = os.path.join(self.primary_base_path, path)
-        self._makedirs(fname)
 
         # Write to the main repository
         yield make_deferred_yieldable(
@@ -141,7 +141,6 @@ class MediaRepository(object):
         """
         if self.backup_base_path:
             backup_fname = os.path.join(self.backup_base_path, path)
-            self._makedirs(backup_fname)
 
             # We can either wait for successful writing to the backup repository
             # or write in the background and immediately return
