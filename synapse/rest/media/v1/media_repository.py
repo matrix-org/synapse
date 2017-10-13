@@ -468,7 +468,7 @@ class MediaRepository(object):
         thumbnails = {}
         for r_width, r_height, r_method, r_type in requirements:
             if r_method == "crop":
-                thumbnails.setdefault((r_width, r_height,r_type), r_method)
+                thumbnails.setdefault((r_width, r_height, r_type), r_method)
             elif r_method == "scale":
                 t_width, t_height = thumbnailer.aspect(r_width, r_height)
                 t_width = min(m_width, t_width)
