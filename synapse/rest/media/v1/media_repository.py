@@ -102,7 +102,6 @@ class MediaRepository(object):
         Args:
             source: A file like object to be written
             fname (str): Path to write to
-            close_source (bool): Whether to close source after writing
         """
         MediaRepository._makedirs(fname)
         source.seek(0)  # Ensure we read from the start of the file
