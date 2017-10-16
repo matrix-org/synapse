@@ -41,6 +41,8 @@ class RegistrationConfig(Config):
             self.allow_guest_access and config.get("invite_3pid_guest", False)
         )
 
+        self.auto_join_rooms = config.get("auto_join_rooms", [])
+
     def default_config(self, **kwargs):
         registration_shared_secret = random_string_with_symbols(50)
 
@@ -70,6 +72,10 @@ class RegistrationConfig(Config):
             - matrix.org
             - vector.im
             - riot.im
+
+        # Users who register on this homeserver will automatically be joined to these rooms
+        #auto_join_rooms:
+        #    - "#example:example.com"
         """ % locals()
 
     def add_arguments(self, parser):
