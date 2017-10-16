@@ -371,6 +371,27 @@ class GroupUsersServlet(RestServlet):
         defer.returnValue((200, result))
 
 
+class GroupInvitedUsersServlet(RestServlet):
+    """Get users invited to a group
+    """
+    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/invited_users$")
+
+    def __init__(self, hs):
+        super(GroupInvitedUsersServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.groups_handler = hs.get_groups_local_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, group_id):
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        result = yield self.groups_handler.get_invited_users_in_group(group_id, user_id)
+
+        defer.returnValue((200, result))
+
+
 class GroupCreateServlet(RestServlet):
     """Create a group
     """
@@ -674,6 +695,7 @@ class GroupsForUserServlet(RestServlet):
 def register_servlets(hs, http_server):
     GroupServlet(hs).register(http_server)
     GroupSummaryServlet(hs).register(http_server)
+    GroupInvitedUsersServlet(hs).register(http_server)
     GroupUsersServlet(hs).register(http_server)
     GroupRoomServlet(hs).register(http_server)
     GroupCreateServlet(hs).register(http_server)
