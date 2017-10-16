@@ -220,6 +220,23 @@ class GroupsLocalHandler(object):
         defer.returnValue(res)
 
     @defer.inlineCallbacks
+    def get_invited_users_in_group(self, group_id, requester_user_id):
+        """Get users invited to a group
+        """
+        if self.is_mine_id(group_id):
+            res = yield self.groups_server_handler.get_invited_users_in_group(
+                group_id, requester_user_id
+            )
+            defer.returnValue(res)
+
+        group_server_name = get_domain_from_id(group_id)
+
+        res = yield self.transport_client.get_users_in_group(
+            get_domain_from_id(group_id), group_id, requester_user_id,
+        )
+        defer.returnValue(res)
+
+    @defer.inlineCallbacks
     def join_group(self, group_id, user_id, content):
         """Request to join a group
         """

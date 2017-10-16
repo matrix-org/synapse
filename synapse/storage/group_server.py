@@ -56,6 +56,18 @@ class GroupServerStore(SQLBaseStore):
             desc="get_users_in_group",
         )
 
+    def get_invited_users_in_group(self, group_id):
+        # TODO: Pagination
+
+        return self._simple_select_onecol(
+            table="group_invites",
+            keyvalues={
+                "group_id": group_id,
+            },
+            retcol="user_id",
+            desc="get_invited_users_in_group",
+        )
+
     def get_rooms_in_group(self, group_id, include_private=False):
         # TODO: Pagination
 

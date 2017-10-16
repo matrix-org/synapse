@@ -551,6 +551,19 @@ class TransportLayerClient(object):
         )
 
     @log_function
+    def get_invited_users_in_group(self, destination, group_id, requester_user_id):
+        """Get users that have been invited to a group
+        """
+        path = PREFIX + "/groups/%s/invited_users" % (group_id,)
+
+        return self.client.get_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            ignore_backoff=True,
+        )
+
+    @log_function
     def accept_group_invite(self, destination, group_id, user_id, content):
         """Accept a group invite
         """

@@ -421,6 +421,41 @@ class GroupsServerHandler(object):
         })
 
     @defer.inlineCallbacks
+    def get_invited_users_in_group(self, group_id, requester_user_id):
+        """Get the users that have been invited to a group as seen by requester_user_id.
+
+        The ordering is arbitrary at the moment
+        """
+
+        yield self.check_group_is_ours(group_id, and_exists=True)
+
+        is_user_in_group = yield self.store.is_user_in_group(requester_user_id, group_id)
+
+        if not is_user_in_group:
+            raise SynapseError(403, "User not in group")
+
+        invited_users = yield self.store.get_invited_users_in_group(group_id)
+
+        user_profiles = []
+
+        for user_id in invited_users:
+            user_profile = {
+                "user_id": user_id
+            }
+            try:
+                profile = yield self.profile_handler.get_profile_from_cache(user)
+                user_profile.update(profile)
+            except Exception as e:
+                pass
+            user_profiles.append(user_profile)
+
+        defer.returnValue({
+            "chunk": user_profiles,
+            "total_user_count_estimate": len(invited_users),
+        })
+
+
+    @defer.inlineCallbacks
     def get_rooms_in_group(self, group_id, requester_user_id):
         """Get the rooms in group as seen by requester_user_id
 
