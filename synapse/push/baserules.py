@@ -245,7 +245,7 @@ BASE_APPEND_OVERRIDE_RULES = [
             {
                 'kind': 'event_match',
                 'key': 'content.body',
-                'pattern': '*@room*',
+                'pattern': '@room',
                 '_id': '_roomnotif_content',
             },
             {
