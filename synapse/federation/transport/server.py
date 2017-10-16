@@ -720,6 +720,7 @@ class FederationGroupsUsersServlet(BaseFederationServlet):
 
         defer.returnValue((200, new_content))
 
+
 class FederationGroupsInvitedUsersServlet(BaseFederationServlet):
     """Get the users that have been invited to a group
     """
@@ -736,6 +737,7 @@ class FederationGroupsInvitedUsersServlet(BaseFederationServlet):
         )
 
         defer.returnValue((200, new_content))
+
 
 class FederationGroupsInviteServlet(BaseFederationServlet):
     """Ask a group server to invite someone to the group

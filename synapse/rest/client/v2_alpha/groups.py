@@ -370,6 +370,7 @@ class GroupUsersServlet(RestServlet):
 
         defer.returnValue((200, result))
 
+
 class GroupInvitedUsersServlet(RestServlet):
     """Get users invited to a group
     """

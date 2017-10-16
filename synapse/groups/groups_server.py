@@ -454,7 +454,6 @@ class GroupsServerHandler(object):
             "total_user_count_estimate": len(invited_users),
         })
 
-
     @defer.inlineCallbacks
     def get_rooms_in_group(self, group_id, requester_user_id):
         """Get the rooms in group as seen by requester_user_id
