@@ -313,8 +313,11 @@ class GroupsLocalHandler(object):
         self.notifier.on_new_event(
             "groups_key", token, users=[user_id],
         )
-
-        user_profile = yield self.profile_handler.get_profile(user_id)
+        try:
+            user_profile = yield self.profile_handler.get_profile(user_id)
+        except Exception as e:
+            logger.warn("No profile for user %s: %s", user_id, e)
+            user_profile = {}
 
         defer.returnValue({"state": "invite", "user_profile": user_profile})
 
