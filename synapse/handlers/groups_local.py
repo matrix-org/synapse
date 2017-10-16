@@ -68,6 +68,8 @@ class GroupsLocalHandler(object):
     update_group_profile = _create_rerouter("update_group_profile")
     get_rooms_in_group = _create_rerouter("get_rooms_in_group")
 
+    get_invited_users_in_group = _create_rerouter("get_invited_users_in_group")
+
     add_room_to_group = _create_rerouter("add_room_to_group")
     remove_room_from_group = _create_rerouter("remove_room_from_group")
 
@@ -217,23 +219,6 @@ class GroupsLocalHandler(object):
 
         res["chunk"] = valid_entries
 
-        defer.returnValue(res)
-
-    @defer.inlineCallbacks
-    def get_invited_users_in_group(self, group_id, requester_user_id):
-        """Get users invited to a group
-        """
-        if self.is_mine_id(group_id):
-            res = yield self.groups_server_handler.get_invited_users_in_group(
-                group_id, requester_user_id
-            )
-            defer.returnValue(res)
-
-        group_server_name = get_domain_from_id(group_id)
-
-        res = yield self.transport_client.get_users_in_group(
-            get_domain_from_id(group_id), group_id, requester_user_id,
-        )
         defer.returnValue(res)
 
     @defer.inlineCallbacks
