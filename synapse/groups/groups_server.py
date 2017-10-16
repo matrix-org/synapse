@@ -443,10 +443,10 @@ class GroupsServerHandler(object):
                 "user_id": user_id
             }
             try:
-                profile = yield self.profile_handler.get_profile_from_cache(user)
+                profile = yield self.profile_handler.get_profile_from_cache(user_id)
                 user_profile.update(profile)
             except Exception as e:
-                pass
+                logger.warn("Error getting profile for %s: %s", user_id, e)
             user_profiles.append(user_profile)
 
         defer.returnValue({
