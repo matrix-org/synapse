@@ -73,7 +73,8 @@ class RegistrationConfig(Config):
             - vector.im
             - riot.im
 
-        # Users who register on this homeserver will automatically be joined to these rooms
+        # Users who register on this homeserver will automatically be joined
+        # to these rooms
         #auto_join_rooms:
         #    - "#example:example.com"
         """ % locals()
