@@ -490,12 +490,12 @@ class MediaRepository(object):
             if t_type == "crop":
                 t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
                     thumbnailer.crop,
-                    r_width, r_height, t_type,
+                    t_width, t_height, t_type,
                 ))
             else:
                 t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
                     thumbnailer.scale,
-                    r_width, r_height, t_type,
+                    t_width, t_height, t_type,
                 ))
 
             if not t_byte_source:
