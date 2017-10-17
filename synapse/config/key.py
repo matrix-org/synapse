@@ -118,10 +118,9 @@ class KeyConfig(Config):
         signing_keys = self.read_file(signing_key_path, "signing_key")
         try:
             return read_signing_keys(signing_keys.splitlines(True))
-        except Exception:
+        except Exception as e:
             raise ConfigError(
-                "Error reading signing_key."
-                " Try running again with --generate-config"
+                "Error reading signing_key: %s" % (str(e))
             )
 
     def read_old_signing_keys(self, old_signing_keys):
@@ -141,7 +140,8 @@ class KeyConfig(Config):
 
     def generate_files(self, config):
         signing_key_path = config["signing_key_path"]
-        if not os.path.exists(signing_key_path):
+
+        if not self.path_exists(signing_key_path):
             with open(signing_key_path, "w") as signing_key_file:
                 key_id = "a_" + random_string(4)
                 write_signing_keys(
