@@ -126,7 +126,7 @@ class TlsConfig(Config):
         tls_private_key_path = config["tls_private_key_path"]
         tls_dh_params_path = config["tls_dh_params_path"]
 
-        if not os.path.exists(tls_private_key_path):
+        if not self.path_exists(tls_private_key_path):
             with open(tls_private_key_path, "w") as private_key_file:
                 tls_private_key = crypto.PKey()
                 tls_private_key.generate_key(crypto.TYPE_RSA, 2048)
