@@ -1,4 +1,6 @@
 import synapse.api.auth
+import synapse.federation.transaction_queue
+import synapse.federation.transport.client
 import synapse.handlers
 import synapse.handlers.auth
 import synapse.handlers.device
@@ -26,4 +28,10 @@ class HomeServer(object):
         pass
 
     def get_state_handler(self) -> synapse.state.StateHandler:
+        pass
+
+    def get_federation_sender(self) -> synapse.federation.transaction_queue.TransactionQueue:
+        pass
+
+    def get_federation_transport_client(self) -> synapse.federation.transport.client.TransportLayerClient:
         pass
