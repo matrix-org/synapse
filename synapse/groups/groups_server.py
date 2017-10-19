@@ -16,10 +16,11 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.types import UserID, get_domain_from_id, RoomID
+from synapse.types import UserID, get_domain_from_id, RoomID, GroupID
 
 
 import logging
+import urllib
 
 logger = logging.getLogger(__name__)
 
@@ -697,14 +698,26 @@ class GroupsServerHandler(object):
     def create_group(self, group_id, user_id, content):
         group = yield self.check_group_is_ours(group_id)
 
+        _validate_group_id(group_id)
+
         logger.info("Attempting to create group with ID: %r", group_id)
         if group:
             raise SynapseError(400, "Group already exists")
 
-        # TODO: Add config to enforce that only server admins can create rooms
         is_admin = yield self.auth.is_server_admin(UserID.from_string(user_id))
         if not is_admin:
-            raise SynapseError(403, "Only server admin can create group on this server")
+            if not self.hs.config.enable_group_creation:
+                raise SynapseError(
+                    403, "Only server admin can create group on this server",
+                )
+            localpart = GroupID.from_string(group_id).localpart
+            if not localpart.startswith(self.hs.config.group_creation_prefix):
+                raise SynapseError(
+                    400,
+                    "Can only create groups with prefix %r on this server" % (
+                        self.hs.config.group_creation_prefix,
+                    ),
+                )
 
         profile = content.get("profile", {})
         name = profile.get("name")
@@ -773,3 +786,18 @@ def _parse_visibility_from_contents(content):
         is_public = True
 
     return is_public
+
+
+def _validate_group_id(group_id):
+    """Validates the group ID is valid for creation on this home server
+    """
+    localpart = GroupID.from_string(group_id).localpart
+
+    if localpart.lower() != localpart:
+        raise SynapseError(400, "Group ID must be lower case")
+
+    if urllib.quote(localpart.encode('utf-8')) != localpart:
+        raise SynapseError(
+            400,
+            "Group ID can only contain characters a-z, 0-9, or '_-./'",
+        )
