@@ -126,7 +126,7 @@ class GroupAttestionRenewer(object):
         )
 
         @defer.inlineCallbacks
-        def _renew_attestation(self, group_id, user_id):
+        def _renew_attestation(group_id, user_id):
             attestation = self.attestations.create_attestation(group_id, user_id)
 
             if self.hs.is_mine_id(group_id):
