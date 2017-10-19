@@ -13,11 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.module_loader import load_module
-
 from ._base import Config
-
-from distutils.util import strtobool
 
 
 class GroupsConfig(Config):

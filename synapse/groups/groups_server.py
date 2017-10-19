@@ -707,7 +707,9 @@ class GroupsServerHandler(object):
         is_admin = yield self.auth.is_server_admin(UserID.from_string(user_id))
         if not is_admin:
             if not self.hs.config.enable_group_creation:
-                raise SynapseError(403, "Only server admin can create group on this server")
+                raise SynapseError(
+                    403, "Only server admin can create group on this server",
+                )
             localpart = GroupID.from_string(group_id).localpart
             if not localpart.startswith(self.hs.config.group_creation_prefix):
                 raise SynapseError(
@@ -715,7 +717,7 @@ class GroupsServerHandler(object):
                     "Can only create groups with prefix %r on this server" % (
                         self.hs.config.group_creation_prefix,
                     ),
-            )
+                )
 
         profile = content.get("profile", {})
         name = profile.get("name")
