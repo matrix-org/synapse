@@ -19,14 +19,15 @@ from twisted.internet import defer
 
 import synapse.types
 from synapse.api.errors import SynapseError, AuthError, CodeMessageException
-from synapse.types import UserID
+from synapse.types import UserID, get_domain_from_id
 from ._base import BaseHandler
-
 
 logger = logging.getLogger(__name__)
 
 
 class ProfileHandler(BaseHandler):
+    PROFILE_UPDATE_MS = 60 * 1000
+    PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
 
     def __init__(self, hs):
         super(ProfileHandler, self).__init__(hs)
@@ -35,6 +36,63 @@ class ProfileHandler(BaseHandler):
         self.federation.register_query_handler(
             "profile", self.on_profile_query
         )
+
+        self.clock.looping_call(self._update_remote_profile_cache, self.PROFILE_UPDATE_MS)
+
+    @defer.inlineCallbacks
+    def get_profile(self, user_id):
+        target_user = UserID.from_string(user_id)
+        if self.hs.is_mine(target_user):
+            displayname = yield self.store.get_profile_displayname(
+                target_user.localpart
+            )
+            avatar_url = yield self.store.get_profile_avatar_url(
+                target_user.localpart
+            )
+
+            defer.returnValue({
+                "displayname": displayname,
+                "avatar_url": avatar_url,
+            })
+        else:
+            try:
+                result = yield self.federation.make_query(
+                    destination=target_user.domain,
+                    query_type="profile",
+                    args={
+                        "user_id": user_id,
+                    },
+                    ignore_backoff=True,
+                )
+                defer.returnValue(result)
+            except CodeMessageException as e:
+                if e.code != 404:
+                    logger.exception("Failed to get displayname")
+
+                raise
+
+    @defer.inlineCallbacks
+    def get_profile_from_cache(self, user_id):
+        """Get the profile information from our local cache. If the user is
+        ours then the profile information will always be corect. Otherwise,
+        it may be out of date/missing.
+        """
+        target_user = UserID.from_string(user_id)
+        if self.hs.is_mine(target_user):
+            displayname = yield self.store.get_profile_displayname(
+                target_user.localpart
+            )
+            avatar_url = yield self.store.get_profile_avatar_url(
+                target_user.localpart
+            )
+
+            defer.returnValue({
+                "displayname": displayname,
+                "avatar_url": avatar_url,
+            })
+        else:
+            profile = yield self.store.get_from_remote_profile_cache(user_id)
+            defer.returnValue(profile or {})
 
     @defer.inlineCallbacks
     def get_displayname(self, target_user):
@@ -182,3 +240,44 @@ class ProfileHandler(BaseHandler):
                     "Failed to update join event for room %s - %s",
                     room_id, str(e.message)
                 )
+
+    def _update_remote_profile_cache(self):
+        """Called periodically to check profiles of remote users we haven't
+        checked in a while.
+        """
+        entries = yield self.store.get_remote_profile_cache_entries_that_expire(
+            last_checked=self.clock.time_msec() - self.PROFILE_UPDATE_EVERY_MS
+        )
+
+        for user_id, displayname, avatar_url in entries:
+            is_subscribed = yield self.store.is_subscribed_remote_profile_for_user(
+                user_id,
+            )
+            if not is_subscribed:
+                yield self.store.maybe_delete_remote_profile_cache(user_id)
+                continue
+
+            try:
+                profile = yield self.federation.make_query(
+                    destination=get_domain_from_id(user_id),
+                    query_type="profile",
+                    args={
+                        "user_id": user_id,
+                    },
+                    ignore_backoff=True,
+                )
+            except:
+                logger.exception("Failed to get avatar_url")
+
+                yield self.store.update_remote_profile_cache(
+                    user_id, displayname, avatar_url
+                )
+                continue
+
+            new_name = profile.get("displayname")
+            new_avatar = profile.get("avatar_url")
+
+            # We always hit update to update the last_check timestamp
+            yield self.store.update_remote_profile_cache(
+                user_id, new_name, new_avatar
+            )

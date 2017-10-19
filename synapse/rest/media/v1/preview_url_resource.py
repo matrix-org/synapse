@@ -36,6 +36,9 @@ import cgi
 import ujson as json
 import urlparse
 import itertools
+import datetime
+import errno
+import shutil
 
 import logging
 logger = logging.getLogger(__name__)
@@ -56,6 +59,7 @@ class PreviewUrlResource(Resource):
         self.store = hs.get_datastore()
         self.client = SpiderHttpClient(hs)
         self.media_repo = media_repo
+        self.primary_base_path = media_repo.primary_base_path
 
         self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
 
@@ -69,6 +73,10 @@ class PreviewUrlResource(Resource):
         self.cache.start()
 
         self.downloads = {}
+
+        self._cleaner_loop = self.clock.looping_call(
+            self._expire_url_cache_data, 10 * 1000
+        )
 
     def render_GET(self, request):
         self._async_render_GET(request)
@@ -130,7 +138,7 @@ class PreviewUrlResource(Resource):
         cache_result = yield self.store.get_url_cache(url, ts)
         if (
             cache_result and
-            cache_result["download_ts"] + cache_result["expires"] > ts and
+            cache_result["expires_ts"] > ts and
             cache_result["response_code"] / 100 == 2
         ):
             respond_with_json_bytes(
@@ -163,8 +171,8 @@ class PreviewUrlResource(Resource):
         logger.debug("got media_info of '%s'" % media_info)
 
         if _is_media(media_info['media_type']):
-            dims = yield self.media_repo._generate_local_thumbnails(
-                media_info['filesystem_id'], media_info, url_cache=True,
+            dims = yield self.media_repo._generate_thumbnails(
+                None, media_info['filesystem_id'], media_info, url_cache=True,
             )
 
             og = {
@@ -209,8 +217,8 @@ class PreviewUrlResource(Resource):
 
                 if _is_media(image_info['media_type']):
                     # TODO: make sure we don't choke on white-on-transparent images
-                    dims = yield self.media_repo._generate_local_thumbnails(
-                        image_info['filesystem_id'], image_info, url_cache=True,
+                    dims = yield self.media_repo._generate_thumbnails(
+                        None, image_info['filesystem_id'], image_info, url_cache=True,
                     )
                     if dims:
                         og["og:image:width"] = dims['width']
@@ -239,7 +247,7 @@ class PreviewUrlResource(Resource):
             url,
             media_info["response_code"],
             media_info["etag"],
-            media_info["expires"],
+            media_info["expires"] + media_info["created_ts"],
             json.dumps(og),
             media_info["filesystem_id"],
             media_info["created_ts"],
@@ -253,10 +261,10 @@ class PreviewUrlResource(Resource):
         # we're most likely being explicitly triggered by a human rather than a
         # bot, so are we really a robot?
 
-        # XXX: horrible duplication with base_resource's _download_remote_file()
-        file_id = random_string(24)
+        file_id = datetime.date.today().isoformat() + '_' + random_string(16)
 
-        fname = self.filepaths.url_cache_filepath(file_id)
+        fpath = self.filepaths.url_cache_filepath_rel(file_id)
+        fname = os.path.join(self.primary_base_path, fpath)
         self.media_repo._makedirs(fname)
 
         try:
@@ -266,6 +274,8 @@ class PreviewUrlResource(Resource):
                     url, output_stream=f, max_size=self.max_spider_size,
                 )
                 # FIXME: pass through 404s and other error messages nicely
+
+            yield self.media_repo.copy_to_backup(fpath)
 
             media_type = headers["Content-Type"][0]
             time_now_ms = self.clock.time_msec()
@@ -327,6 +337,91 @@ class PreviewUrlResource(Resource):
             "expires": 60 * 60 * 1000,
             "etag": headers["ETag"][0] if "ETag" in headers else None,
         })
+
+    @defer.inlineCallbacks
+    def _expire_url_cache_data(self):
+        """Clean up expired url cache content, media and thumbnails.
+        """
+
+        # TODO: Delete from backup media store
+
+        now = self.clock.time_msec()
+
+        # First we delete expired url cache entries
+        media_ids = yield self.store.get_expired_url_cache(now)
+
+        removed_media = []
+        for media_id in media_ids:
+            fname = self.filepaths.url_cache_filepath(media_id)
+            try:
+                os.remove(fname)
+            except OSError as e:
+                # If the path doesn't exist, meh
+                if e.errno != errno.ENOENT:
+                    logger.warn("Failed to remove media: %r: %s", media_id, e)
+                    continue
+
+            removed_media.append(media_id)
+
+            try:
+                dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
+                for dir in dirs:
+                    os.rmdir(dir)
+            except:
+                pass
+
+        yield self.store.delete_url_cache(removed_media)
+
+        if removed_media:
+            logger.info("Deleted %d entries from url cache", len(removed_media))
+
+        # Now we delete old images associated with the url cache.
+        # These may be cached for a bit on the client (i.e., they
+        # may have a room open with a preview url thing open).
+        # So we wait a couple of days before deleting, just in case.
+        expire_before = now - 2 * 24 * 60 * 60 * 1000
+        media_ids = yield self.store.get_url_cache_media_before(expire_before)
+
+        removed_media = []
+        for media_id in media_ids:
+            fname = self.filepaths.url_cache_filepath(media_id)
+            try:
+                os.remove(fname)
+            except OSError as e:
+                # If the path doesn't exist, meh
+                if e.errno != errno.ENOENT:
+                    logger.warn("Failed to remove media: %r: %s", media_id, e)
+                    continue
+
+            try:
+                dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
+                for dir in dirs:
+                    os.rmdir(dir)
+            except:
+                pass
+
+            thumbnail_dir = self.filepaths.url_cache_thumbnail_directory(media_id)
+            try:
+                shutil.rmtree(thumbnail_dir)
+            except OSError as e:
+                # If the path doesn't exist, meh
+                if e.errno != errno.ENOENT:
+                    logger.warn("Failed to remove media: %r: %s", media_id, e)
+                    continue
+
+            removed_media.append(media_id)
+
+            try:
+                dirs = self.filepaths.url_cache_thumbnail_dirs_to_delete(media_id)
+                for dir in dirs:
+                    os.rmdir(dir)
+            except:
+                pass
+
+        yield self.store.delete_url_cache_media(removed_media)
+
+        if removed_media:
+            logger.info("Deleted %d media from url cache", len(removed_media))
 
 
 def decode_and_calc_og(body, media_uri, request_encoding=None):

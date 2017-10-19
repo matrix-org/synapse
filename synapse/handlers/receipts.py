@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from synapse.util import logcontext
 
 from ._base import BaseHandler
 
@@ -59,6 +60,8 @@ class ReceiptsHandler(BaseHandler):
         is_new = yield self._handle_new_receipts([receipt])
 
         if is_new:
+            # fire off a process in the background to send the receipt to
+            # remote servers
             self._push_remotes([receipt])
 
     @defer.inlineCallbacks
@@ -126,6 +129,7 @@ class ReceiptsHandler(BaseHandler):
 
             defer.returnValue(True)
 
+    @logcontext.preserve_fn   # caller should not yield on this
     @defer.inlineCallbacks
     def _push_remotes(self, receipts):
         """Given a list of receipts, works out which remote servers should be

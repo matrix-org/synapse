@@ -743,6 +743,33 @@ class SQLBaseStore(object):
         txn.execute(sql, values)
         return cls.cursor_to_dict(txn)
 
+    def _simple_update(self, table, keyvalues, updatevalues, desc):
+        return self.runInteraction(
+            desc,
+            self._simple_update_txn,
+            table, keyvalues, updatevalues,
+        )
+
+    @staticmethod
+    def _simple_update_txn(txn, table, keyvalues, updatevalues):
+        if keyvalues:
+            where = "WHERE %s" % " AND ".join("%s = ?" % k for k in keyvalues.iterkeys())
+        else:
+            where = ""
+
+        update_sql = "UPDATE %s SET %s %s" % (
+            table,
+            ", ".join("%s = ?" % (k,) for k in updatevalues),
+            where,
+        )
+
+        txn.execute(
+            update_sql,
+            updatevalues.values() + keyvalues.values()
+        )
+
+        return txn.rowcount
+
     def _simple_update_one(self, table, keyvalues, updatevalues,
                            desc="_simple_update_one"):
         """Executes an UPDATE query on the named table, setting new values for
@@ -768,27 +795,13 @@ class SQLBaseStore(object):
             table, keyvalues, updatevalues,
         )
 
-    @staticmethod
-    def _simple_update_one_txn(txn, table, keyvalues, updatevalues):
-        if keyvalues:
-            where = "WHERE %s" % " AND ".join("%s = ?" % k for k in keyvalues.iterkeys())
-        else:
-            where = ""
+    @classmethod
+    def _simple_update_one_txn(cls, txn, table, keyvalues, updatevalues):
+        rowcount = cls._simple_update_txn(txn, table, keyvalues, updatevalues)
 
-        update_sql = "UPDATE %s SET %s %s" % (
-            table,
-            ", ".join("%s = ?" % (k,) for k in updatevalues),
-            where,
-        )
-
-        txn.execute(
-            update_sql,
-            updatevalues.values() + keyvalues.values()
-        )
-
-        if txn.rowcount == 0:
+        if rowcount == 0:
             raise StoreError(404, "No row found")
-        if txn.rowcount > 1:
+        if rowcount > 1:
             raise StoreError(500, "More than one row matched")
 
     @staticmethod

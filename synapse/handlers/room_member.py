@@ -45,9 +45,12 @@ class RoomMemberHandler(BaseHandler):
     def __init__(self, hs):
         super(RoomMemberHandler, self).__init__(hs)
 
+        self.profile_handler = hs.get_profile_handler()
+
         self.member_linearizer = Linearizer(name="member")
 
         self.clock = hs.get_clock()
+        self.spam_checker = hs.get_spam_checker()
 
         self.distributor = hs.get_distributor()
         self.distributor.declare("user_joined_room")
@@ -191,6 +194,8 @@ class RoomMemberHandler(BaseHandler):
         if action in ["kick", "unban"]:
             effective_membership_state = "leave"
 
+        # if this is a join with a 3pid signature, we may need to turn a 3pid
+        # invite into a normal invite before we can handle the join.
         if third_party_signed is not None:
             replication = self.hs.get_replication_layer()
             yield replication.exchange_third_party_invite(
@@ -207,6 +212,30 @@ class RoomMemberHandler(BaseHandler):
             is_blocked = yield self.store.is_room_blocked(room_id)
             if is_blocked:
                 raise SynapseError(403, "This room has been blocked on this server")
+
+        if effective_membership_state == "invite":
+            block_invite = False
+            is_requester_admin = yield self.auth.is_server_admin(
+                requester.user,
+            )
+            if not is_requester_admin:
+                if self.hs.config.block_non_admin_invites:
+                    logger.info(
+                        "Blocking invite: user is not admin and non-admin "
+                        "invites disabled"
+                    )
+                    block_invite = True
+
+                if not self.spam_checker.user_may_invite(
+                    requester.user.to_string(), target.to_string(), room_id,
+                ):
+                    logger.info("Blocking invite due to spam checker")
+                    block_invite = True
+
+            if block_invite:
+                raise SynapseError(
+                    403, "Invites have been disabled on this server",
+                )
 
         latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
         current_state_ids = yield self.state_handler.get_current_state_ids(
@@ -255,7 +284,7 @@ class RoomMemberHandler(BaseHandler):
 
                 content["membership"] = Membership.JOIN
 
-                profile = self.hs.get_handlers().profile_handler
+                profile = self.profile_handler
                 if not content_specified:
                     content["displayname"] = yield profile.get_displayname(target)
                     content["avatar_url"] = yield profile.get_avatar_url(target)
@@ -471,6 +500,16 @@ class RoomMemberHandler(BaseHandler):
             requester,
             txn_id
     ):
+        if self.hs.config.block_non_admin_invites:
+            is_requester_admin = yield self.auth.is_server_admin(
+                requester.user,
+            )
+            if not is_requester_admin:
+                raise SynapseError(
+                    403, "Invites have been disabled on this server",
+                    Codes.FORBIDDEN,
+                )
+
         invitee = yield self._lookup_3pid(
             id_server, medium, address
         )

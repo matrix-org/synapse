@@ -60,6 +60,11 @@ class RoomCreationHandler(BaseHandler):
         },
     }
 
+    def __init__(self, hs):
+        super(RoomCreationHandler, self).__init__(hs)
+
+        self.spam_checker = hs.get_spam_checker()
+
     @defer.inlineCallbacks
     def create_room(self, requester, config, ratelimit=True):
         """ Creates a new room.
@@ -74,6 +79,9 @@ class RoomCreationHandler(BaseHandler):
             horribly wrong.
         """
         user_id = requester.user.to_string()
+
+        if not self.spam_checker.user_may_create_room(user_id):
+            raise SynapseError(403, "You are not permitted to create rooms")
 
         if ratelimit:
             yield self.ratelimit(requester)

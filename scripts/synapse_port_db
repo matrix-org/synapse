@@ -252,6 +252,25 @@ class Porter(object):
             )
             return
 
+        if table in (
+            "user_directory", "user_directory_search", "users_who_share_rooms",
+            "users_in_pubic_room",
+        ):
+            # We don't port these tables, as they're a faff and we can regenreate
+            # them anyway.
+            self.progress.update(table, table_size)  # Mark table as done
+            return
+
+        if table == "user_directory_stream_pos":
+            # We need to make sure there is a single row, `(X, null), as that is
+            # what synapse expects to be there.
+            yield self.postgres_store._simple_insert(
+                table=table,
+                values={"stream_id": None},
+            )
+            self.progress.update(table, table_size)  # Mark table as done
+            return
+
         forward_select = (
             "SELECT rowid, * FROM %s WHERE rowid >= ? ORDER BY rowid LIMIT ?"
             % (table,)
@@ -357,10 +376,13 @@ class Porter(object):
                         " VALUES (?,?,?,?,to_tsvector('english', ?),?,?)"
                     )
 
-                    rows_dict = [
-                        dict(zip(headers, row))
-                        for row in rows
-                    ]
+                    rows_dict = []
+                    for row in rows:
+                        d = dict(zip(headers, row))
+                        if "\0" in d['value']:
+                            logger.warn('dropping search row %s', d)
+                        else:
+                            rows_dict.append(d)
 
                     txn.executemany(sql, [
                         (
