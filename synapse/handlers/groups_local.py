@@ -68,6 +68,8 @@ class GroupsLocalHandler(object):
     update_group_profile = _create_rerouter("update_group_profile")
     get_rooms_in_group = _create_rerouter("get_rooms_in_group")
 
+    get_invited_users_in_group = _create_rerouter("get_invited_users_in_group")
+
     add_room_to_group = _create_rerouter("add_room_to_group")
     remove_room_from_group = _create_rerouter("remove_room_from_group")
 
@@ -313,8 +315,11 @@ class GroupsLocalHandler(object):
         self.notifier.on_new_event(
             "groups_key", token, users=[user_id],
         )
-
-        user_profile = yield self.profile_handler.get_profile(user_id)
+        try:
+            user_profile = yield self.profile_handler.get_profile(user_id)
+        except Exception as e:
+            logger.warn("No profile for user %s: %s", user_id, e)
+            user_profile = {}
 
         defer.returnValue({"state": "invite", "user_profile": user_profile})
 

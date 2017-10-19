@@ -192,7 +192,6 @@ class FederationServer(FederationBase):
                     pdu_results[event_id] = {}
                 except FederationError as e:
                     logger.warn("Error handling PDU %s: %s", event_id, e)
-                    self.send_failure(e, transaction.origin)
                     pdu_results[event_id] = {"error": str(e)}
                 except Exception as e:
                     pdu_results[event_id] = {"error": str(e)}

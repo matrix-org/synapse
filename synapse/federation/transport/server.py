@@ -721,6 +721,24 @@ class FederationGroupsUsersServlet(BaseFederationServlet):
         defer.returnValue((200, new_content))
 
 
+class FederationGroupsInvitedUsersServlet(BaseFederationServlet):
+    """Get the users that have been invited to a group
+    """
+    PATH = "/groups/(?P<group_id>[^/]*)/invited_users$"
+
+    @defer.inlineCallbacks
+    def on_GET(self, origin, content, query, group_id):
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        if get_domain_from_id(requester_user_id) != origin:
+            raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        new_content = yield self.handler.get_invited_users_in_group(
+            group_id, requester_user_id
+        )
+
+        defer.returnValue((200, new_content))
+
+
 class FederationGroupsInviteServlet(BaseFederationServlet):
     """Ask a group server to invite someone to the group
     """
@@ -817,7 +835,7 @@ class FederationGroupsRenewAttestaionServlet(BaseFederationServlet):
     def on_POST(self, origin, content, query, group_id, user_id):
         # We don't need to check auth here as we check the attestation signatures
 
-        new_content = yield self.handler.on_renew_group_attestation(
+        new_content = yield self.handler.on_renew_attestation(
             origin, content, group_id, user_id
         )
 
@@ -1109,12 +1127,12 @@ ROOM_LIST_CLASSES = (
     PublicRoomList,
 )
 
-
 GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsProfileServlet,
     FederationGroupsSummaryServlet,
     FederationGroupsRoomsServlet,
     FederationGroupsUsersServlet,
+    FederationGroupsInvitedUsersServlet,
     FederationGroupsInviteServlet,
     FederationGroupsAcceptInviteServlet,
     FederationGroupsRemoveUserServlet,
