@@ -35,6 +35,7 @@ from .emailconfig import EmailConfig
 from .workers import WorkerConfig
 from .push import PushConfig
 from .spam_checker import SpamCheckerConfig
+from .groups import GroupsConfig
 
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
@@ -43,7 +44,7 @@ class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        AppServiceConfig, KeyConfig, SAML2Config, CasConfig,
                        JWTConfig, PasswordConfig, EmailConfig,
                        WorkerConfig, PasswordAuthProviderConfig, PushConfig,
-                       SpamCheckerConfig,):
+                       SpamCheckerConfig, GroupsConfig,):
     pass
 
 
