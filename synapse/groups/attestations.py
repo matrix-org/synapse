@@ -90,6 +90,7 @@ class GroupAttestionRenewer(object):
         self.assestations = hs.get_groups_attestation_signing()
         self.transport_client = hs.get_federation_transport_client()
         self.is_mine_id = hs.is_mine_id
+        self.attestations = hs.get_groups_attestation_signing()
 
         self._renew_attestations_loop = self.clock.looping_call(
             self._renew_attestations, 30 * 60 * 1000,
@@ -129,7 +130,7 @@ class GroupAttestionRenewer(object):
         def _renew_attestation(group_id, user_id):
             attestation = self.attestations.create_attestation(group_id, user_id)
 
-            if self.hs.is_mine_id(group_id):
+            if self.is_mine_id(group_id):
                 destination = get_domain_from_id(user_id)
             else:
                 destination = get_domain_from_id(group_id)
