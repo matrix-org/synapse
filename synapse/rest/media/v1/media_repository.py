@@ -487,16 +487,19 @@ class MediaRepository(object):
                 )
 
             # Generate the thumbnail
-            if t_type == "crop":
+            if t_method == "crop":
                 t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
                     thumbnailer.crop,
                     t_width, t_height, t_type,
                 ))
-            else:
+            elif t_method == "scale":
                 t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
                     thumbnailer.scale,
                     t_width, t_height, t_type,
                 ))
+            else:
+                logger.error("Unrecognized method: %r", t_method)
+                continue
 
             if not t_byte_source:
                 continue
