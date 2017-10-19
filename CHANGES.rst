@@ -20,6 +20,7 @@ Changes:
 * Spam checking: add the invitee to user_may_invite (PR #2502)
 * Process events from federation for different rooms in parallel (PR #2520)
 * Allow error strings from spam checker (PR #2531)
+* Improve error handling for missing files in config (PR #2551)
 
 
 Bug fixes:
