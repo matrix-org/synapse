@@ -794,5 +794,5 @@ def _validate_group_id(group_id):
     if types.contains_invalid_mxid_characters(localpart):
         raise SynapseError(
             400,
-            "Group ID can only contain characters a-z, 0-9, or '_-./'",
+            "Group ID can only contain characters a-z, 0-9, or '=_-./'",
         )

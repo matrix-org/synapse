@@ -49,7 +49,7 @@ class RegistrationHandler(BaseHandler):
         if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
                 400,
-                "User ID can only contain characters a-z, 0-9, or '_-./'",
+                "User ID can only contain characters a-z, 0-9, or '=_-./'",
                 Codes.INVALID_USERNAME
             )
 
@@ -255,8 +255,7 @@ class RegistrationHandler(BaseHandler):
         if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
                 400,
-                "User ID must only contain characters which do not"
-                " require URL encoding."
+                "User ID can only contain characters a-z, 0-9, or '=_-./'",
             )
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()

@@ -162,7 +162,7 @@ class GroupID(DomainSpecificString):
     SIGIL = "+"
 
 
-mxid_localpart_allowed_characters = set("_-./" + string.ascii_lowercase + string.digits)
+mxid_localpart_allowed_characters = set("_-./=" + string.ascii_lowercase + string.digits)
 
 
 def contains_invalid_mxid_characters(localpart):
