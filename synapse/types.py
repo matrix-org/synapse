@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import string
 
 from synapse.api.errors import SynapseError
 
@@ -159,6 +160,21 @@ class EventID(DomainSpecificString):
 class GroupID(DomainSpecificString):
     """Structure representing a group ID."""
     SIGIL = "+"
+
+
+mxid_localpart_allowed_characters = set("_-./" + string.ascii_lowercase + string.digits)
+
+
+def contains_invalid_mxid_characters(localpart):
+    """Check for characters not allowed in an mxid or groupid localpart
+
+    Args:
+        localpart (basestring): the localpart to be checked
+
+    Returns:
+        bool: True if there are any naughty characters
+    """
+    return any(c not in mxid_localpart_allowed_characters for c in localpart)
 
 
 class StreamToken(

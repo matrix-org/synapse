@@ -13,14 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from synapse.api.errors import SynapseError
-from synapse.types import UserID, get_domain_from_id, RoomID, GroupID
-
-
 import logging
-import urllib
+
+from synapse import types
+from synapse.api.errors import SynapseError
+from synapse.types import GroupID, RoomID, UserID, get_domain_from_id
+from twisted.internet import defer
 
 logger = logging.getLogger(__name__)
 
@@ -793,10 +791,7 @@ def _validate_group_id(group_id):
     """
     localpart = GroupID.from_string(group_id).localpart
 
-    if localpart.lower() != localpart:
-        raise SynapseError(400, "Group ID must be lower case")
-
-    if urllib.quote(localpart.encode('utf-8')) != localpart:
+    if types.contains_invalid_mxid_characters(localpart):
         raise SynapseError(
             400,
             "Group ID can only contain characters a-z, 0-9, or '_-./'",
