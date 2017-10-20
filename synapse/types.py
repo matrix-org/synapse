@@ -161,6 +161,23 @@ class GroupID(DomainSpecificString):
     """Structure representing a group ID."""
     SIGIL = "+"
 
+    @classmethod
+    def from_string(cls, s):
+        group_id = super(GroupID, cls).from_string(s)
+        if not group_id.localpart:
+            raise SynapseError(
+                400,
+                "Group ID cannot be empty",
+            )
+
+        if contains_invalid_mxid_characters(group_id.localpart):
+            raise SynapseError(
+                400,
+                "Group ID can only contain characters a-z, 0-9, or '=_-./'",
+            )
+
+        return group_id
+
 
 mxid_localpart_allowed_characters = set("_-./=" + string.ascii_lowercase + string.digits)
 

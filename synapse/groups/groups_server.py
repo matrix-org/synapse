@@ -15,7 +15,6 @@
 
 import logging
 
-from synapse import types
 from synapse.api.errors import SynapseError
 from synapse.types import GroupID, RoomID, UserID, get_domain_from_id
 from twisted.internet import defer
@@ -696,9 +695,11 @@ class GroupsServerHandler(object):
     def create_group(self, group_id, user_id, content):
         group = yield self.check_group_is_ours(group_id)
 
-        _validate_group_id(group_id)
-
         logger.info("Attempting to create group with ID: %r", group_id)
+
+        # parsing the id into a GroupID validates it.
+        group_id_obj = GroupID.from_string(group_id)
+
         if group:
             raise SynapseError(400, "Group already exists")
 
@@ -708,7 +709,7 @@ class GroupsServerHandler(object):
                 raise SynapseError(
                     403, "Only server admin can create group on this server",
                 )
-            localpart = GroupID.from_string(group_id).localpart
+            localpart = group_id_obj.localpart
             if not localpart.startswith(self.hs.config.group_creation_prefix):
                 raise SynapseError(
                     400,
@@ -784,15 +785,3 @@ def _parse_visibility_from_contents(content):
         is_public = True
 
     return is_public
-
-
-def _validate_group_id(group_id):
-    """Validates the group ID is valid for creation on this home server
-    """
-    localpart = GroupID.from_string(group_id).localpart
-
-    if types.contains_invalid_mxid_characters(localpart):
-        raise SynapseError(
-            400,
-            "Group ID can only contain characters a-z, 0-9, or '=_-./'",
-        )
