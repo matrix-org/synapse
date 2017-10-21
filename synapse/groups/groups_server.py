@@ -383,10 +383,13 @@ class GroupsServerHandler(object):
         yield self.check_group_is_ours(group_id, and_exists=True)
 
         is_user_in_group = yield self.store.is_user_in_group(requester_user_id, group_id)
+        group = yield self.store.get_group(group_id)
 
-        user_results = yield self.store.get_users_in_group(
-            group_id, include_private=is_user_in_group,
-        )
+        user_results = []
+        if not group.membership_is_private:
+            user_results = yield self.store.get_users_in_group(
+                group_id, include_private=is_user_in_group,
+            )
 
         chunk = []
         for user_result in user_results:
@@ -725,6 +728,7 @@ class GroupsServerHandler(object):
         short_description = profile.get("short_description")
         long_description = profile.get("long_description")
         user_profile = content.get("user_profile", {})
+        membership_is_private = content.get("membership_is_private", False)
 
         yield self.store.create_group(
             group_id,
@@ -733,6 +737,7 @@ class GroupsServerHandler(object):
             avatar_url=avatar_url,
             short_description=short_description,
             long_description=long_description,
+            membership_is_private=membership_is_private,
         )
 
         if not self.hs.is_mine_id(user_id):
