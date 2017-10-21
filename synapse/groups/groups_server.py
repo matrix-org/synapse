@@ -386,7 +386,7 @@ class GroupsServerHandler(object):
         group = yield self.store.get_group(group_id)
 
         user_results = []
-        if not group.membership_is_private:
+        if not group["membership_is_private"] or group["membership_is_private"] is None:
             user_results = yield self.store.get_users_in_group(
                 group_id, include_private=is_user_in_group,
             )
