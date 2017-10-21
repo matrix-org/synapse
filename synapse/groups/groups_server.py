@@ -370,6 +370,8 @@ class GroupsServerHandler(object):
                 if not isinstance(value, basestring):
                     raise SynapseError(400, "%r value is not a string" % (keyname,))
                 profile[keyname] = value
+        if not isinstance(content["membership_is_private"], bool):
+            profile["membership_is_private"] = content["membership_is_private"]
 
         yield self.store.update_group_profile(group_id, profile)
 
