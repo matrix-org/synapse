@@ -35,7 +35,8 @@ class GroupServerStore(SQLBaseStore):
             keyvalues={
                 "group_id": group_id,
             },
-            retcols=("name", "short_description", "long_description", "avatar_url", "membership_is_private"),
+            retcols=("name", "short_description", "long_description", "avatar_url",
+                     "membership_is_private"),
             allow_none=True,
             desc="is_user_in_group",
         )
