@@ -385,7 +385,7 @@ class GroupsServerHandler(object):
         is_user_in_group = yield self.store.is_user_in_group(requester_user_id, group_id)
         group = yield self.store.get_group(group_id)
         is_membership_public = not group["membership_is_private"] \
-                               or group["membership_is_private"] is None
+            or group["membership_is_private"] is None
 
         user_results = []
         if is_membership_public or is_user_in_group:
