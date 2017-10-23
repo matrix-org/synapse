@@ -15,7 +15,6 @@
 
 """Contains functions for registering clients."""
 import logging
-import urllib
 
 from twisted.internet import defer
 
@@ -23,6 +22,7 @@ from synapse.api.errors import (
     AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError
 )
 from synapse.http.client import CaptchaServerHttpClient
+from synapse import types
 from synapse.types import UserID
 from synapse.util.async import run_on_reactor
 from ._base import BaseHandler
@@ -46,12 +46,10 @@ class RegistrationHandler(BaseHandler):
     @defer.inlineCallbacks
     def check_username(self, localpart, guest_access_token=None,
                        assigned_user_id=None):
-        yield run_on_reactor()
-
-        if urllib.quote(localpart.encode('utf-8')) != localpart:
+        if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
                 400,
-                "User ID can only contain characters a-z, 0-9, or '_-./'",
+                "User ID can only contain characters a-z, 0-9, or '=_-./'",
                 Codes.INVALID_USERNAME
             )
 
@@ -81,7 +79,7 @@ class RegistrationHandler(BaseHandler):
                     "A different user ID has already been registered for this session",
                 )
 
-        yield self.check_user_id_not_appservice_exclusive(user_id)
+        self.check_user_id_not_appservice_exclusive(user_id)
 
         users = yield self.store.get_users_by_id_case_insensitive(user_id)
         if users:
@@ -254,11 +252,10 @@ class RegistrationHandler(BaseHandler):
         """
         Registers email_id as SAML2 Based Auth.
         """
-        if urllib.quote(localpart) != localpart:
+        if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
                 400,
-                "User ID must only contain characters which do not"
-                " require URL encoding."
+                "User ID can only contain characters a-z, 0-9, or '=_-./'",
             )
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
