@@ -93,7 +93,7 @@ class UploadResource(Resource):
         # TODO(markjh): parse content-dispostion
 
         content_uri = yield self.media_repo.create_content(
-            media_type, upload_name, request.content.read(),
+            media_type, upload_name, request.content,
             content_length, requester.user
         )
 

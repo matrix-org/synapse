@@ -82,21 +82,37 @@ class Config(object):
         return os.path.abspath(file_path) if file_path else file_path
 
     @classmethod
+    def path_exists(cls, file_path):
+        """Check if a file exists
+
+        Unlike os.path.exists, this throws an exception if there is an error
+        checking if the file exists (for example, if there is a perms error on
+        the parent dir).
+
+        Returns:
+            bool: True if the file exists; False if not.
+        """
+        try:
+            os.stat(file_path)
+            return True
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise e
+            return False
+
+    @classmethod
     def check_file(cls, file_path, config_name):
         if file_path is None:
             raise ConfigError(
                 "Missing config for %s."
-                " You must specify a path for the config file. You can "
-                "do this with the -c or --config-path option. "
-                "Adding --generate-config along with --server-name "
-                "<server name> will generate a config file at the given path."
                 % (config_name,)
             )
-        if not os.path.exists(file_path):
+        try:
+            os.stat(file_path)
+        except OSError as e:
             raise ConfigError(
-                "File %s config for %s doesn't exist."
-                " Try running again with --generate-config"
-                % (file_path, config_name,)
+                "Error accessing file '%s' (config for %s): %s"
+                % (file_path, config_name, e.strerror)
             )
         return cls.abspath(file_path)
 
@@ -248,7 +264,7 @@ class Config(object):
                     " -c CONFIG-FILE\""
                 )
             (config_path,) = config_files
-            if not os.path.exists(config_path):
+            if not cls.path_exists(config_path):
                 if config_args.keys_directory:
                     config_dir_path = config_args.keys_directory
                 else:
@@ -261,7 +277,7 @@ class Config(object):
                         "Must specify a server_name to a generate config for."
                         " Pass -H server.name."
                     )
-                if not os.path.exists(config_dir_path):
+                if not cls.path_exists(config_dir_path):
                     os.makedirs(config_dir_path)
                 with open(config_path, "wb") as config_file:
                     config_bytes, config = obj.generate_config(

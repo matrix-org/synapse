@@ -470,14 +470,14 @@ def _check_power_levels(event, auth_events):
         ("invite", None),
     ]
 
-    old_list = current_state.content.get("users")
+    old_list = current_state.content.get("users", {})
     for user in set(old_list.keys() + user_list.keys()):
         levels_to_check.append(
             (user, "users")
         )
 
-    old_list = current_state.content.get("events")
-    new_list = event.content.get("events")
+    old_list = current_state.content.get("events", {})
+    new_list = event.content.get("events", {})
     for ev_id in set(old_list.keys() + new_list.keys()):
         levels_to_check.append(
             (ev_id, "events")

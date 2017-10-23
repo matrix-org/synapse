@@ -94,3 +94,41 @@ class LoggingContextTestCase(unittest.TestCase):
                 yield defer.succeed(None)
 
         return self._test_preserve_fn(nonblocking_function)
+
+    @defer.inlineCallbacks
+    def test_make_deferred_yieldable(self):
+        # a function which retuns an incomplete deferred, but doesn't follow
+        # the synapse rules.
+        def blocking_function():
+            d = defer.Deferred()
+            reactor.callLater(0, d.callback, None)
+            return d
+
+        sentinel_context = LoggingContext.current_context()
+
+        with LoggingContext() as context_one:
+            context_one.test_key = "one"
+
+            d1 = logcontext.make_deferred_yieldable(blocking_function())
+            # make sure that the context was reset by make_deferred_yieldable
+            self.assertIs(LoggingContext.current_context(), sentinel_context)
+
+            yield d1
+
+            # now it should be restored
+            self._check_test_key("one")
+
+    @defer.inlineCallbacks
+    def test_make_deferred_yieldable_on_non_deferred(self):
+        """Check that make_deferred_yieldable does the right thing when its
+        argument isn't actually a deferred"""
+
+        with LoggingContext() as context_one:
+            context_one.test_key = "one"
+
+            d1 = logcontext.make_deferred_yieldable("bum")
+            self._check_test_key("one")
+
+            r = yield d1
+            self.assertEqual(r, "bum")
+            self._check_test_key("one")

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
+# Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.events import spamcheck
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
@@ -26,6 +26,7 @@ from synapse.types import (
 from synapse.util.async import run_on_reactor, ReadWriteLock, Limiter
 from synapse.util.logcontext import preserve_fn
 from synapse.util.metrics import measure_func
+from synapse.util.frozenutils import unfreeze
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -47,6 +48,7 @@ class MessageHandler(BaseHandler):
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
         self.validator = EventValidator()
+        self.profile_handler = hs.get_profile_handler()
 
         self.pagination_lock = ReadWriteLock()
 
@@ -57,6 +59,8 @@ class MessageHandler(BaseHandler):
         self.limiter = Limiter(max_count=5)
 
         self.action_generator = hs.get_action_generator()
+
+        self.spam_checker = hs.get_spam_checker()
 
     @defer.inlineCallbacks
     def purge_history(self, room_id, event_id):
@@ -210,7 +214,7 @@ class MessageHandler(BaseHandler):
 
                 if membership in {Membership.JOIN, Membership.INVITE}:
                     # If event doesn't include a display name, add one.
-                    profile = self.hs.get_handlers().profile_handler
+                    profile = self.profile_handler
                     content = builder.content
 
                     try:
@@ -322,9 +326,12 @@ class MessageHandler(BaseHandler):
             txn_id=txn_id
         )
 
-        if spamcheck.check_event_for_spam(event):
+        spam_error = self.spam_checker.check_event_for_spam(event)
+        if spam_error:
+            if not isinstance(spam_error, basestring):
+                spam_error = "Spam is not permitted here"
             raise SynapseError(
-                403, "Spam is not permitted here", Codes.FORBIDDEN
+                403, spam_error, Codes.FORBIDDEN
             )
 
         yield self.send_nonmember_event(
@@ -418,6 +425,51 @@ class MessageHandler(BaseHandler):
             [serialize_event(c, now) for c in room_state.values()]
         )
 
+    @defer.inlineCallbacks
+    def get_joined_members(self, requester, room_id):
+        """Get all the joined members in the room and their profile information.
+
+        If the user has left the room return the state events from when they left.
+
+        Args:
+            requester(Requester): The user requesting state events.
+            room_id(str): The room ID to get all state events from.
+        Returns:
+            A dict of user_id to profile info
+        """
+        user_id = requester.user.to_string()
+        if not requester.app_service:
+            # We check AS auth after fetching the room membership, as it
+            # requires us to pull out all joined members anyway.
+            membership, _ = yield self._check_in_room_or_world_readable(
+                room_id, user_id
+            )
+            if membership != Membership.JOIN:
+                raise NotImplementedError(
+                    "Getting joined members after leaving is not implemented"
+                )
+
+        users_with_profile = yield self.state.get_current_user_in_room(room_id)
+
+        # If this is an AS, double check that they are allowed to see the members.
+        # This can either be because the AS user is in the room or becuase there
+        # is a user in the room that the AS is "interested in"
+        if requester.app_service and user_id not in users_with_profile:
+            for uid in users_with_profile:
+                if requester.app_service.is_interested_in_user(uid):
+                    break
+            else:
+                # Loop fell through, AS has no interested users in room
+                raise AuthError(403, "Appservice not in room")
+
+        defer.returnValue({
+            user_id: {
+                "avatar_url": profile.avatar_url,
+                "display_name": profile.display_name,
+            }
+            for user_id, profile in users_with_profile.iteritems()
+        })
+
     @measure_func("_create_new_client_event")
     @defer.inlineCallbacks
     def _create_new_client_event(self, builder, requester=None, prev_event_ids=None):
@@ -509,7 +561,7 @@ class MessageHandler(BaseHandler):
 
         # Ensure that we can round trip before trying to persist in db
         try:
-            dump = ujson.dumps(event.content)
+            dump = ujson.dumps(unfreeze(event.content))
             ujson.loads(dump)
         except:
             logger.exception("Failed to encode content: %r", event.content)

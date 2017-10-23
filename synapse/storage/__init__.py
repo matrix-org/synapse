@@ -37,7 +37,7 @@ from .media_repository import MediaRepositoryStore
 from .rejections import RejectionsStore
 from .event_push_actions import EventPushActionsStore
 from .deviceinbox import DeviceInboxStore
-
+from .group_server import GroupServerStore
 from .state import StateStore
 from .signatures import SignatureStore
 from .filtering import FilteringStore
@@ -88,6 +88,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 DeviceStore,
                 DeviceInboxStore,
                 UserDirectoryStore,
+                GroupServerStore,
                 ):
 
     def __init__(self, db_conn, hs):
@@ -134,6 +135,9 @@ class DataStore(RoomMemberStore, RoomStore,
         self._pushers_id_gen = StreamIdGenerator(
             db_conn, "pushers", "id",
             extra_tables=[("deleted_pushers", "stream_id")],
+        )
+        self._group_updates_id_gen = StreamIdGenerator(
+            db_conn, "local_group_updates", "stream_id",
         )
 
         if isinstance(self.database_engine, PostgresEngine):
@@ -233,6 +237,18 @@ class DataStore(RoomMemberStore, RoomStore,
         self._curr_state_delta_stream_cache = StreamChangeCache(
             "_curr_state_delta_stream_cache", min_curr_state_delta_id,
             prefilled_cache=curr_state_delta_prefill,
+        )
+
+        _group_updates_prefill, min_group_updates_id = self._get_cache_dict(
+            db_conn, "local_group_updates",
+            entity_column="user_id",
+            stream_column="stream_id",
+            max_value=self._group_updates_id_gen.get_current_token(),
+            limit=1000,
+        )
+        self._group_updates_stream_cache = StreamChangeCache(
+            "_group_updates_stream_cache", min_group_updates_id,
+            prefilled_cache=_group_updates_prefill,
         )
 
         cur = LoggingTransaction(

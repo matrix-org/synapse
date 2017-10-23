@@ -31,6 +31,7 @@ from synapse.appservice.api import ApplicationServiceApi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
+from synapse.events.spamcheck import SpamChecker
 from synapse.federation import initialize_http_replication
 from synapse.federation.send_queue import FederationRemoteSendQueue
 from synapse.federation.transport.client import TransportLayerClient
@@ -50,6 +51,10 @@ from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.user_directory import UserDirectoyHandler
+from synapse.handlers.groups_local import GroupsLocalHandler
+from synapse.handlers.profile import ProfileHandler
+from synapse.groups.groups_server import GroupsServerHandler
+from synapse.groups.attestations import GroupAttestionRenewer, GroupAttestationSigning
 from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier
@@ -111,6 +116,7 @@ class HomeServer(object):
         'application_service_scheduler',
         'application_service_handler',
         'device_message_handler',
+        'profile_handler',
         'notifier',
         'distributor',
         'client_resource',
@@ -139,6 +145,11 @@ class HomeServer(object):
         'read_marker_handler',
         'action_generator',
         'user_directory_handler',
+        'groups_local_handler',
+        'groups_server_handler',
+        'groups_attestation_signing',
+        'groups_attestation_renewer',
+        'spam_checker',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -251,6 +262,9 @@ class HomeServer(object):
     def build_initial_sync_handler(self):
         return InitialSyncHandler(self)
 
+    def build_profile_handler(self):
+        return ProfileHandler(self)
+
     def build_event_sources(self):
         return EventSources(self)
 
@@ -308,6 +322,21 @@ class HomeServer(object):
 
     def build_user_directory_handler(self):
         return UserDirectoyHandler(self)
+
+    def build_groups_local_handler(self):
+        return GroupsLocalHandler(self)
+
+    def build_groups_server_handler(self):
+        return GroupsServerHandler(self)
+
+    def build_groups_attestation_signing(self):
+        return GroupAttestationSigning(self)
+
+    def build_groups_attestation_renewer(self):
+        return GroupAttestionRenewer(self)
+
+    def build_spam_checker(self):
+        return SpamChecker(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
