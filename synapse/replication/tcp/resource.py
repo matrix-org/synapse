@@ -162,7 +162,7 @@ class ReplicationStreamer(object):
                         )
                         try:
                             updates, current_token = yield stream.get_updates()
-                        except:
+                        except Exception:
                             logger.info("Failed to handle stream %s", stream.NAME)
                             raise
 

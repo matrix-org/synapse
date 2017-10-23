@@ -130,7 +130,7 @@ def wrap_request_handler(request_handler, include_metrics=False):
                             pretty_print=_request_user_agent_is_curl(request),
                             version_string=self.version_string,
                         )
-                    except:
+                    except Exception:
                         logger.exception(
                             "Failed handle request %s.%s on %r: %r",
                             request_handler.__module__,

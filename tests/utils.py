@@ -184,7 +184,7 @@ class MockHttpResource(HttpServer):
             mock_request.args = urlparse.parse_qs(path.split('?')[1])
             mock_request.path = path.split('?')[0]
             path = mock_request.path
-        except:
+        except Exception:
             pass
 
         for (method, pattern, func) in self.callbacks:
@@ -364,13 +364,13 @@ class MemoryDataStore(object):
             return {
                 "name": self.tokens_to_users[token],
             }
-        except:
+        except Exception:
             raise StoreError(400, "User does not exist.")
 
     def get_room(self, room_id):
         try:
             return self.rooms[room_id]
-        except:
+        except Exception:
             return None
 
     def store_room(self, room_id, room_creator_user_id, is_public):
@@ -499,7 +499,7 @@ class DeferredMockCallable(object):
         for _, _, d in self.expectations:
             try:
                 d.errback(failure)
-            except:
+            except Exception:
                 pass
 
         raise failure

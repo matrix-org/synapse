@@ -48,7 +48,7 @@ def parse_integer_from_args(args, name, default=None, required=False):
     if name in args:
         try:
             return int(args[name][0])
-        except:
+        except Exception:
             message = "Query parameter %r must be an integer" % (name,)
             raise SynapseError(400, message)
     else:
@@ -88,7 +88,7 @@ def parse_boolean_from_args(args, name, default=None, required=False):
                 "true": True,
                 "false": False,
             }[args[name][0]]
-        except:
+        except Exception:
             message = (
                 "Boolean query parameter %r must be one of"
                 " ['true', 'false']"
@@ -162,7 +162,7 @@ def parse_json_value_from_request(request):
     """
     try:
         content_bytes = request.content.read()
-    except:
+    except Exception:
         raise SynapseError(400, "Error reading JSON content.")
 
     try:

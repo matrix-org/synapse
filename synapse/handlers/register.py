@@ -289,7 +289,7 @@ class RegistrationHandler(BaseHandler):
             try:
                 identity_handler = self.hs.get_handlers().identity_handler
                 threepid = yield identity_handler.threepid_from_creds(c)
-            except:
+            except Exception:
                 logger.exception("Couldn't validate 3pid")
                 raise RegistrationError(400, "Couldn't validate 3pid")
 

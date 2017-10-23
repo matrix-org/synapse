@@ -45,7 +45,7 @@ def parse_media_id(request):
             except UnicodeDecodeError:
                 pass
         return server_name, media_id, file_name
-    except:
+    except Exception:
         raise SynapseError(
             404,
             "Invalid media id token %r" % (request.postpath,),

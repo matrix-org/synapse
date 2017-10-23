@@ -19,7 +19,7 @@ import sys
 
 try:
     import affinity
-except:
+except Exception:
     affinity = None
 
 from daemonize import Daemonize

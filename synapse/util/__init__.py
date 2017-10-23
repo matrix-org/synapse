@@ -59,9 +59,9 @@ class Clock(object):
             f(function): The function to call repeatedly.
             msec(float): How long to wait between calls in milliseconds.
         """
-        l = task.LoopingCall(f)
-        l.start(msec / 1000.0, now=False)
-        return l
+        call = task.LoopingCall(f)
+        call.start(msec / 1000.0, now=False)
+        return call
 
     def call_later(self, delay, callback, *args, **kwargs):
         """Call something later
@@ -82,7 +82,7 @@ class Clock(object):
     def cancel_call_later(self, timer, ignore_errs=False):
         try:
             timer.cancel()
-        except:
+        except Exception:
             if not ignore_errs:
                 raise
 
@@ -97,12 +97,12 @@ class Clock(object):
 
             try:
                 ret_deferred.errback(e)
-            except:
+            except Exception:
                 pass
 
             try:
                 given_deferred.cancel()
-            except:
+            except Exception:
                 pass
 
         timer = None
@@ -110,7 +110,7 @@ class Clock(object):
         def cancel(res):
             try:
                 self.cancel_call_later(timer)
-            except:
+            except Exception:
                 pass
             return res
 
@@ -119,7 +119,7 @@ class Clock(object):
         def success(res):
             try:
                 ret_deferred.callback(res)
-            except:
+            except Exception:
                 pass
 
             return res
@@ -127,7 +127,7 @@ class Clock(object):
         def err(res):
             try:
                 ret_deferred.errback(res)
-            except:
+            except Exception:
                 pass
 
         given_deferred.addCallbacks(callback=success, errback=err)

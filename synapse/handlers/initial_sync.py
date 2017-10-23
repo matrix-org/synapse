@@ -214,7 +214,7 @@ class InitialSyncHandler(BaseHandler):
                     })
 
                 d["account_data"] = account_data_events
-            except:
+            except Exception:
                 logger.exception("Failed to get snapshot")
 
         yield concurrently_execute(handle_room, room_list, 10)

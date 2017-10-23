@@ -78,7 +78,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
                 raise KeyError()
         except SynapseError as e:
             raise e
-        except:
+        except Exception:
             raise SynapseError(400, "Unable to parse state")
 
         yield self.presence_handler.set_state(user, state)
