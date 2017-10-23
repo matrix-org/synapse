@@ -131,10 +131,6 @@ class DomainSpecificString(
 
     __str__ = to_string
 
-    @classmethod
-    def create(cls, localpart, domain,):
-        return cls(localpart=localpart, domain=domain)
-
 
 class UserID(DomainSpecificString):
     """Structure representing a user ID."""

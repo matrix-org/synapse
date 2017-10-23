@@ -91,7 +91,7 @@ class RoomCreationHandler(BaseHandler):
                 if wchar in config["room_alias_name"]:
                     raise SynapseError(400, "Invalid characters in room alias")
 
-            room_alias = RoomAlias.create(
+            room_alias = RoomAlias(
                 config["room_alias_name"],
                 self.hs.hostname,
             )
@@ -123,7 +123,7 @@ class RoomCreationHandler(BaseHandler):
         while attempts < 5:
             try:
                 random_string = stringutils.random_string(18)
-                gen_room_id = RoomID.create(
+                gen_room_id = RoomID(
                     random_string,
                     self.hs.hostname,
                 )

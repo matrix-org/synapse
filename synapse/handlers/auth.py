@@ -267,7 +267,7 @@ class AuthHandler(BaseHandler):
         user_id = authdict["user"]
         password = authdict["password"]
         if not user_id.startswith('@'):
-            user_id = UserID.create(user_id, self.hs.hostname).to_string()
+            user_id = UserID(user_id, self.hs.hostname).to_string()
 
         return self._check_password(user_id, password)
 
