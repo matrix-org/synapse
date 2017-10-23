@@ -370,6 +370,8 @@ class GroupsServerHandler(object):
                 if not isinstance(value, basestring):
                     raise SynapseError(400, "%r value is not a string" % (keyname,))
                 profile[keyname] = value
+        if not isinstance(content["membership_is_private"], bool):
+            profile["membership_is_private"] = content["membership_is_private"]
 
         yield self.store.update_group_profile(group_id, profile)
 
@@ -383,10 +385,15 @@ class GroupsServerHandler(object):
         yield self.check_group_is_ours(group_id, and_exists=True)
 
         is_user_in_group = yield self.store.is_user_in_group(requester_user_id, group_id)
+        group = yield self.store.get_group(group_id)
+        is_membership_public = not group["membership_is_private"] \
+            or group["membership_is_private"] is None
 
-        user_results = yield self.store.get_users_in_group(
-            group_id, include_private=is_user_in_group,
-        )
+        user_results = []
+        if is_membership_public or is_user_in_group:
+            user_results = yield self.store.get_users_in_group(
+                group_id, include_private=is_user_in_group,
+            )
 
         chunk = []
         for user_result in user_results:
@@ -725,6 +732,7 @@ class GroupsServerHandler(object):
         short_description = profile.get("short_description")
         long_description = profile.get("long_description")
         user_profile = content.get("user_profile", {})
+        membership_is_private = content.get("membership_is_private", False)
 
         yield self.store.create_group(
             group_id,
@@ -733,6 +741,7 @@ class GroupsServerHandler(object):
             avatar_url=avatar_url,
             short_description=short_description,
             long_description=long_description,
+            membership_is_private=membership_is_private,
         )
 
         if not self.hs.is_mine_id(user_id):

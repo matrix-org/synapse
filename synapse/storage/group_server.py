@@ -35,7 +35,8 @@ class GroupServerStore(SQLBaseStore):
             keyvalues={
                 "group_id": group_id,
             },
-            retcols=("name", "short_description", "long_description", "avatar_url",),
+            retcols=("name", "short_description", "long_description", "avatar_url",
+                     "membership_is_private"),
             allow_none=True,
             desc="is_user_in_group",
         )
@@ -1017,7 +1018,7 @@ class GroupServerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def create_group(self, group_id, user_id, name, avatar_url, short_description,
-                     long_description,):
+                     long_description, membership_is_private):
         yield self._simple_insert(
             table="groups",
             values={
@@ -1026,6 +1027,7 @@ class GroupServerStore(SQLBaseStore):
                 "avatar_url": avatar_url,
                 "short_description": short_description,
                 "long_description": long_description,
+                "membership_is_private": membership_is_private,
             },
             desc="create_group",
         )
