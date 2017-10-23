@@ -59,9 +59,9 @@ class Clock(object):
             f(function): The function to call repeatedly.
             msec(float): How long to wait between calls in milliseconds.
         """
-        l = task.LoopingCall(f)
-        l.start(msec / 1000.0, now=False)
-        return l
+        call = task.LoopingCall(f)
+        call.start(msec / 1000.0, now=False)
+        return call
 
     def call_later(self, delay, callback, *args, **kwargs):
         """Call something later
