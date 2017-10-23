@@ -98,7 +98,7 @@ class BackgroundUpdateStore(SQLBaseStore):
                 result = yield self.do_next_background_update(
                     self.BACKGROUND_UPDATE_DURATION_MS
                 )
-            except:
+            except Exception:
                 logger.exception("Error doing update")
             else:
                 if result is None:

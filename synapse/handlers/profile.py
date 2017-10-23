@@ -118,7 +118,7 @@ class ProfileHandler(BaseHandler):
                     logger.exception("Failed to get displayname")
 
                 raise
-            except:
+            except Exception:
                 logger.exception("Failed to get displayname")
             else:
                 defer.returnValue(result["displayname"])
@@ -165,7 +165,7 @@ class ProfileHandler(BaseHandler):
                 if e.code != 404:
                     logger.exception("Failed to get avatar_url")
                 raise
-            except:
+            except Exception:
                 logger.exception("Failed to get avatar_url")
 
             defer.returnValue(result["avatar_url"])
@@ -266,7 +266,7 @@ class ProfileHandler(BaseHandler):
                     },
                     ignore_backoff=True,
                 )
-            except:
+            except Exception:
                 logger.exception("Failed to get avatar_url")
 
                 yield self.store.update_remote_profile_cache(

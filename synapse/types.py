@@ -127,7 +127,7 @@ class DomainSpecificString(
         try:
             cls.from_string(s)
             return True
-        except:
+        except Exception:
             return False
 
     __str__ = to_string
@@ -213,7 +213,7 @@ class StreamToken(
                 # i.e. old token from before receipt_key
                 keys.append("0")
             return cls(*keys)
-        except:
+        except Exception:
             raise SynapseError(400, "Invalid Token")
 
     def to_string(self):
@@ -299,7 +299,7 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
             if string[0] == 't':
                 parts = string[1:].split('-', 1)
                 return cls(topological=int(parts[0]), stream=int(parts[1]))
-        except:
+        except Exception:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
 
@@ -308,7 +308,7 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
         try:
             if string[0] == 's':
                 return cls(topological=None, stream=int(string[1:]))
-        except:
+        except Exception:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
 

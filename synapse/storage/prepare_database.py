@@ -66,7 +66,7 @@ def prepare_database(db_conn, database_engine, config):
 
         cur.close()
         db_conn.commit()
-    except:
+    except Exception:
         db_conn.rollback()
         raise
 
