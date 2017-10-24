@@ -61,7 +61,7 @@ class SearchHandler(BaseHandler):
                 assert batch_group is not None
                 assert batch_group_key is not None
                 assert batch_token is not None
-            except:
+            except Exception:
                 raise SynapseError(400, "Invalid batch")
 
         try:

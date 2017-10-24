@@ -759,7 +759,7 @@ def _handle_key_deferred(verify_request):
     ))
     try:
         verify_signed_json(json_object, server_name, verify_key)
-    except:
+    except Exception:
         raise SynapseError(
             401,
             "Invalid signature for server %s with key %s:%s" % (

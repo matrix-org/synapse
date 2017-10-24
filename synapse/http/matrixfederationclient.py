@@ -550,7 +550,7 @@ class MatrixFederationHttpClient(object):
                 length = yield _readBodyToFile(
                     response, output_stream, max_size
                 )
-        except:
+        except Exception:
             logger.exception("Failed to download body")
             raise
 

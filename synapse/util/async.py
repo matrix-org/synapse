@@ -73,7 +73,7 @@ class ObservableDeferred(object):
                 try:
                     # TODO: Handle errors here.
                     self._observers.pop().callback(r)
-                except:
+                except Exception:
                     pass
             return r
 
@@ -83,7 +83,7 @@ class ObservableDeferred(object):
                 try:
                     # TODO: Handle errors here.
                     self._observers.pop().errback(f)
-                except:
+                except Exception:
                     pass
 
             if consumeErrors:
@@ -205,7 +205,7 @@ class Linearizer(object):
             try:
                 with PreserveLoggingContext():
                     yield current_defer
-            except:
+            except Exception:
                 logger.exception("Unexpected exception in Linearizer")
 
             logger.info("Acquired linearizer lock %r for key %r", self.name,

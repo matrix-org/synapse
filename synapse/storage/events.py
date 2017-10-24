@@ -1481,7 +1481,7 @@ class EventsStore(SQLBaseStore):
                                         for i in ids
                                         if i in res
                                     ])
-                            except:
+                            except Exception:
                                 logger.exception("Failed to callback")
                 with PreserveLoggingContext():
                     reactor.callFromThread(fire, event_list, row_dict)

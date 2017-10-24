@@ -213,7 +213,7 @@ class RemoteKey(Resource):
                     )
                 except KeyLookupError as e:
                     logger.info("Failed to fetch key: %s", e)
-                except:
+                except Exception:
                     logger.exception("Failed to get key for %r", server_name)
             yield self.query_keys(
                 request, query, query_remote_on_cache_miss=False

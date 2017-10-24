@@ -560,7 +560,7 @@ def _resolve_with_state(unconflicted_state_ids, conflicted_state_ds, auth_event_
         resolved_state = _resolve_state_events(
             conflicted_state, auth_events
         )
-    except:
+    except Exception:
         logger.exception("Failed to resolve state")
         raise
 

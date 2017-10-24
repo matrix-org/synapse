@@ -211,7 +211,7 @@ class LoginRestServlet(ClientV1RestServlet):
         user_id = identifier["user"]
 
         if not user_id.startswith('@'):
-            user_id = UserID.create(
+            user_id = UserID(
                 user_id, self.hs.hostname
             ).to_string()
 
@@ -278,7 +278,7 @@ class LoginRestServlet(ClientV1RestServlet):
         if user is None:
             raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
 
-        user_id = UserID.create(user, self.hs.hostname).to_string()
+        user_id = UserID(user, self.hs.hostname).to_string()
         auth_handler = self.auth_handler
         registered_user_id = yield auth_handler.check_user_exists(user_id)
         if registered_user_id:
@@ -444,7 +444,7 @@ class CasTicketServlet(ClientV1RestServlet):
                 if required_value != actual_value:
                     raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
 
-        user_id = UserID.create(user, self.hs.hostname).to_string()
+        user_id = UserID(user, self.hs.hostname).to_string()
         auth_handler = self.auth_handler
         registered_user_id = yield auth_handler.check_user_exists(user_id)
         if not registered_user_id:

@@ -112,7 +112,7 @@ class Authenticator(object):
                 key = strip_quotes(param_dict["key"])
                 sig = strip_quotes(param_dict["sig"])
                 return (origin, key, sig)
-            except:
+            except Exception:
                 raise AuthenticationError(
                     400, "Malformed Authorization header", Codes.UNAUTHORIZED
                 )
@@ -177,7 +177,7 @@ class BaseFederationServlet(object):
                 if self.REQUIRE_AUTH:
                     logger.exception("authenticate_request failed")
                     raise
-            except:
+            except Exception:
                 logger.exception("authenticate_request failed")
                 raise
 
@@ -270,7 +270,7 @@ class FederationSendServlet(BaseFederationServlet):
             code, response = yield self.handler.on_incoming_transaction(
                 transaction_data
             )
-        except:
+        except Exception:
             logger.exception("on_incoming_transaction failed")
             raise
 
@@ -610,7 +610,7 @@ class FederationVersionServlet(BaseFederationServlet):
 
 
 class FederationGroupsProfileServlet(BaseFederationServlet):
-    """Get the basic profile of a group on behalf of a user
+    """Get/set the basic profile of a group on behalf of a user
     """
     PATH = "/groups/(?P<group_id>[^/]*)/profile$"
 
@@ -622,6 +622,18 @@ class FederationGroupsProfileServlet(BaseFederationServlet):
 
         new_content = yield self.handler.get_group_profile(
             group_id, requester_user_id
+        )
+
+        defer.returnValue((200, new_content))
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id):
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        if get_domain_from_id(requester_user_id) != origin:
+            raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        new_content = yield self.handler.update_group_profile(
+            group_id, requester_user_id, content
         )
 
         defer.returnValue((200, new_content))
@@ -638,18 +650,6 @@ class FederationGroupsSummaryServlet(BaseFederationServlet):
 
         new_content = yield self.handler.get_group_summary(
             group_id, requester_user_id
-        )
-
-        defer.returnValue((200, new_content))
-
-    @defer.inlineCallbacks
-    def on_POST(self, origin, content, query, group_id):
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
-        if get_domain_from_id(requester_user_id) != origin:
-            raise SynapseError(403, "requester_user_id doesn't match origin")
-
-        new_content = yield self.handler.update_group_profile(
-            group_id, requester_user_id, content
         )
 
         defer.returnValue((200, new_content))

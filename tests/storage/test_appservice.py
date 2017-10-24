@@ -65,7 +65,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
         for f in self.as_yaml_files:
             try:
                 os.remove(f)
-            except:
+            except Exception:
                 pass
 
     def _add_appservice(self, as_token, id, url, hs_token, sender):
