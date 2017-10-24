@@ -67,7 +67,7 @@ class SynapseRequest(Request):
             ru_utime, ru_stime = context.get_resource_usage()
             db_txn_count = context.db_txn_count
             db_txn_duration = context.db_txn_duration
-        except:
+        except Exception:
             ru_utime, ru_stime = (0, 0)
             db_txn_count, db_txn_duration = (0, 0)
 

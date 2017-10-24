@@ -81,7 +81,7 @@ class SearchStore(BackgroundUpdateStore):
                     etype = row["type"]
                     try:
                         content = json.loads(row["content"])
-                    except:
+                    except Exception:
                         continue
 
                     if etype == "m.room.message":
@@ -407,7 +407,7 @@ class SearchStore(BackgroundUpdateStore):
                 origin_server_ts, stream = pagination_token.split(",")
                 origin_server_ts = int(origin_server_ts)
                 stream = int(stream)
-            except:
+            except Exception:
                 raise SynapseError(400, "Invalid pagination token")
 
             clauses.append(

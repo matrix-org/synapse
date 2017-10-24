@@ -367,7 +367,7 @@ class PreviewUrlResource(Resource):
                 dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
                 for dir in dirs:
                     os.rmdir(dir)
-            except:
+            except Exception:
                 pass
 
         yield self.store.delete_url_cache(removed_media)
@@ -397,7 +397,7 @@ class PreviewUrlResource(Resource):
                 dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
                 for dir in dirs:
                     os.rmdir(dir)
-            except:
+            except Exception:
                 pass
 
             thumbnail_dir = self.filepaths.url_cache_thumbnail_directory(media_id)
@@ -415,7 +415,7 @@ class PreviewUrlResource(Resource):
                 dirs = self.filepaths.url_cache_thumbnail_dirs_to_delete(media_id)
                 for dir in dirs:
                     os.rmdir(dir)
-            except:
+            except Exception:
                 pass
 
         yield self.store.delete_url_cache_media(removed_media)

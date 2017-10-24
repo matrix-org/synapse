@@ -137,7 +137,7 @@ class PusherPool:
                         )
 
             yield preserve_context_over_deferred(defer.gatherResults(deferreds))
-        except:
+        except Exception:
             logger.exception("Exception in pusher on_new_notifications")
 
     @defer.inlineCallbacks
@@ -162,7 +162,7 @@ class PusherPool:
                         )
 
             yield preserve_context_over_deferred(defer.gatherResults(deferreds))
-        except:
+        except Exception:
             logger.exception("Exception in pusher on_new_receipts")
 
     @defer.inlineCallbacks
@@ -188,7 +188,7 @@ class PusherPool:
         for pusherdict in pushers:
             try:
                 p = self.pusher_factory.create_pusher(pusherdict)
-            except:
+            except Exception:
                 logger.exception("Couldn't start a pusher: caught Exception")
                 continue
             if p:

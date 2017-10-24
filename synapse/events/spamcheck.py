@@ -22,7 +22,7 @@ class SpamChecker(object):
         config = None
         try:
             module, config = hs.config.spam_checker
-        except:
+        except Exception:
             pass
 
         if module is not None:

@@ -43,7 +43,7 @@ def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
     message_hash_base64 = event.hashes[name]
     try:
         message_hash_bytes = decode_base64(message_hash_base64)
-    except:
+    except Exception:
         raise SynapseError(
             400,
             "Invalid base64: %s" % (message_hash_base64,),

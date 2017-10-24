@@ -91,7 +91,4 @@ class WheelTimer(object):
         return ret
 
     def __len__(self):
-        l = 0
-        for entry in self.entries:
-            l += len(entry.queue)
-        return l
+        return sum(len(entry.queue) for entry in self.entries)

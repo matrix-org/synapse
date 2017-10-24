@@ -227,7 +227,7 @@ class FederationHandler(BaseHandler):
                 state, auth_chain = yield self.replication_layer.get_state_for_room(
                     origin, pdu.room_id, pdu.event_id,
                 )
-            except:
+            except Exception:
                 logger.exception("Failed to get state for event: %s", pdu.event_id)
 
         yield self._process_received_pdu(
@@ -461,7 +461,7 @@ class FederationHandler(BaseHandler):
         def check_match(id):
             try:
                 return server_name == get_domain_from_id(id)
-            except:
+            except Exception:
                 return False
 
         # Parses mapping `event_id -> (type, state_key) -> state event_id`
@@ -499,7 +499,7 @@ class FederationHandler(BaseHandler):
                             continue
                         try:
                             domain = get_domain_from_id(ev.state_key)
-                        except:
+                        except Exception:
                             continue
 
                         if domain != server_name:
@@ -738,7 +738,7 @@ class FederationHandler(BaseHandler):
                         joined_domains[dom] = min(d, old_d)
                     else:
                         joined_domains[dom] = d
-                except:
+                except Exception:
                     pass
 
             return sorted(joined_domains.items(), key=lambda d: d[1])
@@ -940,7 +940,7 @@ class FederationHandler(BaseHandler):
                     room_creator_user_id="",
                     is_public=False
                 )
-            except:
+            except Exception:
                 # FIXME
                 pass
 
@@ -1775,7 +1775,7 @@ class FederationHandler(BaseHandler):
                     [e_id for e_id, _ in event.auth_events]
                 )
                 seen_events = set(have_events.keys())
-            except:
+            except Exception:
                 # FIXME:
                 logger.exception("Failed to get auth chain")
 
@@ -1899,7 +1899,7 @@ class FederationHandler(BaseHandler):
                         except AuthError:
                             pass
 
-                except:
+                except Exception:
                     # FIXME:
                     logger.exception("Failed to query auth chain")
 
@@ -1966,7 +1966,7 @@ class FederationHandler(BaseHandler):
         def get_next(it, opt=None):
             try:
                 return it.next()
-            except:
+            except Exception:
                 return opt
 
         current_local = get_next(local_iter)
