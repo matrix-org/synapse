@@ -102,7 +102,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
                         filter_object,
                         self.factory.hs.config.filter_timeline_limit
                     )
-                except:
+                except Exception:
                     raise SynapseError(400, "Invalid filter JSON")
                 self.factory.filtering.check_valid_filter(filter_object)
                 self.filter = FilterCollection(filter_object)
@@ -300,7 +300,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
                 raise SynapseError(400, "Too many keys", errcode=Codes.BAD_JSON)
         except SynapseError as e:
             raise e
-        except:
+        except Exception:
             raise SynapseError(400, "Unable to parse state")
 
         yield self.factory.presence_handler.set_state(self.requester.user, state)
