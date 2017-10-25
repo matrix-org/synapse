@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util import logcontext
 from synapse.util.async import ObservableDeferred
 
 
@@ -53,4 +52,4 @@ class ResponseCache(object):
             return r
 
         result.addBoth(remove)
-        return logcontext.make_deferred_yieldable(result.observe())
+        return result.observe()
