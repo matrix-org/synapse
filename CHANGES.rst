@@ -1,3 +1,11 @@
+Changes in synapse v0.24.1 (2017-10-24)
+=======================================
+
+Bug fixes:
+
+* Fix updating group profiles over federation (PR #2567)
+
+
 Changes in synapse v0.24.0 (2017-10-23)
 =======================================
 
