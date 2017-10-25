@@ -70,6 +70,7 @@ class RoomListHandler(BaseHandler):
         if search_filter:
             # We explicitly don't bother caching searches or requests for
             # appservice specific lists.
+            logger.info("Bypassing cache as search request.")
             return self._get_public_room_list(
                 limit, since_token, search_filter, network_tuple=network_tuple,
             )
@@ -77,6 +78,7 @@ class RoomListHandler(BaseHandler):
         key = (limit, since_token, network_tuple)
         result = self.response_cache.get(key)
         if not result:
+            logger.info("No cached result, calculating one.")
             result = self.response_cache.set(
                 key,
                 self._get_public_room_list(
