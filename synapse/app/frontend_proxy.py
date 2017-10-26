@@ -61,8 +61,15 @@ class PresenceStatusStubServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        # Pass through the auth headers, if any, in case the access token
+        # is there.
+        auth_headers = request.requestHeaders.getRawHeaders("Authorization", [])
+        headers = {
+            "Authorization": auth_headers,
+        }
         result = yield self.http_client.get_json(
             self.main_uri + request.uri,
+            headers=headers,        
         )
         defer.returnValue((200, result))
 
