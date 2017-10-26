@@ -13,21 +13,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 
 from twisted.internet import defer
 
+from synapse.api.auth import has_access_token
 from synapse.api.constants import LoginType
-from synapse.api.errors import LoginError, SynapseError, Codes
+from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.http.servlet import (
-    RestServlet, parse_json_object_from_request, assert_params_in_request
+    RestServlet, assert_params_in_request,
+    parse_json_object_from_request,
 )
 from synapse.util.async import run_on_reactor
 from synapse.util.msisdn import phone_number_to_msisdn
-
 from ._base import client_v2_patterns
-
-import logging
-
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +171,18 @@ class DeactivateAccountRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
+        # if the caller provides an access token, it ought to be valid.
+        requester = None
+        if has_access_token(request):
+            requester = yield self.auth.get_user_by_req(
+                request,
+            )  # type: synapse.types.Requester
+
+        # allow ASes to dectivate their own users
+        if requester and requester.app_service:
+            yield self._deactivate_account(requester.user.to_string())
+            defer.returnValue((200, {}))
+
         authed, result, params, _ = yield self.auth_handler.check_auth([
             [LoginType.PASSWORD],
         ], body, self.hs.get_ip_from_request(request))
@@ -179,26 +190,31 @@ class DeactivateAccountRestServlet(RestServlet):
         if not authed:
             defer.returnValue((401, result))
 
-        user_id = None
-        requester = None
-
         if LoginType.PASSWORD in result:
+            user_id = result[LoginType.PASSWORD]
             # if using password, they should also be logged in
-            requester = yield self.auth.get_user_by_req(request)
-            user_id = requester.user.to_string()
-            if user_id != result[LoginType.PASSWORD]:
+            if requester is None:
+                raise SynapseError(
+                    400,
+                    "Deactivate account requires an access_token",
+                    errcode=Codes.MISSING_TOKEN
+                )
+            if requester.user.to_string() != user_id:
                 raise LoginError(400, "", Codes.UNKNOWN)
         else:
             logger.error("Auth succeeded but no known type!", result.keys())
             raise SynapseError(500, "", Codes.UNKNOWN)
 
-        # FIXME: Theoretically there is a race here wherein user resets password
-        # using threepid.
+        yield self._deactivate_account(user_id)
+        defer.returnValue((200, {}))
+
+    @defer.inlineCallbacks
+    def _deactivate_account(self, user_id):
+        # FIXME: Theoretically there is a race here wherein user resets
+        # password using threepid.
         yield self.store.user_delete_access_tokens(user_id)
         yield self.store.user_delete_threepids(user_id)
         yield self.store.user_set_password_hash(user_id, None)
-
-        defer.returnValue((200, {}))
 
 
 class EmailThreepidRequestTokenRestServlet(RestServlet):
