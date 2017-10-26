@@ -73,3 +73,47 @@
   `examples
   <http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html>`_
   in the sphinx documentation.
+
+- **Imports**:
+
+  - Prefer to import classes and functions than packages or modules.
+
+    Example::
+
+      from synapse.types import UserID
+      ...
+      user_id = UserID(local, server)
+
+    is preferred over::
+
+      from synapse import types
+      ...
+      user_id = types.UserID(local, server)
+
+    (or any other variant).
+
+    This goes against the advice in the Google style guide, but it means that
+    errors in the name are caught early (at import time).
+
+  - Multiple imports from the same package can be combined onto one line::
+
+      from synapse.types import GroupID, RoomID, UserID
+
+    An effort should be made to keep the individual imports in alphabetical
+    order.
+
+    If the list becomes long, wrap it with parentheses and split it over
+    multiple lines.
+
+  - As per `PEP-8 <https://www.python.org/dev/peps/pep-0008/#imports>`_,
+    imports should be grouped in the following order, with a blank line between
+    each group:
+
+    1. standard library imports
+    2. related third party imports
+    3. local application/library specific imports
+
+  - Imports within each group should be sorted alphabetically by module name.
+
+  - Avoid wildcard imports (``from synapse.types import *``) and relative
+    imports (``from .types import UserID``).
