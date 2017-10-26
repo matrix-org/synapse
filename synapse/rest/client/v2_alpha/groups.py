@@ -39,20 +39,20 @@ class GroupServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, group_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
-        group_description = yield self.groups_handler.get_group_profile(group_id, user_id)
+        group_description = yield self.groups_handler.get_group_profile(group_id, requester_user_id)
 
         defer.returnValue((200, group_description))
 
     @defer.inlineCallbacks
     def on_POST(self, request, group_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
         yield self.groups_handler.update_group_profile(
-            group_id, user_id, content,
+            group_id, requester_user_id, content,
         )
 
         defer.returnValue((200, {}))
@@ -72,9 +72,9 @@ class GroupSummaryServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, group_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
-        get_group_summary = yield self.groups_handler.get_group_summary(group_id, user_id)
+        get_group_summary = yield self.groups_handler.get_group_summary(group_id, requester_user_id)
 
         defer.returnValue((200, get_group_summary))
 
@@ -101,11 +101,11 @@ class GroupSummaryRoomsCatServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, group_id, category_id, room_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
         resp = yield self.groups_handler.update_group_summary_room(
-            group_id, user_id,
+            group_id, requester_user_id,
             room_id=room_id,
             category_id=category_id,
             content=content,
@@ -116,10 +116,10 @@ class GroupSummaryRoomsCatServlet(RestServlet):
     @defer.inlineCallbacks
     def on_DELETE(self, request, group_id, category_id, room_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
         resp = yield self.groups_handler.delete_group_summary_room(
-            group_id, user_id,
+            group_id, requester_user_id,
             room_id=room_id,
             category_id=category_id,
         )
@@ -143,10 +143,10 @@ class GroupCategoryServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, group_id, category_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
         category = yield self.groups_handler.get_group_category(
-            group_id, user_id,
+            group_id, requester_user_id,
             category_id=category_id,
         )
 
@@ -155,11 +155,11 @@ class GroupCategoryServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, group_id, category_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
         resp = yield self.groups_handler.update_group_category(
-            group_id, user_id,
+            group_id, requester_user_id,
             category_id=category_id,
             content=content,
         )
@@ -169,10 +169,10 @@ class GroupCategoryServlet(RestServlet):
     @defer.inlineCallbacks
     def on_DELETE(self, request, group_id, category_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
         resp = yield self.groups_handler.delete_group_category(
-            group_id, user_id,
+            group_id, requester_user_id,
             category_id=category_id,
         )
 
@@ -195,10 +195,10 @@ class GroupCategoriesServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, group_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
         category = yield self.groups_handler.get_group_categories(
-            group_id, user_id,
+            group_id, requester_user_id,
         )
 
         defer.returnValue((200, category))
@@ -220,10 +220,10 @@ class GroupRoleServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, group_id, role_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
         category = yield self.groups_handler.get_group_role(
-            group_id, user_id,
+            group_id, requester_user_id,
             role_id=role_id,
         )
 
@@ -232,11 +232,11 @@ class GroupRoleServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, group_id, role_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
         resp = yield self.groups_handler.update_group_role(
-            group_id, user_id,
+            group_id, requester_user_id,
             role_id=role_id,
             content=content,
         )
@@ -246,10 +246,10 @@ class GroupRoleServlet(RestServlet):
     @defer.inlineCallbacks
     def on_DELETE(self, request, group_id, role_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
         resp = yield self.groups_handler.delete_group_role(
-            group_id, user_id,
+            group_id, requester_user_id,
             role_id=role_id,
         )
 
@@ -272,10 +272,10 @@ class GroupRolesServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, group_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
         category = yield self.groups_handler.get_group_roles(
-            group_id, user_id,
+            group_id, requester_user_id,
         )
 
         defer.returnValue((200, category))
@@ -343,9 +343,9 @@ class GroupRoomServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, group_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.get_rooms_in_group(group_id, user_id)
+        result = yield self.groups_handler.get_rooms_in_group(group_id, requester_user_id)
 
         defer.returnValue((200, result))
 
@@ -364,9 +364,9 @@ class GroupUsersServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, group_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.get_users_in_group(group_id, user_id)
+        result = yield self.groups_handler.get_users_in_group(group_id, requester_user_id)
 
         defer.returnValue((200, result))
 
@@ -385,9 +385,9 @@ class GroupInvitedUsersServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, group_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.get_invited_users_in_group(group_id, user_id)
+        result = yield self.groups_handler.get_invited_users_in_group(group_id, requester_user_id)
 
         defer.returnValue((200, result))
 
@@ -407,14 +407,14 @@ class GroupCreateServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
         # TODO: Create group on remote server
         content = parse_json_object_from_request(request)
         localpart = content.pop("localpart")
         group_id = GroupID(localpart, self.server_name).to_string()
 
-        result = yield self.groups_handler.create_group(group_id, user_id, content)
+        result = yield self.groups_handler.create_group(group_id, requester_user_id, content)
 
         defer.returnValue((200, result))
 
@@ -435,11 +435,11 @@ class GroupAdminRoomsServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, group_id, room_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
         result = yield self.groups_handler.add_room_to_group(
-            group_id, user_id, room_id, content,
+            group_id, requester_user_id, room_id, content,
         )
 
         defer.returnValue((200, result))
@@ -447,10 +447,10 @@ class GroupAdminRoomsServlet(RestServlet):
     @defer.inlineCallbacks
     def on_DELETE(self, request, group_id, room_id):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
         result = yield self.groups_handler.remove_room_from_group(
-            group_id, user_id, room_id,
+            group_id, requester_user_id, room_id,
         )
 
         defer.returnValue((200, result))
@@ -685,9 +685,9 @@ class GroupsForUserServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request):
         requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.get_joined_groups(user_id)
+        result = yield self.groups_handler.get_joined_groups(requester_user_id)
 
         defer.returnValue((200, result))
 
