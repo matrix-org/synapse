@@ -87,7 +87,7 @@ class RoomListHandler(BaseHandler):
                 )
             )
         else:
-            logger.info("Using cached result.")
+            logger.info("Using cached deferred result.")
         return make_deferred_yieldable(result)
 
     @defer.inlineCallbacks
