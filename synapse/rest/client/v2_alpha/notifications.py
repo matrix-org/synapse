@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class NotificationsServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/notifications$", releases=())
+    PATTERNS = client_v2_patterns("/notifications$")
 
     def __init__(self, hs):
         super(NotificationsServlet, self).__init__()
