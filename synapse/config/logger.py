@@ -148,8 +148,8 @@ def setup_logging(config, use_worker_options=False):
         "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
         " - %(message)s"
     )
-    if log_config is None:
 
+    if log_config is None:
         level = logging.INFO
         level_for_storage = logging.INFO
         if config.verbosity:
@@ -176,6 +176,10 @@ def setup_logging(config, use_worker_options=False):
                 logger.info("Opened new log file due to SIGHUP")
         else:
             handler = logging.StreamHandler()
+
+            def sighup(signum, stack):
+                pass
+
         handler.setFormatter(formatter)
 
         handler.addFilter(LoggingContextFilter(request=""))
