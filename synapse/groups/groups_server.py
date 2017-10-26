@@ -69,7 +69,7 @@ class GroupsServerHandler(object):
             raise SynapseError(404, "Unknown group")
 
         is_user_in_group = yield self.store.is_user_in_group(requester_user_id, group_id)
-        if is_user_in_group or not group.is_public:
+        if not is_user_in_group or not group.is_public:
             raise SynapseError(404, "Unknown group")
 
         if and_is_admin:
