@@ -18,7 +18,7 @@ from OpenSSL.SSL import VERIFY_NONE
 from synapse.api.errors import (
     CodeMessageException, MatrixCodeMessageException, SynapseError, Codes,
 )
-from synapse.util.logcontext import preserve_context_over_fn
+from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util import logcontext
 import synapse.metrics
 from synapse.http.endpoint import SpiderEndpoint
@@ -130,7 +130,7 @@ class SimpleHttpClient(object):
             bodyProducer=FileBodyProducer(StringIO(query_bytes))
         )
 
-        body = yield preserve_context_over_fn(readBody, response)
+        body = yield make_deferred_yieldable(readBody(response))
 
         defer.returnValue(json.loads(body))
 
@@ -150,7 +150,7 @@ class SimpleHttpClient(object):
             bodyProducer=FileBodyProducer(StringIO(json_str))
         )
 
-        body = yield preserve_context_over_fn(readBody, response)
+        body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
             defer.returnValue(json.loads(body))
@@ -215,7 +215,7 @@ class SimpleHttpClient(object):
             bodyProducer=FileBodyProducer(StringIO(json_str))
         )
 
-        body = yield preserve_context_over_fn(readBody, response)
+        body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
             defer.returnValue(json.loads(body))
@@ -254,7 +254,7 @@ class SimpleHttpClient(object):
             })
         )
 
-        body = yield preserve_context_over_fn(readBody, response)
+        body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
             defer.returnValue(body)
@@ -315,10 +315,9 @@ class SimpleHttpClient(object):
         # straight back in again
 
         try:
-            length = yield preserve_context_over_fn(
-                _readBodyToFile,
-                response, output_stream, max_size
-            )
+            length = yield make_deferred_yieldable(_readBodyToFile(
+                response, output_stream, max_size,
+            ))
         except Exception as e:
             logger.exception("Failed to download body")
             raise SynapseError(
@@ -395,7 +394,7 @@ class CaptchaServerHttpClient(SimpleHttpClient):
         )
 
         try:
-            body = yield preserve_context_over_fn(readBody, response)
+            body = yield make_deferred_yieldable(readBody(response))
             defer.returnValue(body)
         except PartialDownloadError as e:
             # twisted dislikes google's response, no content length.
