@@ -50,8 +50,7 @@ logger = logging.getLogger("synapse.app.frontend_proxy")
 
 
 class KeyUploadServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/keys/upload(/(?P<device_id>[^/]+))?$",
-                                  releases=())
+    PATTERNS = client_v2_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
 
     def __init__(self, hs):
         """
