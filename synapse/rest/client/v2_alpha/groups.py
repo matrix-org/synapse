@@ -41,7 +41,10 @@ class GroupServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        group_description = yield self.groups_handler.get_group_profile(group_id, requester_user_id)
+        group_description = yield self.groups_handler.get_group_profile(
+            group_id,
+            requester_user_id,
+        )
 
         defer.returnValue((200, group_description))
 
@@ -74,7 +77,10 @@ class GroupSummaryServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        get_group_summary = yield self.groups_handler.get_group_summary(group_id, requester_user_id)
+        get_group_summary = yield self.groups_handler.get_group_summary(
+            group_id,
+            requester_user_id,
+        )
 
         defer.returnValue((200, get_group_summary))
 
@@ -387,7 +393,10 @@ class GroupInvitedUsersServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.get_invited_users_in_group(group_id, requester_user_id)
+        result = yield self.groups_handler.get_invited_users_in_group(
+            group_id,
+            requester_user_id,
+        )
 
         defer.returnValue((200, result))
 
@@ -414,7 +423,11 @@ class GroupCreateServlet(RestServlet):
         localpart = content.pop("localpart")
         group_id = GroupID(localpart, self.server_name).to_string()
 
-        result = yield self.groups_handler.create_group(group_id, requester_user_id, content)
+        result = yield self.groups_handler.create_group(
+            group_id,
+            requester_user_id,
+            content,
+        )
 
         defer.returnValue((200, result))
 

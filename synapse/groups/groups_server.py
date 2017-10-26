@@ -49,7 +49,8 @@ class GroupsServerHandler(object):
         hs.get_groups_attestation_renewer()
 
     @defer.inlineCallbacks
-    def check_group_is_ours(self, group_id, requester_user_id, and_exists=False, and_is_admin=None):
+    def check_group_is_ours(self, group_id, requester_user_id,
+                            and_exists=False, and_is_admin=None):
         """Check that the group is ours, and optionally if it exists.
 
         If group does exist then return group.
@@ -157,10 +158,16 @@ class GroupsServerHandler(object):
         })
 
     @defer.inlineCallbacks
-    def update_group_summary_room(self, group_id, requester_user_id, room_id, category_id, content):
+    def update_group_summary_room(self, group_id, requester_user_id,
+                                  room_id, category_id, content):
         """Add/update a room to the group summary
         """
-        yield self.check_group_is_ours(group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id)
+        yield self.check_group_is_ours(
+            group_id,
+            requester_user_id,
+            and_exists=True,
+            and_is_admin=requester_user_id,
+        )
 
         RoomID.from_string(room_id)  # Ensure valid room id
 
@@ -179,10 +186,16 @@ class GroupsServerHandler(object):
         defer.returnValue({})
 
     @defer.inlineCallbacks
-    def delete_group_summary_room(self, group_id, requester_user_id, room_id, category_id):
+    def delete_group_summary_room(self, group_id, requester_user_id,
+                                  room_id, category_id):
         """Remove a room from the summary
         """
-        yield self.check_group_is_ours(group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id)
+        yield self.check_group_is_ours(
+            group_id,
+            requester_user_id,
+            and_exists=True,
+            and_is_admin=requester_user_id,
+        )
 
         yield self.store.remove_room_from_summary(
             group_id=group_id,
@@ -220,7 +233,12 @@ class GroupsServerHandler(object):
     def update_group_category(self, group_id, requester_user_id, category_id, content):
         """Add/Update a group category
         """
-        yield self.check_group_is_ours(group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id)
+        yield self.check_group_is_ours(
+            group_id,
+            requester_user_id,
+            and_exists=True,
+            and_is_admin=requester_user_id,
+        )
 
         is_public = _parse_visibility_from_contents(content)
         profile = content.get("profile")
@@ -238,7 +256,12 @@ class GroupsServerHandler(object):
     def delete_group_category(self, group_id, requester_user_id, category_id):
         """Delete a group category
         """
-        yield self.check_group_is_ours(group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id)
+        yield self.check_group_is_ours(
+            group_id,
+            requester_user_id,
+            and_exists=True,
+            and_is_admin=requester_user_id
+        )
 
         yield self.store.remove_group_category(
             group_id=group_id,
@@ -274,7 +297,12 @@ class GroupsServerHandler(object):
     def update_group_role(self, group_id, requester_user_id, role_id, content):
         """Add/update a role in a group
         """
-        yield self.check_group_is_ours(group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id)
+        yield self.check_group_is_ours(
+            group_id,
+            requester_user_id,
+            and_exists=True,
+            and_is_admin=requester_user_id,
+        )
 
         is_public = _parse_visibility_from_contents(content)
 
@@ -293,7 +321,12 @@ class GroupsServerHandler(object):
     def delete_group_role(self, group_id, requester_user_id, role_id):
         """Remove role from group
         """
-        yield self.check_group_is_ours(group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id)
+        yield self.check_group_is_ours(
+            group_id,
+            requester_user_id,
+            and_exists=True,
+            and_is_admin=requester_user_id,
+        )
 
         yield self.store.remove_group_role(
             group_id=group_id,
@@ -623,7 +656,10 @@ class GroupsServerHandler(object):
         else:
             remote_attestation = None
 
-        local_attestation = self.attestations.create_attestation(group_id, requester_user_id)
+        local_attestation = self.attestations.create_attestation(
+            group_id,
+            requester_user_id,
+        )
 
         is_public = _parse_visibility_from_contents(content)
 
@@ -747,7 +783,10 @@ class GroupsServerHandler(object):
                 group_id=group_id,
             )
 
-            local_attestation = self.attestations.create_attestation(group_id, requester_user_id)
+            local_attestation = self.attestations.create_attestation(
+                group_id,
+                requester_user_id,
+            )
         else:
             local_attestation = None
             remote_attestation = None
