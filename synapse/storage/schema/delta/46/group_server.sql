@@ -14,4 +14,5 @@
  */
 
 -- whether non-members can access group APIs
-ALTER TABLE groups ADD COLUMN is_public BOOL DEFAULT 1 NOT NULL;
+-- NB: awful hack to get the default to be true on postgres and 1 on sqlite
+ALTER TABLE groups ADD COLUMN is_public BOOL DEFAULT (1=1) NOT NULL;
