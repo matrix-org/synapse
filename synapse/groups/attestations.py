@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import random
-
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
@@ -26,11 +24,6 @@ from signedjson.sign import sign_json
 
 # Default validity duration for new attestations we create
 DEFAULT_ATTESTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
-
-# We add some jitter to the validity duration of attestations so that if we
-# add lots of users at once we don't need to renew them all at once.
-# The jitter is a multiplier picked randomly between the first and second number
-DEFAULT_ATTESTATION_JITTER = (0.9, 1.3)
 
 # Start trying to update our attestations when they come this close to expiring
 UPDATE_ATTESTATION_TIME_MS = 1 * 24 * 60 * 60 * 1000
@@ -80,14 +73,10 @@ class GroupAttestationSigning(object):
         """Create an attestation for the group_id and user_id with default
         validity length.
         """
-        validity_period = DEFAULT_ATTESTATION_LENGTH_MS
-        validity_period *= random.uniform(*DEFAULT_ATTESTATION_JITTER)
-        valid_until_ms = int(self.clock.time_msec() + validity_period)
-
         return sign_json({
             "group_id": group_id,
             "user_id": user_id,
-            "valid_until_ms": valid_until_ms,
+            "valid_until_ms": self.clock.time_msec() + DEFAULT_ATTESTATION_LENGTH_MS,
         }, self.server_name, self.signing_key)
 
 
