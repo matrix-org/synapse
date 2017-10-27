@@ -188,7 +188,7 @@ class TransactionQueue(object):
                                 prev_id for prev_id, _ in event.prev_events
                             ],
                         )
-                    except:
+                    except Exception:
                         logger.exception("Failed to calculate hosts in room")
                         continue
 
@@ -249,7 +249,7 @@ class TransactionQueue(object):
         Args:
             states (list(UserPresenceState))
         """
-	return
+        return
 
         # First we queue up the new presence by user ID, so multiple presence
         # updates in quick successtion are correctly handled
