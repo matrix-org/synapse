@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
@@ -20,6 +22,9 @@ from synapse.types import get_domain_from_id
 from synapse.util.logcontext import preserve_fn
 
 from signedjson.sign import sign_json
+
+
+logger = logging.getLogger(__name__)
 
 
 # Default validity duration for new attestations we create
