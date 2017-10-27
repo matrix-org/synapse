@@ -733,7 +733,7 @@ class GroupsServerHandler(object):
 
     @defer.inlineCallbacks
     def create_group(self, group_id, requester_user_id, content):
-        group = yield self.check_group_is_ours(group_id)
+        group = yield self.check_group_is_ours(group_id, requester_user_id)
 
         logger.info("Attempting to create group with ID: %r", group_id)
 
