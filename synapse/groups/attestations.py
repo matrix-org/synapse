@@ -13,6 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Attestations ensure that users and groups can't lie about their memberships.
+
+When a user joins a group the HS and GS swap attestations, which allow them
+both to independently prove to third parties their membership.These
+attestations have a validity period so need to be periodically renewed.
+
+If a user leaves (or gets kicked out of) a group, either side can still use
+their attestation to "prove" their membership, until the attestation expires.
+Therefore attestations shouldn't be relied on to prove membership in important
+cases, but can for less important situtations, e.g. showing a users membership
+of groups on their profile, showing flairs, etc.abs
+
+An attestsation is a signed blob of json that looks like:
+
+    {
+        "user_id": "@foo:a.example.com",
+        "group_id": "+bar:b.example.com",
+        "valid_until_ms": 1507994728530,
+        "signatures":{"matrix.org":{"ed25519:auto":"..."}}
+    }
+"""
+
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
