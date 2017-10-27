@@ -646,7 +646,9 @@ class GroupsServerHandler(object):
             raise SynapseError(403, "User not invited to group")
 
         if not self.hs.is_mine_id(requester_user_id):
-            local_attestation = self.attestations.create_attestation(group_id, user_id)
+            local_attestation = self.attestations.create_attestation(
+                group_id, requester_user_id,
+            )
             remote_attestation = content["attestation"]
 
             yield self.attestations.verify_attestation(
