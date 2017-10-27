@@ -443,12 +443,12 @@ def _check_power_levels(event, auth_events):
     for k, v in user_list.items():
         try:
             UserID.from_string(k)
-        except:
+        except Exception:
             raise SynapseError(400, "Not a valid user_id: %s" % (k,))
 
         try:
             int(v)
-        except:
+        except Exception:
             raise SynapseError(400, "Not a valid power level: %s" % (v,))
 
     key = (event.type, event.state_key, )

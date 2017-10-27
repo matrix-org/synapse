@@ -486,6 +486,26 @@ class TransportLayerClient(object):
         )
 
     @log_function
+    def update_group_profile(self, destination, group_id, requester_user_id, content):
+        """Update a remote group profile
+
+        Args:
+            destination (str)
+            group_id (str)
+            requester_user_id (str)
+            content (dict): The new profile of the group
+        """
+        path = PREFIX + "/groups/%s/profile" % (group_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            data=content,
+            ignore_backoff=True,
+        )
+
+    @log_function
     def get_group_summary(self, destination, group_id, requester_user_id):
         """Get a group summary
         """

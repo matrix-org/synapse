@@ -563,7 +563,7 @@ class MessageHandler(BaseHandler):
         try:
             dump = ujson.dumps(unfreeze(event.content))
             ujson.loads(dump)
-        except:
+        except Exception:
             logger.exception("Failed to encode content: %r", event.content)
             raise
 

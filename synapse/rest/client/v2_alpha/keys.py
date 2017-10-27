@@ -53,8 +53,7 @@ class KeyUploadServlet(RestServlet):
       },
     }
     """
-    PATTERNS = client_v2_patterns("/keys/upload(/(?P<device_id>[^/]+))?$",
-                                  releases=())
+    PATTERNS = client_v2_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
 
     def __init__(self, hs):
         """
@@ -128,10 +127,7 @@ class KeyQueryServlet(RestServlet):
     } } } } } }
     """
 
-    PATTERNS = client_v2_patterns(
-        "/keys/query$",
-        releases=()
-    )
+    PATTERNS = client_v2_patterns("/keys/query$")
 
     def __init__(self, hs):
         """
@@ -160,10 +156,7 @@ class KeyChangesServlet(RestServlet):
         200 OK
         { "changed": ["@foo:example.com"] }
     """
-    PATTERNS = client_v2_patterns(
-        "/keys/changes$",
-        releases=()
-    )
+    PATTERNS = client_v2_patterns("/keys/changes$")
 
     def __init__(self, hs):
         """
@@ -213,10 +206,7 @@ class OneTimeKeyServlet(RestServlet):
     } } } }
 
     """
-    PATTERNS = client_v2_patterns(
-        "/keys/claim$",
-        releases=()
-    )
+    PATTERNS = client_v2_patterns("/keys/claim$")
 
     def __init__(self, hs):
         super(OneTimeKeyServlet, self).__init__()

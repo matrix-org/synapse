@@ -412,7 +412,7 @@ class GroupCreateServlet(RestServlet):
         # TODO: Create group on remote server
         content = parse_json_object_from_request(request)
         localpart = content.pop("localpart")
-        group_id = GroupID.create(localpart, self.server_name).to_string()
+        group_id = GroupID(localpart, self.server_name).to_string()
 
         result = yield self.groups_handler.create_group(group_id, user_id, content)
 

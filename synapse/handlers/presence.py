@@ -364,7 +364,7 @@ class PresenceHandler(object):
                 )
 
             preserve_fn(self._update_states)(changes)
-        except:
+        except Exception:
             logger.exception("Exception in _handle_timeouts loop")
 
     @defer.inlineCallbacks
