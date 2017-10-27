@@ -80,13 +80,13 @@ class PaginationConfig(object):
                 from_tok = None  # For backwards compat.
             elif from_tok:
                 from_tok = StreamToken.from_string(from_tok)
-        except:
+        except Exception:
             raise SynapseError(400, "'from' paramater is invalid")
 
         try:
             if to_tok:
                 to_tok = StreamToken.from_string(to_tok)
-        except:
+        except Exception:
             raise SynapseError(400, "'to' paramater is invalid")
 
         limit = get_param("limit", None)
@@ -98,7 +98,7 @@ class PaginationConfig(object):
 
         try:
             return PaginationConfig(from_tok, to_tok, direction, limit)
-        except:
+        except Exception:
             logger.exception("Failed to create pagination config")
             raise SynapseError(400, "Invalid request.")
 

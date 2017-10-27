@@ -636,7 +636,7 @@ class RoomMemberStore(SQLBaseStore):
                 room_id = row["room_id"]
                 try:
                     content = json.loads(row["content"])
-                except:
+                except Exception:
                     continue
 
                 display_name = content.get("displayname", None)

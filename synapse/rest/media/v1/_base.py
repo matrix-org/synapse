@@ -17,6 +17,7 @@ from synapse.http.server import respond_with_json, finish_request
 from synapse.api.errors import (
     cs_error, Codes, SynapseError
 )
+from synapse.util import logcontext
 
 from twisted.internet import defer
 from twisted.protocols.basic import FileSender
@@ -44,7 +45,7 @@ def parse_media_id(request):
             except UnicodeDecodeError:
                 pass
         return server_name, media_id, file_name
-    except:
+    except Exception:
         raise SynapseError(
             404,
             "Invalid media id token %r" % (request.postpath,),
@@ -103,7 +104,9 @@ def respond_with_file(request, media_type, file_path,
         )
 
         with open(file_path, "rb") as f:
-            yield FileSender().beginFileTransfer(f, request)
+            yield logcontext.make_deferred_yieldable(
+                FileSender().beginFileTransfer(f, request)
+            )
 
         finish_request(request)
     else:

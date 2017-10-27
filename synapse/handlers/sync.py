@@ -15,7 +15,7 @@
 
 from synapse.api.constants import Membership, EventTypes
 from synapse.util.async import concurrently_execute
-from synapse.util.logcontext import LoggingContext
+from synapse.util.logcontext import LoggingContext, make_deferred_yieldable, preserve_fn
 from synapse.util.metrics import Measure, measure_func
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.push.clientformat import format_push_rules_for_user
@@ -184,11 +184,11 @@ class SyncHandler(object):
         if not result:
             result = self.response_cache.set(
                 sync_config.request_key,
-                self._wait_for_sync_for_user(
+                preserve_fn(self._wait_for_sync_for_user)(
                     sync_config, since_token, timeout, full_state
                 )
             )
-        return result
+        return make_deferred_yieldable(result)
 
     @defer.inlineCallbacks
     def _wait_for_sync_for_user(self, sync_config, since_token, timeout,

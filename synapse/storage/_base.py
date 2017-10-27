@@ -103,7 +103,7 @@ class LoggingTransaction(object):
                     "[SQL values] {%s} %r",
                     self.name, args[0]
                 )
-            except:
+            except Exception:
                 # Don't let logging failures stop SQL from working
                 pass
 

@@ -1,3 +1,53 @@
+Changes in synapse v0.24.1 (2017-10-24)
+=======================================
+
+Bug fixes:
+
+* Fix updating group profiles over federation (PR #2567)
+
+
+Changes in synapse v0.24.0 (2017-10-23)
+=======================================
+
+No changes since v0.24.0-rc1
+
+
+Changes in synapse v0.24.0-rc1 (2017-10-19)
+===========================================
+
+Features:
+
+* Add Group Server (PR #2352, #2363, #2374, #2377, #2378, #2382, #2410, #2426,
+  #2430, #2454, #2471, #2472, #2544)
+* Add support for channel notifications (PR #2501)
+* Add basic implementation of backup media store (PR #2538)
+* Add config option to auto-join new users to rooms (PR #2545)
+
+
+Changes:
+
+* Make the spam checker a module (PR #2474)
+* Delete expired url cache data (PR #2478)
+* Ignore incoming events for rooms that we have left (PR #2490)
+* Allow spam checker to reject invites too (PR #2492)
+* Add room creation checks to spam checker (PR #2495)
+* Spam checking: add the invitee to user_may_invite (PR #2502)
+* Process events from federation for different rooms in parallel (PR #2520)
+* Allow error strings from spam checker (PR #2531)
+* Improve error handling for missing files in config (PR #2551)
+
+
+Bug fixes:
+
+* Fix handling SERVFAILs when doing AAAA lookups for federation (PR #2477)
+* Fix incompatibility with newer versions of ujson (PR #2483) Thanks to
+  @jeremycline!
+* Fix notification keywords that start/end with non-word chars (PR #2500)
+* Fix stack overflow and logcontexts from linearizer (PR #2532)
+* Fix 500 error when fields missing from power_levels event (PR #2552)
+* Fix 500 error when we get an error handling a PDU (PR #2553)
+
+
 Changes in synapse v0.23.1 (2017-10-02)
 =======================================
 

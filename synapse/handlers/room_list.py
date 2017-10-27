@@ -20,6 +20,7 @@ from ._base import BaseHandler
 from synapse.api.constants import (
     EventTypes, JoinRules,
 )
+from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
 from synapse.util.async import concurrently_execute
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.util.caches.response_cache import ResponseCache
@@ -70,6 +71,7 @@ class RoomListHandler(BaseHandler):
         if search_filter:
             # We explicitly don't bother caching searches or requests for
             # appservice specific lists.
+            logger.info("Bypassing cache as search request.")
             return self._get_public_room_list(
                 limit, since_token, search_filter, network_tuple=network_tuple,
             )
@@ -77,13 +79,16 @@ class RoomListHandler(BaseHandler):
         key = (limit, since_token, network_tuple)
         result = self.response_cache.get(key)
         if not result:
+            logger.info("No cached result, calculating one.")
             result = self.response_cache.set(
                 key,
-                self._get_public_room_list(
+                preserve_fn(self._get_public_room_list)(
                     limit, since_token, network_tuple=network_tuple
                 )
             )
-        return result
+        else:
+            logger.info("Using cached deferred result.")
+        return make_deferred_yieldable(result)
 
     @defer.inlineCallbacks
     def _get_public_room_list(self, limit=None, since_token=None,

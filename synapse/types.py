@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import string
 
 from synapse.api.errors import SynapseError
 
@@ -126,14 +127,10 @@ class DomainSpecificString(
         try:
             cls.from_string(s)
             return True
-        except:
+        except Exception:
             return False
 
     __str__ = to_string
-
-    @classmethod
-    def create(cls, localpart, domain,):
-        return cls(localpart=localpart, domain=domain)
 
 
 class UserID(DomainSpecificString):
@@ -160,6 +157,38 @@ class GroupID(DomainSpecificString):
     """Structure representing a group ID."""
     SIGIL = "+"
 
+    @classmethod
+    def from_string(cls, s):
+        group_id = super(GroupID, cls).from_string(s)
+        if not group_id.localpart:
+            raise SynapseError(
+                400,
+                "Group ID cannot be empty",
+            )
+
+        if contains_invalid_mxid_characters(group_id.localpart):
+            raise SynapseError(
+                400,
+                "Group ID can only contain characters a-z, 0-9, or '=_-./'",
+            )
+
+        return group_id
+
+
+mxid_localpart_allowed_characters = set("_-./=" + string.ascii_lowercase + string.digits)
+
+
+def contains_invalid_mxid_characters(localpart):
+    """Check for characters not allowed in an mxid or groupid localpart
+
+    Args:
+        localpart (basestring): the localpart to be checked
+
+    Returns:
+        bool: True if there are any naughty characters
+    """
+    return any(c not in mxid_localpart_allowed_characters for c in localpart)
+
 
 class StreamToken(
     namedtuple("Token", (
@@ -184,7 +213,7 @@ class StreamToken(
                 # i.e. old token from before receipt_key
                 keys.append("0")
             return cls(*keys)
-        except:
+        except Exception:
             raise SynapseError(400, "Invalid Token")
 
     def to_string(self):
@@ -270,7 +299,7 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
             if string[0] == 't':
                 parts = string[1:].split('-', 1)
                 return cls(topological=int(parts[0]), stream=int(parts[1]))
-        except:
+        except Exception:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
 
@@ -279,7 +308,7 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
         try:
             if string[0] == 's':
                 return cls(topological=None, stream=int(string[1:]))
-        except:
+        except Exception:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
 
