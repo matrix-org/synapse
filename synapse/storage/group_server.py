@@ -1086,6 +1086,24 @@ class GroupServerStore(SQLBaseStore):
             desc="update_remote_attestion",
         )
 
+    def remove_attestation_renewal(self, group_id, user_id):
+        """Remove an attestation that we thought we should renew, but actually
+        shouldn't. Ideally this would never get called as we would never
+        incorrectly try and do attestations for local users on local groups.
+
+        Args:
+            group_id (str)
+            user_id (str)
+        """
+        return self._simple_update_one(
+            table="_simple_delete",
+            keyvalues={
+                "group_id": group_id,
+                "user_id": user_id,
+            },
+            desc="remove_attestation_renewal",
+        )
+
     @defer.inlineCallbacks
     def get_remote_attestation(self, group_id, user_id):
         """Get the attestation that proves the remote agrees that the user is

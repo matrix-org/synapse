@@ -139,6 +139,7 @@ class GroupAttestionRenewer(object):
                     "Incorrectly trying to do attestations for user: %r in %r",
                     user_id, group_id,
                 )
+                yield self.store.remove_attestation_renewal(group_id, user_id)
                 return
 
             yield self.transport_client.renew_group_attestation(
