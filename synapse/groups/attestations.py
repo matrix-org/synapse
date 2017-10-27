@@ -130,10 +130,16 @@ class GroupAttestionRenewer(object):
         def _renew_attestation(group_id, user_id):
             attestation = self.attestations.create_attestation(group_id, user_id)
 
-            if self.is_mine_id(group_id):
+            if not self.is_mine_id(group_id):
+                destination = get_domain_from_id(group_id)
+            else not self.is_mine_id(user_id):
                 destination = get_domain_from_id(user_id)
             else:
-                destination = get_domain_from_id(group_id)
+                logger.warn(
+                    "Incorrectly trying to do attestations for user: %r in %r",
+                    user_id, group_id,
+                )
+                return
 
             yield self.transport_client.renew_group_attestation(
                 destination, group_id, user_id,
