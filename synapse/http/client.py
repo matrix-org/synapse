@@ -115,6 +115,17 @@ class SimpleHttpClient(object):
 
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, uri, args={}, headers=None):
+        """
+        Args:
+            uri (str):
+            args (dict[str, str|List[str]]): query params
+            headers (dict[str, List[str]]|None): If not None, a map from
+               header name to a list of values for that header
+
+        Returns:
+            Deferred[object]: parsed json
+        """
+
         # TODO: Do we ever want to log message contents?
         logger.debug("post_urlencoded_get_json args: %s", args)
 
