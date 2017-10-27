@@ -186,9 +186,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         )
 
         try:
-            result = yield self.factory.txns.fetch_or_execute(
-                msg["id"], method, msg,
-            )
+            result = yield method(msg)
             self.sendMessage(result)
         except SynapseError as ex:
             self.sendMessage(json.dumps({
@@ -337,8 +335,14 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         defer.returnValue(bytes('{"id":"' + msg["id"] + '","result":{}}'))
 
     @defer.inlineCallbacks
-    def _handle_send(self, msg):
+    def _handle_send(self, msg, use_cached=True):
         logger.debug("Execute _handle_send")
+        if use_cached:
+            result = yield self.factory.txns.fetch_or_execute(
+                msg["id"], self._handle_send, msg, use_cached=False,
+            )
+            defer.returnValue(result)
+
         params = msg["params"]
 
         yield self.factory.presence_handler.bump_presence_active_time(self.requester.user)
@@ -362,8 +366,13 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         }))
 
     @defer.inlineCallbacks
-    def _handle_state(self, msg):
+    def _handle_state(self, msg, use_cached=True):
         logger.debug("Execute _handle_state")
+        if use_cached:
+            result = yield self.factory.txns.fetch_or_execute(
+                msg["id"], self._handle_state, msg, use_cached=False,
+            )
+            defer.returnValue(result)
 
         yield self.factory.presence_handler.bump_presence_active_time(self.requester.user)
 
