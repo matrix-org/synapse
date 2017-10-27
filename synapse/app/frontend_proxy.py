@@ -69,7 +69,7 @@ class PresenceStatusStubServlet(ClientV1RestServlet):
         }
         result = yield self.http_client.get_json(
             self.main_uri + request.uri,
-            headers=headers,        
+            headers=headers,
         )
         defer.returnValue((200, result))
 
