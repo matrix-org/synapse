@@ -1095,8 +1095,8 @@ class GroupServerStore(SQLBaseStore):
             group_id (str)
             user_id (str)
         """
-        return self._simple_update_one(
-            table="_simple_delete",
+        return self._simple_delete(
+            table="group_attestations_renewals",
             keyvalues={
                 "group_id": group_id,
                 "user_id": user_id,

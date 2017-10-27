@@ -128,11 +128,9 @@ class GroupAttestionRenewer(object):
 
         @defer.inlineCallbacks
         def _renew_attestation(group_id, user_id):
-            attestation = self.attestations.create_attestation(group_id, user_id)
-
             if not self.is_mine_id(group_id):
                 destination = get_domain_from_id(group_id)
-            else not self.is_mine_id(user_id):
+            elif not self.is_mine_id(user_id):
                 destination = get_domain_from_id(user_id)
             else:
                 logger.warn(
@@ -141,6 +139,8 @@ class GroupAttestionRenewer(object):
                 )
                 yield self.store.remove_attestation_renewal(group_id, user_id)
                 return
+
+            attestation = self.attestations.create_attestation(group_id, user_id)
 
             yield self.transport_client.renew_group_attestation(
                 destination, group_id, user_id,
