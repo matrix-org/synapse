@@ -82,7 +82,7 @@ class AuthHandler(BaseHandler):
     def check_auth(self, flows, clientdict, clientip):
         """
         Takes a dictionary sent by the client in the login / registration
-        protocol and handles the login flow.
+        protocol and handles the User-Interactive Auth flow.
 
         As a side effect, this function fills in the 'creds' key on the user's
         session with a map, which maps each auth-type (str) to the relevant
