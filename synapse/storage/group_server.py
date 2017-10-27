@@ -1026,6 +1026,7 @@ class GroupServerStore(SQLBaseStore):
                 "avatar_url": avatar_url,
                 "short_description": short_description,
                 "long_description": long_description,
+                "is_public": True,
             },
             desc="create_group",
         )
