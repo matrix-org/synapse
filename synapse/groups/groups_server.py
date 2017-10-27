@@ -642,7 +642,10 @@ class GroupsServerHandler(object):
 
         yield self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
 
-        if not self.store.is_user_invited_to_local_group(group_id, requester_user_id):
+        is_invited = yield self.store.is_user_invited_to_local_group(
+            group_id, requester_user_id,
+        )
+        if not is_invited:
             raise SynapseError(403, "User not invited to group")
 
         if not self.hs.is_mine_id(requester_user_id):
