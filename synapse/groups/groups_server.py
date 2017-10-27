@@ -646,6 +646,7 @@ class GroupsServerHandler(object):
             raise SynapseError(403, "User not invited to group")
 
         if not self.hs.is_mine_id(requester_user_id):
+            local_attestation = self.attestations.create_attestation(group_id, user_id)
             remote_attestation = content["attestation"]
 
             yield self.attestations.verify_attestation(
@@ -654,12 +655,8 @@ class GroupsServerHandler(object):
                 group_id=group_id,
             )
         else:
+            local_attestation = None
             remote_attestation = None
-
-        local_attestation = self.attestations.create_attestation(
-            group_id,
-            requester_user_id,
-        )
 
         is_public = _parse_visibility_from_contents(content)
 
