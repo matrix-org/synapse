@@ -244,8 +244,8 @@ BASE_APPEND_OVERRIDE_RULES = [
         'conditions': [
             {
                 'kind': 'event_match',
-                'key': 'content.body',
-                'pattern': '@room',
+                'key': 'content.formatted_body',
+                'pattern': '*https://matrix.to/#@room*',
                 '_id': '_roomnotif_content',
             },
             {
