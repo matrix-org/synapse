@@ -42,9 +42,6 @@ REQUIREMENTS = {
     "phonenumbers>=8.2.0": ["phonenumbers"],
 }
 CONDITIONAL_REQUIREMENTS = {
-    "web_client": {
-        "matrix_angular_sdk>=0.6.8": ["syweb>=0.6.8"],
-    },
     "preview_url": {
         "netaddr>=0.7.18": ["netaddr"],
     },

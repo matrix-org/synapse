@@ -34,8 +34,7 @@ from synapse.http.server import RootRedirect
 from synapse.http.site import SynapseSite
 from synapse.metrics import register_memory_metrics
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
-from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, \
-    check_requirements
+from synapse.python_dependencies import check_requirements
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
 from synapse.rest.key.v1.server_key_resource import LocalKey
@@ -56,42 +55,13 @@ from twisted.internet import defer, reactor
 from twisted.web.resource import EncodingResourceWrapper, Resource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
+from twisted.web.util import Redirect
 
 logger = logging.getLogger("synapse.app.homeserver")
 
 
 def gz_wrap(r):
     return EncodingResourceWrapper(r, [GzipEncoderFactory()])
-
-
-def build_resource_for_web_client(hs):
-    webclient_path = hs.get_config().web_client_location
-    if not webclient_path:
-        try:
-            import syweb
-        except ImportError:
-            quit_with_error(
-                "Could not find a webclient.\n\n"
-                "Please either install the matrix-angular-sdk or configure\n"
-                "the location of the source to serve via the configuration\n"
-                "option `web_client_location`\n\n"
-                "To install the `matrix-angular-sdk` via pip, run:\n\n"
-                "    pip install '%(dep)s'\n"
-                "\n"
-                "You can also disable hosting of the webclient via the\n"
-                "configuration option `web_client`\n"
-                % {"dep": CONDITIONAL_REQUIREMENTS["web_client"].keys()[0]}
-            )
-        syweb_path = os.path.dirname(syweb.__file__)
-        webclient_path = os.path.join(syweb_path, "webclient")
-    # GZip is disabled here due to
-    # https://twistedmatrix.com/trac/ticket/7678
-    # (It can stay enabled for the API resources: they call
-    # write() with the whole body and then finish() straight
-    # after and so do not trigger the bug.
-    # GzipFile was removed in commit 184ba09
-    # return GzipFile(webclient_path)  # TODO configurable?
-    return File(webclient_path)  # TODO configurable?
 
 
 class SynapseHomeServer(HomeServer):
@@ -148,16 +118,14 @@ class SynapseHomeServer(HomeServer):
                         SERVER_KEY_V2_PREFIX: KeyApiV2Resource(self),
                     })
 
-                if name == "webclient":
-                    resources[WEB_CLIENT_PREFIX] = build_resource_for_web_client(self)
-
                 if name == "metrics" and self.get_config().enable_metrics:
                     resources[METRICS_PREFIX] = MetricsResource(self)
 
-        if WEB_CLIENT_PREFIX in resources:
-            root_resource = RootRedirect(WEB_CLIENT_PREFIX)
-        else:
-            root_resource = Resource()
+        # TODO: which URL should be used=
+        resources[WEB_CLIENT_PREFIX] = Redirect(
+            "https://matrix.to/?hs=" + config.server_name
+        )
+        root_resource = resources[WEB_CLIENT_PREFIX]
 
         root_resource = create_resource_tree(resources, root_resource)
 

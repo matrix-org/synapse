@@ -122,7 +122,6 @@ class HomeServer(object):
         'client_resource',
         'resource_for_federation',
         'resource_for_static_content',
-        'resource_for_web_client',
         'resource_for_content_repo',
         'resource_for_server_key',
         'resource_for_server_key_v2',
