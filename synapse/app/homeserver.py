@@ -30,7 +30,6 @@ from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.federation.transport.server import TransportLayerServer
-from synapse.http.server import RootRedirect
 from synapse.http.site import SynapseSite
 from synapse.metrics import register_memory_metrics
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
@@ -52,7 +51,7 @@ from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
 from twisted.application import service
 from twisted.internet import defer, reactor
-from twisted.web.resource import EncodingResourceWrapper, Resource
+from twisted.web.resource import EncodingResourceWrapper
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
 from twisted.web.util import Redirect
