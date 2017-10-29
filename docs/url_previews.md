@@ -56,6 +56,7 @@ As a first cut, let's do #2 and have the receiver hit the API to calculate its o
 API
 ---
 
+```
 GET /_matrix/media/r0/preview_url?url=http://wherever.com
 200 OK
 {
@@ -66,6 +67,7 @@ GET /_matrix/media/r0/preview_url?url=http://wherever.com
     "og:description" : "“Synapse 0.12 is out! Lots of polishing, performance &amp;amp; bugfixes: /sync API, /r0 prefix, fulltext search, 3PID invites https://t.co/5alhXLLEGP”"
     "og:site_name"   : "Twitter"
 }
+```
 
 * Downloads the URL
   * If HTML, just stores it in RAM and parses it for OG meta tags
