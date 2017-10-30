@@ -749,7 +749,7 @@ class GroupsServerHandler(object):
         if not is_admin:
             if not self.hs.config.enable_group_creation:
                 raise SynapseError(
-                    403, "Only server admin can create group on this server",
+                    403, "Only a server admin can create groups on this server",
                 )
             localpart = group_id_obj.localpart
             if not localpart.startswith(self.hs.config.group_creation_prefix):
