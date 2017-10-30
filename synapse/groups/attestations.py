@@ -13,6 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Attestations ensure that users and groups can't lie about their memberships.
+
+When a user joins a group the HS and GS swap attestations, which allow them
+both to independently prove to third parties their membership.These
+attestations have a validity period so need to be periodically renewed.
+
+If a user leaves (or gets kicked out of) a group, either side can still use
+their attestation to "prove" their membership, until the attestation expires.
+Therefore attestations shouldn't be relied on to prove membership in important
+cases, but can for less important situtations, e.g. showing a users membership
+of groups on their profile, showing flairs, etc.abs
+
+An attestsation is a signed blob of json that looks like:
+
+    {
+        "user_id": "@foo:a.example.com",
+        "group_id": "+bar:b.example.com",
+        "valid_until_ms": 1507994728530,
+        "signatures":{"matrix.org":{"ed25519:auto":"..."}}
+    }
+"""
+
+import logging
+import random
+
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
@@ -22,8 +47,16 @@ from synapse.util.logcontext import preserve_fn
 from signedjson.sign import sign_json
 
 
+logger = logging.getLogger(__name__)
+
+
 # Default validity duration for new attestations we create
 DEFAULT_ATTESTATION_LENGTH_MS = 3 * 24 * 60 * 60 * 1000
+
+# We add some jitter to the validity duration of attestations so that if we
+# add lots of users at once we don't need to renew them all at once.
+# The jitter is a multiplier picked randomly between the first and second number
+DEFAULT_ATTESTATION_JITTER = (0.9, 1.3)
 
 # Start trying to update our attestations when they come this close to expiring
 UPDATE_ATTESTATION_TIME_MS = 1 * 24 * 60 * 60 * 1000
@@ -73,10 +106,14 @@ class GroupAttestationSigning(object):
         """Create an attestation for the group_id and user_id with default
         validity length.
         """
+        validity_period = DEFAULT_ATTESTATION_LENGTH_MS
+        validity_period *= random.uniform(*DEFAULT_ATTESTATION_JITTER)
+        valid_until_ms = int(self.clock.time_msec() + validity_period)
+
         return sign_json({
             "group_id": group_id,
             "user_id": user_id,
-            "valid_until_ms": self.clock.time_msec() + DEFAULT_ATTESTATION_LENGTH_MS,
+            "valid_until_ms": valid_until_ms,
         }, self.server_name, self.signing_key)
 
 
@@ -128,12 +165,19 @@ class GroupAttestionRenewer(object):
 
         @defer.inlineCallbacks
         def _renew_attestation(group_id, user_id):
-            attestation = self.attestations.create_attestation(group_id, user_id)
-
-            if self.is_mine_id(group_id):
+            if not self.is_mine_id(group_id):
+                destination = get_domain_from_id(group_id)
+            elif not self.is_mine_id(user_id):
                 destination = get_domain_from_id(user_id)
             else:
-                destination = get_domain_from_id(group_id)
+                logger.warn(
+                    "Incorrectly trying to do attestations for user: %r in %r",
+                    user_id, group_id,
+                )
+                yield self.store.remove_attestation_renewal(group_id, user_id)
+                return
+
+            attestation = self.attestations.create_attestation(group_id, user_id)
 
             yield self.transport_client.renew_group_attestation(
                 destination, group_id, user_id,

@@ -117,6 +117,8 @@ class DeviceRestServlet(servlet.RestServlet):
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, device_id):
+        requester = yield self.auth.get_user_by_req(request)
+
         try:
             body = servlet.parse_json_object_from_request(request)
 
@@ -135,11 +137,12 @@ class DeviceRestServlet(servlet.RestServlet):
         if not authed:
             defer.returnValue((401, result))
 
-        requester = yield self.auth.get_user_by_req(request)
-        yield self.device_handler.delete_device(
-            requester.user.to_string(),
-            device_id,
-        )
+        # check that the UI auth matched the access token
+        user_id = result[constants.LoginType.PASSWORD]
+        if user_id != requester.user.to_string():
+            raise errors.AuthError(403, "Invalid auth")
+
+        yield self.device_handler.delete_device(user_id, device_id)
         defer.returnValue((200, {}))
 
     @defer.inlineCallbacks
