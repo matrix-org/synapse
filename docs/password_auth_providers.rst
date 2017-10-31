@@ -37,3 +37,15 @@ Password auth provider classes must provide the following methods:
 
     The method should return a Twisted ``Deferred`` object, which resolves to
     ``True`` if authentication is successful, and ``False`` if not.
+
+Optional methods
+----------------
+
+Password provider classes may optionally provide the following methods.
+
+*class* ``SomeProvider.get_db_schema_files()``
+
+    This method, if implemented, should return an Iterable of ``(name,
+    stream)`` pairs of database schema files. Each file is applied in turn at
+    initialisation, and a record is then made in the database so that it is
+    not re-applied on the next start.
