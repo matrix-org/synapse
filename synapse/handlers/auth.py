@@ -517,7 +517,8 @@ class AuthHandler(BaseHandler):
             login_submission (dict): the whole of the login submission
                 (including 'type' and other relevant fields)
         Returns:
-            Deferred[str]: canonical user id
+            Deferred[str, func]: canonical user id, and optional callback
+                to be called once the access token and device id are issued
         Raises:
             StoreError if there was a problem accessing the database
             SynapseError if there was a problem with the request
@@ -581,11 +582,13 @@ class AuthHandler(BaseHandler):
                     ),
                 )
 
-            returned_user_id = yield provider.check_auth(
+            result = yield provider.check_auth(
                 username, login_type, login_dict,
             )
-            if returned_user_id:
-                defer.returnValue(returned_user_id)
+            if result:
+                if isinstance(result, str):
+                    result = (result, None)
+                defer.returnValue(result)
 
         if login_type == LoginType.PASSWORD:
             known_login_type = True
@@ -595,7 +598,7 @@ class AuthHandler(BaseHandler):
             )
 
             if canonical_user_id:
-                defer.returnValue(canonical_user_id)
+                defer.returnValue((canonical_user_id, None))
 
         if not known_login_type:
             raise SynapseError(400, "Unknown login type %s" % login_type)

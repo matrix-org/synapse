@@ -219,7 +219,7 @@ class LoginRestServlet(ClientV1RestServlet):
             raise SynapseError(400, "User identifier is missing 'user' key")
 
         auth_handler = self.auth_handler
-        canonical_user_id = yield auth_handler.validate_login(
+        canonical_user_id, callback = yield auth_handler.validate_login(
             identifier["user"],
             login_submission,
         )
@@ -237,6 +237,9 @@ class LoginRestServlet(ClientV1RestServlet):
             "home_server": self.hs.hostname,
             "device_id": device_id,
         }
+
+        if callback is not None:
+            yield callback(result)
 
         defer.returnValue((200, result))
 
