@@ -846,19 +846,25 @@ class GroupServerStore(SQLBaseStore):
             )
         return self.runInteraction("remove_user_from_group", _remove_user_from_group_txn)
 
-    def add_room_to_group(self, group_id, room_id, is_public):
-        return self._simple_insert(
+    def update_room_group_association(self, group_id, room_id, is_public=True):
+        return self._simple_upsert(
             table="group_rooms",
-            values={
+            keyvalues={
                 "group_id": group_id,
                 "room_id": room_id,
+            },
+            values={
                 "is_public": is_public,
             },
-            desc="add_room_to_group",
+            insertion_values={
+                "group_id": group_id,
+                "room_id": room_id,
+            },
+            desc="update_room_group_association",
         )
 
-    def remove_room_from_group(self, group_id, room_id):
-        def _remove_room_from_group_txn(txn):
+    def delete_room_group_association(self, group_id, room_id):
+        def _delete_room_group_association_txn(txn):
             self._simple_delete_txn(
                 txn,
                 table="group_rooms",
@@ -877,7 +883,7 @@ class GroupServerStore(SQLBaseStore):
                 },
             )
         return self.runInteraction(
-            "remove_room_from_group", _remove_room_from_group_txn,
+            "delete_room_group_association", _delete_room_group_association_txn,
         )
 
     def get_publicised_groups_for_user(self, user_id):
