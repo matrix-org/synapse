@@ -531,7 +531,8 @@ class GroupsServerHandler(object):
         })
 
     @defer.inlineCallbacks
-    def update_room_group_association(self, group_id, requester_user_id, room_id, content):
+    def update_room_group_association(self, group_id, requester_user_id, room_id,
+                                      content):
         """Add room to group
         """
         RoomID.from_string(room_id)  # Ensure valid room id
@@ -542,7 +543,9 @@ class GroupsServerHandler(object):
 
         is_public = _parse_visibility_from_contents(content)
 
-        yield self.store.update_room_group_association(group_id, room_id, is_public=is_public)
+        yield self.store.update_room_group_association(
+            group_id, room_id, is_public=is_public
+        )
 
         defer.returnValue({})
 

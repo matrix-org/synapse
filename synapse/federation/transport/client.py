@@ -531,8 +531,8 @@ class TransportLayerClient(object):
             ignore_backoff=True,
         )
 
-    def update_room_group_association(self, destination, group_id, requester_user_id, room_id,
-                          content):
+    def update_room_group_association(self, destination, group_id, requester_user_id,
+                                      room_id, content):
         """Add a room to a group
         """
         path = PREFIX + "/groups/%s/room/%s" % (group_id, room_id,)
@@ -545,7 +545,8 @@ class TransportLayerClient(object):
             ignore_backoff=True,
         )
 
-    def delete_room_group_association(self, destination, group_id, requester_user_id, room_id):
+    def delete_room_group_association(self, destination, group_id, requester_user_id,
+                                      room_id):
         """Remove a room from a group
         """
         path = PREFIX + "/groups/%s/room/%s" % (group_id, room_id,)
