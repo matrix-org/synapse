@@ -320,7 +320,7 @@ class Porter(object):
                     backward_chunk = min(row[0] for row in brows) - 1
 
                 rows = frows + brows
-                self._convert_rows(table, headers, rows)
+                rows = self._convert_rows(table, headers, rows)
 
                 def insert(txn):
                     self.postgres_store.insert_many_txn(
@@ -556,17 +556,29 @@ class Porter(object):
             i for i, h in enumerate(headers) if h in bool_col_names
         ]
 
+        class BadValueException(Exception):
+            pass
+
         def conv(j, col):
             if j in bool_cols:
                 return bool(col)
+            elif isinstance(col, basestring) and "\0" in col:
+                logger.warn("DROPPING ROW: NUL value in table %s col %s: %r", table, headers[j], col)
+                raise BadValueException();
             return col
 
+        outrows = []
         for i, row in enumerate(rows):
-            rows[i] = tuple(
-                conv(j, col)
-                for j, col in enumerate(row)
-                if j > 0
-            )
+            try:
+                outrows.append(tuple(
+                    conv(j, col)
+                    for j, col in enumerate(row)
+                    if j > 0
+                ))
+            except BadValueException:
+                pass
+
+        return outrows
 
     @defer.inlineCallbacks
     def _setup_sent_transactions(self):
@@ -594,7 +606,7 @@ class Porter(object):
             "select", r,
         )
 
-        self._convert_rows("sent_transactions", headers, rows)
+        rows = self._convert_rows("sent_transactions", headers, rows)
 
         inserted_rows = len(rows)
         if inserted_rows:
