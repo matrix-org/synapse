@@ -77,6 +77,12 @@ class AuthHandler(BaseHandler):
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.device_handler = hs.get_device_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
+        self._password_enabled = hs.config.password_enabled
+
+        login_types = set()
+        if self._password_enabled:
+            login_types.add(LoginType.PASSWORD)
+        self._supported_login_types = frozenset(login_types)
 
     @defer.inlineCallbacks
     def check_auth(self, flows, clientdict, clientip):
@@ -266,10 +272,11 @@ class AuthHandler(BaseHandler):
 
         user_id = authdict["user"]
         password = authdict["password"]
-        if not user_id.startswith('@'):
-            user_id = UserID(user_id, self.hs.hostname).to_string()
 
-        return self._check_password(user_id, password)
+        return self.validate_login(user_id, {
+            "type": LoginType.PASSWORD,
+            "password": password,
+        })
 
     @defer.inlineCallbacks
     def _check_recaptcha(self, authdict, clientip):
@@ -398,23 +405,6 @@ class AuthHandler(BaseHandler):
 
         return self.sessions[session_id]
 
-    def validate_password_login(self, user_id, password):
-        """
-        Authenticates the user with their username and password.
-
-        Used only by the v1 login API.
-
-        Args:
-            user_id (str): complete @user:id
-            password (str): Password
-        Returns:
-            defer.Deferred: (str) canonical user id
-        Raises:
-            StoreError if there was a problem accessing the database
-            LoginError if there was an authentication problem.
-        """
-        return self._check_password(user_id, password)
-
     @defer.inlineCallbacks
     def get_access_token_for_user_id(self, user_id, device_id=None,
                                      initial_display_name=None):
@@ -501,26 +491,60 @@ class AuthHandler(BaseHandler):
             )
         defer.returnValue(result)
 
-    @defer.inlineCallbacks
-    def _check_password(self, user_id, password):
-        """Authenticate a user against the LDAP and local databases.
+    def get_supported_login_types(self):
+        """Get a the login types supported for the /login API
 
-        user_id is checked case insensitively against the local database, but
-        will throw if there are multiple inexact matches.
+        By default this is just 'm.login.password' (unless password_enabled is
+        False in the config file), but password auth providers can provide
+        other login types.
+
+        Returns:
+            Iterable[str]: login types
+        """
+        return self._supported_login_types
+
+    @defer.inlineCallbacks
+    def validate_login(self, user_id, login_submission):
+        """Authenticates the user for the /login API
+
+        Also used by the user-interactive auth flow to validate
+        m.login.password auth types.
 
         Args:
-            user_id (str): complete @user:id
+            user_id (str): user_id supplied by the user
+            login_submission (dict): the whole of the login submission
+                (including 'type' and other relevant fields)
         Returns:
-            (str) the canonical_user_id
+            Deferred[str]: canonical user id
         Raises:
-            LoginError if login fails
+            StoreError if there was a problem accessing the database
+            SynapseError if there was a problem with the request
+            LoginError if there was an authentication problem.
         """
+
+        if not user_id.startswith('@'):
+            user_id = UserID(
+                user_id, self.hs.hostname
+            ).to_string()
+
+        login_type = login_submission.get("type")
+
+        if login_type != LoginType.PASSWORD:
+            raise SynapseError(400, "Bad login type.")
+        if not self._password_enabled:
+            raise SynapseError(400, "Password login has been disabled.")
+        if "password" not in login_submission:
+            raise SynapseError(400, "Missing parameter: password")
+
+        password = login_submission["password"]
         for provider in self.password_providers:
             is_valid = yield provider.check_password(user_id, password)
             if is_valid:
                 defer.returnValue(user_id)
 
-        canonical_user_id = yield self._check_local_password(user_id, password)
+        canonical_user_id = yield self._check_local_password(
+            user_id, password,
+        )
 
         if canonical_user_id:
             defer.returnValue(canonical_user_id)
