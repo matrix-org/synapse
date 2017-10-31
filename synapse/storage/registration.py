@@ -36,12 +36,15 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             columns=["user_id", "device_id"],
         )
 
-        self.register_background_index_update(
-            "refresh_tokens_device_index",
-            index_name="refresh_tokens_device_id",
-            table="refresh_tokens",
-            columns=["user_id", "device_id"],
-        )
+        # we no longer use refresh tokens, but it's possible that some people
+        # might have a background update queued to build this index. Just
+        # clear the background update.
+        @defer.inlineCallbacks
+        def noop_update(progress, batch_size):
+            yield self._end_background_update("refresh_tokens_device_index")
+            defer.returnValue(1)
+        self.register_background_update_handler(
+            "refresh_tokens_device_index", noop_update)
 
     @defer.inlineCallbacks
     def add_access_token_to_user(self, user_id, token, device_id=None):
@@ -238,10 +241,9 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
 
     @defer.inlineCallbacks
     def user_delete_access_tokens(self, user_id, except_token_id=None,
-                                  device_id=None,
-                                  delete_refresh_tokens=False):
+                                  device_id=None):
         """
-        Invalidate access/refresh tokens belonging to a user
+        Invalidate access tokens belonging to a user
 
         Args:
             user_id (str):  ID of user the tokens belong to
@@ -250,8 +252,6 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             device_id (str|None):  ID of device the tokens are associated with.
                 If None, tokens associated with any device (or no device) will
                 be deleted
-            delete_refresh_tokens (bool):  True to delete refresh tokens as
-                well as access tokens.
         Returns:
             defer.Deferred:
         """
@@ -261,13 +261,6 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             }
             if device_id is not None:
                 keyvalues["device_id"] = device_id
-
-            if delete_refresh_tokens:
-                self._simple_delete_txn(
-                    txn,
-                    table="refresh_tokens",
-                    keyvalues=keyvalues,
-                )
 
             items = keyvalues.items()
             where_clause = " AND ".join(k + " = ?" for k, _ in items)

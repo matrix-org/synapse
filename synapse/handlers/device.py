@@ -161,7 +161,6 @@ class DeviceHandler(BaseHandler):
 
         yield self.store.user_delete_access_tokens(
             user_id, device_id=device_id,
-            delete_refresh_tokens=True,
         )
 
         yield self.store.delete_e2e_keys_by_device(
@@ -196,7 +195,6 @@ class DeviceHandler(BaseHandler):
         for device_id in device_ids:
             yield self.store.user_delete_access_tokens(
                 user_id, device_id=device_id,
-                delete_refresh_tokens=True,
             )
             yield self.store.delete_e2e_keys_by_device(
                 user_id=user_id, device_id=device_id
