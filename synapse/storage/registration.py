@@ -180,9 +180,11 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             )
 
         if create_profile_with_localpart:
+            # set a default displayname serverside to avoid ugly race
+            # between auto-joins and clients trying to set displaynames
             txn.execute(
-                "INSERT INTO profiles(user_id) VALUES (?)",
-                (create_profile_with_localpart,)
+                "INSERT INTO profiles(user_id, displayname) VALUES (?,?)",
+                (create_profile_with_localpart, create_profile_with_localpart)
             )
 
         self._invalidate_cache_and_stream(
