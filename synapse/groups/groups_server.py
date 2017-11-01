@@ -533,7 +533,7 @@ class GroupsServerHandler(object):
     @defer.inlineCallbacks
     def update_room_group_association(self, group_id, requester_user_id, room_id,
                                       content):
-        """Add room to group
+        """Add or update an association between room and group
         """
         RoomID.from_string(room_id)  # Ensure valid room id
 
