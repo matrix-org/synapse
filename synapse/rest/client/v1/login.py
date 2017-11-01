@@ -175,7 +175,7 @@ class LoginRestServlet(ClientV1RestServlet):
             login_submission.get('medium'),
             login_submission.get('address'),
             login_submission.get('user'),
-        );
+        )
         login_submission_legacy_convert(login_submission)
 
         if "identifier" not in login_submission:
