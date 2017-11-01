@@ -605,11 +605,56 @@ class AuthHandler(BaseHandler):
             if e.code == 404:
                 raise SynapseError(404, "Unknown user", Codes.NOT_FOUND)
             raise e
-        yield self.store.user_delete_access_tokens(
-            user_id, except_access_token_id
+        yield self.delete_access_tokens_for_user(
+            user_id, except_token_id=except_access_token_id,
         )
         yield self.hs.get_pusherpool().remove_pushers_by_user(
             user_id, except_access_token_id
+        )
+
+    @defer.inlineCallbacks
+    def deactivate_account(self, user_id):
+        """Deactivate a user's account
+
+        Args:
+            user_id (str): ID of user to be deactivated
+
+        Returns:
+            Deferred
+        """
+        # FIXME: Theoretically there is a race here wherein user resets
+        # password using threepid.
+        yield self.delete_access_tokens_for_user(user_id)
+        yield self.store.user_delete_threepids(user_id)
+        yield self.store.user_set_password_hash(user_id, None)
+
+    def delete_access_token(self, access_token):
+        """Invalidate a single access token
+
+        Args:
+            access_token (str): access token to be deleted
+
+        Returns:
+            Deferred
+        """
+        return self.store.delete_access_token(access_token)
+
+    def delete_access_tokens_for_user(self, user_id, except_token_id=None,
+                                      device_id=None):
+        """Invalidate access tokens belonging to a user
+
+        Args:
+            user_id (str):  ID of user the tokens belong to
+            except_token_id (str|None): access_token ID which should *not* be
+                deleted
+            device_id (str|None):  ID of device the tokens are associated with.
+                If None, tokens associated with any device (or no device) will
+                be deleted
+        Returns:
+            Deferred
+        """
+        return self.store.user_delete_access_tokens(
+            user_id, except_token_id=except_token_id, device_id=device_id,
         )
 
     @defer.inlineCallbacks
