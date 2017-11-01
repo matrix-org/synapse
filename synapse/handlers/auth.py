@@ -270,6 +270,7 @@ class AuthHandler(BaseHandler):
         sess = self._get_session_info(session_id)
         return sess.setdefault('serverdict', {}).get(key, default)
 
+    @defer.inlineCallbacks
     def _check_password_auth(self, authdict, _):
         if "user" not in authdict or "password" not in authdict:
             raise LoginError(400, "", Codes.MISSING_PARAM)
@@ -277,10 +278,11 @@ class AuthHandler(BaseHandler):
         user_id = authdict["user"]
         password = authdict["password"]
 
-        return self.validate_login(user_id, {
+        (canonical_id, callback) = yield self.validate_login(user_id, {
             "type": LoginType.PASSWORD,
             "password": password,
         })
+        defer.returnValue(canonical_id)
 
     @defer.inlineCallbacks
     def _check_recaptcha(self, authdict, clientip):
