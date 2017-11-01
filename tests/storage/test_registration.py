@@ -86,7 +86,8 @@ class RegistrationStoreTestCase(unittest.TestCase):
 
         # now delete some
         yield self.store.user_delete_access_tokens(
-            self.user_id, device_id=self.device_id, delete_refresh_tokens=True)
+            self.user_id, device_id=self.device_id,
+        )
 
         # check they were deleted
         user = yield self.store.get_user_by_access_token(self.tokens[1])
@@ -97,8 +98,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
         self.assertEqual(self.user_id, user["name"])
 
         # now delete the rest
-        yield self.store.user_delete_access_tokens(
-            self.user_id, delete_refresh_tokens=True)
+        yield self.store.user_delete_access_tokens(self.user_id)
 
         user = yield self.store.get_user_by_access_token(self.tokens[0])
         self.assertIsNone(user,
