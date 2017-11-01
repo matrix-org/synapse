@@ -36,6 +36,7 @@ class RegistrationHandler(BaseHandler):
         super(RegistrationHandler, self).__init__(hs)
 
         self.auth = hs.get_auth()
+        self._auth_handler = hs.get_auth_handler()
         self.profile_handler = hs.get_profile_handler()
         self.captcha_client = CaptchaServerHttpClient(hs)
 
@@ -416,7 +417,7 @@ class RegistrationHandler(BaseHandler):
                 create_profile_with_localpart=user.localpart,
             )
         else:
-            yield self.store.user_delete_access_tokens(user_id=user_id)
+            yield self._auth_handler.delete_access_tokens_for_user(user_id)
             yield self.store.add_access_token_to_user(user_id=user_id, token=token)
 
         if displayname is not None:

@@ -162,7 +162,6 @@ class DeactivateAccountRestServlet(RestServlet):
 
     def __init__(self, hs):
         self.hs = hs
-        self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         super(DeactivateAccountRestServlet, self).__init__()
@@ -180,7 +179,9 @@ class DeactivateAccountRestServlet(RestServlet):
 
         # allow ASes to dectivate their own users
         if requester and requester.app_service:
-            yield self._deactivate_account(requester.user.to_string())
+            yield self.auth_handler.deactivate_account(
+                requester.user.to_string()
+            )
             defer.returnValue((200, {}))
 
         authed, result, params, _ = yield self.auth_handler.check_auth([
@@ -205,16 +206,8 @@ class DeactivateAccountRestServlet(RestServlet):
             logger.error("Auth succeeded but no known type!", result.keys())
             raise SynapseError(500, "", Codes.UNKNOWN)
 
-        yield self._deactivate_account(user_id)
+        yield self.auth_handler.deactivate_account(user_id)
         defer.returnValue((200, {}))
-
-    @defer.inlineCallbacks
-    def _deactivate_account(self, user_id):
-        # FIXME: Theoretically there is a race here wherein user resets
-        # password using threepid.
-        yield self.store.user_delete_access_tokens(user_id)
-        yield self.store.user_delete_threepids(user_id)
-        yield self.store.user_set_password_hash(user_id, None)
 
 
 class EmailThreepidRequestTokenRestServlet(RestServlet):
