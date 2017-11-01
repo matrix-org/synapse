@@ -566,7 +566,6 @@ class RegisterRestServlet(RestServlet):
         access_token = (
             yield self.auth_handler.get_access_token_for_user_id(
                 user_id, device_id=device_id,
-                initial_display_name=params.get("initial_device_display_name")
             )
         )
 
