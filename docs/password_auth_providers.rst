@@ -82,3 +82,13 @@ Password auth provider classes may optionally provide the following methods.
 
     The method should return a Twisted ``Deferred`` object, which resolves to
     ``True`` if authentication is successful, and ``False`` if not.
+
+``someprovider.on_logged_out``\(*user_id*, *device_id*, *access_token*)
+
+    This method, if implemented, is called when a user logs out. It is passed
+    the qualified user ID, the ID of the deactivated device (if any: access
+    tokens are occasionally created without an associated device ID), and the
+    (now deactivated) access token.
+
+    It may return a Twisted ``Deferred`` object; the logout request will wait
+    for the deferred to complete but the result is ignored.
