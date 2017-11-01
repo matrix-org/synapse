@@ -846,7 +846,7 @@ class GroupServerStore(SQLBaseStore):
             )
         return self.runInteraction("remove_user_from_group", _remove_user_from_group_txn)
 
-    def update_room_group_association(self, group_id, room_id, is_public=True):
+    def update_room_group_association(self, group_id, room_id, is_public):
         return self._simple_upsert(
             table="group_rooms",
             keyvalues={
