@@ -1,4 +1,4 @@
-/* Copyright 2016 OpenMarket Ltd
+/* Copyright 2017 New Vector Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,4 +13,5 @@
  * limitations under the License.
  */
 
-ALTER TABLE refresh_tokens ADD COLUMN device_id TEXT;
+/* we no longer use (or create) the refresh_tokens table */
+DROP TABLE IF EXISTS refresh_tokens;
