@@ -20,7 +20,7 @@ import synapse
 import synapse.types
 from synapse.api.auth import get_access_token_from_request, has_access_token
 from synapse.api.constants import LoginType
-from synapse.types import RoomID, RoomAlias
+from synapse.types import RoomID, RoomAlias, get_localpart_from_id
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
 from synapse.http.servlet import (
     RestServlet, parse_json_object_from_request, assert_params_in_request, parse_string
@@ -341,6 +341,13 @@ class RegisterRestServlet(RestServlet):
                 password=new_password,
                 guest_access_token=guest_access_token,
                 generate_token=False,
+            )
+
+            # before we auto-join, set a default displayname to avoid ugly race
+            # between the client joining rooms and trying to set a displayname
+            localpart = get_localpart_from_id(registered_user_id)
+            yield self.store.set_profile_displayname(
+                localpart, localpart
             )
 
             # auto-join the user to any rooms we're supposed to dump them into
