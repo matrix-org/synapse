@@ -75,7 +75,6 @@ class AuthHandler(BaseHandler):
         logger.info("Extra password_providers: %r", self.password_providers)
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
-        self.device_handler = hs.get_device_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
         self._password_enabled = hs.config.password_enabled
 
@@ -406,8 +405,7 @@ class AuthHandler(BaseHandler):
         return self.sessions[session_id]
 
     @defer.inlineCallbacks
-    def get_access_token_for_user_id(self, user_id, device_id=None,
-                                     initial_display_name=None):
+    def get_access_token_for_user_id(self, user_id, device_id=None):
         """
         Creates a new access token for the user with the given user ID.
 
@@ -421,13 +419,10 @@ class AuthHandler(BaseHandler):
             device_id (str|None): the device ID to associate with the tokens.
                None to leave the tokens unassociated with a device (deprecated:
                we should always have a device ID)
-            initial_display_name (str): display name to associate with the
-               device if it needs re-registering
         Returns:
               The access token for the user's session.
         Raises:
             StoreError if there was a problem storing the token.
-            LoginError if there was an authentication problem.
         """
         logger.info("Logging in user %s on device %s", user_id, device_id)
         access_token = yield self.issue_access_token(user_id, device_id)
@@ -437,9 +432,11 @@ class AuthHandler(BaseHandler):
         # really don't want is active access_tokens without a record of the
         # device, so we double-check it here.
         if device_id is not None:
-            yield self.device_handler.check_device_registered(
-                user_id, device_id, initial_display_name
-            )
+            try:
+                yield self.store.get_device(user_id, device_id)
+            except StoreError:
+                yield self.store.delete_access_token(access_token)
+                raise StoreError(400, "Login raced against device deletion")
 
         defer.returnValue(access_token)
 

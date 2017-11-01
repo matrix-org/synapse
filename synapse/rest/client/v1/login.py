@@ -166,6 +166,16 @@ class LoginRestServlet(ClientV1RestServlet):
         Returns:
             (int, object): HTTP code/response
         """
+        # Log the request we got, but only certain fields to minimise the chance of
+        # logging someone's password (even if they accidentally put it in the wrong
+        # field)
+        logger.info(
+            "Got login request with identifier: %r, medium: %r, address: %r, user: %r",
+            login_submission.get('identifier'),
+            login_submission.get('medium'),
+            login_submission.get('address'),
+            login_submission.get('user'),
+        )
         login_submission_legacy_convert(login_submission)
 
         if "identifier" not in login_submission:
@@ -219,7 +229,6 @@ class LoginRestServlet(ClientV1RestServlet):
         )
         access_token = yield auth_handler.get_access_token_for_user_id(
             canonical_user_id, device_id,
-            login_submission.get("initial_device_display_name"),
         )
 
         result = {
@@ -241,7 +250,6 @@ class LoginRestServlet(ClientV1RestServlet):
         device_id = yield self._register_device(user_id, login_submission)
         access_token = yield auth_handler.get_access_token_for_user_id(
             user_id, device_id,
-            login_submission.get("initial_device_display_name"),
         )
         result = {
             "user_id": user_id,  # may have changed
@@ -284,7 +292,6 @@ class LoginRestServlet(ClientV1RestServlet):
             )
             access_token = yield auth_handler.get_access_token_for_user_id(
                 registered_user_id, device_id,
-                login_submission.get("initial_device_display_name"),
             )
 
             result = {
