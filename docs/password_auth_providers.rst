@@ -70,6 +70,11 @@ Password auth provider classes may optionally provide the following methods.
     the canonical ``@localpart:domain`` user id if authentication is successful,
     and ``None`` if not.
 
+    Alternatively, the ``Deferred`` can resolve to a ``(str, func)`` tuple, in
+    which case the second field is a callback which will be called with the
+    result from the ``/login`` call (including ``access_token``, ``device_id``,
+    etc.)
+
 ``someprovider.check_password``\(*user_id*, *password*)
 
     This method provides a simpler interface than ``get_supported_login_types``
