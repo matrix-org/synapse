@@ -30,6 +30,8 @@ from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.federation.transport.server import TransportLayerServer
+from synapse.module_api import ModuleApi
+from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import RootRedirect
 from synapse.http.site import SynapseSite
 from synapse.metrics import register_memory_metrics
@@ -49,6 +51,7 @@ from synapse.storage.prepare_database import UpgradeDatabaseException, prepare_d
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
+from synapse.util.module_loader import load_module
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
 from twisted.application import service
@@ -153,6 +156,15 @@ class SynapseHomeServer(HomeServer):
 
                 if name == "metrics" and self.get_config().enable_metrics:
                     resources[METRICS_PREFIX] = MetricsResource(self)
+
+        additional_resources = listener_config.get("additional_resources", {})
+        logger.debug("Configuring additional resources: %r",
+                     additional_resources)
+        module_api = ModuleApi(self, self.get_auth_handler())
+        for path, resmodule in additional_resources.items():
+            handler_cls, config = load_module(resmodule)
+            handler = handler_cls(config, module_api)
+            resources[path] = AdditionalResource(self, handler.handle_request)
 
         if WEB_CLIENT_PREFIX in resources:
             root_resource = RootRedirect(WEB_CLIENT_PREFIX)

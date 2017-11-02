@@ -247,6 +247,13 @@ class ServerConfig(Config):
               - names: [federation]  # Federation APIs
                 compress: false
 
+            # optional list of additional endpoints which can be loaded via
+            # dynamic modules
+            # additional_resources:
+            #   "/_matrix/my/custom/endpoint":
+            #     module: my_module.CustomRequestHandler
+            #     config: {}
+
           # Unsecure HTTP listener,
           # For when matrix traffic passes through loadbalancer that unwraps TLS.
           - port: %(unsecure_port)s
