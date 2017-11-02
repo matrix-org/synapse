@@ -24,7 +24,25 @@ class ModuleApi(object):
         self.hs = hs
 
         self._store = hs.get_datastore()
+        self._auth = hs.get_auth()
         self._auth_handler = auth_handler
+
+    def get_user_by_req(self, req, allow_guest=False):
+        """Check the access_token provided for a request
+
+        Args:
+            req (twisted.web.server.Request): Incoming HTTP request
+            allow_guest (bool): True if guest users should be allowed. If this
+                is False, and the access token is for a guest user, an
+                AuthError will be thrown
+        Returns:
+            twisted.internet.defer.Deferred[synapse.types.Requester]:
+                the requester for this request
+        Raises:
+            synapse.api.errors.AuthError: if no user by that token exists,
+                or the token is invalid.
+        """
+        return self._auth.get_user_by_req(req, allow_guest)
 
     def get_qualified_user_id(self, username):
         """Qualify a user id, if necessary
@@ -62,6 +80,22 @@ class ModuleApi(object):
         """
         reg = self.hs.get_handlers().registration_handler
         return reg.register(localpart=localpart)
+
+    def invalidate_access_token(self, access_token):
+        """Invalidate an access token for a user
+
+        Args:
+            access_token(str): access token
+
+        Returns:
+            twisted.internet.defer.Deferred - resolves once the access token
+               has been removed.
+
+        Raises:
+            synapse.api.errors.AuthError: the access token is invalid
+        """
+
+        return self._auth_handler.delete_access_token(access_token)
 
     def run_db_interaction(self, desc, func, *args, **kwargs):
         """Run a function with a database connection
