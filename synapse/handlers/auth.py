@@ -826,6 +826,7 @@ class _AccountHandler(object):
         self.hs = hs
 
         self._check_user_exists = check_user_exists
+        self._store = hs.get_datastore()
 
     def get_qualified_user_id(self, username):
         """Qualify a user id, if necessary
@@ -863,3 +864,18 @@ class _AccountHandler(object):
         """
         reg = self.hs.get_handlers().registration_handler
         return reg.register(localpart=localpart)
+
+    def run_db_interaction(self, desc, func, *args, **kwargs):
+        """Run a function with a database connection
+
+        Args:
+            desc (str): description for the transaction, for metrics etc
+            func (func): function to be run. Passed a database cursor object
+                as well as *args and **kwargs
+            *args: positional args to be passed to func
+            **kwargs: named args to be passed to func
+
+        Returns:
+            Deferred[object]: result of func
+        """
+        return self._store.runInteraction(desc, func, *args, **kwargs)
