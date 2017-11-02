@@ -255,7 +255,8 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
                 If None, tokens associated with any device (or no device) will
                 be deleted
         Returns:
-            defer.Deferred:
+            defer.Deferred[list[str, str|None]]: a list of the deleted tokens
+                and device IDs
         """
         def f(txn):
             keyvalues = {
@@ -272,20 +273,22 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
                 values.append(except_token_id)
 
             txn.execute(
-                "SELECT token FROM access_tokens WHERE %s" % where_clause,
+                "SELECT token, device_id FROM access_tokens WHERE %s" % where_clause,
                 values
             )
-            rows = self.cursor_to_dict(txn)
+            tokens_and_devices = [(r[0], r[1]) for r in txn]
 
-            for row in rows:
+            for token, _ in tokens_and_devices:
                 self._invalidate_cache_and_stream(
-                    txn, self.get_user_by_access_token, (row["token"],)
+                    txn, self.get_user_by_access_token, (token,)
                 )
 
             txn.execute(
                 "DELETE FROM access_tokens WHERE %s" % where_clause,
                 values
             )
+
+            return tokens_and_devices
 
         yield self.runInteraction(
             "user_delete_access_tokens", f,

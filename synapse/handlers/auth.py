@@ -687,6 +687,7 @@ class AuthHandler(BaseHandler):
         yield self.store.user_delete_threepids(user_id)
         yield self.store.user_set_password_hash(user_id, None)
 
+    @defer.inlineCallbacks
     def delete_access_token(self, access_token):
         """Invalidate a single access token
 
@@ -696,8 +697,19 @@ class AuthHandler(BaseHandler):
         Returns:
             Deferred
         """
-        return self.store.delete_access_token(access_token)
+        user_info = yield self.auth.get_user_by_access_token(access_token)
+        yield self.store.delete_access_token(access_token)
 
+        # see if any of our auth providers want to know about this
+        for provider in self.password_providers:
+            if hasattr(provider, "on_logged_out"):
+                yield provider.on_logged_out(
+                    user_id=str(user_info["user"]),
+                    device_id=user_info["device_id"],
+                    access_token=access_token,
+                )
+
+    @defer.inlineCallbacks
     def delete_access_tokens_for_user(self, user_id, except_token_id=None,
                                       device_id=None):
         """Invalidate access tokens belonging to a user
@@ -712,9 +724,19 @@ class AuthHandler(BaseHandler):
         Returns:
             Deferred
         """
-        return self.store.user_delete_access_tokens(
+        tokens_and_devices = yield self.store.user_delete_access_tokens(
             user_id, except_token_id=except_token_id, device_id=device_id,
         )
+
+        # see if any of our auth providers want to know about this
+        for provider in self.password_providers:
+            if hasattr(provider, "on_logged_out"):
+                for token, device_id in tokens_and_devices:
+                    yield provider.on_logged_out(
+                        user_id=user_id,
+                        device_id=device_id,
+                        access_token=token,
+                    )
 
     @defer.inlineCallbacks
     def add_threepid(self, user_id, medium, address, validated_at):
