@@ -27,7 +27,7 @@ Password auth provider classes must provide the following methods:
 *class* ``SomeProvider``\(*config*, *account_handler*)
 
     The constructor is passed the config object returned by ``parse_config``,
-    and a ``synapse.handlers.auth._AccountHandler`` object which allows the
+    and a ``synapse.module_api.ModuleApi`` object which allows the
     password provider to check if accounts exist and/or create new ones.
 
 Optional methods

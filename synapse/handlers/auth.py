@@ -13,13 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from twisted.internet import defer
 
 from ._base import BaseHandler
 from synapse.api.constants import LoginType
-from synapse.types import UserID
 from synapse.api.errors import AuthError, LoginError, Codes, StoreError, SynapseError
+from synapse.module_api import ModuleApi
+from synapse.types import UserID
 from synapse.util.async import run_on_reactor
 from synapse.util.caches.expiringcache import ExpiringCache
 
@@ -63,10 +63,7 @@ class AuthHandler(BaseHandler):
             reset_expiry_on_get=True,
         )
 
-        account_handler = _AccountHandler(
-            hs, check_user_exists=self.check_user_exists
-        )
-
+        account_handler = ModuleApi(hs, self)
         self.password_providers = [
             module(config=config, account_handler=account_handler)
             for module, config in hs.config.password_providers
@@ -843,66 +840,3 @@ class MacaroonGeneartor(object):
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         return macaroon
-
-
-class _AccountHandler(object):
-    """A proxy object that gets passed to password auth providers so they
-    can register new users etc if necessary.
-    """
-    def __init__(self, hs, check_user_exists):
-        self.hs = hs
-
-        self._check_user_exists = check_user_exists
-        self._store = hs.get_datastore()
-
-    def get_qualified_user_id(self, username):
-        """Qualify a user id, if necessary
-
-        Takes a user id provided by the user and adds the @ and :domain to
-        qualify it, if necessary
-
-        Args:
-            username (str): provided user id
-
-        Returns:
-            str: qualified @user:id
-        """
-        if username.startswith('@'):
-            return username
-        return UserID(username, self.hs.hostname).to_string()
-
-    def check_user_exists(self, user_id):
-        """Check if user exists.
-
-        Args:
-            user_id (str): Complete @user:id
-
-        Returns:
-            Deferred[str|None]: Canonical (case-corrected) user_id, or None
-               if the user is not registered.
-        """
-        return self._check_user_exists(user_id)
-
-    def register(self, localpart):
-        """Registers a new user with given localpart
-
-        Returns:
-            Deferred: a 2-tuple of (user_id, access_token)
-        """
-        reg = self.hs.get_handlers().registration_handler
-        return reg.register(localpart=localpart)
-
-    def run_db_interaction(self, desc, func, *args, **kwargs):
-        """Run a function with a database connection
-
-        Args:
-            desc (str): description for the transaction, for metrics etc
-            func (func): function to be run. Passed a database cursor object
-                as well as *args and **kwargs
-            *args: positional args to be passed to func
-            **kwargs: named args to be passed to func
-
-        Returns:
-            Deferred[object]: result of func
-        """
-        return self._store.runInteraction(desc, func, *args, **kwargs)
