@@ -507,7 +507,6 @@ class GroupsServerHandler(object):
         chunk = []
         for room_result in room_results:
             room_id = room_result["room_id"]
-            is_public = room_result["is_public"]
 
             joined_users = yield self.store.get_users_in_room(room_id)
             entry = yield self.room_list_handler.generate_room_entry(
@@ -518,8 +517,7 @@ class GroupsServerHandler(object):
             if not entry:
                 continue
 
-            if not is_public:
-                entry["is_public"] = False
+            entry["is_public"] = bool(room_result["is_public"])
 
             chunk.append(entry)
 
