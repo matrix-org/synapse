@@ -57,7 +57,7 @@ class GroupServerStore(SQLBaseStore):
             retcols=("user_id", "is_public", "is_admin",),
             desc="get_users_in_group",
             order="is_admin",
-            order_asc=False, # Order descending: admins first
+            order_asc=False,  # Order descending: admins first
         )
 
     def get_invited_users_in_group(self, group_id):

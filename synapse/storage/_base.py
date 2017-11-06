@@ -641,7 +641,8 @@ class SQLBaseStore(object):
         )
 
     @classmethod
-    def _simple_select_list_txn(cls, txn, table, keyvalues, retcols, order=None, order_asc=True):
+    def _simple_select_list_txn(cls, txn, table, keyvalues, retcols,
+                                order=None, order_asc=True):
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
