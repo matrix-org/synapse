@@ -670,8 +670,9 @@ class SQLBaseStore(object):
             )
 
         if order:
-            sql = sql + " ORDER BY ? %s" % ("ASC" if order_asc else "DESC")
-            query_values.append(order)
+            sql = sql + " ORDER BY %s %s" % (
+                order, "ASC" if order_asc else "DESC"
+            )
 
         txn.execute(sql, query_values)
 
