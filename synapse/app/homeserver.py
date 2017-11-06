@@ -92,11 +92,12 @@ class SynapseHomeServer(HomeServer):
             handler = handler_cls(config, module_api)
             resources[path] = AdditionalResource(self, handler.handle_request)
 
-        # TODO: which URL should be used=
-        resources[WEB_CLIENT_PREFIX] = Redirect(
-            "https://matrix.to/?hs=" + config.server_name
+        # redirect old webclients to root
+        resources[WEB_CLIENT_PREFIX] = Redirect("/")
+
+        root_resource = File(
+            os.path.join(os.path.dirname(synapse.__file__), "static")
         )
-        root_resource = resources[WEB_CLIENT_PREFIX]
 
         root_resource = create_resource_tree(resources, root_resource)
 
