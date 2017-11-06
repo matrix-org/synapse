@@ -79,49 +79,6 @@ class SynapseHomeServer(HomeServer):
         resources = {}
         for res in listener_config["resources"]:
             for name in res["names"]:
-                if name == "client":
-                    client_resource = ClientRestResource(self)
-                    if res["compress"]:
-                        client_resource = gz_wrap(client_resource)
-
-                    resources.update({
-                        "/_matrix/client/api/v1": client_resource,
-                        "/_matrix/client/r0": client_resource,
-                        "/_matrix/client/unstable": client_resource,
-                        "/_matrix/client/v2_alpha": client_resource,
-                        "/_matrix/client/versions": client_resource,
-                    })
-
-                if name == "federation":
-                    resources.update({
-                        FEDERATION_PREFIX: TransportLayerServer(self),
-                    })
-
-                if name in ["static", "client"]:
-                    resources.update({
-                        STATIC_PREFIX: File(
-                            os.path.join(os.path.dirname(synapse.__file__), "static")
-                        ),
-                    })
-
-                if name in ["media", "federation", "client"]:
-                    media_repo = MediaRepositoryResource(self)
-                    resources.update({
-                        MEDIA_PREFIX: media_repo,
-                        LEGACY_MEDIA_PREFIX: media_repo,
-                        CONTENT_REPO_PREFIX: ContentRepoResource(
-                            self, self.config.uploads_path
-                        ),
-                    })
-
-                if name in ["keys", "federation"]:
-                    resources.update({
-                        SERVER_KEY_PREFIX: LocalKey(self),
-                        SERVER_KEY_V2_PREFIX: KeyApiV2Resource(self),
-                    })
-
-                if name == "metrics" and self.get_config().enable_metrics:
-                    resources[METRICS_PREFIX] = MetricsResource(self)
                 resources.update(self._configure_named_resource(
                     name, res.get("compress", False),
                 ))
@@ -222,9 +179,6 @@ class SynapseHomeServer(HomeServer):
                 SERVER_KEY_PREFIX: LocalKey(self),
                 SERVER_KEY_V2_PREFIX: KeyApiV2Resource(self),
             })
-
-        if name == "webclient":
-            resources[WEB_CLIENT_PREFIX] = build_resource_for_web_client(self)
 
         if name == "metrics" and self.get_config().enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(self)
