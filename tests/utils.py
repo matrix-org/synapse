@@ -310,6 +310,7 @@ class SQLiteMemoryDbPool(ConnectionPool, object):
         )
 
         self.config = Mock()
+        self.config.password_providers = []
         self.config.database_config = {"name": "sqlite3"}
 
     def prepare(self):

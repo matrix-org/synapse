@@ -30,6 +30,8 @@ from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.federation.transport.server import TransportLayerServer
+from synapse.module_api import ModuleApi
+from synapse.http.additional_resource import AdditionalResource
 from synapse.http.site import SynapseSite
 from synapse.metrics import register_memory_metrics
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
@@ -47,6 +49,7 @@ from synapse.storage.prepare_database import UpgradeDatabaseException, prepare_d
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
+from synapse.util.module_loader import load_module
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
 from twisted.application import service
@@ -119,6 +122,18 @@ class SynapseHomeServer(HomeServer):
 
                 if name == "metrics" and self.get_config().enable_metrics:
                     resources[METRICS_PREFIX] = MetricsResource(self)
+                resources.update(self._configure_named_resource(
+                    name, res.get("compress", False),
+                ))
+
+        additional_resources = listener_config.get("additional_resources", {})
+        logger.debug("Configuring additional resources: %r",
+                     additional_resources)
+        module_api = ModuleApi(self, self.get_auth_handler())
+        for path, resmodule in additional_resources.items():
+            handler_cls, config = load_module(resmodule)
+            handler = handler_cls(config, module_api)
+            resources[path] = AdditionalResource(self, handler.handle_request)
 
         # TODO: which URL should be used=
         resources[WEB_CLIENT_PREFIX] = Redirect(
@@ -154,6 +169,67 @@ class SynapseHomeServer(HomeServer):
                     interface=address
                 )
         logger.info("Synapse now listening on port %d", port)
+
+    def _configure_named_resource(self, name, compress=False):
+        """Build a resource map for a named resource
+
+        Args:
+            name (str): named resource: one of "client", "federation", etc
+            compress (bool): whether to enable gzip compression for this
+                resource
+
+        Returns:
+            dict[str, Resource]: map from path to HTTP resource
+        """
+        resources = {}
+        if name == "client":
+            client_resource = ClientRestResource(self)
+            if compress:
+                client_resource = gz_wrap(client_resource)
+
+            resources.update({
+                "/_matrix/client/api/v1": client_resource,
+                "/_matrix/client/r0": client_resource,
+                "/_matrix/client/unstable": client_resource,
+                "/_matrix/client/v2_alpha": client_resource,
+                "/_matrix/client/versions": client_resource,
+            })
+
+        if name == "federation":
+            resources.update({
+                FEDERATION_PREFIX: TransportLayerServer(self),
+            })
+
+        if name in ["static", "client"]:
+            resources.update({
+                STATIC_PREFIX: File(
+                    os.path.join(os.path.dirname(synapse.__file__), "static")
+                ),
+            })
+
+        if name in ["media", "federation", "client"]:
+            media_repo = MediaRepositoryResource(self)
+            resources.update({
+                MEDIA_PREFIX: media_repo,
+                LEGACY_MEDIA_PREFIX: media_repo,
+                CONTENT_REPO_PREFIX: ContentRepoResource(
+                    self, self.config.uploads_path
+                ),
+            })
+
+        if name in ["keys", "federation"]:
+            resources.update({
+                SERVER_KEY_PREFIX: LocalKey(self),
+                SERVER_KEY_V2_PREFIX: KeyApiV2Resource(self),
+            })
+
+        if name == "webclient":
+            resources[WEB_CLIENT_PREFIX] = build_resource_for_web_client(self)
+
+        if name == "metrics" and self.get_config().enable_metrics:
+            resources[METRICS_PREFIX] = MetricsResource(self)
+
+        return resources
 
     def start_listening(self):
         config = self.get_config()

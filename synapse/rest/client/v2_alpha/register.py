@@ -557,25 +557,28 @@ class RegisterRestServlet(RestServlet):
         Args:
             (str) user_id: full canonical @user:id
             (object) params: registration parameters, from which we pull
-                device_id and initial_device_name
+                device_id, initial_device_name and inhibit_login
         Returns:
             defer.Deferred: (object) dictionary for response from /register
         """
-        device_id = yield self._register_device(user_id, params)
-
-        access_token = (
-            yield self.auth_handler.get_access_token_for_user_id(
-                user_id, device_id=device_id,
-                initial_display_name=params.get("initial_device_display_name")
-            )
-        )
-
-        defer.returnValue({
+        result = {
             "user_id": user_id,
-            "access_token": access_token,
             "home_server": self.hs.hostname,
-            "device_id": device_id,
-        })
+        }
+        if not params.get("inhibit_login", False):
+            device_id = yield self._register_device(user_id, params)
+
+            access_token = (
+                yield self.auth_handler.get_access_token_for_user_id(
+                    user_id, device_id=device_id,
+                )
+            )
+
+            result.update({
+                "access_token": access_token,
+                "device_id": device_id,
+            })
+        defer.returnValue(result)
 
     def _register_device(self, user_id, params):
         """Register a device for a user.

@@ -507,7 +507,6 @@ class GroupsServerHandler(object):
         chunk = []
         for room_result in room_results:
             room_id = room_result["room_id"]
-            is_public = room_result["is_public"]
 
             joined_users = yield self.store.get_users_in_room(room_id)
             entry = yield self.room_list_handler.generate_room_entry(
@@ -518,8 +517,7 @@ class GroupsServerHandler(object):
             if not entry:
                 continue
 
-            if not is_public:
-                entry["is_public"] = False
+            entry["is_public"] = bool(room_result["is_public"])
 
             chunk.append(entry)
 
@@ -531,8 +529,9 @@ class GroupsServerHandler(object):
         })
 
     @defer.inlineCallbacks
-    def add_room_to_group(self, group_id, requester_user_id, room_id, content):
-        """Add room to group
+    def update_room_group_association(self, group_id, requester_user_id, room_id,
+                                      content):
+        """Add or update an association between room and group
         """
         RoomID.from_string(room_id)  # Ensure valid room id
 
@@ -542,19 +541,21 @@ class GroupsServerHandler(object):
 
         is_public = _parse_visibility_from_contents(content)
 
-        yield self.store.add_room_to_group(group_id, room_id, is_public=is_public)
+        yield self.store.update_room_group_association(
+            group_id, room_id, is_public=is_public
+        )
 
         defer.returnValue({})
 
     @defer.inlineCallbacks
-    def remove_room_from_group(self, group_id, requester_user_id, room_id):
+    def delete_room_group_association(self, group_id, requester_user_id, room_id):
         """Remove room from group
         """
         yield self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
 
-        yield self.store.remove_room_from_group(group_id, room_id)
+        yield self.store.delete_room_group_association(group_id, room_id)
 
         defer.returnValue({})
 
@@ -749,7 +750,7 @@ class GroupsServerHandler(object):
         if not is_admin:
             if not self.hs.config.enable_group_creation:
                 raise SynapseError(
-                    403, "Only server admin can create group on this server",
+                    403, "Only a server admin can create groups on this server",
                 )
             localpart = group_id_obj.localpart
             if not localpart.startswith(self.hs.config.group_creation_prefix):
