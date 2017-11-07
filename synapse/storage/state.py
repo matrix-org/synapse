@@ -13,16 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached, cachedList
-from synapse.util.caches import intern_string
-from synapse.util.stringutils import to_ascii
-from synapse.storage.engines import PostgresEngine
+from collections import namedtuple
+import logging
 
 from twisted.internet import defer
-from collections import namedtuple
 
-import logging
+from synapse.storage.engines import PostgresEngine
+from synapse.util.caches import intern_string, CACHE_SIZE_FACTOR
+from synapse.util.caches.descriptors import cached, cachedList
+from synapse.util.caches.dictionary_cache import DictionaryCache
+from synapse.util.stringutils import to_ascii
+from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,10 @@ class StateStore(SQLBaseStore):
             table="current_state_events",
             columns=["state_key"],
             where_clause="type='m.room.member'",
+        )
+
+        self._state_group_cache = DictionaryCache(
+            "*stateGroupCache*", 100000 * CACHE_SIZE_FACTOR
         )
 
     @cached(max_entries=100000, iterable=True)
