@@ -1934,11 +1934,15 @@ class FederationHandler(BaseHandler):
             event_key ((str, str)): (type, state_key) for the current event.
                 this will not be included in the current_state in the context.
         """
-        context.current_state_ids = dict(context.current_state_ids)
-        context.current_state_ids.update({
+        state_updates = {
             k: a.event_id for k, a in auth_events.items()
             if k != event_key
-        })
+        }
+        context.current_state_ids = dict(context.current_state_ids)
+        context.current_state_ids.update(state_updates)
+        if context.delta_ids is not None:
+            context.delta_ids = dict(context.delta_ids)
+            context.delta_ids.update(state_updates)
         context.prev_state_ids = dict(context.prev_state_ids)
         context.prev_state_ids.update({
             k: a.event_id for k, a in auth_events.items()
