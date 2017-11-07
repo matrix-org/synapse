@@ -426,14 +426,15 @@ class GroupsServerHandler(object):
         for user_result in user_results:
             g_user_id = user_result["user_id"]
             is_public = user_result["is_public"]
+            is_admin = user_result["is_admin"]
 
             entry = {"user_id": g_user_id}
 
             profile = yield self.profile_handler.get_profile_from_cache(g_user_id)
             entry.update(profile)
 
-            if not is_public:
-                entry["is_public"] = False
+            entry["is_public"] = bool(is_public)
+            entry["is_admin"] = bool(is_admin)
 
             if not self.is_mine_id(g_user_id):
                 attestation = yield self.store.get_remote_attestation(group_id, g_user_id)

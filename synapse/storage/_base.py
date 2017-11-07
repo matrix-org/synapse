@@ -619,7 +619,7 @@ class SQLBaseStore(object):
         )
 
     def _simple_select_list(self, table, keyvalues, retcols,
-                            desc="_simple_select_list"):
+                            desc="_simple_select_list", order=None, order_asc=True):
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -629,17 +629,20 @@ class SQLBaseStore(object):
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
             retcols (iterable[str]): the names of the columns to return
+            order (str): order the select by this column
+            order_asc (bool): order ascending (if order specified). Default True.
         Returns:
             defer.Deferred: resolves to list[dict[str, Any]]
         """
         return self.runInteraction(
             desc,
             self._simple_select_list_txn,
-            table, keyvalues, retcols
+            table, keyvalues, retcols, order, order_asc
         )
 
     @classmethod
-    def _simple_select_list_txn(cls, txn, table, keyvalues, retcols):
+    def _simple_select_list_txn(cls, txn, table, keyvalues, retcols,
+                                order=None, order_asc=True):
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -650,20 +653,29 @@ class SQLBaseStore(object):
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
             retcols (iterable[str]): the names of the columns to return
+            order (str): order the select by this column
+            order_asc (bool): order ascending (if order specified). Default True.
         """
+        query_values = []
         if keyvalues:
             sql = "SELECT %s FROM %s WHERE %s" % (
                 ", ".join(retcols),
                 table,
                 " AND ".join("%s = ?" % (k, ) for k in keyvalues)
             )
-            txn.execute(sql, keyvalues.values())
+            query_values.extend(keyvalues.values())
         else:
             sql = "SELECT %s FROM %s" % (
                 ", ".join(retcols),
                 table
             )
-            txn.execute(sql)
+
+        if order:
+            sql = sql + " ORDER BY %s %s" % (
+                order, "ASC" if order_asc else "DESC"
+            )
+
+        txn.execute(sql, query_values)
 
         return cls.cursor_to_dict(txn)
 
