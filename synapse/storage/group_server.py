@@ -54,7 +54,7 @@ class GroupServerStore(SQLBaseStore):
         return self._simple_select_list(
             table="group_users",
             keyvalues=keyvalues,
-            retcols=("user_id", "is_public",),
+            retcols=("user_id", "is_public", "is_admin",),
             desc="get_users_in_group",
         )
 
