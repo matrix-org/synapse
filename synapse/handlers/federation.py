@@ -1706,6 +1706,17 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     @log_function
     def do_auth(self, origin, event, context, auth_events):
+        """
+
+        Args:
+            origin (str):
+            event (synapse.events.FrozenEvent):
+            context (synapse.events.snapshot.EventContext):
+            auth_events (dict[(str, str)->str]):
+
+        Returns:
+            defer.Deferred[None]
+        """
         # Check if we have all the auth events.
         current_state = set(e.event_id for e in auth_events.values())
         event_auth_events = set(e_id for e_id, _ in event.auth_events)
@@ -1817,16 +1828,9 @@ class FederationHandler(BaseHandler):
                 current_state = set(e.event_id for e in auth_events.values())
                 different_auth = event_auth_events - current_state
 
-                context.current_state_ids = dict(context.current_state_ids)
-                context.current_state_ids.update({
-                    k: a.event_id for k, a in auth_events.items()
-                    if k != event_key
-                })
-                context.prev_state_ids = dict(context.prev_state_ids)
-                context.prev_state_ids.update({
-                    k: a.event_id for k, a in auth_events.items()
-                })
-                context.state_group = self.store.get_next_state_group()
+                self._update_context_for_auth_events(
+                    context, auth_events, event_key,
+                )
 
         if different_auth and not event.internal_metadata.is_outlier():
             logger.info("Different auth after resolution: %s", different_auth)
@@ -1906,22 +1910,40 @@ class FederationHandler(BaseHandler):
                 # 4. Look at rejects and their proofs.
                 # TODO.
 
-                context.current_state_ids = dict(context.current_state_ids)
-                context.current_state_ids.update({
-                    k: a.event_id for k, a in auth_events.items()
-                    if k != event_key
-                })
-                context.prev_state_ids = dict(context.prev_state_ids)
-                context.prev_state_ids.update({
-                    k: a.event_id for k, a in auth_events.items()
-                })
-                context.state_group = self.store.get_next_state_group()
+                self._update_context_for_auth_events(
+                    context, auth_events, event_key,
+                )
 
         try:
             self.auth.check(event, auth_events=auth_events)
         except AuthError as e:
             logger.warn("Failed auth resolution for %r because %s", event, e)
             raise e
+
+    def _update_context_for_auth_events(self, context, auth_events,
+                                        event_key):
+        """Update the state_ids in an event context after auth event resolution
+
+        Args:
+            context (synapse.events.snapshot.EventContext): event context
+                to be updated
+
+            auth_events (dict[(str, str)->str]): Events to update in the event
+                context.
+
+            event_key ((str, str)): (type, state_key) for the current event.
+                this will not be included in the current_state in the context.
+        """
+        context.current_state_ids = dict(context.current_state_ids)
+        context.current_state_ids.update({
+            k: a.event_id for k, a in auth_events.items()
+            if k != event_key
+        })
+        context.prev_state_ids = dict(context.prev_state_ids)
+        context.prev_state_ids.update({
+            k: a.event_id for k, a in auth_events.items()
+        })
+        context.state_group = self.store.get_next_state_group()
 
     @defer.inlineCallbacks
     def construct_auth_difference(self, local_auth, remote_auth):
