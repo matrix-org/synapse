@@ -13,20 +13,12 @@
  * limitations under the License.
  */
 
-CREATE TABLE groups_new (
-    group_id TEXT NOT NULL,
-    name TEXT,  -- the display name of the room
-    avatar_url TEXT,
-    short_description TEXT,
-    long_description TEXT,
-    is_public BOOL NOT NULL -- whether non-members can access group APIs
-);
+-- this is just embarassing :|
+ALTER TABLE users_in_pubic_room RENAME TO users_in_public_rooms;
 
--- NB: awful hack to get the default to be true on postgres and 1 on sqlite
-INSERT INTO groups_new
-    SELECT group_id, name, avatar_url, short_description, long_description, (1=1) FROM groups;
-
-DROP TABLE groups;
-ALTER TABLE groups_new RENAME TO groups;
-
-CREATE UNIQUE INDEX groups_idx ON groups(group_id);
+-- this is only 300K rows on matrix.org and takes ~3s to generate the index,
+-- so is hopefully not going to block anyone else for that long...
+CREATE INDEX users_in_public_rooms_room_idx ON users_in_public_rooms(room_id);
+CREATE UNIQUE INDEX users_in_public_rooms_user_idx ON users_in_public_rooms(user_id);
+DROP INDEX users_in_pubic_room_room_idx;
+DROP INDEX users_in_pubic_room_user_idx;

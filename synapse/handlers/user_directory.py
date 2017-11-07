@@ -152,7 +152,7 @@ class UserDirectoyHandler(object):
 
         for room_id in room_ids:
             logger.info("Handling room %d/%d", num_processed_rooms, len(room_ids))
-            yield self._handle_intial_room(room_id)
+            yield self._handle_initial_room(room_id)
             num_processed_rooms += 1
             yield sleep(self.INITIAL_SLEEP_MS / 1000.)
 
@@ -166,7 +166,7 @@ class UserDirectoyHandler(object):
         yield self.store.update_user_directory_stream_pos(new_pos)
 
     @defer.inlineCallbacks
-    def _handle_intial_room(self, room_id):
+    def _handle_initial_room(self, room_id):
         """Called when we initially fill out user_directory one room at a time
         """
         is_in_room = yield self.store.is_host_joined(room_id, self.server_name)
