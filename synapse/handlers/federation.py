@@ -1935,7 +1935,7 @@ class FederationHandler(BaseHandler):
                 this will not be included in the current_state in the context.
         """
         state_updates = {
-            k: a.event_id for k, a in auth_events.items()
+            k: a.event_id for k, a in auth_events.iteritems()
             if k != event_key
         }
         context.current_state_ids = dict(context.current_state_ids)
@@ -1945,7 +1945,7 @@ class FederationHandler(BaseHandler):
             context.delta_ids.update(state_updates)
         context.prev_state_ids = dict(context.prev_state_ids)
         context.prev_state_ids.update({
-            k: a.event_id for k, a in auth_events.items()
+            k: a.event_id for k, a in auth_events.iteritems()
         })
         context.state_group = self.store.get_next_state_group()
 
