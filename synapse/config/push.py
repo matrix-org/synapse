@@ -29,14 +29,17 @@ class PushConfig(Config):
         push_config = config.get("push", {})
         self.push_include_content = push_config.get("include_content", True)
 
+        # There was a a 'redact_content' setting but mistakenly read from the
+        # 'email'section'. Check for the flag in the 'push' section, and log,
+        # but do not honour it to avoid nasty surprises when people upgrade.
         if push_config.get("redact_content") is not None:
             reactor.callWhenRunning(lambda: logger.warn(
                 "The push.redact_content content option has never worked. "
                 "Please set push.include_content if you want this behaviour"
             ))
 
-        # There was a a 'redact_content' setting but mistakenly read from the
-        # 'email' section: check for it and honour it, with a warning.
+        # Now check for the one in the 'email' section and honour it,
+        # with a warning.
         push_config = config.get("email", {})
         redact_content = push_config.get("redact_content")
         if redact_content is not None:
