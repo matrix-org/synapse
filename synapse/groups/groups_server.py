@@ -546,6 +546,29 @@ class GroupsServerHandler(object):
         defer.returnValue({})
 
     @defer.inlineCallbacks
+    def update_room_in_group(self, group_id, requester_user_id, room_id, config_key,
+                             content):
+        """Update room in group
+        """
+        RoomID.from_string(room_id)  # Ensure valid room id
+
+        yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        if config_key == "visibility":
+            is_public = _parse_visibility_from_contents(content)
+
+            yield self.store.update_room_in_group_visibility(
+                group_id, room_id,
+                is_public=is_public,
+            )
+        else:
+            raise SynapseError(400, "Uknown config option")
+
+        defer.returnValue({})
+
+    @defer.inlineCallbacks
     def remove_room_from_group(self, group_id, requester_user_id, room_id):
         """Remove room from group
         """

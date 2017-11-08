@@ -857,6 +857,19 @@ class GroupServerStore(SQLBaseStore):
             desc="add_room_to_group",
         )
 
+    def update_room_in_group_visibility(self, group_id, room_id, is_public):
+        return self._simple_update(
+            table="group_rooms",
+            keyvalues={
+                "group_id": group_id,
+                "room_id": room_id,
+            },
+            values={
+                "is_public": is_public,
+            },
+            desc="update_room_in_group_visibility",
+        )
+
     def remove_room_from_group(self, group_id, room_id):
         def _remove_room_from_group_txn(txn):
             self._simple_delete_txn(

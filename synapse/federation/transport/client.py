@@ -545,6 +545,20 @@ class TransportLayerClient(object):
             ignore_backoff=True,
         )
 
+    def update_room_in_group(self, destination, group_id, requester_user_id, room_id,
+                             config_key, content):
+        """Update room in group
+        """
+        path = PREFIX + "/groups/%s/room/%s/config/%s" % (group_id, room_id, config_key,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            data=content,
+            ignore_backoff=True,
+        )
+
     def remove_room_from_group(self, destination, group_id, requester_user_id, room_id):
         """Remove a room from a group
         """

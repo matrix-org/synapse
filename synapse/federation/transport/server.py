@@ -676,7 +676,7 @@ class FederationGroupsRoomsServlet(BaseFederationServlet):
 class FederationGroupsAddRoomsServlet(BaseFederationServlet):
     """Add/remove room from group
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/room/(?<room_id>)$"
+    PATH = "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)$"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, room_id):
@@ -701,6 +701,25 @@ class FederationGroupsAddRoomsServlet(BaseFederationServlet):
         )
 
         defer.returnValue((200, new_content))
+
+
+class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
+    """Update room config in group
+    """
+    PATH = "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)"
+    "/config/(?P<config_key>[^/]*)$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id, room_id, config_key):
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        if get_domain_from_id(requester_user_id) != origin:
+            raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        result = yield self.groups_handler.update_room_in_group(
+            group_id, requester_user_id, room_id, config_key, content,
+        )
+
+        defer.returnValue((200, result))
 
 
 class FederationGroupsUsersServlet(BaseFederationServlet):
@@ -1142,6 +1161,8 @@ GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsRolesServlet,
     FederationGroupsRoleServlet,
     FederationGroupsSummaryUsersServlet,
+    FederationGroupsAddRoomsServlet,
+    FederationGroupsAddRoomsConfigServlet,
 )
 
 
