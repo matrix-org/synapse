@@ -70,8 +70,8 @@ class GroupsLocalHandler(object):
 
     get_invited_users_in_group = _create_rerouter("get_invited_users_in_group")
 
-    update_room_group_association = _create_rerouter("update_room_group_association")
-    delete_room_group_association = _create_rerouter("delete_room_group_association")
+    add_room_to_group = _create_rerouter("add_room_to_group")
+    remove_room_from_group = _create_rerouter("remove_room_from_group")
 
     update_group_summary_room = _create_rerouter("update_group_summary_room")
     delete_group_summary_room = _create_rerouter("delete_group_summary_room")

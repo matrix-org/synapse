@@ -684,7 +684,7 @@ class FederationGroupsAddRoomsServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        new_content = yield self.handler.update_room_group_association(
+        new_content = yield self.handler.add_room_to_group(
             group_id, requester_user_id, room_id, content
         )
 
@@ -696,7 +696,7 @@ class FederationGroupsAddRoomsServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        new_content = yield self.handler.delete_room_group_association(
+        new_content = yield self.handler.remove_room_from_group(
             group_id, requester_user_id, room_id,
         )
 

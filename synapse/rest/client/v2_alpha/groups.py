@@ -451,7 +451,7 @@ class GroupAdminRoomsServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.update_room_group_association(
+        result = yield self.groups_handler.add_room_to_group(
             group_id, requester_user_id, room_id, content,
         )
 
@@ -462,7 +462,7 @@ class GroupAdminRoomsServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.delete_room_group_association(
+        result = yield self.groups_handler.remove_room_from_group(
             group_id, requester_user_id, room_id,
         )
 
