@@ -70,11 +70,10 @@ class ApplicationServicesHandler(object):
         with Measure(self.clock, "notify_interested_services"):
             self.is_processing = True
             try:
-                upper_bound = self.current_max
                 limit = 100
                 while True:
                     upper_bound, events = yield self.store.get_new_events_for_appservice(
-                        upper_bound, limit
+                        self.current_max, limit
                     )
 
                     if not events:
@@ -105,9 +104,6 @@ class ApplicationServicesHandler(object):
                             )
 
                     yield self.store.set_appservice_last_pos(upper_bound)
-
-                    if len(events) < limit:
-                        break
             finally:
                 self.is_processing = False
 
