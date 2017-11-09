@@ -241,7 +241,6 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             "user_set_password_hash", user_set_password_hash_txn
         )
 
-    @defer.inlineCallbacks
     def user_delete_access_tokens(self, user_id, except_token_id=None,
                                   device_id=None):
         """
@@ -290,7 +289,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
 
             return tokens_and_devices
 
-        yield self.runInteraction(
+        return self.runInteraction(
             "user_delete_access_tokens", f,
         )
 
