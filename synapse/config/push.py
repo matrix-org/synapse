@@ -64,5 +64,5 @@ class PushConfig(Config):
         # notification saying only that a message arrived and who it came from.
         #
         #push:
-        #   include_content: false
+        #   include_content: true
         """
