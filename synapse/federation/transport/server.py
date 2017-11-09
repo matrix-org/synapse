@@ -706,8 +706,10 @@ class FederationGroupsAddRoomsServlet(BaseFederationServlet):
 class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
     """Update room config in group
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)"
-    "/config/(?P<config_key>[^/]*)$"
+    PATH = (
+        "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)"
+        "/config/(?P<config_key>[^/]*)$"
+    )
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, room_id, config_key):
