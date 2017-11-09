@@ -224,6 +224,9 @@ class RegisterRestServlet(RestServlet):
             # 'user' key not 'username'). Since this is a new addition, we'll
             # fallback to 'username' if they gave one.
             desired_username = body.get("user", desired_username)
+
+            # XXX we should check that desired_username is valid
+
             access_token = get_access_token_from_request(request)
 
             if isinstance(desired_username, basestring):
@@ -273,7 +276,7 @@ class RegisterRestServlet(RestServlet):
 
         if desired_username is not None:
             yield self.registration_handler.check_username(
-                desired_username,
+                desired_username.lower(),
                 guest_access_token=guest_access_token,
                 assigned_user_id=registered_user_id,
             )
@@ -335,6 +338,9 @@ class RegisterRestServlet(RestServlet):
             desired_username = params.get("username", None)
             new_password = params.get("password", None)
             guest_access_token = params.get("guest_access_token", None)
+
+            if desired_username is not None:
+                desired_username = desired_username.lower()
 
             (registered_user_id, _) = yield self.registration_handler.register(
                 localpart=desired_username,
