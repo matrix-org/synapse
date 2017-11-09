@@ -556,8 +556,8 @@ class GroupsServerHandler(object):
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
 
-        if config_key == "visibility":
-            is_public = _parse_visibility_from_contents(content)
+        if config_key == "m.visibility":
+            is_public = _parse_visibility_dict(content)
 
             yield self.store.update_room_in_group_visibility(
                 group_id, room_id,
@@ -840,15 +840,25 @@ def _parse_visibility_from_contents(content):
     public or not
     """
 
-    visibility = content.get("visibility")
+    visibility = content.get("m.visibility")
     if visibility:
-        vis_type = visibility["type"]
-        if vis_type not in ("public", "private"):
-            raise SynapseError(
-                400, "Synapse only supports 'public'/'private' visibility"
-            )
-        is_public = vis_type == "public"
+        return _parse_visibility_dict(visibility)
     else:
         is_public = True
 
     return is_public
+
+
+def _parse_visibility_dict(visibility):
+    """Given a dict for the "m.visibility" config return if the entity should
+    be public or not
+    """
+    vis_type = visibility.get("type")
+    if not vis_type:
+        return True
+
+    if vis_type not in ("public", "private"):
+        raise SynapseError(
+            400, "Synapse only supports 'public'/'private' visibility"
+        )
+    return vis_type == "public"
