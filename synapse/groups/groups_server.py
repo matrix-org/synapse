@@ -530,9 +530,8 @@ class GroupsServerHandler(object):
         })
 
     @defer.inlineCallbacks
-    def update_room_group_association(self, group_id, requester_user_id, room_id,
-                                      content):
-        """Add or update an association between room and group
+    def add_room_to_group(self, group_id, requester_user_id, room_id, content):
+        """Add room to group
         """
         RoomID.from_string(room_id)  # Ensure valid room id
 
@@ -542,21 +541,42 @@ class GroupsServerHandler(object):
 
         is_public = _parse_visibility_from_contents(content)
 
-        yield self.store.update_room_group_association(
-            group_id, room_id, is_public=is_public
-        )
+        yield self.store.add_room_to_group(group_id, room_id, is_public=is_public)
 
         defer.returnValue({})
 
     @defer.inlineCallbacks
-    def delete_room_group_association(self, group_id, requester_user_id, room_id):
+    def update_room_in_group(self, group_id, requester_user_id, room_id, config_key,
+                             content):
+        """Update room in group
+        """
+        RoomID.from_string(room_id)  # Ensure valid room id
+
+        yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        if config_key == "visibility":
+            is_public = _parse_visibility_from_contents(content)
+
+            yield self.store.update_room_in_group_visibility(
+                group_id, room_id,
+                is_public=is_public,
+            )
+        else:
+            raise SynapseError(400, "Uknown config option")
+
+        defer.returnValue({})
+
+    @defer.inlineCallbacks
+    def remove_room_from_group(self, group_id, requester_user_id, room_id):
         """Remove room from group
         """
         yield self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
 
-        yield self.store.delete_room_group_association(group_id, room_id)
+        yield self.store.remove_room_from_group(group_id, room_id)
 
         defer.returnValue({})
 

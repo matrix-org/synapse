@@ -451,7 +451,7 @@ class GroupAdminRoomsServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.update_room_group_association(
+        result = yield self.groups_handler.add_room_to_group(
             group_id, requester_user_id, room_id, content,
         )
 
@@ -462,8 +462,35 @@ class GroupAdminRoomsServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.delete_room_group_association(
+        result = yield self.groups_handler.remove_room_from_group(
             group_id, requester_user_id, room_id,
+        )
+
+        defer.returnValue((200, result))
+
+
+class GroupAdminRoomsConfigServlet(RestServlet):
+    """Update the config of a room in a group
+    """
+    PATTERNS = client_v2_patterns(
+        "/groups/(?P<group_id>[^/]*)/admin/rooms/(?P<room_id>[^/]*)"
+        "/config/(?P<config_key>[^/]*)$"
+    )
+
+    def __init__(self, hs):
+        super(GroupAdminRoomsConfigServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.groups_handler = hs.get_groups_local_handler()
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, group_id, room_id, config_key):
+        requester = yield self.auth.get_user_by_req(request)
+        requester_user_id = requester.user.to_string()
+
+        content = parse_json_object_from_request(request)
+        result = yield self.groups_handler.update_room_in_group(
+            group_id, requester_user_id, room_id, config_key, content,
         )
 
         defer.returnValue((200, result))
