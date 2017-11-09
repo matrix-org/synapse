@@ -29,7 +29,7 @@ class DirectoryStoreTestCase(unittest.TestCase):
     def setUp(self):
         hs = yield setup_test_homeserver()
 
-        self.store = DirectoryStore(hs)
+        self.store = DirectoryStore(None, hs)
 
         self.room = RoomID.from_string("!abcde:test")
         self.alias = RoomAlias.from_string("#my-room:test")
