@@ -740,6 +740,7 @@ def register_servlets(hs, http_server):
     GroupRoomServlet(hs).register(http_server)
     GroupCreateServlet(hs).register(http_server)
     GroupAdminRoomsServlet(hs).register(http_server)
+    GroupAdminRoomsConfigServlet(hs).register(http_server)
     GroupAdminUsersInviteServlet(hs).register(http_server)
     GroupAdminUsersKickServlet(hs).register(http_server)
     GroupSelfLeaveServlet(hs).register(http_server)
