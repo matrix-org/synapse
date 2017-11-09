@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 class DeviceStore(SQLBaseStore):
-    def __init__(self, hs):
-        super(DeviceStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(DeviceStore, self).__init__(db_conn, hs)
 
         # Map of (user_id, device_id) -> bool. If there is an entry that implies
         # the device exists.

@@ -32,14 +32,14 @@ LAST_SEEN_GRANULARITY = 120 * 1000
 
 
 class ClientIpStore(background_updates.BackgroundUpdateStore):
-    def __init__(self, hs):
+    def __init__(self, db_conn, hs):
         self.client_ip_last_seen = Cache(
             name="client_ip_last_seen",
             keylen=4,
             max_entries=50000 * CACHE_SIZE_FACTOR,
         )
 
-        super(ClientIpStore, self).__init__(hs)
+        super(ClientIpStore, self).__init__(db_conn, hs)
 
         self.register_background_index_update(
             "user_ips_device_index",

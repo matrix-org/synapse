@@ -24,8 +24,8 @@ from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 class RegistrationStore(background_updates.BackgroundUpdateStore):
 
-    def __init__(self, hs):
-        super(RegistrationStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(RegistrationStore, self).__init__(db_conn, hs)
 
         self.clock = hs.get_clock()
 
