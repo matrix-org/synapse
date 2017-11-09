@@ -864,7 +864,7 @@ class GroupServerStore(SQLBaseStore):
                 "group_id": group_id,
                 "room_id": room_id,
             },
-            values={
+            updatevalues={
                 "is_public": is_public,
             },
             desc="update_room_in_group_visibility",
