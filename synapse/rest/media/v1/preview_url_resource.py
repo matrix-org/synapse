@@ -144,6 +144,8 @@ class PreviewUrlResource(Resource):
                 consumeErrors=True
             )
             self._cache[url] = observable
+        else:
+            logger.info("Returning cached response")
 
         og = yield make_deferred_yieldable(observable.observe())
         respond_with_json_bytes(request, 200, og, send_cors=True)
