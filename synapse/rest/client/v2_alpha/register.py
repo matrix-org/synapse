@@ -225,7 +225,10 @@ class RegisterRestServlet(RestServlet):
             # fallback to 'username' if they gave one.
             desired_username = body.get("user", desired_username)
 
-            # XXX we should check that desired_username is valid
+            # XXX we should check that desired_username is valid. Currently
+            # we give appservices carte blanche for any insanity in mxids,
+            # because the IRC bridges rely on being able to register stupid
+            # IDs.
 
             access_token = get_access_token_from_request(request)
 
