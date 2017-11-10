@@ -236,6 +236,15 @@ class RegisterRestServlet(RestServlet):
             defer.returnValue((200, result))  # we throw for non 200 responses
             return
 
+        # for either shared secret or regular registration, downcase the
+        # provided username before attempting to register it. This should mean
+        # that people who try to register with upper-case in their usernames
+        # don't get a nasty surprise. (Note that we treat username
+        # case-insenstively in login, so they are free to carry on imagining
+        # that their username is CrAzYh4cKeR if that keeps them happy)
+        if desired_username is not None:
+            desired_username = desired_username.lower()
+
         # == Shared Secret Registration == (e.g. create new user scripts)
         if 'mac' in body:
             # FIXME: Should we really be determining if this is shared secret
@@ -276,7 +285,7 @@ class RegisterRestServlet(RestServlet):
 
         if desired_username is not None:
             yield self.registration_handler.check_username(
-                desired_username.lower(),
+                desired_username,
                 guest_access_token=guest_access_token,
                 assigned_user_id=registered_user_id,
             )
@@ -423,13 +432,22 @@ class RegisterRestServlet(RestServlet):
     def _do_shared_secret_registration(self, username, password, body):
         if not self.hs.config.registration_shared_secret:
             raise SynapseError(400, "Shared secret registration is not enabled")
+        if not username:
+            raise SynapseError(
+                400, "username must be specified", errcode=Codes.BAD_JSON,
+            )
 
-        user = username.encode("utf-8")
+        # use the username from the original request rather than the
+        # downcased one in `username` for the mac calculation
+        user = body["username"].encode("utf-8")
 
         # str() because otherwise hmac complains that 'unicode' does not
         # have the buffer interface
         got_mac = str(body["mac"])
 
+        # FIXME this is different to the /v1/register endpoint, which
+        # includes the password and admin flag in the hashed text. Why are
+        # these different?
         want_mac = hmac.new(
             key=self.hs.config.registration_shared_secret,
             msg=user,
