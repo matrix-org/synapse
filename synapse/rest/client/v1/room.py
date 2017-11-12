@@ -592,6 +592,24 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             # cheekily send invalid bodies.
             content = {}
 
+        if membership_action == "join":
+            try:
+                remote_room_hosts = request.args["server_name"]
+            except Exception:
+                remote_room_hosts = None
+            yield self.handlers.room_member_handler.update_membership(
+                requester=requester,
+                target=requester.user,
+                room_id=room_id,
+                action="join",
+                txn_id=txn_id,
+                remote_room_hosts=remote_room_hosts,
+                content=content,
+                third_party_signed=content.get("third_party_signed", None),
+            )
+            defer.returnValue((200, {"room_id", room_id}))
+            return
+
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
             yield self.handlers.room_member_handler.do_3pid_invite(
                 room_id,
