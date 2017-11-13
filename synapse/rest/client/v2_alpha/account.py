@@ -382,6 +382,22 @@ class ThreepidDeleteRestServlet(RestServlet):
         defer.returnValue((200, {}))
 
 
+class WhoamiRestServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/account/whoami$")
+
+    def __init__(self, hs):
+        super(WhoamiRestServlet, self).__init__()
+        self.auth = hs.get_auth()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        yield run_on_reactor()
+
+        requester = yield self.auth.get_user_by_req(request)
+
+        defer.returnValue((200, {'user_id': requester.user.to_string()}))
+
+
 def register_servlets(hs, http_server):
     EmailPasswordRequestTokenRestServlet(hs).register(http_server)
     MsisdnPasswordRequestTokenRestServlet(hs).register(http_server)
@@ -391,3 +407,4 @@ def register_servlets(hs, http_server):
     MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
     ThreepidDeleteRestServlet(hs).register(http_server)
+    WhoamiRestServlet(hs).register(http_server)
