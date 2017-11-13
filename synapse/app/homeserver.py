@@ -32,6 +32,7 @@ from synapse.crypto import context_factory
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.module_api import ModuleApi
 from synapse.http.additional_resource import AdditionalResource
+from synapse.http.server import RootRedirect
 from synapse.http.site import SynapseSite
 from synapse.metrics import register_memory_metrics
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
@@ -92,12 +93,7 @@ class SynapseHomeServer(HomeServer):
             handler = handler_cls(config, module_api)
             resources[path] = AdditionalResource(self, handler.handle_request)
 
-        # redirect old webclients to root
-        resources[WEB_CLIENT_PREFIX] = Redirect("/")
-
-        root_resource = File(
-            os.path.join(os.path.dirname(synapse.__file__), "static")
-        )
+        root_resource = RootRedirect(STATIC_PREFIX)
 
         root_resource = create_resource_tree(resources, root_resource)
 
@@ -140,6 +136,11 @@ class SynapseHomeServer(HomeServer):
             dict[str, Resource]: map from path to HTTP resource
         """
         resources = {}
+        if name == "webclient":
+            # redirect old webclients to root
+            logger.warn("DEPRECATED: Handling of %s got removed from synapse. Please unconfigure it", WEB_CLIENT_PREFIX)
+            resources[WEB_CLIENT_PREFIX] = Redirect(STATIC_PREFIX)
+
         if name == "client":
             client_resource = ClientRestResource(self)
             if compress:
