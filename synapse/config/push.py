@@ -16,13 +16,6 @@
 
 from ._base import Config
 
-import logging
-
-from twisted.internet import reactor
-
-
-logger = logging.getLogger(__name__)
-
 
 class PushConfig(Config):
     def read_config(self, config):
@@ -33,20 +26,20 @@ class PushConfig(Config):
         # 'email'section'. Check for the flag in the 'push' section, and log,
         # but do not honour it to avoid nasty surprises when people upgrade.
         if push_config.get("redact_content") is not None:
-            reactor.callWhenRunning(lambda: logger.warn(
+            print(
                 "The push.redact_content content option has never worked. "
                 "Please set push.include_content if you want this behaviour"
-            ))
+            )
 
         # Now check for the one in the 'email' section and honour it,
         # with a warning.
         push_config = config.get("email", {})
         redact_content = push_config.get("redact_content")
         if redact_content is not None:
-            reactor.callWhenRunning(lambda: logger.warn(
+            print(
                 "The 'email.redact_content' option is deprecated: "
                 "please set push.include_content instead"
-            ))
+            )
             self.push_include_content = not redact_content
 
     def default_config(self, config_dir_path, server_name, **kwargs):
