@@ -30,7 +30,7 @@ class LogoutRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(LogoutRestServlet, self).__init__(hs)
-        self.store = hs.get_datastore()
+        self._auth_handler = hs.get_auth_handler()
 
     def on_OPTIONS(self, request):
         return (200, {})
@@ -38,7 +38,7 @@ class LogoutRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         access_token = get_access_token_from_request(request)
-        yield self.store.delete_access_token(access_token)
+        yield self._auth_handler.delete_access_token(access_token)
         defer.returnValue((200, {}))
 
 
@@ -47,8 +47,8 @@ class LogoutAllRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(LogoutAllRestServlet, self).__init__(hs)
-        self.store = hs.get_datastore()
         self.auth = hs.get_auth()
+        self._auth_handler = hs.get_auth_handler()
 
     def on_OPTIONS(self, request):
         return (200, {})
@@ -57,7 +57,7 @@ class LogoutAllRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
-        yield self.store.user_delete_access_tokens(user_id)
+        yield self._auth_handler.delete_access_tokens_for_user(user_id)
         defer.returnValue((200, {}))
 
 

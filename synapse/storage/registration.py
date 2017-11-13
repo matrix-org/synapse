@@ -36,12 +36,15 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             columns=["user_id", "device_id"],
         )
 
-        self.register_background_index_update(
-            "refresh_tokens_device_index",
-            index_name="refresh_tokens_device_id",
-            table="refresh_tokens",
-            columns=["user_id", "device_id"],
-        )
+        # we no longer use refresh tokens, but it's possible that some people
+        # might have a background update queued to build this index. Just
+        # clear the background update.
+        @defer.inlineCallbacks
+        def noop_update(progress, batch_size):
+            yield self._end_background_update("refresh_tokens_device_index")
+            defer.returnValue(1)
+        self.register_background_update_handler(
+            "refresh_tokens_device_index", noop_update)
 
     @defer.inlineCallbacks
     def add_access_token_to_user(self, user_id, token, device_id=None):
@@ -177,9 +180,11 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             )
 
         if create_profile_with_localpart:
+            # set a default displayname serverside to avoid ugly race
+            # between auto-joins and clients trying to set displaynames
             txn.execute(
-                "INSERT INTO profiles(user_id) VALUES (?)",
-                (create_profile_with_localpart,)
+                "INSERT INTO profiles(user_id, displayname) VALUES (?,?)",
+                (create_profile_with_localpart, create_profile_with_localpart)
             )
 
         self._invalidate_cache_and_stream(
@@ -236,12 +241,10 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             "user_set_password_hash", user_set_password_hash_txn
         )
 
-    @defer.inlineCallbacks
     def user_delete_access_tokens(self, user_id, except_token_id=None,
-                                  device_id=None,
-                                  delete_refresh_tokens=False):
+                                  device_id=None):
         """
-        Invalidate access/refresh tokens belonging to a user
+        Invalidate access tokens belonging to a user
 
         Args:
             user_id (str):  ID of user the tokens belong to
@@ -250,10 +253,9 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             device_id (str|None):  ID of device the tokens are associated with.
                 If None, tokens associated with any device (or no device) will
                 be deleted
-            delete_refresh_tokens (bool):  True to delete refresh tokens as
-                well as access tokens.
         Returns:
-            defer.Deferred:
+            defer.Deferred[list[str, str|None]]: a list of the deleted tokens
+                and device IDs
         """
         def f(txn):
             keyvalues = {
@@ -261,13 +263,6 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             }
             if device_id is not None:
                 keyvalues["device_id"] = device_id
-
-            if delete_refresh_tokens:
-                self._simple_delete_txn(
-                    txn,
-                    table="refresh_tokens",
-                    keyvalues=keyvalues,
-                )
 
             items = keyvalues.items()
             where_clause = " AND ".join(k + " = ?" for k, _ in items)
@@ -277,14 +272,14 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
                 values.append(except_token_id)
 
             txn.execute(
-                "SELECT token FROM access_tokens WHERE %s" % where_clause,
+                "SELECT token, device_id FROM access_tokens WHERE %s" % where_clause,
                 values
             )
-            rows = self.cursor_to_dict(txn)
+            tokens_and_devices = [(r[0], r[1]) for r in txn]
 
-            for row in rows:
+            for token, _ in tokens_and_devices:
                 self._invalidate_cache_and_stream(
-                    txn, self.get_user_by_access_token, (row["token"],)
+                    txn, self.get_user_by_access_token, (token,)
                 )
 
             txn.execute(
@@ -292,7 +287,9 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
                 values
             )
 
-        yield self.runInteraction(
+            return tokens_and_devices
+
+        return self.runInteraction(
             "user_delete_access_tokens", f,
         )
 

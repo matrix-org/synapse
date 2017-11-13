@@ -426,14 +426,15 @@ class GroupsServerHandler(object):
         for user_result in user_results:
             g_user_id = user_result["user_id"]
             is_public = user_result["is_public"]
+            is_privileged = user_result["is_admin"]
 
             entry = {"user_id": g_user_id}
 
             profile = yield self.profile_handler.get_profile_from_cache(g_user_id)
             entry.update(profile)
 
-            if not is_public:
-                entry["is_public"] = False
+            entry["is_public"] = bool(is_public)
+            entry["is_privileged"] = bool(is_privileged)
 
             if not self.is_mine_id(g_user_id):
                 attestation = yield self.store.get_remote_attestation(group_id, g_user_id)
@@ -507,7 +508,6 @@ class GroupsServerHandler(object):
         chunk = []
         for room_result in room_results:
             room_id = room_result["room_id"]
-            is_public = room_result["is_public"]
 
             joined_users = yield self.store.get_users_in_room(room_id)
             entry = yield self.room_list_handler.generate_room_entry(
@@ -518,8 +518,7 @@ class GroupsServerHandler(object):
             if not entry:
                 continue
 
-            if not is_public:
-                entry["is_public"] = False
+            entry["is_public"] = bool(room_result["is_public"])
 
             chunk.append(entry)
 
@@ -543,6 +542,29 @@ class GroupsServerHandler(object):
         is_public = _parse_visibility_from_contents(content)
 
         yield self.store.add_room_to_group(group_id, room_id, is_public=is_public)
+
+        defer.returnValue({})
+
+    @defer.inlineCallbacks
+    def update_room_in_group(self, group_id, requester_user_id, room_id, config_key,
+                             content):
+        """Update room in group
+        """
+        RoomID.from_string(room_id)  # Ensure valid room id
+
+        yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        if config_key == "m.visibility":
+            is_public = _parse_visibility_dict(content)
+
+            yield self.store.update_room_in_group_visibility(
+                group_id, room_id,
+                is_public=is_public,
+            )
+        else:
+            raise SynapseError(400, "Uknown config option")
 
         defer.returnValue({})
 
@@ -749,7 +771,7 @@ class GroupsServerHandler(object):
         if not is_admin:
             if not self.hs.config.enable_group_creation:
                 raise SynapseError(
-                    403, "Only server admin can create group on this server",
+                    403, "Only a server admin can create groups on this server",
                 )
             localpart = group_id_obj.localpart
             if not localpart.startswith(self.hs.config.group_creation_prefix):
@@ -818,15 +840,25 @@ def _parse_visibility_from_contents(content):
     public or not
     """
 
-    visibility = content.get("visibility")
+    visibility = content.get("m.visibility")
     if visibility:
-        vis_type = visibility["type"]
-        if vis_type not in ("public", "private"):
-            raise SynapseError(
-                400, "Synapse only supports 'public'/'private' visibility"
-            )
-        is_public = vis_type == "public"
+        return _parse_visibility_dict(visibility)
     else:
         is_public = True
 
     return is_public
+
+
+def _parse_visibility_dict(visibility):
+    """Given a dict for the "m.visibility" config return if the entity should
+    be public or not
+    """
+    vis_type = visibility.get("type")
+    if not vis_type:
+        return True
+
+    if vis_type not in ("public", "private"):
+        raise SynapseError(
+            400, "Synapse only supports 'public'/'private' visibility"
+        )
+    return vis_type == "public"

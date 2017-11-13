@@ -520,7 +520,14 @@ def _calc_og(tree, media_uri):
             from lxml import etree
 
             TAGS_TO_REMOVE = (
-                "header", "nav", "aside", "footer", "script", "style", etree.Comment
+                "header",
+                "nav",
+                "aside",
+                "footer",
+                "script",
+                "noscript",
+                "style",
+                etree.Comment
             )
 
             # Split all the text nodes into paragraphs (by splitting on new

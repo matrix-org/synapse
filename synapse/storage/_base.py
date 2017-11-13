@@ -16,8 +16,6 @@ import logging
 
 from synapse.api.errors import StoreError
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
-from synapse.util.caches import CACHE_SIZE_FACTOR
-from synapse.util.caches.dictionary_cache import DictionaryCache
 from synapse.util.caches.descriptors import Cache
 from synapse.storage.engines import PostgresEngine
 import synapse.metrics
@@ -179,10 +177,6 @@ class SQLBaseStore(object):
 
         self._get_event_cache = Cache("*getEvent*", keylen=3,
                                       max_entries=hs.config.event_cache_size)
-
-        self._state_group_cache = DictionaryCache(
-            "*stateGroupCache*", 500000 * CACHE_SIZE_FACTOR
-        )
 
         self._event_fetch_lock = threading.Condition()
         self._event_fetch_list = []
