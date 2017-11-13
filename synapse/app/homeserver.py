@@ -138,7 +138,7 @@ class SynapseHomeServer(HomeServer):
         resources = {}
         if name == "webclient":
             # redirect old webclients to root
-            logger.warn("DEPRECATED: Handling of %s got removed from synapse. Please unconfigure it", WEB_CLIENT_PREFIX)
+            logger.warn("DEPRECATED: Handling of webclient got removed from synapse.")
             resources[WEB_CLIENT_PREFIX] = Redirect(STATIC_PREFIX)
 
         if name == "client":
