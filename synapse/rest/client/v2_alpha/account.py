@@ -391,8 +391,6 @@ class WhoamiRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        yield run_on_reactor()
-
         requester = yield self.auth.get_user_by_req(request)
 
         defer.returnValue((200, {'user_id': requester.user.to_string()}))
