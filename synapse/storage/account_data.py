@@ -63,7 +63,7 @@ class AccountDataStore(SQLBaseStore):
             "get_account_data_for_user", get_account_data_for_user_txn
         )
 
-    @cachedInlineCallbacks(num_args=2)
+    @cachedInlineCallbacks(num_args=2, max_entries=5000)
     def get_global_account_data_by_type_for_user(self, data_type, user_id):
         """
         Returns:
