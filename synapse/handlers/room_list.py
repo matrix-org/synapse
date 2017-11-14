@@ -186,42 +186,39 @@ class RoomListHandler(BaseHandler):
         logger.info("After sorting and filtering, %i rooms remain",
                     len(rooms_to_scan))
 
-        # Actually generate the entries. _append_room_entry_to_chunk will append to
-        # chunk but will stop if len(chunk) > limit
-        chunk = []
-        if limit and not search_filter:
+        # _append_room_entry_to_chunk will append to chunk but will stop if
+        # len(chunk) > limit
+        #
+        # Normally we will generate enough results on the first iteration here,
+        #  but if there is a search filter, _append_room_entry_to_chunk may
+        # filter some results out, in which case we loop again.
+        #
+        # We don't want to scan over the entire range either as that
+        # would potentially waste a lot of work.
+        #
+        # XXX if there is no limit, we may end up DoSing the server with
+        # calls to get_current_state_ids for every single room on the
+        # server. Surely we should cap this somehow?
+        #
+        if limit:
             step = limit + 1
-            for i in xrange(0, len(rooms_to_scan), step):
-                logger.info("Processing %i rooms for result", step)
-                # We iterate here because the vast majority of cases we'll stop
-                # at first iteration, but occaisonally _append_room_entry_to_chunk
-                # won't append to the chunk and so we need to loop again.
-                # We don't want to scan over the entire range either as that
-                # would potentially waste a lot of work.
-                #
-                # XXX why would that happen? _append_room_entry_to_chunk will
-                # only exclude rooms which don't match search_filter, but we
-                # know search_filter is None here.
-                yield concurrently_execute(
-                    lambda r: self._append_room_entry_to_chunk(
-                        r, rooms_to_num_joined[r],
-                        chunk, limit, search_filter
-                    ),
-                    rooms_to_scan[i:i + step], 10
-                )
-                logger.info("Now %i rooms in result", len(chunk))
-                if len(chunk) >= limit + 1:
-                    break
         else:
-            logger.info("Processing %i rooms for result", len(rooms_to_scan))
+            step = len(rooms_to_scan)
+
+        chunk = []
+        for i in xrange(0, len(rooms_to_scan), step):
+            batch = rooms_to_scan[i:i + step]
+            logger.info("Processing %i rooms for result", len(batch))
             yield concurrently_execute(
                 lambda r: self._append_room_entry_to_chunk(
                     r, rooms_to_num_joined[r],
                     chunk, limit, search_filter
                 ),
-                rooms_to_scan, 5
+                batch, 5,
             )
             logger.info("Now %i rooms in result", len(chunk))
+            if len(chunk) >= limit + 1:
+                break
 
         chunk.sort(key=lambda e: (-e["num_joined_members"], e["room_id"]))
 
