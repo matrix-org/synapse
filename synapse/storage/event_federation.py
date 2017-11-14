@@ -39,8 +39,8 @@ class EventFederationStore(SQLBaseStore):
 
     EVENT_AUTH_STATE_ONLY = "event_auth_state_only"
 
-    def __init__(self, hs):
-        super(EventFederationStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(EventFederationStore, self).__init__(db_conn, hs)
 
         self.register_background_update_handler(
             self.EVENT_AUTH_STATE_ONLY,

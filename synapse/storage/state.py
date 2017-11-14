@@ -63,8 +63,8 @@ class StateStore(SQLBaseStore):
     STATE_GROUP_INDEX_UPDATE_NAME = "state_group_state_type_index"
     CURRENT_STATE_INDEX_UPDATE_NAME = "current_state_members_idx"
 
-    def __init__(self, hs):
-        super(StateStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(StateStore, self).__init__(db_conn, hs)
         self.register_background_update_handler(
             self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME,
             self._background_deduplicate_state,
