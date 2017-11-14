@@ -20,7 +20,7 @@ class PushConfig(Config):
     def read_config(self, config):
         self.push_redact_content = False
 
-        push_config = config.get("email", {})
+        push_config = config.get("push", {})
         self.push_redact_content = push_config.get("redact_content", False)
 
     def default_config(self, config_dir_path, server_name, **kwargs):
