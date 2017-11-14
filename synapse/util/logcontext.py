@@ -261,36 +261,6 @@ class PreserveLoggingContext(object):
                 )
 
 
-class _PreservingContextDeferred(defer.Deferred):
-    """A deferred that ensures that all callbacks and errbacks are called with
-    the given logging context.
-    """
-    def __init__(self, context):
-        self._log_context = context
-        defer.Deferred.__init__(self)
-
-    def addCallbacks(self, callback, errback=None,
-                     callbackArgs=None, callbackKeywords=None,
-                     errbackArgs=None, errbackKeywords=None):
-        callback = self._wrap_callback(callback)
-        errback = self._wrap_callback(errback)
-        return defer.Deferred.addCallbacks(
-            self, callback,
-            errback=errback,
-            callbackArgs=callbackArgs,
-            callbackKeywords=callbackKeywords,
-            errbackArgs=errbackArgs,
-            errbackKeywords=errbackKeywords,
-        )
-
-    def _wrap_callback(self, f):
-        def g(res, *args, **kwargs):
-            with PreserveLoggingContext(self._log_context):
-                res = f(res, *args, **kwargs)
-            return res
-        return g
-
-
 def preserve_fn(f):
     """Wraps a function, to ensure that the current context is restored after
     return from the function, and that the sentinel context is set once the
