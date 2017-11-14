@@ -291,37 +291,6 @@ class _PreservingContextDeferred(defer.Deferred):
         return g
 
 
-def preserve_context_over_fn(fn, *args, **kwargs):
-    """Takes a function and invokes it with the given arguments, but removes
-    and restores the current logging context while doing so.
-
-    If the result is a deferred, call preserve_context_over_deferred before
-    returning it.
-    """
-    with PreserveLoggingContext():
-        res = fn(*args, **kwargs)
-
-    if isinstance(res, defer.Deferred):
-        return preserve_context_over_deferred(res)
-    else:
-        return res
-
-
-def preserve_context_over_deferred(deferred, context=None):
-    """Given a deferred wrap it such that any callbacks added later to it will
-    be invoked with the current context.
-
-    Deprecated: this almost certainly doesn't do want you want, ie make
-    the deferred follow the synapse logcontext rules: try
-    ``make_deferred_yieldable`` instead.
-    """
-    if context is None:
-        context = LoggingContext.current_context()
-    d = _PreservingContextDeferred(context)
-    deferred.chainDeferred(d)
-    return d
-
-
 def preserve_fn(f):
     """Wraps a function, to ensure that the current context is restored after
     return from the function, and that the sentinel context is set once the
