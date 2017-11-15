@@ -27,7 +27,7 @@ def random_string(length):
 
 def random_string_with_symbols(length):
     return ''.join(
-        random.SystemRandom().choice.(_string_with_symbols) for _ in xrange(length)
+        random.SystemRandom().choice(_string_with_symbols) for _ in xrange(length)
     )
 
 
