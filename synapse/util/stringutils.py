@@ -22,7 +22,8 @@ _string_with_symbols = (
 
 
 def random_string(length):
-    return ''.join(random.SystemRandom().choice(string.ascii_letters) for _ in xrange(length))
+    return ''.join(random.SystemRandom().choice(string.ascii_letters)
+                   for _ in xrange(length))
 
 
 def random_string_with_symbols(length):
