@@ -49,6 +49,8 @@ class ServerConfig(Config):
             "block_non_admin_invites", False,
         )
 
+        self.room_federate_default = config.get("room_federate_default", True)
+
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
                 self.public_baseurl += '/'
@@ -203,6 +205,10 @@ class ServerConfig(Config):
         # Whether room invites to users on this server should be blocked
         # (except those sent by local server admins). The default is False.
         # block_non_admin_invites: True
+
+        # The default behavior of created room if m.federate is not
+        # specified during the room creation
+        # room_federate_default = True
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.

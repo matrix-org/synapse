@@ -81,8 +81,12 @@ class Auth(object):
         Returns:
             True if the auth checks pass.
         """
+        room_federate_default = True
+        if self.hs.is_mine_id(event.room_id):
+            room_federate_default = self.hs.config.room_federate_default
         with Measure(self.clock, "auth.check"):
-            event_auth.check(event, auth_events, do_sig_check=do_sig_check)
+            event_auth.check(event, auth_events, do_sig_check=do_sig_check,
+                             room_federate_default=room_federate_default)
 
     @defer.inlineCallbacks
     def check_joined_room(self, room_id, user_id, current_state=None):
