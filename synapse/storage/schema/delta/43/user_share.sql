@@ -29,5 +29,5 @@ CREATE INDEX users_who_share_rooms_r_idx ON users_who_share_rooms(room_id);
 CREATE INDEX users_who_share_rooms_o_idx ON users_who_share_rooms(other_user_id);
 
 
--- Make sure that we popualte the table initially
+-- Make sure that we populate the table initially
 UPDATE user_directory_stream_pos SET stream_id = NULL;

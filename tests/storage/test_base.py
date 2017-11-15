@@ -56,7 +56,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             database_engine=create_engine(config.database_config),
         )
 
-        self.datastore = SQLBaseStore(hs)
+        self.datastore = SQLBaseStore(None, hs)
 
     @defer.inlineCallbacks
     def test_insert_1col(self):

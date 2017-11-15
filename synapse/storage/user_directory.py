@@ -63,7 +63,7 @@ class UserDirectoryStore(SQLBaseStore):
             user_ids (list(str)): Users to add
         """
         yield self._simple_insert_many(
-            table="users_in_pubic_room",
+            table="users_in_public_rooms",
             values=[
                 {
                     "user_id": user_id,
@@ -219,7 +219,7 @@ class UserDirectoryStore(SQLBaseStore):
     @defer.inlineCallbacks
     def update_user_in_public_user_list(self, user_id, room_id):
         yield self._simple_update_one(
-            table="users_in_pubic_room",
+            table="users_in_public_rooms",
             keyvalues={"user_id": user_id},
             updatevalues={"room_id": room_id},
             desc="update_user_in_public_user_list",
@@ -240,7 +240,7 @@ class UserDirectoryStore(SQLBaseStore):
             )
             self._simple_delete_txn(
                 txn,
-                table="users_in_pubic_room",
+                table="users_in_public_rooms",
                 keyvalues={"user_id": user_id},
             )
             txn.call_after(
@@ -256,7 +256,7 @@ class UserDirectoryStore(SQLBaseStore):
     @defer.inlineCallbacks
     def remove_from_user_in_public_room(self, user_id):
         yield self._simple_delete(
-            table="users_in_pubic_room",
+            table="users_in_public_rooms",
             keyvalues={"user_id": user_id},
             desc="remove_from_user_in_public_room",
         )
@@ -267,7 +267,7 @@ class UserDirectoryStore(SQLBaseStore):
         in the given room_id
         """
         return self._simple_select_onecol(
-            table="users_in_pubic_room",
+            table="users_in_public_rooms",
             keyvalues={"room_id": room_id},
             retcol="user_id",
             desc="get_users_in_public_due_to_room",
@@ -286,7 +286,7 @@ class UserDirectoryStore(SQLBaseStore):
         )
 
         user_ids_pub = yield self._simple_select_onecol(
-            table="users_in_pubic_room",
+            table="users_in_public_rooms",
             keyvalues={"room_id": room_id},
             retcol="user_id",
             desc="get_users_in_dir_due_to_room",
@@ -514,7 +514,7 @@ class UserDirectoryStore(SQLBaseStore):
         def _delete_all_from_user_dir_txn(txn):
             txn.execute("DELETE FROM user_directory")
             txn.execute("DELETE FROM user_directory_search")
-            txn.execute("DELETE FROM users_in_pubic_room")
+            txn.execute("DELETE FROM users_in_public_rooms")
             txn.execute("DELETE FROM users_who_share_rooms")
             txn.call_after(self.get_user_in_directory.invalidate_all)
             txn.call_after(self.get_user_in_public_room.invalidate_all)
@@ -537,7 +537,7 @@ class UserDirectoryStore(SQLBaseStore):
     @cached()
     def get_user_in_public_room(self, user_id):
         return self._simple_select_one(
-            table="users_in_pubic_room",
+            table="users_in_public_rooms",
             keyvalues={"user_id": user_id},
             retcols=("room_id",),
             allow_none=True,
@@ -641,7 +641,7 @@ class UserDirectoryStore(SQLBaseStore):
                 SELECT d.user_id, display_name, avatar_url
                 FROM user_directory_search
                 INNER JOIN user_directory AS d USING (user_id)
-                LEFT JOIN users_in_pubic_room AS p USING (user_id)
+                LEFT JOIN users_in_public_rooms AS p USING (user_id)
                 LEFT JOIN (
                     SELECT other_user_id AS user_id FROM users_who_share_rooms
                     WHERE user_id = ? AND share_private
@@ -680,7 +680,7 @@ class UserDirectoryStore(SQLBaseStore):
                 SELECT d.user_id, display_name, avatar_url
                 FROM user_directory_search
                 INNER JOIN user_directory AS d USING (user_id)
-                LEFT JOIN users_in_pubic_room AS p USING (user_id)
+                LEFT JOIN users_in_public_rooms AS p USING (user_id)
                 LEFT JOIN (
                     SELECT other_user_id AS user_id FROM users_who_share_rooms
                     WHERE user_id = ? AND share_private

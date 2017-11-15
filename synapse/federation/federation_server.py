@@ -18,6 +18,7 @@ from .federation_base import FederationBase
 from .units import Transaction, Edu
 
 from synapse.util import async
+from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
 from synapse.util.logutils import log_function
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.events import FrozenEvent
@@ -253,12 +254,13 @@ class FederationServer(FederationBase):
         result = self._state_resp_cache.get((room_id, event_id))
         if not result:
             with (yield self._server_linearizer.queue((origin, room_id))):
-                resp = yield self._state_resp_cache.set(
+                d = self._state_resp_cache.set(
                     (room_id, event_id),
-                    self._on_context_state_request_compute(room_id, event_id)
+                    preserve_fn(self._on_context_state_request_compute)(room_id, event_id)
                 )
+                resp = yield make_deferred_yieldable(d)
         else:
-            resp = yield result
+            resp = yield make_deferred_yieldable(result)
 
         defer.returnValue((200, resp))
 

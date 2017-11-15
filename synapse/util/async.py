@@ -278,8 +278,13 @@ class Limiter(object):
         if entry[0] >= self.max_count:
             new_defer = defer.Deferred()
             entry[1].append(new_defer)
+
+            logger.info("Waiting to acquire limiter lock for key %r", key)
             with PreserveLoggingContext():
                 yield new_defer
+            logger.info("Acquired limiter lock for key %r", key)
+        else:
+            logger.info("Acquired uncontended limiter lock for key %r", key)
 
         entry[0] += 1
 
@@ -288,16 +293,21 @@ class Limiter(object):
             try:
                 yield
             finally:
+                logger.info("Releasing limiter lock for key %r", key)
+
                 # We've finished executing so check if there are any things
                 # blocked waiting to execute and start one of them
                 entry[0] -= 1
-                try:
-                    entry[1].pop(0).callback(None)
-                except IndexError:
-                    # If nothing else is executing for this key then remove it
-                    # from the map
-                    if entry[0] == 0:
-                        self.key_to_defer.pop(key, None)
+
+                if entry[1]:
+                    next_def = entry[1].pop(0)
+
+                    with PreserveLoggingContext():
+                        next_def.callback(None)
+                elif entry[0] == 0:
+                    # We were the last thing for this key: remove it from the
+                    # map.
+                    del self.key_to_defer[key]
 
         defer.returnValue(_ctx_manager())
 

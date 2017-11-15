@@ -823,7 +823,9 @@ spidering 'internal' URLs on your network.  At the very least we recommend that
 your loopback and RFC1918 IP addresses are blacklisted.
 
 This also requires the optional lxml and netaddr python dependencies to be
-installed.
+installed.  This in turn requires the libxml2 library to be available - on
+Debian/Ubuntu this means ``apt-get install libxml2-dev``, or equivalent for
+your OS.
 
 
 Password reset

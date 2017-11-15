@@ -29,7 +29,7 @@ class PresenceStoreTestCase(unittest.TestCase):
     def setUp(self):
         hs = yield setup_test_homeserver(clock=MockClock())
 
-        self.store = PresenceStore(hs)
+        self.store = PresenceStore(None, hs)
 
         self.u_apple = UserID.from_string("@apple:test")
         self.u_banana = UserID.from_string("@banana:test")

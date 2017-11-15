@@ -50,8 +50,7 @@ logger = logging.getLogger("synapse.app.frontend_proxy")
 
 
 class KeyUploadServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/keys/upload(/(?P<device_id>[^/]+))?$",
-                                  releases=())
+    PATTERNS = client_v2_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
 
     def __init__(self, hs):
         """
@@ -89,9 +88,16 @@ class KeyUploadServlet(RestServlet):
 
         if body:
             # They're actually trying to upload something, proxy to main synapse.
+            # Pass through the auth headers, if any, in case the access token
+            # is there.
+            auth_headers = request.requestHeaders.getRawHeaders("Authorization", [])
+            headers = {
+                "Authorization": auth_headers,
+            }
             result = yield self.http_client.post_json_get_json(
                 self.main_uri + request.uri,
                 body,
+                headers=headers,
             )
 
             defer.returnValue((200, result))

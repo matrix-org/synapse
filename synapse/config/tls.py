@@ -109,6 +109,12 @@ class TlsConfig(Config):
         # key. It may be necessary to publish the fingerprints of a new
         # certificate and wait until the "valid_until_ts" of the previous key
         # responses have passed before deploying it.
+        #
+        # You can calculate a fingerprint from a given TLS listener via:
+        # openssl s_client -connect $host:$port < /dev/null 2> /dev/null |
+        #   openssl x509 -outform DER | openssl sha256 -binary | base64 | tr -d '='
+        # or by checking matrix.org/federationtester/api/report?server_name=$host
+        #
         tls_fingerprints: []
         # tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
         """ % locals()

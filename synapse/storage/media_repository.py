@@ -254,6 +254,9 @@ class MediaRepositoryStore(SQLBaseStore):
         return self.runInteraction("get_expired_url_cache", _get_expired_url_cache_txn)
 
     def delete_url_cache(self, media_ids):
+        if len(media_ids) == 0:
+            return
+
         sql = (
             "DELETE FROM local_media_repository_url_cache"
             " WHERE media_id = ?"
@@ -281,6 +284,9 @@ class MediaRepositoryStore(SQLBaseStore):
         )
 
     def delete_url_cache_media(self, media_ids):
+        if len(media_ids) == 0:
+            return
+
         def _delete_url_cache_media_txn(txn):
             sql = (
                 "DELETE FROM local_media_repository"

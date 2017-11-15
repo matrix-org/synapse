@@ -1,3 +1,61 @@
+Changes in synapse v0.25.0 (2017-11-15)
+=======================================
+
+Bug fixes:
+
+* Fix port script (PR #2673)
+
+
+Changes in synapse v0.25.0-rc1 (2017-11-14)
+===========================================
+
+Features:
+
+* Add is_public to groups table to allow for private groups (PR #2582)
+* Add a route for determining who you are (PR #2668) Thanks to @turt2live!
+* Add more features to the password providers (PR #2608, #2610, #2620, #2622,
+  #2623, #2624, #2626, #2628, #2629)
+* Add a hook for custom rest endpoints (PR #2627)
+* Add API to update group room visibility (PR #2651)
+
+
+Changes:
+
+* Ignore <noscript> tags when generating URL preview descriptions (PR #2576)
+  Thanks to @maximevaillancourt!
+* Register some /unstable endpoints in /r0 as well (PR #2579) Thanks to
+  @krombel!
+* Support /keys/upload on /r0 as well as /unstable (PR #2585)
+* Front-end proxy: pass through auth header (PR #2586)
+* Allow ASes to deactivate their own users (PR #2589)
+* Remove refresh tokens (PR #2613)
+* Automatically set default displayname on register (PR #2617)
+* Log login requests (PR #2618)
+* Always return `is_public` in the `/groups/:group_id/rooms` API (PR #2630)
+* Avoid no-op media deletes (PR #2637) Thanks to @spantaleev!
+* Fix various embarrassing typos around user_directory and add some doc. (PR
+  #2643)
+* Return whether a user is an admin within a group (PR #2647)
+* Namespace visibility options for groups (PR #2657)
+* Downcase UserIDs on registration (PR #2662)
+* Cache failures when fetching URL previews (PR #2669)
+
+
+Bug fixes:
+
+* Fix port script (PR #2577)
+* Fix error when running synapse with no logfile (PR #2581)
+* Fix UI auth when deleting devices (PR #2591)
+* Fix typo when checking if user is invited to group (PR #2599)
+* Fix the port script to drop NUL values in all tables (PR #2611)
+* Fix appservices being backlogged and not receiving new events due to a bug in
+  notify_interested_services (PR #2631) Thanks to @xyzz!
+* Fix updating rooms avatar/display name when modified by admin (PR #2636)
+  Thanks to @farialima!
+* Fix bug in state group storage (PR #2649)
+* Fix 500 on invalid utf-8 in request (PR #2663)
+
+
 Changes in synapse v0.24.1 (2017-10-24)
 =======================================
 

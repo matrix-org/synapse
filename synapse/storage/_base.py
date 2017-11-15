@@ -162,7 +162,7 @@ class PerformanceCounters(object):
 class SQLBaseStore(object):
     _TXN_ID = 0
 
-    def __init__(self, hs):
+    def __init__(self, db_conn, hs):
         self.hs = hs
         self._clock = hs.get_clock()
         self._db_pool = hs.get_db_pool()

@@ -35,7 +35,9 @@ class GroupServerStore(SQLBaseStore):
             keyvalues={
                 "group_id": group_id,
             },
-            retcols=("name", "short_description", "long_description", "avatar_url",),
+            retcols=(
+                "name", "short_description", "long_description", "avatar_url", "is_public"
+            ),
             allow_none=True,
             desc="is_user_in_group",
         )
@@ -52,7 +54,7 @@ class GroupServerStore(SQLBaseStore):
         return self._simple_select_list(
             table="group_users",
             keyvalues=keyvalues,
-            retcols=("user_id", "is_public",),
+            retcols=("user_id", "is_public", "is_admin",),
             desc="get_users_in_group",
         )
 
@@ -855,6 +857,19 @@ class GroupServerStore(SQLBaseStore):
             desc="add_room_to_group",
         )
 
+    def update_room_in_group_visibility(self, group_id, room_id, is_public):
+        return self._simple_update(
+            table="group_rooms",
+            keyvalues={
+                "group_id": group_id,
+                "room_id": room_id,
+            },
+            updatevalues={
+                "is_public": is_public,
+            },
+            desc="update_room_in_group_visibility",
+        )
+
     def remove_room_from_group(self, group_id, room_id):
         def _remove_room_from_group_txn(txn):
             self._simple_delete_txn(
@@ -1026,6 +1041,7 @@ class GroupServerStore(SQLBaseStore):
                 "avatar_url": avatar_url,
                 "short_description": short_description,
                 "long_description": long_description,
+                "is_public": True,
             },
             desc="create_group",
         )
@@ -1084,6 +1100,24 @@ class GroupServerStore(SQLBaseStore):
                 "attestation_json": json.dumps(attestation)
             },
             desc="update_remote_attestion",
+        )
+
+    def remove_attestation_renewal(self, group_id, user_id):
+        """Remove an attestation that we thought we should renew, but actually
+        shouldn't. Ideally this would never get called as we would never
+        incorrectly try and do attestations for local users on local groups.
+
+        Args:
+            group_id (str)
+            user_id (str)
+        """
+        return self._simple_delete(
+            table="group_attestations_renewals",
+            keyvalues={
+                "group_id": group_id,
+                "user_id": user_id,
+            },
+            desc="remove_attestation_renewal",
         )
 
     @defer.inlineCallbacks
