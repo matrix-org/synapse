@@ -17,7 +17,7 @@
 from twisted.internet import defer
 
 from .pusher import PusherFactory
-from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
+from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
 from synapse.util.async import run_on_reactor
 
 import logging
@@ -136,7 +136,7 @@ class PusherPool:
                             )
                         )
 
-            yield preserve_context_over_deferred(defer.gatherResults(deferreds))
+            yield make_deferred_yieldable(defer.gatherResults(deferreds))
         except Exception:
             logger.exception("Exception in pusher on_new_notifications")
 
@@ -161,7 +161,7 @@ class PusherPool:
                             preserve_fn(p.on_new_receipts)(min_stream_id, max_stream_id)
                         )
 
-            yield preserve_context_over_deferred(defer.gatherResults(deferreds))
+            yield make_deferred_yieldable(defer.gatherResults(deferreds))
         except Exception:
             logger.exception("Exception in pusher on_new_receipts")
 
