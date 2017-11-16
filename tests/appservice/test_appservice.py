@@ -36,7 +36,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
             id="unique_identifier",
             url="some_url",
             token="some_token",
-            hostname="matrix.org", # only used by get_groups_for_user
+            hostname="matrix.org",  # only used by get_groups_for_user
             namespaces={
                 ApplicationService.NS_USERS: [],
                 ApplicationService.NS_ROOMS: [],
