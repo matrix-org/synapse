@@ -14,6 +14,7 @@
 # limitations under the License.
 from synapse.api.constants import EventTypes
 from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.types import GroupID, get_domain_from_id
 
 from twisted.internet import defer
 
@@ -83,12 +84,13 @@ class ApplicationService(object):
 
     GROUP_ID_REGEX = re.compile('\+.*:.+')
 
-    def __init__(self, token, url=None, namespaces=None, hs_token=None,
+    def __init__(self, token, hostname, url=None, namespaces=None, hs_token=None,
                  sender=None, id=None, protocols=None, rate_limited=True):
         self.token = token
         self.url = url
         self.hs_token = hs_token
         self.sender = sender
+        self.server_name = hostname
         self.namespaces = self._check_namespaces(namespaces)
         self.id = id
 
@@ -132,10 +134,16 @@ class ApplicationService(object):
                         raise ValueError(
                             "Expected string for 'group_id' in ns '%s'" % ns
                         )
-                    if not ApplicationService.GROUP_ID_REGEX.match(
-                            regex_obj.get("group_id")):
+                    try:
+                        GroupID.from_string(regex_obj.get("group_id"))
+                    except Exception:
                         raise ValueError(
                             "Expected valid group ID for 'group_id' in ns '%s'" % ns
+                        )
+
+                    if get_domain_from_id(regex_obj.get("group_id")) != self.server_name:
+                        raise ValueError(
+                            "Expected string for 'group_id' to be for this host in ns '%s'" % ns
                         )
 
                 regex = regex_obj.get("regex")
