@@ -503,7 +503,7 @@ class SQLBaseStore(object):
                     lock=lock
                 )
                 defer.returnValue(result)
-            except self.database_engine.IntegrityError as e:
+            except self.database_engine.module.IntegrityError as e:
                 # presumably we raced with another transaction: let's retry.
                 logger.warn(
                     "IntegrityError when upserting into %s; retrying: %s",
