@@ -82,8 +82,6 @@ class ApplicationService(object):
     # values.
     NS_LIST = [NS_USERS, NS_ALIASES, NS_ROOMS]
 
-    GROUP_ID_REGEX = re.compile('\+.*:.+')
-
     def __init__(self, token, hostname, url=None, namespaces=None, hs_token=None,
                  sender=None, id=None, protocols=None, rate_limited=True):
         self.token = token
