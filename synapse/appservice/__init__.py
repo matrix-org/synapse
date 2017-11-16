@@ -274,6 +274,12 @@ class ApplicationService(object):
 
     def get_groups_for_user(self, user_id):
         """Get the groups that this user is associated with by this AS
+
+        Args:
+            user_id (str): The ID of the user.
+
+        Returns:
+            iterable[str]: an iterable that yields group_id strings.
         """
         return (
             regex_obj["group_id"]
