@@ -81,6 +81,8 @@ class ApplicationService(object):
     # values.
     NS_LIST = [NS_USERS, NS_ALIASES, NS_ROOMS]
 
+    GROUP_ID_REGEX = re.compile('\+.*:.+')
+
     def __init__(self, token, url=None, namespaces=None, hs_token=None,
                  sender=None, id=None, protocols=None, rate_limited=True):
         self.token = token
@@ -125,6 +127,17 @@ class ApplicationService(object):
                     raise ValueError(
                         "Expected bool for 'exclusive' in ns '%s'" % ns
                     )
+                if regex_obj.get("group_id"):
+                    if not isinstance(regex_obj.get("group_id"), str):
+                        raise ValueError(
+                            "Expected string for 'group_id' in ns '%s'" % ns
+                        )
+                    if not ApplicationService.GROUP_ID_REGEX.match(
+                            regex_obj.get("group_id")):
+                        raise ValueError(
+                            "Expected valid group ID for 'group_id' in ns '%s'" % ns
+                        )
+
                 regex = regex_obj.get("regex")
                 if isinstance(regex, basestring):
                     regex_obj["regex"] = re.compile(regex)  # Pre-compile regex
@@ -249,6 +262,15 @@ class ApplicationService(object):
             regex_obj["regex"]
             for regex_obj in self.namespaces[ApplicationService.NS_USERS]
             if regex_obj["exclusive"]
+        ]
+
+    def get_groups_for_user(self, user_id):
+        """Get the groups that this user is associated with by this AS
+        """
+        return [
+            regex_obj["group_id"]
+            for regex_obj in self.namespaces[ApplicationService.NS_USERS]
+            if "group_id" in regex_obj and regex_obj["regex"].match(user_id)
         ]
 
     def is_rate_limited(self):
