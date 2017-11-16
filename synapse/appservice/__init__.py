@@ -143,7 +143,7 @@ class ApplicationService(object):
 
                     if get_domain_from_id(regex_obj.get("group_id")) != self.server_name:
                         raise ValueError(
-                            "Expected string for 'group_id' to be for this host in ns '%s'" % ns
+                            "Expected 'group_id' to be this host in ns '%s'" % ns
                         )
 
                 regex = regex_obj.get("regex")
