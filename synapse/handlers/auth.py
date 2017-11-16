@@ -551,7 +551,7 @@ class AuthHandler(BaseHandler):
                     qualified_user_id, password,
                 )
                 if is_valid:
-                    defer.returnValue((qualified_user_id, None))
+                    defer.returnValue(qualified_user_id)
 
             if (not hasattr(provider, "get_supported_login_types")
                     or not hasattr(provider, "check_auth")):
