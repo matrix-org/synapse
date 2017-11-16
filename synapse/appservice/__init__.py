@@ -127,19 +127,20 @@ class ApplicationService(object):
                     raise ValueError(
                         "Expected bool for 'exclusive' in ns '%s'" % ns
                     )
-                if regex_obj.get("group_id"):
-                    if not isinstance(regex_obj.get("group_id"), str):
+                group_id = regex_obj.get("group_id")
+                if group_id:
+                    if not isinstance(group_id, str):
                         raise ValueError(
                             "Expected string for 'group_id' in ns '%s'" % ns
                         )
                     try:
-                        GroupID.from_string(regex_obj.get("group_id"))
+                        GroupID.from_string(group_id)
                     except Exception:
                         raise ValueError(
                             "Expected valid group ID for 'group_id' in ns '%s'" % ns
                         )
 
-                    if get_domain_from_id(regex_obj.get("group_id")) != self.server_name:
+                    if get_domain_from_id(group_id) != self.server_name:
                         raise ValueError(
                             "Expected 'group_id' to be this host in ns '%s'" % ns
                         )
