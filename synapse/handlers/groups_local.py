@@ -421,4 +421,9 @@ class GroupsLocalHandler(object):
                 uid
             )
 
+            # Check AS associated groups for this user - this depends on the
+            # RegExps in the AS registration file (under `users`)
+            for app_service in self.store.get_app_services():
+                results[uid].extend(app_service.get_groups_for_user(uid))
+
         defer.returnValue({"users": results})
