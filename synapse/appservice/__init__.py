@@ -275,11 +275,11 @@ class ApplicationService(object):
     def get_groups_for_user(self, user_id):
         """Get the groups that this user is associated with by this AS
         """
-        return [
+        return (
             regex_obj["group_id"]
             for regex_obj in self.namespaces[ApplicationService.NS_USERS]
             if "group_id" in regex_obj and regex_obj["regex"].match(user_id)
-        ]
+        )
 
     def is_rate_limited(self):
         return self.rate_limited
