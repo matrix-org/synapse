@@ -1,3 +1,11 @@
+Changes in synapse v0.25.1 (2017-11-17)
+=======================================
+
+Bug fixes:
+
+* Fix login with LDAP and other password provider modules (PR #2678). Thanks to
+  @jkolo!
+
 Changes in synapse v0.25.0 (2017-11-15)
 =======================================
 
