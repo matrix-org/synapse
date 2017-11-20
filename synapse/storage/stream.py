@@ -39,7 +39,7 @@ from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached
 from synapse.api.constants import EventTypes
 from synapse.types import RoomStreamToken
-from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
+from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 import logging
@@ -234,7 +234,7 @@ class StreamStore(SQLBaseStore):
         results = {}
         room_ids = list(room_ids)
         for rm_ids in (room_ids[i:i + 20] for i in xrange(0, len(room_ids), 20)):
-            res = yield preserve_context_over_deferred(defer.gatherResults([
+            res = yield make_deferred_yieldable(defer.gatherResults([
                 preserve_fn(self.get_room_events_stream_for_room)(
                     room_id, from_key, to_key, limit, order=order,
                 )

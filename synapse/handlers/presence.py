@@ -1199,7 +1199,7 @@ def handle_timeout(state, is_mine, syncing_user_ids, now):
                 )
                 changed = True
     else:
-        # We expect to be poked occaisonally by the other side.
+        # We expect to be poked occasionally by the other side.
         # This is to protect against forgetful/buggy servers, so that
         # no one gets stuck online forever.
         if now - state.last_federation_update_ts > FEDERATION_TIMEOUT:

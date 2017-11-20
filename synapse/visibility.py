@@ -17,7 +17,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import Membership, EventTypes
 
-from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
+from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
 
 import logging
 
@@ -58,7 +58,7 @@ def filter_events_for_clients(store, user_tuples, events, event_id_to_state,
         always_include_ids (set(event_id)): set of event ids to specifically
             include (unless sender is ignored)
     """
-    forgotten = yield preserve_context_over_deferred(defer.gatherResults([
+    forgotten = yield make_deferred_yieldable(defer.gatherResults([
         defer.maybeDeferred(
             preserve_fn(store.who_forgot_in_room),
             room_id,
