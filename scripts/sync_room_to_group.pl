@@ -26,6 +26,9 @@ my $group_users = [
     (map { $_->{user_id} } @{decode_json($ua->get("${hs}/_matrix/client/unstable/groups/${group_id}/invited_users?access_token=${access_token}" )->decoded_content)->{chunk}}),
 ];
 
+die "refusing to sync from empty room" unless (@$room_users);
+die "refusing to sync to empty group" unless (@$group_users);
+
 my $diff = {};
 foreach my $user (@$room_users) { $diff->{$user}++ }
 foreach my $user (@$group_users) { $diff->{$user}-- }
