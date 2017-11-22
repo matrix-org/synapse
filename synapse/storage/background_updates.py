@@ -110,13 +110,36 @@ class BackgroundUpdateStore(SQLBaseStore):
                     self._all_done = True
                     defer.returnValue(None)
 
+    @defer.inlineCallbacks
     def has_completed_background_updates(self):
         """Check if all the background updates have completed
 
         Returns:
-            bool: True if all background updates have completed
+            Deferred[bool]: True if all background updates have completed
         """
-        return self._all_done
+        # if we've previously determined that there is nothing left to do, that
+        # is easy
+        if self._all_done:
+            defer.returnValue(True)
+
+        # obviously, if we have things in our queue, we're not done.
+        if self._background_update_queue:
+            defer.returnValue(False)
+
+        # otherwise, check if there are updates to be run. This is important,
+        # as we may be running on a worker which doesn't perform the bg updates
+        # itself, but still wants to wait for them to happen.
+        updates = yield self._simple_select_onecol(
+            "background_updates",
+            keyvalues=None,
+            retcol="1",
+            desc="check_background_updates",
+        )
+        if not updates:
+            self._all_done = True
+            defer.returnValue(True)
+
+        defer.returnValue(False)
 
     @defer.inlineCallbacks
     def do_next_background_update(self, desired_duration_ms):
