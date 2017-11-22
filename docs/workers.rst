@@ -170,6 +170,10 @@ Handles the media repository. It can handle all endpoints starting with::
 
     /_matrix/media/
 
+You should also set ``enable_media_repo: False`` in the shared configuration
+file to stop the main synapse running background jobs related to managing the
+media repository.
+
 Note this worker cannot be load-balanced: only one instance should be active.
 
 ``synapse.app.client_reader``
@@ -203,4 +207,3 @@ the ``worker_main_http_uri`` setting in the frontend_proxy worker configuration
 file. For example::
 
     worker_main_http_uri: http://127.0.0.1:8008
-
