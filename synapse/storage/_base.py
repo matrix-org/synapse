@@ -608,7 +608,7 @@ class SQLBaseStore(object):
         }
 
         if keyvalues:
-            sql += "WHERE %s" % " AND ".join("%s = ?" % k for k in keyvalues.iterkeys())
+            sql += " WHERE %s" % " AND ".join("%s = ?" % k for k in keyvalues.iterkeys())
             txn.execute(sql, keyvalues.values())
         else:
             txn.execute(sql)
