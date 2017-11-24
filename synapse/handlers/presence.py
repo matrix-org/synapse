@@ -467,6 +467,7 @@ class PresenceHandler(object):
         Returns:
             set(str): A set of user_id strings.
         """
+        # presence is disabled on matrix.org, so we return the empty set
         return set()
         syncing_user_ids = {
             user_id for user_id, count in self.user_to_num_current_syncs.items()
