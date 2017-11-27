@@ -65,8 +65,8 @@ def _deserialize_action(actions, is_highlight):
 class EventPushActionsStore(SQLBaseStore):
     EPA_HIGHLIGHT_INDEX = "epa_highlight_index"
 
-    def __init__(self, hs):
-        super(EventPushActionsStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(EventPushActionsStore, self).__init__(db_conn, hs)
 
         self.register_background_index_update(
             self.EPA_HIGHLIGHT_INDEX,

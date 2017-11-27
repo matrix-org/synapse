@@ -33,8 +33,8 @@ class SearchStore(BackgroundUpdateStore):
     EVENT_SEARCH_ORDER_UPDATE_NAME = "event_search_order"
     EVENT_SEARCH_USE_GIST_POSTGRES_NAME = "event_search_postgres_gist"
 
-    def __init__(self, hs):
-        super(SearchStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(SearchStore, self).__init__(db_conn, hs)
         self.register_background_update_handler(
             self.EVENT_SEARCH_UPDATE_NAME, self._background_reindex_search
         )

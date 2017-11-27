@@ -5,6 +5,7 @@ import synapse.handlers
 import synapse.handlers.auth
 import synapse.handlers.device
 import synapse.handlers.e2e_keys
+import synapse.rest.media.v1.media_repository
 import synapse.storage
 import synapse.state
 
@@ -34,4 +35,10 @@ class HomeServer(object):
         pass
 
     def get_federation_transport_client(self) -> synapse.federation.transport.client.TransportLayerClient:
+        pass
+
+    def get_media_repository_resource(self) -> synapse.rest.media.v1.media_repository.MediaRepositoryResource:
+        pass
+
+    def get_media_repository(self) -> synapse.rest.media.v1.media_repository.MediaRepository:
         pass

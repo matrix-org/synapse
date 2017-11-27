@@ -46,8 +46,8 @@ class TransactionStore(SQLBaseStore):
     """A collection of queries for handling PDUs.
     """
 
-    def __init__(self, hs):
-        super(TransactionStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(TransactionStore, self).__init__(db_conn, hs)
 
         self._clock.looping_call(self._cleanup_transactions, 30 * 60 * 1000)
 

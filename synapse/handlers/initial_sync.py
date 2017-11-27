@@ -27,7 +27,7 @@ from synapse.types import (
 from synapse.util import unwrapFirstError
 from synapse.util.async import concurrently_execute
 from synapse.util.caches.snapshot_cache import SnapshotCache
-from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
+from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -163,7 +163,7 @@ class InitialSyncHandler(BaseHandler):
                         lambda states: states[event.event_id]
                     )
 
-                (messages, token), current_state = yield preserve_context_over_deferred(
+                (messages, token), current_state = yield make_deferred_yieldable(
                     defer.gatherResults(
                         [
                             preserve_fn(self.store.get_recent_events_for_room)(
