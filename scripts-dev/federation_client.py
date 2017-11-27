@@ -123,15 +123,25 @@ def lookup(destination, path):
         except:
             return "https://%s:%d%s" % (destination, 8448, path)
 
-def get_json(origin_name, origin_key, destination, path):
-    request_json = {
-        "method": "GET",
+
+def request_json(method, origin_name, origin_key, destination, path, content):
+    if method is None:
+        if content is None:
+            method = "GET"
+        else:
+            method = "POST"
+
+    json_to_sign = {
+        "method": method,
         "uri": path,
         "origin": origin_name,
         "destination": destination,
     }
 
-    signed_json = sign_json(request_json, origin_key, origin_name)
+    if content is not None:
+        json_to_sign["content"] = json.loads(content)
+
+    signed_json = sign_json(json_to_sign, origin_key, origin_name)
 
     authorization_headers = []
 
@@ -145,10 +155,12 @@ def get_json(origin_name, origin_key, destination, path):
     dest = lookup(destination, path)
     print ("Requesting %s" % dest, file=sys.stderr)
 
-    result = requests.get(
-        dest,
+    result = requests.request(
+        method=method,
+        url=dest,
         headers={"Authorization": authorization_headers[0]},
         verify=False,
+        data=content,
     )
     sys.stderr.write("Status Code: %d\n" % (result.status_code,))
     return result.json()
@@ -187,6 +199,17 @@ def main():
     )
 
     parser.add_argument(
+        "-X", "--method",
+        help="HTTP method to use for the request. Defaults to GET if --data is"
+             "unspecified, POST if it is."
+    )
+
+    parser.add_argument(
+        "--body",
+        help="Data to send as the body of the HTTP request"
+    )
+
+    parser.add_argument(
         "path",
         help="request path. We will add '/_matrix/federation/v1/' to this."
     )
@@ -199,8 +222,11 @@ def main():
     with open(args.signing_key_path) as f:
         key = read_signing_keys(f)[0]
 
-    result = get_json(
-        args.server_name, key, args.destination, "/_matrix/federation/v1/" + args.path
+    result = request_json(
+        args.method,
+        args.server_name, key, args.destination,
+        "/_matrix/federation/v1/" + args.path,
+        content=args.body,
     )
 
     json.dump(result, sys.stdout)
