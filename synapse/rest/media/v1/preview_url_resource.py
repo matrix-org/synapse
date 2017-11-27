@@ -25,7 +25,8 @@ from synapse.util.stringutils import random_string
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.http.client import SpiderHttpClient
 from synapse.http.server import (
-    request_handler, respond_with_json_bytes
+    request_handler, respond_with_json_bytes,
+    respond_with_json,
 )
 from synapse.util.async import ObservableDeferred
 from synapse.util.stringutils import is_ascii
@@ -77,6 +78,9 @@ class PreviewUrlResource(Resource):
         self._cleaner_loop = self.clock.looping_call(
             self._expire_url_cache_data, 10 * 1000
         )
+
+    def render_OPTIONS(self, request):
+        return respond_with_json(request, 200, {}, send_cors=True)
 
     def render_GET(self, request):
         self._async_render_GET(request)
