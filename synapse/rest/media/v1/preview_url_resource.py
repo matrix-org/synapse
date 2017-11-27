@@ -352,10 +352,15 @@ class PreviewUrlResource(Resource):
     def _expire_url_cache_data(self):
         """Clean up expired url cache content, media and thumbnails.
         """
-
         # TODO: Delete from backup media store
 
         now = self.clock.time_msec()
+
+        logger.info("Running url preview cache expiry")
+
+        if not (yield self.store.has_completed_background_updates()):
+            logger.info("Still running DB updates; skipping expiry")
+            return
 
         # First we delete expired url cache entries
         media_ids = yield self.store.get_expired_url_cache(now)
@@ -430,8 +435,7 @@ class PreviewUrlResource(Resource):
 
         yield self.store.delete_url_cache_media(removed_media)
 
-        if removed_media:
-            logger.info("Deleted %d media from url cache", len(removed_media))
+        logger.info("Deleted %d media from url cache", len(removed_media))
 
 
 def decode_and_calc_og(body, media_uri, request_encoding=None):
