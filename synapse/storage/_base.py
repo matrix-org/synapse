@@ -495,6 +495,7 @@ class SQLBaseStore(object):
             Deferred(bool): True if a new entry was created, False if an
                 existing one was updated.
         """
+        attempts = 0
         while True:
             try:
                 result = yield self.runInteraction(
@@ -504,6 +505,12 @@ class SQLBaseStore(object):
                 )
                 defer.returnValue(result)
             except self.database_engine.module.IntegrityError as e:
+                attempts += 1
+                if attempts >= 5:
+                    # don't retry forever, because things other than races
+                    # can cause IntegrityErrors
+                    raise
+
                 # presumably we raced with another transaction: let's retry.
                 logger.warn(
                     "IntegrityError when upserting into %s; retrying: %s",
