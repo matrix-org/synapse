@@ -210,7 +210,7 @@ class RoomCreationHandler(BaseHandler):
             is_direct = config.get("is_direct", None)
             if is_direct:
                 content["is_direct"] = is_direct
-            
+
             yield room_member_handler.update_membership(
                 requester,
                 UserID.from_string(invitee),
