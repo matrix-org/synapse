@@ -6,6 +6,7 @@ import synapse.handlers.auth
 import synapse.handlers.deactivate_account
 import synapse.handlers.device
 import synapse.handlers.e2e_keys
+import synapse.handlers.set_password
 import synapse.rest.media.v1.media_repository
 import synapse.state
 import synapse.storage
@@ -34,6 +35,9 @@ class HomeServer(object):
         pass
 
     def get_deactivate_account_handler(self) -> synapse.handlers.deactivate_account.DeactivateAccountHandler:
+        pass
+
+    def get_set_password_handler(self) -> synapse.handlers.set_password.SetPasswordHandler:
         pass
 
     def get_federation_sender(self) -> synapse.federation.transaction_queue.TransactionQueue:

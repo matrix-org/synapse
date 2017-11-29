@@ -650,22 +650,6 @@ class AuthHandler(BaseHandler):
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
 
     @defer.inlineCallbacks
-    def set_password(self, user_id, newpassword, requester=None):
-        password_hash = self.hash(newpassword)
-
-        except_access_token_id = requester.access_token_id if requester else None
-
-        try:
-            yield self.store.user_set_password_hash(user_id, password_hash)
-        except StoreError as e:
-            if e.code == 404:
-                raise SynapseError(404, "Unknown user", Codes.NOT_FOUND)
-            raise e
-        yield self.delete_access_tokens_for_user(
-            user_id, except_token_id=except_access_token_id,
-        )
-
-    @defer.inlineCallbacks
     def delete_access_token(self, access_token):
         """Invalidate a single access token
 

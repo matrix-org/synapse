@@ -45,6 +45,7 @@ from synapse.handlers.device import DeviceHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.room_list import RoomListHandler
+from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import TypingHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
@@ -117,6 +118,7 @@ class HomeServer(object):
         'device_message_handler',
         'profile_handler',
         'deactivate_account_handler',
+        'set_password_handler',
         'notifier',
         'event_sources',
         'keyring',
@@ -272,6 +274,9 @@ class HomeServer(object):
 
     def build_deactivate_account_handler(self):
         return DeactivateAccountHandler(self)
+
+    def build_set_password_handler(self):
+        return SetPasswordHandler(self)
 
     def build_event_sources(self):
         return EventSources(self)
