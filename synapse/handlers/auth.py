@@ -666,22 +666,6 @@ class AuthHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def deactivate_account(self, user_id):
-        """Deactivate a user's account
-
-        Args:
-            user_id (str): ID of user to be deactivated
-
-        Returns:
-            Deferred
-        """
-        # FIXME: Theoretically there is a race here wherein user resets
-        # password using threepid.
-        yield self.delete_access_tokens_for_user(user_id)
-        yield self.store.user_delete_threepids(user_id)
-        yield self.store.user_set_password_hash(user_id, None)
-
-    @defer.inlineCallbacks
     def delete_access_token(self, access_token):
         """Invalidate a single access token
 

@@ -3,11 +3,13 @@ import synapse.federation.transaction_queue
 import synapse.federation.transport.client
 import synapse.handlers
 import synapse.handlers.auth
+import synapse.handlers.deactivate_account
 import synapse.handlers.device
 import synapse.handlers.e2e_keys
 import synapse.rest.media.v1.media_repository
-import synapse.storage
 import synapse.state
+import synapse.storage
+
 
 class HomeServer(object):
     def get_auth(self) -> synapse.api.auth.Auth:
@@ -29,6 +31,9 @@ class HomeServer(object):
         pass
 
     def get_state_handler(self) -> synapse.state.StateHandler:
+        pass
+
+    def get_deactivate_account_handler(self) -> synapse.handlers.deactivate_account.DeactivateAccountHandler:
         pass
 
     def get_federation_sender(self) -> synapse.federation.transaction_queue.TransactionQueue:
