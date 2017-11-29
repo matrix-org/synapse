@@ -629,6 +629,10 @@ class UserDirectoryStore(SQLBaseStore):
                     ]
                 }
         """
+
+        include_pattern = self.hs.config.user_directory_include_pattern or "%";
+        logger.error("include pattern is %s" % (include_pattern))
+
         if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
 
@@ -647,7 +651,9 @@ class UserDirectoryStore(SQLBaseStore):
                     WHERE user_id = ? AND share_private
                 ) AS s USING (user_id)
                 WHERE
-                    (s.user_id IS NOT NULL OR p.user_id IS NOT NULL)
+                    (s.user_id IS NOT NULL OR
+                     p.user_id IS NOT NULL OR
+                     d.user_id LIKE ?)
                     AND vector @@ to_tsquery('english', ?)
                 ORDER BY
                     (CASE WHEN s.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
@@ -672,7 +678,7 @@ class UserDirectoryStore(SQLBaseStore):
                     avatar_url IS NULL
                 LIMIT ?
             """
-            args = (user_id, full_query, exact_query, prefix_query, limit + 1,)
+            args = (user_id, include_pattern, full_query, exact_query, prefix_query, limit + 1,)
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_sqlite(search_term)
 
@@ -686,7 +692,9 @@ class UserDirectoryStore(SQLBaseStore):
                     WHERE user_id = ? AND share_private
                 ) AS s USING (user_id)
                 WHERE
-                    (s.user_id IS NOT NULL OR p.user_id IS NOT NULL)
+                    (s.user_id IS NOT NULL OR
+                     p.user_id IS NOT NULL OR
+                     d.user_id LIKE ?)
                     AND value MATCH ?
                 ORDER BY
                     rank(matchinfo(user_directory_search)) DESC,
@@ -694,7 +702,7 @@ class UserDirectoryStore(SQLBaseStore):
                     avatar_url IS NULL
                 LIMIT ?
             """
-            args = (user_id, search_query, limit + 1)
+            args = (user_id, include_pattern, search_query, limit + 1)
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")

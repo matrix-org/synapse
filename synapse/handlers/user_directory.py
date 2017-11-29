@@ -25,7 +25,7 @@ from synapse.util.async import sleep
 logger = logging.getLogger(__name__)
 
 
-class UserDirectoyHandler(object):
+class UserDirectoryHandler(object):
     """Handles querying of and keeping updated the user_directory.
 
     N.B.: ASSUMES IT IS THE ONLY THING THAT MODIFIES THE USER DIRECTORY
@@ -389,7 +389,7 @@ class UserDirectoyHandler(object):
         """Called when we might need to add user to directory
 
         Args:
-            room_id (str): room_id that user joined or started being public that
+            room_id (str): room_id that user joined or started being public
             user_id (str)
         """
         logger.debug("Adding user to dir, %r", user_id)
