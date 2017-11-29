@@ -27,11 +27,13 @@ class SetPasswordHandler(BaseHandler):
     def __init__(self, hs):
         super(SetPasswordHandler, self).__init__(hs)
         self._auth_handler = hs.get_auth_handler()
+        self._device_handler = hs.get_device_handler()
 
     @defer.inlineCallbacks
     def set_password(self, user_id, newpassword, requester=None):
         password_hash = self._auth_handler.hash(newpassword)
 
+        except_device_id = requester.device_id if requester else None
         except_access_token_id = requester.access_token_id if requester else None
 
         try:
@@ -40,6 +42,15 @@ class SetPasswordHandler(BaseHandler):
             if e.code == 404:
                 raise SynapseError(404, "Unknown user", Codes.NOT_FOUND)
             raise e
+
+        # we want to log out all of the user's other sessions. First delete
+        # all his other devices.
+        yield self._device_handler.delete_all_devices_for_user(
+            user_id, except_device_id=except_device_id,
+        )
+
+        # and now delete any access tokens which weren't associated with
+        # devices (or were associated with this device).
         yield self._auth_handler.delete_access_tokens_for_user(
             user_id, except_token_id=except_access_token_id,
         )

@@ -26,6 +26,7 @@ class DeactivateAccountHandler(BaseHandler):
     def __init__(self, hs):
         super(DeactivateAccountHandler, self).__init__(hs)
         self._auth_handler = hs.get_auth_handler()
+        self._device_handler = hs.get_device_handler()
 
     @defer.inlineCallbacks
     def deactivate_account(self, user_id):
@@ -39,6 +40,13 @@ class DeactivateAccountHandler(BaseHandler):
         """
         # FIXME: Theoretically there is a race here wherein user resets
         # password using threepid.
+
+        # first delete any devices belonging to the user, which will also
+        # delete corresponding access tokens.
+        yield self._device_handler.delete_all_devices_for_user(user_id)
+        # then delete any remaining access tokens which weren't associated with
+        # a device.
         yield self._auth_handler.delete_access_tokens_for_user(user_id)
+
         yield self.store.user_delete_threepids(user_id)
         yield self.store.user_set_password_hash(user_id, None)
