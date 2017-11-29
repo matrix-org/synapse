@@ -164,7 +164,7 @@ class UserDirectoryStore(SQLBaseStore):
             )
 
             if isinstance(self.database_engine, PostgresEngine):
-                # We weight the loclpart most highly, then display name and finally
+                # We weight the localpart most highly, then display name and finally
                 # server name
                 if new_entry:
                     sql = """
@@ -316,6 +316,16 @@ class UserDirectoryStore(SQLBaseStore):
         """
         rows = yield self._execute("get_all_rooms", None, sql)
         defer.returnValue([room_id for room_id, in rows])
+
+    @defer.inlineCallbacks
+    def get_all_local_users(self):
+        """Get all local users
+        """
+        sql = """
+            SELECT name FROM users
+        """
+        rows = yield self._execute("get_all_local_users", None, sql)
+        defer.returnValue([name for name, in rows])
 
     def add_users_who_share_room(self, room_id, share_private, user_id_tuples):
         """Insert entries into the users_who_share_rooms table. The first
@@ -630,7 +640,12 @@ class UserDirectoryStore(SQLBaseStore):
                 }
         """
 
-        include_pattern = self.hs.config.user_directory_include_pattern or "%";
+        include_pattern_clause = ""
+        if self.hs.config.user_directory_include_pattern:
+            include_pattern_clause = "OR d.user_id LIKE '%s'" % (
+                self.hs.config.user_directory_include_pattern
+            )
+
         logger.error("include pattern is %s" % (include_pattern))
 
         if isinstance(self.database_engine, PostgresEngine):
@@ -651,9 +666,7 @@ class UserDirectoryStore(SQLBaseStore):
                     WHERE user_id = ? AND share_private
                 ) AS s USING (user_id)
                 WHERE
-                    (s.user_id IS NOT NULL OR
-                     p.user_id IS NOT NULL OR
-                     d.user_id LIKE ?)
+                    (s.user_id IS NOT NULL OR p.user_id IS NOT NULL %s)
                     AND vector @@ to_tsquery('english', ?)
                 ORDER BY
                     (CASE WHEN s.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
@@ -677,8 +690,8 @@ class UserDirectoryStore(SQLBaseStore):
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """
-            args = (user_id, include_pattern, full_query, exact_query, prefix_query, limit + 1,)
+            """ % ( include_pattern_clause )
+            args = (user_id, full_query, exact_query, prefix_query, limit + 1,)
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_sqlite(search_term)
 
@@ -692,17 +705,15 @@ class UserDirectoryStore(SQLBaseStore):
                     WHERE user_id = ? AND share_private
                 ) AS s USING (user_id)
                 WHERE
-                    (s.user_id IS NOT NULL OR
-                     p.user_id IS NOT NULL OR
-                     d.user_id LIKE ?)
+                    (s.user_id IS NOT NULL OR p.user_id IS NOT NULL %s)
                     AND value MATCH ?
                 ORDER BY
                     rank(matchinfo(user_directory_search)) DESC,
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """
-            args = (user_id, include_pattern, search_query, limit + 1)
+            """ % ( include_pattern_clause )
+            args = (user_id, search_query, limit + 1)
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")

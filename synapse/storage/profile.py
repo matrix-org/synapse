@@ -15,6 +15,8 @@
 
 from twisted.internet import defer
 
+from synapse.storage.roommember import ProfileInfo
+
 from ._base import SQLBaseStore
 
 
@@ -24,6 +26,18 @@ class ProfileStore(SQLBaseStore):
             table="profiles",
             values={"user_id": user_localpart},
             desc="create_profile",
+        )
+
+    def get_profileinfo(self, user_localpart):
+        profile = self._simple_select_one(
+            table="profiles",
+            keyvalues={"user_id": user_localpart},
+            retcols=("displayname", "avatar_url"),
+            desc="get_profileinfo",
+        )
+        return ProfileInfo(
+            avatar_url=profile.avatar_url,
+            displayname=profile.displayname,
         )
 
     def get_profile_displayname(self, user_localpart):

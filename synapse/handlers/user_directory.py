@@ -111,6 +111,15 @@ class UserDirectoryHandler(object):
             self._is_processing = False
 
     @defer.inlineCallbacks
+    def handle_local_profile_change(self, user_id, profile):
+        """Called to update index of our local user profiles when they change
+        irrespective of any rooms the user may be in.
+        """
+        yield self.store.update_profile_in_user_dir(
+            user_id, profile.display_name, profile.avatar_url,
+        )
+
+    @defer.inlineCallbacks
     def _unsafe_process(self):
         # If self.pos is None then means we haven't fetched it from DB
         if self.pos is None:
@@ -148,15 +157,29 @@ class UserDirectoryHandler(object):
         room_ids = yield self.store.get_all_rooms()
 
         logger.info("Doing initial update of user directory. %d rooms", len(room_ids))
-        num_processed_rooms = 1
+        num_processed_rooms = 0
 
         for room_id in room_ids:
-            logger.info("Handling room %d/%d", num_processed_rooms, len(room_ids))
+            logger.info("Handling room %d/%d", num_processed_rooms+1, len(room_ids))
             yield self._handle_initial_room(room_id)
             num_processed_rooms += 1
             yield sleep(self.INITIAL_SLEEP_MS / 1000.)
 
         logger.info("Processed all rooms.")
+
+        if self.hs.config.user_directory_include_pattern:
+            logger.info("Doing initial update of user directory. %d users", len(user_ids))
+            num_processed_users = 0
+            user_ids = yield self.store.get_all_local_users()
+            for user_id in user_ids:
+                # We add profiles for all users even if they don't match the
+                # include pattern, just in case we want to change it in future
+                logger.info("Handling user %d/%d", num_processed_users+1, len(user_ids))
+                yield self._handle_local_user(user_id)
+                num_processed_users += 1
+                yield sleep(self.INITIAL_SLEEP_MS / 1000.)
+
+            logger.info("Processed all users")
 
         self.initially_handled_users = None
         self.initially_handled_users_in_public = None
@@ -385,6 +408,21 @@ class UserDirectoryHandler(object):
                 yield self._handle_remove_user(room_id, user_id)
 
     @defer.inlineCallbacks
+    def _handle_local_user(self, user_id):
+        """Adds a new local roomless user into the user_directory_search table.
+        Used to populate up the user index when we have an
+        user_directory_include_pattern specified.
+        """
+        logger.debug("Adding new local user to dir, %r", user_id)
+
+        profile = yield self.store.get_profileinfo(user_id)
+
+        row = yield self.store.get_user_in_directory(user_id)
+        if not row:
+            yield self.store.add_profiles_to_user_dir(None, {user_id: profile})
+
+
+    @defer.inlineCallbacks
     def _handle_new_user(self, room_id, user_id, profile):
         """Called when we might need to add user to directory
 
@@ -392,7 +430,7 @@ class UserDirectoryHandler(object):
             room_id (str): room_id that user joined or started being public
             user_id (str)
         """
-        logger.debug("Adding user to dir, %r", user_id)
+        logger.debug("Adding new user to dir, %r", user_id)
 
         row = yield self.store.get_user_in_directory(user_id)
         if not row:
@@ -407,7 +445,7 @@ class UserDirectoryHandler(object):
             if not row:
                 yield self.store.add_users_to_public_room(room_id, [user_id])
         else:
-            logger.debug("Not adding user to public dir, %r", user_id)
+            logger.debug("Not adding new user to public dir, %r", user_id)
 
         # Now we update users who share rooms with users. We do this by getting
         # all the current users in the room and seeing which aren't already

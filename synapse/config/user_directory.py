@@ -22,18 +22,17 @@ class UserDirectoryConfig(Config):
     """
 
     def read_config(self, config):
-        self.user_directory_include_pattern = "%"
         user_directory_config = config.get("user_directory", None)
         if user_directory_config:
             self.user_directory_include_pattern = (
-                user_directory_config.get("include_pattern", "%")
+                user_directory_config.get("include_pattern", None)
             )
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # User Directory configuration
         # 'include_pattern' defines an optional SQL LIKE pattern when querying the
-        # user directory in addition to publicly visible users. Defaults to "%%"
+        # user directory in addition to publicly visible users. Defaults to None.
         #
         #user_directory:
         #   include_pattern: "%%:%s"
