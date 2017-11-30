@@ -640,13 +640,17 @@ class UserDirectoryStore(SQLBaseStore):
                 }
         """
 
-        include_pattern_clause = ""
+        include_pattern_join = ""
+        include_pattern_where_clause = ""
         if self.hs.config.user_directory_include_pattern:
-            include_pattern_clause = "OR d.user_id LIKE '%s'" % (
-                self.hs.config.user_directory_include_pattern
-            )
+            include_pattern_join = """
+                LEFT JOIN (
+                    SELECT user_id FROM user_directory
+                    WHERE user_id LIKE '%s'
+                ) AS ld USING (user_id)
+            """ % ( self.hs.config.user_directory_include_pattern )
 
-        logger.error("include pattern is %s" % (include_pattern))
+            include_pattern_where_clause = "OR ld.user_id IS NOT NULL"
 
         if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
@@ -665,6 +669,7 @@ class UserDirectoryStore(SQLBaseStore):
                     SELECT other_user_id AS user_id FROM users_who_share_rooms
                     WHERE user_id = ? AND share_private
                 ) AS s USING (user_id)
+                %s
                 WHERE
                     (s.user_id IS NOT NULL OR p.user_id IS NOT NULL %s)
                     AND vector @@ to_tsquery('english', ?)
@@ -690,7 +695,7 @@ class UserDirectoryStore(SQLBaseStore):
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """ % ( include_pattern_clause )
+            """ % ( include_pattern_join, include_pattern_where_clause )
             args = (user_id, full_query, exact_query, prefix_query, limit + 1,)
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_sqlite(search_term)
@@ -704,6 +709,7 @@ class UserDirectoryStore(SQLBaseStore):
                     SELECT other_user_id AS user_id FROM users_who_share_rooms
                     WHERE user_id = ? AND share_private
                 ) AS s USING (user_id)
+                %s
                 WHERE
                     (s.user_id IS NOT NULL OR p.user_id IS NOT NULL %s)
                     AND value MATCH ?
@@ -712,7 +718,7 @@ class UserDirectoryStore(SQLBaseStore):
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """ % ( include_pattern_clause )
+            """ % ( include_pattern_join, include_pattern_where_clause )
             args = (user_id, search_query, limit + 1)
         else:
             # This should be unreachable.

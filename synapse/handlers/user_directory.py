@@ -20,6 +20,7 @@ from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.storage.roommember import ProfileInfo
 from synapse.util.metrics import Measure
 from synapse.util.async import sleep
+from synapse.types import get_localpart_from_id
 
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ class UserDirectoryHandler(object):
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
         self.update_user_directory = hs.config.update_user_directory
+        self.include_pattern = hs.config.user_directory_include_pattern
 
         # When start up for the first time we need to populate the user_directory.
         # This is a set of user_id's we've inserted already
@@ -116,7 +118,7 @@ class UserDirectoryHandler(object):
         irrespective of any rooms the user may be in.
         """
         yield self.store.update_profile_in_user_dir(
-            user_id, profile.display_name, profile.avatar_url,
+            user_id, profile.display_name, profile.avatar_url, None,
         )
 
     @defer.inlineCallbacks
@@ -167,10 +169,10 @@ class UserDirectoryHandler(object):
 
         logger.info("Processed all rooms.")
 
-        if self.hs.config.user_directory_include_pattern:
-            logger.info("Doing initial update of user directory. %d users", len(user_ids))
+        if self.include_pattern:
             num_processed_users = 0
             user_ids = yield self.store.get_all_local_users()
+            logger.info("Doing initial update of user directory. %d users", len(user_ids))
             for user_id in user_ids:
                 # We add profiles for all users even if they don't match the
                 # include pattern, just in case we want to change it in future
@@ -415,7 +417,7 @@ class UserDirectoryHandler(object):
         """
         logger.debug("Adding new local user to dir, %r", user_id)
 
-        profile = yield self.store.get_profileinfo(user_id)
+        profile = yield self.store.get_profileinfo(get_localpart_from_id(user_id))
 
         row = yield self.store.get_user_in_directory(user_id)
         if not row:
