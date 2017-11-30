@@ -98,6 +98,7 @@ class PasswordRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.datastore = self.hs.get_datastore()
+        self._set_password_handler = hs.get_set_password_handler()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -147,7 +148,7 @@ class PasswordRestServlet(RestServlet):
             raise SynapseError(400, "", Codes.MISSING_PARAM)
         new_password = params['new_password']
 
-        yield self.auth_handler.set_password(
+        yield self._set_password_handler.set_password(
             user_id, new_password, requester
         )
 
@@ -161,10 +162,11 @@ class DeactivateAccountRestServlet(RestServlet):
     PATTERNS = client_v2_patterns("/account/deactivate$")
 
     def __init__(self, hs):
+        super(DeactivateAccountRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
-        super(DeactivateAccountRestServlet, self).__init__()
+        self._deactivate_account_handler = hs.get_deactivate_account_handler()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -179,7 +181,7 @@ class DeactivateAccountRestServlet(RestServlet):
 
         # allow ASes to dectivate their own users
         if requester and requester.app_service:
-            yield self.auth_handler.deactivate_account(
+            yield self._deactivate_account_handler.deactivate_account(
                 requester.user.to_string()
             )
             defer.returnValue((200, {}))
@@ -206,7 +208,7 @@ class DeactivateAccountRestServlet(RestServlet):
             logger.error("Auth succeeded but no known type!", result.keys())
             raise SynapseError(500, "", Codes.UNKNOWN)
 
-        yield self.auth_handler.deactivate_account(user_id)
+        yield self._deactivate_account_handler.deactivate_account(user_id)
         defer.returnValue((200, {}))
 
 
