@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from twisted.internet import defer
 
 from synapse.types import UserID
 
@@ -81,6 +82,7 @@ class ModuleApi(object):
         reg = self.hs.get_handlers().registration_handler
         return reg.register(localpart=localpart)
 
+    @defer.inlineCallbacks
     def invalidate_access_token(self, access_token):
         """Invalidate an access token for a user
 
@@ -94,8 +96,16 @@ class ModuleApi(object):
         Raises:
             synapse.api.errors.AuthError: the access token is invalid
         """
-
-        return self._auth_handler.delete_access_token(access_token)
+        # see if the access token corresponds to a device
+        user_info = yield self._auth.get_user_by_access_token(access_token)
+        device_id = user_info.get("device_id")
+        user_id = user_info["user"].to_string()
+        if device_id:
+            # delete the device, which will also delete its access tokens
+            yield self.hs.get_device_handler().delete_device(user_id, device_id)
+        else:
+            # no associated device. Just delete the access token.
+            yield self._auth_handler.delete_access_token(access_token)
 
     def run_db_interaction(self, desc, func, *args, **kwargs):
         """Run a function with a database connection
