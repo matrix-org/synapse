@@ -42,9 +42,10 @@ class UserDirectoryHandler(object):
     one public room.
     """
 
-    INITIAL_SLEEP_MS = 50
-    INITIAL_SLEEP_COUNT = 100
-    INITIAL_BATCH_SIZE = 100
+    INITIAL_ROOM_SLEEP_MS = 50
+    INITIAL_ROOM_SLEEP_COUNT = 100
+    INITIAL_ROOM_BATCH_SIZE = 100
+    INITIAL_USER_SLEEP_MS = 10
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -165,7 +166,7 @@ class UserDirectoryHandler(object):
             logger.info("Handling room %d/%d", num_processed_rooms + 1, len(room_ids))
             yield self._handle_initial_room(room_id)
             num_processed_rooms += 1
-            yield sleep(self.INITIAL_SLEEP_MS / 1000.)
+            yield sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.)
 
         logger.info("Processed all rooms.")
 
@@ -179,7 +180,7 @@ class UserDirectoryHandler(object):
                 logger.info("Handling user %d/%d", num_processed_users + 1, len(user_ids))
                 yield self._handle_local_user(user_id)
                 num_processed_users += 1
-                yield sleep(self.INITIAL_SLEEP_MS / 1000.)
+                yield sleep(self.INITIAL_USER_SLEEP_MS / 1000.)
 
             logger.info("Processed all users")
 
@@ -226,8 +227,8 @@ class UserDirectoryHandler(object):
         to_update = set()
         count = 0
         for user_id in user_ids:
-            if count % self.INITIAL_SLEEP_COUNT == 0:
-                yield sleep(self.INITIAL_SLEEP_MS / 1000.)
+            if count % self.INITIAL_ROOM_SLEEP_COUNT == 0:
+                yield sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.)
 
             if not self.is_mine_id(user_id):
                 count += 1
@@ -241,8 +242,8 @@ class UserDirectoryHandler(object):
                 if user_id == other_user_id:
                     continue
 
-                if count % self.INITIAL_SLEEP_COUNT == 0:
-                    yield sleep(self.INITIAL_SLEEP_MS / 1000.)
+                if count % self.INITIAL_ROOM_SLEEP_COUNT == 0:
+                    yield sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.)
                 count += 1
 
                 user_set = (user_id, other_user_id)
@@ -262,13 +263,13 @@ class UserDirectoryHandler(object):
                 else:
                     self.initially_handled_users_share_private_room.add(user_set)
 
-                if len(to_insert) > self.INITIAL_BATCH_SIZE:
+                if len(to_insert) > self.INITIAL_ROOM_BATCH_SIZE:
                     yield self.store.add_users_who_share_room(
                         room_id, not is_public, to_insert,
                     )
                     to_insert.clear()
 
-                if len(to_update) > self.INITIAL_BATCH_SIZE:
+                if len(to_update) > self.INITIAL_ROOM_BATCH_SIZE:
                     yield self.store.update_users_who_share_room(
                         room_id, not is_public, to_update,
                     )
