@@ -22,19 +22,20 @@ class UserDirectoryConfig(Config):
     """
 
     def read_config(self, config):
-        self.user_directory_include_pattern = None
+        self.user_directory_search_all_users = False
         user_directory_config = config.get("user_directory", None)
         if user_directory_config:
-            self.user_directory_include_pattern = (
-                user_directory_config.get("include_pattern", None)
+            self.user_directory_search_all_users = (
+                user_directory_config.get("search_all_users", False)
             )
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # User Directory configuration
-        # 'include_pattern' defines an optional SQL LIKE pattern when querying the
-        # user directory in addition to publicly visible users. Defaults to None.
+        # 'search_all_users' defines whether to search all users visible to your HS
+        # when searching the user directory, rather than limiting to users visible
+        # in public rooms. Defaults to false.
         #
         #user_directory:
-        #   include_pattern: "%%:%s"
-        """ % (server_name)
+        #   search_all_users: false
+        """

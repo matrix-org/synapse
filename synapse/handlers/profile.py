@@ -141,7 +141,7 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, new_displayname
         )
 
-        if self.hs.config.user_directory_include_pattern:
+        if self.hs.config.user_directory_search_all_users:
             profile = yield self.store.get_profileinfo(target_user.localpart)
             yield self.user_directory_handler.handle_local_profile_change(
                 target_user.to_string(), profile
@@ -191,7 +191,7 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, new_avatar_url
         )
 
-        if self.hs.config.user_directory_include_pattern:
+        if self.hs.config.user_directory_search_all_users:
             profile = yield self.store.get_profileinfo(target_user.localpart)
             yield self.user_directory_handler.handle_local_profile_change(
                 target_user.user_id, profile

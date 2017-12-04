@@ -640,17 +640,19 @@ class UserDirectoryStore(SQLBaseStore):
                 }
         """
 
-        include_pattern_join = ""
-        include_pattern_where_clause = ""
-        if self.hs.config.user_directory_include_pattern:
-            include_pattern_join = """
-                LEFT JOIN (
-                    SELECT user_id FROM user_directory
-                    WHERE user_id LIKE '%s'
-                ) AS ld USING (user_id)
-            """ % ( self.hs.config.user_directory_include_pattern )
 
-            include_pattern_where_clause = "OR ld.user_id IS NOT NULL"
+        if self.hs.config.user_directory_search_all_users:
+            join_clause = ""
+            where_clause = "?<>''" # naughty hack to keep the same number of binds
+        else:
+            join_clause = """
+                LEFT JOIN users_in_public_rooms AS p USING (user_id)
+                LEFT JOIN (
+                    SELECT other_user_id AS user_id FROM users_who_share_rooms
+                    WHERE user_id = ? AND share_private
+                ) AS s USING (user_id)
+            """
+            where_clause = "(s.user_id IS NOT NULL OR p.user_id IS NOT NULL)"
 
         if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
@@ -664,14 +666,9 @@ class UserDirectoryStore(SQLBaseStore):
                 SELECT d.user_id, display_name, avatar_url
                 FROM user_directory_search
                 INNER JOIN user_directory AS d USING (user_id)
-                LEFT JOIN users_in_public_rooms AS p USING (user_id)
-                LEFT JOIN (
-                    SELECT other_user_id AS user_id FROM users_who_share_rooms
-                    WHERE user_id = ? AND share_private
-                ) AS s USING (user_id)
                 %s
                 WHERE
-                    (s.user_id IS NOT NULL OR p.user_id IS NOT NULL %s)
+                    %s
                     AND vector @@ to_tsquery('english', ?)
                 ORDER BY
                     (CASE WHEN s.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
@@ -695,7 +692,7 @@ class UserDirectoryStore(SQLBaseStore):
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """ % ( include_pattern_join, include_pattern_where_clause )
+            """ % ( join_clause, where_clause )
             args = (user_id, full_query, exact_query, prefix_query, limit + 1,)
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_sqlite(search_term)
@@ -704,21 +701,16 @@ class UserDirectoryStore(SQLBaseStore):
                 SELECT d.user_id, display_name, avatar_url
                 FROM user_directory_search
                 INNER JOIN user_directory AS d USING (user_id)
-                LEFT JOIN users_in_public_rooms AS p USING (user_id)
-                LEFT JOIN (
-                    SELECT other_user_id AS user_id FROM users_who_share_rooms
-                    WHERE user_id = ? AND share_private
-                ) AS s USING (user_id)
                 %s
                 WHERE
-                    (s.user_id IS NOT NULL OR p.user_id IS NOT NULL %s)
+                    %s
                     AND value MATCH ?
                 ORDER BY
                     rank(matchinfo(user_directory_search)) DESC,
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """ % ( include_pattern_join, include_pattern_where_clause )
+            """ % ( join_clause, where_clause )
             args = (user_id, search_query, limit + 1)
         else:
             # This should be unreachable.

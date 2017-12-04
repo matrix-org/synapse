@@ -54,7 +54,7 @@ class UserDirectoryHandler(object):
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
         self.update_user_directory = hs.config.update_user_directory
-        self.include_pattern = hs.config.user_directory_include_pattern
+        self.search_all_users = hs.config.user_directory_search_all_users
 
         # When start up for the first time we need to populate the user_directory.
         # This is a set of user_id's we've inserted already
@@ -169,7 +169,7 @@ class UserDirectoryHandler(object):
 
         logger.info("Processed all rooms.")
 
-        if self.include_pattern:
+        if self.search_all_users:
             num_processed_users = 0
             user_ids = yield self.store.get_all_local_users()
             logger.info("Doing initial update of user directory. %d users", len(user_ids))
@@ -413,7 +413,7 @@ class UserDirectoryHandler(object):
     def _handle_local_user(self, user_id):
         """Adds a new local roomless user into the user_directory_search table.
         Used to populate up the user index when we have an
-        user_directory_include_pattern specified.
+        user_directory_search_all_users specified.
         """
         logger.debug("Adding new local user to dir, %r", user_id)
 

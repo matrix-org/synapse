@@ -167,7 +167,7 @@ class RegistrationHandler(BaseHandler):
                 admin=admin,
             )
 
-            if self.hs.config.user_directory_include_pattern:
+            if self.hs.config.user_directory_search_all_users:
                 profile = yield self.store.get_profileinfo(localpart)
                 yield self.user_directory_handler.handle_local_profile_change(
                     user_id, profile
