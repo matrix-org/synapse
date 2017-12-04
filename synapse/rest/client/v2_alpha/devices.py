@@ -17,7 +17,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api import constants, errors
+from synapse.api import errors
 from synapse.http import servlet
 from ._base import client_v2_patterns, interactive_auth_handler
 
@@ -63,6 +63,8 @@ class DeleteDevicesRestServlet(servlet.RestServlet):
     @interactive_auth_handler
     @defer.inlineCallbacks
     def on_POST(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+
         try:
             body = servlet.parse_json_object_from_request(request)
         except errors.SynapseError as e:
@@ -78,11 +80,10 @@ class DeleteDevicesRestServlet(servlet.RestServlet):
                 400, "No devices supplied", errcode=errors.Codes.MISSING_PARAM
             )
 
-        result, params, _ = yield self.auth_handler.check_auth([
-            [constants.LoginType.PASSWORD],
-        ], body, self.hs.get_ip_from_request(request))
+        result, params, _ = yield self.auth_handler.validate_user_via_ui_auth(
+            requester, body, self.hs.get_ip_from_request(request),
+        )
 
-        requester = yield self.auth.get_user_by_req(request)
         yield self.device_handler.delete_devices(
             requester.user.to_string(),
             body['devices'],
@@ -129,16 +130,13 @@ class DeviceRestServlet(servlet.RestServlet):
             else:
                 raise
 
-        result, params, _ = yield self.auth_handler.check_auth([
-            [constants.LoginType.PASSWORD],
-        ], body, self.hs.get_ip_from_request(request))
+        yield self.auth_handler.validate_user_via_ui_auth(
+            requester, body, self.hs.get_ip_from_request(request),
+        )
 
-        # check that the UI auth matched the access token
-        user_id = result[constants.LoginType.PASSWORD]
-        if user_id != requester.user.to_string():
-            raise errors.AuthError(403, "Invalid auth")
-
-        yield self.device_handler.delete_device(user_id, device_id)
+        yield self.device_handler.delete_device(
+            requester.user.to_string(), device_id,
+        )
         defer.returnValue((200, {}))
 
     @defer.inlineCallbacks
