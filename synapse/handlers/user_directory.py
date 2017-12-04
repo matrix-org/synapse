@@ -162,7 +162,7 @@ class UserDirectoryHandler(object):
         num_processed_rooms = 0
 
         for room_id in room_ids:
-            logger.info("Handling room %d/%d", num_processed_rooms+1, len(room_ids))
+            logger.info("Handling room %d/%d", num_processed_rooms + 1, len(room_ids))
             yield self._handle_initial_room(room_id)
             num_processed_rooms += 1
             yield sleep(self.INITIAL_SLEEP_MS / 1000.)
@@ -176,7 +176,7 @@ class UserDirectoryHandler(object):
             for user_id in user_ids:
                 # We add profiles for all users even if they don't match the
                 # include pattern, just in case we want to change it in future
-                logger.info("Handling user %d/%d", num_processed_users+1, len(user_ids))
+                logger.info("Handling user %d/%d", num_processed_users + 1, len(user_ids))
                 yield self._handle_local_user(user_id)
                 num_processed_users += 1
                 yield sleep(self.INITIAL_SLEEP_MS / 1000.)
@@ -422,7 +422,6 @@ class UserDirectoryHandler(object):
         row = yield self.store.get_user_in_directory(user_id)
         if not row:
             yield self.store.add_profiles_to_user_dir(None, {user_id: profile})
-
 
     @defer.inlineCallbacks
     def _handle_new_user(self, room_id, user_id, profile):

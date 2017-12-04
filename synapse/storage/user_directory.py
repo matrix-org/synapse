@@ -640,10 +640,9 @@ class UserDirectoryStore(SQLBaseStore):
                 }
         """
 
-
         if self.hs.config.user_directory_search_all_users:
             join_clause = ""
-            where_clause = "?<>''" # naughty hack to keep the same number of binds
+            where_clause = "?<>''"  # naughty hack to keep the same number of binds
         else:
             join_clause = """
                 LEFT JOIN users_in_public_rooms AS p USING (user_id)
@@ -692,7 +691,7 @@ class UserDirectoryStore(SQLBaseStore):
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """ % ( join_clause, where_clause )
+            """ % (join_clause, where_clause)
             args = (user_id, full_query, exact_query, prefix_query, limit + 1,)
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_sqlite(search_term)
@@ -710,7 +709,7 @@ class UserDirectoryStore(SQLBaseStore):
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """ % ( join_clause, where_clause )
+            """ % (join_clause, where_clause)
             args = (user_id, search_query, limit + 1)
         else:
             # This should be unreachable.
