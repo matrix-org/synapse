@@ -58,7 +58,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         self.mock_federation_resource = MockHttpResource()
 
-        mock_notifier = Mock(spec=["on_new_event"])
+        mock_notifier = Mock()
         self.on_new_event = mock_notifier.on_new_event
 
         self.auth = Mock(spec=[])
