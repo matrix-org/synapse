@@ -42,6 +42,7 @@ from .state import StateStore
 from .signatures import SignatureStore
 from .filtering import FilteringStore
 from .end_to_end_keys import EndToEndKeyStore
+from .e2e_room_keys import EndToEndRoomKeyStore
 
 from .receipts import ReceiptsStore
 from .search import SearchStore
@@ -79,6 +80,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 EventsStore,
                 ReceiptsStore,
                 EndToEndKeyStore,
+                EndToEndRoomKeyStore,
                 SearchStore,
                 TagsStore,
                 AccountDataStore,

@@ -17,26 +17,25 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError
 from synapse.http.servlet import (
-    RestServlet, parse_json_object_from_request, parse_integer
+    RestServlet, parse_json_object_from_request
 )
-from synapse.http.servlet import parse_string
-from synapse.types import StreamToken
 from ._base import client_v2_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class RoomKeysServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/room_keys/keys(/(?P<room_id>[^/]+))?(/(?P<session_id>[^/]+))?$")
+    PATTERNS = client_v2_patterns(
+        "/room_keys/keys(/(?P<room_id>[^/]+))?(/(?P<session_id>[^/]+))?$"
+    )
 
     def __init__(self, hs):
         """
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(RoomKeysUploadServlet, self).__init__()
+        super(RoomKeysServlet, self).__init__()
         self.auth = hs.get_auth()
         self.e2e_room_keys_handler = hs.get_e2e_room_keys_handler()
 
@@ -45,24 +44,32 @@ class RoomKeysServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
-        version = request.args.get("version", None)
+        version = request.args.get("version")[0]
 
         if session_id:
-            body = { "sessions": { session_id : body } }
+            body = {
+                "sessions": {
+                    session_id: body
+                }
+            }
 
         if room_id:
-            body = { "rooms": { room_id : body } }
+            body = {
+                "rooms": {
+                    room_id: body
+                }
+            }
 
-        result = yield self.e2e_room_keys_handler.upload_room_keys(
+        yield self.e2e_room_keys_handler.upload_room_keys(
             user_id, version, body
         )
-        defer.returnValue((200, result))
+        defer.returnValue((200, {}))
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, session_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
-        version = request.args.get("version", None)
+        version = request.args.get("version")[0]
 
         room_keys = yield self.e2e_room_keys_handler.get_room_keys(
             user_id, version, room_id, session_id
@@ -73,7 +80,7 @@ class RoomKeysServlet(RestServlet):
     def on_DELETE(self, request, room_id, session_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
-        version = request.args.get("version", None)
+        version = request.args.get("version")[0]
 
         yield self.e2e_room_keys_handler.delete_room_keys(
             user_id, version, room_id, session_id
