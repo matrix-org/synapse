@@ -80,7 +80,7 @@ class DeleteDevicesRestServlet(servlet.RestServlet):
                 400, "No devices supplied", errcode=errors.Codes.MISSING_PARAM
             )
 
-        result, params, _ = yield self.auth_handler.validate_user_via_ui_auth(
+        yield self.auth_handler.validate_user_via_ui_auth(
             requester, body, self.hs.get_ip_from_request(request),
         )
 
