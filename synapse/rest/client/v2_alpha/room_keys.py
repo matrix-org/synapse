@@ -28,7 +28,7 @@ from ._base import client_v2_patterns
 logger = logging.getLogger(__name__)
 
 
-class RoomKeysUploadServlet(RestServlet):
+class RoomKeysServlet(RestServlet):
     PATTERNS = client_v2_patterns("/room_keys/keys(/(?P<room_id>[^/]+))?(/(?P<session_id>[^/]+))?$")
 
     def __init__(self, hs):
@@ -41,16 +41,45 @@ class RoomKeysUploadServlet(RestServlet):
         self.e2e_room_keys_handler = hs.get_e2e_room_keys_handler()
 
     @defer.inlineCallbacks
-    def on_POST(self, request, room_id, session_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    def on_PUT(self, request, room_id, session_id):
+        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
+        version = request.args.get("version", None)
+
+        if session_id:
+            body = { "sessions": { session_id : body } }
+
+        if room_id:
+            body = { "rooms": { room_id : body } }
 
         result = yield self.e2e_room_keys_handler.upload_room_keys(
             user_id, version, body
         )
         defer.returnValue((200, result))
 
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id, session_id):
+        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        user_id = requester.user.to_string()
+        version = request.args.get("version", None)
+
+        room_keys = yield self.e2e_room_keys_handler.get_room_keys(
+            user_id, version, room_id, session_id
+        )
+        defer.returnValue((200, room_keys))
+
+    @defer.inlineCallbacks
+    def on_DELETE(self, request, room_id, session_id):
+        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        user_id = requester.user.to_string()
+        version = request.args.get("version", None)
+
+        yield self.e2e_room_keys_handler.delete_room_keys(
+            user_id, version, room_id, session_id
+        )
+        defer.returnValue((200, {}))
+
 
 def register_servlets(hs, http_server):
-    RoomKeysUploadServlet(hs).register(http_server)
+    RoomKeysServlet(hs).register(http_server)

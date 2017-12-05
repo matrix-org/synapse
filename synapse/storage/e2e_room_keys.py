@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from twisted.internet import defer
 
 from synapse.util.caches.descriptors import cached
@@ -77,6 +78,9 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         )
 
 
+    # XXX: this isn't currently used and isn't tested anywhere
+    # it could be used in future for bulk-uploading new versions of room_keys
+    # for a user or something though.
     def set_e2e_room_keys(self, user_id, version, room_keys):
 
         def _set_e2e_room_keys_txn(txn):
@@ -131,3 +135,19 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         sessions = {}
         sessions['rooms'][roomId]['sessions'][session_id] = row for row in rows;
         defer.returnValue(sessions);
+
+    @defer.inlineCallbacks
+    def delete_e2e_room_keys(self, user_id, version, room_id, session_id):
+
+        keyvalues={
+            "user_id": user_id,
+            "version": version,
+        }
+        if room_id: keyvalues['room_id'] = room_id
+        if session_id: keyvalues['session_id'] = session_id
+
+        yield self._simple_delete(
+            table="e2e_room_keys",
+            keyvalues=keyvalues,
+            desc="delete_e2e_room_keys",
+        )
