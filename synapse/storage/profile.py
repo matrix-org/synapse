@@ -38,7 +38,7 @@ class ProfileStore(SQLBaseStore):
                 retcols=("displayname", "avatar_url"),
                 desc="get_profileinfo",
             )
-        except StoreError, e:
+        except StoreError as e:
             if e.code == 404:
                 # no match
                 defer.returnValue(ProfileInfo(None, None))
