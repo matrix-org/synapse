@@ -26,7 +26,7 @@ from synapse.http.servlet import (
 )
 from synapse.util.async import run_on_reactor
 from synapse.util.msisdn import phone_number_to_msisdn
-from ._base import client_v2_patterns
+from ._base import client_v2_patterns, interactive_auth_handler
 
 logger = logging.getLogger(__name__)
 
@@ -100,20 +100,18 @@ class PasswordRestServlet(RestServlet):
         self.datastore = self.hs.get_datastore()
         self._set_password_handler = hs.get_set_password_handler()
 
+    @interactive_auth_handler
     @defer.inlineCallbacks
     def on_POST(self, request):
         yield run_on_reactor()
 
         body = parse_json_object_from_request(request)
 
-        authed, result, params, _ = yield self.auth_handler.check_auth([
+        result, params, _ = yield self.auth_handler.check_auth([
             [LoginType.PASSWORD],
             [LoginType.EMAIL_IDENTITY],
             [LoginType.MSISDN],
         ], body, self.hs.get_ip_from_request(request))
-
-        if not authed:
-            defer.returnValue((401, result))
 
         user_id = None
         requester = None
@@ -168,6 +166,7 @@ class DeactivateAccountRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
         self._deactivate_account_handler = hs.get_deactivate_account_handler()
 
+    @interactive_auth_handler
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
@@ -186,12 +185,9 @@ class DeactivateAccountRestServlet(RestServlet):
             )
             defer.returnValue((200, {}))
 
-        authed, result, params, _ = yield self.auth_handler.check_auth([
+        result, params, _ = yield self.auth_handler.check_auth([
             [LoginType.PASSWORD],
         ], body, self.hs.get_ip_from_request(request))
-
-        if not authed:
-            defer.returnValue((401, result))
 
         if LoginType.PASSWORD in result:
             user_id = result[LoginType.PASSWORD]

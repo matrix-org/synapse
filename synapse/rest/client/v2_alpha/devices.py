@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from synapse.api import constants, errors
 from synapse.http import servlet
-from ._base import client_v2_patterns
+from ._base import client_v2_patterns, interactive_auth_handler
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,7 @@ class DeleteDevicesRestServlet(servlet.RestServlet):
         self.device_handler = hs.get_device_handler()
         self.auth_handler = hs.get_auth_handler()
 
+    @interactive_auth_handler
     @defer.inlineCallbacks
     def on_POST(self, request):
         try:
@@ -77,12 +78,9 @@ class DeleteDevicesRestServlet(servlet.RestServlet):
                 400, "No devices supplied", errcode=errors.Codes.MISSING_PARAM
             )
 
-        authed, result, params, _ = yield self.auth_handler.check_auth([
+        result, params, _ = yield self.auth_handler.check_auth([
             [constants.LoginType.PASSWORD],
         ], body, self.hs.get_ip_from_request(request))
-
-        if not authed:
-            defer.returnValue((401, result))
 
         requester = yield self.auth.get_user_by_req(request)
         yield self.device_handler.delete_devices(
@@ -115,6 +113,7 @@ class DeviceRestServlet(servlet.RestServlet):
         )
         defer.returnValue((200, device))
 
+    @interactive_auth_handler
     @defer.inlineCallbacks
     def on_DELETE(self, request, device_id):
         requester = yield self.auth.get_user_by_req(request)
@@ -130,12 +129,9 @@ class DeviceRestServlet(servlet.RestServlet):
             else:
                 raise
 
-        authed, result, params, _ = yield self.auth_handler.check_auth([
+        result, params, _ = yield self.auth_handler.check_auth([
             [constants.LoginType.PASSWORD],
         ], body, self.hs.get_ip_from_request(request))
-
-        if not authed:
-            defer.returnValue((401, result))
 
         # check that the UI auth matched the access token
         user_id = result[constants.LoginType.PASSWORD]
