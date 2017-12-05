@@ -29,7 +29,7 @@ CREATE UNIQUE INDEX e2e_room_keys_user_idx ON e2e_room_keys(user_id);
 CREATE UNIQUE INDEX e2e_room_keys_room_idx ON e2e_room_keys(room_id);
 CREATE UNIQUE INDEX e2e_room_keys_session_idx ON e2e_room_keys(session_id);
 
--- the versioning metadata about versions of users' encrypted e2e session backups
+-- the metadata for each generation of encrypted e2e session backups
 CREATE TABLE e2e_room_key_versions (
     user_id TEXT NOT NULL,
     version INT NOT NULL,
