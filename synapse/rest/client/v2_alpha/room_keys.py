@@ -41,6 +41,79 @@ class RoomKeysServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, session_id):
+        """
+        Uploads one or more encrypted E2E room keys for backup purposes.
+        room_id: the ID of the room the keys are for (optional)
+        session_id: the ID for the E2E room keys for the room (optional)
+        version: the version of the user's backup which this data is for.
+        the version must already have been created via the /change_secret API.
+
+        Each session has:
+         * first_message_index: a numeric index indicating the oldest message
+           encrypted by this session.
+         * forwarded_count: how many times the uploading client claims this key
+           has been shared (forwarded)
+         * is_verified: whether the client that uploaded the keys claims they
+           were sent by a device which they've verified
+         * session_data: base64-encrypted data describing the session.
+
+        Returns 200 OK on success with body {}
+
+        The API is designed to be otherwise agnostic to the room_key encryption
+        algorithm being used.  Sessions are merged with existing ones in the
+        backup using the heuristics:
+         * is_verified sessions always win over unverified sessions
+         * older first_message_index always win over newer sessions
+         * lower forwarded_count always wins over higher forwarded_count
+
+        We trust the clients not to lie and corrupt their own backups.
+
+        POST /room_keys/keys/!abc:matrix.org/c0ff33?version=1 HTTP/1.1
+        Content-Type: application/json
+
+        {
+            "first_message_index": 1,
+            "forwarded_count": 1,
+            "is_verified": false,
+            "session_data": "SSBBTSBBIEZJU0gK"
+        }
+
+        Or...
+
+        POST /room_keys/keys/!abc:matrix.org?version=1 HTTP/1.1
+        Content-Type: application/json
+
+        {
+            "sessions": {
+                "c0ff33": {
+                    "first_message_index": 1,
+                    "forwarded_count": 1,
+                    "is_verified": false,
+                    "session_data": "SSBBTSBBIEZJU0gK"
+                }
+            }
+        }
+
+        Or...
+
+        POST /room_keys/keys?version=1 HTTP/1.1
+        Content-Type: application/json
+
+        {
+            "rooms": {
+                "!abc:matrix.org": {
+                    "sessions": {
+                        "c0ff33": {
+                            "first_message_index": 1,
+                            "forwarded_count": 1,
+                            "is_verified": false,
+                            "session_data": "SSBBTSBBIEZJU0gK"
+                        }
+                    }
+                }
+            }
+        }
+        """
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
@@ -67,6 +140,57 @@ class RoomKeysServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, session_id):
+        """
+        Retrieves one or more encrypted E2E room keys for backup purposes.
+        Symmetric with the PUT version of the API.
+
+        room_id: the ID of the room to retrieve the keys for (optional)
+        session_id: the ID for the E2E room keys to retrieve the keys for (optional)
+        version: the version of the user's backup which this data is for.
+        the version must already have been created via the /change_secret API.
+
+        Returns as follows:
+
+        GET /room_keys/keys/!abc:matrix.org/c0ff33?version=1 HTTP/1.1
+        {
+            "first_message_index": 1,
+            "forwarded_count": 1,
+            "is_verified": false,
+            "session_data": "SSBBTSBBIEZJU0gK"
+        }
+
+        Or...
+
+        GET /room_keys/keys/!abc:matrix.org?version=1 HTTP/1.1
+        {
+            "sessions": {
+                "c0ff33": {
+                    "first_message_index": 1,
+                    "forwarded_count": 1,
+                    "is_verified": false,
+                    "session_data": "SSBBTSBBIEZJU0gK"
+                }
+            }
+        }
+
+        Or...
+
+        GET /room_keys/keys?version=1 HTTP/1.1
+        {
+            "rooms": {
+                "!abc:matrix.org": {
+                    "sessions": {
+                        "c0ff33": {
+                            "first_message_index": 1,
+                            "forwarded_count": 1,
+                            "is_verified": false,
+                            "session_data": "SSBBTSBBIEZJU0gK"
+                        }
+                    }
+                }
+            }
+        }
+        """
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
         version = request.args.get("version")[0]
@@ -78,6 +202,15 @@ class RoomKeysServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, room_id, session_id):
+        """
+        Deletes one or more encrypted E2E room keys for a user for backup purposes.
+
+        room_id: the ID of the room whose keys to delete (optional)
+        session_id: the ID for the E2E session to delete (optional)
+        version: the version of the user's backup which this data is for.
+        the version must already have been created via the /change_secret API.
+        """
+
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
         version = request.args.get("version")[0]
