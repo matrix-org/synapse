@@ -221,5 +221,52 @@ class RoomKeysServlet(RestServlet):
         defer.returnValue((200, {}))
 
 
+class RoomKeysVersionServlet(RestServlet):
+    PATTERNS = client_v2_patterns(
+        "/room_keys/version(/(?P<version>[^/]+))?$"
+    )
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(RoomKeysVersionServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.e2e_room_keys_handler = hs.get_e2e_room_keys_handler()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, version):
+        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        user_id = requester.user.to_string()
+        info = parse_json_object_from_request(request)
+
+        new_version = yield self.e2e_room_keys_handler.create_version(
+            user_id, version, info
+        )
+        defer.returnValue((200, {"version": new_version}))
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, version):
+        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        user_id = requester.user.to_string()
+
+        info = yield self.e2e_room_keys_handler.get_version_info(
+            user_id, version
+        )
+        defer.returnValue((200, info))
+
+    @defer.inlineCallbacks
+    def on_DELETE(self, request, version):
+        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        user_id = requester.user.to_string()
+
+        yield self.e2e_room_keys_handler.delete_version(
+            user_id, version
+        )
+        defer.returnValue((200, {}))
+
+
 def register_servlets(hs, http_server):
     RoomKeysServlet(hs).register(http_server)
+    RoomKeysVersionServlet(hs).register(http_server)
