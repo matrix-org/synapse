@@ -18,7 +18,7 @@ CREATE TABLE e2e_room_keys (
     user_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
     session_id TEXT NOT NULL,
-    version INT NOT NULL,
+    version TEXT NOT NULL,
     first_message_index INT,
     forwarded_count INT,
     is_verified BOOLEAN,
@@ -32,7 +32,7 @@ CREATE UNIQUE INDEX e2e_room_keys_session_idx ON e2e_room_keys(session_id);
 -- the metadata for each generation of encrypted e2e session backups
 CREATE TABLE e2e_room_key_versions (
     user_id TEXT NOT NULL,
-    version INT NOT NULL,
+    version TEXT NOT NULL,
     algorithm TEXT NOT NULL,
     auth_data TEXT NOT NULL
 );

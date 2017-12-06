@@ -48,13 +48,16 @@ class E2eRoomKeysHandler(object):
         # TODO: Validate the JSON to make sure it has the right keys.
 
         # Check that the version we're trying to upload is the current version
+
         try:
             version_info = yield self.get_version_info(user_id, version)
         except StoreError as e:
             if e.code == 404:
-                raise SynapseError(404, "Version '%d' not found" % (version,))
+                raise SynapseError(404, "Version '%s' not found" % (version,))
+            else:
+                raise e
 
-        if version_info.version != version:
+        if version_info['version'] != version:
             raise RoomKeysVersionError(current_version=version_info.version)
 
         # XXX: perhaps we should use a finer grained lock here?
@@ -81,7 +84,7 @@ class E2eRoomKeysHandler(object):
             if e.code == 404:
                 pass
             else:
-                raise
+                raise e
 
         # check whether we merge or not. spelling it out with if/elifs rather
         # than lots of booleans for legibility.
@@ -106,20 +109,21 @@ class E2eRoomKeysHandler(object):
             )
 
     @defer.inlineCallbacks
-    def create_version(self, user_id, version, version_info):
+    def create_version(self, user_id, version_info):
 
         # TODO: Validate the JSON to make sure it has the right keys.
 
         # lock everyone out until we've switched version
         with (yield self._upload_linearizer.queue(user_id)):
-            yield self.store.create_version(
-                user_id, version, version_info
+            new_version = yield self.store.create_e2e_room_key_version(
+                user_id, version_info
             )
+            defer.returnValue(new_version)
 
     @defer.inlineCallbacks
     def get_version_info(self, user_id, version):
         with (yield self._upload_linearizer.queue(user_id)):
-            results = yield self.store.get_e2e_room_key_version(
+            results = yield self.store.get_e2e_room_key_version_info(
                 user_id, version
             )
             defer.returnValue(results)
