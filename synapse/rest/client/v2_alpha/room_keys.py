@@ -17,6 +17,7 @@ import logging
 
 from twisted.internet import defer
 
+from synapse.api.errors import SynapseError
 from synapse.http.servlet import (
     RestServlet, parse_json_object_from_request
 )
@@ -237,14 +238,20 @@ class RoomKeysVersionServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, version):
+        if version:
+            raise SynapseError(405, "Cannot POST to a specific version")
+
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
         info = parse_json_object_from_request(request)
 
         new_version = yield self.e2e_room_keys_handler.create_version(
-            user_id, version, info
+            user_id, info
         )
         defer.returnValue((200, {"version": new_version}))
+
+    # we deliberately don't have a PUT /version, as these things really should
+    # be immutable to avoid people footgunning
 
     @defer.inlineCallbacks
     def on_GET(self, request, version):
