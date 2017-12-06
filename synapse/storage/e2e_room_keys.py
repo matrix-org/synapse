@@ -170,3 +170,59 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             keyvalues=keyvalues,
             desc="delete_e2e_room_keys",
         )
+
+    @defer.inlineCallbacks
+    def get_e2e_room_key_version(self, user_id, version):
+
+        row = yield self._simple_select_one(
+            table="e2e_room_key_versions",
+            keyvalues={
+                "user_id": user_id,
+                "version": version,
+            },
+            retcols=(
+                "user_id",
+                "version",
+                "algorithm",
+                "auth_data",
+            ),
+            desc="get_e2e_room_key_version_info",
+        )
+
+        defer.returnValue(row)
+
+    def create_e2e_room_key_version(self, user_id, version, info):
+
+        def _create_e2e_room_key_version_txn(txn):
+
+            self._simple_insert_txn(
+                txn,
+                table="e2e_room_key_versions",
+                values={
+                    "user_id": user_id,
+                    "version": version,
+                    "algorithm": info["algorithm"],
+                    "auth_data": info["auth_data"],
+                },
+                lock=False,
+            )
+
+            return True
+
+        return self.runInteraction(
+            "create_e2e_room_key_version_txn", _create_e2e_room_key_version_txn
+        )
+
+    @defer.inlineCallbacks
+    def delete_e2e_room_key_version(self, user_id, version):
+
+        keyvalues = {
+            "user_id": user_id,
+            "version": version,
+        }
+
+        yield self._simple_delete(
+            table="e2e_room_key_versions",
+            keyvalues=keyvalues,
+            desc="delete_e2e_room_key_version",
+        )

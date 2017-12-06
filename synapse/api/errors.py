@@ -56,6 +56,7 @@ class Codes(object):
     CONSENT_NOT_GIVEN = "M_CONSENT_NOT_GIVEN"
     CANNOT_LEAVE_SERVER_NOTICE_ROOM = "M_CANNOT_LEAVE_SERVER_NOTICE_ROOM"
     MAU_LIMIT_EXCEEDED = "M_MAU_LIMIT_EXCEEDED"
+    WRONG_ROOM_KEYS_VERSION = "M_WRONG_ROOM_KEYS_VERSION"
 
 
 class CodeMessageException(RuntimeError):
@@ -283,6 +284,30 @@ class LimitExceededError(SynapseError):
             self.errcode,
             retry_after_ms=self.retry_after_ms,
         )
+
+
+class RoomKeysVersionError(SynapseError):
+    """A client has tried to upload to a non-current version of the room_keys store
+    """
+    def __init__(self, code=403, msg="Wrong room_keys version", current_version=None,
+                 errcode=Codes.WRONG_ROOM_KEYS_VERSION):
+        super(RoomKeysVersionError, self).__init__(code, msg, errcode)
+        self.current_version = current_version
+
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+            current_version=self.current_version,
+        )
+
+
+def cs_exception(exception):
+    if isinstance(exception, CodeMessageException):
+        return exception.error_dict()
+    else:
+        logger.error("Unknown exception type: %s", type(exception))
+        return {}
 
 
 def cs_error(msg, code=Codes.UNKNOWN, **kwargs):
