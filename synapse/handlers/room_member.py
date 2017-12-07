@@ -189,6 +189,10 @@ class RoomMemberHandler(BaseHandler):
         content_specified = bool(content)
         if content is None:
             content = {}
+        else:
+            # We do a copy here as we potentially change some keys
+            # later on.
+            content = dict(content)
 
         effective_membership_state = action
         if action in ["kick", "unban"]:
