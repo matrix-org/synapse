@@ -375,6 +375,12 @@ class GroupsLocalHandler(object):
     def get_publicised_groups_for_user(self, user_id):
         if self.hs.is_mine_id(user_id):
             result = yield self.store.get_publicised_groups_for_user(user_id)
+
+            # Check AS associated groups for this user - this depends on the
+            # RegExps in the AS registration file (under `users`)
+            for app_service in self.store.get_app_services():
+                result.extend(app_service.get_groups_for_user(user_id))
+
             defer.returnValue({"groups": result})
         else:
             result = yield self.transport_client.get_publicised_groups_for_user(
@@ -414,5 +420,10 @@ class GroupsLocalHandler(object):
             results[uid] = yield self.store.get_publicised_groups_for_user(
                 uid
             )
+
+            # Check AS associated groups for this user - this depends on the
+            # RegExps in the AS registration file (under `users`)
+            for app_service in self.store.get_app_services():
+                results[uid].extend(app_service.get_groups_for_user(uid))
 
         defer.returnValue({"users": results})

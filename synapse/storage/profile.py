@@ -15,6 +15,9 @@
 
 from twisted.internet import defer
 
+from synapse.storage.roommember import ProfileInfo
+from synapse.api.errors import StoreError
+
 from ._base import SQLBaseStore
 
 
@@ -24,6 +27,30 @@ class ProfileStore(SQLBaseStore):
             table="profiles",
             values={"user_id": user_localpart},
             desc="create_profile",
+        )
+
+    @defer.inlineCallbacks
+    def get_profileinfo(self, user_localpart):
+        try:
+            profile = yield self._simple_select_one(
+                table="profiles",
+                keyvalues={"user_id": user_localpart},
+                retcols=("displayname", "avatar_url"),
+                desc="get_profileinfo",
+            )
+        except StoreError as e:
+            if e.code == 404:
+                # no match
+                defer.returnValue(ProfileInfo(None, None))
+                return
+            else:
+                raise
+
+        defer.returnValue(
+            ProfileInfo(
+                avatar_url=profile['avatar_url'],
+                display_name=profile['displayname'],
+            )
         )
 
     def get_profile_displayname(self, user_localpart):
