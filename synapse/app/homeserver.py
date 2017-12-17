@@ -25,7 +25,7 @@ from synapse.api.urls import CONTENT_REPO_PREFIX, FEDERATION_PREFIX, \
     LEGACY_MEDIA_PREFIX, MEDIA_PREFIX, SERVER_KEY_PREFIX, SERVER_KEY_V2_PREFIX, \
     STATIC_PREFIX, WEB_CLIENT_PREFIX
 from synapse.app import _base
-from synapse.app._base import quit_with_error
+from synapse.app._base import quit_with_error, listen_ssl, listen_tcp
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
@@ -58,7 +58,6 @@ from twisted.internet import defer, reactor
 from twisted.web.resource import EncodingResourceWrapper, Resource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
-from twisted.internet import error
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -131,8 +130,7 @@ class SynapseHomeServer(HomeServer):
         root_resource = create_resource_tree(resources, root_resource)
 
         if tls:
-            _base.listen_ssl(
-                logger,
+            listen_ssl(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -145,8 +143,7 @@ class SynapseHomeServer(HomeServer):
             )
 
         else:
-            _base.listen_tcp(
-                logger,
+            listen_tcp(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -233,8 +230,7 @@ class SynapseHomeServer(HomeServer):
             elif listener["type"] == "manhole":
                 bind_addresses = listener["bind_addresses"]
 
-                _base.listen_tcp(
-                    logger,
+                listen_tcp(
                     bind_addresses,
                     listener["port"],
                     manhole(
@@ -246,16 +242,13 @@ class SynapseHomeServer(HomeServer):
             elif listener["type"] == "replication":
                 bind_addresses = listener["bind_addresses"]
                 for address in bind_addresses:
-                    try:
-                        factory = ReplicationStreamProtocolFactory(self)
-                        server_listener = reactor.listenTCP(
-                            listener["port"], factory, interface=address
-                        )
-                        reactor.addSystemEventTrigger(
-                            "before", "shutdown", server_listener.stopListening,
-                        )
-                    except error.CannotListenError as e:
-                        _base.check_bind_error(logger, e, address, bind_addresses)
+                    factory = ReplicationStreamProtocolFactory(self)
+                    server_listener = reactor.listenTCP(
+                        listener["port"], factory, interface=address
+                    )
+                    reactor.addSystemEventTrigger(
+                        "before", "shutdown", server_listener.stopListening,
+                    )
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 

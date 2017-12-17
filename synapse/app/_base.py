@@ -27,6 +27,8 @@ from synapse.util import PreserveLoggingContext
 from synapse.util.rlimit import change_resource_limit
 from twisted.internet import error, reactor
 
+logger = logging.getLogger(__name__)
+
 
 def start_worker_reactor(appname, config):
     """ Run the reactor in the main process
@@ -122,7 +124,7 @@ def quit_with_error(error_string):
     sys.exit(1)
 
 
-def listen_tcp(logger, bind_addresses, port, factory, backlog=50):
+def listen_tcp(bind_addresses, port, factory, backlog=50):
     """
     Create a TCP socket for a port and several addresses
     """
@@ -135,10 +137,10 @@ def listen_tcp(logger, bind_addresses, port, factory, backlog=50):
                 address
             )
         except error.CannotListenError as e:
-            check_bind_error(logger, e, address, bind_addresses)
+            check_bind_error(e, address, bind_addresses)
 
 
-def listen_ssl(logger, bind_addresses, port, factory, context_factory, backlog=50):
+def listen_ssl(bind_addresses, port, factory, context_factory, backlog=50):
     """
     Create an SSL socket for a port and several addresses
     """
@@ -152,10 +154,10 @@ def listen_ssl(logger, bind_addresses, port, factory, context_factory, backlog=5
                 address
             )
         except error.CannotListenError as e:
-            check_bind_error(logger, e, address, bind_addresses)
+            check_bind_error(e, address, bind_addresses)
 
 
-def check_bind_error(logger, e, address, bind_addresses):
+def check_bind_error(e, address, bind_addresses):
     """
     This method checks an exception occurred while binding on 0.0.0.0.
     If :: is specified in the bind addresses a warning is shown.
@@ -166,7 +168,6 @@ def check_bind_error(logger, e, address, bind_addresses):
     When binding on 0.0.0.0 after :: this can safely be ignored.
 
     Args:
-        logger (Logger): Logger used to log the warning.
         e (Exception): Exception that was caught.
         address (str): Address on which binding was attempted.
         bind_addresses (list): Addresses on which the service listens.
