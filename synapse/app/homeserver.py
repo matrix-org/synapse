@@ -228,10 +228,8 @@ class SynapseHomeServer(HomeServer):
             if listener["type"] == "http":
                 self._listener_http(config, listener)
             elif listener["type"] == "manhole":
-                bind_addresses = listener["bind_addresses"]
-
                 listen_tcp(
-                    bind_addresses,
+                    listener["bind_addresses"],
                     listener["port"],
                     manhole(
                         username="matrix",
