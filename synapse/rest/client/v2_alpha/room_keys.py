@@ -68,6 +68,8 @@ class RoomKeysServlet(RestServlet):
          * lower forwarded_count always wins over higher forwarded_count
 
         We trust the clients not to lie and corrupt their own backups.
+        It also means that if your access_token is stolen, the attacker could
+        delete your backup.
 
         POST /room_keys/keys/!abc:matrix.org/c0ff33?version=1 HTTP/1.1
         Content-Type: application/json

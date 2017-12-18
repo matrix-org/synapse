@@ -237,9 +237,14 @@ class LimitExceededError(SynapseError):
 class RoomKeysVersionError(SynapseError):
     """A client has tried to upload to a non-current version of the room_keys store
     """
-    def __init__(self, code=403, msg="Wrong room_keys version", current_version=None,
-                 errcode=Codes.WRONG_ROOM_KEYS_VERSION):
-        super(RoomKeysVersionError, self).__init__(code, msg, errcode)
+    def __init__(self, current_version):
+        """
+        Args:
+            current_version (str): the current version of the store they should have used
+        """
+        super(RoomKeysVersionError, self).__init__(
+            403, "Wrong room_keys version", Codes.WRONG_ROOM_KEYS_VERSION
+        )
         self.current_version = current_version
 
     def error_dict(self):

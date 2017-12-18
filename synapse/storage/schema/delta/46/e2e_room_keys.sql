@@ -25,16 +25,14 @@ CREATE TABLE e2e_room_keys (
     session_data TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX e2e_room_keys_user_idx ON e2e_room_keys(user_id);
-CREATE UNIQUE INDEX e2e_room_keys_room_idx ON e2e_room_keys(room_id);
-CREATE UNIQUE INDEX e2e_room_keys_session_idx ON e2e_room_keys(session_id);
+CREATE UNIQUE INDEX e2e_room_keys_idx ON e2e_room_keys(user_id, room_id, session_id);
 
 -- the metadata for each generation of encrypted e2e session backups
-CREATE TABLE e2e_room_key_versions (
+CREATE TABLE e2e_room_keys_versions (
     user_id TEXT NOT NULL,
     version TEXT NOT NULL,
     algorithm TEXT NOT NULL,
     auth_data TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX e2e_room_key_user_idx ON e2e_room_keys(user_id);
+CREATE UNIQUE INDEX e2e_room_keys_versions_user_idx ON e2e_room_keys_versions(user_id);
