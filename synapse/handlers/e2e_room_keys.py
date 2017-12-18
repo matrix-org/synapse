@@ -24,8 +24,21 @@ logger = logging.getLogger(__name__)
 
 
 class E2eRoomKeysHandler(object):
+    """
+    Implements an optional realtime backup mechanism for encrypted E2E megolm room keys.
+    This gives a way for users to store and recover their megolm keys if they lose all
+    their clients. It should also extend easily to future room key mechanisms.
+    The actual payload of the encrypted keys is completely opaque to the handler.
+    """
+
     def __init__(self, hs):
         self.store = hs.get_datastore()
+
+        # Used to lock whenever a client is uploading key data.  This prevents collisions
+        # between clients trying to upload the details of a new session, given all
+        # clients belonging to a user will receive and try to upload a new session at
+        # roughly the same time.  Also used to lock out uploads when the key is being
+        # changed.
         self._upload_linearizer = Linearizer("upload_room_keys_lock")
 
     @defer.inlineCallbacks
@@ -40,33 +53,34 @@ class E2eRoomKeysHandler(object):
 
     @defer.inlineCallbacks
     def delete_room_keys(self, user_id, version, room_id, session_id):
-        yield self.store.delete_e2e_room_keys(user_id, version, room_id, session_id)
+        # lock for consistency with uploading
+        with (yield self._upload_linearizer.queue(user_id)):
+            yield self.store.delete_e2e_room_keys(user_id, version, room_id, session_id)
 
     @defer.inlineCallbacks
     def upload_room_keys(self, user_id, version, room_keys):
 
         # TODO: Validate the JSON to make sure it has the right keys.
 
-        # Check that the version we're trying to upload is the current version
-
-        try:
-            version_info = yield self.get_version_info(user_id, version)
-        except StoreError as e:
-            if e.code == 404:
-                raise SynapseError(404, "Version '%s' not found" % (version,))
-            else:
-                raise e
-
-        if version_info['version'] != version:
-            raise RoomKeysVersionError(current_version=version_info.version)
-
         # XXX: perhaps we should use a finer grained lock here?
         with (yield self._upload_linearizer.queue(user_id)):
+            # Check that the version we're trying to upload is the current version
+            try:
+                version_info = yield self.get_version_info(user_id, version)
+            except StoreError as e:
+                if e.code == 404:
+                    raise SynapseError(404, "Version '%s' not found" % (version,))
+                else:
+                    raise e
 
-            # go through the room_keys
-            for room_id in room_keys['rooms']:
-                for session_id in room_keys['rooms'][room_id]['sessions']:
-                    room_key = room_keys['rooms'][room_id]['sessions'][session_id]
+            if version_info['version'] != version:
+                raise RoomKeysVersionError(current_version=version_info.version)
+
+            # go through the room_keys.
+            # XXX: this should/could be done concurrently, given we're in a lock.
+            for room_id, room in room_keys['rooms'].iteritems():
+                for session_id, session in room['sessions'].iteritems():
+                    room_key = session[session_id]
 
                     yield self._upload_room_key(
                         user_id, version, room_id, session_id, room_key
@@ -86,10 +100,29 @@ class E2eRoomKeysHandler(object):
             else:
                 raise e
 
-        # check whether we merge or not. spelling it out with if/elifs rather
-        # than lots of booleans for legibility.
-        upsert = True
+        if _should_replace_room_key(current_room_key, room_key):
+            yield self.store.set_e2e_room_key(
+                user_id, version, room_id, session_id, room_key
+            )
+
+    def _should_replace_room_key(current_room_key, room_key):
+        """
+        Determine whether to replace the current_room_key in our backup for this
+        session (if any) with a new room_key that has been uploaded.
+
+        Args:
+            current_room_key (dict): Optional, the current room_key dict if any
+            room_key (dict): The new room_key dict which may or may not be fit to
+                replace the current_room_key
+
+        Returns:
+            True if current_room_key should be replaced by room_key in the backup
+        """
+
         if current_room_key:
+            # spelt out with if/elifs rather than nested boolean expressions
+            # purely for legibility.
+
             if room_key['is_verified'] and not current_room_key['is_verified']:
                 pass
             elif (
@@ -97,16 +130,11 @@ class E2eRoomKeysHandler(object):
                 current_room_key['first_message_index']
             ):
                 pass
-            elif room_key['forwarded_count'] < room_key['forwarded_count']:
+            elif room_key['forwarded_count'] < current_room_key['forwarded_count']:
                 pass
             else:
-                upsert = False
-
-        # if so, we set the new room_key
-        if upsert:
-            yield self.store.set_e2e_room_key(
-                user_id, version, room_id, session_id, room_key
-            )
+                return False
+        return True
 
     @defer.inlineCallbacks
     def create_version(self, user_id, version_info):
