@@ -99,7 +99,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_e2e_room_keys(
-        self, user_id, version, room_id=room_id, session_id=session_id
+        self, user_id, version, room_id=None, session_id=None
     ):
 
         keyvalues = {
@@ -140,7 +140,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def delete_e2e_room_keys(
-        self, user_id, version, room_id=room_id, session_id=session_id
+        self, user_id, version, room_id=None, session_id=None
     ):
 
         keyvalues = {
@@ -159,10 +159,10 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def get_e2e_room_key_version_info(self, user_id, version):
+    def get_e2e_room_keys_version_info(self, user_id, version):
 
         row = yield self._simple_select_one(
-            table="e2e_room_key_versions",
+            table="e2e_room_keys_versions",
             keyvalues={
                 "user_id": user_id,
                 "version": version,
@@ -173,20 +173,20 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 "algorithm",
                 "auth_data",
             ),
-            desc="get_e2e_room_key_version_info",
+            desc="get_e2e_room_keys_version_info",
         )
 
         defer.returnValue(row)
 
-    def create_e2e_room_key_version(self, user_id, info):
+    def create_e2e_room_keys_version(self, user_id, info):
         """Atomically creates a new version of this user's e2e_room_keys store
         with the given version info.
         """
 
-        def _create_e2e_room_key_version_txn(txn):
+        def _create_e2e_room_keys_version_txn(txn):
 
             txn.execute(
-                "SELECT MAX(version) FROM e2e_room_key_versions WHERE user_id=?",
+                "SELECT MAX(version) FROM e2e_room_keys_versions WHERE user_id=?",
                 (user_id,)
             )
             current_version = txn.fetchone()[0]
@@ -197,7 +197,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
             self._simple_insert_txn(
                 txn,
-                table="e2e_room_key_versions",
+                table="e2e_room_keys_versions",
                 values={
                     "user_id": user_id,
                     "version": new_version,
@@ -209,11 +209,11 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             return new_version
 
         return self.runInteraction(
-            "create_e2e_room_key_version_txn", _create_e2e_room_key_version_txn
+            "create_e2e_room_keys_version_txn", _create_e2e_room_keys_version_txn
         )
 
     @defer.inlineCallbacks
-    def delete_e2e_room_key_version(self, user_id, version):
+    def delete_e2e_room_keys_version(self, user_id, version):
 
         keyvalues = {
             "user_id": user_id,
@@ -221,7 +221,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         }
 
         yield self._simple_delete(
-            table="e2e_room_key_versions",
+            table="e2e_room_keys_versions",
             keyvalues=keyvalues,
-            desc="delete_e2e_room_key_version",
+            desc="delete_e2e_room_keys_version",
         )

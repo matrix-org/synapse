@@ -143,7 +143,7 @@ class E2eRoomKeysHandler(object):
 
         # lock everyone out until we've switched version
         with (yield self._upload_linearizer.queue(user_id)):
-            new_version = yield self.store.create_e2e_room_key_version(
+            new_version = yield self.store.create_e2e_room_keys_version(
                 user_id, version_info
             )
             defer.returnValue(new_version)
@@ -151,7 +151,7 @@ class E2eRoomKeysHandler(object):
     @defer.inlineCallbacks
     def get_version_info(self, user_id, version):
         with (yield self._upload_linearizer.queue(user_id)):
-            results = yield self.store.get_e2e_room_key_version_info(
+            results = yield self.store.get_e2e_room_keys_version_info(
                 user_id, version
             )
             defer.returnValue(results)
@@ -159,4 +159,4 @@ class E2eRoomKeysHandler(object):
     @defer.inlineCallbacks
     def delete_version(self, user_id, version):
         with (yield self._upload_linearizer.queue(user_id)):
-            yield self.store.delete_e2e_room_key_version(user_id, version)
+            yield self.store.delete_e2e_room_keys_version(user_id, version)
