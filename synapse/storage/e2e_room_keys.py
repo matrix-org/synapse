@@ -22,6 +22,22 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_e2e_room_key(self, user_id, version, room_id, session_id):
+        """Get the encrypted E2E room key for a given session from a given
+        backup version of room_keys.  We only store the 'best' room key for a given
+        session at a given time, as determined by the handler.
+
+        Args:
+            user_id(str): the user whose backup we're querying
+            version(str): the version ID of the backup for the set of keys we're querying
+            room_id(str): the ID of the room whose keys we're querying.
+                This is a bit redundant as it's implied by the session_id, but
+                we include for consistency with the rest of the API.
+            session_id(str): the session whose room_key we're querying.
+
+        Returns:
+            A deferred dict giving the session_data and message metadata for
+            this room key.
+        """
 
         row = yield self._simple_select_one(
             table="e2e_room_keys",
@@ -43,6 +59,17 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         defer.returnValue(row)
 
     def set_e2e_room_key(self, user_id, version, room_id, session_id, room_key):
+        """Replaces or inserts the encrypted E2E room key for a given session in
+        a given backup
+
+        Args:
+            user_id(str): the user whose backup we're setting
+            version(str): the version ID of the backup we're updating
+            room_id(str): the ID of the room whose keys we're setting
+            session_id(str): the session whose room_key we're setting
+        Raises:
+            StoreError if stuff goes wrong, probably
+        """
 
         yield self._simple_upsert(
             table="e2e_room_keys",
@@ -61,46 +88,27 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             lock=False,
         )
 
-    # XXX: this isn't currently used and isn't tested anywhere
-    # it could be used in future for bulk-uploading new versions of room_keys
-    # for a user or something though.
-    def set_e2e_room_keys(self, user_id, version, room_keys):
-
-        def _set_e2e_room_keys_txn(txn):
-
-            values = []
-            for room_id in room_keys['rooms']:
-                for session_id in room_keys['rooms'][room_id]['sessions']:
-                    session = room_keys['rooms'][room_id]['sessions'][session_id]
-                    values.append(
-                        {
-                            "user_id": user_id,
-                            "room_id": room_id,
-                            "session_id": session_id,
-                            "version": version,
-                            "first_message_index": session['first_message_index'],
-                            "forwarded_count": session['forwarded_count'],
-                            "is_verified": session['is_verified'],
-                            "session_data": session['session_data'],
-                        }
-                    )
-
-            self._simple_insert_many_txn(
-                txn,
-                table="e2e_room_keys",
-                values=values
-            )
-
-            return True
-
-        return self.runInteraction(
-            "set_e2e_room_keys", _set_e2e_room_keys_txn
-        )
-
     @defer.inlineCallbacks
     def get_e2e_room_keys(
         self, user_id, version, room_id=None, session_id=None
     ):
+        """Bulk get the E2E room keys for a given backup, optionally filtered to a given
+        room, or a given session.
+
+        Args:
+            user_id(str): the user whose backup we're querying
+            version(str): the version ID of the backup for the set of keys we're querying
+            room_id(str): Optional. the ID of the room whose keys we're querying, if any.
+                If not specified, we return the keys for all the rooms in the backup.
+            session_id(str): Optional. the session whose room_key we're querying, if any.
+                If specified, we also require the room_id to be specified.
+                If not specified, we return all the keys in this version of
+                the backup (or for the specified room)
+
+        Returns:
+            A deferred list of dicts giving the session_data and message metadata for
+            these room keys.
+        """
 
         keyvalues = {
             "user_id": user_id,
@@ -142,6 +150,22 @@ class EndToEndRoomKeyStore(SQLBaseStore):
     def delete_e2e_room_keys(
         self, user_id, version, room_id=None, session_id=None
     ):
+        """Bulk delete the E2E room keys for a given backup, optionally filtered to a given
+        room or a given session.
+
+        Args:
+            user_id(str): the user whose backup we're deleting from
+            version(str): the version ID of the backup for the set of keys we're deleting
+            room_id(str): Optional. the ID of the room whose keys we're deleting, if any.
+                If not specified, we delete the keys for all the rooms in the backup.
+            session_id(str): Optional. the session whose room_key we're querying, if any.
+                If specified, we also require the room_id to be specified.
+                If not specified, we delete all the keys in this version of
+                the backup (or for the specified room)
+
+        Returns:
+            A deferred of the deletion transaction
+        """
 
         keyvalues = {
             "user_id": user_id,
@@ -160,6 +184,15 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_e2e_room_keys_version_info(self, user_id, version):
+        """Get info etadata about a given version of our room_keys backup
+
+        Args:
+            user_id(str): the user whose backup we're querying
+            version(str): the version ID of the backup we're querying about
+
+        Returns:
+            A deferred dict giving the info metadata for this backup version
+        """
 
         row = yield self._simple_select_one(
             table="e2e_room_keys_versions",
@@ -181,6 +214,13 @@ class EndToEndRoomKeyStore(SQLBaseStore):
     def create_e2e_room_keys_version(self, user_id, info):
         """Atomically creates a new version of this user's e2e_room_keys store
         with the given version info.
+
+        Args:
+            user_id(str): the user whose backup we're creating a version
+            info(dict): the info about the backup version to be created
+
+        Returns:
+            A deferred string for the newly created version ID
         """
 
         def _create_e2e_room_keys_version_txn(txn):
@@ -214,6 +254,13 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def delete_e2e_room_keys_version(self, user_id, version):
+        """Delete a given backup version of the user's room keys.
+        Doesn't delete their actual key data.
+
+        Args:
+            user_id(str): the user whose backup version we're deleting
+            version(str): the ID of the backup version we're deleting
+        """
 
         keyvalues = {
             "user_id": user_id,
