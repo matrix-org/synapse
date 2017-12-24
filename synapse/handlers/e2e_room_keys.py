@@ -59,7 +59,6 @@ class E2eRoomKeysHandler(object):
 
     @defer.inlineCallbacks
     def upload_room_keys(self, user_id, version, room_keys):
-
         # TODO: Validate the JSON to make sure it has the right keys.
 
         # XXX: perhaps we should use a finer grained lock here?
@@ -139,7 +138,6 @@ class E2eRoomKeysHandler(object):
 
     @defer.inlineCallbacks
     def create_version(self, user_id, version_info):
-
         # TODO: Validate the JSON to make sure it has the right keys.
 
         # lock everyone out until we've switched version
