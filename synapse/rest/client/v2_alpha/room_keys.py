@@ -208,6 +208,10 @@ class RoomKeysServlet(RestServlet):
         """
         Deletes one or more encrypted E2E room keys for a user for backup purposes.
 
+        DELETE /room_keys/keys/!abc:matrix.org/c0ff33?version=1
+        HTTP/1.1 200 OK
+        {}
+
         room_id: the ID of the room whose keys to delete (optional)
         session_id: the ID for the E2E session to delete (optional)
         version: the version of the user's backup which this data is for.
@@ -240,6 +244,33 @@ class RoomKeysVersionServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, version):
+        """
+        Create a new backup version for this user's room_keys with the given
+        info.  The version is allocated by the server and returned to the user
+        in the response.  This API is intended to be used whenever the user
+        changes the encryption key for their backups, ensuring that backups
+        encrypted with different keys don't collide.
+
+        The algorithm passed in the version info is a reverse-DNS namespaced
+        identifier to describe the format of the encrypted backupped keys.
+
+        The auth_data is { user_id: "user_id", nonce: <random string> }
+        encrypted using the algorithm and current encryption key described above.
+
+        POST /room_keys/version
+        Content-Type: application/json
+        {
+            "algorithm": "m.megolm_backup.v1",
+            "auth_data": "dGhpcyBzaG91bGQgYWN0dWFsbHkgYmUgZW5jcnlwdGVkIGpzb24K"
+        }
+
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        {
+            "version": 12345
+        }
+        """
+
         if version:
             raise SynapseError(405, "Cannot POST to a specific version")
 
@@ -257,6 +288,17 @@ class RoomKeysVersionServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, version):
+        """
+        Retrieve the version information about a given version of the user's
+        room_keys backup.
+
+        GET /room_keys/version/12345 HTTP/1.1
+        {
+            "algorithm": "m.megolm_backup.v1",
+            "auth_data": "dGhpcyBzaG91bGQgYWN0dWFsbHkgYmUgZW5jcnlwdGVkIGpzb24K"
+        }
+        """
+
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
 
@@ -267,6 +309,15 @@ class RoomKeysVersionServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, version):
+        """
+        Delete the information about a given version of the user's
+        room_keys backup.  Doesn't delete the actual room data.
+
+        DELETE /room_keys/version/12345 HTTP/1.1
+        HTTP/1.1 200 OK
+        {}
+        """
+
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
 
