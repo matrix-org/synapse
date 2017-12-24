@@ -100,15 +100,16 @@ class E2eRoomKeysHandler(object):
             else:
                 raise e
 
-        if _should_replace_room_key(current_room_key, room_key):
+        if E2eRoomKeysHandler._should_replace_room_key(current_room_key, room_key):
             yield self.store.set_e2e_room_key(
                 user_id, version, room_id, session_id, room_key
             )
 
+    @staticmethod
     def _should_replace_room_key(current_room_key, room_key):
         """
-        Determine whether to replace the current_room_key in our backup for this
-        session (if any) with a new room_key that has been uploaded.
+        Determine whether to replace a given current_room_key (if any)
+        with a newly uploaded room_key backup
 
         Args:
             current_room_key (dict): Optional, the current room_key dict if any
