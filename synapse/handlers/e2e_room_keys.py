@@ -136,7 +136,7 @@ class E2eRoomKeysHandler(object):
         """Upload a given room_key for a given room and session into a given
         version of the backup.  Merges the key with any which might already exist.
 
-        Args: 
+        Args:
             user_id(str): the user whose backup we're setting
             version(str): the version ID of the backup we're updating
             room_id(str): the ID of the room whose keys we're setting
@@ -199,7 +199,7 @@ class E2eRoomKeysHandler(object):
         backup version for the user's keys; previous backups will no longer be
         writeable to.
 
-        Args: 
+        Args:
             user_id(str): the user whose backup version we're creating
             version_info(dict): metadata about the new version being created
 

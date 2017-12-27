@@ -202,13 +202,15 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                     "SELECT MAX(version) FROM e2e_room_keys_versions WHERE user_id=?",
                     (user_id,)
                 )
-                version = txn.fetchone()[0]
+                this_version = txn.fetchone()[0]
+            else:
+                this_version = version
 
             return self._simple_select_one_txn(
                 table="e2e_room_keys_versions",
                 keyvalues={
                     "user_id": user_id,
-                    "version": version,
+                    "version": this_version,
                 },
                 retcols=(
                     "user_id",
