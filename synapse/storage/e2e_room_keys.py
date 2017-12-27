@@ -219,7 +219,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             )
 
         return self.runInteraction(
-            desc="get_e2e_room_keys_version_info",
+            "get_e2e_room_keys_version_info",
             _get_e2e_room_keys_version_info_txn
         )
 
