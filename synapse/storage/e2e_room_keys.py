@@ -67,6 +67,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             version(str): the version ID of the backup we're updating
             room_id(str): the ID of the room whose keys we're setting
             session_id(str): the session whose room_key we're setting
+            room_key(dict): the room_key being set
         Raises:
             StoreError if stuff goes wrong, probably
         """
@@ -182,34 +183,45 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             desc="delete_e2e_room_keys",
         )
 
-    @defer.inlineCallbacks
-    def get_e2e_room_keys_version_info(self, user_id, version):
-        """Get info etadata about a given version of our room_keys backup
+    def get_e2e_room_keys_version_info(self, user_id, version=None):
+        """Get info metadata about a version of our room_keys backup.
 
         Args:
             user_id(str): the user whose backup we're querying
-            version(str): the version ID of the backup we're querying about
-
+            version(str): Optional. the version ID of the backup we're querying about
+                If missing, we return the information about the current version.
+        Raises:
+            StoreError: with code 404 if there are no e2e_room_keys_versions present
         Returns:
             A deferred dict giving the info metadata for this backup version
         """
 
-        row = yield self._simple_select_one(
-            table="e2e_room_keys_versions",
-            keyvalues={
-                "user_id": user_id,
-                "version": version,
-            },
-            retcols=(
-                "user_id",
-                "version",
-                "algorithm",
-                "auth_data",
-            ),
-            desc="get_e2e_room_keys_version_info",
-        )
+        def _get_e2e_room_keys_version_info_txn(txn):
+            if version is None:
+                txn.execute(
+                    "SELECT MAX(version) FROM e2e_room_keys_versions WHERE user_id=?",
+                    (user_id,)
+                )
+                version = txn.fetchone()[0]
 
-        defer.returnValue(row)
+            return self._simple_select_one_txn(
+                table="e2e_room_keys_versions",
+                keyvalues={
+                    "user_id": user_id,
+                    "version": version,
+                },
+                retcols=(
+                    "user_id",
+                    "version",
+                    "algorithm",
+                    "auth_data",
+                ),
+            )
+
+        return self.runInteraction(
+            desc="get_e2e_room_keys_version_info",
+            _get_e2e_room_keys_version_info_txn
+        )
 
     def create_e2e_room_keys_version(self, user_id, info):
         """Atomically creates a new version of this user's e2e_room_keys store
@@ -224,7 +236,6 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         """
 
         def _create_e2e_room_keys_version_txn(txn):
-
             txn.execute(
                 "SELECT MAX(version) FROM e2e_room_keys_versions WHERE user_id=?",
                 (user_id,)
