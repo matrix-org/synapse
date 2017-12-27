@@ -42,7 +42,16 @@ class E2eRoomKeysHandler(object):
         self._upload_linearizer = Linearizer("upload_room_keys_lock")
 
     @defer.inlineCallbacks
-    def get_room_keys(self, user_id, version, room_id, session_id):
+    def get_room_keys(self, user_id, version, room_id=None, session_id=None):
+        """Bulk get the E2E room keys for a given backup, optionally filtered to a given
+        room, or a given session.
+        See EndToEndRoomKeyStore.get_e2e_room_keys for full details.
+
+        Returns:
+            A deferred list of dicts giving the session_data and message metadata for
+            these room keys.
+        """
+
         # we deliberately take the lock to get keys so that changing the version
         # works atomically
         with (yield self._upload_linearizer.queue(user_id)):
@@ -52,20 +61,56 @@ class E2eRoomKeysHandler(object):
             defer.returnValue(results)
 
     @defer.inlineCallbacks
-    def delete_room_keys(self, user_id, version, room_id, session_id):
+    def delete_room_keys(self, user_id, version, room_id=None, session_id=None):
+        """Bulk delete the E2E room keys for a given backup, optionally filtered to a given
+        room or a given session.
+        See EndToEndRoomKeyStore.delete_e2e_room_keys for full details.
+
+        Returns:
+            A deferred of the deletion transaction
+        """
+
         # lock for consistency with uploading
         with (yield self._upload_linearizer.queue(user_id)):
             yield self.store.delete_e2e_room_keys(user_id, version, room_id, session_id)
 
     @defer.inlineCallbacks
     def upload_room_keys(self, user_id, version, room_keys):
+        """Bulk upload a list of room keys into a given backup version, asserting
+        that the given version is the current backup version.  room_keys are merged
+        into the current backup as described in RoomKeysServlet.on_PUT().
+
+        Args:
+            user_id(str): the user whose backup we're setting
+            version(str): the version ID of the backup we're updating
+            room_keys(dict): a nested dict describing the room_keys we're setting:
+
+        {
+            "rooms": {
+                "!abc:matrix.org": {
+                    "sessions": {
+                        "c0ff33": {
+                            "first_message_index": 1,
+                            "forwarded_count": 1,
+                            "is_verified": false,
+                            "session_data": "SSBBTSBBIEZJU0gK"
+                        }
+                    }
+                }
+            }
+        }
+
+        Raises:
+            SynapseError: with code 404 if there are no versions defined
+            RoomKeysVersionError: if the uploaded version is not the current version
+        """
+
         # TODO: Validate the JSON to make sure it has the right keys.
 
         # XXX: perhaps we should use a finer grained lock here?
         with (yield self._upload_linearizer.queue(user_id)):
             # Check that the version we're trying to upload is the current version
-            try:
-                version_info = yield self.get_version_info(user_id, version)
+            version_info = yield self.get_current_version_info(user_id)
             except StoreError as e:
                 if e.code == 404:
                     raise SynapseError(404, "Version '%s' not found" % (version,))
@@ -87,6 +132,17 @@ class E2eRoomKeysHandler(object):
 
     @defer.inlineCallbacks
     def _upload_room_key(self, user_id, version, room_id, session_id, room_key):
+        """Upload a given room_key for a given room and session into a given
+        version of the backup.  Merges the key with any which might already exist.
+
+        Args: 
+            user_id(str): the user whose backup we're setting
+            version(str): the version ID of the backup we're updating
+            room_id(str): the ID of the room whose keys we're setting
+            session_id(str): the session whose room_key we're setting
+            room_key(dict): the room_key being set
+        """
+
         # get the room_key for this particular row
         current_room_key = None
         try:
@@ -138,6 +194,23 @@ class E2eRoomKeysHandler(object):
 
     @defer.inlineCallbacks
     def create_version(self, user_id, version_info):
+        """Create a new backup version.  This automatically becomes the new
+        backup version for the user's keys; previous backups will no longer be
+        writeable to.
+
+        Args: 
+            user_id(str): the user whose backup version we're creating
+            version_info(dict): metadata about the new version being created
+
+        {
+            "algorithm": "m.megolm_backup.v1",
+            "auth_data": "dGhpcyBzaG91bGQgYWN0dWFsbHkgYmUgZW5jcnlwdGVkIGpzb24K"
+        }
+
+        Returns:
+            A deferred of a string that gives the new version number.
+        """
+
         # TODO: Validate the JSON to make sure it has the right keys.
 
         # lock everyone out until we've switched version
@@ -148,14 +221,36 @@ class E2eRoomKeysHandler(object):
             defer.returnValue(new_version)
 
     @defer.inlineCallbacks
-    def get_version_info(self, user_id, version):
+    def get_current_version_info(self, user_id):
+        """Get the user's current backup version.
+
+        Args:
+            user_id(str): the user whose current backup version we're querying
+        Raises:
+            StoreError: code 404 if there is no current backup version
+        Returns:
+            A deferred of a info dict that gives the info about the new version.
+
+        {
+            "algorithm": "m.megolm_backup.v1",
+            "auth_data": "dGhpcyBzaG91bGQgYWN0dWFsbHkgYmUgZW5jcnlwdGVkIGpzb24K"
+        }
+        """
+
         with (yield self._upload_linearizer.queue(user_id)):
-            results = yield self.store.get_e2e_room_keys_version_info(
-                user_id, version
-            )
+            results = yield self.store.get_e2e_room_keys_version_info(user_id)
             defer.returnValue(results)
 
     @defer.inlineCallbacks
     def delete_version(self, user_id, version):
+        """Deletes a given version of the user's e2e_room_keys backup
+
+        Args:
+            user_id(str): the user whose current backup version we're deleting
+            version(str): the version id of the backup being deleted
+        Raises:
+            StoreError: code 404 if this backup version doesn't exist
+        """
+
         with (yield self._upload_linearizer.queue(user_id)):
             yield self.store.delete_e2e_room_keys_version(user_id, version)
