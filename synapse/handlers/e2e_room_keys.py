@@ -110,7 +110,8 @@ class E2eRoomKeysHandler(object):
         # XXX: perhaps we should use a finer grained lock here?
         with (yield self._upload_linearizer.queue(user_id)):
             # Check that the version we're trying to upload is the current version
-            version_info = yield self.get_current_version_info(user_id)
+            try:
+                version_info = yield self.get_current_version_info(user_id)
             except StoreError as e:
                 if e.code == 404:
                     raise SynapseError(404, "Version '%s' not found" % (version,))
