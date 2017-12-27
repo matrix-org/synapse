@@ -47,7 +47,7 @@ class RoomKeysServlet(RestServlet):
         room_id: the ID of the room the keys are for (optional)
         session_id: the ID for the E2E room keys for the room (optional)
         version: the version of the user's backup which this data is for.
-        the version must already have been created via the /change_secret API.
+        the version must already have been created via the /room_keys/version API.
 
         Each session has:
          * first_message_index: a numeric index indicating the oldest message
@@ -59,6 +59,9 @@ class RoomKeysServlet(RestServlet):
          * session_data: base64-encrypted data describing the session.
 
         Returns 200 OK on success with body {}
+        Returns 403 Forbidden if the version in question is not the most recently
+        created version (i.e. if this is an old client trying to write to a stale backup)
+        Returns 404 Not Found if the version in question doesn't exist
 
         The API is designed to be otherwise agnostic to the room_key encryption
         algorithm being used.  Sessions are merged with existing ones in the
@@ -251,6 +254,9 @@ class RoomKeysVersionServlet(RestServlet):
         changes the encryption key for their backups, ensuring that backups
         encrypted with different keys don't collide.
 
+        It takes out an exclusive lock on this user's room_key backups, to ensure
+        clients only upload to the current backup.
+
         The algorithm passed in the version info is a reverse-DNS namespaced
         identifier to describe the format of the encrypted backupped keys.
 
@@ -291,6 +297,9 @@ class RoomKeysVersionServlet(RestServlet):
         """
         Retrieve the version information about a given version of the user's
         room_keys backup.
+
+        It takes out an exclusive lock on this user's room_key backups, to ensure
+        clients only upload to the current backup.
 
         GET /room_keys/version/12345 HTTP/1.1
         {
