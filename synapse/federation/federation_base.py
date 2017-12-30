@@ -18,6 +18,7 @@ from synapse.api.errors import SynapseError
 from synapse.crypto.event_signing import check_event_content_hash
 from synapse.events import FrozenEvent
 from synapse.events.utils import prune_event
+from synapse.http.servlet import assert_params_in_request
 from synapse.util import unwrapFirstError, logcontext
 from twisted.internet import defer
 
@@ -181,7 +182,13 @@ def event_from_pdu_json(pdu_json, outlier=False):
 
     Returns:
         FrozenEvent
+
+    Raises:
+        SynapseError: if the pdu is missing required fields
     """
+    # we could probably enforce a bunch of other fields here (room_id, sender,
+    # origin, etc etc)
+    assert_params_in_request(pdu_json, ('event_id', 'type'))
     event = FrozenEvent(
         pdu_json
     )
