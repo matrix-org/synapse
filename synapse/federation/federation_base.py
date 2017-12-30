@@ -16,6 +16,7 @@ import logging
 
 from synapse.api.errors import SynapseError
 from synapse.crypto.event_signing import check_event_content_hash
+from synapse.events import FrozenEvent
 from synapse.events.utils import prune_event
 from synapse.util import unwrapFirstError, logcontext
 from twisted.internet import defer
@@ -169,3 +170,22 @@ class FederationBase(object):
             )
 
         return deferreds
+
+
+def event_from_pdu_json(pdu_json, outlier=False):
+    """Construct a FrozenEvent from an event json received over federation
+
+    Args:
+        pdu_json (object): pdu as received over federation
+        outlier (bool): True to mark this event as an outlier
+
+    Returns:
+        FrozenEvent
+    """
+    event = FrozenEvent(
+        pdu_json
+    )
+
+    event.internal_metadata.outlier = outlier
+
+    return event

@@ -19,8 +19,10 @@ from twisted.internet import defer
 
 from synapse.api.errors import AuthError, FederationError, SynapseError
 from synapse.crypto.event_signing import compute_event_signature
-from synapse.events import FrozenEvent
-from synapse.federation.federation_base import FederationBase
+from synapse.federation.federation_base import (
+    FederationBase,
+    event_from_pdu_json,
+)
 from synapse.federation.units import Edu, Transaction
 import synapse.metrics
 from synapse.types import get_domain_from_id
@@ -169,7 +171,7 @@ class FederationServer(FederationBase):
                 p["age_ts"] = request_time - int(p["age"])
                 del p["age"]
 
-            event = self.event_from_pdu_json(p)
+            event = event_from_pdu_json(p)
             room_id = event.room_id
             pdus_by_room.setdefault(room_id, []).append(event)
 
@@ -343,7 +345,7 @@ class FederationServer(FederationBase):
 
     @defer.inlineCallbacks
     def on_invite_request(self, origin, content):
-        pdu = self.event_from_pdu_json(content)
+        pdu = event_from_pdu_json(content)
         ret_pdu = yield self.handler.on_invite_request(origin, pdu)
         time_now = self._clock.time_msec()
         defer.returnValue((200, {"event": ret_pdu.get_pdu_json(time_now)}))
@@ -351,7 +353,7 @@ class FederationServer(FederationBase):
     @defer.inlineCallbacks
     def on_send_join_request(self, origin, content):
         logger.debug("on_send_join_request: content: %s", content)
-        pdu = self.event_from_pdu_json(content)
+        pdu = event_from_pdu_json(content)
         logger.debug("on_send_join_request: pdu sigs: %s", pdu.signatures)
         res_pdus = yield self.handler.on_send_join_request(origin, pdu)
         time_now = self._clock.time_msec()
@@ -371,7 +373,7 @@ class FederationServer(FederationBase):
     @defer.inlineCallbacks
     def on_send_leave_request(self, origin, content):
         logger.debug("on_send_leave_request: content: %s", content)
-        pdu = self.event_from_pdu_json(content)
+        pdu = event_from_pdu_json(content)
         logger.debug("on_send_leave_request: pdu sigs: %s", pdu.signatures)
         yield self.handler.on_send_leave_request(origin, pdu)
         defer.returnValue((200, {}))
@@ -408,7 +410,7 @@ class FederationServer(FederationBase):
         """
         with (yield self._server_linearizer.queue((origin, room_id))):
             auth_chain = [
-                self.event_from_pdu_json(e)
+                event_from_pdu_json(e)
                 for e in content["auth_chain"]
             ]
 
@@ -582,15 +584,6 @@ class FederationServer(FederationBase):
 
     def __str__(self):
         return "<ReplicationLayer(%s)>" % self.server_name
-
-    def event_from_pdu_json(self, pdu_json, outlier=False):
-        event = FrozenEvent(
-            pdu_json
-        )
-
-        event.internal_metadata.outlier = outlier
-
-        return event
 
     @defer.inlineCallbacks
     def exchange_third_party_invite(
