@@ -12,25 +12,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.internet import defer
-
-from .federation_base import FederationBase
-from .units import Transaction, Edu
-
-from synapse.util import async
-from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
-from synapse.util.logutils import log_function
-from synapse.util.caches.response_cache import ResponseCache
-from synapse.events import FrozenEvent
-from synapse.types import get_domain_from_id
-import synapse.metrics
-
-from synapse.api.errors import AuthError, FederationError, SynapseError
-
-from synapse.crypto.event_signing import compute_event_signature
+import logging
 
 import simplejson as json
-import logging
+from twisted.internet import defer
+
+from synapse.api.errors import AuthError, FederationError, SynapseError
+from synapse.crypto.event_signing import compute_event_signature
+from synapse.events import FrozenEvent
+from synapse.federation.federation_base import FederationBase
+from synapse.federation.units import Edu, Transaction
+import synapse.metrics
+from synapse.types import get_domain_from_id
+from synapse.util import async
+from synapse.util.caches.response_cache import ResponseCache
+from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
+from synapse.util.logutils import log_function
 
 # when processing incoming transactions, we try to handle multiple rooms in
 # parallel, up to this limit.
