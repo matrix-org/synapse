@@ -14,28 +14,25 @@
 # limitations under the License.
 
 
-from twisted.internet import defer
-
-from .federation_base import FederationBase
-from synapse.api.constants import Membership
-
-from synapse.api.errors import (
-    CodeMessageException, HttpResponseException, SynapseError,
-)
-from synapse.util import unwrapFirstError, logcontext
-from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.util.logutils import log_function
-from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
-from synapse.events import FrozenEvent, builder
-import synapse.metrics
-
-from synapse.util.retryutils import NotRetryingDestination
-
 import copy
 import itertools
 import logging
 import random
 
+from twisted.internet import defer
+
+from synapse.api.constants import Membership
+from synapse.api.errors import (
+    CodeMessageException, HttpResponseException, SynapseError,
+)
+from synapse.events import FrozenEvent, builder
+from synapse.federation.federation_base import FederationBase
+import synapse.metrics
+from synapse.util import logcontext, unwrapFirstError
+from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
+from synapse.util.logutils import log_function
+from synapse.util.retryutils import NotRetryingDestination
 
 logger = logging.getLogger(__name__)
 
