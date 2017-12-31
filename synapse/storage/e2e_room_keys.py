@@ -213,7 +213,6 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                     "version": this_version,
                 },
                 retcols=(
-                    "user_id",
                     "version",
                     "algorithm",
                     "auth_data",
