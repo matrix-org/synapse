@@ -136,7 +136,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             desc="get_e2e_room_keys",
         )
 
-        sessions = { 'rooms': {} }
+        sessions = {'rooms': {}}
         for row in rows:
             room_entry = sessions['rooms'].setdefault(row['room_id'], {"sessions": {}})
             room_entry['sessions'][row['session_id']] = {

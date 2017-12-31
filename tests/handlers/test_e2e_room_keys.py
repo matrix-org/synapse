@@ -42,6 +42,7 @@ room_keys = {
     }
 }
 
+
 class E2eRoomKeysHandlerTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(E2eRoomKeysHandlerTestCase, self).__init__(*args, **kwargs)
@@ -55,7 +56,7 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
             replication_layer=mock.Mock(),
         )
         self.handler = synapse.handlers.e2e_room_keys.E2eRoomKeysHandler(self.hs)
-        self.local_user = "@boris:" + self.hs.hostname;
+        self.local_user = "@boris:" + self.hs.hostname
 
     @defer.inlineCallbacks
     def test_get_missing_current_version_info(self):
@@ -184,7 +185,8 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_upload_room_keys_bogus_version(self):
-        """Check that we get a 404 on uploading keys when an nonexistent version is specified
+        """Check that we get a 404 on uploading keys when an nonexistent version
+        is specified
         """
         version = yield self.handler.create_version(self.local_user, {
             "algorithm": "m.megolm_backup.v1",
@@ -194,7 +196,9 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
 
         res = None
         try:
-            yield self.handler.upload_room_keys(self.local_user, "bogus_version", room_keys)
+            yield self.handler.upload_room_keys(
+                self.local_user, "bogus_version", room_keys
+            )
         except errors.SynapseError as e:
             res = e.code
         self.assertEqual(res, 404)
@@ -267,10 +271,11 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         yield self.handler.upload_room_keys(self.local_user, version, room_keys)
 
         new_room_keys = copy.deepcopy(room_keys)
+        new_room_key = new_room_keys['rooms']['!abc:matrix.org']['sessions']['c0ff33']
 
         # test that increasing the message_index doesn't replace the existing session
-        new_room_keys['rooms']['!abc:matrix.org']['sessions']['c0ff33']['first_message_index'] = 2
-        new_room_keys['rooms']['!abc:matrix.org']['sessions']['c0ff33']['session_data'] = 'new'
+        new_room_key['first_message_index'] = 2
+        new_room_key['session_data'] = 'new'
         yield self.handler.upload_room_keys(self.local_user, version, new_room_keys)
 
         res = yield self.handler.get_room_keys(self.local_user, version)
@@ -280,7 +285,7 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         )
 
         # test that marking the session as verified however /does/ replace it
-        new_room_keys['rooms']['!abc:matrix.org']['sessions']['c0ff33']['is_verified'] = True
+        new_room_key['is_verified'] = True
         yield self.handler.upload_room_keys(self.local_user, version, new_room_keys)
 
         res = yield self.handler.get_room_keys(self.local_user, version)
@@ -291,8 +296,8 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
 
         # test that a session with a higher forwarded_count doesn't replace one
         # with a lower forwarding count
-        new_room_keys['rooms']['!abc:matrix.org']['sessions']['c0ff33']['forwarded_count'] = 2
-        new_room_keys['rooms']['!abc:matrix.org']['sessions']['c0ff33']['session_data'] = 'other'
+        new_room_key['forwarded_count'] = 2
+        new_room_key['session_data'] = 'other'
         yield self.handler.upload_room_keys(self.local_user, version, new_room_keys)
 
         res = yield self.handler.get_room_keys(self.local_user, version)
