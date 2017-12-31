@@ -207,6 +207,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 this_version = version
 
             return self._simple_select_one_txn(
+                txn,
                 table="e2e_room_keys_versions",
                 keyvalues={
                     "user_id": user_id,
@@ -243,9 +244,9 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             )
             current_version = txn.fetchone()[0]
             if current_version is None:
-                current_version = 0
+                current_version = '0'
 
-            new_version = current_version + 1
+            new_version = str(int(current_version) + 1)
 
             self._simple_insert_txn(
                 txn,
