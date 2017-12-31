@@ -58,6 +58,10 @@ class E2eRoomKeysHandler(object):
             results = yield self.store.get_e2e_room_keys(
                 user_id, version, room_id, session_id
             )
+
+            if results['rooms'] == {}:
+                raise SynapseError(404, "No room_keys found")
+
             defer.returnValue(results)
 
     @defer.inlineCallbacks
@@ -109,9 +113,10 @@ class E2eRoomKeysHandler(object):
 
         # XXX: perhaps we should use a finer grained lock here?
         with (yield self._upload_linearizer.queue(user_id)):
+
             # Check that the version we're trying to upload is the current version
             try:
-                version_info = yield self.get_version_info(user_id)
+                version_info = yield self._get_version_info_unlocked(user_id)
             except StoreError as e:
                 if e.code == 404:
                     raise SynapseError(404, "Version '%s' not found" % (version,))
@@ -119,16 +124,23 @@ class E2eRoomKeysHandler(object):
                     raise e
 
             if version_info['version'] != version:
-                raise RoomKeysVersionError(current_version=version_info.version)
+                # Check that the version we're trying to upload actually exists
+                try:
+                    version_info = yield self._get_version_info_unlocked(user_id, version)
+                    # if we get this far, the version must exist
+                    raise RoomKeysVersionError(current_version=version_info['version'])
+                except StoreError as e:
+                    if e.code == 404:
+                        raise SynapseError(404, "Version '%s' not found" % (version,))
+                    else:
+                        raise e
 
             # go through the room_keys.
             # XXX: this should/could be done concurrently, given we're in a lock.
             for room_id, room in room_keys['rooms'].iteritems():
                 for session_id, session in room['sessions'].iteritems():
-                    room_key = session[session_id]
-
                     yield self._upload_room_key(
-                        user_id, version, room_id, session_id, room_key
+                        user_id, version, room_id, session_id, session
                     )
 
     @defer.inlineCallbacks
@@ -242,8 +254,17 @@ class E2eRoomKeysHandler(object):
         """
 
         with (yield self._upload_linearizer.queue(user_id)):
-            results = yield self.store.get_e2e_room_keys_version_info(user_id)
-            defer.returnValue(results)
+            res = yield self._get_version_info_unlocked(user_id, version)
+            defer.returnValue(res)
+
+    @defer.inlineCallbacks
+    def _get_version_info_unlocked(self, user_id, version=None):
+        """Get the info about a given version of the user's backup
+        without obtaining the upload_linearizer lock.  For params see get_version_info
+        """
+
+        results = yield self.store.get_e2e_room_keys_version_info(user_id, version)
+        defer.returnValue(results)
 
     @defer.inlineCallbacks
     def delete_version(self, user_id, version):

@@ -204,6 +204,12 @@ class RoomKeysServlet(RestServlet):
         room_keys = yield self.e2e_room_keys_handler.get_room_keys(
             user_id, version, room_id, session_id
         )
+
+        if session_id:
+            room_keys = room_keys['rooms'][room_id]['sessions'][session_id]
+        elif room_id:
+            room_keys = room_keys['rooms'][room_id]
+
         defer.returnValue((200, room_keys))
 
     @defer.inlineCallbacks
