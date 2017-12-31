@@ -58,6 +58,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
         defer.returnValue(row)
 
+    @defer.inlineCallbacks
     def set_e2e_room_key(self, user_id, version, room_id, session_id, room_key):
         """Replaces or inserts the encrypted E2E room key for a given session in
         a given backup
@@ -135,7 +136,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             desc="get_e2e_room_keys",
         )
 
-        sessions = {}
+        sessions = { 'rooms': {} }
         for row in rows:
             room_entry = sessions['rooms'].setdefault(row['room_id'], {"sessions": {}})
             room_entry['sessions'][row['session_id']] = {
