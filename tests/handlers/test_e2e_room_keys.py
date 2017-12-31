@@ -37,7 +37,7 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
             handlers=None,
             replication_layer=mock.Mock(),
         )
-        self.handler = synapse.handlers.e2e_keys.E2eRoomKeysHandler(self.hs)
+        self.handler = synapse.handlers.e2e_room_keys.E2eRoomKeysHandler(self.hs)
 
 
     @defer.inlineCallbacks
@@ -46,6 +46,7 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         if there is no version.
         """
         local_user = "@boris:" + self.hs.hostname
+        res = None
         try:
             res = yield self.handler.get_version_info(local_user);
         except errors.SynapseError as e:
@@ -58,6 +59,7 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         if it doesn't exist.
         """
         local_user = "@boris:" + self.hs.hostname
+        res = None
         try:
             res = yield self.handler.get_version_info(local_user, "mrflibble");
         except errors.SynapseError as e:
@@ -69,7 +71,7 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         """Check that we can create and then retrieve versions.
         """
         local_user = "@boris:" + self.hs.hostname
-        res = yield self.handler.create_version(user_id, {
+        res = yield self.handler.create_version(local_user, {
             "algorithm": "m.megolm_backup.v1",
             "auth_data": "first_version_auth_data",
         });
@@ -92,7 +94,7 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         });
 
         # upload a new one...
-        res = yield self.handler.create_version(user_id, {
+        res = yield self.handler.create_version(local_user, {
             "algorithm": "m.megolm_backup.v1",
             "auth_data": "second_version_auth_data",
         });
@@ -111,7 +113,7 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         """Check that we can create and then delete versions.
         """
         local_user = "@boris:" + self.hs.hostname
-        res = yield self.handler.create_version(user_id, {
+        res = yield self.handler.create_version(local_user, {
             "algorithm": "m.megolm_backup.v1",
             "auth_data": "first_version_auth_data",
         });
@@ -121,21 +123,22 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         yield self.handler.delete_version(local_user, "1");
 
         # check that it's gone
+        res = None        
         try:
             res = yield self.handler.get_version_info(local_user, "1");
         except errors.SynapseError as e:
             self.assertEqual(e.code, 404);
-        self.assertEqual(res, None);        
+        self.assertEqual(res, None);
 
 
     @defer.inlineCallbacks
     def test_get_room_keys(self):
-        pass
+        yield None
 
     @defer.inlineCallbacks
     def test_upload_room_keys(self):
-        pass
+        yield None
 
     @defer.inlineCallbacks
     def test_delete_room_keys(self):
-        pass
+        yield None

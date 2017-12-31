@@ -35,4 +35,4 @@ CREATE TABLE e2e_room_keys_versions (
     auth_data TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX e2e_room_keys_versions_user_idx ON e2e_room_keys_versions(user_id);
+CREATE UNIQUE INDEX e2e_room_keys_versions_idx ON e2e_room_keys_versions(user_id, version);
