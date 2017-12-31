@@ -39,7 +39,6 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         )
         self.handler = synapse.handlers.e2e_room_keys.E2eRoomKeysHandler(self.hs)
 
-
     @defer.inlineCallbacks
     def test_get_missing_current_version_info(self):
         """Check that we get a 404 if we ask for info about the current version
@@ -48,10 +47,10 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         local_user = "@boris:" + self.hs.hostname
         res = None
         try:
-            res = yield self.handler.get_version_info(local_user);
+            res = yield self.handler.get_version_info(local_user)
         except errors.SynapseError as e:
-            self.assertEqual(e.code, 404);
-        self.assertEqual(res, None);
+            self.assertEqual(e.code, 404)
+        self.assertEqual(res, None)
 
     @defer.inlineCallbacks
     def test_get_missing_version_info(self):
@@ -61,10 +60,10 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         local_user = "@boris:" + self.hs.hostname
         res = None
         try:
-            res = yield self.handler.get_version_info(local_user, "mrflibble");
+            res = yield self.handler.get_version_info(local_user, "mrflibble")
         except errors.SynapseError as e:
-            self.assertEqual(e.code, 404);
-        self.assertEqual(res, None);
+            self.assertEqual(e.code, 404)
+        self.assertEqual(res, None)
 
     @defer.inlineCallbacks
     def test_create_version(self):
@@ -74,39 +73,39 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         res = yield self.handler.create_version(local_user, {
             "algorithm": "m.megolm_backup.v1",
             "auth_data": "first_version_auth_data",
-        });
-        self.assertEqual(res, "1");
+        })
+        self.assertEqual(res, "1")
 
         # check we can retrieve it as the current version
-        res = yield self.handler.get_version_info(local_user);
+        res = yield self.handler.get_version_info(local_user)
         self.assertDictEqual(res, {
             "version": "1",
             "algorithm": "m.megolm_backup.v1",
             "auth_data": "first_version_auth_data",
-        });
+        })
 
         # check we can retrieve it as a specific version
-        res = yield self.handler.get_version_info(local_user, "1");
+        res = yield self.handler.get_version_info(local_user, "1")
         self.assertDictEqual(res, {
             "version": "1",
             "algorithm": "m.megolm_backup.v1",
             "auth_data": "first_version_auth_data",
-        });
+        })
 
         # upload a new one...
         res = yield self.handler.create_version(local_user, {
             "algorithm": "m.megolm_backup.v1",
             "auth_data": "second_version_auth_data",
-        });
-        self.assertEqual(res, "2");
+        })
+        self.assertEqual(res, "2")
 
         # check we can retrieve it as the current version
-        res = yield self.handler.get_version_info(local_user);
+        res = yield self.handler.get_version_info(local_user)
         self.assertDictEqual(res, {
             "version": "2",
             "algorithm": "m.megolm_backup.v1",
             "auth_data": "second_version_auth_data",
-        });
+        })
 
     @defer.inlineCallbacks
     def test_delete_version(self):
@@ -116,20 +115,19 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         res = yield self.handler.create_version(local_user, {
             "algorithm": "m.megolm_backup.v1",
             "auth_data": "first_version_auth_data",
-        });
-        self.assertEqual(res, "1");
+        })
+        self.assertEqual(res, "1")
 
         # check we can delete it
-        yield self.handler.delete_version(local_user, "1");
+        yield self.handler.delete_version(local_user, "1")
 
         # check that it's gone
-        res = None        
+        res = None
         try:
-            res = yield self.handler.get_version_info(local_user, "1");
+            res = yield self.handler.get_version_info(local_user, "1")
         except errors.SynapseError as e:
-            self.assertEqual(e.code, 404);
-        self.assertEqual(res, None);
-
+            self.assertEqual(e.code, 404)
+        self.assertEqual(res, None)
 
     @defer.inlineCallbacks
     def test_get_room_keys(self):
