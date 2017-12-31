@@ -111,7 +111,7 @@ class E2eRoomKeysHandler(object):
         with (yield self._upload_linearizer.queue(user_id)):
             # Check that the version we're trying to upload is the current version
             try:
-                version_info = yield self.get_current_version_info(user_id)
+                version_info = yield self.get_version_info(user_id)
             except StoreError as e:
                 if e.code == 404:
                     raise SynapseError(404, "Version '%s' not found" % (version,))
@@ -222,17 +222,20 @@ class E2eRoomKeysHandler(object):
             defer.returnValue(new_version)
 
     @defer.inlineCallbacks
-    def get_current_version_info(self, user_id):
-        """Get the user's current backup version.
+    def get_version_info(self, user_id, version=None):
+        """Get the info about a given version of the user's backup
 
         Args:
             user_id(str): the user whose current backup version we're querying
+            version(str): Optional; if None gives the most recent version
+                otherwise a historical one.
         Raises:
-            StoreError: code 404 if there is no current backup version
+            StoreError: code 404 if the requested backup version doesn't exist
         Returns:
             A deferred of a info dict that gives the info about the new version.
 
         {
+            "version": "1234",
             "algorithm": "m.megolm_backup.v1",
             "auth_data": "dGhpcyBzaG91bGQgYWN0dWFsbHkgYmUgZW5jcnlwdGVkIGpzb24K"
         }
