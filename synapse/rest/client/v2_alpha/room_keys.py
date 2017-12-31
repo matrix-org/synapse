@@ -296,13 +296,17 @@ class RoomKeysVersionServlet(RestServlet):
     def on_GET(self, request, version):
         """
         Retrieve the version information about a given version of the user's
-        room_keys backup.
+        room_keys backup.  If the version part is missing, returns info about the
+        most current backup version (if any)
 
         It takes out an exclusive lock on this user's room_key backups, to ensure
         clients only upload to the current backup.
 
+        Returns 404 is the given version does not exist.
+
         GET /room_keys/version/12345 HTTP/1.1
         {
+            "version": "12345",
             "algorithm": "m.megolm_backup.v1",
             "auth_data": "dGhpcyBzaG91bGQgYWN0dWFsbHkgYmUgZW5jcnlwdGVkIGpzb24K"
         }
