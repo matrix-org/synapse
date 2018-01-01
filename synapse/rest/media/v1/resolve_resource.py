@@ -79,7 +79,7 @@ class ResolveResource(Resource):
         media_type = response.headers.getRawHeaders("Content-Type")[0]
 
         content_uri = yield self.media_repo.create_content(
-            media_type, upload_name, r.content,
+            media_type, upload_name, response.content,
             content_length, requester.user
         )
 
