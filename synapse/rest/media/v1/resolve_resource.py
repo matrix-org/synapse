@@ -13,18 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import respond_with_json, request_handler
-
-from synapse.api.errors import SynapseError
+import re
+import logging
 
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
-
 from twisted.web.resource import Resource
 
-import logging
 import requests
-import re
+
+from synapse.http.server import respond_with_json, request_handler
+from synapse.api.errors import SynapseError
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +38,7 @@ class ResolveResource(Resource):
         self.filepaths = media_repo.filepaths
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
+        self.max_upload_size = hs.config.max_upload_size
         self.server_name = hs.hostname
         self.auth = hs.get_auth()
         self.version_string = hs.version_string
@@ -70,10 +70,13 @@ class ResolveResource(Resource):
         self._validate_resource(url)
         logger.debug("URL '%s' is valid on resolving", url)
 
-        r = requests.get(url, allow_redirects=True)
-        upload_name = self._get_filename(r)
+        response = requests.get(url, allow_redirects=True)
+        upload_name = self._get_filename(response)
         logger.debug("Resolved URL '%s' and upload name is '%s'",
             url, upload_name)
+
+        content_length = response.headers.get('Content-Length')
+        media_type = response.headers.getRawHeaders("Content-Type")[0]
 
         content_uri = yield self.media_repo.create_content(
             media_type, upload_name, r.content,
@@ -91,10 +94,10 @@ class ResolveResource(Resource):
         Get filename from content-disposition
         """
         header = response.headers.get('content-disposition')
-        if not cd:
+        if not header:
             return None
         fname = re.findall('filename=(.+)', header)
-        if len(fname) == 0:
+        if fname:
             return None
         return fname[0]
 
@@ -105,6 +108,7 @@ class ResolveResource(Resource):
         return True
 
     def _should_be_downloadable(self, url, head_response):
+        #pylint: disable=E1101
         if head_response.status_code is not requests.codes.ok:
             raise SynapseError(
                 msg="Not found resource to resolve %r" % (url),
@@ -112,15 +116,16 @@ class ResolveResource(Resource):
             )
 
     def _should_have_allowed_max_upload_size(self, url, head_response):
-        content_length = request.getHeader("Content-Length")
+        #pylint: disable=E0602
+        content_length = head_response.headers.get("Content-Length")
         if content_length is None:
             raise SynapseError(
-                msg="Request must specify a Content-Length", code=400
+                msg="Request must specify a Content-Length for %r" % (url), code=400
             )
 
         if int(content_length) > self.max_upload_size:
             raise SynapseError(
-                msg="Upload request body is too large",
+                msg="Upload request body is too large for %r" % (url),
                 code=413,
             )
 
