@@ -33,7 +33,6 @@ from synapse.rest.media.v1._base import validate_url_blacklist
 
 import os
 import re
-import fnmatch
 import cgi
 import ujson as json
 import urlparse

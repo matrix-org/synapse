@@ -102,9 +102,10 @@ class ContentRepositoryConfig(Config):
             except ImportError:
                 raise ConfigError(MISSING_NETADDR)
 
-            if ("url_ip_range_blacklist" in config) or ("url_preview_ip_range_blacklist" in config):
+            if ("url_ip_range_blacklist" in config) or \
+                ("url_preview_ip_range_blacklist" in config):
                 self.url_ip_range_blacklist = IPSet(
-                    config.get("url_ip_range_blacklist") or \
+                    config.get("url_ip_range_blacklist") or
                     config.get("url_preview_ip_range_blacklist")
                 )
             else:
@@ -114,13 +115,14 @@ class ContentRepositoryConfig(Config):
                     "to work"
                 )
 
-            self.url_ip_range_whitelist = IPSet(
-                config.get("url_ip_range_whitelist") or \
-                config.get("url_preview_ip_range_whitelist", ())
-            )
+            whitelist = config.get("url_ip_range_whitelist")
+            whitelist = whitelist or config.get("url_preview_ip_range_whitelist", ())
+            self.url_ip_range_whitelist = IPSet(whitelist)
 
-            self.url_blacklist = config.get("url_blacklist") or \
-                config.get("url_preview_blacklist", ())
+            blacklist = config.get("url_blacklist")
+            blacklist = blacklist or config.get("url_preview_blacklist", ())
+            self.url_blacklist = blacklist
+
 
     def default_config(self, **kwargs):
         media_store = self.default_path("media_store")
