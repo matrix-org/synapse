@@ -298,10 +298,6 @@ It can be used like this:
         # this will now be logged against the request context
         logger.debug("Request handling complete")
 
-XXX: I think ``preserve_context_over_fn`` is supposed to do the first option,
-but the fact that it does ``preserve_context_over_deferred`` on its results
-means that its use is fraught with difficulty.
-
 Passing synapse deferreds into third-party functions
 ----------------------------------------------------
 

@@ -17,7 +17,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.util.metrics import Measure
-from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
+from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
 
 import logging
 
@@ -159,7 +159,7 @@ class ApplicationServicesHandler(object):
     def query_3pe(self, kind, protocol, fields):
         services = yield self._get_services_for_3pn(protocol)
 
-        results = yield preserve_context_over_deferred(defer.DeferredList([
+        results = yield make_deferred_yieldable(defer.DeferredList([
             preserve_fn(self.appservice_api.query_3pe)(service, kind, protocol, fields)
             for service in services
         ], consumeErrors=True))

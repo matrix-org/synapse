@@ -25,7 +25,8 @@ from synapse.util.stringutils import random_string
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.http.client import SpiderHttpClient
 from synapse.http.server import (
-    request_handler, respond_with_json_bytes
+    request_handler, respond_with_json_bytes,
+    respond_with_json,
 )
 from synapse.util.async import ObservableDeferred
 from synapse.util.stringutils import is_ascii
@@ -77,6 +78,9 @@ class PreviewUrlResource(Resource):
         self._cleaner_loop = self.clock.looping_call(
             self._expire_url_cache_data, 10 * 1000
         )
+
+    def render_OPTIONS(self, request):
+        return respond_with_json(request, 200, {}, send_cors=True)
 
     def render_GET(self, request):
         self._async_render_GET(request)
@@ -321,10 +325,15 @@ class PreviewUrlResource(Resource):
     def _expire_url_cache_data(self):
         """Clean up expired url cache content, media and thumbnails.
         """
-
         # TODO: Delete from backup media store
 
         now = self.clock.time_msec()
+
+        logger.info("Running url preview cache expiry")
+
+        if not (yield self.store.has_completed_background_updates()):
+            logger.info("Still running DB updates; skipping expiry")
+            return
 
         # First we delete expired url cache entries
         media_ids = yield self.store.get_expired_url_cache(now)
@@ -399,8 +408,7 @@ class PreviewUrlResource(Resource):
 
         yield self.store.delete_url_cache_media(removed_media)
 
-        if removed_media:
-            logger.info("Deleted %d media from url cache", len(removed_media))
+        logger.info("Deleted %d media from url cache", len(removed_media))
 
 
 def decode_and_calc_og(body, media_uri, request_encoding=None):

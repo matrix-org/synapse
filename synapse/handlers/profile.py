@@ -36,6 +36,8 @@ class ProfileHandler(BaseHandler):
             "profile", self.on_profile_query
         )
 
+        self.user_directory_handler = hs.get_user_directory_handler()
+
         self.clock.looping_call(self._update_remote_profile_cache, self.PROFILE_UPDATE_MS)
 
     @defer.inlineCallbacks
@@ -139,6 +141,12 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, new_displayname
         )
 
+        if self.hs.config.user_directory_search_all_users:
+            profile = yield self.store.get_profileinfo(target_user.localpart)
+            yield self.user_directory_handler.handle_local_profile_change(
+                target_user.to_string(), profile
+            )
+
         yield self._update_join_states(requester, target_user)
 
     @defer.inlineCallbacks
@@ -182,6 +190,12 @@ class ProfileHandler(BaseHandler):
         yield self.store.set_profile_avatar_url(
             target_user.localpart, new_avatar_url
         )
+
+        if self.hs.config.user_directory_search_all_users:
+            profile = yield self.store.get_profileinfo(target_user.localpart)
+            yield self.user_directory_handler.handle_local_profile_change(
+                target_user.to_string(), profile
+            )
 
         yield self._update_join_states(requester, target_user)
 

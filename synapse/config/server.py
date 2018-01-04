@@ -41,6 +41,12 @@ class ServerConfig(Config):
         # false only if we are updating the user directory in a worker
         self.update_user_directory = config.get("update_user_directory", True)
 
+        # whether to enable the media repository endpoints. This should be set
+        # to false if the media repository is running as a separate endpoint;
+        # doing so ensures that we will not run cache cleanup jobs on the
+        # master, potentially causing inconsistency.
+        self.enable_media_repo = config.get("enable_media_repo", True)
+
         self.filter_timeline_limit = config.get("filter_timeline_limit", -1)
 
         # Whether we should block invites sent to users on this server
@@ -214,13 +220,12 @@ class ServerConfig(Config):
             port: %(bind_port)s
 
             # Local addresses to listen on.
-            # This will listen on all IPv4 addresses by default.
+            # On Linux and Mac OS, `::` will listen on all IPv4 and IPv6
+            # addresses by default. For most other OSes, this will only listen
+            # on IPv6.
             bind_addresses:
+              - '::'
               - '0.0.0.0'
-              # Uncomment to listen on all IPv6 interfaces
-              # N.B: On at least Linux this will also listen on all IPv4
-              # addresses, so you will need to comment out the line above.
-              # - '::'
 
             # This is a 'http' listener, allows us to specify 'resources'.
             type: http
@@ -258,7 +263,7 @@ class ServerConfig(Config):
           # For when matrix traffic passes through loadbalancer that unwraps TLS.
           - port: %(unsecure_port)s
             tls: false
-            bind_addresses: ['0.0.0.0']
+            bind_addresses: ['::', '0.0.0.0']
             type: http
 
             x_forwarded: false
@@ -272,7 +277,7 @@ class ServerConfig(Config):
           # Turn on the twisted ssh manhole service on localhost on the given
           # port.
           # - port: 9000
-          #   bind_address: 127.0.0.1
+          #   bind_addresses: ['::1', '127.0.0.1']
           #   type: manhole
         """ % locals()
 

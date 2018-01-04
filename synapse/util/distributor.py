@@ -13,32 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from synapse.util.logcontext import (
-    PreserveLoggingContext, preserve_context_over_fn
-)
-
-from synapse.util import unwrapFirstError
-
 import logging
 
+from twisted.internet import defer
+
+from synapse.util import unwrapFirstError
+from synapse.util.logcontext import PreserveLoggingContext
 
 logger = logging.getLogger(__name__)
 
 
 def user_left_room(distributor, user, room_id):
-    return preserve_context_over_fn(
-        distributor.fire,
-        "user_left_room", user=user, room_id=room_id
-    )
+    with PreserveLoggingContext():
+        distributor.fire("user_left_room", user=user, room_id=room_id)
 
 
 def user_joined_room(distributor, user, room_id):
-    return preserve_context_over_fn(
-        distributor.fire,
-        "user_joined_room", user=user, room_id=room_id
-    )
+    with PreserveLoggingContext():
+        distributor.fire("user_joined_room", user=user, room_id=room_id)
 
 
 class Distributor(object):

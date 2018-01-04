@@ -58,7 +58,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         self.mock_federation_resource = MockHttpResource()
 
-        mock_notifier = Mock(spec=["on_new_event"])
+        mock_notifier = Mock()
         self.on_new_event = mock_notifier.on_new_event
 
         self.auth = Mock(spec=[])
@@ -76,6 +76,9 @@ class TypingNotificationsTestCase(unittest.TestCase):
                 "set_received_txn_response",
                 "get_destination_retry_timings",
                 "get_devices_by_remote",
+                # Bits that user_directory needs
+                "get_user_directory_stream_pos",
+                "get_current_state_deltas",
             ]),
             state_handler=self.state_handler,
             handlers=None,
@@ -121,6 +124,15 @@ class TypingNotificationsTestCase(unittest.TestCase):
         def get_current_user_in_room(room_id):
             return set(str(u) for u in self.room_members)
         self.state_handler.get_current_user_in_room = get_current_user_in_room
+
+        self.datastore.get_user_directory_stream_pos.return_value = (
+            # we deliberately return a non-None stream pos to avoid doing an initial_spam
+            defer.succeed(1)
+        )
+
+        self.datastore.get_current_state_deltas.return_value = (
+            None
+        )
 
         self.auth.check_joined_room = check_joined_room
 
