@@ -104,10 +104,9 @@ class ContentRepositoryConfig(Config):
 
             if ("url_ip_range_blacklist" in config) or \
                 ("url_preview_ip_range_blacklist" in config):
-                self.url_ip_range_blacklist = IPSet(
-                    config.get("url_ip_range_blacklist") or
-                    config.get("url_preview_ip_range_blacklist")
-                )
+                ip_blacklist = config.get("url_ip_range_blacklist")
+                ip_blacklist = ip_blacklist or config.get("url_preview_ip_range_blacklist")
+                self.url_ip_range_blacklist = IPSet(ip_blacklist)
             else:
                 raise ConfigError(
                     "For security, you must specify an explicit target IP address "
