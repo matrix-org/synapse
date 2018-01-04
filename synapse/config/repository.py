@@ -89,7 +89,8 @@ class ContentRepositoryConfig(Config):
             config["thumbnail_sizes"]
         )
         self.url_preview_enabled = config.get("url_preview_enabled", False)
-        if self.url_preview_enabled:
+        self.url_resolve_enabled = config.get("url_resolve_enabled", False)
+        if self.url_preview_enabled or self.url_resolve_enabled:
             try:
                 import lxml
                 lxml  # To stop unused lint.
@@ -101,24 +102,25 @@ class ContentRepositoryConfig(Config):
             except ImportError:
                 raise ConfigError(MISSING_NETADDR)
 
-            if "url_preview_ip_range_blacklist" in config:
-                self.url_preview_ip_range_blacklist = IPSet(
-                    config["url_preview_ip_range_blacklist"]
+            if ("url_ip_range_blacklist" in config) or ("url_preview_ip_range_blacklist" in config):
+                self.url_ip_range_blacklist = IPSet(
+                    config.get("url_ip_range_blacklist") or \
+                    config.get("url_preview_ip_range_blacklist")
                 )
             else:
                 raise ConfigError(
                     "For security, you must specify an explicit target IP address "
-                    "blacklist in url_preview_ip_range_blacklist for url previewing "
+                    "blacklist in url_ip_range_blacklist for url previewing "
                     "to work"
                 )
 
-            self.url_preview_ip_range_whitelist = IPSet(
+            self.url_ip_range_whitelist = IPSet(
+                config.get("url_ip_range_whitelist") or \
                 config.get("url_preview_ip_range_whitelist", ())
             )
 
-            self.url_preview_url_blacklist = config.get(
-                "url_preview_url_blacklist", ()
-            )
+            self.url_blacklist = config.get("url_blacklist") or \
+                config.get("url_preview_blacklist", ())
 
     def default_config(self, **kwargs):
         media_store = self.default_path("media_store")
@@ -170,9 +172,14 @@ class ContentRepositoryConfig(Config):
           method: scale
 
         # Is the preview URL API enabled?  If enabled, you *must* specify
-        # an explicit url_preview_ip_range_blacklist of IPs that the spider is
+        # an explicit url_ip_range_blacklist of IPs that the spider is
         # denied from accessing.
         url_preview_enabled: False
+
+        # Is the resolve URL API enabled?  If enabled, you *must* specify
+        # an explicit url_ip_range_blacklist of IPs that the spider is
+        # denied from accessing.
+        url_resolve_enabled: False
 
         # List of IP address CIDR ranges that the URL preview spider is denied
         # from accessing.  There are no defaults: you must explicitly
@@ -182,7 +189,7 @@ class ContentRepositoryConfig(Config):
         # synapse to issue arbitrary GET requests to your internal services,
         # causing serious security issues.
         #
-        # url_preview_ip_range_blacklist:
+        # url_ip_range_blacklist:
         # - '127.0.0.0/8'
         # - '10.0.0.0/8'
         # - '172.16.0.0/12'
@@ -191,16 +198,16 @@ class ContentRepositoryConfig(Config):
         # - '169.254.0.0/16'
         #
         # List of IP address CIDR ranges that the URL preview spider is allowed
-        # to access even if they are specified in url_preview_ip_range_blacklist.
+        # to access even if they are specified in url_ip_range_blacklist.
         # This is useful for specifying exceptions to wide-ranging blacklisted
         # target IP ranges - e.g. for enabling URL previews for a specific private
         # website only visible in your network.
         #
-        # url_preview_ip_range_whitelist:
+        # url_ip_range_whitelist:
         # - '192.168.1.1'
 
         # Optional list of URL matches that the URL preview spider is
-        # denied from accessing.  You should use url_preview_ip_range_blacklist
+        # denied from accessing.  You should use url_ip_range_blacklist
         # in preference to this, otherwise someone could define a public DNS
         # entry that points to a private IP address and circumvent the blacklist.
         # This is more useful if you know there is an entire shape of URL that
@@ -215,7 +222,7 @@ class ContentRepositoryConfig(Config):
         # specified component matches for a given list item succeed, the URL is
         # blacklisted.
         #
-        # url_preview_url_blacklist:
+        # url_blacklist:
         # # blacklist any URL with a username in its URI
         # - username: '*'
         #

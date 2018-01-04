@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from io import UnsupportedOperation
+
 from twisted.internet import defer, threads
 import twisted.internet.error
 import twisted.web.http
@@ -105,7 +107,10 @@ class MediaRepository(object):
             fname (str): Path to write to
         """
         MediaRepository._makedirs(fname)
-        source.seek(0)  # Ensure we read from the start of the file
+        try:
+            source.seek(0)  # Ensure we read from the start of the file
+        except UnsupportedOperation:
+            pass
         with open(fname, "wb") as f:
             shutil.copyfileobj(source, f)
 
@@ -631,9 +636,10 @@ class MediaRepositoryResource(Resource):
         media_repo = hs.get_media_repository()
 
         self.putChild("upload", UploadResource(hs, media_repo))
-        self.putChild("resolve", ResolveResource(hs, media_repo))
         self.putChild("download", DownloadResource(hs, media_repo))
         self.putChild("thumbnail", ThumbnailResource(hs, media_repo))
         self.putChild("identicon", IdenticonResource())
         if hs.config.url_preview_enabled:
             self.putChild("preview_url", PreviewUrlResource(hs, media_repo))
+        if hs.config.url_resolve_enabled:
+            self.putChild("resolve", ResolveResource(hs, media_repo))
