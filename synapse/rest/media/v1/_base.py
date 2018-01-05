@@ -70,38 +70,11 @@ def respond_with_file(request, media_type, file_path,
     logger.debug("Responding with %r", file_path)
 
     if os.path.isfile(file_path):
-        request.setHeader(b"Content-Type", media_type.encode("UTF-8"))
-        if upload_name:
-            if is_ascii(upload_name):
-                request.setHeader(
-                    b"Content-Disposition",
-                    b"inline; filename=%s" % (
-                        urllib.quote(upload_name.encode("utf-8")),
-                    ),
-                )
-            else:
-                request.setHeader(
-                    b"Content-Disposition",
-                    b"inline; filename*=utf-8''%s" % (
-                        urllib.quote(upload_name.encode("utf-8")),
-                    ),
-                )
-
-        # cache for at least a day.
-        # XXX: we might want to turn this off for data we don't want to
-        # recommend caching as it's sensitive or private - or at least
-        # select private. don't bother setting Expires as all our
-        # clients are smart enough to be happy with Cache-Control
-        request.setHeader(
-            b"Cache-Control", b"public,max-age=86400,s-maxage=86400"
-        )
         if file_size is None:
             stat = os.stat(file_path)
             file_size = stat.st_size
 
-        request.setHeader(
-            b"Content-Length", b"%d" % (file_size,)
-        )
+        add_file_headers(request, media_type, file_size, upload_name)
 
         with open(file_path, "rb") as f:
             yield logcontext.make_deferred_yieldable(
@@ -111,3 +84,44 @@ def respond_with_file(request, media_type, file_path,
         finish_request(request)
     else:
         respond_404(request)
+
+
+def add_file_headers(request, media_type, file_size, upload_name):
+    """Adds the correct response headers in preparation for responding with the
+    media.
+
+    Args:
+        request (twisted.web.http.Request)
+        media_type (str): The media/content type.
+        file_size (int): Size in bytes of the media, if known.
+        upload_name (str): The name of the requested file, if any.
+    """
+    request.setHeader(b"Content-Type", media_type.encode("UTF-8"))
+    if upload_name:
+        if is_ascii(upload_name):
+            request.setHeader(
+                b"Content-Disposition",
+                b"inline; filename=%s" % (
+                    urllib.quote(upload_name.encode("utf-8")),
+                ),
+            )
+        else:
+            request.setHeader(
+                b"Content-Disposition",
+                b"inline; filename*=utf-8''%s" % (
+                    urllib.quote(upload_name.encode("utf-8")),
+                ),
+            )
+
+    # cache for at least a day.
+    # XXX: we might want to turn this off for data we don't want to
+    # recommend caching as it's sensitive or private - or at least
+    # select private. don't bother setting Expires as all our
+    # clients are smart enough to be happy with Cache-Control
+    request.setHeader(
+        b"Cache-Control", b"public,max-age=86400,s-maxage=86400"
+    )
+
+    request.setHeader(
+        b"Content-Length", b"%d" % (file_size,)
+    )
