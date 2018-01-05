@@ -191,19 +191,25 @@ class LoginRestServlet(ClientV1RestServlet):
 
         # convert threepid identifiers to user IDs
         if identifier["type"] == "m.id.thirdparty":
-            if 'medium' not in identifier or 'address' not in identifier:
+            address = identifier.get('address')
+            medium = identifier.get('medium')
+
+            if medium is None or address is None:
                 raise SynapseError(400, "Invalid thirdparty identifier")
 
-            address = identifier['address']
-            if identifier['medium'] == 'email':
+            if medium == 'email':
                 # For emails, transform the address to lowercase.
                 # We store all email addreses as lowercase in the DB.
                 # (See add_threepid in synapse/handlers/auth.py)
                 address = address.lower()
             user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
-                identifier['medium'], address
+                medium, address,
             )
             if not user_id:
+                logger.warn(
+                    "unknown 3pid identifier medium %s, address %r",
+                    medium, address,
+                )
                 raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
             identifier = {
