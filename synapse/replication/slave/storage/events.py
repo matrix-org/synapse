@@ -12,20 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from ._base import BaseSlavedStore
-from ._slaved_id_tracker import SlavedIdTracker
+import logging
 
 from synapse.api.constants import EventTypes
 from synapse.storage import DataStore
-from synapse.storage.roommember import RoomMemberStore
 from synapse.storage.event_federation import EventFederationStore
 from synapse.storage.event_push_actions import EventPushActionsStore
-from synapse.storage.state import StateStore
+from synapse.storage.roommember import RoomMemberStore
+from synapse.storage.state import StateGroupReadStore
 from synapse.storage.stream import StreamStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
-
-import logging
-
+from ._base import BaseSlavedStore
+from ._slaved_id_tracker import SlavedIdTracker
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +37,7 @@ logger = logging.getLogger(__name__)
 # the method descriptor on the DataStore and chuck them into our class.
 
 
-class SlavedEventStore(BaseSlavedStore):
+class SlavedEventStore(StateGroupReadStore, BaseSlavedStore):
 
     def __init__(self, db_conn, hs):
         super(SlavedEventStore, self).__init__(db_conn, hs)
@@ -90,25 +88,9 @@ class SlavedEventStore(BaseSlavedStore):
     _get_unread_counts_by_pos_txn = (
         DataStore._get_unread_counts_by_pos_txn.__func__
     )
-    _get_state_group_for_events = (
-        StateStore.__dict__["_get_state_group_for_events"]
-    )
-    _get_state_group_for_event = (
-        StateStore.__dict__["_get_state_group_for_event"]
-    )
-    _get_state_groups_from_groups = (
-        StateStore.__dict__["_get_state_groups_from_groups"]
-    )
-    _get_state_groups_from_groups_txn = (
-        DataStore._get_state_groups_from_groups_txn.__func__
-    )
     get_recent_event_ids_for_room = (
         StreamStore.__dict__["get_recent_event_ids_for_room"]
     )
-    get_current_state_ids = (
-        StateStore.__dict__["get_current_state_ids"]
-    )
-    get_state_group_delta = StateStore.__dict__["get_state_group_delta"]
     _get_joined_hosts_cache = RoomMemberStore.__dict__["_get_joined_hosts_cache"]
     has_room_changed_since = DataStore.has_room_changed_since.__func__
 
@@ -134,12 +116,6 @@ class SlavedEventStore(BaseSlavedStore):
         DataStore.get_room_events_stream_for_room.__func__
     )
     get_events_around = DataStore.get_events_around.__func__
-    get_state_for_event = DataStore.get_state_for_event.__func__
-    get_state_for_events = DataStore.get_state_for_events.__func__
-    get_state_groups = DataStore.get_state_groups.__func__
-    get_state_groups_ids = DataStore.get_state_groups_ids.__func__
-    get_state_ids_for_event = DataStore.get_state_ids_for_event.__func__
-    get_state_ids_for_events = DataStore.get_state_ids_for_events.__func__
     get_joined_users_from_state = DataStore.get_joined_users_from_state.__func__
     get_joined_users_from_context = DataStore.get_joined_users_from_context.__func__
     _get_joined_users_from_context = (
@@ -169,10 +145,7 @@ class SlavedEventStore(BaseSlavedStore):
     _get_rooms_for_user_where_membership_is_txn = (
         DataStore._get_rooms_for_user_where_membership_is_txn.__func__
     )
-    _get_state_for_groups = DataStore._get_state_for_groups.__func__
-    _get_all_state_from_cache = DataStore._get_all_state_from_cache.__func__
     _get_events_around_txn = DataStore._get_events_around_txn.__func__
-    _get_some_state_from_cache = DataStore._get_some_state_from_cache.__func__
 
     get_backfill_events = DataStore.get_backfill_events.__func__
     _get_backfill_events = DataStore._get_backfill_events.__func__

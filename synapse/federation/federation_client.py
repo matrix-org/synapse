@@ -25,7 +25,7 @@ from synapse.api.errors import (
 from synapse.util import unwrapFirstError, logcontext
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logutils import log_function
-from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
+from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
 from synapse.events import FrozenEvent, builder
 import synapse.metrics
 
@@ -420,7 +420,7 @@ class FederationClient(FederationBase):
                 for e_id in batch
             ]
 
-            res = yield preserve_context_over_deferred(
+            res = yield make_deferred_yieldable(
                 defer.DeferredList(deferreds, consumeErrors=True)
             )
             for success, result in res:

@@ -17,7 +17,7 @@
 from twisted.internet import defer, reactor
 
 from .logcontext import (
-    PreserveLoggingContext, preserve_fn, preserve_context_over_deferred,
+    PreserveLoggingContext, make_deferred_yieldable, preserve_fn
 )
 from synapse.util import logcontext, unwrapFirstError
 
@@ -351,7 +351,7 @@ class ReadWriteLock(object):
 
         # We wait for the latest writer to finish writing. We can safely ignore
         # any existing readers... as they're readers.
-        yield curr_writer
+        yield make_deferred_yieldable(curr_writer)
 
         @contextmanager
         def _ctx_manager():
@@ -380,7 +380,7 @@ class ReadWriteLock(object):
         curr_readers.clear()
         self.key_to_current_writer[key] = new_defer
 
-        yield preserve_context_over_deferred(defer.gatherResults(to_wait_on))
+        yield make_deferred_yieldable(defer.gatherResults(to_wait_on))
 
         @contextmanager
         def _ctx_manager():
