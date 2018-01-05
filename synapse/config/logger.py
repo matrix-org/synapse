@@ -79,12 +79,6 @@ class LoggingConfig(Config):
             os.path.join(config_dir_path, server_name + ".log.config")
         )
         return """
-        # Logging verbosity level. Ignored if log_config is specified.
-        verbose: 0
-
-        # File to write logging to. Ignored if log_config is specified.
-        log_file: "%(log_file)s"
-
         # A yaml python logging config file
         log_config: "%(log_config)s"
         """ % locals()
@@ -150,6 +144,9 @@ def setup_logging(config, use_worker_options=False):
     )
 
     if log_config is None:
+        # We don't have a logfile, so fall back to the 'verbosity' param from
+        # the config or cmdline. (Note that we generate a log config for new
+        # installs, so this will be an unusual case)
         level = logging.INFO
         level_for_storage = logging.INFO
         if config.verbosity:
@@ -157,11 +154,10 @@ def setup_logging(config, use_worker_options=False):
             if config.verbosity > 1:
                 level_for_storage = logging.DEBUG
 
-        # FIXME: we need a logging.WARN for a -q quiet option
         logger = logging.getLogger('')
         logger.setLevel(level)
 
-        logging.getLogger('synapse.storage').setLevel(level_for_storage)
+        logging.getLogger('synapse.storage.SQL').setLevel(level_for_storage)
 
         formatter = logging.Formatter(log_format)
         if log_file:
