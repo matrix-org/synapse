@@ -18,6 +18,7 @@ from .postgres import PostgresEngine
 from .sqlite3 import Sqlite3Engine
 
 import importlib
+import platform
 
 
 SUPPORTED_MODULE = {
@@ -31,7 +32,12 @@ def create_engine(database_config):
     engine_class = SUPPORTED_MODULE.get(name, None)
 
     if engine_class:
-        module = importlib.import_module(name)
+        needs_pypy_hack = (name == "psycopg2" and
+                platform.python_implementation() == "PyPy")
+        if needs_pypy_hack:
+            module = importlib.import_module("psycopg2cffi")
+        else:
+            module = importlib.import_module(name)
         return engine_class(module, database_config)
 
     raise RuntimeError(
