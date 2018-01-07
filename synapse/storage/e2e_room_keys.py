@@ -184,6 +184,17 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             desc="delete_e2e_room_keys",
         )
 
+    @staticmethod
+    def _get_current_version(txn, user_id):
+        txn.execute(
+            "SELECT MAX(version) FROM e2e_room_keys_versions WHERE user_id=?",
+            (user_id,)
+        )
+        row = txn.fetchone()
+        if not row:
+            raise StoreError(404, 'No current backup version')
+        return row[0]
+
     def get_e2e_room_keys_version_info(self, user_id, version=None):
         """Get info metadata about a version of our room_keys backup.
 
@@ -199,11 +210,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
         def _get_e2e_room_keys_version_info_txn(txn):
             if version is None:
-                txn.execute(
-                    "SELECT MAX(version) FROM e2e_room_keys_versions WHERE user_id=?",
-                    (user_id,)
-                )
-                this_version = txn.fetchone()[0]
+                this_version = self._get_current_version(txn, user_id)
             else:
                 this_version = version
 
@@ -266,23 +273,35 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             "create_e2e_room_keys_version_txn", _create_e2e_room_keys_version_txn
         )
 
-    @defer.inlineCallbacks
-    def delete_e2e_room_keys_version(self, user_id, version):
+    def delete_e2e_room_keys_version(self, user_id, version=None):
         """Delete a given backup version of the user's room keys.
         Doesn't delete their actual key data.
 
         Args:
             user_id(str): the user whose backup version we're deleting
-            version(str): the ID of the backup version we're deleting
+            version(str): Optional. the version ID of the backup version we're deleting
+                If missing, we delete the current backup version info.
+        Raises:
+            StoreError: with code 404 if there are no e2e_room_keys_versions present,
+                or if the version requested doesn't exist.
         """
 
-        keyvalues = {
-            "user_id": user_id,
-            "version": version,
-        }
+        def _delete_e2e_room_keys_version_txn(txn):
+            if version is None:
+                this_version = self._get_current_version(txn, user_id)
+            else:
+                this_version = version
 
-        yield self._simple_delete(
-            table="e2e_room_keys_versions",
-            keyvalues=keyvalues,
-            desc="delete_e2e_room_keys_version",
+            return self._simple_delete_one_txn(
+                txn,
+                table="e2e_room_keys_versions",
+                keyvalues={
+                    "user_id": user_id,
+                    "version": this_version,
+                },
+            )
+
+        return self.runInteraction(
+            "delete_e2e_room_keys_version",
+            _delete_e2e_room_keys_version_txn
         )

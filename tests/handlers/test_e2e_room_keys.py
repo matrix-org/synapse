@@ -124,6 +124,28 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         })
 
     @defer.inlineCallbacks
+    def test_delete_missing_version(self):
+        """Check that we get a 404 on deleting nonexistent versions
+        """
+        res = None
+        try:
+            yield self.handler.delete_version(self.local_user, "1")
+        except errors.SynapseError as e:
+            res = e.code
+        self.assertEqual(res, 404)
+
+    @defer.inlineCallbacks
+    def test_delete_missing_current_version(self):
+        """Check that we get a 404 on deleting nonexistent current version
+        """
+        res = None
+        try:
+            yield self.handler.delete_version(self.local_user)
+        except errors.SynapseError as e:
+            res = e.code
+        self.assertEqual(res, 404)
+
+    @defer.inlineCallbacks
     def test_delete_version(self):
         """Check that we can create and then delete versions.
         """
