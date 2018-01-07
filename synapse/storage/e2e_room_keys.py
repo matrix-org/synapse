@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from twisted.internet import defer
+from synapse.api.errors import StoreError
 
 from ._base import SQLBaseStore
 
