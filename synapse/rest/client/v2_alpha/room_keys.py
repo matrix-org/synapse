@@ -123,7 +123,7 @@ class RoomKeysServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
-        version = request.args.get("version")[0]
+        version = parse_string(request, "version")
 
         if session_id:
             body = {
@@ -199,7 +199,7 @@ class RoomKeysServlet(RestServlet):
         """
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
-        version = request.args.get("version")[0]
+        version = parse_string(request, "version")
 
         room_keys = yield self.e2e_room_keys_handler.get_room_keys(
             user_id, version, room_id, session_id
@@ -229,7 +229,7 @@ class RoomKeysServlet(RestServlet):
 
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
-        version = request.args.get("version")[0]
+        version = parse_string(request, "version")
 
         yield self.e2e_room_keys_handler.delete_room_keys(
             user_id, version, room_id, session_id
