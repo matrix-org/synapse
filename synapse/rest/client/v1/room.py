@@ -202,7 +202,7 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
             "sender": requester.user.to_string(),
         }
 
-        if request.args['ts'] and requester.app_service:
+        if 'ts' in request.args and requester.app_service:
             event_dict['origin_server_ts'] = parse_integer(request, "ts", 0)
 
         msg_handler = self.handlers.message_handler
