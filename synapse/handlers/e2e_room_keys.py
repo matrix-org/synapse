@@ -267,7 +267,7 @@ class E2eRoomKeysHandler(object):
         defer.returnValue(results)
 
     @defer.inlineCallbacks
-    def delete_version(self, user_id, version):
+    def delete_version(self, user_id, version=None):
         """Deletes a given version of the user's e2e_room_keys backup
 
         Args:

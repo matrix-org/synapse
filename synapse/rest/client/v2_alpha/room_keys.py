@@ -308,7 +308,7 @@ class RoomKeysVersionServlet(RestServlet):
         It takes out an exclusive lock on this user's room_key backups, to ensure
         clients only upload to the current backup.
 
-        Returns 404 is the given version does not exist.
+        Returns 404 if the given version does not exist.
 
         GET /room_keys/version/12345 HTTP/1.1
         {
@@ -330,7 +330,8 @@ class RoomKeysVersionServlet(RestServlet):
     def on_DELETE(self, request, version):
         """
         Delete the information about a given version of the user's
-        room_keys backup.  Doesn't delete the actual room data.
+        room_keys backup.  If the version part is missing, deletes the most
+        current backup version (if any). Doesn't delete the actual room data.
 
         DELETE /room_keys/version/12345 HTTP/1.1
         HTTP/1.1 200 OK
