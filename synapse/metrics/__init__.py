@@ -17,6 +17,7 @@ import logging
 import functools
 import time
 import gc
+import platform
 
 from twisted.internet import reactor
 
@@ -30,6 +31,7 @@ from .process_collector import register_process_collector
 logger = logging.getLogger(__name__)
 
 
+running_on_pypy = platform.python_implementation() == 'PyPy'
 all_metrics = []
 all_collectors = []
 
@@ -174,6 +176,9 @@ def runUntilCurrentTimer(func):
         tick_time.inc_by(end - start)
         pending_calls_metric.inc_by(num_pending)
 
+        if running_on_pypy:
+            return ret
+
         # Check if we need to do a manual GC (since its been disabled), and do
         # one if necessary.
         threshold = gc.get_threshold()
@@ -206,6 +211,7 @@ try:
 
     # We manually run the GC each reactor tick so that we can get some metrics
     # about time spent doing GC,
-    gc.disable()
+    if not running_on_pypy:
+        gc.disable()
 except AttributeError:
     pass
