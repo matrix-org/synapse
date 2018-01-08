@@ -14,7 +14,7 @@
 # limitations under the License.
 import synapse.http.servlet
 
-from ._base import parse_media_id, respond_with_file, respond_404
+from ._base import parse_media_id, respond_404
 from twisted.web.resource import Resource
 from synapse.http.server import request_handler, set_cors_headers
 
@@ -59,35 +59,14 @@ class DownloadResource(Resource):
         if server_name == self.server_name:
             yield self.media_repo.get_local_media(request, media_id, name)
         else:
-            yield self._respond_remote_file(
-                request, server_name, media_id, name
-            )
+            allow_remote = synapse.http.servlet.parse_boolean(
+                request, "allow_remote", default=True)
+            if not allow_remote:
+                logger.info(
+                    "Rejecting request for remote media %s/%s due to allow_remote",
+                    server_name, media_id,
+                )
+                respond_404(request)
+                return
 
-    @defer.inlineCallbacks
-    def _respond_remote_file(self, request, server_name, media_id, name):
-        # don't forward requests for remote media if allow_remote is false
-        allow_remote = synapse.http.servlet.parse_boolean(
-            request, "allow_remote", default=True)
-        if not allow_remote:
-            logger.info(
-                "Rejecting request for remote media %s/%s due to allow_remote",
-                server_name, media_id,
-            )
-            respond_404(request)
-            return
-
-        media_info = yield self.media_repo.get_remote_media(server_name, media_id)
-
-        media_type = media_info["media_type"]
-        media_length = media_info["media_length"]
-        filesystem_id = media_info["filesystem_id"]
-        upload_name = name if name else media_info["upload_name"]
-
-        file_path = self.filepaths.remote_media_filepath(
-            server_name, filesystem_id
-        )
-
-        yield respond_with_file(
-            request, media_type, file_path, media_length,
-            upload_name=upload_name,
-        )
+            yield self.media_repo.get_remote_media(request, server_name, media_id, name)
