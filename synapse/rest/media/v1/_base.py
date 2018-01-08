@@ -125,3 +125,76 @@ def add_file_headers(request, media_type, file_size, upload_name):
     request.setHeader(
         b"Content-Length", b"%d" % (file_size,)
     )
+
+
+@defer.inlineCallbacks
+def respond_with_responder(request, responder, media_type, file_size, upload_name=None):
+    """Responds to the request with given responder. If responder is None then
+    returns 404.
+
+    Args:
+        request (twisted.web.http.Request)
+        responder (Responder)
+        media_type (str): The media/content type.
+        file_size (int): Size in bytes of the media, if known.
+        upload_name (str): The name of the requested file, if any.
+    """
+    if not responder:
+        respond_404(request)
+        return
+
+    add_file_headers(request, media_type, file_size, upload_name)
+    yield responder.write_to_consumer(request)
+    finish_request(request)
+
+
+class Responder(object):
+    """Represents a response that can be streamed to the requester.
+
+    Either `write_to_consumer` or `cancel` must be called to clean up any open
+    resources.
+    """
+    def write_to_consumer(self, consumer):
+        """Stream response into consumer
+
+        Args:
+            consumer (IConsumer)
+
+        Returns:
+            Deferred: Resolves once the response has finished being written
+        """
+        pass
+
+    def cancel(self):
+        """Called when the responder is not going to be used after all.
+        """
+        pass
+
+
+class FileInfo(object):
+    """Details about a requested/uploaded file.
+
+    Attributes:
+        server_name (str): The server name where the media originated from,
+            or None if local.
+        file_id (str): The local ID of the file. For local files this is the
+            same as the media_id
+        media_type (str): Type of the file
+        url_cache (bool): If the file is for the url preview cache
+        thumbnail (bool): Whether the file is a thumbnail or not.
+        thumbnail_width (int)
+        thumbnail_height (int)
+        thumbnail_method (int)
+        thumbnail_type (str)
+    """
+    def __init__(self, server_name, file_id, url_cache=False,
+                 thumbnail=False, thumbnail_width=None, thumbnail_height=None,
+                 thumbnail_method=None, thumbnail_type=None):
+        self.server_name = server_name
+        self.file_id = file_id
+        self.url_cache = url_cache
+        self.thumbnail = thumbnail
+        self.thumbnail_width = thumbnail_width
+        self.thumbnail_height = thumbnail_height
+        self.thumbnail_method = thumbnail_method
+        self.thumbnail_type = thumbnail_type
