@@ -27,6 +27,9 @@ from .identicon_resource import IdenticonResource
 from .preview_url_resource import PreviewUrlResource
 from .filepath import MediaFilePaths
 from .thumbnailer import Thumbnailer
+from .storage_provider import (
+    StorageProviderWrapper, FileStorageProviderBackend,
+)
 from .media_storage import MediaStorage
 
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
@@ -66,10 +69,6 @@ class MediaRepository(object):
         self.primary_base_path = hs.config.media_store_path
         self.filepaths = MediaFilePaths(self.primary_base_path)
 
-        self.backup_base_path = hs.config.backup_media_store_path
-
-        self.synchronous_backup_media_store = hs.config.synchronous_backup_media_store
-
         self.dynamic_thumbnails = hs.config.dynamic_thumbnails
         self.thumbnail_requirements = hs.config.thumbnail_requirements
 
@@ -77,7 +76,27 @@ class MediaRepository(object):
 
         self.recently_accessed_remotes = set()
 
-        self.media_storage = MediaStorage(self.primary_base_path, self.filepaths)
+        # List of StorageProvider's where we should search for media and
+        # potentially upload to.
+        self.storage_providers = []
+
+        # TODO: Move this into config and allow other storage providers to be
+        # defined.
+        if hs.config.backup_media_store_path:
+            backend = FileStorageProviderBackend(
+                self.primary_base_path, hs.config.backup_media_store_path,
+            )
+            provider = StorageProviderWrapper(
+                backend,
+                store=True,
+                store_synchronous=hs.config.synchronous_backup_media_store,
+                store_remote=True,
+            )
+            self.storage_providers.append(provider)
+
+        self.media_storage = MediaStorage(
+            self.primary_base_path, self.filepaths, self.storage_providers,
+        )
 
         self.clock.looping_call(
             self._update_recently_accessed_remotes,

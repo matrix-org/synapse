@@ -32,9 +32,10 @@ class MediaStorage(object):
     """Responsible for storing/fetching files from local sources.
     """
 
-    def __init__(self, local_media_directory, filepaths):
+    def __init__(self, local_media_directory, filepaths, storage_providers):
         self.local_media_directory = local_media_directory
         self.filepaths = filepaths
+        self.storage_providers = storage_providers
 
     @defer.inlineCallbacks
     def store_file(self, source, file_info):
@@ -90,11 +91,12 @@ class MediaStorage(object):
 
         finished_called = [False]
 
+        @defer.inlineCallbacks
         def finish():
-            # This will be used later when we want to hit out to other storage
-            # places
+            for provider in self.storage_providers:
+                yield provider.store_file(path, file_info)
+
             finished_called[0] = True
-            return defer.succeed(None)
 
         try:
             with open(fname, "wb") as f:
@@ -126,6 +128,11 @@ class MediaStorage(object):
         local_path = os.path.join(self.local_media_directory, path)
         if os.path.exists(local_path):
             defer.returnValue(FileResponder(open(local_path, "rb")))
+
+        for provider in self.storage_providers:
+            res = yield provider.fetch(path, file_info)
+            if res:
+                defer.returnValue(res)
 
         defer.returnValue(None)
 
