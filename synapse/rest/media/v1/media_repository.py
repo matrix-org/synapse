@@ -637,7 +637,9 @@ class MediaRepositoryResource(Resource):
 
         self.putChild("upload", UploadResource(hs, media_repo))
         self.putChild("download", DownloadResource(hs, media_repo))
-        self.putChild("thumbnail", ThumbnailResource(hs, media_repo))
+        self.putChild("thumbnail", ThumbnailResource(
+            hs, media_repo, media_repo.media_storage,
+        ))
         self.putChild("identicon", IdenticonResource())
         if hs.config.url_preview_enabled:
             self.putChild("preview_url", PreviewUrlResource(hs, media_repo))
