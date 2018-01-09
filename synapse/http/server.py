@@ -107,6 +107,10 @@ def wrap_request_handler(request_handler, include_metrics=False):
         with LoggingContext(request_id) as request_context:
             with Measure(self.clock, "wrapped_request_handler"):
                 request_metrics = RequestMetrics()
+                # we start the request metrics timer here with an initial stab
+                # at the servlet name. For most requests that name will be
+                # JsonResource (or a subclass), and JsonResource._async_render
+                # will update it once it picks a servlet.
                 request_metrics.start(self.clock, name=self.__class__.__name__)
 
                 request_context.request = request_id
@@ -249,11 +253,22 @@ class JsonResource(HttpServer, resource.Resource):
             if not m:
                 continue
 
-            # We found a match! Trigger callback and then return the
-            # returned response. We pass both the request and any
-            # matched groups from the regex to the callback.
+            # We found a match! First update the metrics object to indicate
+            # which servlet is handling the request.
 
             callback = path_entry.callback
+
+            servlet_instance = getattr(callback, "__self__", None)
+            if servlet_instance is not None:
+                servlet_classname = servlet_instance.__class__.__name__
+            else:
+                servlet_classname = "%r" % callback
+
+            request_metrics.name = servlet_classname
+
+            # Now trigger the callback. If it returns a response, we send it
+            # here. If it throws an exception, that is handled by the wrapper
+            # installed by @request_handler.
 
             kwargs = intern_dict({
                 name: urllib.unquote(value).decode("UTF-8") if value else value
@@ -265,17 +280,10 @@ class JsonResource(HttpServer, resource.Resource):
                 code, response = callback_return
                 self._send_response(request, code, response)
 
-            servlet_instance = getattr(callback, "__self__", None)
-            if servlet_instance is not None:
-                servlet_classname = servlet_instance.__class__.__name__
-            else:
-                servlet_classname = "%r" % callback
-
-            request_metrics.name = servlet_classname
-
             return
 
         # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
+        request_metrics.name = self.__class__.__name__ + ".UnrecognizedRequest"
         raise UnrecognizedRequestError()
 
     def _send_response(self, request, code, response_json_object,
