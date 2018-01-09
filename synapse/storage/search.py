@@ -106,6 +106,7 @@ class SearchStore(BackgroundUpdateStore):
                 event_search_rows.append((event_id, room_id, key, value))
 
             if isinstance(self.database_engine, PostgresEngine):
+                txn.execute("SET work_mem='256KB'")
                 sql = (
                     "INSERT INTO event_search (event_id, room_id, key, vector)"
                     " VALUES (?,?,?,to_tsvector('english', ?))"
@@ -122,6 +123,9 @@ class SearchStore(BackgroundUpdateStore):
             for index in range(0, len(event_search_rows), INSERT_CLUMP_SIZE):
                 clump = event_search_rows[index:index + INSERT_CLUMP_SIZE]
                 txn.executemany(sql, clump)
+
+            if isinstance(self.database_engine, PostgresEngine):
+                txn.execute("RESET work_mem")
 
             progress = {
                 "target_min_stream_id_inclusive": target_min_stream_id,
