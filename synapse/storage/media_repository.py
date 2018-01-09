@@ -29,9 +29,6 @@ class MediaRepositoryStore(BackgroundUpdateStore):
             where_clause='url_cache IS NOT NULL',
         )
 
-    def get_default_thumbnails(self, top_level_type, sub_type):
-        return []
-
     def get_local_media(self, media_id):
         """Get the metadata for a local piece of media
         Returns:
