@@ -31,7 +31,7 @@ class SearchStore(BackgroundUpdateStore):
 
     EVENT_SEARCH_UPDATE_NAME = "event_search"
     EVENT_SEARCH_ORDER_UPDATE_NAME = "event_search_order"
-    EVENT_SEARCH_USE_GIST_POSTGRES_NAME = "event_search_postgres_gist"
+    EVENT_SEARCH_USE_GIN_POSTGRES_NAME = "event_search_postgres_gin"
 
     def __init__(self, db_conn, hs):
         super(SearchStore, self).__init__(db_conn, hs)
@@ -43,8 +43,8 @@ class SearchStore(BackgroundUpdateStore):
             self._background_reindex_search_order
         )
         self.register_background_update_handler(
-            self.EVENT_SEARCH_USE_GIST_POSTGRES_NAME,
-            self._background_reindex_gist_search
+            self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME,
+            self._background_reindex_gin_search
         )
 
     @defer.inlineCallbacks
@@ -145,25 +145,30 @@ class SearchStore(BackgroundUpdateStore):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def _background_reindex_gist_search(self, progress, batch_size):
+    def _background_reindex_gin_search(self, progress, batch_size):
+        '''This handles old synapses which used GIST indexes; converting them
+        back to be GIN as per the actual schema.  Otherwise it crashes out
+        as a NOOP
+        '''
+
         def create_index(conn):
             conn.rollback()
             conn.set_session(autocommit=True)
             c = conn.cursor()
 
             c.execute(
-                "CREATE INDEX CONCURRENTLY event_search_fts_idx_gist"
-                " ON event_search USING GIST (vector)"
+                "CREATE INDEX CONCURRENTLY event_search_fts_idx"
+                " ON event_search USING GIN (vector)"
             )
 
-            c.execute("DROP INDEX event_search_fts_idx")
+            c.execute("DROP INDEX event_search_fts_idx_gist")
 
             conn.set_session(autocommit=False)
 
         if isinstance(self.database_engine, PostgresEngine):
             yield self.runWithConnection(create_index)
 
-        yield self._end_background_update(self.EVENT_SEARCH_USE_GIST_POSTGRES_NAME)
+        yield self._end_background_update(self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME)
         defer.returnValue(1)
 
     @defer.inlineCallbacks
