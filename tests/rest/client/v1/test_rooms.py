@@ -515,9 +515,6 @@ class RoomsCreateTestCase(RestTestCase):
 
         synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
-    def tearDown(self):
-        pass
-
     @defer.inlineCallbacks
     def test_post_room_no_keys(self):
         # POST with no config keys, expect new room id
