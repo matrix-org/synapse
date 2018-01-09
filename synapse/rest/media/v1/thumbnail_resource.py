@@ -85,11 +85,6 @@ class ThumbnailResource(Resource):
             respond_404(request)
             return
 
-        # if media_info["media_type"] == "image/svg+xml":
-        #     file_path = self.filepaths.local_media_filepath(media_id)
-        #     yield respond_with_file(request, media_info["media_type"], file_path)
-        #     return
-
         thumbnail_infos = yield self.store.get_local_media_thumbnails(media_id)
 
         if thumbnail_infos:
@@ -114,9 +109,7 @@ class ThumbnailResource(Resource):
             yield respond_with_file(request, t_type, file_path)
 
         else:
-            yield self._respond_default_thumbnail(
-                request, media_info, width, height, method, m_type,
-            )
+            respond_404(request)
 
     @defer.inlineCallbacks
     def _select_or_generate_local_thumbnail(self, request, media_id, desired_width,
@@ -127,11 +120,6 @@ class ThumbnailResource(Resource):
         if not media_info or media_info["quarantined_by"]:
             respond_404(request)
             return
-
-        # if media_info["media_type"] == "image/svg+xml":
-        #     file_path = self.filepaths.local_media_filepath(media_id)
-        #     yield respond_with_file(request, media_info["media_type"], file_path)
-        #     return
 
         thumbnail_infos = yield self.store.get_local_media_thumbnails(media_id)
         for info in thumbnail_infos:
@@ -166,21 +154,13 @@ class ThumbnailResource(Resource):
         if file_path:
             yield respond_with_file(request, desired_type, file_path)
         else:
-            yield self._respond_default_thumbnail(
-                request, media_info, desired_width, desired_height,
-                desired_method, desired_type,
-            )
+            respond_404(request)
 
     @defer.inlineCallbacks
     def _select_or_generate_remote_thumbnail(self, request, server_name, media_id,
                                              desired_width, desired_height,
                                              desired_method, desired_type):
         media_info = yield self.media_repo.get_remote_media(server_name, media_id)
-
-        # if media_info["media_type"] == "image/svg+xml":
-        #     file_path = self.filepaths.remote_media_filepath(server_name, media_id)
-        #     yield respond_with_file(request, media_info["media_type"], file_path)
-        #     return
 
         thumbnail_infos = yield self.store.get_remote_media_thumbnails(
             server_name, media_id,
@@ -213,23 +193,13 @@ class ThumbnailResource(Resource):
         if file_path:
             yield respond_with_file(request, desired_type, file_path)
         else:
-            yield self._respond_default_thumbnail(
-                request, media_info, desired_width, desired_height,
-                desired_method, desired_type,
-            )
+            respond_404(request)
 
     @defer.inlineCallbacks
     def _respond_remote_thumbnail(self, request, server_name, media_id, width,
                                   height, method, m_type):
         # TODO: Don't download the whole remote file
         # We should proxy the thumbnail from the remote server instead.
-        media_info = yield self.media_repo.get_remote_media(server_name, media_id)
-
-        # if media_info["media_type"] == "image/svg+xml":
-        #     file_path = self.filepaths.remote_media_filepath(server_name, media_id)
-        #     yield respond_with_file(request, media_info["media_type"], file_path)
-        #     return
-
         thumbnail_infos = yield self.store.get_remote_media_thumbnails(
             server_name, media_id,
         )
@@ -250,47 +220,7 @@ class ThumbnailResource(Resource):
             )
             yield respond_with_file(request, t_type, file_path, t_length)
         else:
-            yield self._respond_default_thumbnail(
-                request, media_info, width, height, method, m_type,
-            )
-
-    @defer.inlineCallbacks
-    def _respond_default_thumbnail(self, request, media_info, width, height,
-                                   method, m_type):
-        # XXX: how is this meant to work? store.get_default_thumbnails
-        # appears to always return [] so won't this always 404?
-        media_type = media_info["media_type"]
-        top_level_type = media_type.split("/")[0]
-        sub_type = media_type.split("/")[-1].split(";")[0]
-        thumbnail_infos = yield self.store.get_default_thumbnails(
-            top_level_type, sub_type,
-        )
-        if not thumbnail_infos:
-            thumbnail_infos = yield self.store.get_default_thumbnails(
-                top_level_type, "_default",
-            )
-        if not thumbnail_infos:
-            thumbnail_infos = yield self.store.get_default_thumbnails(
-                "_default", "_default",
-            )
-        if not thumbnail_infos:
             respond_404(request)
-            return
-
-        thumbnail_info = self._select_thumbnail(
-            width, height, "crop", m_type, thumbnail_infos
-        )
-
-        t_width = thumbnail_info["thumbnail_width"]
-        t_height = thumbnail_info["thumbnail_height"]
-        t_type = thumbnail_info["thumbnail_type"]
-        t_method = thumbnail_info["thumbnail_method"]
-        t_length = thumbnail_info["thumbnail_length"]
-
-        file_path = self.filepaths.default_thumbnail(
-            top_level_type, sub_type, t_width, t_height, t_type, t_method,
-        )
-        yield respond_with_file(request, t_type, file_path, t_length)
 
     def _select_thumbnail(self, desired_width, desired_height, desired_method,
                           desired_type, thumbnail_infos):
