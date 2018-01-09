@@ -58,6 +58,10 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.email_enable_notifs = False
         config.block_non_admin_invites = False
 
+        # disable user directory updates, because they get done in the
+        # background, which upsets the test runner.
+        config.update_user_directory = False
+
     config.use_frozen_dicts = True
     config.database_config = {"name": "sqlite3"}
     config.ldap_enabled = False
