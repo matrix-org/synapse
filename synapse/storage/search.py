@@ -146,24 +146,28 @@ class SearchStore(BackgroundUpdateStore):
 
     @defer.inlineCallbacks
     def _background_reindex_gin_search(self, progress, batch_size):
-        '''This handles old synapses which used GIST indexes; converting them
-        back to be GIN as per the actual schema.  Otherwise it crashes out
-        as a NOOP
+        '''This handles old synapses which used GIST indexes, if any;
+        converting them back to be GIN as per the actual schema.
         '''
 
         def create_index(conn):
-            conn.rollback()
-            conn.set_session(autocommit=True)
-            c = conn.cursor()
+            try:
+                conn.rollback()
+                conn.set_session(autocommit=True)
+                c = conn.cursor()
 
-            c.execute(
-                "CREATE INDEX CONCURRENTLY event_search_fts_idx"
-                " ON event_search USING GIN (vector)"
-            )
+                c.execute(
+                    "CREATE INDEX CONCURRENTLY event_search_fts_idx"
+                    " ON event_search USING GIN (vector)"
+                )
 
-            c.execute("DROP INDEX event_search_fts_idx_gist")
+                c.execute("DROP INDEX event_search_fts_idx_gist")
 
-            conn.set_session(autocommit=False)
+                conn.set_session(autocommit=False)
+            except e:
+                logger.warn(
+                    "Ignoring error %s when trying to switch from GIST to GIN" % (e,)
+                )
 
         if isinstance(self.database_engine, PostgresEngine):
             yield self.runWithConnection(create_index)
