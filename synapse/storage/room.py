@@ -310,6 +310,7 @@ class RoomStore(SQLBaseStore):
 
     def _store_event_search_txn(self, txn, event, key, value):
         if isinstance(self.database_engine, PostgresEngine):
+            txn.execute("SET work_mem='256KB'")
             sql = (
                 "INSERT INTO event_search"
                 " (event_id, room_id, key, vector, stream_ordering, origin_server_ts)"
@@ -323,6 +324,7 @@ class RoomStore(SQLBaseStore):
                     event.origin_server_ts,
                 )
             )
+            txn.execute("RESET work_mem")
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
                 "INSERT INTO event_search (event_id, room_id, key, value)"
