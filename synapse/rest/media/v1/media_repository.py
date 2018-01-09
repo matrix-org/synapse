@@ -642,4 +642,6 @@ class MediaRepositoryResource(Resource):
         ))
         self.putChild("identicon", IdenticonResource())
         if hs.config.url_preview_enabled:
-            self.putChild("preview_url", PreviewUrlResource(hs, media_repo))
+            self.putChild("preview_url", PreviewUrlResource(
+                hs, media_repo, media_repo.media_storage,
+            ))
