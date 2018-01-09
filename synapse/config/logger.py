@@ -28,27 +28,27 @@ DEFAULT_LOG_CONFIG = Template("""
 version: 1
 
 formatters:
-  precise:
-   format: '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s\
-- %(message)s'
+    precise:
+        format: '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - \
+%(request)s - %(message)s'
 
 filters:
-  context:
-    (): synapse.util.logcontext.LoggingContextFilter
-    request: ""
+    context:
+        (): synapse.util.logcontext.LoggingContextFilter
+        request: ""
 
 handlers:
-  file:
-    class: logging.handlers.RotatingFileHandler
-    formatter: precise
-    filename: ${log_file}
-    maxBytes: 104857600
-    backupCount: 10
-    filters: [context]
-  console:
-    class: logging.StreamHandler
-    formatter: precise
-    filters: [context]
+    file:
+        class: logging.handlers.RotatingFileHandler
+        formatter: precise
+        filename: ${log_file}
+        maxBytes: 104857600
+        backupCount: 10
+        filters: [context]
+    console:
+        class: logging.StreamHandler
+        formatter: precise
+        filters: [context]
 
 loggers:
     synapse:
