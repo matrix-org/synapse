@@ -159,23 +159,18 @@ class RoomMemberHandler(BaseHandler):
     ):
         key = (room_id,)
 
-        as_id = object()
-        if requester.app_service:
-            as_id = requester.app_service.id
-
-        with (yield self.member_limiter.queue(as_id)):
-            with (yield self.member_linearizer.queue(key)):
-                result = yield self._update_membership(
-                    requester,
-                    target,
-                    room_id,
-                    action,
-                    txn_id=txn_id,
-                    remote_room_hosts=remote_room_hosts,
-                    third_party_signed=third_party_signed,
-                    ratelimit=ratelimit,
-                    content=content,
-                )
+        with (yield self.member_linearizer.queue(key)):
+            result = yield self._update_membership(
+                requester,
+                target,
+                room_id,
+                action,
+                txn_id=txn_id,
+                remote_room_hosts=remote_room_hosts,
+                third_party_signed=third_party_signed,
+                ratelimit=ratelimit,
+                content=content,
+            )
 
         defer.returnValue(result)
 
@@ -273,87 +268,94 @@ class RoomMemberHandler(BaseHandler):
                 if same_sender and same_membership and same_content:
                     defer.returnValue(old_state)
 
-        is_host_in_room = yield self._is_host_in_room(current_state_ids)
+        # hotfix branch limiter to ensure only join changes get limited
+        if requester.app_service:
+            as_id = requester.app_service.id
+        else:
+            as_id = object()  # no limit
 
-        if effective_membership_state == Membership.JOIN:
-            if requester.is_guest:
-                guest_can_join = yield self._can_guest_join(current_state_ids)
-                if not guest_can_join:
-                    # This should be an auth check, but guests are a local concept,
-                    # so don't really fit into the general auth process.
-                    raise AuthError(403, "Guest access not allowed")
+        with (yield self.member_limiter.queue(as_id)):
+            is_host_in_room = yield self._is_host_in_room(current_state_ids)
 
-            if not is_host_in_room:
-                inviter = yield self.get_inviter(target.to_string(), room_id)
-                if inviter and not self.hs.is_mine(inviter):
-                    remote_room_hosts.append(inviter.domain)
-
-                content["membership"] = Membership.JOIN
-
-                profile = self.profile_handler
-                if not content_specified:
-                    content["displayname"] = yield profile.get_displayname(target)
-                    content["avatar_url"] = yield profile.get_avatar_url(target)
-
+            if effective_membership_state == Membership.JOIN:
                 if requester.is_guest:
-                    content["kind"] = "guest"
+                    guest_can_join = yield self._can_guest_join(current_state_ids)
+                    if not guest_can_join:
+                        # This should be an auth check, but guests are a local concept,
+                        # so don't really fit into the general auth process.
+                        raise AuthError(403, "Guest access not allowed")
 
-                ret = yield self.remote_join(
-                    remote_room_hosts, room_id, target, content
-                )
-                defer.returnValue(ret)
+                if not is_host_in_room:
+                    inviter = yield self.get_inviter(target.to_string(), room_id)
+                    if inviter and not self.hs.is_mine(inviter):
+                        remote_room_hosts.append(inviter.domain)
 
-        elif effective_membership_state == Membership.LEAVE:
-            if not is_host_in_room:
-                # perhaps we've been invited
-                inviter = yield self.get_inviter(target.to_string(), room_id)
-                if not inviter:
-                    raise SynapseError(404, "Not a known room")
+                    content["membership"] = Membership.JOIN
 
-                if self.hs.is_mine(inviter):
-                    # the inviter was on our server, but has now left. Carry on
-                    # with the normal rejection codepath.
-                    #
-                    # This is a bit of a hack, because the room might still be
-                    # active on other servers.
-                    pass
-                else:
-                    # send the rejection to the inviter's HS.
-                    remote_room_hosts = remote_room_hosts + [inviter.domain]
-                    fed_handler = self.hs.get_handlers().federation_handler
-                    try:
-                        ret = yield fed_handler.do_remotely_reject_invite(
-                            remote_room_hosts,
-                            room_id,
-                            target.to_string(),
-                        )
-                        defer.returnValue(ret)
-                    except Exception as e:
-                        # if we were unable to reject the exception, just mark
-                        # it as rejected on our end and plough ahead.
+                    profile = self.profile_handler
+                    if not content_specified:
+                        content["displayname"] = yield profile.get_displayname(target)
+                        content["avatar_url"] = yield profile.get_avatar_url(target)
+
+                    if requester.is_guest:
+                        content["kind"] = "guest"
+
+                    ret = yield self.remote_join(
+                        remote_room_hosts, room_id, target, content
+                    )
+                    defer.returnValue(ret)
+
+            elif effective_membership_state == Membership.LEAVE:
+                if not is_host_in_room:
+                    # perhaps we've been invited
+                    inviter = yield self.get_inviter(target.to_string(), room_id)
+                    if not inviter:
+                        raise SynapseError(404, "Not a known room")
+
+                    if self.hs.is_mine(inviter):
+                        # the inviter was on our server, but has now left. Carry on
+                        # with the normal rejection codepath.
                         #
-                        # The 'except' clause is very broad, but we need to
-                        # capture everything from DNS failures upwards
-                        #
-                        logger.warn("Failed to reject invite: %s", e)
+                        # This is a bit of a hack, because the room might still be
+                        # active on other servers.
+                        pass
+                    else:
+                        # send the rejection to the inviter's HS.
+                        remote_room_hosts = remote_room_hosts + [inviter.domain]
+                        fed_handler = self.hs.get_handlers().federation_handler
+                        try:
+                            ret = yield fed_handler.do_remotely_reject_invite(
+                                remote_room_hosts,
+                                room_id,
+                                target.to_string(),
+                            )
+                            defer.returnValue(ret)
+                        except Exception as e:
+                            # if we were unable to reject the exception, just mark
+                            # it as rejected on our end and plough ahead.
+                            #
+                            # The 'except' clause is very broad, but we need to
+                            # capture everything from DNS failures upwards
+                            #
+                            logger.warn("Failed to reject invite: %s", e)
 
-                        yield self.store.locally_reject_invite(
-                            target.to_string(), room_id
-                        )
+                            yield self.store.locally_reject_invite(
+                                target.to_string(), room_id
+                            )
 
-                        defer.returnValue({})
+                            defer.returnValue({})
 
-        res = yield self._local_membership_update(
-            requester=requester,
-            target=target,
-            room_id=room_id,
-            membership=effective_membership_state,
-            txn_id=txn_id,
-            ratelimit=ratelimit,
-            prev_event_ids=latest_event_ids,
-            content=content,
-        )
-        defer.returnValue(res)
+            res = yield self._local_membership_update(
+                requester=requester,
+                target=target,
+                room_id=room_id,
+                membership=effective_membership_state,
+                txn_id=txn_id,
+                ratelimit=ratelimit,
+                prev_event_ids=latest_event_ids,
+                content=content,
+            )
+            defer.returnValue(res)
 
     @defer.inlineCallbacks
     def send_membership_event(
