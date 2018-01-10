@@ -130,7 +130,7 @@ class RegistrationHandler(BaseHandler):
         yield run_on_reactor()
         password_hash = None
         if password:
-            password_hash = self.auth_handler().hash(password)
+            password_hash = yield self.auth_handler().hash(password)
 
         if localpart:
             yield self.check_username(localpart, guest_access_token=guest_access_token)
