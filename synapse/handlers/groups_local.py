@@ -383,9 +383,10 @@ class GroupsLocalHandler(object):
 
             defer.returnValue({"groups": result})
         else:
-            result = yield self.transport_client.bulk_get_publicised_groups(
+            bulk_result = yield self.transport_client.bulk_get_publicised_groups(
                 get_domain_from_id(user_id), [user_id],
-            )["users"][user_id]
+            )
+            result = bulk_result.get("users", {}).get(user_id)
             # TODO: Verify attestations
             defer.returnValue({"groups": result})
 
