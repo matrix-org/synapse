@@ -425,6 +425,20 @@ class Porter(object):
             else:
                 return
 
+    def handle_state_group_seq(self):
+        """Updates postgres handle_state_group_seq with last state_group ID
+        """
+        def handle_state_group_seq_txn(txn):
+            txn.execute("""
+                SELECT setval('state_group_id_seq',
+                    SELECT COALESCE(MAX(id), 0) FROM state_groups
+                )
+            """)
+
+        return self.postgres_store.runInteraction(
+            "handle_state_group_seq", handle_state_group_seq_txn,
+        )
+
     def setup_db(self, db_config, database_engine):
         db_conn = database_engine.module.connect(
             **{
@@ -547,6 +561,8 @@ class Porter(object):
                 ],
                 consumeErrors=True,
             )
+
+            yield self.handle_state_group_seq()
 
             self.progress.done()
         except:
