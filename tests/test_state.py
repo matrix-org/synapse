@@ -99,6 +99,10 @@ class StateGroupStore(object):
         for e in events:
             self._event_id_to_event[e.event_id] = e
 
+    def store_state_group(self, *args, **kwargs):
+        self._next_group += 1
+        return self._next_group
+
 
 class DictObj(dict):
     def __init__(self, **kwargs):
@@ -144,6 +148,7 @@ class StateTestCase(unittest.TestCase):
                 "get_events",
                 "get_next_state_group",
                 "get_state_group_delta",
+                "store_state_group",
             ]
         )
         hs = Mock(spec_set=[
@@ -316,6 +321,7 @@ class StateTestCase(unittest.TestCase):
         store = StateGroupStore()
         self.store.get_state_groups_ids.side_effect = store.get_state_groups_ids
         self.store.get_events = store.get_events
+        self.store.store_state_group = store.store_state_group
         store.register_events(graph.walk())
 
         context_store = {}
@@ -399,6 +405,7 @@ class StateTestCase(unittest.TestCase):
         store = StateGroupStore()
         self.store.get_state_groups_ids.side_effect = store.get_state_groups_ids
         self.store.get_events = store.get_events
+        self.store.store_state_group = store.store_state_group
         store.register_events(graph.walk())
 
         context_store = {}
