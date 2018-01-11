@@ -1829,7 +1829,7 @@ class FederationHandler(BaseHandler):
                 different_auth = event_auth_events - current_state
 
                 self._update_context_for_auth_events(
-                    context, auth_events, event_key,
+                    event, context, auth_events, event_key,
                 )
 
         if different_auth and not event.internal_metadata.is_outlier():
@@ -1911,7 +1911,7 @@ class FederationHandler(BaseHandler):
                 # TODO.
 
                 self._update_context_for_auth_events(
-                    context, auth_events, event_key,
+                    event, context, auth_events, event_key,
                 )
 
         try:
@@ -1920,7 +1920,7 @@ class FederationHandler(BaseHandler):
             logger.warn("Failed auth resolution for %r because %s", event, e)
             raise e
 
-    def _update_context_for_auth_events(self, context, auth_events,
+    def _update_context_for_auth_events(self, event, context, auth_events,
                                         event_key):
         """Update the state_ids in an event context after auth event resolution
 
@@ -1947,7 +1947,13 @@ class FederationHandler(BaseHandler):
         context.prev_state_ids.update({
             k: a.event_id for k, a in auth_events.iteritems()
         })
-        context.state_group = self.store.get_next_state_group()
+
+        context.state_group = yield self.store.store_state_group(
+            event.event_id, event.room_id,
+            context.prev_group,
+            context.delta_ids,
+            context.current_state_ids,
+        )
 
     @defer.inlineCallbacks
     def construct_auth_difference(self, local_auth, remote_auth):
