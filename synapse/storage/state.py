@@ -656,8 +656,7 @@ class StateStore(StateGroupReadStore, BackgroundUpdateStore):
                 )
                 return
 
-            # FIXME Replace this with Postgres/SQLITE specific ID generation
-            state_group = 456
+            state_group = self.database_engine.get_next_state_group_id(txn)
 
             self._simple_insert_txn(
                 txn,
