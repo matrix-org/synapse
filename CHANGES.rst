@@ -1,3 +1,10 @@
+Unreleased
+==========
+
+synctl no longer starts the main synapse when using ``-a`` option with workers.
+A new worker file should be added with ``worker_app: synapse.app.homeserver``
+
+
 Changes in synapse v0.26.0 (2018-01-05)
 =======================================
 
