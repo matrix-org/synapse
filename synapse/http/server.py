@@ -68,10 +68,21 @@ response_db_txn_count = metrics.register_distribution(
     "response_db_txn_count", labels=["method", "servlet", "tag"]
 )
 
+# seconds spent waiting for db txns, excluding scheduling time, when processing
+# this request
 response_db_txn_duration = metrics.register_distribution(
     "response_db_txn_duration", labels=["method", "servlet", "tag"]
 )
 
+# seconds spent waiting for a db connection, when processing this request
+#
+# it's a counter rather than a distribution, because the count would always
+# be the same as that of all the other distributions.
+#
+# FIXME: use a floating-point rather than integer metric
+response_db_sched_duration = metrics.register_counter(
+    "response_db_sched_duration", labels=["method", "servlet", "tag"]
+)
 
 _next_request_id = 0
 
@@ -349,7 +360,10 @@ class RequestMetrics(object):
             context.db_txn_count, request.method, self.name, tag
         )
         response_db_txn_duration.inc_by(
-            context.db_txn_duration, request.method, self.name, tag
+            context.db_txn_duration_ms / 1000., request.method, self.name, tag
+        )
+        response_db_sched_duration.inc_by(
+            context.db_sched_duration_ms / 1000., request.method, self.name, tag
         )
 
 

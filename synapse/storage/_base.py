@@ -217,7 +217,6 @@ class SQLBaseStore(object):
 
     def _new_transaction(self, conn, desc, after_callbacks, final_callbacks,
                          logging_context, func, *args, **kwargs):
-        start = time.time() * 1000
         txn_id = self._TXN_ID
 
         # We don't really need these to be unique, so lets stop it from
@@ -277,21 +276,24 @@ class SQLBaseStore(object):
             logger.debug("[TXN FAIL] {%s} %s", name, e)
             raise
         finally:
-            end = time.time() * 1000
-            duration = end - start
-
-            if logging_context is not None:
-                logging_context.add_database_transaction(duration)
-
-            transaction_logger.debug("[TXN END] {%s} %f", name, duration)
-
-            self._current_txn_total_time += duration
-            self._txn_perf_counters.update(desc, start, end)
-            sql_txn_timer.inc_by(duration, desc)
+            transaction_logger.debug("[TXN END] {%s}", name)
 
     @defer.inlineCallbacks
     def runInteraction(self, desc, func, *args, **kwargs):
-        """Wraps the .runInteraction() method on the underlying db_pool."""
+        """Starts a transaction on the database and runs a given function
+
+        Arguments:
+            desc (str): description of the transaction, for logging and metrics
+            func (func): callback function, which will be called with a
+                database transaction (twisted.enterprise.adbapi.Transaction) as
+                its first argument, followed by `args` and `kwargs`.
+
+            args (list): positional args to pass to `func`
+            kwargs (dict): named args to pass to `func`
+
+        Returns:
+            Deferred: The result of func
+        """
         current_context = LoggingContext.current_context()
 
         start_time = time.time() * 1000
@@ -301,17 +303,32 @@ class SQLBaseStore(object):
 
         def inner_func(conn, *args, **kwargs):
             with LoggingContext("runInteraction") as context:
-                sql_scheduling_timer.inc_by(time.time() * 1000 - start_time)
+                sched_delay_ms = time.time() * 1000 - start_time
+                sql_scheduling_timer.inc_by(sched_delay_ms)
 
                 if self.database_engine.is_connection_closed(conn):
                     logger.debug("Reconnecting closed database connection")
                     conn.reconnect()
 
                 current_context.copy_to(context)
-                return self._new_transaction(
-                    conn, desc, after_callbacks, final_callbacks, current_context,
-                    func, *args, **kwargs
-                )
+                txn_start_time_ms = time.time() * 1000
+                try:
+                    return self._new_transaction(
+                        conn, desc, after_callbacks, final_callbacks, current_context,
+                        func, *args, **kwargs
+                    )
+                finally:
+                    txn_end_time_ms = time.time() * 1000
+                    txn_duration = txn_end_time_ms - txn_start_time_ms
+
+                    current_context.add_database_transaction(
+                        txn_duration, sched_delay_ms,
+                    )
+                    self._current_txn_total_time += txn_duration
+                    self._txn_perf_counters.update(
+                        desc, txn_start_time_ms, txn_end_time_ms,
+                    )
+                    sql_txn_timer.inc_by(txn_duration, desc)
 
         try:
             with PreserveLoggingContext():
@@ -329,7 +346,7 @@ class SQLBaseStore(object):
 
     @defer.inlineCallbacks
     def runWithConnection(self, func, *args, **kwargs):
-        """Wraps the .runInteraction() method on the underlying db_pool."""
+        """Wraps the .runWithConnection() method on the underlying db_pool."""
         current_context = LoggingContext.current_context()
 
         start_time = time.time() * 1000

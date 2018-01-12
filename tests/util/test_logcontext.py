@@ -12,12 +12,12 @@ class LoggingContextTestCase(unittest.TestCase):
 
     def _check_test_key(self, value):
         self.assertEquals(
-            LoggingContext.current_context().test_key, value
+            LoggingContext.current_context().request, value
         )
 
     def test_with_context(self):
         with LoggingContext() as context_one:
-            context_one.test_key = "test"
+            context_one.request = "test"
             self._check_test_key("test")
 
     @defer.inlineCallbacks
@@ -25,14 +25,14 @@ class LoggingContextTestCase(unittest.TestCase):
         @defer.inlineCallbacks
         def competing_callback():
             with LoggingContext() as competing_context:
-                competing_context.test_key = "competing"
+                competing_context.request = "competing"
                 yield sleep(0)
                 self._check_test_key("competing")
 
         reactor.callLater(0, competing_callback)
 
         with LoggingContext() as context_one:
-            context_one.test_key = "one"
+            context_one.request = "one"
             yield sleep(0)
             self._check_test_key("one")
 
@@ -43,14 +43,14 @@ class LoggingContextTestCase(unittest.TestCase):
 
         @defer.inlineCallbacks
         def cb():
-            context_one.test_key = "one"
+            context_one.request = "one"
             yield function()
             self._check_test_key("one")
 
             callback_completed[0] = True
 
         with LoggingContext() as context_one:
-            context_one.test_key = "one"
+            context_one.request = "one"
 
             # fire off function, but don't wait on it.
             logcontext.preserve_fn(cb)()
@@ -107,7 +107,7 @@ class LoggingContextTestCase(unittest.TestCase):
         sentinel_context = LoggingContext.current_context()
 
         with LoggingContext() as context_one:
-            context_one.test_key = "one"
+            context_one.request = "one"
 
             d1 = logcontext.make_deferred_yieldable(blocking_function())
             # make sure that the context was reset by make_deferred_yieldable
@@ -124,7 +124,7 @@ class LoggingContextTestCase(unittest.TestCase):
         argument isn't actually a deferred"""
 
         with LoggingContext() as context_one:
-            context_one.test_key = "one"
+            context_one.request = "one"
 
             d1 = logcontext.make_deferred_yieldable("bum")
             self._check_test_key("one")
