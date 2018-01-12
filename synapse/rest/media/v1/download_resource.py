@@ -32,11 +32,8 @@ class DownloadResource(Resource):
     def __init__(self, hs, media_repo):
         Resource.__init__(self)
 
-        self.filepaths = media_repo.filepaths
         self.media_repo = media_repo
         self.server_name = hs.hostname
-        self.store = hs.get_datastore()
-        self.version_string = hs.version_string
         self.clock = hs.get_clock()
 
     def render_GET(self, request):
