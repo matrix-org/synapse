@@ -30,6 +30,12 @@ logger = logging.getLogger(__name__)
 
 class MediaStorage(object):
     """Responsible for storing/fetching files from local sources.
+
+    Args:
+        local_media_directory (str): Base path where we store media on disk
+        filepaths (MediaFilePaths)
+        storage_providers ([StorageProvider]): List of StorageProvider that are
+            used to fetch and store files.
     """
 
     def __init__(self, local_media_directory, filepaths, storage_providers):
@@ -68,9 +74,16 @@ class MediaStorage(object):
         """Context manager used to get a file like object to write into, as
         described by file_info.
 
-        Actually yields a 3-tuple (file, fname, finish_cb), where finish_cb is a
-        function that returns a Deferred that must be waited on after the file
-        has been successfully written to.
+        Actually yields a 3-tuple (file, fname, finish_cb), where file is a file
+        like object that can be written to, fname is the absolute path of file
+        on disk, and finish_cb is a function that returns a Deferred.
+
+        fname can be used to read the contents from after upload, e.g. to
+        generate thumbnails.
+
+        finish_cb must be called and waited on after the file has been
+        successfully been written to. Should not be called if there was an
+        error.
 
         Args:
             file_info (FileInfo): Info about the file to store
@@ -109,7 +122,7 @@ class MediaStorage(object):
             raise e
 
         if not finished_called:
-            raise Exception("Fnished callback not called")
+            raise Exception("Finished callback not called")
 
     @defer.inlineCallbacks
     def fetch_media(self, file_info):
@@ -120,7 +133,7 @@ class MediaStorage(object):
             file_info (FileInfo)
 
         Returns:
-            Deferred(Responder): Returns a Responder if the file was found,
+            Deferred[Responder|None]: Returns a Responder if the file was found,
                 otherwise None.
         """
 
@@ -138,6 +151,15 @@ class MediaStorage(object):
 
     def _file_info_to_path(self, file_info):
         """Converts file_info into a relative path.
+
+        The path is suitable for storing files under a directory, e.g. used to
+        store files on local FS under the base media repository directory.
+
+        Args:
+            file_info (FileInfo)
+
+        Returns:
+            str
         """
         if file_info.url_cache:
             return self.filepaths.url_cache_filepath_rel(file_info.file_id)

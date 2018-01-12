@@ -134,9 +134,9 @@ def respond_with_responder(request, responder, media_type, file_size, upload_nam
 
     Args:
         request (twisted.web.http.Request)
-        responder (Responder)
+        responder (Responder|None)
         media_type (str): The media/content type.
-        file_size (int): Size in bytes of the media, if known.
+        file_size (int): Size in bytes of the media. If not known it should be None
         upload_name (str): The name of the requested file, if any.
     """
     if not responder:
@@ -179,13 +179,12 @@ class FileInfo(object):
             or None if local.
         file_id (str): The local ID of the file. For local files this is the
             same as the media_id
-        media_type (str): Type of the file
         url_cache (bool): If the file is for the url preview cache
         thumbnail (bool): Whether the file is a thumbnail or not.
         thumbnail_width (int)
         thumbnail_height (int)
-        thumbnail_method (int)
-        thumbnail_type (str)
+        thumbnail_method (str)
+        thumbnail_type (str): Content type of thumbnail, e.g. image/png
     """
     def __init__(self, server_name, file_id, url_cache=False,
                  thumbnail=False, thumbnail_width=None, thumbnail_height=None,

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vecotr Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -76,7 +76,7 @@ class MediaRepository(object):
 
         self.recently_accessed_remotes = set()
 
-        # List of StorageProvider's where we should search for media and
+        # List of StorageProviders where we should search for media and
         # potentially upload to.
         self.storage_providers = []
 
@@ -158,6 +158,16 @@ class MediaRepository(object):
     @defer.inlineCallbacks
     def get_local_media(self, request, media_id, name):
         """Responds to reqests for local media, if exists, or returns 404.
+
+        Args:
+            request(twisted.web.http.Request)
+            media_id (str)
+            name (str|None): Optional name that, if specified, will be used as
+                the filename in the Content-Disposition header of the response.
+
+        Retruns:
+            Deferred: Resolves once a response has successfully been written
+                to request
         """
         media_info = yield self.store.get_local_media(media_id)
         if not media_info or media_info["quarantined_by"]:
@@ -182,18 +192,29 @@ class MediaRepository(object):
     @defer.inlineCallbacks
     def get_remote_media(self, request, server_name, media_id, name):
         """Respond to requests for remote media.
+
+        Args:
+            request(twisted.web.http.Request)
+            server_name (str): Remote server_name where the media originated.
+            media_id (str)
+            name (str|None): Optional name that, if specified, will be used as
+                the filename in the Content-Disposition header of the response.
+
+        Retruns:
+            Deferred: Resolves once a response has successfully been written
+                to request
         """
         self.recently_accessed_remotes.add((server_name, media_id))
 
         # We linearize here to ensure that we don't try and download remote
-        # media mutliple times concurrently
+        # media multiple times concurrently
         key = (server_name, media_id)
         with (yield self.remote_media_linearizer.queue(key)):
             responder, media_info = yield self._get_remote_media_impl(
                 server_name, media_id,
             )
 
-        # We purposefully stream the file outside the lock
+        # We deliberately stream the file outside the lock
         if responder:
             media_type = media_info["media_type"]
             media_length = media_info["media_length"]
@@ -210,7 +231,7 @@ class MediaRepository(object):
         download from remote server.
 
         Returns:
-            Deferred((Respodner, media_info))
+            Deferred[(Responder, media_info)]
         """
         media_info = yield self.store.get_cached_remote_media(
             server_name, media_id
@@ -251,6 +272,14 @@ class MediaRepository(object):
     def _download_remote_file(self, server_name, media_id, file_id):
         """Attempt to download the remote file from the given server name,
         using the given file_id as the local id.
+
+        Args:
+            server_name (str): Originating server
+            media_id (str)
+            file_id (str): Local file ID
+
+        Returns:
+            Deferred[MediaInfo]
         """
 
         file_info = FileInfo(
