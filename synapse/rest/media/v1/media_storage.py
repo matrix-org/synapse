@@ -220,8 +220,7 @@ class FileResponder(Responder):
 
     @defer.inlineCallbacks
     def write_to_consumer(self, consumer):
-        with self.open_file:
-            yield FileSender().beginFileTransfer(self.open_file, consumer)
+        yield FileSender().beginFileTransfer(self.open_file, consumer)
 
-    def cancel(self):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self.open_file.close()

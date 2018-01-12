@@ -144,15 +144,16 @@ def respond_with_responder(request, responder, media_type, file_size, upload_nam
         return
 
     add_file_headers(request, media_type, file_size, upload_name)
-    yield responder.write_to_consumer(request)
+    with responder:
+        yield responder.write_to_consumer(request)
     finish_request(request)
 
 
 class Responder(object):
     """Represents a response that can be streamed to the requester.
 
-    Either `write_to_consumer` or `cancel` must be called to clean up any open
-    resources.
+    Responder is a context manager which *must* be used, so that any resources
+    held can be cleaned up.
     """
     def write_to_consumer(self, consumer):
         """Stream response into consumer
@@ -165,9 +166,10 @@ class Responder(object):
         """
         pass
 
-    def cancel(self):
-        """Called when the responder is not going to be used after all.
-        """
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
         pass
 
 
