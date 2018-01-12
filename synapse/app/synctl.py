@@ -207,11 +207,19 @@ def main():
             # We need to special case all of this to pick up options that may
             # be set in the main config file or in this worker config file.
             worker_pidfile = (
-                worker_config.get("worker_pid_file")
-                or worker_config("pid_file")
+                worker_config.get("pid_file")
                 or pidfile
             )
             worker_cache_factor = worker_config.get("synctl_cache_factor") or cache_factor
+            daemonize = worker_config.get("daemonize") or config.get("daemonize")
+            assert daemonize, "Main process must have daemonize set to true"
+
+            # The master process doesn't support using worker_* config.
+            for key in worker_config:
+                if key == "worker_app":  # But we allow worker_app
+                    continue
+                assert not key.startswith("worker_"), \
+                    "Main process cannot use worker_* config"
         else:
             worker_pidfile = worker_config["worker_pid_file"]
             worker_daemonize = worker_config["worker_daemonize"]
