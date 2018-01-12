@@ -263,10 +263,7 @@ class MediaRepository(object):
         )
 
         responder = yield self.media_storage.fetch_media(file_info)
-        if responder:
-            defer.returnValue((responder, media_info))
-
-        defer.returnValue((None, media_info))
+        defer.returnValue((responder, media_info))
 
     @defer.inlineCallbacks
     def _download_remote_file(self, server_name, media_id, file_id):
