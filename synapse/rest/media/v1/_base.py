@@ -136,8 +136,8 @@ def respond_with_responder(request, responder, media_type, file_size, upload_nam
         request (twisted.web.http.Request)
         responder (Responder|None)
         media_type (str): The media/content type.
-        file_size (int): Size in bytes of the media. If not known it should be None
-        upload_name (str): The name of the requested file, if any.
+        file_size (int|None): Size in bytes of the media. If not known it should be None
+        upload_name (str|None): The name of the requested file, if any.
     """
     if not responder:
         respond_404(request)

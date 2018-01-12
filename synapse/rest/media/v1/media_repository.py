@@ -161,11 +161,12 @@ class MediaRepository(object):
 
         Args:
             request(twisted.web.http.Request)
-            media_id (str)
+            media_id (str): The media ID of the content. (This is the same as
+                the file_id for local content.)
             name (str|None): Optional name that, if specified, will be used as
                 the filename in the Content-Disposition header of the response.
 
-        Retruns:
+        Returns:
             Deferred: Resolves once a response has successfully been written
                 to request
         """
@@ -196,11 +197,12 @@ class MediaRepository(object):
         Args:
             request(twisted.web.http.Request)
             server_name (str): Remote server_name where the media originated.
-            media_id (str)
+            media_id (str): The media ID of the content (as defined by the
+                remote server).
             name (str|None): Optional name that, if specified, will be used as
                 the filename in the Content-Disposition header of the response.
 
-        Retruns:
+        Returns:
             Deferred: Resolves once a response has successfully been written
                 to request
         """
@@ -229,6 +231,11 @@ class MediaRepository(object):
     def _get_remote_media_impl(self, server_name, media_id):
         """Looks for media in local cache, if not there then attempt to
         download from remote server.
+
+        Args:
+            server_name (str): Remote server_name where the media originated.
+            media_id (str): The media ID of the content (as defined by the
+                remote server).
 
         Returns:
             Deferred[(Responder, media_info)]
@@ -272,7 +279,9 @@ class MediaRepository(object):
 
         Args:
             server_name (str): Originating server
-            media_id (str)
+            media_id (str): The media ID of the content (as defined by the
+                remote server). This is different than the file_id, which is
+                locally generated.
             file_id (str): Local file ID
 
         Returns:
