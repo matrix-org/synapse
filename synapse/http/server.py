@@ -80,7 +80,7 @@ response_db_txn_duration = metrics.register_distribution(
 # be the same as that of all the other distributions.
 #
 # FIXME: use a floating-point rather than integer metric
-response_db_sched_duration = metrics.register_distribution(
+response_db_sched_duration = metrics.register_counter(
     "response_db_sched_duration", labels=["method", "servlet", "tag"]
 )
 
