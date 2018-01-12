@@ -59,7 +59,8 @@ class LoggingContext(object):
 
     __slots__ = [
         "previous_context", "name", "ru_stime", "ru_utime",
-        "db_txn_count", "db_txn_duration_ms", "usage_start", "usage_end",
+        "db_txn_count", "db_txn_duration_ms", "db_sched_duration_ms",
+        "usage_start", "usage_end",
         "main_thread", "alive",
         "request", "tag",
     ]
@@ -86,6 +87,9 @@ class LoggingContext(object):
         def add_database_transaction(self, duration_ms):
             pass
 
+        def add_database_scheduled(self, sched_ms):
+            pass
+
         def __nonzero__(self):
             return False
 
@@ -100,6 +104,9 @@ class LoggingContext(object):
 
         # ms spent waiting for db txns, excluding scheduling time
         self.db_txn_duration_ms = 0
+
+        # ms spent waiting for db txns to be scheduled
+        self.db_sched_duration_ms = 0
 
         self.usage_start = None
         self.usage_end = None
@@ -209,6 +216,15 @@ class LoggingContext(object):
     def add_database_transaction(self, duration_ms):
         self.db_txn_count += 1
         self.db_txn_duration_ms += duration_ms
+
+    def add_database_scheduled(self, sched_ms):
+        """Record a use of the database pool
+
+        Args:
+            sched_ms (int): number of milliseconds it took us to get a
+                connection
+        """
+        self.db_sched_duration_ms += sched_ms
 
 
 class LoggingContextFilter(logging.Filter):
