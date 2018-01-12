@@ -211,21 +211,16 @@ def main():
                 or worker_config("pid_file")
                 or pidfile
             )
-            workers.append(Worker(
-                "synapse.app.homeserver",
-                worker_configfile,
-                worker_pidfile,
-                worker_config.get("synctl_cache_factor") or cache_factor,
-            ))
+            worker_cache_factor = worker_config.get("synctl_cache_factor") or cache_factor
         else:
             worker_pidfile = worker_config["worker_pid_file"]
             worker_daemonize = worker_config["worker_daemonize"]
             assert worker_daemonize, "In config %r: expected '%s' to be True" % (
                 worker_configfile, "worker_daemonize")
             worker_cache_factor = worker_config.get("synctl_cache_factor")
-            workers.append(Worker(
-                worker_app, worker_configfile, worker_pidfile, worker_cache_factor,
-            ))
+        workers.append(Worker(
+            worker_app, worker_configfile, worker_pidfile, worker_cache_factor,
+        ))
 
     action = options.action
 
