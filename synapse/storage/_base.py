@@ -321,7 +321,9 @@ class SQLBaseStore(object):
                     txn_end_time_ms = time.time() * 1000
                     txn_duration = txn_end_time_ms - txn_start_time_ms
 
-                    current_context.add_database_transaction(txn_duration)
+                    current_context.add_database_transaction(
+                        txn_duration, sched_delay_ms,
+                    )
                     self._current_txn_total_time += txn_duration
                     self._txn_perf_counters.update(
                         desc, txn_start_time_ms, txn_end_time_ms,

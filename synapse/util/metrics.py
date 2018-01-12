@@ -49,6 +49,16 @@ block_db_txn_duration = metrics.register_distribution(
     "block_db_txn_duration", labels=["block_name"]
 )
 
+# seconds spent waiting for a db connection, in this block
+#
+# it's a counter rather than a distribution, because the count would always
+# be the same as that of all the other distributions.
+#
+# FIXME: use a floating-point rather than integer metric
+block_db_sched_duration = metrics.register_counter(
+    "block_db_sched_duration", labels=["block_name"]
+)
+
 
 def measure_func(name):
     def wrapper(func):
@@ -65,7 +75,9 @@ def measure_func(name):
 class Measure(object):
     __slots__ = [
         "clock", "name", "start_context", "start", "new_context", "ru_utime",
-        "ru_stime", "db_txn_count", "db_txn_duration_ms", "created_context"
+        "ru_stime",
+        "db_txn_count", "db_txn_duration_ms", "db_sched_duration_ms",
+        "created_context",
     ]
 
     def __init__(self, clock, name):
@@ -86,6 +98,7 @@ class Measure(object):
         self.ru_utime, self.ru_stime = self.start_context.get_resource_usage()
         self.db_txn_count = self.start_context.db_txn_count
         self.db_txn_duration_ms = self.start_context.db_txn_duration_ms
+        self.db_sched_duration_ms = self.start_context.db_sched_duration_ms
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if isinstance(exc_type, Exception) or not self.start_context:
@@ -116,6 +129,10 @@ class Measure(object):
         )
         block_db_txn_duration.inc_by(
             (context.db_txn_duration_ms - self.db_txn_duration_ms) / 1000.,
+            self.name
+        )
+        block_db_sched_duration.inc_by(
+            (context.db_sched_duration_ms - self.db_sched_duration_ms) / 1000.,
             self.name
         )
 
