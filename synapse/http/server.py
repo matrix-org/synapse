@@ -42,34 +42,35 @@ logger = logging.getLogger(__name__)
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 
-incoming_requests_counter = metrics.register_counter(
-    "requests",
-    labels=["method", "servlet", "tag"],
-)
-outgoing_responses_counter = metrics.register_counter(
+response_code_counter = metrics.register_counter(
     "responses",
     labels=["method", "code"],
 )
 
-response_timer = metrics.register_distribution(
-    "response_time",
+response_counter = metrics.register_counter(
+    "response_count",
+    labels=["method", "servlet", "tag"],
+)
+
+response_timer = metrics.register_counter(
+    "response_time_seconds",
     labels=["method", "servlet", "tag"]
 )
 
-response_ru_utime = metrics.register_distribution(
-    "response_ru_utime", labels=["method", "servlet", "tag"]
+response_ru_utime = metrics.register_counter(
+    "response_ru_utime_seconds", labels=["method", "servlet", "tag"]
 )
 
-response_ru_stime = metrics.register_distribution(
-    "response_ru_stime", labels=["method", "servlet", "tag"]
+response_ru_stime = metrics.register_counter(
+    "response_ru_stime_seconds", labels=["method", "servlet", "tag"]
 )
 
-response_db_txn_count = metrics.register_distribution(
+response_db_txn_count = metrics.register_counter(
     "response_db_txn_count", labels=["method", "servlet", "tag"]
 )
 
-response_db_txn_duration = metrics.register_distribution(
-    "response_db_txn_duration", labels=["method", "servlet", "tag"]
+response_db_txn_duration = metrics.register_counter(
+    "response_db_txn_duration_seconds", labels=["method", "servlet", "tag"]
 )
 
 
@@ -129,7 +130,7 @@ def wrap_request_handler(request_handler, include_metrics=False):
                             )
                         else:
                             logger.exception(e)
-                        outgoing_responses_counter.inc(request.method, str(code))
+                        response_code_counter.inc(request.method, str(code))
                         respond_with_json(
                             request, code, cs_exception(e), send_cors=True,
                             pretty_print=_request_user_agent_is_curl(request),
@@ -297,7 +298,7 @@ class JsonResource(HttpServer, resource.Resource):
                 request)
             return
 
-        outgoing_responses_counter.inc(request.method, str(code))
+        response_code_counter.inc(request.method, str(code))
 
         # TODO: Only enable CORS for the requests that need it.
         respond_with_json(
@@ -330,7 +331,7 @@ class RequestMetrics(object):
                 )
                 return
 
-        incoming_requests_counter.inc(request.method, self.name, tag)
+        response_counter.inc(request.method, self.name, tag)
 
         response_timer.inc_by(
             clock.time_msec() - self.start, request.method,
