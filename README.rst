@@ -632,6 +632,11 @@ largest boxes pause for thought.)
 
 Troubleshooting
 ---------------
+
+You can use the federation tester to check if your homeserver is all set:
+``https://matrix.org/federationtester/api/report?server_name=<your_server_name>``
+If any of the attributes under "checks" is false, federation won't work.
+
 The typical failure mode with federation is that when you try to join a room,
 it is rejected with "401: Unauthorized". Generally this means that other
 servers in the room couldn't access yours. (Joining a room over federation is a
