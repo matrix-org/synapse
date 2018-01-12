@@ -78,7 +78,7 @@ class MediaRepository(object):
 
         # List of StorageProviders where we should search for media and
         # potentially upload to.
-        self.storage_providers = []
+        storage_providers = []
 
         # TODO: Move this into config and allow other storage providers to be
         # defined.
@@ -92,10 +92,10 @@ class MediaRepository(object):
                 store_synchronous=hs.config.synchronous_backup_media_store,
                 store_remote=True,
             )
-            self.storage_providers.append(provider)
+            storage_providers.append(provider)
 
         self.media_storage = MediaStorage(
-            self.primary_base_path, self.filepaths, self.storage_providers,
+            self.primary_base_path, self.filepaths, storage_providers,
         )
 
         self.clock.looping_call(
