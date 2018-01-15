@@ -27,25 +27,30 @@ logger = logging.getLogger(__name__)
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 
-block_timer = metrics.register_distribution(
-    "block_timer",
+block_count = metrics.register_counter(
+    "block_count",
     labels=["block_name"]
 )
 
-block_ru_utime = metrics.register_distribution(
-    "block_ru_utime", labels=["block_name"]
+block_timer = metrics.register_counter(
+    "block_time_seconds",
+    labels=["block_name"]
 )
 
-block_ru_stime = metrics.register_distribution(
-    "block_ru_stime", labels=["block_name"]
+block_ru_utime = metrics.register_counter(
+    "block_ru_utime_seconds", labels=["block_name"]
 )
 
-block_db_txn_count = metrics.register_distribution(
+block_ru_stime = metrics.register_counter(
+    "block_ru_stime_seconds", labels=["block_name"]
+)
+
+block_db_txn_count = metrics.register_counter(
     "block_db_txn_count", labels=["block_name"]
 )
 
-block_db_txn_duration = metrics.register_distribution(
-    "block_db_txn_duration", labels=["block_name"]
+block_db_txn_duration = metrics.register_counter(
+    "block_db_txn_duration_seconds", labels=["block_name"]
 )
 
 
@@ -91,6 +96,8 @@ class Measure(object):
             return
 
         duration = self.clock.time_msec() - self.start
+
+        block_count.inc(self.name)
         block_timer.inc_by(duration, self.name)
 
         context = LoggingContext.current_context()
