@@ -82,6 +82,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(RoomStateEventRestServlet, self).__init__(hs)
         self.handlers = hs.get_handlers()
+        self.event_creation_hander = hs.get_event_creation_handler()
 
     def register(self, http_server):
         # /room/$roomid/state/$eventtype
@@ -162,15 +163,16 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
                 content=content,
             )
         else:
-            msg_handler = self.handlers.message_handler
-            event, context = yield msg_handler.create_event(
+            event, context = yield self.event_creation_hander.create_event(
                 requester,
                 event_dict,
                 token_id=requester.access_token_id,
                 txn_id=txn_id,
             )
 
-            yield msg_handler.send_nonmember_event(requester, event, context)
+            yield self.event_creation_hander.send_nonmember_event(
+                requester, event, context,
+            )
 
         ret = {}
         if event:
@@ -184,6 +186,7 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(RoomSendEventRestServlet, self).__init__(hs)
         self.handlers = hs.get_handlers()
+        self.event_creation_hander = hs.get_event_creation_handler()
 
     def register(self, http_server):
         # /rooms/$roomid/send/$event_type[/$txn_id]
@@ -195,8 +198,7 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         content = parse_json_object_from_request(request)
 
-        msg_handler = self.handlers.message_handler
-        event = yield msg_handler.create_and_send_nonmember_event(
+        event = yield self.event_creation_hander.create_and_send_nonmember_event(
             requester,
             {
                 "type": event_type,
@@ -665,6 +667,7 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(RoomRedactEventRestServlet, self).__init__(hs)
         self.handlers = hs.get_handlers()
+        self.event_creation_handler = hs.get_event_creation_handler()
 
     def register(self, http_server):
         PATTERNS = ("/rooms/(?P<room_id>[^/]*)/redact/(?P<event_id>[^/]*)")
@@ -675,8 +678,7 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         content = parse_json_object_from_request(request)
 
-        msg_handler = self.handlers.message_handler
-        event = yield msg_handler.create_and_send_nonmember_event(
+        event = yield self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
                 "type": EventTypes.Redaction,
