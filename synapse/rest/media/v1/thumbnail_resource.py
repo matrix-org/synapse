@@ -129,18 +129,10 @@ class ThumbnailResource(Resource):
             t_type = info["thumbnail_type"] == desired_type
 
             if t_w and t_h and t_method and t_type:
-                if media_info["url_cache"]:
-                    # TODO: Check the file still exists, if it doesn't we can redownload
-                    # it from the url `media_info["url_cache"]`
-                    file_path = self.filepaths.url_cache_thumbnail(
-                        media_id, desired_width, desired_height, desired_type,
-                        desired_method,
-                    )
-                else:
-                    file_path = self.filepaths.local_media_thumbnail(
-                        media_id, desired_width, desired_height, desired_type,
-                        desired_method,
-                    )
+                file_path = self.filepaths.local_media_thumbnail(
+                    media_id, desired_width, desired_height, desired_type,
+                    desired_method,
+                )
                 yield respond_with_file(request, desired_type, file_path)
                 return
 
@@ -148,7 +140,8 @@ class ThumbnailResource(Resource):
 
         # Okay, so we generate one.
         file_path = yield self.media_repo.generate_local_exact_thumbnail(
-            media_id, desired_width, desired_height, desired_method, desired_type
+            media_id, desired_width, desired_height, desired_method, desired_type,
+            media_info["url_cache"]
         )
 
         if file_path:
