@@ -50,7 +50,14 @@ class BaseMetric(object):
 
 class CounterMetric(BaseMetric):
     """The simplest kind of metric; one that stores a monotonically-increasing
-    integer that counts events."""
+    value that counts events or running totals.
+
+    Example use cases for Counters:
+    - Number of requests processed
+    - Number of items that were inserted into a queue
+    - Total amount of data that a system has processed
+    Counters can only go up (and be reset when the process restarts).
+    """
 
     def __init__(self, *args, **kwargs):
         super(CounterMetric, self).__init__(*args, **kwargs)
@@ -59,7 +66,7 @@ class CounterMetric(BaseMetric):
 
         # Scalar metrics are never empty
         if self.is_scalar():
-            self.counts[()] = 0
+            self.counts[()] = 0.
 
     def inc_by(self, incr, *values):
         if len(values) != self.dimension():
@@ -78,7 +85,7 @@ class CounterMetric(BaseMetric):
         self.inc_by(1, *values)
 
     def render_item(self, k):
-        return ["%s%s %d" % (self.name, self._render_key(k), self.counts[k])]
+        return ["%s%s %.12g" % (self.name, self._render_key(k), self.counts[k])]
 
     def render(self):
         return map_concat(self.render_item, sorted(self.counts.keys()))
