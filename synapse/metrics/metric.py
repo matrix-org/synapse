@@ -17,24 +17,33 @@
 from itertools import chain
 
 
-# TODO(paul): I can't believe Python doesn't have one of these
-def map_concat(func, items):
-    # flatten a list-of-lists
-    return list(chain.from_iterable(map(func, items)))
+def flatten(items):
+    """Flatten a list of lists
+
+    Args:
+        items: iterable[iterable[X]]
+
+    Returns:
+        list[X]: flattened list
+    """
+    return list(chain.from_iterable(items))
 
 
 class BaseMetric(object):
     """Base class for metrics which report a single value per label set
     """
 
-    def __init__(self, name, labels=[]):
+    def __init__(self, name, labels=[], alternative_names=[]):
         """
         Args:
             name (str): principal name for this metric
             labels (list(str)): names of the labels which will be reported
                 for this metric
+            alternative_names (iterable(str)): list of alternative names for
+                 this metric. This can be useful to provide a migration path
+                when renaming metrics.
         """
-        self.name = name
+        self._names = [name] + list(alternative_names)
         self.labels = labels  # OK not to clone as we never write it
 
     def dimension(self):
@@ -53,6 +62,22 @@ class BaseMetric(object):
         return "{%s}" % (
             ",".join(["%s=%s" % (k, self._render_labelvalue(v))
                       for k, v in zip(self.labels, values)])
+        )
+
+    def _render_for_labels(self, label_values, value):
+        """Render this metric for a single set of labels
+
+        Args:
+            label_values (list[str]): values for each of the labels
+            value: value of the metric at with these labels
+
+        Returns:
+            iterable[str]: rendered metric
+        """
+        rendered_labels = self._render_key(label_values)
+        return (
+            "%s%s %.12g" % (name, rendered_labels, value)
+            for name in self._names
         )
 
     def render(self):
@@ -110,11 +135,11 @@ class CounterMetric(BaseMetric):
     def inc(self, *values):
         self.inc_by(1, *values)
 
-    def render_item(self, k):
-        return ["%s%s %.12g" % (self.name, self._render_key(k), self.counts[k])]
-
     def render(self):
-        return map_concat(self.render_item, sorted(self.counts.keys()))
+        return flatten(
+            self._render_for_labels(k, self.counts[k])
+            for k in sorted(self.counts.keys())
+        )
 
 
 class CallbackMetric(BaseMetric):
@@ -131,10 +156,12 @@ class CallbackMetric(BaseMetric):
         value = self.callback()
 
         if self.is_scalar():
-            return ["%s %.12g" % (self.name, value)]
+            return list(self._render_for_labels([], value))
 
-        return ["%s%s %.12g" % (self.name, self._render_key(k), value[k])
-                for k in sorted(value.keys())]
+        return flatten(
+            self._render_for_labels(k, value[k])
+            for k in sorted(value.keys())
+        )
 
 
 class DistributionMetric(object):
