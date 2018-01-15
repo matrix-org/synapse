@@ -24,8 +24,16 @@ def map_concat(func, items):
 
 
 class BaseMetric(object):
+    """Base class for metrics which report a single value per label set
+    """
 
     def __init__(self, name, labels=[]):
+        """
+        Args:
+            name (str): principal name for this metric
+            labels (list(str)): names of the labels which will be reported
+                for this metric
+        """
         self.name = name
         self.labels = labels  # OK not to clone as we never write it
 
@@ -36,7 +44,7 @@ class BaseMetric(object):
         return not len(self.labels)
 
     def _render_labelvalue(self, value):
-        # TODO: some kind of value escape
+        # TODO: escape backslashes, quotes and newlines
         return '"%s"' % (value)
 
     def _render_key(self, values):
@@ -46,6 +54,20 @@ class BaseMetric(object):
             ",".join(["%s=%s" % (k, self._render_labelvalue(v))
                       for k, v in zip(self.labels, values)])
         )
+
+    def render(self):
+        """Render this metric
+
+        Each metric is rendered as:
+
+            name{label1="val1",label2="val2"} value
+
+        https://prometheus.io/docs/instrumenting/exposition_formats/#text-format-details
+
+        Returns:
+            iterable[str]: rendered metrics
+        """
+        raise NotImplementedError()
 
 
 class CounterMetric(BaseMetric):
@@ -62,6 +84,10 @@ class CounterMetric(BaseMetric):
     def __init__(self, *args, **kwargs):
         super(CounterMetric, self).__init__(*args, **kwargs)
 
+        # dict[list[str]]: value for each set of label values. the keys are the
+        # label values, in the same order as the labels in self.labels.
+        #
+        # (if the metric is a scalar, the (single) key is the empty list).
         self.counts = {}
 
         # Scalar metrics are never empty
