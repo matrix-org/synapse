@@ -13,12 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from io import UnsupportedOperation
+
 from twisted.internet import defer, threads
 import twisted.internet.error
 import twisted.web.http
 from twisted.web.resource import Resource
 
 from .upload_resource import UploadResource
+from .resolve_resource import ResolveResource
 from .download_resource import DownloadResource
 from .thumbnail_resource import ThumbnailResource
 from .identicon_resource import IdenticonResource
@@ -104,7 +107,10 @@ class MediaRepository(object):
             fname (str): Path to write to
         """
         MediaRepository._makedirs(fname)
-        source.seek(0)  # Ensure we read from the start of the file
+        try:
+            source.seek(0)  # Ensure we read from the start of the file
+        except UnsupportedOperation:
+            pass
         with open(fname, "wb") as f:
             shutil.copyfileobj(source, f)
 
@@ -604,6 +610,17 @@ class MediaRepositoryResource(Resource):
 
            <thumbnail>
 
+    Clients can resolve URL of attachment that should be automatically
+    uploaded and returned the accessible url.
+
+        => POST /_matrix/media/v1/resolve HTTP/1.1
+           <media-url>
+
+        <= HTTP/1.1 200 OK
+           Content-Type: application/json
+
+           { "content_uri": "mxc://<server-name>/<media-id>" }
+
     The thumbnail methods are "crop" and "scale". "scale" trys to return an
     image where either the width or the height is smaller than the requested
     size. The client should then scale and letterbox the image if it needs to
@@ -624,3 +641,5 @@ class MediaRepositoryResource(Resource):
         self.putChild("identicon", IdenticonResource())
         if hs.config.url_preview_enabled:
             self.putChild("preview_url", PreviewUrlResource(hs, media_repo))
+        if hs.config.url_resolve_enabled:
+            self.putChild("resolve", ResolveResource(hs, media_repo))

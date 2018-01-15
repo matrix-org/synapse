@@ -13,24 +13,64 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import respond_with_json, finish_request
-from synapse.api.errors import (
-    cs_error, Codes, SynapseError
-)
-from synapse.util import logcontext
-
-from twisted.internet import defer
-from twisted.protocols.basic import FileSender
-
-from synapse.util.stringutils import is_ascii
-
 import os
 
 import logging
 import urllib
 import urlparse
+import re
+import fnmatch
+
+from twisted.internet import defer
+from twisted.protocols.basic import FileSender
+
+from synapse.http.server import respond_with_json, finish_request
+from synapse.api.errors import (
+    cs_error, Codes, SynapseError
+)
+from synapse.util import logcontext
+from synapse.util.stringutils import is_ascii
+
 
 logger = logging.getLogger(__name__)
+
+
+def validate_url_blacklist(blacklist, url):
+    '''
+    Preview and resolve endpoints would require to validate urls
+    before to process it. In the configuration section the administrator
+    should define blacklist urls to ensure that synapse users will not
+    try to explore files using these api for restricted areas.
+    '''
+    url_tuple = urlparse.urlsplit(url)
+
+    for entry in blacklist:
+        match = True
+
+        for attrib in entry:
+            pattern = entry[attrib]
+            value = getattr(url_tuple, attrib)
+            logger.debug(
+                "Matching attrib '%s' with value '%s' against"
+                " pattern '%s'", attrib, value, pattern)
+
+            if value is None:
+                match = False
+                continue
+
+            if pattern.startswith('^'):
+                if not re.match(pattern, getattr(url_tuple, attrib)):
+                    match = False
+                    continue
+            else:
+                if not fnmatch.fnmatch(getattr(url_tuple, attrib), pattern):
+                    match = False
+                    continue
+
+            if match:
+                logger.warn("URL %s blocked by url_blacklist entry %s", url, entry)
+                return False
+    return True
 
 
 def parse_media_id(request):

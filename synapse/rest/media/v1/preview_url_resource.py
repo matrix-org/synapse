@@ -30,10 +30,10 @@ from synapse.http.server import (
 )
 from synapse.util.async import ObservableDeferred
 from synapse.util.stringutils import is_ascii
+from synapse.rest.media.v1._base import validate_url_blacklist
 
 import os
 import re
-import fnmatch
 import cgi
 import ujson as json
 import urlparse
@@ -63,7 +63,7 @@ class PreviewUrlResource(Resource):
         self.media_repo = media_repo
         self.primary_base_path = media_repo.primary_base_path
 
-        self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
+        self.url_blacklist = hs.config.url_blacklist
 
         # memory cache mapping urls to an ObservableDeferred returning
         # JSON-encoded OG metadata
@@ -98,38 +98,11 @@ class PreviewUrlResource(Resource):
         else:
             ts = self.clock.time_msec()
 
-        # XXX: we could move this into _do_preview if we wanted.
-        url_tuple = urlparse.urlsplit(url)
-        for entry in self.url_preview_url_blacklist:
-            match = True
-            for attrib in entry:
-                pattern = entry[attrib]
-                value = getattr(url_tuple, attrib)
-                logger.debug((
-                    "Matching attrib '%s' with value '%s' against"
-                    " pattern '%s'"
-                ) % (attrib, value, pattern))
-
-                if value is None:
-                    match = False
-                    continue
-
-                if pattern.startswith('^'):
-                    if not re.match(pattern, getattr(url_tuple, attrib)):
-                        match = False
-                        continue
-                else:
-                    if not fnmatch.fnmatch(getattr(url_tuple, attrib), pattern):
-                        match = False
-                        continue
-            if match:
-                logger.warn(
-                    "URL %s blocked by url_blacklist entry %s", url, entry
-                )
-                raise SynapseError(
-                    403, "URL blocked by url pattern blacklist entry",
-                    Codes.UNKNOWN
-                )
+        if not validate_url_blacklist(self.url_blacklist, url):
+            raise SynapseError(
+                403, "URL blocked by url pattern blacklist entry",
+                Codes.UNKNOWN
+            )
 
         # the in-memory cache:
         # * ensures that only one request is active at a time

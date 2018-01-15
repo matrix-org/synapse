@@ -455,8 +455,8 @@ class CaptchaServerHttpClient(SimpleHttpClient):
 
 class SpiderEndpointFactory(object):
     def __init__(self, hs):
-        self.blacklist = hs.config.url_preview_ip_range_blacklist
-        self.whitelist = hs.config.url_preview_ip_range_whitelist
+        self.blacklist = hs.config.url_ip_range_blacklist
+        self.whitelist = hs.config.url_ip_range_whitelist
         self.policyForHTTPS = hs.get_http_client_context_factory()
 
     def endpointForURI(self, uri):
