@@ -24,8 +24,8 @@ from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 class RegistrationStore(background_updates.BackgroundUpdateStore):
 
-    def __init__(self, hs):
-        super(RegistrationStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(RegistrationStore, self).__init__(db_conn, hs)
 
         self.clock = hs.get_clock()
 
@@ -241,7 +241,6 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             "user_set_password_hash", user_set_password_hash_txn
         )
 
-    @defer.inlineCallbacks
     def user_delete_access_tokens(self, user_id, except_token_id=None,
                                   device_id=None):
         """
@@ -255,8 +254,8 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
                 If None, tokens associated with any device (or no device) will
                 be deleted
         Returns:
-            defer.Deferred[list[str, str|None]]: a list of the deleted tokens
-                and device IDs
+            defer.Deferred[list[str, int, str|None, int]]: a list of
+                (token, token id, device id) for each of the deleted tokens
         """
         def f(txn):
             keyvalues = {
@@ -273,12 +272,12 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
                 values.append(except_token_id)
 
             txn.execute(
-                "SELECT token, device_id FROM access_tokens WHERE %s" % where_clause,
+                "SELECT token, id, device_id FROM access_tokens WHERE %s" % where_clause,
                 values
             )
-            tokens_and_devices = [(r[0], r[1]) for r in txn]
+            tokens_and_devices = [(r[0], r[1], r[2]) for r in txn]
 
-            for token, _ in tokens_and_devices:
+            for token, _, _ in tokens_and_devices:
                 self._invalidate_cache_and_stream(
                     txn, self.get_user_by_access_token, (token,)
                 )
@@ -290,7 +289,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
 
             return tokens_and_devices
 
-        yield self.runInteraction(
+        return self.runInteraction(
             "user_delete_access_tokens", f,
         )
 

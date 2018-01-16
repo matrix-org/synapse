@@ -48,8 +48,8 @@ def _make_exclusive_regex(services_cache):
 
 class ApplicationServiceStore(SQLBaseStore):
 
-    def __init__(self, hs):
-        super(ApplicationServiceStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(ApplicationServiceStore, self).__init__(db_conn, hs)
         self.hostname = hs.hostname
         self.services_cache = load_appservices(
             hs.hostname,
@@ -173,8 +173,8 @@ class ApplicationServiceStore(SQLBaseStore):
 
 class ApplicationServiceTransactionStore(SQLBaseStore):
 
-    def __init__(self, hs):
-        super(ApplicationServiceTransactionStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(ApplicationServiceTransactionStore, self).__init__(db_conn, hs)
 
     @defer.inlineCallbacks
     def get_appservices_by_state(self, state):

@@ -1,3 +1,119 @@
+Unreleased
+==========
+
+synctl no longer starts the main synapse when using ``-a`` option with workers.
+A new worker file should be added with ``worker_app: synapse.app.homeserver``
+
+
+Changes in synapse v0.26.0 (2018-01-05)
+=======================================
+
+No changes since v0.26.0-rc1
+
+
+Changes in synapse v0.26.0-rc1 (2017-12-13)
+===========================================
+
+Features:
+
+* Add ability for ASes to publicise groups for their users (PR #2686)
+* Add all local users to the user_directory and optionally search them (PR
+  #2723)
+* Add support for custom login types for validating users (PR #2729)
+
+
+Changes:
+
+* Update example Prometheus config to new format (PR #2648) Thanks to
+  @krombel!
+* Rename redact_content option to include_content in Push API (PR #2650)
+* Declare support for r0.3.0 (PR #2677)
+* Improve upserts (PR #2684, #2688, #2689, #2713)
+* Improve documentation of workers (PR #2700)
+* Improve tracebacks on exceptions (PR #2705)
+* Allow guest access to group APIs for reading (PR #2715)
+* Support for posting content in federation_client script (PR #2716)
+* Delete devices and pushers on logouts etc (PR #2722)
+
+
+Bug fixes:
+
+* Fix database port script (PR #2673)
+* Fix internal server error on login with ldap_auth_provider (PR #2678) Thanks
+  to @jkolo!
+* Fix error on sqlite 3.7 (PR #2697)
+* Fix OPTIONS on preview_url (PR #2707)
+* Fix error handling on dns lookup (PR #2711)
+* Fix wrong avatars when inviting multiple users when creating room (PR #2717)
+* Fix 500 when joining matrix-dev (PR #2719)
+
+
+Changes in synapse v0.25.1 (2017-11-17)
+=======================================
+
+Bug fixes:
+
+* Fix login with LDAP and other password provider modules (PR #2678). Thanks to
+  @jkolo!
+
+Changes in synapse v0.25.0 (2017-11-15)
+=======================================
+
+Bug fixes:
+
+* Fix port script (PR #2673)
+
+
+Changes in synapse v0.25.0-rc1 (2017-11-14)
+===========================================
+
+Features:
+
+* Add is_public to groups table to allow for private groups (PR #2582)
+* Add a route for determining who you are (PR #2668) Thanks to @turt2live!
+* Add more features to the password providers (PR #2608, #2610, #2620, #2622,
+  #2623, #2624, #2626, #2628, #2629)
+* Add a hook for custom rest endpoints (PR #2627)
+* Add API to update group room visibility (PR #2651)
+
+
+Changes:
+
+* Ignore <noscript> tags when generating URL preview descriptions (PR #2576)
+  Thanks to @maximevaillancourt!
+* Register some /unstable endpoints in /r0 as well (PR #2579) Thanks to
+  @krombel!
+* Support /keys/upload on /r0 as well as /unstable (PR #2585)
+* Front-end proxy: pass through auth header (PR #2586)
+* Allow ASes to deactivate their own users (PR #2589)
+* Remove refresh tokens (PR #2613)
+* Automatically set default displayname on register (PR #2617)
+* Log login requests (PR #2618)
+* Always return `is_public` in the `/groups/:group_id/rooms` API (PR #2630)
+* Avoid no-op media deletes (PR #2637) Thanks to @spantaleev!
+* Fix various embarrassing typos around user_directory and add some doc. (PR
+  #2643)
+* Return whether a user is an admin within a group (PR #2647)
+* Namespace visibility options for groups (PR #2657)
+* Downcase UserIDs on registration (PR #2662)
+* Cache failures when fetching URL previews (PR #2669)
+
+
+Bug fixes:
+
+* Fix port script (PR #2577)
+* Fix error when running synapse with no logfile (PR #2581)
+* Fix UI auth when deleting devices (PR #2591)
+* Fix typo when checking if user is invited to group (PR #2599)
+* Fix the port script to drop NUL values in all tables (PR #2611)
+* Fix appservices being backlogged and not receiving new events due to a bug in
+  notify_interested_services (PR #2631) Thanks to @xyzz!
+* Fix updating rooms avatar/display name when modified by admin (PR #2636)
+  Thanks to @farialima!
+* Fix bug in state group storage (PR #2649)
+* Fix 500 on invalid utf-8 in request (PR #2663)
+
+
 Changes in synapse v0.24.1 (2017-10-24)
 =======================================
 

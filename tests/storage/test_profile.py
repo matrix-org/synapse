@@ -29,7 +29,7 @@ class ProfileStoreTestCase(unittest.TestCase):
     def setUp(self):
         hs = yield setup_test_homeserver()
 
-        self.store = ProfileStore(hs)
+        self.store = ProfileStore(None, hs)
 
         self.u_frank = UserID.from_string("@frank:test")
 

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,28 +19,43 @@ from ._base import Config
 
 class PushConfig(Config):
     def read_config(self, config):
-        self.push_redact_content = False
+        push_config = config.get("push", {})
+        self.push_include_content = push_config.get("include_content", True)
 
+        # There was a a 'redact_content' setting but mistakenly read from the
+        # 'email'section'. Check for the flag in the 'push' section, and log,
+        # but do not honour it to avoid nasty surprises when people upgrade.
+        if push_config.get("redact_content") is not None:
+            print(
+                "The push.redact_content content option has never worked. "
+                "Please set push.include_content if you want this behaviour"
+            )
+
+        # Now check for the one in the 'email' section and honour it,
+        # with a warning.
         push_config = config.get("email", {})
-        self.push_redact_content = push_config.get("redact_content", False)
+        redact_content = push_config.get("redact_content")
+        if redact_content is not None:
+            print(
+                "The 'email.redact_content' option is deprecated: "
+                "please set push.include_content instead"
+            )
+            self.push_include_content = not redact_content
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
-        # Control how push messages are sent to google/apple to notifications.
-        # Normally every message said in a room with one or more people using
-        # mobile devices will be posted to a push server hosted by matrix.org
-        # which is registered with google and apple in order to allow push
-        # notifications to be sent to these mobile devices.
-        #
-        # Setting redact_content to true will make the push messages contain no
-        # message content which will provide increased privacy. This is a
-        # temporary solution pending improvements to Android and iPhone apps
-        # to get content from the app rather than the notification.
-        #
+        # Clients requesting push notifications can either have the body of
+        # the message sent in the notification poke along with other details
+        # like the sender, or just the event ID and room ID (`event_id_only`).
+        # If clients choose the former, this option controls whether the
+        # notification request includes the content of the event (other details
+        # like the sender are still included). For `event_id_only` push, it
+        # has no effect.
+
         # For modern android devices the notification content will still appear
         # because it is loaded by the app. iPhone, however will send a
         # notification saying only that a message arrived and who it came from.
         #
         #push:
-        #   redact_content: false
+        #   include_content: true
         """

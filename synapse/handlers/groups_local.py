@@ -70,8 +70,9 @@ class GroupsLocalHandler(object):
 
     get_invited_users_in_group = _create_rerouter("get_invited_users_in_group")
 
-    update_room_group_association = _create_rerouter("update_room_group_association")
-    delete_room_group_association = _create_rerouter("delete_room_group_association")
+    add_room_to_group = _create_rerouter("add_room_to_group")
+    update_room_in_group = _create_rerouter("update_room_in_group")
+    remove_room_from_group = _create_rerouter("remove_room_from_group")
 
     update_group_summary_room = _create_rerouter("update_group_summary_room")
     delete_group_summary_room = _create_rerouter("delete_group_summary_room")
@@ -374,13 +375,20 @@ class GroupsLocalHandler(object):
     def get_publicised_groups_for_user(self, user_id):
         if self.hs.is_mine_id(user_id):
             result = yield self.store.get_publicised_groups_for_user(user_id)
+
+            # Check AS associated groups for this user - this depends on the
+            # RegExps in the AS registration file (under `users`)
+            for app_service in self.store.get_app_services():
+                result.extend(app_service.get_groups_for_user(user_id))
+
             defer.returnValue({"groups": result})
         else:
-            result = yield self.transport_client.get_publicised_groups_for_user(
-                get_domain_from_id(user_id), user_id
+            bulk_result = yield self.transport_client.bulk_get_publicised_groups(
+                get_domain_from_id(user_id), [user_id],
             )
+            result = bulk_result.get("users", {}).get(user_id)
             # TODO: Verify attestations
-            defer.returnValue(result)
+            defer.returnValue({"groups": result})
 
     @defer.inlineCallbacks
     def bulk_get_publicised_groups(self, user_ids, proxy=True):
@@ -413,5 +421,10 @@ class GroupsLocalHandler(object):
             results[uid] = yield self.store.get_publicised_groups_for_user(
                 uid
             )
+
+            # Check AS associated groups for this user - this depends on the
+            # RegExps in the AS registration file (under `users`)
+            for app_service in self.store.get_app_services():
+                results[uid].extend(app_service.get_groups_for_user(uid))
 
         defer.returnValue({"users": results})

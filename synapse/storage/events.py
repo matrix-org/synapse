@@ -197,8 +197,8 @@ class EventsStore(SQLBaseStore):
     EVENT_ORIGIN_SERVER_TS_NAME = "event_origin_server_ts"
     EVENT_FIELDS_SENDER_URL_UPDATE_NAME = "event_fields_sender_url"
 
-    def __init__(self, hs):
-        super(EventsStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(EventsStore, self).__init__(db_conn, hs)
         self._clock = hs.get_clock()
         self.register_background_update_handler(
             self.EVENT_ORIGIN_SERVER_TS_NAME, self._background_reindex_origin_server_ts

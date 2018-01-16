@@ -27,7 +27,7 @@ from synapse.http.servlet import (
 )
 from synapse.util.msisdn import phone_number_to_msisdn
 
-from ._base import client_v2_patterns
+from ._base import client_v2_patterns, interactive_auth_handler
 
 import logging
 import hmac
@@ -176,6 +176,7 @@ class RegisterRestServlet(RestServlet):
         self.device_handler = hs.get_device_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
 
+    @interactive_auth_handler
     @defer.inlineCallbacks
     def on_POST(self, request):
         yield run_on_reactor()
@@ -224,6 +225,12 @@ class RegisterRestServlet(RestServlet):
             # 'user' key not 'username'). Since this is a new addition, we'll
             # fallback to 'username' if they gave one.
             desired_username = body.get("user", desired_username)
+
+            # XXX we should check that desired_username is valid. Currently
+            # we give appservices carte blanche for any insanity in mxids,
+            # because the IRC bridges rely on being able to register stupid
+            # IDs.
+
             access_token = get_access_token_from_request(request)
 
             if isinstance(desired_username, basestring):
@@ -232,6 +239,15 @@ class RegisterRestServlet(RestServlet):
                 )
             defer.returnValue((200, result))  # we throw for non 200 responses
             return
+
+        # for either shared secret or regular registration, downcase the
+        # provided username before attempting to register it. This should mean
+        # that people who try to register with upper-case in their usernames
+        # don't get a nasty surprise. (Note that we treat username
+        # case-insenstively in login, so they are free to carry on imagining
+        # that their username is CrAzYh4cKeR if that keeps them happy)
+        if desired_username is not None:
+            desired_username = desired_username.lower()
 
         # == Shared Secret Registration == (e.g. create new user scripts)
         if 'mac' in body:
@@ -310,13 +326,9 @@ class RegisterRestServlet(RestServlet):
                     [LoginType.MSISDN, LoginType.EMAIL_IDENTITY],
                 ])
 
-        authed, auth_result, params, session_id = yield self.auth_handler.check_auth(
+        auth_result, params, session_id = yield self.auth_handler.check_auth(
             flows, body, self.hs.get_ip_from_request(request)
         )
-
-        if not authed:
-            defer.returnValue((401, auth_result))
-            return
 
         if registered_user_id is not None:
             logger.info(
@@ -335,6 +347,9 @@ class RegisterRestServlet(RestServlet):
             desired_username = params.get("username", None)
             new_password = params.get("password", None)
             guest_access_token = params.get("guest_access_token", None)
+
+            if desired_username is not None:
+                desired_username = desired_username.lower()
 
             (registered_user_id, _) = yield self.registration_handler.register(
                 localpart=desired_username,
@@ -417,13 +432,22 @@ class RegisterRestServlet(RestServlet):
     def _do_shared_secret_registration(self, username, password, body):
         if not self.hs.config.registration_shared_secret:
             raise SynapseError(400, "Shared secret registration is not enabled")
+        if not username:
+            raise SynapseError(
+                400, "username must be specified", errcode=Codes.BAD_JSON,
+            )
 
-        user = username.encode("utf-8")
+        # use the username from the original request rather than the
+        # downcased one in `username` for the mac calculation
+        user = body["username"].encode("utf-8")
 
         # str() because otherwise hmac complains that 'unicode' does not
         # have the buffer interface
         got_mac = str(body["mac"])
 
+        # FIXME this is different to the /v1/register endpoint, which
+        # includes the password and admin flag in the hashed text. Why are
+        # these different?
         want_mac = hmac.new(
             key=self.hs.config.registration_shared_secret,
             msg=user,

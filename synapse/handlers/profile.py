@@ -17,7 +17,6 @@ import logging
 
 from twisted.internet import defer
 
-import synapse.types
 from synapse.api.errors import SynapseError, AuthError, CodeMessageException
 from synapse.types import UserID, get_domain_from_id
 from ._base import BaseHandler
@@ -36,6 +35,8 @@ class ProfileHandler(BaseHandler):
         self.federation.register_query_handler(
             "profile", self.on_profile_query
         )
+
+        self.user_directory_handler = hs.get_user_directory_handler()
 
         self.clock.looping_call(self._update_remote_profile_cache, self.PROFILE_UPDATE_MS)
 
@@ -140,7 +141,13 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, new_displayname
         )
 
-        yield self._update_join_states(requester)
+        if self.hs.config.user_directory_search_all_users:
+            profile = yield self.store.get_profileinfo(target_user.localpart)
+            yield self.user_directory_handler.handle_local_profile_change(
+                target_user.to_string(), profile
+            )
+
+        yield self._update_join_states(requester, target_user)
 
     @defer.inlineCallbacks
     def get_avatar_url(self, target_user):
@@ -184,7 +191,13 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, new_avatar_url
         )
 
-        yield self._update_join_states(requester)
+        if self.hs.config.user_directory_search_all_users:
+            profile = yield self.store.get_profileinfo(target_user.localpart)
+            yield self.user_directory_handler.handle_local_profile_change(
+                target_user.to_string(), profile
+            )
+
+        yield self._update_join_states(requester, target_user)
 
     @defer.inlineCallbacks
     def on_profile_query(self, args):
@@ -209,28 +222,24 @@ class ProfileHandler(BaseHandler):
         defer.returnValue(response)
 
     @defer.inlineCallbacks
-    def _update_join_states(self, requester):
-        user = requester.user
-        if not self.hs.is_mine(user):
+    def _update_join_states(self, requester, target_user):
+        if not self.hs.is_mine(target_user):
             return
 
         yield self.ratelimit(requester)
 
         room_ids = yield self.store.get_rooms_for_user(
-            user.to_string(),
+            target_user.to_string(),
         )
 
         for room_id in room_ids:
             handler = self.hs.get_handlers().room_member_handler
             try:
-                # Assume the user isn't a guest because we don't let guests set
-                # profile or avatar data.
-                # XXX why are we recreating `requester` here for each room?
-                # what was wrong with the `requester` we were passed?
-                requester = synapse.types.create_requester(user)
+                # Assume the target_user isn't a guest,
+                # because we don't let guests set profile or avatar data.
                 yield handler.update_membership(
                     requester,
-                    user,
+                    target_user,
                     room_id,
                     "join",  # We treat a profile update like a join.
                     ratelimit=False,  # Try to hide that these events aren't atomic.

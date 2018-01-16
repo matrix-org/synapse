@@ -359,7 +359,7 @@ class RegisterRestServlet(ClientV1RestServlet):
         if compare_digest(want_mac, got_mac):
             handler = self.handlers.registration_handler
             user_id, token = yield handler.register(
-                localpart=user,
+                localpart=user.lower(),
                 password=password,
                 admin=bool(admin),
             )

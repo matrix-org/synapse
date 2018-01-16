@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 class DeviceInboxStore(BackgroundUpdateStore):
     DEVICE_INBOX_STREAM_ID = "device_inbox_stream_drop"
 
-    def __init__(self, hs):
-        super(DeviceInboxStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(DeviceInboxStore, self).__init__(db_conn, hs)
 
         self.register_background_index_update(
             "device_inbox_stream_index",

@@ -12,15 +12,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from synapse.storage.background_updates import BackgroundUpdateStore
 
-from ._base import SQLBaseStore
 
-
-class MediaRepositoryStore(SQLBaseStore):
+class MediaRepositoryStore(BackgroundUpdateStore):
     """Persistence for attachments and avatars"""
 
-    def get_default_thumbnails(self, top_level_type, sub_type):
-        return []
+    def __init__(self, db_conn, hs):
+        super(MediaRepositoryStore, self).__init__(db_conn, hs)
+
+        self.register_background_index_update(
+            update_name='local_media_repository_url_idx',
+            index_name='local_media_repository_url_idx',
+            table='local_media_repository',
+            columns=['created_ts'],
+            where_clause='url_cache IS NOT NULL',
+        )
 
     def get_local_media(self, media_id):
         """Get the metadata for a local piece of media
@@ -254,6 +261,9 @@ class MediaRepositoryStore(SQLBaseStore):
         return self.runInteraction("get_expired_url_cache", _get_expired_url_cache_txn)
 
     def delete_url_cache(self, media_ids):
+        if len(media_ids) == 0:
+            return
+
         sql = (
             "DELETE FROM local_media_repository_url_cache"
             " WHERE media_id = ?"
@@ -281,6 +291,9 @@ class MediaRepositoryStore(SQLBaseStore):
         )
 
     def delete_url_cache_media(self, media_ids):
+        if len(media_ids) == 0:
+            return
+
         def _delete_url_cache_media_txn(txn):
             sql = (
                 "DELETE FROM local_media_repository"

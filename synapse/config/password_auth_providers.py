@@ -29,10 +29,10 @@ class PasswordAuthProviderConfig(Config):
         # param.
         ldap_config = config.get("ldap_config", {})
         if ldap_config.get("enabled", False):
-            providers.append[{
+            providers.append({
                 'module': LDAP_PROVIDER,
                 'config': ldap_config,
-            }]
+            })
 
         providers.extend(config.get("password_providers", []))
         for provider in providers:

@@ -63,7 +63,7 @@ class UserDirectoryStore(SQLBaseStore):
             user_ids (list(str)): Users to add
         """
         yield self._simple_insert_many(
-            table="users_in_pubic_room",
+            table="users_in_public_rooms",
             values=[
                 {
                     "user_id": user_id,
@@ -164,7 +164,7 @@ class UserDirectoryStore(SQLBaseStore):
             )
 
             if isinstance(self.database_engine, PostgresEngine):
-                # We weight the loclpart most highly, then display name and finally
+                # We weight the localpart most highly, then display name and finally
                 # server name
                 if new_entry:
                     sql = """
@@ -219,7 +219,7 @@ class UserDirectoryStore(SQLBaseStore):
     @defer.inlineCallbacks
     def update_user_in_public_user_list(self, user_id, room_id):
         yield self._simple_update_one(
-            table="users_in_pubic_room",
+            table="users_in_public_rooms",
             keyvalues={"user_id": user_id},
             updatevalues={"room_id": room_id},
             desc="update_user_in_public_user_list",
@@ -240,7 +240,7 @@ class UserDirectoryStore(SQLBaseStore):
             )
             self._simple_delete_txn(
                 txn,
-                table="users_in_pubic_room",
+                table="users_in_public_rooms",
                 keyvalues={"user_id": user_id},
             )
             txn.call_after(
@@ -256,7 +256,7 @@ class UserDirectoryStore(SQLBaseStore):
     @defer.inlineCallbacks
     def remove_from_user_in_public_room(self, user_id):
         yield self._simple_delete(
-            table="users_in_pubic_room",
+            table="users_in_public_rooms",
             keyvalues={"user_id": user_id},
             desc="remove_from_user_in_public_room",
         )
@@ -267,7 +267,7 @@ class UserDirectoryStore(SQLBaseStore):
         in the given room_id
         """
         return self._simple_select_onecol(
-            table="users_in_pubic_room",
+            table="users_in_public_rooms",
             keyvalues={"room_id": room_id},
             retcol="user_id",
             desc="get_users_in_public_due_to_room",
@@ -286,7 +286,7 @@ class UserDirectoryStore(SQLBaseStore):
         )
 
         user_ids_pub = yield self._simple_select_onecol(
-            table="users_in_pubic_room",
+            table="users_in_public_rooms",
             keyvalues={"room_id": room_id},
             retcol="user_id",
             desc="get_users_in_dir_due_to_room",
@@ -316,6 +316,16 @@ class UserDirectoryStore(SQLBaseStore):
         """
         rows = yield self._execute("get_all_rooms", None, sql)
         defer.returnValue([room_id for room_id, in rows])
+
+    @defer.inlineCallbacks
+    def get_all_local_users(self):
+        """Get all local users
+        """
+        sql = """
+            SELECT name FROM users
+        """
+        rows = yield self._execute("get_all_local_users", None, sql)
+        defer.returnValue([name for name, in rows])
 
     def add_users_who_share_room(self, room_id, share_private, user_id_tuples):
         """Insert entries into the users_who_share_rooms table. The first
@@ -514,7 +524,7 @@ class UserDirectoryStore(SQLBaseStore):
         def _delete_all_from_user_dir_txn(txn):
             txn.execute("DELETE FROM user_directory")
             txn.execute("DELETE FROM user_directory_search")
-            txn.execute("DELETE FROM users_in_pubic_room")
+            txn.execute("DELETE FROM users_in_public_rooms")
             txn.execute("DELETE FROM users_who_share_rooms")
             txn.call_after(self.get_user_in_directory.invalidate_all)
             txn.call_after(self.get_user_in_public_room.invalidate_all)
@@ -537,7 +547,7 @@ class UserDirectoryStore(SQLBaseStore):
     @cached()
     def get_user_in_public_room(self, user_id):
         return self._simple_select_one(
-            table="users_in_pubic_room",
+            table="users_in_public_rooms",
             keyvalues={"user_id": user_id},
             retcols=("room_id",),
             allow_none=True,
@@ -629,6 +639,20 @@ class UserDirectoryStore(SQLBaseStore):
                     ]
                 }
         """
+
+        if self.hs.config.user_directory_search_all_users:
+            join_clause = ""
+            where_clause = "?<>''"  # naughty hack to keep the same number of binds
+        else:
+            join_clause = """
+                LEFT JOIN users_in_public_rooms AS p USING (user_id)
+                LEFT JOIN (
+                    SELECT other_user_id AS user_id FROM users_who_share_rooms
+                    WHERE user_id = ? AND share_private
+                ) AS s USING (user_id)
+            """
+            where_clause = "(s.user_id IS NOT NULL OR p.user_id IS NOT NULL)"
+
         if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
 
@@ -641,13 +665,9 @@ class UserDirectoryStore(SQLBaseStore):
                 SELECT d.user_id, display_name, avatar_url
                 FROM user_directory_search
                 INNER JOIN user_directory AS d USING (user_id)
-                LEFT JOIN users_in_pubic_room AS p USING (user_id)
-                LEFT JOIN (
-                    SELECT other_user_id AS user_id FROM users_who_share_rooms
-                    WHERE user_id = ? AND share_private
-                ) AS s USING (user_id)
+                %s
                 WHERE
-                    (s.user_id IS NOT NULL OR p.user_id IS NOT NULL)
+                    %s
                     AND vector @@ to_tsquery('english', ?)
                 ORDER BY
                     (CASE WHEN s.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
@@ -671,7 +691,7 @@ class UserDirectoryStore(SQLBaseStore):
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """
+            """ % (join_clause, where_clause)
             args = (user_id, full_query, exact_query, prefix_query, limit + 1,)
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_sqlite(search_term)
@@ -680,20 +700,16 @@ class UserDirectoryStore(SQLBaseStore):
                 SELECT d.user_id, display_name, avatar_url
                 FROM user_directory_search
                 INNER JOIN user_directory AS d USING (user_id)
-                LEFT JOIN users_in_pubic_room AS p USING (user_id)
-                LEFT JOIN (
-                    SELECT other_user_id AS user_id FROM users_who_share_rooms
-                    WHERE user_id = ? AND share_private
-                ) AS s USING (user_id)
+                %s
                 WHERE
-                    (s.user_id IS NOT NULL OR p.user_id IS NOT NULL)
+                    %s
                     AND value MATCH ?
                 ORDER BY
                     rank(matchinfo(user_directory_search)) DESC,
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """
+            """ % (join_clause, where_clause)
             args = (user_id, search_query, limit + 1)
         else:
             # This should be unreachable.
@@ -723,7 +739,7 @@ def _parse_query_sqlite(search_term):
 
     # Pull out the individual words, discarding any non-word characters.
     results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
-    return " & ".join("(%s* | %s)" % (result, result,) for result in results)
+    return " & ".join("(%s* OR %s)" % (result, result,) for result in results)
 
 
 def _parse_query_postgres(search_term):

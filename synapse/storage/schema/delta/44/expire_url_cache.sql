@@ -13,7 +13,10 @@
  * limitations under the License.
  */
 
-CREATE INDEX local_media_repository_url_idx ON local_media_repository(created_ts) WHERE url_cache IS NOT NULL;
+-- this didn't work on SQLite 3.7 (because of lack of partial indexes), so was
+-- removed and replaced with 46/local_media_repository_url_idx.sql.
+--
+-- CREATE INDEX local_media_repository_url_idx ON local_media_repository(created_ts) WHERE url_cache IS NOT NULL;
 
 -- we need to change `expires` to `expires_ts` so that we can index on it. SQLite doesn't support
 -- indices on expressions until 3.9.

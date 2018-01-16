@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 
 
 class ReceiptsStore(SQLBaseStore):
-    def __init__(self, hs):
-        super(ReceiptsStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(ReceiptsStore, self).__init__(db_conn, hs)
 
         self._receipts_stream_cache = StreamChangeCache(
             "ReceiptsRoomChangeCache", self._receipts_id_gen.get_current_token()

@@ -167,7 +167,8 @@ def parse_json_value_from_request(request):
 
     try:
         content = simplejson.loads(content_bytes)
-    except simplejson.JSONDecodeError:
+    except Exception as e:
+        logger.warn("Unable to parse JSON: %s", e)
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
     return content
