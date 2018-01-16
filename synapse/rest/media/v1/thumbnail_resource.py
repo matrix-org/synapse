@@ -185,7 +185,7 @@ class ThumbnailResource(Resource):
 
             if t_w and t_h and t_method and t_type:
                 file_info = FileInfo(
-                    server_name=None, file_id=media_id,
+                    server_name=server_name, file_id=media_info["filesystem_id"],
                     thumbnail=True,
                     thumbnail_width=info["thumbnail_width"],
                     thumbnail_height=info["thumbnail_height"],
@@ -221,7 +221,7 @@ class ThumbnailResource(Resource):
         # TODO: Don't download the whole remote file
         # We should proxy the thumbnail from the remote server instead of
         # downloading the remote file and generating our own thumbnails.
-        yield self.media_repo.get_remote_media_info(server_name, media_id)
+        media_info = yield self.media_repo.get_remote_media_info(server_name, media_id)
 
         thumbnail_infos = yield self.store.get_remote_media_thumbnails(
             server_name, media_id,
@@ -232,7 +232,7 @@ class ThumbnailResource(Resource):
                 width, height, method, m_type, thumbnail_infos
             )
             file_info = FileInfo(
-                server_name=None, file_id=media_id,
+                server_name=server_name, file_id=media_info["filesystem_id"],
                 thumbnail=True,
                 thumbnail_width=thumbnail_info["thumbnail_width"],
                 thumbnail_height=thumbnail_info["thumbnail_height"],

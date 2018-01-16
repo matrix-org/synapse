@@ -539,7 +539,10 @@ class MediaRepository(object):
             Deferred[dict]: Dict with "width" and "height" keys of original image
         """
         media_type = media_info["media_type"]
-        file_id = media_info.get("filesystem_id")
+        if server_name:
+            file_id = media_info["filesystem_id"]
+        else:
+            file_id = media_id
         requirements = self._get_thumbnail_requirements(media_type)
         if not requirements:
             return
@@ -597,7 +600,7 @@ class MediaRepository(object):
             try:
                 file_info = FileInfo(
                     server_name=server_name,
-                    file_id=media_id,
+                    file_id=file_id,
                     thumbnail=True,
                     thumbnail_width=t_width,
                     thumbnail_height=t_height,
