@@ -85,6 +85,7 @@ class ThumbnailResource(Resource):
         media_info = yield self.store.get_local_media(media_id)
 
         if not media_info or media_info["quarantined_by"]:
+            logger.info("Media is quarantined")
             respond_404(request)
             return
 
@@ -111,6 +112,7 @@ class ThumbnailResource(Resource):
             responder = yield self.media_storage.fetch_media(file_info)
             yield respond_with_responder(request, responder, t_type, t_length)
         else:
+            logger.info("Couldn't find any generated thumbnails")
             respond_404(request)
 
     @defer.inlineCallbacks
@@ -120,6 +122,7 @@ class ThumbnailResource(Resource):
         media_info = yield self.store.get_local_media(media_id)
 
         if not media_info or media_info["quarantined_by"]:
+            logger.info("Media is quarantined")
             respond_404(request)
             return
 
@@ -159,6 +162,7 @@ class ThumbnailResource(Resource):
         if file_path:
             yield respond_with_file(request, desired_type, file_path)
         else:
+            logger.warn("Failed to generate local thumbnail")
             respond_404(request)
 
     @defer.inlineCallbacks
@@ -197,7 +201,7 @@ class ThumbnailResource(Resource):
                     yield respond_with_responder(request, responder, t_type, t_length)
                     return
 
-        logger.debug("We don't have a local thumbnail of that size. Generating")
+        logger.debug("We don't have a remote thumbnail of that size. Generating")
 
         # Okay, so we generate one.
         file_path = yield self.media_repo.generate_remote_exact_thumbnail(
@@ -208,6 +212,7 @@ class ThumbnailResource(Resource):
         if file_path:
             yield respond_with_file(request, desired_type, file_path)
         else:
+            logger.warn("Failed to generate remote thumbnail")
             respond_404(request)
 
     @defer.inlineCallbacks
@@ -241,6 +246,7 @@ class ThumbnailResource(Resource):
             responder = yield self.media_storage.fetch_media(file_info)
             yield respond_with_responder(request, responder, t_type, t_length)
         else:
+            logger.info("Failed to find any generated thumbnails")
             respond_404(request)
 
     def _select_thumbnail(self, desired_width, desired_height, desired_method,

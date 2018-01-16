@@ -285,6 +285,7 @@ class MediaRepository(object):
         # If we have an entry in the DB, try and look for it
         if media_info:
             if media_info["quarantined_by"]:
+                logger.info("Media is quarentined")
                 raise NotFoundError()
 
             responder = yield self.media_storage.fetch_media(file_info)
