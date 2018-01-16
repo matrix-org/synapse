@@ -165,7 +165,7 @@ class ThumbnailResource(Resource):
     def _select_or_generate_remote_thumbnail(self, request, server_name, media_id,
                                              desired_width, desired_height,
                                              desired_method, desired_type):
-        media_info = yield self.media_repo.get_remote_media(server_name, media_id)
+        media_info = yield self.media_repo.get_remote_media_info(server_name, media_id)
 
         thumbnail_infos = yield self.store.get_remote_media_thumbnails(
             server_name, media_id,
@@ -216,7 +216,7 @@ class ThumbnailResource(Resource):
         # TODO: Don't download the whole remote file
         # We should proxy the thumbnail from the remote server instead of
         # downloading the remote file and generating our own thumbnails.
-        yield self.media_repo.get_remote_media(server_name, media_id)
+        yield self.media_repo.get_remote_media_info(server_name, media_id)
 
         thumbnail_infos = yield self.store.get_remote_media_thumbnails(
             server_name, media_id,

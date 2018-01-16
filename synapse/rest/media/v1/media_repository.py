@@ -228,6 +228,34 @@ class MediaRepository(object):
             respond_404(request)
 
     @defer.inlineCallbacks
+    def get_remote_media_info(self, server_name, media_id):
+        """Gets the media info associated with the remote file, downloading
+        if necessary.
+
+        Args:
+            server_name (str): Remote server_name where the media originated.
+            media_id (str): The media ID of the content (as defined by the
+                remote server).
+
+        Returns:
+            Deferred[dict]: The media_info of the file
+        """
+        # We linearize here to ensure that we don't try and download remote
+        # media multiple times concurrently
+        key = (server_name, media_id)
+        with (yield self.remote_media_linearizer.queue(key)):
+            responder, media_info = yield self._get_remote_media_impl(
+                server_name, media_id,
+            )
+
+        # Ensure we actually use the responder so that it releases resources
+        if responder:
+            with responder:
+                pass
+
+        defer.returnValue(media_info)
+
+    @defer.inlineCallbacks
     def _get_remote_media_impl(self, server_name, media_id):
         """Looks for media in local cache, if not there then attempt to
         download from remote server.
