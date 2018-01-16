@@ -15,6 +15,7 @@
 
 from twisted.internet import defer, threads
 from twisted.protocols.basic import FileSender
+from twisted.protocols.ftp import FileConsumer  # This isn't FTP specific
 
 from ._base import Responder
 
@@ -150,6 +151,32 @@ class MediaStorage(object):
                 defer.returnValue(res)
 
         defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def ensure_media_is_in_local_cache(self, file_info):
+        """Ensures that the given file is in the local cache. Attempts to
+        download it from storage providers if it isn't.
+
+        Args:
+            file_info (FileInfo)
+
+        Returns:
+            Deferred[str]: Full path to local file
+        """
+        path = self._file_info_to_path(file_info)
+        local_path = os.path.join(self.local_media_directory, path)
+        if os.path.exists(local_path):
+            defer.returnValue(local_path)
+
+        for provider in self.storage_providers:
+            res = yield provider.fetch(path, file_info)
+            if res:
+                with res:
+                    with open(local_path, "w") as f:
+                        res.write_to_consumer(FileConsumer(f))
+                defer.returnValue(local_path)
+
+        raise Exception("file could not be found")
 
     def _file_info_to_path(self, file_info):
         """Converts file_info into a relative path.
