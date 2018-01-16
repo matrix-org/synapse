@@ -84,10 +84,11 @@ class ThumbnailResource(Resource):
                                  method, m_type):
         media_info = yield self.store.get_local_media(media_id)
 
-        if not media_info or media_info["quarantined_by"]:
-            if media_info:
-                logger.info("Media is quarantined")
-
+        if not media_info:
+            respond_404(request)
+            return
+        if media_info["quarantined_by"]:
+            logger.info("Media is quarantined")
             respond_404(request)
             return
 
@@ -123,9 +124,11 @@ class ThumbnailResource(Resource):
                                             desired_type):
         media_info = yield self.store.get_local_media(media_id)
 
-        if not media_info or media_info["quarantined_by"]:
-            if media_info["quarantined_by"]:
-                logger.info("Media is quarantined")
+        if not media_info:
+            respond_404(request)
+            return
+        if media_info["quarantined_by"]:
+            logger.info("Media is quarantined")
             respond_404(request)
             return
 
