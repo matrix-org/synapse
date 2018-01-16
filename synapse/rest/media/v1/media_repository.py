@@ -151,7 +151,9 @@ class MediaRepository(object):
             "media_length": content_length,
         }
 
-        yield self._generate_thumbnails(None, media_id, media_id, media_info)
+        yield self._generate_thumbnails(
+            None, media_id, media_id, media_info["media_type"],
+        )
 
         defer.returnValue("mxc://%s/%s" % (self.server_name, media_id))
 
@@ -413,7 +415,7 @@ class MediaRepository(object):
         }
 
         yield self._generate_thumbnails(
-            server_name, media_id, file_id, media_info,
+            server_name, media_id, file_id, media_info["media_type"],
         )
 
         defer.returnValue(media_info)
@@ -525,7 +527,7 @@ class MediaRepository(object):
             defer.returnValue(output_path)
 
     @defer.inlineCallbacks
-    def _generate_thumbnails(self, server_name, media_id, file_id, media_info,
+    def _generate_thumbnails(self, server_name, media_id, file_id, media_type,
                              url_cache=False):
         """Generate and store thumbnails for an image.
 
@@ -534,14 +536,13 @@ class MediaRepository(object):
             media_id (str): The media ID of the content. (This is the same as
                 the file_id for local content)
             file_id (str): Local file ID
-            media_info (dict)
+            media_type (str)
             url_cache (bool): If we are thumbnailing images downloaded for the URL cache,
                 used exclusively by the url previewer
 
         Returns:
             Deferred[dict]: Dict with "width" and "height" keys of original image
         """
-        media_type = media_info["media_type"]
         requirements = self._get_thumbnail_requirements(media_type)
         if not requirements:
             return
