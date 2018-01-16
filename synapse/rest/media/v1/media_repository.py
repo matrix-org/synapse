@@ -146,13 +146,9 @@ class MediaRepository(object):
             media_length=content_length,
             user_id=auth_user,
         )
-        media_info = {
-            "media_type": media_type,
-            "media_length": content_length,
-        }
 
         yield self._generate_thumbnails(
-            None, media_id, media_id, media_info["media_type"],
+            None, media_id, media_id, media_type,
         )
 
         defer.returnValue("mxc://%s/%s" % (self.server_name, media_id))
@@ -415,7 +411,7 @@ class MediaRepository(object):
         }
 
         yield self._generate_thumbnails(
-            server_name, media_id, file_id, media_info["media_type"],
+            server_name, media_id, file_id, media_type,
         )
 
         defer.returnValue(media_info)
