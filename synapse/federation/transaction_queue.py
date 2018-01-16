@@ -42,6 +42,8 @@ sent_edus_counter = client_metrics.register_counter("sent_edus")
 
 sent_transactions_counter = client_metrics.register_counter("sent_transactions")
 
+events_processed_counter = client_metrics.register_counter("events_processed")
+
 
 class TransactionQueue(object):
     """This class makes sure we only have one transaction in flight at
@@ -204,6 +206,8 @@ class TransactionQueue(object):
                     logger.debug("Sending %s to %r", event, destinations)
 
                     self._send_pdu(event, destinations)
+
+                events_processed_counter.inc_by(len(events))
 
                 yield self.store.update_federation_out_pos(
                     "events", next_token
