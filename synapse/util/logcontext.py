@@ -59,7 +59,7 @@ class LoggingContext(object):
 
     __slots__ = [
         "previous_context", "name", "ru_stime", "ru_utime",
-        "db_txn_count", "db_txn_duration", "usage_start", "usage_end",
+        "db_txn_count", "db_txn_duration_ms", "usage_start", "usage_end",
         "main_thread", "alive",
         "request", "tag",
     ]
@@ -97,7 +97,10 @@ class LoggingContext(object):
         self.ru_stime = 0.
         self.ru_utime = 0.
         self.db_txn_count = 0
-        self.db_txn_duration = 0.
+
+        # ms spent waiting for db txns, excluding scheduling time
+        self.db_txn_duration_ms = 0
+
         self.usage_start = None
         self.usage_end = None
         self.main_thread = threading.current_thread()
@@ -205,7 +208,7 @@ class LoggingContext(object):
 
     def add_database_transaction(self, duration_ms):
         self.db_txn_count += 1
-        self.db_txn_duration += duration_ms / 1000.
+        self.db_txn_duration_ms += duration_ms
 
 
 class LoggingContextFilter(logging.Filter):
