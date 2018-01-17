@@ -535,6 +535,12 @@ class EventsStore(SQLBaseStore):
                 # the events we have yet to persist, so we need a slightly more
                 # complicated event lookup function than simply looking the events
                 # up in the db.
+
+                logger.info(
+                    "Resolving state for %s with %i state sets",
+                    room_id, len(state_sets),
+                )
+
                 events_map = {ev.event_id: ev for ev, _ in events_context}
 
                 @defer.inlineCallbacks
