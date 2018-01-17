@@ -185,8 +185,10 @@ class PreviewUrlResource(Resource):
         logger.debug("got media_info of '%s'" % media_info)
 
         if _is_media(media_info['media_type']):
+            file_id = media_info['filesystem_id']
             dims = yield self.media_repo._generate_thumbnails(
-                None, media_info['filesystem_id'], media_info, url_cache=True,
+                None, file_id, file_id, media_info["media_type"],
+                url_cache=True,
             )
 
             og = {
@@ -231,8 +233,10 @@ class PreviewUrlResource(Resource):
 
                 if _is_media(image_info['media_type']):
                     # TODO: make sure we don't choke on white-on-transparent images
+                    file_id = image_info['filesystem_id']
                     dims = yield self.media_repo._generate_thumbnails(
-                        None, image_info['filesystem_id'], image_info, url_cache=True,
+                        None, file_id, file_id, image_info["media_type"],
+                        url_cache=True,
                     )
                     if dims:
                         og["og:image:width"] = dims['width']
