@@ -641,8 +641,13 @@ class UserDirectoryStore(SQLBaseStore):
         """
 
         if self.hs.config.user_directory_search_all_users:
-            join_clause = ""
-            where_clause = "?<>''"  # naughty hack to keep the same number of binds
+            # dummy to keep the number of binds & aliases the same
+            join_clause = """
+                LEFT JOIN (
+                    SELECT NULL as user_id WHERE NULL = ?
+                ) AS s USING (user_id)"
+            """
+            where_clause = ""
         else:
             join_clause = """
                 LEFT JOIN users_in_public_rooms AS p USING (user_id)
