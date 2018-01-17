@@ -146,12 +146,10 @@ class MediaRepository(object):
             media_length=content_length,
             user_id=auth_user,
         )
-        media_info = {
-            "media_type": media_type,
-            "media_length": content_length,
-        }
 
-        yield self._generate_thumbnails(None, media_id, media_info)
+        yield self._generate_thumbnails(
+            None, media_id, media_id, media_type,
+        )
 
         defer.returnValue("mxc://%s/%s" % (self.server_name, media_id))
 
@@ -228,6 +226,34 @@ class MediaRepository(object):
             respond_404(request)
 
     @defer.inlineCallbacks
+    def get_remote_media_info(self, server_name, media_id):
+        """Gets the media info associated with the remote file, downloading
+        if necessary.
+
+        Args:
+            server_name (str): Remote server_name where the media originated.
+            media_id (str): The media ID of the content (as defined by the
+                remote server).
+
+        Returns:
+            Deferred[dict]: The media_info of the file
+        """
+        # We linearize here to ensure that we don't try and download remote
+        # media multiple times concurrently
+        key = (server_name, media_id)
+        with (yield self.remote_media_linearizer.queue(key)):
+            responder, media_info = yield self._get_remote_media_impl(
+                server_name, media_id,
+            )
+
+        # Ensure we actually use the responder so that it releases resources
+        if responder:
+            with responder:
+                pass
+
+        defer.returnValue(media_info)
+
+    @defer.inlineCallbacks
     def _get_remote_media_impl(self, server_name, media_id):
         """Looks for media in local cache, if not there then attempt to
         download from remote server.
@@ -257,6 +283,7 @@ class MediaRepository(object):
         # If we have an entry in the DB, try and look for it
         if media_info:
             if media_info["quarantined_by"]:
+                logger.info("Media is quarantined")
                 raise NotFoundError()
 
             responder = yield self.media_storage.fetch_media(file_info)
@@ -384,7 +411,7 @@ class MediaRepository(object):
         }
 
         yield self._generate_thumbnails(
-            server_name, media_id, media_info
+            server_name, media_id, file_id, media_type,
         )
 
         defer.returnValue(media_info)
@@ -496,21 +523,22 @@ class MediaRepository(object):
             defer.returnValue(output_path)
 
     @defer.inlineCallbacks
-    def _generate_thumbnails(self, server_name, media_id, media_info, url_cache=False):
+    def _generate_thumbnails(self, server_name, media_id, file_id, media_type,
+                             url_cache=False):
         """Generate and store thumbnails for an image.
 
         Args:
-            server_name(str|None): The server name if remote media, else None if local
-            media_id(str)
-            media_info(dict)
-            url_cache(bool): If we are thumbnailing images downloaded for the URL cache,
+            server_name (str|None): The server name if remote media, else None if local
+            media_id (str): The media ID of the content. (This is the same as
+                the file_id for local content)
+            file_id (str): Local file ID
+            media_type (str): The content type of the file
+            url_cache (bool): If we are thumbnailing images downloaded for the URL cache,
                 used exclusively by the url previewer
 
         Returns:
             Deferred[dict]: Dict with "width" and "height" keys of original image
         """
-        media_type = media_info["media_type"]
-        file_id = media_info.get("filesystem_id")
         requirements = self._get_thumbnail_requirements(media_type)
         if not requirements:
             return
@@ -568,7 +596,7 @@ class MediaRepository(object):
             try:
                 file_info = FileInfo(
                     server_name=server_name,
-                    file_id=media_id,
+                    file_id=file_id,
                     thumbnail=True,
                     thumbnail_width=t_width,
                     thumbnail_height=t_height,
