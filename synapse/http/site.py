@@ -67,13 +67,14 @@ class SynapseRequest(Request):
             ru_utime, ru_stime = context.get_resource_usage()
             db_txn_count = context.db_txn_count
             db_txn_duration_ms = context.db_txn_duration_ms
+            db_sched_duration_ms = context.db_sched_duration_ms
         except Exception:
             ru_utime, ru_stime = (0, 0)
             db_txn_count, db_txn_duration_ms = (0, 0)
 
         self.site.access_logger.info(
             "%s - %s - {%s}"
-            " Processed request: %dms (%dms, %dms) (%dms/%d)"
+            " Processed request: %dms (%dms, %dms) (%dms/%dms/%d)"
             " %sB %s \"%s %s %s\" \"%s\"",
             self.getClientIP(),
             self.site.site_tag,
@@ -81,6 +82,7 @@ class SynapseRequest(Request):
             int(time.time() * 1000) - self.start_time,
             int(ru_utime * 1000),
             int(ru_stime * 1000),
+            db_sched_duration_ms,
             db_txn_duration_ms,
             int(db_txn_count),
             self.sentLength,
