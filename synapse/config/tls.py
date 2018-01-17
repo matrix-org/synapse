@@ -96,7 +96,7 @@ class TlsConfig(Config):
         # certificates returned by this server match one of the fingerprints.
         #
         # Synapse automatically adds the fingerprint of its own certificate
-        # to the list. So if federation traffic is handle directly by synapse
+        # to the list. So if federation traffic is handled directly by synapse
         # then no modification to the list is required.
         #
         # If synapse is run behind a load balancer that handles the TLS then it
