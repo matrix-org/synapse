@@ -532,7 +532,7 @@ class MediaRepository(object):
             media_id (str): The media ID of the content. (This is the same as
                 the file_id for local content)
             file_id (str): Local file ID
-            media_type (str)
+            media_type (str): The content type of the file
             url_cache (bool): If we are thumbnailing images downloaded for the URL cache,
                 used exclusively by the url previewer
 
