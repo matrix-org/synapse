@@ -354,6 +354,10 @@ https://matrix.org/docs/projects/try-matrix-now.html (or build your own with one
 Fedora
 ------
 
+Synapse is in the Fedora repositories as ``matrix-synapse``::
+
+    sudo dnf install matrix-synapse
+
 Oleg Girko provides Fedora RPMs at
 https://obs.infoserver.lv/project/monitor/matrix-synapse
 
