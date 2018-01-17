@@ -13,7 +13,4 @@
  * limitations under the License.
  */
 
--- drop the unique constraint on deleted_pushers so that we can just insert
--- into it rather than upserting.
-
 ALTER TABLE local_media_repository ADD COLUMN last_access_ts BIGINT;
