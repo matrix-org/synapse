@@ -135,7 +135,7 @@ class ContentRepositoryConfig(Config):
             )
 
             self.media_storage_providers.append(
-                (provider_class, provider_config, wrapper_config,)
+                (provider_class, parsed_config, wrapper_config,)
             )
 
         self.uploads_path = self.ensure_directory(config["uploads_path"])
