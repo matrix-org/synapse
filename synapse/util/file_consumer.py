@@ -15,7 +15,7 @@
 
 from twisted.internet import threads, reactor
 
-from synapse.util.logcontext import make_deferred_yieldable
+from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
 
 import Queue
 
@@ -70,7 +70,7 @@ class BackgroundFileConsumer(object):
 
         self._producer = producer
         self.streaming = streaming
-        self._finished_deferred = threads.deferToThread(self._writer)
+        self._finished_deferred = preserve_fn(threads.deferToThread)(self._writer)
         if not streaming:
             self._producer.resumeProducing()
 
