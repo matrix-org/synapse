@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2018 New Vecotr Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ class BackgroundFileConsumer(object):
         self._notify_empty_deferred = None
 
     def registerProducer(self, producer, streaming):
-        """Part of IProducer interface
+        """Part of IConsumer interface
 
         Args:
             producer (IProducer)
@@ -91,7 +91,7 @@ class BackgroundFileConsumer(object):
 
         self.bytes_queue.put_nowait(bytes)
 
-        # If this is a pushed based consumer and the queue is getting behind
+        # If this is a PushProducer and the queue is getting behind
         # then we pause the producer.
         if self.streaming and self.bytes_queue.qsize() >= self._PAUSE_ON_QUEUE_SIZE:
             self.paused_producer = True
