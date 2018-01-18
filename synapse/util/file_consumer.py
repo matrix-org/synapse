@@ -43,6 +43,10 @@ class BackgroundFileConsumer(object):
         # True if PushProducer, false if PullProducer
         self.streaming = False
 
+        # For PushProducers, indicates whether we've paused the producer and
+        # need to call resumeProducing before we get more data.
+        self.paused_producer = False
+
         # Queue of slices of bytes to be written. When producer calls
         # unregister a final None is sent.
         self.bytes_queue = Queue.Queue()
@@ -70,8 +74,6 @@ class BackgroundFileConsumer(object):
         self.finished_deferred = threads.deferToThread(self._writer)
         if not streaming:
             self.producer.resumeProducing()
-
-        self.paused_producer = False
 
     def unregisterProducer(self):
         """Part of IProducer interface
