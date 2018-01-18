@@ -69,6 +69,9 @@ class BackgroundFileConsumer(object):
             streaming (bool): True if push based producer, False if pull
                 based.
         """
+        if self.producer:
+            raise Exception("registerProducer called twice")
+
         self.producer = producer
         self.streaming = streaming
         self.finished_deferred = threads.deferToThread(self._writer)
