@@ -39,7 +39,11 @@ ThumbnailRequirement = namedtuple(
 )
 
 MediaStorageProviderConfig = namedtuple(
-    "MediaStorageProviderConfig", ("store_local", "store_remote", "store_synchronous",)
+    "MediaStorageProviderConfig", (
+        "store_local",  # Whether to store newly uploaded local files
+        "store_remote",  # Whether to store newly downloaded remote files
+        "store_synchronous",  # Whether to wait for successful storage for local uploads
+    ),
 )
 
 

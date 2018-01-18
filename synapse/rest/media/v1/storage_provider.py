@@ -99,7 +99,7 @@ class FileStorageProviderBackend(StorageProvider):
 
     Args:
         hs (HomeServer)
-        config: The config returned by `parse_config`, i
+        config: The config returned by `parse_config`.
     """
 
     def __init__(self, hs, config):
@@ -133,7 +133,7 @@ class FileStorageProviderBackend(StorageProvider):
 
         The returned value is passed into the constructor.
 
-        In this case we only care about a single param, the directory, so lets
+        In this case we only care about a single param, the directory, so let's
         just pull that out.
         """
         return Config.ensure_directory(config["directory"])
