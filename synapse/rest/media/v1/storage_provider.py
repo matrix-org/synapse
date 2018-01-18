@@ -77,7 +77,7 @@ class StorageProviderWrapper(StorageProvider):
         self.store_remote = store_remote
 
     def store_file(self, path, file_info):
-        if not self.store:
+        if not file_info.server_name and not self.store_local:
             return defer.succeed(None)
 
         if file_info.server_name and not self.store_remote:
