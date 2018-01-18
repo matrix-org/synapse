@@ -15,6 +15,9 @@
 
 
 from itertools import chain
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def flatten(items):
@@ -153,7 +156,11 @@ class CallbackMetric(BaseMetric):
         self.callback = callback
 
     def render(self):
-        value = self.callback()
+        try:
+            value = self.callback()
+        except Exception:
+            logger.exception("Failed to render %s", self.name)
+            return ["# FAILED to render " + self.name]
 
         if self.is_scalar():
             return list(self._render_for_labels([], value))
