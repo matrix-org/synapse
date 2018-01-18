@@ -127,6 +127,7 @@ class FileStorageProviderBackend(StorageProvider):
         if os.path.isfile(backup_fname):
             return FileResponder(open(backup_fname, "rb"))
 
+    @staticmethod
     def parse_config(config):
         """Called on startup to parse config supplied. This should parse
         the config and raise if there is a problem.
