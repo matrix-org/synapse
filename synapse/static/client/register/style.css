@@ -1,0 +1,60 @@
+html {
+    height: 100%;
+}
+
+body {
+    height: 100%;
+    font-family: "Myriad Pro", "Myriad", Helvetica, Arial, sans-serif;
+    font-size: 12pt;
+    margin: 0px;
+}
+
+h1 {
+    font-size: 20pt;
+}
+
+a:link    { color: #666; }
+a:visited { color: #666; }
+a:hover   { color: #000; }
+a:active  { color: #000; }
+
+input {
+   width: 100%
+}
+
+textarea, input {
+   font-family: inherit;
+   font-size: inherit;
+}
+
+.smallPrint {
+    color: #888;
+    font-size: 9pt ! important;
+    font-style: italic ! important;
+}
+
+#recaptcha_area { 
+    margin: auto
+}
+
+.g-recaptcha div {
+    margin: auto;
+}
+
+#registrationForm {
+    text-align: left;
+    padding: 5px;
+    margin-bottom: 40px;
+    display: inline-block;
+    
+    -webkit-border-radius: 10px;
+    -moz-border-radius: 10px;
+    border-radius: 10px;
+    
+    -webkit-box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.15);
+    -moz-box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.15);
+    box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.15);
+    
+    background-color: #f8f8f8;
+    border: 1px #ccc solid;
+}
