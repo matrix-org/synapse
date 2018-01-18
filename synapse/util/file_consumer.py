@@ -110,7 +110,7 @@ class BackgroundFileConsumer(object):
                     if self.bytes_queue.qsize() <= self._RESUME_ON_QUEUE_SIZE:
                         reactor.callFromThread(self._resume_paused_producer)
 
-                if self._notify_empty and self.bytes_queue.empty():
+                if self._notify_empty_deferred and self.bytes_queue.empty():
                     reactor.callFromThread(self._notify_empty)
 
                 bytes = self.bytes_queue.get()
