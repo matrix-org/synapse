@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from mock import NonCallableMock
 
 from synapse.util.file_consumer import BackgroundFileConsumer
@@ -53,7 +53,7 @@ class FileConsumerTests(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_push_consumer(self):
-        string_file = StringIO()
+        string_file = BlockingStringWrite()
         consumer = BackgroundFileConsumer(string_file)
 
         try:
@@ -62,14 +62,14 @@ class FileConsumerTests(unittest.TestCase):
             consumer.registerProducer(producer, True)
 
             consumer.write("Foo")
-            yield consumer.wait_for_writes()
+            yield string_file.wait_for_n_writes(1)
 
-            self.assertEqual(string_file.getvalue(), "Foo")
+            self.assertEqual(string_file.buffer, "Foo")
 
             consumer.write("Bar")
-            yield consumer.wait_for_writes()
+            yield string_file.wait_for_n_writes(2)
 
-            self.assertEqual(string_file.getvalue(), "FooBar")
+            self.assertEqual(string_file.buffer, "FooBar")
         finally:
             consumer.unregisterProducer()
 
@@ -85,15 +85,22 @@ class FileConsumerTests(unittest.TestCase):
         try:
             producer = NonCallableMock(spec_set=["pauseProducing", "resumeProducing"])
 
+            resume_deferred = defer.Deferred()
+            producer.resumeProducing.side_effect = lambda: resume_deferred.callback(None)
+
             consumer.registerProducer(producer, True)
 
+            number_writes = 0
             with string_file.write_lock:
                 for _ in range(consumer._PAUSE_ON_QUEUE_SIZE):
                     consumer.write("Foo")
+                    number_writes += 1
 
                 producer.pauseProducing.assert_called_once()
 
-            yield consumer.wait_for_writes()
+            yield string_file.wait_for_n_writes(number_writes)
+
+            yield resume_deferred
             producer.resumeProducing.assert_called_once()
         finally:
             consumer.unregisterProducer()
@@ -131,8 +138,39 @@ class BlockingStringWrite(object):
         self.closed = False
         self.write_lock = threading.Lock()
 
+        self._notify_write_deferred = None
+        self._number_of_writes = 0
+
     def write(self, bytes):
-        self.buffer += bytes
+        with self.write_lock:
+            self.buffer += bytes
+            self._number_of_writes += 1
+
+        reactor.callFromThread(self._notify_write)
 
     def close(self):
         self.closed = True
+
+    def _notify_write(self):
+        "Called by write to indicate a write happened"
+        with self.write_lock:
+            if not self._notify_write_deferred:
+                return
+            d = self._notify_write_deferred
+            self._notify_write_deferred = None
+        d.callback(None)
+
+    @defer.inlineCallbacks
+    def wait_for_n_writes(self, n):
+        "Wait for n writes to have happened"
+        while True:
+            with self.write_lock:
+                if n <= self._number_of_writes:
+                    return
+
+                if not self._notify_write_deferred:
+                    self._notify_write_deferred = defer.Deferred()
+
+                d = self._notify_write_deferred
+
+            yield d
