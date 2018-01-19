@@ -15,6 +15,7 @@
 
 """Contains functions for registering clients."""
 import logging
+import re
 
 from twisted.internet import defer
 
@@ -293,7 +294,7 @@ class RegistrationHandler(BaseHandler):
         """
 
         for c in threepidCreds:
-            logger.info("validating theeepidcred sid %s on id server %s",
+            logger.info("validating threepidcred sid %s on id server %s",
                         c['sid'], c['idServer'])
             try:
                 identity_handler = self.hs.get_handlers().identity_handler
@@ -306,6 +307,16 @@ class RegistrationHandler(BaseHandler):
                 raise RegistrationError(400, "Couldn't validate 3pid")
             logger.info("got threepid with medium '%s' and address '%s'",
                         threepid['medium'], threepid['address'])
+
+            for constraint in self.hs.config.registrations_require_3pid:
+                if (
+                    constraint['medium'] == 'email' and
+                    threepid['medium'] == 'email' and
+                    re.match(constraint['pattern'], threepid['address'])
+                ):
+                    raise RegistrationError(
+                        403, "Third party identifier is not allowed"
+                    )
 
     @defer.inlineCallbacks
     def bind_emails(self, user_id, threepidCreds):

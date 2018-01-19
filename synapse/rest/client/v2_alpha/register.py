@@ -72,7 +72,9 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         ])
 
         if not check_3pid_allowed(self.hs, "email", body['email']):
-            raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
+            raise SynapseError(
+                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED
+            )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'email', body['email']
@@ -110,7 +112,9 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
-            raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
+            raise SynapseError(
+                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED
+            )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'msisdn', msisdn
@@ -368,7 +372,9 @@ class RegisterRestServlet(RestServlet):
                     auth_result[LoginType.EMAIL_IDENTITY].threepid.address
                 )
             ):
-                raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
+                raise SynapseError(
+                    403, "Third party identifier is not allowed", Codes.THREEPID_DENIED
+                )
             elif (
                 constraint['medium'] == 'msisdn' and
                 auth_result and LoginType.MSISDN in auth_result and
@@ -377,7 +383,9 @@ class RegisterRestServlet(RestServlet):
                     auth_result[LoginType.MSISDN].threepid.address
                 )
             ):
-                raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
+                raise SynapseError(
+                    403, "Third party identifier is not allowed", Codes.THREEPID_DENIED
+                )
 
         if registered_user_id is not None:
             logger.info(

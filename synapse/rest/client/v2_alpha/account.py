@@ -48,7 +48,9 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         ])
 
         if not check_3pid_allowed(self.hs, "email", body['email']):
-            raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
+            raise SynapseError(
+                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED
+            )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'email', body['email']
@@ -82,7 +84,9 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
         msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
-            raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
+            raise SynapseError(
+                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED
+            )
 
         existingUid = yield self.datastore.get_user_id_by_threepid(
             'msisdn', msisdn
@@ -224,7 +228,9 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
 
         if not check_3pid_allowed(self.hs, "email", body['email']):
-            raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
+            raise SynapseError(
+                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED
+            )
 
         existingUid = yield self.datastore.get_user_id_by_threepid(
             'email', body['email']
@@ -265,7 +271,9 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
-            raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
+            raise SynapseError(
+                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED
+            )
 
         existingUid = yield self.datastore.get_user_id_by_threepid(
             'msisdn', msisdn
