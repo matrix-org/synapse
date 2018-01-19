@@ -26,11 +26,11 @@ from synapse.http.servlet import (
     RestServlet, parse_json_object_from_request, assert_params_in_request, parse_string
 )
 from synapse.util.msisdn import phone_number_to_msisdn
+from synapse.util.threepids import check_3pid_allowed
 
-from ._base import client_v2_patterns, interactive_auth_handler, check_3pid_allowed
+from ._base import client_v2_patterns, interactive_auth_handler
 
 import logging
-import re
 import hmac
 from hashlib import sha1
 from synapse.util.async import run_on_reactor
@@ -316,41 +316,41 @@ class RegisterRestServlet(RestServlet):
         if 'x_show_msisdn' in body and body['x_show_msisdn']:
             show_msisdn = True
 
-        require_email = False
-        require_msisdn = False
-        for constraint in self.hs.config.registrations_require_3pid:
-            if constraint['medium'] == 'email':
-                require_email = True
-            elif constraint['medium'] == 'msisdn':
-                require_msisdn = True
-            else:
-                logger.warn(
-                    "Unrecognised 3PID medium %s in registrations_require_3pid" %
-                    constraint['medium']
-                )
+        # FIXME: need a better error than "no auth flow found" for scenarios
+        # where we required 3PID for registration but the user didn't give one
+        require_email = 'email' in self.hs.config.registrations_require_3pid
+        require_msisdn = 'msisdn' in self.hs.config.registrations_require_3pid
 
         flows = []
         if self.hs.config.enable_registration_captcha:
+            # only support 3PIDless registration if no 3PIDs are required
             if not require_email and not require_msisdn:
                 flows.extend([[LoginType.RECAPTCHA]])
-            if require_email or not require_msisdn:
+            # only support the email-only flow if we don't require MSISDN 3PIDs
+            if not require_msisdn:
                 flows.extend([[LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA]])
 
             if show_msisdn:
-                if not require_email or require_msisdn:
+                # only support the MSISDN-only flow if we don't require email 3PIDs
+                if not require_email:
                     flows.extend([[LoginType.MSISDN, LoginType.RECAPTCHA]])
+                # always let users provide both MSISDN & email
                 flows.extend([
                     [LoginType.MSISDN, LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
                 ])
         else:
+            # only support 3PIDless registration if no 3PIDs are required
             if not require_email and not require_msisdn:
                 flows.extend([[LoginType.DUMMY]])
-            if require_email or not require_msisdn:
+            # only support the email-only flow if we don't require MSISDN 3PIDs
+            if not require_msisdn:
                 flows.extend([[LoginType.EMAIL_IDENTITY]])
 
             if show_msisdn:
+                # only support the MSISDN-only flow if we don't require email 3PIDs
                 if not require_email or require_msisdn:
                     flows.extend([[LoginType.MSISDN]])
+                # always let users provide both MSISDN & email
                 flows.extend([
                     [LoginType.MSISDN, LoginType.EMAIL_IDENTITY]
                 ])
@@ -359,30 +359,23 @@ class RegisterRestServlet(RestServlet):
             flows, body, self.hs.get_ip_from_request(request)
         )
 
-        # doublecheck that we're not trying to register an denied 3pid.
-        # the user-facing checks should already have happened when we requested
-        # a 3PID token to validate them in /register/email/requestToken etc
+        # Check that we're not trying to register a denied 3pid.
+        #
+        # the user-facing checks will probably already have happened in
+        # /register/email/requestToken when we requested a 3pid, but that's not
+        # guaranteed.
 
-        for constraint in self.hs.config.registrations_require_3pid:
-            if (
-                constraint['medium'] == 'email' and
-                auth_result and LoginType.EMAIL_IDENTITY in auth_result and
-                re.match(
-                    constraint['pattern'],
-                    auth_result[LoginType.EMAIL_IDENTITY].threepid.address
-                )
-            ):
-                raise SynapseError(
-                    403, "Third party identifier is not allowed", Codes.THREEPID_DENIED
-                )
-            elif (
-                constraint['medium'] == 'msisdn' and
-                auth_result and LoginType.MSISDN in auth_result and
-                re.match(
-                    constraint['pattern'],
-                    auth_result[LoginType.MSISDN].threepid.address
-                )
-            ):
+        if (
+            auth_result and
+            (
+                LoginType.EMAIL_IDENTITY in auth_result or
+                LoginType.EMAIL_MSISDN in auth_result
+            )
+        ):
+            medium = auth_result[LoginType.EMAIL_IDENTITY].threepid['medium']
+            address = auth_result[LoginType.EMAIL_IDENTITY].threepid['address']
+
+            if not check_3pid_allowed(self.hs, medium, address):
                 raise SynapseError(
                     403, "Third party identifier is not allowed", Codes.THREEPID_DENIED
                 )

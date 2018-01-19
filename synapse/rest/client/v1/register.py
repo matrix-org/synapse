@@ -71,22 +71,13 @@ class RegisterRestServlet(ClientV1RestServlet):
 
     def on_GET(self, request):
 
-        require_email = False
-        require_msisdn = False
-        for constraint in self.hs.config.registrations_require_3pid:
-            if constraint['medium'] == 'email':
-                require_email = True
-            elif constraint['medium'] == 'msisdn':
-                require_msisdn = True
-            else:
-                logger.warn(
-                    "Unrecognised 3PID medium %s in registrations_require_3pid" %
-                    constraint['medium']
-                )
+        require_email = 'email' in self.hs.config.registrations_require_3pid
+        require_msisdn = 'msisdn' in self.hs.config.registrations_require_3pid
 
         flows = []
         if self.hs.config.enable_registration_captcha:
-            if require_email or not require_msisdn:
+            # only support the email-only flow if we don't require MSISDN 3PIDs
+            if not require_msisdn:
                 flows.extend([
                     {
                         "type": LoginType.RECAPTCHA,
@@ -97,6 +88,7 @@ class RegisterRestServlet(ClientV1RestServlet):
                         ]
                     },
                 ])
+            # only support 3PIDless registration if no 3PIDs are required
             if not require_email and not require_msisdn:
                 flows.extend([
                     {
@@ -105,6 +97,7 @@ class RegisterRestServlet(ClientV1RestServlet):
                     }
                 ])
         else:
+            # only support the email-only flow if we don't require MSISDN 3PIDs
             if require_email or not require_msisdn:
                 flows.extend([
                     {
@@ -114,6 +107,7 @@ class RegisterRestServlet(ClientV1RestServlet):
                         ]
                     }
                 ])
+            # only support 3PIDless registration if no 3PIDs are required
             if not require_email and not require_msisdn:
                 flows.extend([
                     {

@@ -32,6 +32,7 @@ class RegistrationConfig(Config):
             )
 
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
+        self.allowed_local_3pids = config.get("allowed_local_3pids", [])
         self.registration_shared_secret = config.get("registration_shared_secret")
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
@@ -53,11 +54,16 @@ class RegistrationConfig(Config):
         # Enable registration for new users.
         enable_registration: False
 
-        # Mandate that registrations require a 3PID which matches one or more
-        # of these 3PIDs.  N.B. regexp escape backslashes are doubled (once for
-        # YAML and once for the regexp itself)
+        # The user must provide all of the below types of 3PID when registering.
         #
         # registrations_require_3pid:
+        #     - email
+        #     - msisdn
+
+        # Mandate that users are only allowed to associate certain formats of
+        # 3PIDs with accounts on this server.
+        #
+        # allowed_local_3pids:
         #     - medium: email
         #       pattern: ".*@matrix\\.org"
         #     - medium: email

@@ -15,7 +15,6 @@
 
 """Contains functions for registering clients."""
 import logging
-import re
 
 from twisted.internet import defer
 
@@ -26,6 +25,7 @@ from synapse.http.client import CaptchaServerHttpClient
 from synapse import types
 from synapse.types import UserID
 from synapse.util.async import run_on_reactor
+from synapse.util.threepids import check_3pid_allowed
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
@@ -308,15 +308,10 @@ class RegistrationHandler(BaseHandler):
             logger.info("got threepid with medium '%s' and address '%s'",
                         threepid['medium'], threepid['address'])
 
-            for constraint in self.hs.config.registrations_require_3pid:
-                if (
-                    constraint['medium'] == 'email' and
-                    threepid['medium'] == 'email' and
-                    re.match(constraint['pattern'], threepid['address'])
-                ):
-                    raise RegistrationError(
-                        403, "Third party identifier is not allowed"
-                    )
+            if not check_3pid_allowed(self.hs, threepid['medium'], threepid['address']):
+                raise RegistrationError(
+                    403, "Third party identifier is not allowed"
+                )
 
     @defer.inlineCallbacks
     def bind_emails(self, user_id, threepidCreds):
