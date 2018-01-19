@@ -27,13 +27,16 @@ def check_3pid_allowed(hs, medium, address):
         medium (str): 3pid medium - e.g. email, msisdn
         address (str): address within that medium (e.g. "wotan@matrix.org")
             msisdns need to first have been canonicalised
+    Returns:
+        bool: whether the 3PID medium/address is allowed to be added to this HS
     """
 
     if hs.config.allowed_local_3pids:
         for constraint in hs.config.allowed_local_3pids:
-            logger.debug("Checking 3PID %s (%s) against %s (%s)" % (
-                address, medium, constraint['pattern'], constraint['medium']
-            ))
+            logger.debug(
+                "Checking 3PID %s (%s) against %s (%s)",
+                address, medium, constraint['pattern'], constraint['medium'],
+            )
             if (
                 medium == constraint['medium'] and
                 re.match(constraint['pattern'], address)
