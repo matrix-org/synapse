@@ -366,7 +366,7 @@ class RegisterRestServlet(RestServlet):
         # guaranteed.
 
         if auth_result:
-            for login_type in [LoginType.EMAIL_IDENTITY, LoginType.EMAIL_MSISDN]:
+            for login_type in [LoginType.EMAIL_IDENTITY, LoginType.MSISDN]:
                 if login_type in auth_result:
                     medium = auth_result[login_type].threepid['medium']
                     address = auth_result[login_type].threepid['address']
