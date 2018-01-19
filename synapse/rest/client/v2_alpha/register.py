@@ -27,9 +27,10 @@ from synapse.http.servlet import (
 )
 from synapse.util.msisdn import phone_number_to_msisdn
 
-from ._base import client_v2_patterns, interactive_auth_handler
+from ._base import client_v2_patterns, interactive_auth_handler, check_3pid_allowed
 
 import logging
+import re
 import hmac
 from hashlib import sha1
 from synapse.util.async import run_on_reactor
@@ -70,6 +71,9 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             'id_server', 'client_secret', 'email', 'send_attempt'
         ])
 
+        if not check_3pid_allowed(self.hs, "email", body['email']):
+            raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
+
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'email', body['email']
         )
@@ -104,6 +108,9 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         ])
 
         msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
+
+        if not check_3pid_allowed(self.hs, "msisdn", msisdn):
+            raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'msisdn', msisdn
@@ -305,30 +312,72 @@ class RegisterRestServlet(RestServlet):
         if 'x_show_msisdn' in body and body['x_show_msisdn']:
             show_msisdn = True
 
+        require_email = False
+        require_msisdn = False
+        for constraint in self.hs.config.registrations_require_3pid:
+            if constraint['medium'] == 'email':
+                require_email = True
+            elif constraint['medium'] == 'msisdn':
+                require_msisdn = True
+            else:
+                logger.warn(
+                    "Unrecognised 3PID medium %s in registrations_require_3pid" %
+                    constraint['medium']
+                )
+
+        flows = []
         if self.hs.config.enable_registration_captcha:
-            flows = [
-                [LoginType.RECAPTCHA],
-                [LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
-            ]
+            if not require_email and not require_msisdn:
+                flows.extend([[LoginType.RECAPTCHA]])
+            if require_email or not require_msisdn:
+                flows.extend([[LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA]])
+
             if show_msisdn:
+                if not require_email or require_msisdn:
+                    flows.extend([[LoginType.MSISDN, LoginType.RECAPTCHA]])
                 flows.extend([
-                    [LoginType.MSISDN, LoginType.RECAPTCHA],
                     [LoginType.MSISDN, LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
                 ])
         else:
-            flows = [
-                [LoginType.DUMMY],
-                [LoginType.EMAIL_IDENTITY],
-            ]
+            if not require_email and not require_msisdn:
+                flows.extend([[LoginType.DUMMY]])
+            if require_email or not require_msisdn:
+                flows.extend([[LoginType.EMAIL_IDENTITY]])
+
             if show_msisdn:
+                if not require_email or require_msisdn:
+                    flows.extend([[LoginType.MSISDN]])
                 flows.extend([
-                    [LoginType.MSISDN],
-                    [LoginType.MSISDN, LoginType.EMAIL_IDENTITY],
+                    [LoginType.MSISDN, LoginType.EMAIL_IDENTITY]
                 ])
 
         auth_result, params, session_id = yield self.auth_handler.check_auth(
             flows, body, self.hs.get_ip_from_request(request)
         )
+
+        # doublecheck that we're not trying to register an denied 3pid.
+        # the user-facing checks should already have happened when we requested
+        # a 3PID token to validate them in /register/email/requestToken etc
+
+        for constraint in self.hs.config.registrations_require_3pid:
+            if (
+                constraint['medium'] == 'email' and
+                auth_result and LoginType.EMAIL_IDENTITY in auth_result and
+                re.match(
+                    constraint['pattern'],
+                    auth_result[LoginType.EMAIL_IDENTITY].threepid.address
+                )
+            ):
+                raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
+            elif (
+                constraint['medium'] == 'msisdn' and
+                auth_result and LoginType.MSISDN in auth_result and
+                re.match(
+                    constraint['pattern'],
+                    auth_result[LoginType.MSISDN].threepid.address
+                )
+            ):
+                raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
 
         if registered_user_id is not None:
             logger.info(

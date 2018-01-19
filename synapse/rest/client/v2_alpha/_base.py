@@ -60,6 +60,28 @@ def set_timeline_upper_limit(filter_json, filter_timeline_limit):
             filter_timeline_limit)
 
 
+def check_3pid_allowed(hs, medium, address):
+    # check whether the HS has whitelisted the given 3PID
+
+    allow = False
+    if hs.config.registrations_require_3pid:
+        for constraint in hs.config.registrations_require_3pid:
+            logger.debug("Checking 3PID %s (%s) against %s (%s)" % (
+                address, medium, constraint['pattern'], constraint['medium']
+                )
+            )
+            if (
+                medium == constraint['medium'] and
+                re.match(constraint['pattern'], address)
+            ):
+                allow = True
+                break
+    else:
+        allow = True
+
+    return allow
+
+
 def interactive_auth_handler(orig):
     """Wraps an on_POST method to handle InteractiveAuthIncompleteErrors
 

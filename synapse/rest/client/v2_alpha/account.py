@@ -26,7 +26,7 @@ from synapse.http.servlet import (
 )
 from synapse.util.async import run_on_reactor
 from synapse.util.msisdn import phone_number_to_msisdn
-from ._base import client_v2_patterns, interactive_auth_handler
+from ._base import client_v2_patterns, interactive_auth_handler, check_3pid_allowed
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,9 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         assert_params_in_request(body, [
             'id_server', 'client_secret', 'email', 'send_attempt'
         ])
+
+        if not check_3pid_allowed(self.hs, "email", body['email']):
+            raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'email', body['email']
@@ -77,6 +80,9 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
         ])
 
         msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
+
+        if not check_3pid_allowed(self.hs, "msisdn", msisdn):
+            raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
 
         existingUid = yield self.datastore.get_user_id_by_threepid(
             'msisdn', msisdn
@@ -217,6 +223,9 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         if absent:
             raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
 
+        if not check_3pid_allowed(self.hs, "email", body['email']):
+            raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
+
         existingUid = yield self.datastore.get_user_id_by_threepid(
             'email', body['email']
         )
@@ -254,6 +263,9 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
 
         msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
+
+        if not check_3pid_allowed(self.hs, "msisdn", msisdn):
+            raise SynapseError(403, "3PID denied", Codes.THREEPID_DENIED)
 
         existingUid = yield self.datastore.get_user_id_by_threepid(
             'msisdn', msisdn
