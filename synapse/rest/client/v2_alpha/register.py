@@ -365,20 +365,17 @@ class RegisterRestServlet(RestServlet):
         # /register/email/requestToken when we requested a 3pid, but that's not
         # guaranteed.
 
-        if (
-            auth_result and
-            (
-                LoginType.EMAIL_IDENTITY in auth_result or
-                LoginType.EMAIL_MSISDN in auth_result
-            )
-        ):
-            medium = auth_result[LoginType.EMAIL_IDENTITY].threepid['medium']
-            address = auth_result[LoginType.EMAIL_IDENTITY].threepid['address']
+        if auth_result:
+            for login_type in [LoginType.EMAIL_IDENTITY, LoginType.EMAIL_MSISDN]:
+                if login_type in auth_result:
+                    medium = auth_result[login_type].threepid['medium']
+                    address = auth_result[login_type].threepid['address']
 
-            if not check_3pid_allowed(self.hs, medium, address):
-                raise SynapseError(
-                    403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
-                )
+                    if not check_3pid_allowed(self.hs, medium, address):
+                        raise SynapseError(
+                            403, "Third party identifier is not allowed",
+                            Codes.THREEPID_DENIED,
+                        )
 
         if registered_user_id is not None:
             logger.info(
