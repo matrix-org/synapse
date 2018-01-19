@@ -68,8 +68,7 @@ def check_3pid_allowed(hs, medium, address):
         for constraint in hs.config.registrations_require_3pid:
             logger.debug("Checking 3PID %s (%s) against %s (%s)" % (
                 address, medium, constraint['pattern'], constraint['medium']
-                )
-            )
+            ))
             if (
                 medium == constraint['medium'] and
                 re.match(constraint['pattern'], address)
