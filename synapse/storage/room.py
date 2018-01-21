@@ -553,7 +553,7 @@ class RoomStore(SQLBaseStore):
         the associated media
         """
         def _quarantine_media_in_room(txn):
-            local_media_mxcs, remote_media_mxcs = self._get_media_ids_in_room(txn, room_id)
+            local_media_ids, remote_media_ids = self._get_media_ids_in_room(txn, room_id)
             total_media_quarantined = 0
 
             # Now update all the tables to set the quarantined_by flag
@@ -562,7 +562,7 @@ class RoomStore(SQLBaseStore):
                 UPDATE local_media_repository
                 SET quarantined_by = ?
                 WHERE media_id = ?
-            """, ((quarantined_by, media_id) for media_id in local_media_mxcs))
+            """, ((quarantined_by, media_id) for media_id in local_media_ids))
 
             txn.executemany(
                 """
@@ -572,12 +572,12 @@ class RoomStore(SQLBaseStore):
                 """,
                 (
                     (quarantined_by, origin, media_id)
-                    for origin, media_id in remote_media_mxcs
+                    for origin, media_id in remote_media_ids
                 )
             )
 
-            total_media_quarantined += len(local_media_mxcs)
-            total_media_quarantined += len(remote_media_mxcs)
+            total_media_quarantined += len(local_media_ids)
+            total_media_quarantined += len(remote_media_ids)
 
             return total_media_quarantined
 
