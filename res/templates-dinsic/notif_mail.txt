@@ -1,4 +1,4 @@
-Hi {{ user_display_name }},
+Bonjour {{ user_display_name }},
 
 {{ summary_text }}
 
@@ -6,5 +6,5 @@ Hi {{ user_display_name }},
 {% include 'room.txt' with context %}
 {% endfor %}
 
-You can disable these notifications at {{ unsubscribe_link }}
+Vous pouvez désactiver ces notifications ici {{ unsubscribe_link }}
 
