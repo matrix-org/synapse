@@ -784,7 +784,7 @@ class FederationHandler(BaseHandler):
                     logger.info(e.message)
                     continue
                 except FederationDeniedError as e:
-                    logger.debug(e)
+                    logger.info(e)
                     continue
                 except Exception as e:
                     logger.exception(

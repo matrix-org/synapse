@@ -515,7 +515,7 @@ class DeviceListEduUpdater(object):
                     # eventually become consistent.
                     return
                 except FederationDeniedError as e:
-                    logger.debug(e)
+                    logger.info(e)
                     return
                 except Exception:
                     # TODO: Remember that we are now out of sync and try again

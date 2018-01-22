@@ -55,14 +55,16 @@ class ServerConfig(Config):
             "block_non_admin_invites", False,
         )
 
+        # FIXME: federation_domain_whitelist needs sytests
+        self.federation_domain_whitelist = None
         federation_domain_whitelist = config.get(
-            "federation_domain_whitelist", []
+            "federation_domain_whitelist", None
         )
         # turn the whitelist into a hash for speed of lookup
-        self.federation_domain_whitelist = {}
-        for domain in federation_domain_whitelist:
-            self.federation_domain_whitelist[domain] = True
-        # FIXME: federation_domain_whitelist needs sytests
+        if federation_domain_whitelist is not None:
+            self.federation_domain_whitelist = {}
+            for domain in federation_domain_whitelist:
+                self.federation_domain_whitelist[domain] = True
 
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
@@ -222,7 +224,8 @@ class ServerConfig(Config):
         # Restrict federation to the following whitelist of domains.
         # N.B. we recommend also firewalling your federation listener to limit
         # inbound federation traffic as early as possible, rather than relying
-        # purely on this application-layer restriction.
+        # purely on this application-layer restriction.  If not specified, the
+        # default is to whitelist nothing.
         #
         # federation_domain_whitelist:
         #  - lon.example.com

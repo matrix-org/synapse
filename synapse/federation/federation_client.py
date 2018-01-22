@@ -267,7 +267,7 @@ class FederationClient(FederationBase):
                 logger.info(e.message)
                 continue
             except FederationDeniedError as e:
-                logger.debug(e.message)
+                logger.info(e.message)
                 continue
             except Exception as e:
                 pdu_attempts[destination] = now

@@ -491,7 +491,7 @@ class TransactionQueue(object):
                 ),
             )
         except FederationDeniedError as e:
-            logger.debug(e)
+            logger.info(e)
         except Exception as e:
             logger.warn(
                 "TX [%s] Failed to send transaction: %s",

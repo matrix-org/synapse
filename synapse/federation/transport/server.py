@@ -94,7 +94,7 @@ class Authenticator(object):
         }
 
         if (
-            self.federation_domain_whitelist and
+            self.federation_domain_whitelist is not None and
             self.server_name not in self.federation_domain_whitelist
         ):
             raise FederationDeniedError(self.server_name)

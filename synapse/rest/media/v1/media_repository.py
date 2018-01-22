@@ -226,7 +226,7 @@ class MediaRepository(object):
                 to request
         """
         if (
-            self.federation_domain_whitelist and
+            self.federation_domain_whitelist is not None and
             server_name not in self.federation_domain_whitelist
         ):
             raise FederationDeniedError(server_name)
@@ -266,7 +266,7 @@ class MediaRepository(object):
             Deferred[dict]: The media_info of the file
         """
         if (
-            self.federation_domain_whitelist and
+            self.federation_domain_whitelist is not None and
             server_name not in self.federation_domain_whitelist
         ):
             raise FederationDeniedError(server_name)
@@ -387,8 +387,8 @@ class MediaRepository(object):
                 logger.warn("Not retrying destination %r", server_name)
                 raise SynapseError(502, "Failed to fetch remote media")
             except FederationDeniedError as e:
-                logger.debug(e)
-                raise SynapseError(403, e.message)
+                logger.info(e)
+                raise e
             except Exception:
                 logger.exception("Failed to fetch remote media %s/%s",
                                  server_name, media_id)
