@@ -6,5 +6,5 @@ Bonjour {{ user_display_name }},
 {% include 'room.txt' with context %}
 {% endfor %}
 
-Vous pouvez désactiver ces notifications ici {{ unsubscribe_link }}
+Vous pouvez désactiver ces notifications en cliquant ici {{ unsubscribe_link }}
 
