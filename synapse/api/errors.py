@@ -141,6 +141,32 @@ class RegistrationError(SynapseError):
     pass
 
 
+class FederationDeniedError(SynapseError):
+    """An error raised when the server tries to federate with a server which
+    is not on its federation whitelist.
+
+    Attributes:
+        destination (str): The destination which has been denied
+    """
+
+    def __init__(self, destination):
+        """Raised by federation client or server to indicate that we are
+        are deliberately not attempting to contact a given server because it is
+        not on our federation whitelist.
+
+        Args:
+            destination (str): the domain in question
+        """
+
+        self.destination = destination
+
+        super(FederationDeniedError, self).__init__(
+            code=403,
+            msg="Federation denied with %s." % (self.destination,),
+            errcode=Codes.FORBIDDEN,
+        )
+
+
 class InteractiveAuthIncompleteError(Exception):
     """An error raised when UI auth is not yet complete
 

@@ -57,6 +57,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.worker_app = None
         config.email_enable_notifs = False
         config.block_non_admin_invites = False
+        config.federation_domain_whitelist = None
 
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.

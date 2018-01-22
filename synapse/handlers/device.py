@@ -14,6 +14,7 @@
 # limitations under the License.
 from synapse.api import errors
 from synapse.api.constants import EventTypes
+from synapse.api.errors import FederationDeniedError
 from synapse.util import stringutils
 from synapse.util.async import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -512,6 +513,9 @@ class DeviceListEduUpdater(object):
                     # next time we get a device list update for this user_id.
                     # This makes it more likely that the device lists will
                     # eventually become consistent.
+                    return
+                except FederationDeniedError as e:
+                    logger.info(e)
                     return
                 except Exception:
                     # TODO: Remember that we are now out of sync and try again
