@@ -225,7 +225,7 @@ class ServerConfig(Config):
         # N.B. we recommend also firewalling your federation listener to limit
         # inbound federation traffic as early as possible, rather than relying
         # purely on this application-layer restriction.  If not specified, the
-        # default is to whitelist nothing.
+        # default is to whitelist everything.
         #
         # federation_domain_whitelist:
         #  - lon.example.com
