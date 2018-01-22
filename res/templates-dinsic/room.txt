@@ -1,7 +1,7 @@
 {{ room.title }}
 
 {% if room.invite %}
-    You've been invited, join at {{ room.link }}
+    Vous avez été invité, rejoignez la conversation à {{ room.link }}
 {% else %}
     {% for notif in room.notifs %}
         {% include 'notif.txt' with context %}
