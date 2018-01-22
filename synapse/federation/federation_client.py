@@ -23,7 +23,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import Membership
 from synapse.api.errors import (
-    CodeMessageException, HttpResponseException, SynapseError,
+    CodeMessageException, HttpResponseException, SynapseError, FederationDeniedError
 )
 from synapse.events import builder
 from synapse.federation.federation_base import (
@@ -265,6 +265,9 @@ class FederationClient(FederationBase):
                 )
             except NotRetryingDestination as e:
                 logger.info(e.message)
+                continue
+            except FederationDeniedError as e:
+                logger.debug(e.message)
                 continue
             except Exception as e:
                 pdu_attempts[destination] = now

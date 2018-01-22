@@ -19,7 +19,9 @@ import logging
 from canonicaljson import encode_canonical_json
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, CodeMessageException
+from synapse.api.errors import (
+    SynapseError, CodeMessageException, FederationDeniedError,
+)
 from synapse.types import get_domain_from_id, UserID
 from synapse.util.logcontext import preserve_fn, make_deferred_yieldable
 from synapse.util.retryutils import NotRetryingDestination
@@ -139,6 +141,10 @@ class E2eKeysHandler(object):
             except NotRetryingDestination as e:
                 failures[destination] = {
                     "status": 503, "message": "Not ready for retry",
+                }
+            except FederationDeniedError as e:
+                failures[destination] = {
+                    "status": 403, "message": "Federation Denied",
                 }
             except Exception as e:
                 # include ConnectionRefused and other errors

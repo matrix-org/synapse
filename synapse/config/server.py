@@ -55,6 +55,15 @@ class ServerConfig(Config):
             "block_non_admin_invites", False,
         )
 
+        federation_domain_whitelist = config.get(
+            "federation_domain_whitelist", []
+        )
+        # turn the whitelist into a hash for speed of lookup
+        self.federation_domain_whitelist = {}
+        for domain in federation_domain_whitelist:
+            self.federation_domain_whitelist[domain] = True
+        # FIXME: federation_domain_whitelist needs sytests
+
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
                 self.public_baseurl += '/'
@@ -209,6 +218,16 @@ class ServerConfig(Config):
         # Whether room invites to users on this server should be blocked
         # (except those sent by local server admins). The default is False.
         # block_non_admin_invites: True
+
+        # Restrict federation to the following whitelist of domains.
+        # N.B. we recommend also firewalling your federation listener to limit
+        # inbound federation traffic as early as possible, rather than relying
+        # purely on this application-layer restriction.
+        #
+        # federation_domain_whitelist:
+        #  - lon.example.com
+        #  - nyc.example.com
+        #  - syd.example.com
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.

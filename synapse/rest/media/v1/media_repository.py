@@ -34,8 +34,9 @@ from .media_storage import MediaStorage
 
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.util.stringutils import random_string
-from synapse.api.errors import SynapseError, HttpResponseException, \
-    NotFoundError
+from synapse.api.errors import (
+    SynapseError, HttpResponseException, NotFoundError, FederationDeniedError,
+)
 
 from synapse.util.async import Linearizer
 from synapse.util.stringutils import is_ascii
@@ -76,6 +77,8 @@ class MediaRepository(object):
 
         self.recently_accessed_remotes = set()
         self.recently_accessed_locals = set()
+
+        self.federation_domain_whitelist = hs.config.federation_domain_whitelist
 
         # List of StorageProviders where we should search for media and
         # potentially upload to.
@@ -222,6 +225,12 @@ class MediaRepository(object):
             Deferred: Resolves once a response has successfully been written
                 to request
         """
+        if (
+            self.federation_domain_whitelist and
+            server_name not in self.federation_domain_whitelist
+        ):
+            raise FederationDeniedError(server_name)
+
         self.mark_recently_accessed(server_name, media_id)
 
         # We linearize here to ensure that we don't try and download remote
@@ -256,6 +265,12 @@ class MediaRepository(object):
         Returns:
             Deferred[dict]: The media_info of the file
         """
+        if (
+            self.federation_domain_whitelist and
+            server_name not in self.federation_domain_whitelist
+        ):
+            raise FederationDeniedError(server_name)
+
         # We linearize here to ensure that we don't try and download remote
         # media multiple times concurrently
         key = (server_name, media_id)
@@ -371,6 +386,9 @@ class MediaRepository(object):
             except NotRetryingDestination:
                 logger.warn("Not retrying destination %r", server_name)
                 raise SynapseError(502, "Failed to fetch remote media")
+            except FederationDeniedError as e:
+                logger.debug(e)
+                raise SynapseError(403, e.message)
             except Exception:
                 logger.exception("Failed to fetch remote media %s/%s",
                                  server_name, media_id)
