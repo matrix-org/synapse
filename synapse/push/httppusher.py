@@ -162,8 +162,9 @@ class HttpPusher(object):
         )
 
         logger.info(
-            "Processing %i unprocessed push actions starting at stream_ordering %i",
-            len(unprocessed), self.last_stream_ordering,
+            "Processing %i unprocessed push actions for %s starting at "
+            "stream_ordering %s",
+            len(unprocessed), self.user_id, self.last_stream_ordering,
         )
 
         for push_action in unprocessed:
