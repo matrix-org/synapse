@@ -27,9 +27,7 @@ from .identicon_resource import IdenticonResource
 from .preview_url_resource import PreviewUrlResource
 from .filepath import MediaFilePaths
 from .thumbnailer import Thumbnailer
-from .storage_provider import (
-    StorageProviderWrapper, FileStorageProviderBackend,
-)
+from .storage_provider import StorageProviderWrapper
 from .media_storage import MediaStorage
 
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
@@ -84,17 +82,13 @@ class MediaRepository(object):
         # potentially upload to.
         storage_providers = []
 
-        # TODO: Move this into config and allow other storage providers to be
-        # defined.
-        if hs.config.backup_media_store_path:
-            backend = FileStorageProviderBackend(
-                self.primary_base_path, hs.config.backup_media_store_path,
-            )
+        for clz, provider_config, wrapper_config in hs.config.media_storage_providers:
+            backend = clz(hs, provider_config)
             provider = StorageProviderWrapper(
                 backend,
-                store=True,
-                store_synchronous=hs.config.synchronous_backup_media_store,
-                store_remote=True,
+                store_local=wrapper_config.store_local,
+                store_remote=wrapper_config.store_remote,
+                store_synchronous=wrapper_config.store_synchronous,
             )
             storage_providers.append(provider)
 

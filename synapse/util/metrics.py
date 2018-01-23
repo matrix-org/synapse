@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 metrics = synapse.metrics.get_metrics_for(__name__)
 
 # total number of times we have hit this block
-response_count = metrics.register_counter(
+block_counter = metrics.register_counter(
     "block_count",
     labels=["block_name"],
     alternative_names=(
@@ -76,7 +76,7 @@ block_db_txn_count = metrics.register_counter(
 block_db_txn_duration = metrics.register_counter(
     "block_db_txn_duration_seconds", labels=["block_name"],
     alternative_names=(
-        metrics.name_prefix + "_block_db_txn_count:total",
+        metrics.name_prefix + "_block_db_txn_duration:total",
     ),
 )
 
@@ -131,6 +131,8 @@ class Measure(object):
             return
 
         duration = self.clock.time_msec() - self.start
+
+        block_counter.inc(self.name)
         block_timer.inc_by(duration, self.name)
 
         context = LoggingContext.current_context()

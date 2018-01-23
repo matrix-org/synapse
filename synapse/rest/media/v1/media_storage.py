@@ -164,6 +164,14 @@ class MediaStorage(object):
             str
         """
         if file_info.url_cache:
+            if file_info.thumbnail:
+                return self.filepaths.url_cache_thumbnail_rel(
+                    media_id=file_info.file_id,
+                    width=file_info.thumbnail_width,
+                    height=file_info.thumbnail_height,
+                    content_type=file_info.thumbnail_type,
+                    method=file_info.thumbnail_method,
+                )
             return self.filepaths.url_cache_filepath_rel(file_info.file_id)
 
         if file_info.server_name:

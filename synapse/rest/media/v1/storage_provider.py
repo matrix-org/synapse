@@ -17,6 +17,7 @@ from twisted.internet import defer, threads
 
 from .media_storage import FileResponder
 
+from synapse.config._base import Config
 from synapse.util.logcontext import preserve_fn
 
 import logging
@@ -64,19 +65,19 @@ class StorageProviderWrapper(StorageProvider):
 
     Args:
         backend (StorageProvider)
-        store (bool): Whether to store new files or not.
+        store_local (bool): Whether to store new local files or not.
         store_synchronous (bool): Whether to wait for file to be successfully
             uploaded, or todo the upload in the backgroud.
         store_remote (bool): Whether remote media should be uploaded
     """
-    def __init__(self, backend, store, store_synchronous, store_remote):
+    def __init__(self, backend, store_local, store_synchronous, store_remote):
         self.backend = backend
-        self.store = store
+        self.store_local = store_local
         self.store_synchronous = store_synchronous
         self.store_remote = store_remote
 
     def store_file(self, path, file_info):
-        if not self.store:
+        if not file_info.server_name and not self.store_local:
             return defer.succeed(None)
 
         if file_info.server_name and not self.store_remote:
@@ -97,13 +98,13 @@ class FileStorageProviderBackend(StorageProvider):
     """A storage provider that stores files in a directory on a filesystem.
 
     Args:
-        cache_directory (str): Base path of the local media repository
-        base_directory (str): Base path to store new files
+        hs (HomeServer)
+        config: The config returned by `parse_config`.
     """
 
-    def __init__(self, cache_directory, base_directory):
-        self.cache_directory = cache_directory
-        self.base_directory = base_directory
+    def __init__(self, hs, config):
+        self.cache_directory = hs.config.media_store_path
+        self.base_directory = config
 
     def store_file(self, path, file_info):
         """See StorageProvider.store_file"""
@@ -125,3 +126,15 @@ class FileStorageProviderBackend(StorageProvider):
         backup_fname = os.path.join(self.base_directory, path)
         if os.path.isfile(backup_fname):
             return FileResponder(open(backup_fname, "rb"))
+
+    @staticmethod
+    def parse_config(config):
+        """Called on startup to parse config supplied. This should parse
+        the config and raise if there is a problem.
+
+        The returned value is passed into the constructor.
+
+        In this case we only care about a single param, the directory, so let's
+        just pull that out.
+        """
+        return Config.ensure_directory(config["directory"])
