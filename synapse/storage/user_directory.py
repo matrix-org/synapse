@@ -645,7 +645,7 @@ class UserDirectoryStore(SQLBaseStore):
             join_clause = """
                 LEFT JOIN (
                     SELECT NULL as user_id WHERE NULL = ?
-                ) AS s USING (user_id)"
+                ) AS s USING (user_id)
             """
             where_clause = ""
         else:
