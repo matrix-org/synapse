@@ -164,7 +164,7 @@ class HttpPusher(object):
         logger.info(
             "Processing %i unprocessed push actions for %s starting at "
             "stream_ordering %s",
-            len(unprocessed), self.user_id, self.last_stream_ordering,
+            len(unprocessed), self.name, self.last_stream_ordering,
         )
 
         for push_action in unprocessed:
@@ -342,7 +342,7 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def _send_badge(self, badge):
-        logger.info("Sending updated badge count %d to %r", badge, self.user_id)
+        logger.info("Sending updated badge count %d to %s", badge, self.name)
         d = {
             'notification': {
                 'id': '',
