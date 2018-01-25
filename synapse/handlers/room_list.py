@@ -190,7 +190,6 @@ class RoomListHandler(BaseHandler):
         if len(rooms_to_scan) == 0:
             defer.returnValue([])
 
-
         # _append_room_entry_to_chunk will append to chunk but will stop if
         # len(chunk) > limit
         #
