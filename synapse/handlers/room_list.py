@@ -186,7 +186,7 @@ class RoomListHandler(BaseHandler):
         logger.info("After sorting and filtering, %i rooms remain",
                     len(rooms_to_scan))
 
-        #bail if no rooms to work on
+        # bail if no rooms to work on
         if len(rooms_to_scan) == 0:
             defer.returnValue([])
 
