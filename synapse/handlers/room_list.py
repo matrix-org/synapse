@@ -186,10 +186,6 @@ class RoomListHandler(BaseHandler):
         logger.info("After sorting and filtering, %i rooms remain",
                     len(rooms_to_scan))
 
-        # bail if no rooms to work on
-        if len(rooms_to_scan) == 0:
-            defer.returnValue({})
-
         # _append_room_entry_to_chunk will append to chunk but will stop if
         # len(chunk) > limit
         #
@@ -207,8 +203,8 @@ class RoomListHandler(BaseHandler):
         if limit:
             step = limit + 1
         else:
-            step = len(rooms_to_scan)
-
+            # step cannot be zero
+            step = len(rooms_to_scan) if len(rooms_to_scan) != 0 else 1
         chunk = []
         for i in xrange(0, len(rooms_to_scan), step):
             batch = rooms_to_scan[i:i + step]
