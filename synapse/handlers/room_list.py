@@ -205,6 +205,7 @@ class RoomListHandler(BaseHandler):
         else:
             # step cannot be zero
             step = len(rooms_to_scan) if len(rooms_to_scan) != 0 else 1
+
         chunk = []
         for i in xrange(0, len(rooms_to_scan), step):
             batch = rooms_to_scan[i:i + step]
