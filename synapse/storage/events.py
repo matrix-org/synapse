@@ -586,6 +586,7 @@ class EventsStore(SQLBaseStore):
 
                 current_state = yield resolve_events_with_factory(
                     state_sets,
+                    event_map={},
                     state_map_factory=get_events,
                 )
                 defer.returnValue(current_state)
