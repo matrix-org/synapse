@@ -515,16 +515,21 @@ class EventsStore(SQLBaseStore):
                     if ctx.current_state_ids is None:
                         raise Exception("Unknown current state")
 
+                    if ctx.state_group is None:
+                        # I don't think this can happen, but let's double-check
+                        raise Exception(
+                            "Context for new extremity event %s has no state "
+                            "group" % event_id,
+                        )
+
                     # If we've already seen the state group don't bother adding
                     # it to the state sets again
                     if ctx.state_group not in state_groups:
                         state_sets.append(ctx.current_state_ids)
                         if ctx.delta_ids or hasattr(ev, "state_key"):
                             was_updated = True
-                        if ctx.state_group:
-                            # Add this as a seen state group (if it has a state
-                            # group)
-                            state_groups.add(ctx.state_group)
+                        # Add this as a seen state group
+                        state_groups.add(ctx.state_group)
                     break
             else:
                 # If we couldn't find it, then we'll need to pull
