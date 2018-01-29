@@ -18,6 +18,7 @@ from OpenSSL.SSL import VERIFY_NONE
 from synapse.api.errors import (
     CodeMessageException, MatrixCodeMessageException, SynapseError, Codes,
 )
+from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util import logcontext
 import synapse.metrics
@@ -67,7 +68,11 @@ class SimpleHttpClient(object):
         self.hs = hs
 
         pool = HTTPConnectionPool(reactor)
-        pool.maxPersistentPerHost = 5
+
+        # the pusher makes lots of concurrent SSL connections to sygnal, and
+        # tends to do so in batches, so we need to allow the pool to keep lots
+        # of idle connections around.
+        pool.maxPersistentPerHost = max((100 * CACHE_SIZE_FACTOR, 5))
         pool.cachedConnectionTimeout = 2 * 60
 
         # The default context factory in Twisted 14.0.0 (which we require) is
