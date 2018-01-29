@@ -337,7 +337,7 @@ content served to web browsers a matrix API from being able to attack webapps ho
 on the same domain.  This is particularly true of sharing a matrix webclient and
 server on the same domain.
 
-See https://github.com/vector-im/vector-web/issues/1977 and
+See https://github.com/vector-im/riot-web/issues/1977 and
 https://developer.github.com/changes/2014-04-25-user-content-security for more details.
 
 
@@ -812,7 +812,7 @@ keys.
 You can host your own copy of Sydent, but this will prevent you reaching other
 users in the Matrix ecosystem via their email address, and prevent them finding
 you. We therefore recommend that you use one of the centralised identity servers
-at ``https://matrix.org`` or ``https://vector.im`` for now.
+at ``https://matrix.org`` or ``https://riot.im`` for now.
 
 To reiterate: the Identity server will only be used if you choose to associate
 an email address with your account, or send an invite to another user via their
@@ -841,14 +841,15 @@ Password reset
 ==============
 
 If a user has registered an email address to their account using an identity
-server, they can request a password-reset token via clients such as Vector.
+server, they can request a password-reset token via clients such as Riot.im.
 
 A manual password reset can be done via direct database access as follows.
 
 First calculate the hash of the new password::
 
     $ source ~/.synapse/bin/activate
-    $ ./scripts/hash_password
+    $ cd ~/.synapse
+    $ ./bin/hash_password
     Password:
     Confirm password:
     $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
