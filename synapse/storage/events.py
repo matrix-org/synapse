@@ -503,6 +503,10 @@ class EventsStore(SQLBaseStore):
                 None if there are no changes to the room state, or
                 a dict of (type, state_key) -> event_id].
         """
+
+        if not new_latest_event_ids:
+            defer.returnValue({})
+
         state_sets = []
         state_groups = set()
         missing_event_ids = []
@@ -537,6 +541,9 @@ class EventsStore(SQLBaseStore):
                 was_updated = True
                 missing_event_ids.append(event_id)
 
+        if not was_updated:
+            return
+
         if missing_event_ids:
             # Now pull out the state for any missing events from DB
             event_to_groups = yield self._get_state_group_for_events(
@@ -549,54 +556,49 @@ class EventsStore(SQLBaseStore):
                 group_to_state = yield self._get_state_for_groups(groups)
                 state_sets.extend(group_to_state.itervalues())
 
-        if not new_latest_event_ids:
-            defer.returnValue({})
-        elif was_updated:
-            if len(state_sets) == 1:
-                # If there is only one state set, then we know what the current
-                # state is.
-                defer.returnValue(state_sets[0])
-            else:
-                # We work out the current state by passing the state sets to the
-                # state resolution algorithm. It may ask for some events, including
-                # the events we have yet to persist, so we need a slightly more
-                # complicated event lookup function than simply looking the events
-                # up in the db.
+        if len(state_sets) == 1:
+            # If there is only one state set, then we know what the current
+            # state is.
+            defer.returnValue(state_sets[0])
 
-                logger.info(
-                    "Resolving state with %i state sets", len(state_sets),
+        # We work out the current state by passing the state sets to the
+        # state resolution algorithm. It may ask for some events, including
+        # the events we have yet to persist, so we need a slightly more
+        # complicated event lookup function than simply looking the events
+        # up in the db.
+
+        logger.info(
+            "Resolving state with %i state sets", len(state_sets),
+        )
+
+        events_map = {ev.event_id: ev for ev, _ in events_context}
+
+        @defer.inlineCallbacks
+        def get_events(ev_ids):
+            # We get the events by first looking at the list of events we
+            # are trying to persist, and then fetching the rest from the DB.
+            db = []
+            to_return = {}
+            for ev_id in ev_ids:
+                ev = events_map.get(ev_id, None)
+                if ev:
+                    to_return[ev_id] = ev
+                else:
+                    db.append(ev_id)
+
+            if db:
+                evs = yield self.get_events(
+                    ev_ids, get_prev_content=False, check_redacted=False,
                 )
+                to_return.update(evs)
+            defer.returnValue(to_return)
 
-                events_map = {ev.event_id: ev for ev, _ in events_context}
-
-                @defer.inlineCallbacks
-                def get_events(ev_ids):
-                    # We get the events by first looking at the list of events we
-                    # are trying to persist, and then fetching the rest from the DB.
-                    db = []
-                    to_return = {}
-                    for ev_id in ev_ids:
-                        ev = events_map.get(ev_id, None)
-                        if ev:
-                            to_return[ev_id] = ev
-                        else:
-                            db.append(ev_id)
-
-                    if db:
-                        evs = yield self.get_events(
-                            ev_ids, get_prev_content=False, check_redacted=False,
-                        )
-                        to_return.update(evs)
-                    defer.returnValue(to_return)
-
-                current_state = yield resolve_events_with_factory(
-                    state_sets,
-                    event_map={},
-                    state_map_factory=get_events,
-                )
-                defer.returnValue(current_state)
-        else:
-            return
+        current_state = yield resolve_events_with_factory(
+            state_sets,
+            event_map={},
+            state_map_factory=get_events,
+        )
+        defer.returnValue(current_state)
 
     @defer.inlineCallbacks
     def _calculate_state_delta(self, room_id, current_state):
