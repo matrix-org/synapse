@@ -544,14 +544,14 @@ class RoomStore(SQLBaseStore):
             the hostname and the value is the media ID.
         """
         def _get_media_mxcs_in_room_txn(txn):
-            local_media_ids, remote_media_ids = self._get_media_mxcs_in_room_txn(txn, room_id)
+            local_mxcs, remote_mxcs = self._get_media_mxcs_in_room_txn(txn, room_id)
             local_media_mxcs = []
             remote_media_mxcs = []
 
             # Convert the IDs to MXC URIs
-            for media_id in local_media_ids:
+            for media_id in local_mxcs:
                 local_media_mxcs.append("mxc://%s/%s" % (self.hostname, media_id))
-            for hostname, media_id in remote_media_ids:
+            for hostname, media_id in remote_mxcs:
                 remote_media_mxcs.append("mxc://%s/%s" % (hostname, media_id))
 
             return local_media_mxcs, remote_media_mxcs
@@ -562,7 +562,7 @@ class RoomStore(SQLBaseStore):
         the associated media
         """
         def _quarantine_media_in_room_txn(txn):
-            local_media_ids, remote_media_ids = self._get_media_mxcs_in_room_txn(txn, room_id)
+            local_mxcs, remote_mxcs = self._get_media_mxcs_in_room_txn(txn, room_id)
             total_media_quarantined = 0
 
             # Now update all the tables to set the quarantined_by flag
@@ -571,7 +571,7 @@ class RoomStore(SQLBaseStore):
                 UPDATE local_media_repository
                 SET quarantined_by = ?
                 WHERE media_id = ?
-            """, ((quarantined_by, media_id) for media_id in local_media_ids))
+            """, ((quarantined_by, media_id) for media_id in local_mxcs))
 
             txn.executemany(
                 """
@@ -581,16 +581,19 @@ class RoomStore(SQLBaseStore):
                 """,
                 (
                     (quarantined_by, origin, media_id)
-                    for origin, media_id in remote_media_ids
+                    for origin, media_id in remote_mxcs
                 )
             )
 
-            total_media_quarantined += len(local_media_ids)
-            total_media_quarantined += len(remote_media_ids)
+            total_media_quarantined += len(local_mxcs)
+            total_media_quarantined += len(remote_mxcs)
 
             return total_media_quarantined
 
-        return self.runInteraction("quarantine_media_in_room", _quarantine_media_in_room_txn)
+        return self.runInteraction(
+            "quarantine_media_in_room",
+            _quarantine_media_in_room_txn,
+        )
 
     def _get_media_mxcs_in_room_txn(self, txn, room_id):
         """Retrieves all the local and remote media MXC URIs in a given room
