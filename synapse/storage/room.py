@@ -534,8 +534,17 @@ class RoomStore(SQLBaseStore):
         self.is_room_blocked.invalidate((room_id,))
 
     def get_media_mxcs_in_room(self, room_id):
-        def _get_media_ids_in_room(txn):
-            local_media_ids, remote_media_ids = self._get_media_ids_in_room(txn, room_id)
+        """Retrieves all the local and remote media MXC URIs in a given room
+
+        Args:
+            room_id (str)
+
+        Returns:
+            The local and remote media as a lists of tuples where the key is
+            the hostname and the value is the media ID.
+        """
+        def _get_media_mxcs_in_room_txn(txn):
+            local_media_ids, remote_media_ids = self._get_media_mxcs_in_room_txn(txn, room_id)
             local_media_mxcs = []
             remote_media_mxcs = []
 
@@ -546,14 +555,14 @@ class RoomStore(SQLBaseStore):
                 remote_media_mxcs.append("mxc://%s/%s" % (hostname, media_id))
 
             return local_media_mxcs, remote_media_mxcs
-        return self.runInteraction("get_media_ids_in_room", _get_media_ids_in_room)
+        return self.runInteraction("get_media_ids_in_room", _get_media_mxcs_in_room_txn)
 
     def quarantine_media_ids_in_room(self, room_id, quarantined_by):
         """For a room loops through all events with media and quarantines
         the associated media
         """
-        def _quarantine_media_in_room(txn):
-            local_media_ids, remote_media_ids = self._get_media_ids_in_room(txn, room_id)
+        def _quarantine_media_in_room_txn(txn):
+            local_media_ids, remote_media_ids = self._get_media_mxcs_in_room_txn(txn, room_id)
             total_media_quarantined = 0
 
             # Now update all the tables to set the quarantined_by flag
@@ -581,9 +590,19 @@ class RoomStore(SQLBaseStore):
 
             return total_media_quarantined
 
-        return self.runInteraction("quarantine_media_in_room", _quarantine_media_in_room)
+        return self.runInteraction("quarantine_media_in_room", _quarantine_media_in_room_txn)
 
-    def _get_media_ids_in_room(self, txn, room_id):
+    def _get_media_mxcs_in_room_txn(self, txn, room_id):
+        """Retrieves all the local and remote media MXC URIs in a given room
+
+        Args:
+            txn (cursor)
+            room_id (str)
+
+        Returns:
+            The local and remote media as a lists of tuples where the key is
+            the hostname and the value is the media ID.
+        """
         mxc_re = re.compile("^mxc://([^/]+)/([^/#?]+)")
 
         next_token = self.get_current_events_token() + 1
