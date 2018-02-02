@@ -157,28 +157,42 @@ class SearchStore(BackgroundUpdateStore):
 
     @defer.inlineCallbacks
     def _background_reindex_gin_search(self, progress, batch_size):
-        '''This handles old synapses which used GIST indexes, if any;
+        """This handles old synapses which used GIST indexes, if any;
         converting them back to be GIN as per the actual schema.
-        '''
+        """
 
         def create_index(conn):
+            conn.rollback()
+
+            # we have to set autocommit, because postgres refuses to
+            # CREATE INDEX CONCURRENTLY without it.
+            conn.set_session(autocommit=True)
+
             try:
-                conn.rollback()
-                conn.set_session(autocommit=True)
                 c = conn.cursor()
 
+                # if we skipped the conversion to GIST, we may already/still
+                # have an event_search_fts_idx; unfortunately postgres 9.4
+                # doesn't support CREATE INDEX IF EXISTS so we just catch the
+                # exception and ignore it.
+                import psycopg2
+                try:
+                    c.execute(
+                        "CREATE INDEX CONCURRENTLY event_search_fts_idx"
+                        " ON event_search USING GIN (vector)"
+                    )
+                except psycopg2.ProgrammingError as e:
+                    logger.warn(
+                        "Ignoring error %r when trying to switch from GIST to GIN",
+                        e
+                    )
+
+                # we should now be able to delete the GIST index.
                 c.execute(
-                    "CREATE INDEX CONCURRENTLY event_search_fts_idx"
-                    " ON event_search USING GIN (vector)"
+                    "DROP INDEX IF EXISTS event_search_fts_idx_gist"
                 )
-
-                c.execute("DROP INDEX event_search_fts_idx_gist")
-
+            finally:
                 conn.set_session(autocommit=False)
-            except e:
-                logger.warn(
-                    "Ignoring error %s when trying to switch from GIST to GIN" % (e,)
-                )
 
         if isinstance(self.database_engine, PostgresEngine):
             yield self.runWithConnection(create_index)
