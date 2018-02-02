@@ -203,7 +203,8 @@ class RoomListHandler(BaseHandler):
         if limit:
             step = limit + 1
         else:
-            step = len(rooms_to_scan)
+            # step cannot be zero
+            step = len(rooms_to_scan) if len(rooms_to_scan) != 0 else 1
 
         chunk = []
         for i in xrange(0, len(rooms_to_scan), step):
