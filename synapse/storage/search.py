@@ -246,6 +246,41 @@ class SearchStore(BackgroundUpdateStore):
 
         defer.returnValue(num_rows)
 
+    def store_event_search_txn(self, txn, event, key, value):
+        """Add event to the search table
+
+        Args:
+            txn (cursor):
+            event (EventBase):
+            key (str):
+            value (str):
+        """
+        if isinstance(self.database_engine, PostgresEngine):
+            txn.execute("SET work_mem='256kB'")
+            sql = (
+                "INSERT INTO event_search"
+                " (event_id, room_id, key, vector, stream_ordering, origin_server_ts)"
+                " VALUES (?,?,?,to_tsvector('english', ?),?,?)"
+            )
+            txn.execute(
+                sql,
+                (
+                    event.event_id, event.room_id, key, value,
+                    event.internal_metadata.stream_ordering,
+                    event.origin_server_ts,
+                )
+            )
+            txn.execute("RESET work_mem")
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            sql = (
+                "INSERT INTO event_search (event_id, room_id, key, value)"
+                " VALUES (?,?,?,?)"
+            )
+            txn.execute(sql, (event.event_id, event.room_id, key, value,))
+        else:
+            # This should be unreachable.
+            raise Exception("Unrecognized database engine")
+
     @defer.inlineCallbacks
     def search_msgs(self, room_ids, search_term, keys):
         """Performs a full text search over events with given keys.
