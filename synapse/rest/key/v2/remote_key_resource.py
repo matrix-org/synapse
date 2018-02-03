@@ -93,6 +93,7 @@ class RemoteKey(Resource):
         self.store = hs.get_datastore()
         self.version_string = hs.version_string
         self.clock = hs.get_clock()
+        self.federation_domain_whitelist = hs.config.federation_domain_whitelist
 
     def render_GET(self, request):
         self.async_render_GET(request)
@@ -137,6 +138,13 @@ class RemoteKey(Resource):
         logger.info("Handling query for keys %r", query)
         store_queries = []
         for server_name, key_ids in query.items():
+            if (
+                self.federation_domain_whitelist is not None and
+                server_name not in self.federation_domain_whitelist
+            ):
+                logger.debug("Federation denied with %s", server_name)
+                continue
+
             if not key_ids:
                 key_ids = (None,)
             for key_id in key_ids:

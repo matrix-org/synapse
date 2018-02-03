@@ -591,7 +591,7 @@ class RoomStore(SQLBaseStore):
                     """
                         UPDATE remote_media_cache
                         SET quarantined_by = ?
-                        WHERE media_origin AND media_id = ?
+                        WHERE media_origin = ? AND media_id = ?
                     """,
                     (
                         (quarantined_by, origin, media_id)

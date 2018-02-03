@@ -17,6 +17,8 @@ from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
 from twisted.web.resource import Resource
 
+from ._base import FileInfo
+
 from synapse.api.errors import (
     SynapseError, Codes,
 )
@@ -49,7 +51,7 @@ logger = logging.getLogger(__name__)
 class PreviewUrlResource(Resource):
     isLeaf = True
 
-    def __init__(self, hs, media_repo):
+    def __init__(self, hs, media_repo, media_storage):
         Resource.__init__(self)
 
         self.auth = hs.get_auth()
@@ -62,6 +64,7 @@ class PreviewUrlResource(Resource):
         self.client = SpiderHttpClient(hs)
         self.media_repo = media_repo
         self.primary_base_path = media_repo.primary_base_path
+        self.media_storage = media_storage
 
         self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
 
@@ -182,8 +185,10 @@ class PreviewUrlResource(Resource):
         logger.debug("got media_info of '%s'" % media_info)
 
         if _is_media(media_info['media_type']):
+            file_id = media_info['filesystem_id']
             dims = yield self.media_repo._generate_thumbnails(
-                None, media_info['filesystem_id'], media_info, url_cache=True,
+                None, file_id, file_id, media_info["media_type"],
+                url_cache=True,
             )
 
             og = {
@@ -228,8 +233,10 @@ class PreviewUrlResource(Resource):
 
                 if _is_media(image_info['media_type']):
                     # TODO: make sure we don't choke on white-on-transparent images
+                    file_id = image_info['filesystem_id']
                     dims = yield self.media_repo._generate_thumbnails(
-                        None, image_info['filesystem_id'], image_info, url_cache=True,
+                        None, file_id, file_id, image_info["media_type"],
+                        url_cache=True,
                     )
                     if dims:
                         og["og:image:width"] = dims['width']
@@ -273,19 +280,21 @@ class PreviewUrlResource(Resource):
 
         file_id = datetime.date.today().isoformat() + '_' + random_string(16)
 
-        fpath = self.filepaths.url_cache_filepath_rel(file_id)
-        fname = os.path.join(self.primary_base_path, fpath)
-        self.media_repo._makedirs(fname)
+        file_info = FileInfo(
+            server_name=None,
+            file_id=file_id,
+            url_cache=True,
+        )
 
         try:
-            with open(fname, "wb") as f:
+            with self.media_storage.store_into_file(file_info) as (f, fname, finish):
                 logger.debug("Trying to get url '%s'" % url)
                 length, headers, uri, code = yield self.client.get_file(
                     url, output_stream=f, max_size=self.max_spider_size,
                 )
                 # FIXME: pass through 404s and other error messages nicely
 
-            yield self.media_repo.copy_to_backup(fpath)
+                yield finish()
 
             media_type = headers["Content-Type"][0]
             time_now_ms = self.clock.time_msec()
@@ -327,7 +336,6 @@ class PreviewUrlResource(Resource):
             )
 
         except Exception as e:
-            os.remove(fname)
             raise SynapseError(
                 500, ("Failed to download content: %s" % e),
                 Codes.UNKNOWN

@@ -195,15 +195,20 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         content = parse_json_object_from_request(request)
 
+        event_dict = {
+            "type": event_type,
+            "content": content,
+            "room_id": room_id,
+            "sender": requester.user.to_string(),
+        }
+
+        if 'ts' in request.args and requester.app_service:
+            event_dict['origin_server_ts'] = parse_integer(request, "ts", 0)
+
         msg_handler = self.handlers.message_handler
         event = yield msg_handler.create_and_send_nonmember_event(
             requester,
-            {
-                "type": event_type,
-                "content": content,
-                "room_id": room_id,
-                "sender": requester.user.to_string(),
-            },
+            event_dict,
             txn_id=txn_id,
         )
 
@@ -487,13 +492,35 @@ class RoomInitialSyncRestServlet(ClientV1RestServlet):
         defer.returnValue((200, content))
 
 
-class RoomEventContext(ClientV1RestServlet):
+class RoomEventServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns(
+        "/rooms/(?P<room_id>[^/]*)/event/(?P<event_id>[^/]*)$"
+    )
+
+    def __init__(self, hs):
+        super(RoomEventServlet, self).__init__(hs)
+        self.clock = hs.get_clock()
+        self.event_handler = hs.get_event_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id, event_id):
+        requester = yield self.auth.get_user_by_req(request)
+        event = yield self.event_handler.get_event(requester.user, event_id)
+
+        time_now = self.clock.time_msec()
+        if event:
+            defer.returnValue((200, serialize_event(event, time_now)))
+        else:
+            defer.returnValue((404, "Event not found."))
+
+
+class RoomEventContextServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns(
         "/rooms/(?P<room_id>[^/]*)/context/(?P<event_id>[^/]*)$"
     )
 
     def __init__(self, hs):
-        super(RoomEventContext, self).__init__(hs)
+        super(RoomEventContextServlet, self).__init__(hs)
         self.clock = hs.get_clock()
         self.handlers = hs.get_handlers()
 
@@ -803,4 +830,5 @@ def register_servlets(hs, http_server):
     RoomTypingRestServlet(hs).register(http_server)
     SearchRestServlet(hs).register(http_server)
     JoinedRoomsRestServlet(hs).register(http_server)
-    RoomEventContext(hs).register(http_server)
+    RoomEventServlet(hs).register(http_server)
+    RoomEventContextServlet(hs).register(http_server)

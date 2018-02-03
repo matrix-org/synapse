@@ -42,36 +42,70 @@ logger = logging.getLogger(__name__)
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 
-incoming_requests_counter = metrics.register_counter(
-    "requests",
+# total number of responses served, split by method/servlet/tag
+response_count = metrics.register_counter(
+    "response_count",
     labels=["method", "servlet", "tag"],
+    alternative_names=(
+        # the following are all deprecated aliases for the same metric
+        metrics.name_prefix + x for x in (
+            "_requests",
+            "_response_time:count",
+            "_response_ru_utime:count",
+            "_response_ru_stime:count",
+            "_response_db_txn_count:count",
+            "_response_db_txn_duration:count",
+        )
+    )
 )
+
 outgoing_responses_counter = metrics.register_counter(
     "responses",
     labels=["method", "code"],
 )
 
-response_timer = metrics.register_distribution(
-    "response_time",
-    labels=["method", "servlet", "tag"]
+response_timer = metrics.register_counter(
+    "response_time_seconds",
+    labels=["method", "servlet", "tag"],
+    alternative_names=(
+        metrics.name_prefix + "_response_time:total",
+    ),
 )
 
-response_ru_utime = metrics.register_distribution(
-    "response_ru_utime", labels=["method", "servlet", "tag"]
+response_ru_utime = metrics.register_counter(
+    "response_ru_utime_seconds", labels=["method", "servlet", "tag"],
+    alternative_names=(
+        metrics.name_prefix + "_response_ru_utime:total",
+    ),
 )
 
-response_ru_stime = metrics.register_distribution(
-    "response_ru_stime", labels=["method", "servlet", "tag"]
+response_ru_stime = metrics.register_counter(
+    "response_ru_stime_seconds", labels=["method", "servlet", "tag"],
+    alternative_names=(
+        metrics.name_prefix + "_response_ru_stime:total",
+    ),
 )
 
-response_db_txn_count = metrics.register_distribution(
-    "response_db_txn_count", labels=["method", "servlet", "tag"]
+response_db_txn_count = metrics.register_counter(
+    "response_db_txn_count", labels=["method", "servlet", "tag"],
+    alternative_names=(
+        metrics.name_prefix + "_response_db_txn_count:total",
+    ),
 )
 
-response_db_txn_duration = metrics.register_distribution(
-    "response_db_txn_duration", labels=["method", "servlet", "tag"]
+# seconds spent waiting for db txns, excluding scheduling time, when processing
+# this request
+response_db_txn_duration = metrics.register_counter(
+    "response_db_txn_duration_seconds", labels=["method", "servlet", "tag"],
+    alternative_names=(
+        metrics.name_prefix + "_response_db_txn_duration:total",
+    ),
 )
 
+# seconds spent waiting for a db connection, when processing this request
+response_db_sched_duration = metrics.register_counter(
+    "response_db_sched_duration_seconds", labels=["method", "servlet", "tag"]
+)
 
 _next_request_id = 0
 
@@ -107,6 +141,10 @@ def wrap_request_handler(request_handler, include_metrics=False):
         with LoggingContext(request_id) as request_context:
             with Measure(self.clock, "wrapped_request_handler"):
                 request_metrics = RequestMetrics()
+                # we start the request metrics timer here with an initial stab
+                # at the servlet name. For most requests that name will be
+                # JsonResource (or a subclass), and JsonResource._async_render
+                # will update it once it picks a servlet.
                 request_metrics.start(self.clock, name=self.__class__.__name__)
 
                 request_context.request = request_id
@@ -249,11 +287,22 @@ class JsonResource(HttpServer, resource.Resource):
             if not m:
                 continue
 
-            # We found a match! Trigger callback and then return the
-            # returned response. We pass both the request and any
-            # matched groups from the regex to the callback.
+            # We found a match! First update the metrics object to indicate
+            # which servlet is handling the request.
 
             callback = path_entry.callback
+
+            servlet_instance = getattr(callback, "__self__", None)
+            if servlet_instance is not None:
+                servlet_classname = servlet_instance.__class__.__name__
+            else:
+                servlet_classname = "%r" % callback
+
+            request_metrics.name = servlet_classname
+
+            # Now trigger the callback. If it returns a response, we send it
+            # here. If it throws an exception, that is handled by the wrapper
+            # installed by @request_handler.
 
             kwargs = intern_dict({
                 name: urllib.unquote(value).decode("UTF-8") if value else value
@@ -265,30 +314,14 @@ class JsonResource(HttpServer, resource.Resource):
                 code, response = callback_return
                 self._send_response(request, code, response)
 
-            servlet_instance = getattr(callback, "__self__", None)
-            if servlet_instance is not None:
-                servlet_classname = servlet_instance.__class__.__name__
-            else:
-                servlet_classname = "%r" % callback
-
-            request_metrics.name = servlet_classname
-
             return
 
         # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
+        request_metrics.name = self.__class__.__name__ + ".UnrecognizedRequest"
         raise UnrecognizedRequestError()
 
     def _send_response(self, request, code, response_json_object,
                        response_code_message=None):
-        # could alternatively use request.notifyFinish() and flip a flag when
-        # the Deferred fires, but since the flag is RIGHT THERE it seems like
-        # a waste.
-        if request._disconnected:
-            logger.warn(
-                "Not sending response to request %s, already disconnected.",
-                request)
-            return
-
         outgoing_responses_counter.inc(request.method, str(code))
 
         # TODO: Only enable CORS for the requests that need it.
@@ -322,7 +355,7 @@ class RequestMetrics(object):
                 )
                 return
 
-        incoming_requests_counter.inc(request.method, self.name, tag)
+        response_count.inc(request.method, self.name, tag)
 
         response_timer.inc_by(
             clock.time_msec() - self.start, request.method,
@@ -341,7 +374,10 @@ class RequestMetrics(object):
             context.db_txn_count, request.method, self.name, tag
         )
         response_db_txn_duration.inc_by(
-            context.db_txn_duration, request.method, self.name, tag
+            context.db_txn_duration_ms / 1000., request.method, self.name, tag
+        )
+        response_db_sched_duration.inc_by(
+            context.db_sched_duration_ms / 1000., request.method, self.name, tag
         )
 
 
@@ -364,6 +400,15 @@ class RootRedirect(resource.Resource):
 def respond_with_json(request, code, json_object, send_cors=False,
                       response_code_message=None, pretty_print=False,
                       version_string="", canonical_json=True):
+    # could alternatively use request.notifyFinish() and flip a flag when
+    # the Deferred fires, but since the flag is RIGHT THERE it seems like
+    # a waste.
+    if request._disconnected:
+        logger.warn(
+            "Not sending response to request %s, already disconnected.",
+            request)
+        return
+
     if pretty_print:
         json_bytes = encode_pretty_printed_json(json_object) + "\n"
     else:
