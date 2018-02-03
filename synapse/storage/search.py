@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import sys
 from twisted.internet import defer
 
 from .background_updates import BackgroundUpdateStore
@@ -256,21 +256,51 @@ class SearchStore(BackgroundUpdateStore):
             value (str):
         """
         if isinstance(self.database_engine, PostgresEngine):
-            txn.execute("SET work_mem='256kB'")
             sql = (
                 "INSERT INTO event_search"
-                " (event_id, room_id, key, vector, stream_ordering, origin_server_ts)"
+                " (event_id, room_id, key, vector, stream_ordering, "
+                "  origin_server_ts)"
                 " VALUES (?,?,?,to_tsvector('english', ?),?,?)"
             )
-            txn.execute(
-                sql,
-                (
-                    event.event_id, event.room_id, key, value,
-                    event.internal_metadata.stream_ordering,
-                    event.origin_server_ts,
+
+            # inserts to a GIN index are normally batched up into a pending
+            # list, and then all committed together once the list gets to a
+            # certain size. The trouble with that is that postgres (pre-9.5)
+            # uses work_mem to determine the length of the list, and work_mem
+            # is typically very large.
+            #
+            # We therefore reduce work_mem while we do the insert.
+            #
+            # (postgres 9.5 uses the separate gin_pending_list_limit setting,
+            # so doesn't suffer the same problem, but changing work_mem will
+            # be harmless)
+
+            txn.execute("SET work_mem='256kB'")
+            try:
+                txn.execute(
+                    sql,
+                    (
+                        event.event_id, event.room_id, key, value,
+                        event.internal_metadata.stream_ordering,
+                        event.origin_server_ts,
+                    )
                 )
-            )
-            txn.execute("RESET work_mem")
+            except Exception:
+                # we need to reset work_mem, but doing so may throw a new
+                # exception and we want to preserve the original
+                t, v, tb = sys.exc_info()
+                try:
+                    txn.execute("RESET work_mem")
+                except Exception as e:
+                    logger.warn(
+                        "exception resetting work_mem during exception "
+                        "handling: %r",
+                        e,
+                    )
+                raise t, v, tb
+            else:
+                txn.execute("RESET work_mem")
+
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
                 "INSERT INTO event_search (event_id, room_id, key, value)"
