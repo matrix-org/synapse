@@ -23,7 +23,7 @@ You may have a local Python wheel cache available, in which case copy the releva
 
 It is recommended that you use Docker Compose to run your containers, including
 this image and a Postgres server. A sample ``docker-compose.yml`` is provided,
-with example labels for a reverse proxy and other artifacts.
+including example labels for reverse proxying and other artifacts.
 
 Then, to run the server:
 
@@ -35,13 +35,13 @@ In the case you specified a custom path for you configuration file and wish to
 generate a fresh ``homeserver.yaml``, simply run:
 
 ```
-docker-compose run synapse generate
+docker-compose run --rm synapse generate
 ```
 
 If you do not wish to use Compose, you may still run this image using plain
-Docker commands:
-
-Note that the following is just a guideline and you may need to add parameters to the docker run command to account for the network situation with your postgres database.
+Docker commands. Note that the following is just a guideline and you may need
+to add parameters to the docker run command to account for the network situation
+with your postgres database.
 
 ```
 docker run \
@@ -55,7 +55,7 @@ docker run \
 
 ## Volumes
 
-The image expects a single volue, located at ``/data``, that will hold:
+The image expects a single volume, located at ``/data``, that will hold:
 
 * temporary files during uploads;
 * uploaded media and thumbnais;
@@ -63,9 +63,14 @@ The image expects a single volue, located at ``/data``, that will hold:
 
 ## Environment
 
-If you do not specify a custom path for the configuration file, a very generic
+Unless you specify a custom path for the configuration file, a very generic
 file will be generated, based on the following environment settings.
 These are a good starting point for setting up your own deployment.
+
+Global settings:
+
+* ``UID``, the user id Synapse will run as [default 991]
+* ``GID``, the group id Synapse will run as [default 991]
 
 Synapse specific settings:
 

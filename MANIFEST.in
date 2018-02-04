@@ -25,6 +25,7 @@ recursive-include synapse/static *.js
 exclude jenkins.sh
 exclude jenkins*.sh
 exclude jenkins*
+exclude Dockerfile
 recursive-exclude jenkins *.sh
 
 prune .github

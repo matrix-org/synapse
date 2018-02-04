@@ -1,4 +1,4 @@
-# This compose file is compatible with Copose itself, it might need some
+# This compose file is compatible with Compose itself, it might need some
 # adjustments to run properly with stack.
 
 version: '3'
@@ -18,10 +18,11 @@ services:
       - ./files:/data
     depends_on:
       - db
-    # One may either expose ports directly
+    # In order to expose Synapse, remove one of the following, you might for
+    # instance expose the TLS port directly:
     ports:
       - 8448:8448/tcp
-    # ... or use a reverse proxy, here is an example for traefik
+    # ... or use a reverse proxy, here is an example for traefik:
     labels:
       - traefik.enable=true
       - traefik.frontend.rule=Host:my.matrix.Host
