@@ -22,6 +22,7 @@ if mode == "generate":
 # Parse the configuration file
 if not os.path.exists("/compiled"):
     os.mkdir("/compiled")
+
 convert("/conf/homeserver.yaml", "/compiled/homeserver.yaml")
 convert("/conf/log.config", "/compiled/%s.log.config" % os.environ.get("SYNAPSE_SERVER_NAME"))
 
