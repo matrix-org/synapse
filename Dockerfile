@@ -1,6 +1,6 @@
 FROM python:2-alpine
 
-RUN apk add --no-cache --virtual .nacl_deps build-base libffi-dev zlib-dev openssl-dev libjpeg-turbo-dev linux-headers postgresql-dev
+RUN apk add --no-cache --virtual .nacl_deps su-exec build-base libffi-dev zlib-dev openssl-dev libjpeg-turbo-dev linux-headers postgresql-dev
 
 COPY . /synapse
 
