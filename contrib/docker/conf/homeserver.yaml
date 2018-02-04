@@ -46,15 +46,15 @@ listeners:
 
 ## Database ##
 
-{% if SYNAPSE_DB_PASSWORD %}
+{% if POSTGRES_PASSWORD %}
 database:
   name: "psycopg2"
   args:
-    user: "{{ SYNAPSE_DB_USER or "matrix" }}"
-    password: "{{ SYNAPSE_DB_PASSWORD }}"
-    database: "{{ SYNAPSE_DB_DATABASE or "matrix" }}"
-    host: "{{ SYNAPSE_DB_HOST or "db" }}"
-    port: "{{ SYNAPSE_DB_PORT or "5432" }}"
+    user: "{{ POSTGRES_USER or "matrix" }}"
+    password: "{{ POSTGRES_PASSWORD }}"
+    database: "{{ POSTGRES_DB or "matrix" }}"
+    host: "{{ POSTGRES_HOST or "db" }}"
+    port: "{{ POSTGRES_PORT or "5432" }}"
     cp_min: 5
     cp_max: 10
 {% else %}

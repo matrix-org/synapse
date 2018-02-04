@@ -6,13 +6,18 @@ version: '3'
 services:
 
   synapse:
-    image: matrix/synapse
+    image: synapse
+    # Since snyapse does not retry to connect to the database, restart upon
+    # failure
+    restart: unless-stopped
     # See the readme for a full documentation of the environment settings
     environment:
       - SYNAPSE_SERVER_NAME=my.matrix.host
-      - SYNAPSE_DB_PASSWORD=changeme
+      - SYNAPSE_ENABLE_REGISTRATION=yes
     volumes:
       - ./files:/data
+    depends_on:
+      - db
     # One may either expose ports directly
     ports:
       - 8448:8448/tcp
@@ -29,4 +34,4 @@ services:
       - POSTGRES_USER=matrix
       - POSTGRES_PASSWORD=changeme
     volumes:
-      - ./schemas:/var/lib/postgres
+      - ./schemas:/var/lib/postgresql/data
