@@ -14,4 +14,6 @@ RUN cd /synapse \
 
 VOLUME ["/data"]
 
+EXPOSE 8448
+
 ENTRYPOINT ["/start.py"]

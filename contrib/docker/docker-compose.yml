@@ -1,0 +1,32 @@
+# This compose file is compatible with Copose itself, it might need some
+# adjustments to run properly with stack.
+
+version: '3'
+
+services:
+
+  synapse:
+    image: matrix/synapse
+    # See the readme for a full documentation of the environment settings
+    environment:
+      - SYNAPSE_SERVER_NAME=my.matrix.host
+      - SYNAPSE_DB_PASSWORD=changeme
+    volumes:
+      - ./files:/data
+    # One may either expose ports directly
+    ports:
+      - 8448:8448/tcp
+    # ... or use a reverse proxy, here is an example for traefik
+    labels:
+      - traefik.enable=true
+      - traefik.frontend.rule=Host:my.matrix.Host
+      - traefik.port=8448
+
+  db:
+    image: postgres:latest
+    # Change that password, of course!
+    environment:
+      - POSTGRES_USER=matrix
+      - POSTGRES_PASSWORD=changeme
+    volumes:
+      - ./schemas:/var/lib/postgres
