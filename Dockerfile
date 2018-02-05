@@ -14,6 +14,6 @@ RUN cd /synapse \
 
 VOLUME ["/data"]
 
-EXPOSE 8448
+EXPOSE 8008/tcp 8448/tcp
 
 ENTRYPOINT ["/start.py"]
