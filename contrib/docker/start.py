@@ -4,6 +4,7 @@ import jinja2
 import os
 import sys
 import subprocess
+import glob
 
 convert = lambda src, dst, environ: open(dst, "w").write(jinja2.Template(open(src).read()).render(**environ))
 mode = sys.argv[1] if len(sys.argv) > 1 else None
@@ -25,6 +26,9 @@ for secret in ("SYNAPSE_REGISTRATION_SHARED_SECRET", "SYNAPSE_MACAROON_SECRET_KE
     if secret not in environ:
         print("Generating a random secret for {}".format(secret))
         environ[secret] = os.urandom(32).encode("hex")
+
+# Load appservices configurations
+environ["SYNAPSE_APPSERVICES"] = glob.glob("/data/appservices/*.yaml")
 
 # In generate mode, generate a configuration, missing keys, then exit
 if mode == "generate":

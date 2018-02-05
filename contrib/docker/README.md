@@ -59,7 +59,12 @@ The image expects a single volume, located at ``/data``, that will hold:
 
 * temporary files during uploads;
 * uploaded media and thumbnails;
-* the SQLite database if you do not configure postgres.
+* the SQLite database if you do not configure postgres;
+* the appservices configuration.
+
+In order to setup an application service, simply create an ``appservices``
+directory in the data volume and write the application service Yaml
+configuration file there. Multiple application services are supported.
 
 ## Environment
 
