@@ -126,10 +126,19 @@ recaptcha_siteverify_api: "https://www.google.com/recaptcha/api/siteverify"
 
 ## Turn ##
 
+{% if SYNAPSE_TURN_URIS %}
+turn_uris:
+{% for uri in SYNAPSE_TURN_URIS.split(',') %}  - {{ uri }}
+{% endfor %}
+turn_shared_secret: "{{ SYNAPSE_TURN_SECRET }}"
+turn_user_lifetime: "1h"
+turn_allow_guests: True
+{% else %}
 turn_uris: []
 turn_shared_secret: "YOUR_SHARED_SECRET"
 turn_user_lifetime: "1h"
 turn_allow_guests: True
+{% endif %}
 
 ## Registration ##
 
