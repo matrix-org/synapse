@@ -9,7 +9,7 @@ RUN cd /synapse \
  && pip install --upgrade pip setuptools psycopg2 \
  && mkdir -p /synapse/cache \
  && pip install -f /synapse/cache --upgrade --process-dependency-links . \
- && mv /synapse/contrib/docker/* / \
+ && mv /synapse/contrib/docker/start.py /synapse/contrib/docker/conf / \
  && rm -rf setup.py setup.cfg synapse
 
 VOLUME ["/data"]
