@@ -26,16 +26,18 @@ for secret in ("SYNAPSE_REGISTRATION_SHARED_SECRET", "SYNAPSE_MACAROON_SECRET_KE
         print("Generating a random secret for {}".format(secret))
         environ[secret] = os.urandom(32).encode("hex")
 
-# Parse the configuration file
-if not os.path.exists("/compiled"): os.mkdir("/compiled")
-convert("/conf/homeserver.yaml", "/compiled/homeserver.yaml", environ)
-convert("/conf/log.config", "/compiled/%s.log.config" % environ.get("SYNAPSE_SERVER_NAME"), environ)
-
 # In generate mode, generate a configuration, missing keys, then exit
 if mode == "generate":
     os.execv("/usr/local/bin/python", args + ["--generate-config"])
+
 # In normal mode, generate missing keys if any, then run synapse
 else:
+    # Parse the configuration file
+    if "SYNAPSE_CONFIG_PATH" not in environ:
+        if not os.path.exists("/compiled"): os.mkdir("/compiled")
+        convert("/conf/homeserver.yaml", "/compiled/homeserver.yaml", environ)
+        convert("/conf/log.config", "/compiled/%s.log.config" % environ.get("SYNAPSE_SERVER_NAME"), environ)
+    # Generate missing keys and start synapse
     subprocess.check_output(args + ["--generate-keys"])
     subprocess.check_output(["chown", "-R", permissions, "/data"])
     os.execv("/sbin/su-exec", ["su-exec", permissions] + args)
