@@ -21,6 +21,8 @@ from synapse.rest.media.v1.media_storage import MediaStorage
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.rest.media.v1.storage_provider import FileStorageProviderBackend
 
+from mock import Mock
+
 from tests import unittest
 
 import os
@@ -35,8 +37,11 @@ class MediaStorageTests(unittest.TestCase):
         self.primary_base_path = os.path.join(self.test_dir, "primary")
         self.secondary_base_path = os.path.join(self.test_dir, "secondary")
 
+        hs = Mock()
+        hs.config.media_store_path = self.primary_base_path
+
         storage_providers = [FileStorageProviderBackend(
-            self.primary_base_path, self.secondary_base_path
+            hs, self.secondary_base_path
         )]
 
         self.filepaths = MediaFilePaths(self.primary_base_path)
