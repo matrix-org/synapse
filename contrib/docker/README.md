@@ -49,7 +49,7 @@ docker run \
     --name synapse \
     -v ${DATA_PATH}:/data \
     -e SYNAPSE_SERVER_NAME=my.matrix.host \
-    matrixdotorg/synapse:v0.22.1
+    matrixdotorg/synapse:latest
 ```
 
 

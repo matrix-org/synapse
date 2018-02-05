@@ -6,7 +6,7 @@ version: '3'
 services:
 
   synapse:
-    image: synapse
+    image: matrixdotorg/synapse:latest
     # Since snyapse does not retry to connect to the database, restart upon
     # failure
     restart: unless-stopped
