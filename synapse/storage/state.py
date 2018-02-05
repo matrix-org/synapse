@@ -708,7 +708,7 @@ class StateStore(StateGroupReadStore, BackgroundUpdateStore):
         row = txn.fetchone()
         return row and row[0]
 
-    def _store_mult_state_groups_txn(self, txn, events_and_contexts):
+    def _store_event_state_mappings_txn(self, txn, events_and_contexts):
         state_groups = {}
         for event, context in events_and_contexts:
             if event.internal_metadata.is_outlier():

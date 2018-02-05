@@ -744,7 +744,7 @@ class EventsStore(SQLBaseStore):
 
         # Insert into the state_groups, state_groups_state, and
         # event_to_state_groups tables.
-        self._store_mult_state_groups_txn(txn, events_and_contexts)
+        self._store_event_state_mappings_txn(txn, events_and_contexts)
 
         # _store_rejected_events_txn filters out any events which were
         # rejected, and returns the filtered list.
@@ -982,7 +982,7 @@ class EventsStore(SQLBaseStore):
                 # insert into the state_group, state_groups_state and
                 # event_to_state_groups tables.
                 try:
-                    self._store_mult_state_groups_txn(txn, ((event, context),))
+                    self._store_event_state_mappings_txn(txn, ((event, context),))
                 except Exception:
                     logger.exception("")
                     raise
