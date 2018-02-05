@@ -86,6 +86,10 @@ Synapse specific settings:
 * ``SYNAPSE_EVENT_CACHE_SIZE``, the event cache size [default `10K`].
 * ``SYNAPSE_REPORT_STATS``, set this variable to `yes` to enable anonymous
   statistics reporting back to the Matrix project which helps us to get funding.
+* ``SYNAPSE_RECAPTCHA_PUBLIC_KEY``, set this variable to the recaptcha public
+  key in order to enable recaptcha upon registration
+* ``SYNAPSE_RECAPTCHA_PRIVATE_KEY``, set this variable to the recaptcha private
+  key in order to enable recaptcha upon registration
 
 Shared secrets, these will be initialized to random values if not set:
 

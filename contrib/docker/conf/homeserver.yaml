@@ -112,10 +112,17 @@ max_spider_size: "10M"
 
 ## Captcha ##
 
+{% if SYNAPSE_RECAPTCHA_PUBLIC_KEY %}
+recaptcha_public_key: "{{ SYNAPSE_RECAPTCHA_PUBLIC_KEY }}"
+recaptcha_private_key: "{{ SYNAPSE_RECAPTCHA_PRIVATE_KEY }}"
+enable_registration_captcha: True
+recaptcha_siteverify_api: "https://www.google.com/recaptcha/api/siteverify"
+{% else %}
 recaptcha_public_key: "YOUR_PUBLIC_KEY"
 recaptcha_private_key: "YOUR_PRIVATE_KEY"
 enable_registration_captcha: False
 recaptcha_siteverify_api: "https://www.google.com/recaptcha/api/siteverify"
+{% endif %}
 
 ## Turn ##
 
