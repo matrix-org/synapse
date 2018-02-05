@@ -58,7 +58,7 @@ docker run \
 The image expects a single volume, located at ``/data``, that will hold:
 
 * temporary files during uploads;
-* uploaded media and thumbnais;
+* uploaded media and thumbnails;
 * the SQLite database if you do not configure postgres.
 
 ## Environment
