@@ -553,7 +553,7 @@ class StateGroupWorkerStore(SQLBaseStore):
         Args:
             event_id (str): The event ID for which the state was calculated
             room_id (str)
-            prev_group (str|None): A previous state group for the room, optional.
+            prev_group (int|None): A previous state group for the room, optional.
             delta_ids (dict|None): The delta between state at `prev_group` and
                 `current_state_ids`, if `prev_group` was given. Same format as
                 `current_state_ids`.
@@ -561,7 +561,7 @@ class StateGroupWorkerStore(SQLBaseStore):
                 to event_id.
 
         Returns:
-            Deferred[str]: The state group ID
+            Deferred[int]: The state group ID
         """
         def _store_state_group_txn(txn):
             if current_state_ids is None:
