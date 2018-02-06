@@ -207,3 +207,14 @@ the ``worker_main_http_uri`` setting in the frontend_proxy worker configuration
 file. For example::
 
     worker_main_http_uri: http://127.0.0.1:8008
+
+
+``synapse.app.event_creator``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Handles non-state event creation. It can handle REST endpoints matching:
+
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/send
+
+It will create events locally and then send them on to the main synapse
+instance to be persisted and handled.
