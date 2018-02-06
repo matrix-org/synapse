@@ -1926,7 +1926,8 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     def _update_context_for_auth_events(self, event, context, auth_events,
                                         event_key):
-        """Update the state_ids in an event context after auth event resolution
+        """Update the state_ids in an event context after auth event resolution,
+        storing the changes as a new state group.
 
         Args:
             event (Event): The event we're handling the context for
