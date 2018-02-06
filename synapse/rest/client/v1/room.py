@@ -186,7 +186,6 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(RoomSendEventRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
         self.event_creation_hander = hs.get_event_creation_handler()
 
     def register(self, http_server):

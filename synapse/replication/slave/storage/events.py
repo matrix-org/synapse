@@ -21,6 +21,7 @@ from synapse.storage.event_push_actions import EventPushActionsStore
 from synapse.storage.roommember import RoomMemberStore
 from synapse.storage.state import StateGroupWorkerStore
 from synapse.storage.stream import StreamStore
+from synapse.storage.signatures import SignatureStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from ._base import BaseSlavedStore
 from ._slaved_id_tracker import SlavedIdTracker
@@ -169,6 +170,25 @@ class SlavedEventStore(StateGroupWorkerStore, BaseSlavedStore):
 
     get_federation_out_pos = DataStore.get_federation_out_pos.__func__
     update_federation_out_pos = DataStore.update_federation_out_pos.__func__
+
+    get_latest_event_ids_and_hashes_in_room = (
+        DataStore.get_latest_event_ids_and_hashes_in_room.__func__
+    )
+    _get_latest_event_ids_and_hashes_in_room = (
+        DataStore._get_latest_event_ids_and_hashes_in_room.__func__
+    )
+    _get_event_reference_hashes_txn = (
+        DataStore._get_event_reference_hashes_txn.__func__
+    )
+    add_event_hashes = (
+        DataStore.add_event_hashes.__func__
+    )
+    get_event_reference_hashes = (
+        SignatureStore.__dict__["get_event_reference_hashes"]
+    )
+    get_event_reference_hash = (
+        SignatureStore.__dict__["get_event_reference_hash"]
+    )
 
     def stream_positions(self):
         result = super(SlavedEventStore, self).stream_positions()
