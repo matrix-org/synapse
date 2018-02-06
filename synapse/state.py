@@ -183,8 +183,15 @@ class StateHandler(object):
     def compute_event_context(self, event, old_state=None):
         """Build an EventContext structure for the event.
 
+        This works out what the current state should be for the event, and
+        generates a new state group if necessary.
+
         Args:
             event (synapse.events.EventBase):
+            old_state (dict|None): The state at the event if it can't be
+                calculated from existing events. This is normally only specified
+                when receiving an event from federation where we don't have the
+                prev events for, e.g. when backfilling.
         Returns:
             synapse.events.snapshot.EventContext:
         """
@@ -220,6 +227,10 @@ class StateHandler(object):
             defer.returnValue(context)
 
         if old_state:
+            # We already have the state, so we don't to calculate it.
+            # Lets just correctly fill out the context and create a
+            # new state group for it.
+
             context = EventContext()
             context.prev_state_ids = {
                 (s.type, s.state_key): s.event_id for s in old_state
@@ -257,6 +268,9 @@ class StateHandler(object):
         context = EventContext()
         context.prev_state_ids = curr_state
         if event.is_state():
+            # If this is a state event then we need to create a new state
+            # group for the state after this event.
+
             key = (event.type, event.state_key)
             if key in context.prev_state_ids:
                 replaces = context.prev_state_ids[key]
@@ -266,11 +280,15 @@ class StateHandler(object):
             context.current_state_ids[key] = event.event_id
 
             if entry.state_group:
+                # If the state at the event has a state group assigned then
+                # we can use that as the prev group
                 context.prev_group = entry.state_group
                 context.delta_ids = {
                     key: event.event_id
                 }
             elif entry.prev_group:
+                # If the state at the event only has a prev group, then we can
+                # use that as a prev group too.
                 context.prev_group = entry.prev_group
                 context.delta_ids = dict(entry.delta_ids)
                 context.delta_ids[key] = event.event_id
@@ -278,8 +296,8 @@ class StateHandler(object):
             context.state_group = yield self.store.store_state_group(
                 event.event_id,
                 event.room_id,
-                prev_group=entry.prev_group,
-                delta_ids=entry.delta_ids,
+                prev_group=context.prev_group,
+                delta_ids=context.delta_ids,
                 current_state_ids=context.current_state_ids,
             )
         else:
