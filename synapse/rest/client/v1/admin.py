@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -171,6 +172,7 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
         self.store = hs.get_datastore()
         self.handlers = hs.get_handlers()
         self.state = hs.get_state_handler()
+        self.event_creation_handler = hs.get_event_creation_handler()
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id):
@@ -203,8 +205,7 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
         )
         new_room_id = info["room_id"]
 
-        msg_handler = self.handlers.message_handler
-        yield msg_handler.create_and_send_nonmember_event(
+        yield self.event_creation_handler.create_and_send_nonmember_event(
             room_creator_requester,
             {
                 "type": "m.room.message",

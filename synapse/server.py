@@ -55,6 +55,7 @@ from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
 from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.handlers.profile import ProfileHandler
+from synapse.handlers.message import EventCreationHandler
 from synapse.groups.groups_server import GroupsServerHandler
 from synapse.groups.attestations import GroupAttestionRenewer, GroupAttestationSigning
 from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
@@ -118,6 +119,7 @@ class HomeServer(object):
         'application_service_handler',
         'device_message_handler',
         'profile_handler',
+        'event_creation_handler',
         'deactivate_account_handler',
         'set_password_handler',
         'notifier',
@@ -275,6 +277,9 @@ class HomeServer(object):
 
     def build_profile_handler(self):
         return ProfileHandler(self)
+
+    def build_event_creation_handler(self):
+        return EventCreationHandler(self)
 
     def build_deactivate_account_handler(self):
         return DeactivateAccountHandler(self)
