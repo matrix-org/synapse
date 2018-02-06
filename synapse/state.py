@@ -216,13 +216,9 @@ class StateHandler(object):
                 context.prev_state_ids = {}
             context.prev_state_events = []
 
-            context.state_group = yield self.store.store_state_group(
-                event.event_id,
-                event.room_id,
-                prev_group=None,
-                delta_ids=None,
-                current_state_ids=context.current_state_ids,
-            )
+            # We don't store state for outliers, so we don't generate a state
+            # froup for it.
+            context.state_group = None
 
             defer.returnValue(context)
 
