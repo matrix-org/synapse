@@ -227,8 +227,8 @@ class StateHandler(object):
             defer.returnValue(context)
 
         if old_state:
-            # We already have the state, so we don't to calculate it.
-            # Lets just correctly fill out the context and create a
+            # We already have the state, so we don't need to calculate it.
+            # Let's just correctly fill out the context and create a
             # new state group for it.
 
             context = EventContext()
