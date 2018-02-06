@@ -697,14 +697,6 @@ class StateStore(StateGroupWorkerStore, BackgroundUpdateStore):
             where_clause="type='m.room.member'",
         )
 
-    def _have_persisted_state_group_txn(self, txn, state_group):
-        txn.execute(
-            "SELECT count(*) FROM state_groups WHERE id = ?",
-            (state_group,)
-        )
-        row = txn.fetchone()
-        return row and row[0]
-
     def _store_event_state_mappings_txn(self, txn, events_and_contexts):
         state_groups = {}
         for event, context in events_and_contexts:
