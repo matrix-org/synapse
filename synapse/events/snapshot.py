@@ -25,7 +25,9 @@ class EventContext(object):
             The current state map excluding the current event.
             (type, state_key) -> event_id
 
-        state_group (int): state group id
+        state_group (int|None): state group id, if the state has been stored
+            as a state group. This is usually only None if e.g. the event is
+            an outlier.
         rejected (bool|str): A rejection reason if the event was rejected, else
             False
 
