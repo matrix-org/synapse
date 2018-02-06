@@ -80,14 +80,14 @@ class StateGroupStore(object):
 
         return defer.succeed(groups)
 
-    def store_state_groups(self, event, context):
-        if context.current_state_ids is None:
-            return
+    def store_state_group(self, event_id, room_id, prev_group, delta_ids,
+                          current_state_ids):
+        state_group = self._next_group
+        self._next_group += 1
 
-        state_events = dict(context.current_state_ids)
+        self._group_to_state[state_group] = dict(current_state_ids)
 
-        self._group_to_state[context.state_group] = state_events
-        self._event_to_state_group[event.event_id] = context.state_group
+        return state_group
 
     def get_events(self, event_ids, **kwargs):
         return {
@@ -95,9 +95,18 @@ class StateGroupStore(object):
             if e_id in self._event_id_to_event
         }
 
+    def get_state_group_delta(self, name):
+        return (None, None)
+
     def register_events(self, events):
         for e in events:
             self._event_id_to_event[e.event_id] = e
+
+    def register_event_context(self, event, context):
+        self._event_to_state_group[event.event_id] = context.state_group
+
+    def register_event_id_state_group(self, event_id, state_group):
+        self._event_to_state_group[event_id] = state_group
 
 
 class DictObj(dict):
@@ -137,15 +146,7 @@ class Graph(object):
 
 class StateTestCase(unittest.TestCase):
     def setUp(self):
-        self.store = Mock(
-            spec_set=[
-                "get_state_groups_ids",
-                "add_event_hashes",
-                "get_events",
-                "get_next_state_group",
-                "get_state_group_delta",
-            ]
-        )
+        self.store = StateGroupStore()
         hs = Mock(spec_set=[
             "get_datastore", "get_auth", "get_state_handler", "get_clock",
             "get_state_resolution_handler",
@@ -155,9 +156,6 @@ class StateTestCase(unittest.TestCase):
         hs.get_clock.return_value = MockClock()
         hs.get_auth.return_value = Auth(hs)
         hs.get_state_resolution_handler = lambda: StateResolutionHandler(hs)
-
-        self.store.get_next_state_group.side_effect = Mock
-        self.store.get_state_group_delta.return_value = (None, None)
 
         self.state = StateHandler(hs)
         self.event_id = 0
@@ -197,14 +195,13 @@ class StateTestCase(unittest.TestCase):
             }
         )
 
-        store = StateGroupStore()
-        self.store.get_state_groups_ids.side_effect = store.get_state_groups_ids
+        self.store.register_events(graph.walk())
 
         context_store = {}
 
         for event in graph.walk():
             context = yield self.state.compute_event_context(event)
-            store.store_state_groups(event, context)
+            self.store.register_event_context(event, context)
             context_store[event.event_id] = context
 
         self.assertEqual(2, len(context_store["D"].prev_state_ids))
@@ -249,16 +246,13 @@ class StateTestCase(unittest.TestCase):
             }
         )
 
-        store = StateGroupStore()
-        self.store.get_state_groups_ids.side_effect = store.get_state_groups_ids
-        self.store.get_events = store.get_events
-        store.register_events(graph.walk())
+        self.store.register_events(graph.walk())
 
         context_store = {}
 
         for event in graph.walk():
             context = yield self.state.compute_event_context(event)
-            store.store_state_groups(event, context)
+            self.store.register_event_context(event, context)
             context_store[event.event_id] = context
 
         self.assertSetEqual(
@@ -315,16 +309,13 @@ class StateTestCase(unittest.TestCase):
             }
         )
 
-        store = StateGroupStore()
-        self.store.get_state_groups_ids.side_effect = store.get_state_groups_ids
-        self.store.get_events = store.get_events
-        store.register_events(graph.walk())
+        self.store.register_events(graph.walk())
 
         context_store = {}
 
         for event in graph.walk():
             context = yield self.state.compute_event_context(event)
-            store.store_state_groups(event, context)
+            self.store.register_event_context(event, context)
             context_store[event.event_id] = context
 
         self.assertSetEqual(
@@ -398,16 +389,13 @@ class StateTestCase(unittest.TestCase):
         self._add_depths(nodes, edges)
         graph = Graph(nodes, edges)
 
-        store = StateGroupStore()
-        self.store.get_state_groups_ids.side_effect = store.get_state_groups_ids
-        self.store.get_events = store.get_events
-        store.register_events(graph.walk())
+        self.store.register_events(graph.walk())
 
         context_store = {}
 
         for event in graph.walk():
             context = yield self.state.compute_event_context(event)
-            store.store_state_groups(event, context)
+            self.store.register_event_context(event, context)
             context_store[event.event_id] = context
 
         self.assertSetEqual(
@@ -467,7 +455,11 @@ class StateTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_trivial_annotate_message(self):
-        event = create_event(type="test_message", name="event")
+        prev_event_id = "prev_event_id"
+        event = create_event(
+            type="test_message", name="event2",
+            prev_events=[(prev_event_id, {})],
+        )
 
         old_state = [
             create_event(type="test1", state_key="1"),
@@ -475,11 +467,11 @@ class StateTestCase(unittest.TestCase):
             create_event(type="test2", state_key=""),
         ]
 
-        group_name = "group_name_1"
-
-        self.store.get_state_groups_ids.return_value = {
-            group_name: {(e.type, e.state_key): e.event_id for e in old_state},
-        }
+        group_name = self.store.store_state_group(
+            prev_event_id, event.room_id, None, None,
+            {(e.type, e.state_key): e.event_id for e in old_state},
+        )
+        self.store.register_event_id_state_group(prev_event_id, group_name)
 
         context = yield self.state.compute_event_context(event)
 
@@ -492,7 +484,11 @@ class StateTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_trivial_annotate_state(self):
-        event = create_event(type="state", state_key="", name="event")
+        prev_event_id = "prev_event_id"
+        event = create_event(
+            type="state", state_key="", name="event2",
+            prev_events=[(prev_event_id, {})],
+        )
 
         old_state = [
             create_event(type="test1", state_key="1"),
@@ -500,11 +496,11 @@ class StateTestCase(unittest.TestCase):
             create_event(type="test2", state_key=""),
         ]
 
-        group_name = "group_name_1"
-
-        self.store.get_state_groups_ids.return_value = {
-            group_name: {(e.type, e.state_key): e.event_id for e in old_state},
-        }
+        group_name = self.store.store_state_group(
+            prev_event_id, event.room_id, None, None,
+            {(e.type, e.state_key): e.event_id for e in old_state},
+        )
+        self.store.register_event_id_state_group(prev_event_id, group_name)
 
         context = yield self.state.compute_event_context(event)
 
@@ -517,7 +513,12 @@ class StateTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_resolve_message_conflict(self):
-        event = create_event(type="test_message", name="event")
+        prev_event_id1 = "event_id1"
+        prev_event_id2 = "event_id2"
+        event = create_event(
+            type="test_message", name="event3",
+            prev_events=[(prev_event_id1, {}), (prev_event_id2, {})],
+        )
 
         creation = create_event(
             type=EventTypes.Create, state_key=""
@@ -537,12 +538,12 @@ class StateTestCase(unittest.TestCase):
             create_event(type="test4", state_key=""),
         ]
 
-        store = StateGroupStore()
-        store.register_events(old_state_1)
-        store.register_events(old_state_2)
-        self.store.get_events = store.get_events
+        self.store.register_events(old_state_1)
+        self.store.register_events(old_state_2)
 
-        context = yield self._get_context(event, old_state_1, old_state_2)
+        context = yield self._get_context(
+            event, prev_event_id1, old_state_1, prev_event_id2, old_state_2,
+        )
 
         self.assertEqual(len(context.current_state_ids), 6)
 
@@ -550,7 +551,12 @@ class StateTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_resolve_state_conflict(self):
-        event = create_event(type="test4", state_key="", name="event")
+        prev_event_id1 = "event_id1"
+        prev_event_id2 = "event_id2"
+        event = create_event(
+            type="test4", state_key="", name="event",
+            prev_events=[(prev_event_id1, {}), (prev_event_id2, {})],
+        )
 
         creation = create_event(
             type=EventTypes.Create, state_key=""
@@ -575,7 +581,9 @@ class StateTestCase(unittest.TestCase):
         store.register_events(old_state_2)
         self.store.get_events = store.get_events
 
-        context = yield self._get_context(event, old_state_1, old_state_2)
+        context = yield self._get_context(
+            event, prev_event_id1, old_state_1, prev_event_id2, old_state_2,
+        )
 
         self.assertEqual(len(context.current_state_ids), 6)
 
@@ -583,7 +591,12 @@ class StateTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_standard_depth_conflict(self):
-        event = create_event(type="test4", name="event")
+        prev_event_id1 = "event_id1"
+        prev_event_id2 = "event_id2"
+        event = create_event(
+            type="test4", name="event",
+            prev_events=[(prev_event_id1, {}), (prev_event_id2, {})],
+        )
 
         member_event = create_event(
             type=EventTypes.Member,
@@ -615,7 +628,9 @@ class StateTestCase(unittest.TestCase):
         store.register_events(old_state_2)
         self.store.get_events = store.get_events
 
-        context = yield self._get_context(event, old_state_1, old_state_2)
+        context = yield self._get_context(
+            event, prev_event_id1, old_state_1, prev_event_id2, old_state_2,
+        )
 
         self.assertEqual(
             old_state_2[2].event_id, context.current_state_ids[("test1", "1")]
@@ -639,19 +654,26 @@ class StateTestCase(unittest.TestCase):
         store.register_events(old_state_1)
         store.register_events(old_state_2)
 
-        context = yield self._get_context(event, old_state_1, old_state_2)
+        context = yield self._get_context(
+            event, prev_event_id1, old_state_1, prev_event_id2, old_state_2,
+        )
 
         self.assertEqual(
             old_state_1[2].event_id, context.current_state_ids[("test1", "1")]
         )
 
-    def _get_context(self, event, old_state_1, old_state_2):
-        group_name_1 = "group_name_1"
-        group_name_2 = "group_name_2"
+    def _get_context(self, event, prev_event_id_1, old_state_1, prev_event_id_2,
+                     old_state_2):
+        sg1 = self.store.store_state_group(
+            prev_event_id_1, event.room_id, None, None,
+            {(e.type, e.state_key): e.event_id for e in old_state_1},
+        )
+        self.store.register_event_id_state_group(prev_event_id_1, sg1)
 
-        self.store.get_state_groups_ids.return_value = {
-            group_name_1: {(e.type, e.state_key): e.event_id for e in old_state_1},
-            group_name_2: {(e.type, e.state_key): e.event_id for e in old_state_2},
-        }
+        sg2 = self.store.store_state_group(
+            prev_event_id_2, event.room_id, None, None,
+            {(e.type, e.state_key): e.event_id for e in old_state_2},
+        )
+        self.store.register_event_id_state_group(prev_event_id_2, sg2)
 
         return self.state.compute_event_context(event)
