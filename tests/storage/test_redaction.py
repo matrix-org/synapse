@@ -58,7 +58,7 @@ class RedactionTestCase(unittest.TestCase):
             "content": content,
         })
 
-        event, context = yield self.event_creation_handler._create_new_client_event(
+        event, context = yield self.event_creation_handler.create_new_client_event(
             builder
         )
 
@@ -78,7 +78,7 @@ class RedactionTestCase(unittest.TestCase):
             "content": {"body": body, "msgtype": u"message"},
         })
 
-        event, context = yield self.event_creation_handler._create_new_client_event(
+        event, context = yield self.event_creation_handler.create_new_client_event(
             builder
         )
 
@@ -97,7 +97,7 @@ class RedactionTestCase(unittest.TestCase):
             "redacts": event_id,
         })
 
-        event, context = yield self.event_creation_handler._create_new_client_event(
+        event, context = yield self.event_creation_handler.create_new_client_event(
             builder
         )
 

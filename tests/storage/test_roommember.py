@@ -57,7 +57,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
             "content": {"membership": membership},
         })
 
-        event, context = yield self.event_creation_handler._create_new_client_event(
+        event, context = yield self.event_creation_handler.create_new_client_event(
             builder
         )
 

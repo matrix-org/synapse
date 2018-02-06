@@ -378,7 +378,7 @@ class EventCreationHandler(object):
             if txn_id is not None:
                 builder.internal_metadata.txn_id = txn_id
 
-            event, context = yield self._create_new_client_event(
+            event, context = yield self.create_new_client_event(
                 builder=builder,
                 requester=requester,
                 prev_event_ids=prev_event_ids,
@@ -486,9 +486,9 @@ class EventCreationHandler(object):
         )
         defer.returnValue(event)
 
-    @measure_func("_create_new_client_event")
+    @measure_func("create_new_client_event")
     @defer.inlineCallbacks
-    def _create_new_client_event(self, builder, requester=None, prev_event_ids=None):
+    def create_new_client_event(self, builder, requester=None, prev_event_ids=None):
         if prev_event_ids:
             prev_events = yield self.store.add_event_hashes(prev_event_ids)
             prev_max_depth = yield self.store.get_max_depth_of_events(prev_event_ids)
