@@ -2099,9 +2099,6 @@ class EventsStore(SQLBaseStore):
             "[purge] found %i events before cutoff, of which %i are remote"
             " non-state events to delete", len(event_rows), len(to_delete))
 
-        for event_id, state_key in event_rows:
-            txn.call_after(self._get_state_group_for_event.invalidate, (event_id,))
-
         logger.info("[purge] Finding new backward extremities")
 
         # We calculate the new entries for the backward extremeties by finding
@@ -2229,12 +2226,15 @@ class EventsStore(SQLBaseStore):
             state_rows
         )
 
-        # Delete all non-state
         logger.info("[purge] removing events from event_to_state_groups")
         txn.executemany(
             "DELETE FROM event_to_state_groups WHERE event_id = ?",
             [(event_id,) for event_id, _ in event_rows]
         )
+        for event_id, _ in event_rows:
+            txn.call_after(self._get_state_group_for_event.invalidate, (
+                event_id,
+            ))
 
         logger.info("[purge] updating room_depth")
         txn.execute(
