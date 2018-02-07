@@ -72,7 +72,7 @@ class MessageHandler(BaseHandler):
         depth = event.depth
 
         with (yield self.pagination_lock.write(room_id)):
-            yield self.store.delete_old_state(room_id, depth)
+            yield self.store.purge_history(room_id, depth)
 
     @defer.inlineCallbacks
     def get_messages(self, requester, room_id=None, pagin_config=None,

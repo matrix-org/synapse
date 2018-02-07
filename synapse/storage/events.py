@@ -2031,16 +2031,16 @@ class EventsStore(SQLBaseStore):
             )
         return self.runInteraction("get_all_new_events", get_all_new_events_txn)
 
-    def delete_old_state(self, room_id, topological_ordering):
-        return self.runInteraction(
-            "delete_old_state",
-            self._delete_old_state_txn, room_id, topological_ordering
-        )
-
-    def _delete_old_state_txn(self, txn, room_id, topological_ordering):
-        """Deletes old room state
+    def purge_history(self, room_id, topological_ordering):
+        """Deletes room history before a certain point
         """
 
+        return self.runInteraction(
+            "purge_history",
+            self._purge_history_txn, room_id, topological_ordering
+        )
+
+    def _purge_history_txn(self, txn, room_id, topological_ordering):
         # Tables that should be pruned:
         #     event_auth
         #     event_backward_extremities
