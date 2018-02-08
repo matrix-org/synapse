@@ -15,7 +15,7 @@ if "SYNAPSE_SERVER_NAME" not in environ:
     print("Environment variable SYNAPSE_SERVER_NAME is mandatory, exiting.")
     sys.exit(2)
 
-permissions = "{}:{}".format(environ.get("UID", 991), environ.get("GID", 991))
+ownership = "{}:{}".format(environ.get("UID", 991), environ.get("GID", 991))
 args = ["python", "-m", "synapse.app.homeserver",
         "--server-name", environ.get("SYNAPSE_SERVER_NAME"),
         "--report-stats", environ.get("SYNAPSE_REPORT_STATS", "no"),
@@ -43,5 +43,5 @@ else:
         convert("/conf/log.config", "/compiled/%s.log.config" % environ.get("SYNAPSE_SERVER_NAME"), environ)
     # Generate missing keys and start synapse
     subprocess.check_output(args + ["--generate-keys"])
-    subprocess.check_output(["chown", "-R", permissions, "/data"])
-    os.execv("/sbin/su-exec", ["su-exec", permissions] + args)
+    subprocess.check_output(["chown", "-R", ownership, "/data"])
+    os.execv("/sbin/su-exec", ["su-exec", ownership] + args)
