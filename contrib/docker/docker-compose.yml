@@ -6,7 +6,7 @@ version: '3'
 services:
 
   synapse:
-    image: matrixdotorg/synapse:latest
+    image: docker.io/matrixdotorg/synapse:latest
     # Since snyapse does not retry to connect to the database, restart upon
     # failure
     restart: unless-stopped
@@ -15,7 +15,12 @@ services:
       - SYNAPSE_SERVER_NAME=my.matrix.host
       - SYNAPSE_ENABLE_REGISTRATION=yes
     volumes:
+      # You may either store all the files in a local folder
       - ./files:/data
+      # .. or you may split this between different storage points
+      # - ./files:/data
+      # - /path/to/ssd:/data/uploads
+      # - /path/to/large_hdd:/data/media
     depends_on:
       - db
     # In order to expose Synapse, remove one of the following, you might for
@@ -29,10 +34,13 @@ services:
       - traefik.port=8448
 
   db:
-    image: postgres:latest
+    image: postgres:10-alpine
     # Change that password, of course!
     environment:
       - POSTGRES_USER=matrix
       - POSTGRES_PASSWORD=changeme
     volumes:
+      # You may store the database tables in a local folder..
       - ./schemas:/var/lib/postgresql/data
+      # .. or store them on some high performance storage for better results
+      # - /path/to/ssd/storage:/var/lib/postfesql/data

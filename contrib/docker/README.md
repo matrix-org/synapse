@@ -12,7 +12,7 @@ use that server.
 Build the docker image with the `docker build` command from the root of the synapse repository.
 
 ```
-docker build -t matrixdotorg/synapse:v0.22.1 .
+docker build -t matrixdotorg/synapse .
 ```
 
 The `-t` option sets the image tag. Official images are tagged `matrixdotorg/synapse:<version>` where `<version>` is the same as the release tag in the synapse git repository.
@@ -76,12 +76,17 @@ Global settings:
 
 * ``UID``, the user id Synapse will run as [default 991]
 * ``GID``, the group id Synapse will run as [default 991]
+* ``SYNAPSE_CONFIG_PATH``, path to a custom config file
 
-Synapse specific settings:
+If ``SYNAPSE_CONFIG_PATH`` is set, you should generate a configuration file
+then customize it manually. No other environment variable is required.
+
+Otherwise, a dynamic configuration file will be used. The following environment
+variables are available for configuration:
 
 * ``SYNAPSE_SERVER_NAME`` (mandatory), the current server public hostname.
-* ``SYNAPSE_CONFIG_PATH``, path to a custom config file (will ignore all
-  other options then).
+* ``SYNAPSE_REPORT_STATS``, (mandatory, ``yes`` or ``not``), enable anonymous
+  statistics reporting back to the Matrix project which helps us to get funding.
 * ``SYNAPSE_NO_TLS``, set this variable to disable TLS in Synapse (use this if
   you run your own TLS-capable reverse proxy).
 * ``SYNAPSE_WEB_CLIENT``, set this variable to enable the embedded Web client.
@@ -90,8 +95,6 @@ Synapse specific settings:
 * ``SYNAPSE_ALLOW_GUEST``, set this variable to allow guest joining this server.
 * ``SYNAPSE_EVENT_CACHE_SIZE``, the event cache size [default `10K`].
 * ``SYNAPSE_CACHE_FACTOR``, the cache factor [default `0.5`].
-* ``SYNAPSE_REPORT_STATS``, set this variable to `yes` to enable anonymous
-  statistics reporting back to the Matrix project which helps us to get funding.
 * ``SYNAPSE_RECAPTCHA_PUBLIC_KEY``, set this variable to the recaptcha public
   key in order to enable recaptcha upon registration.
 * ``SYNAPSE_RECAPTCHA_PRIVATE_KEY``, set this variable to the recaptcha private
@@ -100,7 +103,7 @@ Synapse specific settings:
   uris to enable TURN for this homeserver.
 * ``SYNAPSE_TURN_SECRET``, set this to the TURN shared secret if required.
 
-Shared secrets, these will be initialized to random values if not set:
+Shared secrets, that will be initialized to random values if not set:
 
 * ``SYNAPSE_REGISTRATION_SHARED_SECRET``, secret for registrering users if
   registration is disable.
