@@ -156,8 +156,13 @@ trusted_third_party_id_servers:
 
 ## Metrics ###
 
+{% if SYNAPSE_REPORT_STATS.lower() == "yes" %}
+enable_metrics: True
+report_stats: True
+{% else %}
 enable_metrics: False
 report_stats: False
+{% endif %}
 
 ## API Configuration ##
 
