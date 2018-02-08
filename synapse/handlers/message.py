@@ -63,7 +63,7 @@ class MessageHandler(BaseHandler):
         self.spam_checker = hs.get_spam_checker()
 
     @defer.inlineCallbacks
-    def purge_history(self, room_id, event_id):
+    def purge_history(self, room_id, event_id, delete_local_events=False):
         event = yield self.store.get_event(event_id)
 
         if event.room_id != room_id:
@@ -72,7 +72,7 @@ class MessageHandler(BaseHandler):
         depth = event.depth
 
         with (yield self.pagination_lock.write(room_id)):
-            yield self.store.purge_history(room_id, depth)
+            yield self.store.purge_history(room_id, depth, delete_local_events)
 
     @defer.inlineCallbacks
     def get_messages(self, requester, room_id=None, pagin_config=None,

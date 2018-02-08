@@ -2031,16 +2031,32 @@ class EventsStore(SQLBaseStore):
             )
         return self.runInteraction("get_all_new_events", get_all_new_events_txn)
 
-    def purge_history(self, room_id, topological_ordering):
+    def purge_history(
+        self, room_id, topological_ordering, delete_local_events,
+    ):
         """Deletes room history before a certain point
+
+        Args:
+            room_id (str):
+
+            topological_ordering (int):
+                minimum topo ordering to preserve
+
+            delete_local_events (bool):
+                if True, we will delete local events as well as remote ones
+                (instead of just marking them as outliers and deleting their
+                state groups).
         """
 
         return self.runInteraction(
             "purge_history",
-            self._purge_history_txn, room_id, topological_ordering
+            self._purge_history_txn, room_id, topological_ordering,
+            delete_local_events,
         )
 
-    def _purge_history_txn(self, txn, room_id, topological_ordering):
+    def _purge_history_txn(
+        self, txn, room_id, topological_ordering, delete_local_events,
+    ):
         # Tables that should be pruned:
         #     event_auth
         #     event_backward_extremities
@@ -2093,11 +2109,14 @@ class EventsStore(SQLBaseStore):
 
         to_delete = [
             (event_id,) for event_id, state_key in event_rows
-            if state_key is None and not self.hs.is_mine_id(event_id)
+            if state_key is None and (
+                delete_local_events or not self.hs.is_mine_id(event_id)
+            )
         ]
         logger.info(
-            "[purge] found %i events before cutoff, of which %i are remote"
-            " non-state events to delete", len(event_rows), len(to_delete))
+            "[purge] found %i events before cutoff, of which %i can be deleted",
+            len(event_rows), len(to_delete),
+        )
 
         logger.info("[purge] Finding new backward extremities")
 
@@ -2273,7 +2292,9 @@ class EventsStore(SQLBaseStore):
             " WHERE event_id = ?",
             [
                 (True, event_id,) for event_id, state_key in event_rows
-                if state_key is not None or self.hs.is_mine_id(event_id)
+                if state_key is not None or (
+                    not delete_local_events and self.hs.is_mine_id(event_id)
+                )
             ]
         )
 
