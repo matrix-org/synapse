@@ -94,7 +94,6 @@ variables are available for configuration:
   statistics reporting back to the Matrix project which helps us to get funding.
 * ``SYNAPSE_NO_TLS``, set this variable to disable TLS in Synapse (use this if
   you run your own TLS-capable reverse proxy).
-* ``SYNAPSE_WEB_CLIENT``, set this variable to enable the embedded Web client.
 * ``SYNAPSE_ENABLE_REGISTRATION``, set this variable to enable registration on
   the Synapse instance.
 * ``SYNAPSE_ALLOW_GUEST``, set this variable to allow guest joining this server.
