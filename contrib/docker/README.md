@@ -31,11 +31,11 @@ Then, to run the server:
 docker-compose up -d
 ```
 
-In the case you specified a custom path for you configuration file and wish to
+In the case you specify a custom path for you configuration file and wish to
 generate a fresh ``homeserver.yaml``, simply run:
 
 ```
-docker-compose run --rm synapse generate
+docker-compose run --rm -e SYNAPSE_SERVER_NAME=my.matrix.host synapse generate
 ```
 
 If you do not wish to use Compose, you may still run this image using plain
@@ -61,6 +61,11 @@ The image expects a single volume, located at ``/data``, that will hold:
 * uploaded media and thumbnails;
 * the SQLite database if you do not configure postgres;
 * the appservices configuration.
+
+You are free to use separate volumes depending on storage endpoints at your
+disposal. For instance, ``/data/media`` coud be stored on a large but low
+performance hdd storage while other files could be stored on high performance
+endpoints.
 
 In order to setup an application service, simply create an ``appservices``
 directory in the data volume and write the application service Yaml
