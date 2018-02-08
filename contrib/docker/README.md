@@ -119,3 +119,10 @@ Database specific values (will use SQLite if not set):
 * `POSTGRES_HOST` - The host of the postgres database if you wish to use postgresql instead of sqlite3. [default: `db` which is useful when using a container on the same docker network in a compose file where the postgres service is called `db`]
 * `POSTGRES_PASSWORD` - The password for the synapse postgres database. **If this is set then postgres will be used instead of sqlite3.** [default: none] **NOTE**: You are highly encouraged to use postgresql! Please use the compose file to make it easier to deploy.
 * `POSTGRES_USER` - The user for the synapse postgres database. [default: `matrix`]
+
+Mail server specific values (will not send emails if not set):
+
+* ``SYNAPSE_SMTP_HOST``, hostname to the mail server.
+* ``SYNAPSE_SMTP_PORT``, TCP port for accessing the mail server [default ``25``].
+* ``SYNAPSE_SMTP_USER``, username for authenticating against the mail server if any.
+* ``SYNAPSE_SMTP_PASSWORD``, password for authenticating against the mail server if any.
