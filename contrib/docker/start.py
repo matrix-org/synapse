@@ -49,7 +49,7 @@ else:
         environ["SYNAPSE_APPSERVICES"] = glob.glob("/data/appservices/*.yaml")
         if not os.path.exists("/compiled"): os.mkdir("/compiled")
         convert("/conf/homeserver.yaml", "/compiled/homeserver.yaml", environ)
-        convert("/conf/log.config", "/compiled/%s.log.config" % environ["SYNAPSE_SERVER_NAME"], environ)
+        convert("/conf/log.config", "/compiled/log.config", environ)
         subprocess.check_output(["chown", "-R", ownership, "/data"])
         args += ["--config-path", "/compiled/homeserver.yaml"]
     # Generate missing keys and start synapse

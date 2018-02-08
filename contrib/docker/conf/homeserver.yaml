@@ -69,7 +69,7 @@ database:
 event_cache_size: "{{ SYNAPSE_EVENT_CACHE_SIZE or "10K" }}"
 verbose: 0
 log_file: "/data/homeserver.log"
-log_config: "/data/{{ SYNAPSE_SERVER_NAME }}.log.config"
+log_config: "/compiled/log.config"
 
 ## Ratelimiting ##
 
