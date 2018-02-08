@@ -21,22 +21,41 @@ You may have a local Python wheel cache available, in which case copy the releva
 
 ## Run
 
+This image is designed to run either with an automatically generated configuration
+file or with a custom configuration that requires manual edition.
+
+### Automated configuration
+
 It is recommended that you use Docker Compose to run your containers, including
 this image and a Postgres server. A sample ``docker-compose.yml`` is provided,
 including example labels for reverse proxying and other artifacts.
 
-Then, to run the server:
+Read the section about environment variables and set at least mandatory variables,
+then run the server:
 
 ```
 docker-compose up -d
 ```
 
-In the case you specify a custom path for you configuration file and wish to
-generate a fresh ``homeserver.yaml``, simply run:
+### Manual configuration
+
+A sample ``docker-compose.yml`` is provided, including example labels for
+reverse proxying and other artifacts.
+
+Specify a ``SYNAPSE_CONFIG_PATH``, preferably to a persistent path,
+to use manual configuration. To generate a fresh ``homeserver.yaml``, simply run:
 
 ```
 docker-compose run --rm -e SYNAPSE_SERVER_NAME=my.matrix.host synapse generate
 ```
+
+Then, customize your configuration and run the server:
+
+```
+docker-compose up -d
+```
+
+### Without Compose
 
 If you do not wish to use Compose, you may still run this image using plain
 Docker commands. Note that the following is just a guideline and you may need
@@ -49,9 +68,9 @@ docker run \
     --name synapse \
     -v ${DATA_PATH}:/data \
     -e SYNAPSE_SERVER_NAME=my.matrix.host \
-    matrixdotorg/synapse:latest
+    -e SYNAPSE_REPORT_STATS=yes \
+    docker.io/matrixdotorg/synapse:latest
 ```
-
 
 ## Volumes
 
