@@ -13,6 +13,7 @@ services:
     # See the readme for a full documentation of the environment settings
     environment:
       - SYNAPSE_SERVER_NAME=my.matrix.host
+      - SYNAPSE_REPORT_STATS=no
       - SYNAPSE_ENABLE_REGISTRATION=yes
     volumes:
       # You may either store all the files in a local folder

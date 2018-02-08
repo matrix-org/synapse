@@ -90,7 +90,7 @@ Otherwise, a dynamic configuration file will be used. The following environment
 variables are available for configuration:
 
 * ``SYNAPSE_SERVER_NAME`` (mandatory), the current server public hostname.
-* ``SYNAPSE_REPORT_STATS``, (mandatory, ``yes`` or ``not``), enable anonymous
+* ``SYNAPSE_REPORT_STATS``, (mandatory, ``yes`` or ``no``), enable anonymous
   statistics reporting back to the Matrix project which helps us to get funding.
 * ``SYNAPSE_NO_TLS``, set this variable to disable TLS in Synapse (use this if
   you run your own TLS-capable reverse proxy).
