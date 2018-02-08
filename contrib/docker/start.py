@@ -44,8 +44,8 @@ else:
     if "SYNAPSE_CONFIG_PATH" in environ:
         args += ["--config-path", environ["SYNAPSE_CONFIG_PATH"]]
     else:
-        check_arguments(environ, ("SYNAPSE_SERVER_NAME", "SYNAPSE_REPORT_STATS"))
-        generate_secrets(environ, ("SYNAPSE_REGISTRATION_SHARED_SECRET", "SYNAPSE_MACAROON_SECRET_KEY"))
+        check_arguments(environ, ("SYNAPSE_SERVER_NAME", "SYNAPSE_REPORT_STATS", "SYNAPSE_MACAROON_SECRET_KEY"))
+        generate_secrets(environ, ("SYNAPSE_REGISTRATION_SHARED_SECRET",))
         environ["SYNAPSE_APPSERVICES"] = glob.glob("/data/appservices/*.yaml")
         if not os.path.exists("/compiled"): os.mkdir("/compiled")
         convert("/conf/homeserver.yaml", "/compiled/homeserver.yaml", environ)
