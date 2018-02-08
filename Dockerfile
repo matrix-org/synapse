@@ -1,6 +1,6 @@
-FROM python:2-alpine
+FROM docker.io/python:2-alpine3.7
 
-RUN apk add --no-cache --virtual .nacl_deps su-exec build-base libffi-dev zlib-dev openssl-dev libjpeg-turbo-dev linux-headers postgresql-dev
+RUN apk add --no-cache --virtual .nacl_deps su-exec build-base libffi-dev zlib-dev libressl-dev libjpeg-turbo-dev linux-headers postgresql-dev
 
 COPY . /synapse
 
