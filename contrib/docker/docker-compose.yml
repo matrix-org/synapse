@@ -38,7 +38,7 @@ services:
     image: postgres:10-alpine
     # Change that password, of course!
     environment:
-      - POSTGRES_USER=matrix
+      - POSTGRES_USER=synapse
       - POSTGRES_PASSWORD=changeme
     volumes:
       # You may store the database tables in a local folder..

@@ -50,9 +50,9 @@ listeners:
 database:
   name: "psycopg2"
   args:
-    user: "{{ POSTGRES_USER or "matrix" }}"
+    user: "{{ POSTGRES_USER or "synapse" }}"
     password: "{{ POSTGRES_PASSWORD }}"
-    database: "{{ POSTGRES_DB or "matrix" }}"
+    database: "{{ POSTGRES_DB or "synapse" }}"
     host: "{{ POSTGRES_HOST or "db" }}"
     port: "{{ POSTGRES_PORT or "5432" }}"
     cp_min: 5
