@@ -129,7 +129,16 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
         if not is_admin:
             raise AuthError(403, "You are not a server admin")
 
-        yield self.handlers.message_handler.purge_history(room_id, event_id)
+        body = parse_json_object_from_request(request, allow_empty_body=True)
+
+        delete_local_events = bool(
+            body.get("delete_local_history", False)
+        )
+
+        yield self.handlers.message_handler.purge_history(
+            room_id, event_id,
+            delete_local_events=delete_local_events,
+        )
 
         defer.returnValue((200, {}))
 
