@@ -16,10 +16,16 @@ def check_arguments(environ, args):
             sys.exit(2)
 
 def generate_secrets(environ, secrets):
-    for secret in secrets:
+    for name, secret in secrets.items():
         if secret not in environ:
-            print("Generating a random secret for {}".format(secret))
-            environ[secret] = os.urandom(32).encode("hex")
+            filename = "/data/%s.%s.key" % (environ["SYNAPSE_SERVER_NAME"], name)
+            if os.path.exists(filename):
+                with open(filename) as handle: value = handle.read()
+            else:
+                print("Generating a random secret for {}".format(name))
+                value = os.urandom(32).encode("hex")
+                with open(filename, "w") as handle: handle.write(value)
+            environ[secret] = value
 
 # Prepare the configuration
 mode = sys.argv[1] if len(sys.argv) > 1 else None
@@ -44,8 +50,11 @@ else:
     if "SYNAPSE_CONFIG_PATH" in environ:
         args += ["--config-path", environ["SYNAPSE_CONFIG_PATH"]]
     else:
-        check_arguments(environ, ("SYNAPSE_SERVER_NAME", "SYNAPSE_REPORT_STATS", "SYNAPSE_MACAROON_SECRET_KEY"))
-        generate_secrets(environ, ("SYNAPSE_REGISTRATION_SHARED_SECRET",))
+        check_arguments(environ, ("SYNAPSE_SERVER_NAME", "SYNAPSE_REPORT_STATS"))
+        generate_secrets(environ, {
+            "registration": "SYNAPSE_REGISTRATION_SHARED_SECRET",
+            "macaroon": "SYNAPSE_MACAROON_SECRET_KEY"
+        })
         environ["SYNAPSE_APPSERVICES"] = glob.glob("/data/appservices/*.yaml")
         if not os.path.exists("/compiled"): os.mkdir("/compiled")
         convert("/conf/homeserver.yaml", "/compiled/homeserver.yaml", environ)
