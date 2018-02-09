@@ -2255,12 +2255,6 @@ class EventsStore(SQLBaseStore):
                 event_id,
             ))
 
-        logger.info("[purge] updating room_depth")
-        txn.execute(
-            "UPDATE room_depth SET min_depth = ? WHERE room_id = ?",
-            (topological_ordering, room_id,)
-        )
-
         # Delete all remote non-state events
         for table in (
             "events",
@@ -2296,6 +2290,18 @@ class EventsStore(SQLBaseStore):
                     not delete_local_events and self.hs.is_mine_id(event_id)
                 )
             ]
+        )
+
+        # synapse tries to take out an exclusive lock on room_depth whenever it
+        # persists events (because upsert), and once we run this update, we
+        # will block that for the rest of our transaction.
+        #
+        # So, let's stick it at the end so that we don't block event
+        # persistence.
+        logger.info("[purge] updating room_depth")
+        txn.execute(
+            "UPDATE room_depth SET min_depth = ? WHERE room_id = ?",
+            (topological_ordering, room_id,)
         )
 
         logger.info("[purge] done")
