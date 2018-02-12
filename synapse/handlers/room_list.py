@@ -206,7 +206,7 @@ class RoomListHandler(BaseHandler):
             step = len(rooms_to_scan)
 
         chunk = []
-        for i in xrange(0, len(rooms_to_scan), step):
+        for i in xrange(0, len(rooms_to_scan), max(step, 1)):
             batch = rooms_to_scan[i:i + step]
             logger.info("Processing %i rooms for result", len(batch))
             yield concurrently_execute(
