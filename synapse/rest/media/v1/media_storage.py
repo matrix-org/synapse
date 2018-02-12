@@ -70,6 +70,12 @@ class MediaStorage(object):
             _write_file_synchronously, source, fname,
         ))
 
+        # Tell the storage providers about the new file. They'll decide
+        # if they should upload it and whether to do so synchronously
+        # or not.
+        for provider in self.storage_providers:
+            yield provider.store_file(path, file_info)
+
         defer.returnValue(fname)
 
     @contextlib.contextmanager
