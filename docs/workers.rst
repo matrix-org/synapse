@@ -30,16 +30,28 @@ requests made to the federation port. The caveats regarding running a
 reverse-proxy on the federation port still apply (see
 https://github.com/matrix-org/synapse/blob/master/README.rst#reverse-proxying-the-federation-port).
 
-To enable workers, you need to add a replication listener to the master synapse, e.g.::
+To enable workers, you need to add two replication listeners to the master
+synapse, e.g.::
 
     listeners:
+      # The TCP replication port
       - port: 9092
         bind_address: '127.0.0.1'
         type: replication
+      # The HTTP replication port
+      - port: 9093
+        bind_address: '127.0.0.1'
+        type: http
+        resources:
+         - names: [replication]
 
-Under **no circumstances** should this replication API listener be exposed to the
-public internet; it currently implements no authentication whatsoever and is
+Under **no circumstances** should these replication API listeners be exposed to
+the public internet; it currently implements no authentication whatsoever and is
 unencrypted.
+
+(Roughly, the TCP port is used for streaming data from the master to the
+workers, and the HTTP port for the workers to communicate with the main
+synapse process.)
 
 You then create a set of configs for the various worker processes.  These
 should be worker configuration files, and should be stored in a dedicated
@@ -52,8 +64,10 @@ You should minimise the number of overrides though to maintain a usable config.
 
 You must specify the type of worker application (``worker_app``). The currently
 available worker applications are listed below. You must also specify the
-replication endpoint that it's talking to on the main synapse process
-(``worker_replication_host`` and ``worker_replication_port``).
+replication endpoints that it's talking to on the main synapse process.
+``worker_replication_host`` should specify the host of the main synapse,
+``worker_replication_port`` should point to the TCP replication listener port and
+``worker_replication_http_port`` should point to the HTTP replication port.
 
 For instance::
 
@@ -62,6 +76,7 @@ For instance::
     # The replication listener on the synapse to talk to.
     worker_replication_host: 127.0.0.1
     worker_replication_port: 9092
+    worker_replication_http_port: 9093
 
     worker_listeners:
      - type: http
