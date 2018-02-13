@@ -50,7 +50,7 @@ the public internet; it currently implements no authentication whatsoever and is
 unencrypted.
 
 (Roughly, the TCP port is used for streaming data from the master to the
-workers, and the HTTP port for the workers to communicate with the main
+workers, and the HTTP port for the workers to send data to the main
 synapse process.)
 
 You then create a set of configs for the various worker processes.  These
@@ -68,6 +68,9 @@ replication endpoints that it's talking to on the main synapse process.
 ``worker_replication_host`` should specify the host of the main synapse,
 ``worker_replication_port`` should point to the TCP replication listener port and
 ``worker_replication_http_port`` should point to the HTTP replication port.
+
+Currently, only the ``event_creator`` worker requires specifying
+``worker_replication_http_port``.
 
 For instance::
 
