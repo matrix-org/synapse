@@ -1,3 +1,56 @@
+Unreleased
+==========
+
+synctl no longer starts the main synapse when using ``-a`` option with workers.
+A new worker file should be added with ``worker_app: synapse.app.homeserver``.
+
+This release also begins the process of renaming a number of the metrics
+reported to prometheus. See `docs/metrics-howto.rst <docs/metrics-howto.rst#block-and-response-metrics-renamed-for-0-27-0>`_.
+
+
+Changes in synapse v0.26.0 (2018-01-05)
+=======================================
+
+No changes since v0.26.0-rc1
+
+
+Changes in synapse v0.26.0-rc1 (2017-12-13)
+===========================================
+
+Features:
+
+* Add ability for ASes to publicise groups for their users (PR #2686)
+* Add all local users to the user_directory and optionally search them (PR
+  #2723)
+* Add support for custom login types for validating users (PR #2729)
+
+
+Changes:
+
+* Update example Prometheus config to new format (PR #2648) Thanks to
+  @krombel!
+* Rename redact_content option to include_content in Push API (PR #2650)
+* Declare support for r0.3.0 (PR #2677)
+* Improve upserts (PR #2684, #2688, #2689, #2713)
+* Improve documentation of workers (PR #2700)
+* Improve tracebacks on exceptions (PR #2705)
+* Allow guest access to group APIs for reading (PR #2715)
+* Support for posting content in federation_client script (PR #2716)
+* Delete devices and pushers on logouts etc (PR #2722)
+
+
+Bug fixes:
+
+* Fix database port script (PR #2673)
+* Fix internal server error on login with ldap_auth_provider (PR #2678) Thanks
+  to @jkolo!
+* Fix error on sqlite 3.7 (PR #2697)
+* Fix OPTIONS on preview_url (PR #2707)
+* Fix error handling on dns lookup (PR #2711)
+* Fix wrong avatars when inviting multiple users when creating room (PR #2717)
+* Fix 500 when joining matrix-dev (PR #2719)
+
+
 Changes in synapse v0.25.1 (2017-11-17)
 =======================================
 

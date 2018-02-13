@@ -357,8 +357,7 @@ def _get_hosts_for_srv_record(dns_client, host):
     def eb(res, record_type):
         if res.check(DNSNameError):
             return []
-        logger.warn("Error looking up %s for %s: %s",
-                    record_type, host, res, res.value)
+        logger.warn("Error looking up %s for %s: %s", record_type, host, res)
         return res
 
     # no logcontexts here, so we can safely fire these off and gatherResults

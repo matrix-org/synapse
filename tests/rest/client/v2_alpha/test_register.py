@@ -49,6 +49,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.hs.get_auth_handler = Mock(return_value=self.auth_handler)
         self.hs.get_device_handler = Mock(return_value=self.device_handler)
         self.hs.config.enable_registration = True
+        self.hs.config.registrations_require_3pid = []
         self.hs.config.auto_join_rooms = []
 
         # init the thing we're testing

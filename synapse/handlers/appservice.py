@@ -15,6 +15,7 @@
 
 from twisted.internet import defer
 
+import synapse
 from synapse.api.constants import EventTypes
 from synapse.util.metrics import Measure
 from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
@@ -22,6 +23,10 @@ from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
 import logging
 
 logger = logging.getLogger(__name__)
+
+metrics = synapse.metrics.get_metrics_for(__name__)
+
+events_processed_counter = metrics.register_counter("events_processed")
 
 
 def log_failure(failure):
@@ -102,6 +107,8 @@ class ApplicationServicesHandler(object):
                             preserve_fn(self.scheduler.submit_event_for_as)(
                                 service, event
                             )
+
+                    events_processed_counter.inc_by(len(events))
 
                     yield self.store.set_appservice_last_pos(upper_bound)
             finally:

@@ -19,7 +19,7 @@ from twisted.internet import defer
 from .persistence import TransactionActions
 from .units import Transaction, Edu
 
-from synapse.api.errors import HttpResponseException
+from synapse.api.errors import HttpResponseException, FederationDeniedError
 from synapse.util import logcontext, PreserveLoggingContext
 from synapse.util.async import run_on_reactor
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
@@ -41,6 +41,8 @@ sent_pdus_destination_dist = client_metrics.register_distribution(
 sent_edus_counter = client_metrics.register_counter("sent_edus")
 
 sent_transactions_counter = client_metrics.register_counter("sent_transactions")
+
+events_processed_counter = client_metrics.register_counter("events_processed")
 
 
 class TransactionQueue(object):
@@ -204,6 +206,8 @@ class TransactionQueue(object):
                     logger.debug("Sending %s to %r", event, destinations)
 
                     self._send_pdu(event, destinations)
+
+                events_processed_counter.inc_by(len(events))
 
                 yield self.store.update_federation_out_pos(
                     "events", next_token
@@ -486,6 +490,8 @@ class TransactionQueue(object):
                     (e.retry_last_ts + e.retry_interval) / 1000.0
                 ),
             )
+        except FederationDeniedError as e:
+            logger.info(e)
         except Exception as e:
             logger.warn(
                 "TX [%s] Failed to send transaction: %s",

@@ -23,6 +23,11 @@ class WorkerConfig(Config):
 
     def read_config(self, config):
         self.worker_app = config.get("worker_app")
+
+        # Canonicalise worker_app so that master always has None
+        if self.worker_app == "synapse.app.homeserver":
+            self.worker_app = None
+
         self.worker_listeners = config.get("worker_listeners")
         self.worker_daemonize = config.get("worker_daemonize")
         self.worker_pid_file = config.get("worker_pid_file")

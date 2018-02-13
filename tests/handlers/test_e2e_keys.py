@@ -143,7 +143,6 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         except errors.SynapseError:
             pass
 
-    @unittest.DEBUG
     @defer.inlineCallbacks
     def test_claim_one_time_key(self):
         local_user = "@boris:" + self.hs.hostname
