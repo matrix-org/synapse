@@ -157,7 +157,7 @@ class SearchHandler(BaseHandler):
 
         if order_by == "rank":
             search_result = yield self.store.search_msgs(
-                room_ids, search_term, keys
+                user.to_string(), room_ids, search_term, keys
             )
 
             count = search_result["count"]
@@ -205,7 +205,7 @@ class SearchHandler(BaseHandler):
             while len(room_events) < search_filter.limit() and i < 5:
                 i += 1
                 search_result = yield self.store.search_rooms(
-                    room_ids, search_term, keys, search_filter.limit() * 2,
+                    user.to_string(), room_ids, search_term, keys, search_filter.limit() * 2,
                     pagination_token=pagination_token,
                 )
 
