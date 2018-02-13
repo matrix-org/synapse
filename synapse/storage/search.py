@@ -16,6 +16,7 @@
 from collections import namedtuple
 import logging
 import re
+import sys
 import ujson as json
 
 from twisted.internet import defer
@@ -289,7 +290,37 @@ class SearchStore(BackgroundUpdateStore):
                 entry.stream_ordering, entry.origin_server_ts,
             ) for entry in entries)
 
-            txn.executemany(sql, args)
+            # inserts to a GIN index are normally batched up into a pending
+            # list, and then all committed together once the list gets to a
+            # certain size. The trouble with that is that postgres (pre-9.5)
+            # uses work_mem to determine the length of the list, and work_mem
+            # is typically very large.
+            #
+            # We therefore reduce work_mem while we do the insert.
+            #
+            # (postgres 9.5 uses the separate gin_pending_list_limit setting,
+            # so doesn't suffer the same problem, but changing work_mem will
+            # be harmless)
+
+            txn.execute("SET work_mem='256kB'")
+            try:
+                txn.executemany(sql, args)
+            except Exception:
+                # we need to reset work_mem, but doing so may throw a new
+                # exception and we want to preserve the original
+                t, v, tb = sys.exc_info()
+                try:
+                    txn.execute("RESET work_mem")
+                except Exception as e:
+                    logger.warn(
+                        "exception resetting work_mem during exception "
+                        "handling: %r",
+                        e,
+                    )
+                raise t, v, tb
+            else:
+                txn.execute("RESET work_mem")
+
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
                 "INSERT INTO event_search (event_id, room_id, key, value)"
