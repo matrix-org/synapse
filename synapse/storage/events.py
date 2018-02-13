@@ -2287,8 +2287,7 @@ class EventsStore(SQLBaseStore):
             "event_signatures",
             "rejections",
         ):
-            logger.info("[purge] removing remote non-state events from %s",
-                        table)
+            logger.info("[purge] removing events from %s", table)
 
             txn.executemany(
                 "DELETE FROM %s WHERE event_id = ?" % (table,),
