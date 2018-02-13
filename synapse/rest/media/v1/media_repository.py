@@ -472,8 +472,10 @@ class MediaRepository(object):
 
     @defer.inlineCallbacks
     def generate_local_exact_thumbnail(self, media_id, t_width, t_height,
-                                       t_method, t_type):
-        input_path = self.filepaths.local_media_filepath(media_id)
+                                       t_method, t_type, url_cache):
+        input_path = yield self.media_storage.ensure_media_is_in_local_cache(FileInfo(
+            None, media_id, url_cache=url_cache,
+        ))
 
         thumbnailer = Thumbnailer(input_path)
         t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
@@ -486,6 +488,7 @@ class MediaRepository(object):
                 file_info = FileInfo(
                     server_name=None,
                     file_id=media_id,
+                    url_cache=url_cache,
                     thumbnail=True,
                     thumbnail_width=t_width,
                     thumbnail_height=t_height,
@@ -512,7 +515,9 @@ class MediaRepository(object):
     @defer.inlineCallbacks
     def generate_remote_exact_thumbnail(self, server_name, file_id, media_id,
                                         t_width, t_height, t_method, t_type):
-        input_path = self.filepaths.remote_media_filepath(server_name, file_id)
+        input_path = yield self.media_storage.ensure_media_is_in_local_cache(FileInfo(
+            server_name, file_id, url_cache=False,
+        ))
 
         thumbnailer = Thumbnailer(input_path)
         t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
@@ -570,12 +575,9 @@ class MediaRepository(object):
         if not requirements:
             return
 
-        if server_name:
-            input_path = self.filepaths.remote_media_filepath(server_name, file_id)
-        elif url_cache:
-            input_path = self.filepaths.url_cache_filepath(media_id)
-        else:
-            input_path = self.filepaths.local_media_filepath(media_id)
+        input_path = yield self.media_storage.ensure_media_is_in_local_cache(FileInfo(
+            server_name, file_id, url_cache=url_cache,
+        ))
 
         thumbnailer = Thumbnailer(input_path)
         m_width = thumbnailer.width

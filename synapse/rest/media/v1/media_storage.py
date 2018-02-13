@@ -18,6 +18,7 @@ from twisted.protocols.basic import FileSender
 
 from ._base import Responder
 
+from synapse.util.file_consumer import BackgroundFileConsumer
 from synapse.util.logcontext import make_deferred_yieldable
 
 import contextlib
@@ -25,6 +26,7 @@ import os
 import logging
 import shutil
 import sys
+
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +69,12 @@ class MediaStorage(object):
         yield make_deferred_yieldable(threads.deferToThread(
             _write_file_synchronously, source, fname,
         ))
+
+        # Tell the storage providers about the new file. They'll decide
+        # if they should upload it and whether to do so synchronously
+        # or not.
+        for provider in self.storage_providers:
+            yield provider.store_file(path, file_info)
 
         defer.returnValue(fname)
 
@@ -151,6 +159,37 @@ class MediaStorage(object):
 
         defer.returnValue(None)
 
+    @defer.inlineCallbacks
+    def ensure_media_is_in_local_cache(self, file_info):
+        """Ensures that the given file is in the local cache. Attempts to
+        download it from storage providers if it isn't.
+
+        Args:
+            file_info (FileInfo)
+
+        Returns:
+            Deferred[str]: Full path to local file
+        """
+        path = self._file_info_to_path(file_info)
+        local_path = os.path.join(self.local_media_directory, path)
+        if os.path.exists(local_path):
+            defer.returnValue(local_path)
+
+        dirname = os.path.dirname(local_path)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+
+        for provider in self.storage_providers:
+            res = yield provider.fetch(path, file_info)
+            if res:
+                with res:
+                    consumer = BackgroundFileConsumer(open(local_path, "w"))
+                    yield res.write_to_consumer(consumer)
+                    yield consumer.wait()
+                defer.returnValue(local_path)
+
+        raise Exception("file could not be found")
+
     def _file_info_to_path(self, file_info):
         """Converts file_info into a relative path.
 
@@ -228,9 +267,8 @@ class FileResponder(Responder):
     def __init__(self, open_file):
         self.open_file = open_file
 
-    @defer.inlineCallbacks
     def write_to_consumer(self, consumer):
-        yield FileSender().beginFileTransfer(self.open_file, consumer)
+        return FileSender().beginFileTransfer(self.open_file, consumer)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.open_file.close()

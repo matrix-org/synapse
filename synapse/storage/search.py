@@ -12,17 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from collections import namedtuple
+import logging
+import re
 import sys
+import ujson as json
+
 from twisted.internet import defer
 
 from .background_updates import BackgroundUpdateStore
 from synapse.api.errors import SynapseError
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
-
-import logging
-import re
-import ujson as json
 
 
 logger = logging.getLogger(__name__)
@@ -280,10 +281,10 @@ class SearchStore(BackgroundUpdateStore):
         if isinstance(self.database_engine, PostgresEngine):
             sql = (
                 "INSERT INTO event_search"
-                " (event_id, room_id, key, vector, stream_ordering, "
-                "  origin_server_ts)"
+                " (event_id, room_id, key, vector, stream_ordering, origin_server_ts)"
                 " VALUES (?,?,?,to_tsvector('english', ?),?,?)"
             )
+
             args = ((
                 entry.event_id, entry.room_id, entry.key, entry.value,
                 entry.stream_ordering, entry.origin_server_ts,
