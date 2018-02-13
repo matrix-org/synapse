@@ -14,6 +14,9 @@
 # limitations under the License.
 
 
+from frozendict import frozendict
+
+
 class EventContext(object):
     """
     Attributes:
@@ -73,3 +76,72 @@ class EventContext(object):
         self.prev_state_events = None
 
         self.app_service = None
+
+    def serialize(self):
+        """Converts self to a type that can be serialized as JSON, and then
+        deserialized by `deserialize`
+
+        Returns:
+            dict
+        """
+        return {
+            "current_state_ids": _encode_state_dict(self.current_state_ids),
+            "prev_state_ids": _encode_state_dict(self.prev_state_ids),
+            "state_group": self.state_group,
+            "rejected": self.rejected,
+            "push_actions": self.push_actions,
+            "prev_group": self.prev_group,
+            "delta_ids": _encode_state_dict(self.delta_ids),
+            "prev_state_events": self.prev_state_events,
+            "app_service_id": self.app_service.id if self.app_service else None
+        }
+
+    @staticmethod
+    def deserialize(store, input):
+        """Converts a dict that was produced by `serialize` back into a
+        EventContext.
+
+        Args:
+            store (DataStore): Used to convert AS ID to AS object
+            input (dict): A dict produced by `serialize`
+
+        Returns:
+            EventContext
+        """
+        context = EventContext()
+        context.current_state_ids = _decode_state_dict(input["current_state_ids"])
+        context.prev_state_ids = _decode_state_dict(input["prev_state_ids"])
+        context.state_group = input["state_group"]
+        context.rejected = input["rejected"]
+        context.push_actions = input["push_actions"]
+        context.prev_group = input["prev_group"]
+        context.delta_ids = _decode_state_dict(input["delta_ids"])
+        context.prev_state_events = input["prev_state_events"]
+
+        app_service_id = input["app_service_id"]
+        if app_service_id:
+            context.app_service = store.get_app_service_by_id(app_service_id)
+
+        return context
+
+
+def _encode_state_dict(state_dict):
+    """Since dicts of (type, state_key) -> event_id cannot be serialized in
+    JSON we need to convert them to a form that can.
+    """
+    if state_dict is None:
+        return None
+
+    return [
+        (etype, state_key, v)
+        for (etype, state_key), v in state_dict.iteritems()
+    ]
+
+
+def _decode_state_dict(input):
+    """Decodes a state dict encoded using `_encode_state_dict` above
+    """
+    if input is None:
+        return None
+
+    return frozendict({(etype, state_key,): v for etype, state_key, v in input})

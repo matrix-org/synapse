@@ -99,6 +99,19 @@ class ApplicationServiceStore(SQLBaseStore):
                 return service
         return None
 
+    def get_app_service_by_id(self, as_id):
+        """Get the application service with the given appservice ID.
+
+        Args:
+            as_id (str): The application service ID.
+        Returns:
+            synapse.appservice.ApplicationService or None.
+        """
+        for service in self.services_cache:
+            if service.id == as_id:
+                return service
+        return None
+
     def get_app_service_rooms(self, service):
         """Get a list of RoomsForUser for this application service.
 

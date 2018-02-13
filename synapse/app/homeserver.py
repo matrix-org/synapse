@@ -38,6 +38,7 @@ from synapse.metrics import register_memory_metrics
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
 from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, \
     check_requirements
+from synapse.replication.http import ReplicationRestResource, REPLICATION_PREFIX
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
 from synapse.rest.key.v1.server_key_resource import LocalKey
@@ -218,6 +219,9 @@ class SynapseHomeServer(HomeServer):
 
         if name == "metrics" and self.get_config().enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(self)
+
+        if name == "replication":
+            resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
 
         return resources
 
