@@ -528,7 +528,7 @@ class EventsStore(SQLBaseStore):
                         # I don't think this can happen, but let's double-check
                         raise Exception(
                             "Context for new extremity event %s has no state "
-                            "group" % event_id,
+                            "group" % (event_id, ),
                         )
 
                     # If we've already seen the state group don't bother adding
