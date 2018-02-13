@@ -23,5 +23,5 @@ To delete local events as well, set ``delete_local_events`` in the body:
 .. code:: json
 
    {
-       "delete_local_events": True,
+       "delete_local_events": true
    }

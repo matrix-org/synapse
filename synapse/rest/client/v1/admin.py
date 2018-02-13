@@ -131,9 +131,7 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
 
         body = parse_json_object_from_request(request, allow_empty_body=True)
 
-        delete_local_events = bool(
-            body.get("delete_local_history", False)
-        )
+        delete_local_events = bool(body.get("delete_local_events", False))
 
         yield self.handlers.message_handler.purge_history(
             room_id, event_id,
