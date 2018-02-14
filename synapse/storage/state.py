@@ -54,7 +54,7 @@ class StateGroupWorkerStore(SQLBaseStore):
         super(StateGroupWorkerStore, self).__init__(db_conn, hs)
 
         self._state_group_cache = DictionaryCache(
-            "*stateGroupCache*", 100000 * CACHE_SIZE_FACTOR
+            "*stateGroupCache*", 500000 * CACHE_SIZE_FACTOR
         )
 
     @cached(max_entries=100000, iterable=True)
