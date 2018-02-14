@@ -16,7 +16,6 @@
 from collections import namedtuple
 import logging
 import re
-import sys
 import ujson as json
 
 from twisted.internet import defer
@@ -335,25 +334,18 @@ class SearchStore(BackgroundUpdateStore):
             # (postgres 9.5 uses the separate gin_pending_list_limit setting,
             # so doesn't suffer the same problem, but changing work_mem will
             # be harmless)
+            #
+            # Note that we don't need to worry about restoring it on
+            # exception, because exceptions will cause the transaction to be
+            # rolled back, including the effects of the SET command.
+            #
+            # Also: we use SET rather than SET LOCAL because there's lots of
+            # other stuff going on in this transaction, which want to have the
+            # normal work_mem setting.
 
             txn.execute("SET work_mem='256kB'")
-            try:
-                txn.executemany(sql, args)
-            except Exception:
-                # we need to reset work_mem, but doing so may throw a new
-                # exception and we want to preserve the original
-                t, v, tb = sys.exc_info()
-                try:
-                    txn.execute("RESET work_mem")
-                except Exception as e:
-                    logger.warn(
-                        "exception resetting work_mem during exception "
-                        "handling: %r",
-                        e,
-                    )
-                raise t, v, tb
-            else:
-                txn.execute("RESET work_mem")
+            txn.executemany(sql, args)
+            txn.execute("RESET work_mem")
 
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
