@@ -532,8 +532,7 @@ class StateGroupWorkerStore(SQLBaseStore):
                 state_dict = results[group]
 
                 state_dict.update(
-                    ((intern_string(k[0]), intern_string(k[1])), to_ascii(v))
-                    for k, v in group_state_dict.iteritems()
+                    group_state_dict.iteritems()
                 )
 
                 self._state_group_cache.update(
