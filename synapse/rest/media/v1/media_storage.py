@@ -58,23 +58,13 @@ class MediaStorage(object):
         Returns:
             Deferred[str]: the file path written to in the primary media store
         """
-        path = self._file_info_to_path(file_info)
-        fname = os.path.join(self.local_media_directory, path)
 
-        dirname = os.path.dirname(fname)
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
-
-        # Write to the main repository
-        yield make_deferred_yieldable(threads.deferToThread(
-            _write_file_synchronously, source, fname,
-        ))
-
-        # Tell the storage providers about the new file. They'll decide
-        # if they should upload it and whether to do so synchronously
-        # or not.
-        for provider in self.storage_providers:
-            yield provider.store_file(path, file_info)
+        with self.store_into_file(file_info) as (f, fname, finish_cb):
+            # Write to the main repository
+            yield make_deferred_yieldable(threads.deferToThread(
+                _write_file_synchronously, source, f,
+            ))
+            yield finish_cb()
 
         defer.returnValue(fname)
 
@@ -240,21 +230,16 @@ class MediaStorage(object):
         )
 
 
-def _write_file_synchronously(source, fname):
-    """Write `source` to the path `fname` synchronously. Should be called
+def _write_file_synchronously(source, dest):
+    """Write `source` to the file like `dest` synchronously. Should be called
     from a thread.
 
     Args:
-        source: A file like object to be written
-        fname (str): Path to write to
+        source: A file like object that's to be written
+        dest: A file like object to be written to
     """
-    dirname = os.path.dirname(fname)
-    if not os.path.exists(dirname):
-        os.makedirs(dirname)
-
     source.seek(0)  # Ensure we read from the start of the file
-    with open(fname, "wb") as f:
-        shutil.copyfileobj(source, f)
+    shutil.copyfileobj(source, dest)
 
 
 class FileResponder(Responder):
