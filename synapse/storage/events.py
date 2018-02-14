@@ -2093,6 +2093,27 @@ class EventsStore(SQLBaseStore):
         #     state_groups
         #     state_groups_state
 
+        # we will build a temporary table listing the events so that we don't
+        # have to keep shovelling the list back and forth across the
+        # connection. Annoyingly the python sqlite driver commits the
+        # transaction on CREATE, so let's do this first.
+        #
+        # furthermore, we might already have the table from a previous (failed)
+        # purge attempt, so let's drop the table first.
+
+        txn.execute("DROP TABLE IF EXISTS events_to_purge")
+
+        txn.execute(
+            "CREATE TEMPORARY TABLE events_to_purge ("
+            "    event_id TEXT NOT NULL,"
+            "    should_delete BOOLEAN NOT NULL"
+            ")"
+        )
+
+        # create an index on should_delete because later we'll be looking for
+        # the should_delete / shouldn't_delete subsets
+        txn.execute("CREATE INDEX ON events_to_purge(should_delete)")
+
         # First ensure that we're not about to delete all the forward extremeties
         txn.execute(
             "SELECT e.event_id, e.depth FROM events as e "
@@ -2114,20 +2135,6 @@ class EventsStore(SQLBaseStore):
             )
 
         logger.info("[purge] looking for events to delete")
-
-        # we build a temporary table listing the events so that we don't have
-        # to keep shovelling the list back and forth across the connection.
-
-        txn.execute(
-            "CREATE TEMPORARY TABLE events_to_purge ("
-            "    event_id TEXT NOT NULL,"
-            "    should_delete BOOLEAN NOT NULL"
-            ")"
-        )
-
-        # create an index on should_delete because later we'll be looking for
-        # the should_delete / shouldn't_delete subsets
-        txn.execute("CREATE INDEX ON events_to_purge(should_delete)")
 
         should_delete_expr = "state_key IS NULL"
         should_delete_params = ()
@@ -2339,11 +2346,6 @@ class EventsStore(SQLBaseStore):
             (True,),
         )
 
-        # we're now done with the temporary table
-        txn.execute(
-            "DROP TABLE events_to_purge"
-        )
-
         # synapse tries to take out an exclusive lock on room_depth whenever it
         # persists events (because upsert), and once we run this update, we
         # will block that for the rest of our transaction.
@@ -2354,6 +2356,12 @@ class EventsStore(SQLBaseStore):
         txn.execute(
             "UPDATE room_depth SET min_depth = ? WHERE room_id = ?",
             (topological_ordering, room_id,)
+        )
+
+        # finally, drop the temp table. this will commit the txn in sqlite,
+        # so make sure to keep this actually last.
+        txn.execute(
+            "DROP TABLE events_to_purge"
         )
 
         logger.info("[purge] done")
