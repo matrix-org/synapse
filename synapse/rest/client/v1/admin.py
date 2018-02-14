@@ -312,17 +312,6 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
         )
         new_room_id = info["room_id"]
 
-        yield self.event_creation_handler.create_and_send_nonmember_event(
-            room_creator_requester,
-            {
-                "type": "m.room.message",
-                "content": {"body": message, "msgtype": "m.text"},
-                "room_id": new_room_id,
-                "sender": new_room_user_id,
-            },
-            ratelimit=False,
-        )
-
         requester_user_id = requester.user.to_string()
 
         logger.info("Shutting down room %r", room_id)
@@ -359,6 +348,17 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
             )
 
             kicked_users.append(user_id)
+
+        yield self.event_creation_handler.create_and_send_nonmember_event(
+            room_creator_requester,
+            {
+                "type": "m.room.message",
+                "content": {"body": message, "msgtype": "m.text"},
+                "room_id": new_room_id,
+                "sender": new_room_user_id,
+            },
+            ratelimit=False,
+        )
 
         aliases_for_room = yield self.store.get_aliases_for_room(room_id)
 
