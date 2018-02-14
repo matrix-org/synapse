@@ -2112,7 +2112,10 @@ class EventsStore(SQLBaseStore):
 
         # create an index on should_delete because later we'll be looking for
         # the should_delete / shouldn't_delete subsets
-        txn.execute("CREATE INDEX ON events_to_purge(should_delete)")
+        txn.execute(
+            "CREATE INDEX events_to_purge_should_delete"
+            " ON events_to_purge(should_delete)",
+        )
 
         # First ensure that we're not about to delete all the forward extremeties
         txn.execute(
