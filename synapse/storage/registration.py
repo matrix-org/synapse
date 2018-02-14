@@ -39,12 +39,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
         # we no longer use refresh tokens, but it's possible that some people
         # might have a background update queued to build this index. Just
         # clear the background update.
-        @defer.inlineCallbacks
-        def noop_update(progress, batch_size):
-            yield self._end_background_update("refresh_tokens_device_index")
-            defer.returnValue(1)
-        self.register_background_update_handler(
-            "refresh_tokens_device_index", noop_update)
+        self.register_noop_background_update("refresh_tokens_device_index")
 
     @defer.inlineCallbacks
     def add_access_token_to_user(self, user_id, token, device_id=None):
