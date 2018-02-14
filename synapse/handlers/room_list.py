@@ -46,9 +46,12 @@ EMTPY_THIRD_PARTY_ID = ThirdPartyInstanceID(None, None)
 class RoomListHandler(BaseHandler):
     def __init__(self, hs):
         super(RoomListHandler, self).__init__(hs)
-        self.response_cache = ResponseCache(hs, "room_list")
-        self.remote_response_cache = ResponseCache(hs, "remote_room_list",
-                                                   timeout_ms=30 * 1000)
+        self.response_cache = ResponseCache(
+            hs, "room_list", timeout_ms=10 * 60 * 1000,
+        )
+        self.remote_response_cache = ResponseCache(
+            hs, "remote_room_list", timeout_ms=30 * 1000,
+        )
 
     def get_local_public_room_list(self, limit=None, since_token=None,
                                    search_filter=None,
