@@ -15,6 +15,7 @@
 
 from twisted.internet import defer
 
+from synapse.api.errors import SynapseError, MatrixCodeMessageException
 from synapse.events import FrozenEvent
 from synapse.events.snapshot import EventContext
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -27,6 +28,7 @@ import re
 logger = logging.getLogger(__name__)
 
 
+@defer.inlineCallbacks
 def send_event_to_master(client, host, port, requester, event, context):
     """Send event to be handled on the master
 
@@ -48,7 +50,14 @@ def send_event_to_master(client, host, port, requester, event, context):
         "requester": requester.serialize(),
     }
 
-    return client.post_json_get_json(uri, payload)
+    try:
+        result = yield client.post_json_get_json(uri, payload)
+    except MatrixCodeMessageException as e:
+        # We convert to SynapseError as we know that it was a SynapseError
+        # on the master process that we should send to the client. (And
+        # importantly, not stack traces everywhere)
+        raise SynapseError(e.code, e.msg, e.errcode)
+    defer.returnValue(result)
 
 
 class ReplicationSendEventRestServlet(RestServlet):
