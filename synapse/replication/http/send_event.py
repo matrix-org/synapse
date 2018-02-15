@@ -46,7 +46,7 @@ def send_event_to_master(client, host, port, requester, event, context):
         "event": event.get_pdu_json(),
         "internal_metadata": event.internal_metadata.get_dict(),
         "rejected_reason": event.rejected_reason,
-        "context": context.serialize(),
+        "context": context.serialize(event),
         "requester": requester.serialize(),
     }
 
@@ -96,7 +96,7 @@ class ReplicationSendEventRestServlet(RestServlet):
             event = FrozenEvent(event_dict, internal_metadata, rejected_reason)
 
             requester = Requester.deserialize(self.store, content["requester"])
-            context = EventContext.deserialize(self.store, content["context"])
+            context = yield EventContext.deserialize(self.store, content["context"])
 
         if requester.user:
             request.authenticated_entity = requester.user.to_string()
