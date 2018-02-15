@@ -553,22 +553,66 @@ class EventCreationHandler(object):
         event,
         context,
         ratelimit=True,
-        extra_users=[]
+        extra_users=[],
+        calculate_push_actions=True,
     ):
-        # We now need to go and hit out to wherever we need to hit out to.
+        """Processes a new event. This includes persisting it, notifying users,
+        sending to remote servers, etc.
 
-        # If we're a worker we need to hit out to the master.
-        if self.config.worker_app:
-            yield send_event_to_master(
-                self.http_client,
-                host=self.config.worker_replication_host,
-                port=self.config.worker_replication_http_port,
-                requester=requester,
-                event=event,
-                context=context,
+        Args:
+            requester (Requester)
+            event (FrozenEvent)
+            context (EventContext)
+            ratelimit (bool)
+            extra_users (list(str)): Any extra users to notify about event
+            calculate_push_actions (bool): Whether we should generate the push
+                actions or not. Events created on workers will generate the
+                push actions themselves.
+        """
+
+        if calculate_push_actions:
+            yield self.action_generator.handle_push_actions_for_event(
+                event, context
             )
-            return
 
+        try:
+            # We now need to go and hit out to wherever we need to hit out to.
+
+            # If we're a worker we need to hit out to the master.
+            if self.config.worker_app:
+                yield send_event_to_master(
+                    self.http_client,
+                    host=self.config.worker_replication_host,
+                    port=self.config.worker_replication_http_port,
+                    requester=requester,
+                    event=event,
+                    context=context,
+                )
+                return
+
+            yield self._handle_new_client_event_impl(
+                requester,
+                event,
+                context,
+                ratelimit=ratelimit,
+                extra_users=extra_users,
+            )
+        except:  # noqa: E722, as we reraise the exception this is fine.
+            # Ensure that we actually remove the entries in the push actions
+            # staging area, if we calculated them.
+            if calculate_push_actions:
+                preserve_fn(self.store.remove_push_actions_from_staging)(event.event_id)
+            raise
+
+    @defer.inlineCallbacks
+    def _handle_new_client_event_impl(
+        self,
+        requester,
+        event,
+        context,
+        ratelimit=True,
+        extra_users=[],
+    ):
         if ratelimit:
             yield self.base_handler.ratelimit(requester)
 
@@ -679,19 +723,9 @@ class EventCreationHandler(object):
                 "Changing the room create event is forbidden",
             )
 
-        yield self.action_generator.handle_push_actions_for_event(
-            event, context
+        (event_stream_id, max_stream_id) = yield self.store.persist_event(
+            event, context=context
         )
-
-        try:
-            (event_stream_id, max_stream_id) = yield self.store.persist_event(
-                event, context=context
-            )
-        except:  # noqa: E722, as we reraise the exception this is fine.
-            # Ensure that we actually remove the entries in the push actions
-            # staging area
-            preserve_fn(self.store.remove_push_actions_from_staging)(event.event_id)
-            raise
 
         # this intentionally does not yield: we don't care about the result
         # and don't need to wait for it.

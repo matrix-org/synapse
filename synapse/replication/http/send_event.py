@@ -108,6 +108,7 @@ class ReplicationSendEventRestServlet(RestServlet):
 
         yield self.event_creation_handler.handle_new_client_event(
             requester, event, context,
+            calculate_push_actions=False,  # This should have been done on the worker
         )
 
         defer.returnValue((200, {}))
