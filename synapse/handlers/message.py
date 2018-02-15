@@ -683,9 +683,15 @@ class EventCreationHandler(object):
             event, context
         )
 
-        (event_stream_id, max_stream_id) = yield self.store.persist_event(
-            event, context=context
-        )
+        try:
+            (event_stream_id, max_stream_id) = yield self.store.persist_event(
+                event, context=context
+            )
+        except:  # noqa: E722, as we reraise the exception this is fine.
+            # Ensure that we actually remove the entries in the push actions
+            # staging area
+            preserve_fn(self.store.remove_push_actions_from_staging)(event.event_id)
+            raise
 
         # this intentionally does not yield: we don't care about the result
         # and don't need to wait for it.

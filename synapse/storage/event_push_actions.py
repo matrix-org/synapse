@@ -782,6 +782,22 @@ class EventPushActionsStore(SQLBaseStore):
             desc="add_push_actions_to_staging",
         )
 
+    def remove_push_actions_from_staging(self, event_id):
+        """Called if we failed to persist the event to ensure that stale push
+        actions don't build up in the DB
+
+        Args:
+            event_id (str)
+        """
+
+        return self._simple_delete(
+            table="event_push_actions_staging",
+            keyvalues={
+                "event_id": event_id,
+            },
+            desc="remove_push_actions_from_staging",
+        )
+
 
 def _action_has_highlight(actions):
     for action in actions:
