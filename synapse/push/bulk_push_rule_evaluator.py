@@ -191,6 +191,9 @@ class BulkPushRuleEvaluator(object):
                     actions = [x for x in rule['actions'] if x != 'dont_notify']
                     if actions and 'notify' in actions:
                         actions_by_user[uid] = actions
+                        yield self.store.add_push_actions_to_staging(
+                            event.event_id, uid, actions,
+                        )
                     break
         defer.returnValue(actions_by_user)
 

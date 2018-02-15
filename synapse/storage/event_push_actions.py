@@ -738,6 +738,33 @@ class EventPushActionsStore(SQLBaseStore):
             (rotate_to_stream_ordering,)
         )
 
+    def add_push_actions_to_staging(self, event_id, user_id, actions):
+        """Add the push actions for the user and event to the push
+        action staging area.
+
+        Args:
+            event_id (str)
+            user_id (str)
+            actions (list)
+
+        Returns:
+            Deferred
+        """
+
+        is_highlight = _action_has_highlight(actions)
+
+        return self._simple_insert(
+            table="event_push_actions_staging",
+            values={
+                "event_id": event_id,
+                "user_id": user_id,
+                "actions": _serialize_action(actions, is_highlight),
+                "notif": True,
+                "highlight": is_highlight,
+            },
+            desc="add_push_actions_to_staging",
+        )
+
 
 def _action_has_highlight(actions):
     for action in actions:
