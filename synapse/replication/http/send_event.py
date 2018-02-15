@@ -106,9 +106,8 @@ class ReplicationSendEventRestServlet(RestServlet):
             event.event_id, event.room_id,
         )
 
-        yield self.event_creation_handler.handle_new_client_event(
+        yield self.event_creation_handler.persist_and_notify_client_event(
             requester, event, context,
-            calculate_push_actions=False,  # This should have been done on the worker
         )
 
         defer.returnValue((200, {}))
