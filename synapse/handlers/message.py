@@ -555,6 +555,7 @@ class EventCreationHandler(object):
         ratelimit=True,
         extra_users=[],
         calculate_push_actions=True,
+        do_auth=True,
     ):
         """Processes a new event. This includes persisting it, notifying users,
         sending to remote servers, etc.
@@ -568,7 +569,45 @@ class EventCreationHandler(object):
             calculate_push_actions (bool): Whether we should generate the push
                 actions or not. Events created on workers will generate the
                 push actions themselves.
+            do_auth (bool): Whether we should check if the event is
+                authorized. Events created on workers will have already been
+                checked.
         """
+
+        if do_auth:
+            try:
+                yield self.auth.check_from_context(event, context)
+            except AuthError as err:
+                logger.warn("Denying new event %r because %s", event, err)
+                raise err
+
+            if event.type == EventTypes.Redaction:
+                auth_events_ids = yield self.auth.compute_auth_events(
+                    event, context.prev_state_ids, for_verification=True,
+                )
+                auth_events = yield self.store.get_events(auth_events_ids)
+                auth_events = {
+                    (e.type, e.state_key): e for e in auth_events.values()
+                }
+                if self.auth.check_redaction(event, auth_events=auth_events):
+                    original_event = yield self.store.get_event(
+                        event.redacts,
+                        check_redacted=False,
+                        get_prev_content=False,
+                        allow_rejected=False,
+                        allow_none=False
+                    )
+                    if event.user_id != original_event.user_id:
+                        raise AuthError(
+                            403,
+                            "You don't have permission to redact events"
+                        )
+
+            if event.type == EventTypes.Create and context.prev_state_ids:
+                raise AuthError(
+                    403,
+                    "Changing the room create event is forbidden",
+                )
 
         if calculate_push_actions:
             yield self.action_generator.handle_push_actions_for_event(
@@ -615,12 +654,6 @@ class EventCreationHandler(object):
     ):
         if ratelimit:
             yield self.base_handler.ratelimit(requester)
-
-        try:
-            yield self.auth.check_from_context(event, context)
-        except AuthError as err:
-            logger.warn("Denying new event %r because %s", event, err)
-            raise err
 
         # Ensure that we can round trip before trying to persist in db
         try:
@@ -694,34 +727,6 @@ class EventCreationHandler(object):
                     event.signatures.update(
                         returned_invite.signatures
                     )
-
-        if event.type == EventTypes.Redaction:
-            auth_events_ids = yield self.auth.compute_auth_events(
-                event, context.prev_state_ids, for_verification=True,
-            )
-            auth_events = yield self.store.get_events(auth_events_ids)
-            auth_events = {
-                (e.type, e.state_key): e for e in auth_events.values()
-            }
-            if self.auth.check_redaction(event, auth_events=auth_events):
-                original_event = yield self.store.get_event(
-                    event.redacts,
-                    check_redacted=False,
-                    get_prev_content=False,
-                    allow_rejected=False,
-                    allow_none=False
-                )
-                if event.user_id != original_event.user_id:
-                    raise AuthError(
-                        403,
-                        "You don't have permission to redact events"
-                    )
-
-        if event.type == EventTypes.Create and context.prev_state_ids:
-            raise AuthError(
-                403,
-                "Changing the room create event is forbidden",
-            )
 
         (event_stream_id, max_stream_id) = yield self.store.persist_event(
             event, context=context
