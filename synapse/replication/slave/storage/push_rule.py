@@ -32,8 +32,13 @@ class SlavedPushRuleStore(SlavedEventStore):
         )
 
     get_push_rules_for_user = PushRuleStore.__dict__["get_push_rules_for_user"]
+    bulk_get_push_rules = PushRuleStore.__dict__["bulk_get_push_rules"]
+
     get_push_rules_enabled_for_user = (
         PushRuleStore.__dict__["get_push_rules_enabled_for_user"]
+    )
+    bulk_get_push_rules_enabled = (
+        PushRuleStore.__dict__["bulk_get_push_rules_enabled"]
     )
     have_push_rules_changed_for_user = (
         DataStore.have_push_rules_changed_for_user.__func__

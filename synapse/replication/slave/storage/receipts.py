@@ -60,6 +60,14 @@ class SlavedReceiptsStore(BaseSlavedStore):
         DataStore.get_linearized_receipts_for_rooms.__func__
     )
 
+    get_users_with_read_receipts_in_room = (
+        ReceiptsStore.__dict__["get_users_with_read_receipts_in_room"]
+    )
+
+    get_receipts_for_room = (
+        ReceiptsStore.__dict__["get_receipts_for_room"]
+    )
+
     def stream_positions(self):
         result = super(SlavedReceiptsStore, self).stream_positions()
         result["receipts"] = self._receipts_id_gen.get_current_token()
@@ -71,6 +79,8 @@ class SlavedReceiptsStore(BaseSlavedStore):
         self.get_last_receipt_event_id_for_user.invalidate(
             (user_id, room_id, receipt_type)
         )
+        self.get_users_with_read_receipts_in_room.invalidate((room_id,))
+        self.get_receipts_for_room.invalidate((room_id, receipt_type,))
 
     def process_replication_rows(self, stream_name, token, rows):
         if stream_name == "receipts":

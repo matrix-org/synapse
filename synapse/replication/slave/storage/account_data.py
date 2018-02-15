@@ -58,6 +58,8 @@ class SlavedAccountDataStore(BaseSlavedStore):
         DataStore.get_updated_account_data_for_user.__func__
     )
 
+    is_ignored_by = AccountDataStore.__dict__["is_ignored_by"]
+
     def get_max_account_data_stream_id(self):
         return self._account_data_id_gen.get_current_token()
 
