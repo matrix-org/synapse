@@ -2317,7 +2317,6 @@ class EventsStore(SQLBaseStore):
             "event_edge_hashes",
             "event_edges",
             "event_forward_extremities",
-            "event_push_actions",
             "event_reference_hashes",
             "event_search",
             "event_signatures",
