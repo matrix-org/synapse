@@ -553,103 +553,24 @@ class EventCreationHandler(object):
         event,
         context,
         ratelimit=True,
-        extra_users=[]
+        extra_users=[],
     ):
-        # We now need to go and hit out to wherever we need to hit out to.
+        """Processes a new event. This includes checking auth, persisting it,
+        notifying users, sending to remote servers, etc.
 
-        # If we're a worker we need to hit out to the master.
-        if self.config.worker_app:
-            yield send_event_to_master(
-                self.http_client,
-                host=self.config.worker_replication_host,
-                port=self.config.worker_replication_http_port,
-                requester=requester,
-                event=event,
-                context=context,
-            )
-            return
-
-        if ratelimit:
-            yield self.base_handler.ratelimit(requester)
+        Args:
+            requester (Requester)
+            event (FrozenEvent)
+            context (EventContext)
+            ratelimit (bool)
+            extra_users (list(str)): Any extra users to notify about event
+        """
 
         try:
             yield self.auth.check_from_context(event, context)
         except AuthError as err:
             logger.warn("Denying new event %r because %s", event, err)
             raise err
-
-        # Ensure that we can round trip before trying to persist in db
-        try:
-            dump = ujson.dumps(unfreeze(event.content))
-            ujson.loads(dump)
-        except Exception:
-            logger.exception("Failed to encode content: %r", event.content)
-            raise
-
-        yield self.base_handler.maybe_kick_guest_users(event, context)
-
-        if event.type == EventTypes.CanonicalAlias:
-            # Check the alias is acually valid (at this time at least)
-            room_alias_str = event.content.get("alias", None)
-            if room_alias_str:
-                room_alias = RoomAlias.from_string(room_alias_str)
-                directory_handler = self.hs.get_handlers().directory_handler
-                mapping = yield directory_handler.get_association(room_alias)
-
-                if mapping["room_id"] != event.room_id:
-                    raise SynapseError(
-                        400,
-                        "Room alias %s does not point to the room" % (
-                            room_alias_str,
-                        )
-                    )
-
-        federation_handler = self.hs.get_handlers().federation_handler
-
-        if event.type == EventTypes.Member:
-            if event.content["membership"] == Membership.INVITE:
-                def is_inviter_member_event(e):
-                    return (
-                        e.type == EventTypes.Member and
-                        e.sender == event.sender
-                    )
-
-                state_to_include_ids = [
-                    e_id
-                    for k, e_id in context.current_state_ids.iteritems()
-                    if k[0] in self.hs.config.room_invite_state_types
-                    or k == (EventTypes.Member, event.sender)
-                ]
-
-                state_to_include = yield self.store.get_events(state_to_include_ids)
-
-                event.unsigned["invite_room_state"] = [
-                    {
-                        "type": e.type,
-                        "state_key": e.state_key,
-                        "content": e.content,
-                        "sender": e.sender,
-                    }
-                    for e in state_to_include.itervalues()
-                ]
-
-                invitee = UserID.from_string(event.state_key)
-                if not self.hs.is_mine(invitee):
-                    # TODO: Can we add signature from remote server in a nicer
-                    # way? If we have been invited by a remote server, we need
-                    # to get them to sign the event.
-
-                    returned_invite = yield federation_handler.send_invite(
-                        invitee.domain,
-                        event,
-                    )
-
-                    event.unsigned.pop("room_state", None)
-
-                    # TODO: Make sure the signatures actually are correct.
-                    event.signatures.update(
-                        returned_invite.signatures
-                    )
 
         if event.type == EventTypes.Redaction:
             auth_events_ids = yield self.auth.compute_auth_events(
@@ -679,19 +600,136 @@ class EventCreationHandler(object):
                 "Changing the room create event is forbidden",
             )
 
+        # If this is an invite event then we annotate it with some room state
+        if event.type == EventTypes.Member:
+            if event.content["membership"] == Membership.INVITE:
+                def is_inviter_member_event(e):
+                    return (
+                        e.type == EventTypes.Member and
+                        e.sender == event.sender
+                    )
+
+                state_to_include_ids = [
+                    e_id
+                    for k, e_id in context.current_state_ids.iteritems()
+                    if k[0] in self.hs.config.room_invite_state_types
+                    or k == (EventTypes.Member, event.sender)
+                ]
+
+                state_to_include = yield self.store.get_events(state_to_include_ids)
+
+                event.unsigned["invite_room_state"] = [
+                    {
+                        "type": e.type,
+                        "state_key": e.state_key,
+                        "content": e.content,
+                        "sender": e.sender,
+                    }
+                    for e in state_to_include.itervalues()
+                ]
+
+        # Ensure that we can round trip before trying to persist in db
+        try:
+            dump = ujson.dumps(unfreeze(event.content))
+            ujson.loads(dump)
+        except Exception:
+            logger.exception("Failed to encode content: %r", event.content)
+            raise
+
         yield self.action_generator.handle_push_actions_for_event(
             event, context
         )
 
         try:
-            (event_stream_id, max_stream_id) = yield self.store.persist_event(
-                event, context=context
+            # We now need to go and hit out to wherever we need to hit out to.
+
+            # If we're a worker we need to hit out to the master.
+            if self.config.worker_app:
+                yield send_event_to_master(
+                    self.http_client,
+                    host=self.config.worker_replication_host,
+                    port=self.config.worker_replication_http_port,
+                    requester=requester,
+                    event=event,
+                    context=context,
+                )
+                return
+
+            yield self.persist_and_notify_client_event(
+                requester,
+                event,
+                context,
+                ratelimit=ratelimit,
+                extra_users=extra_users,
             )
         except:  # noqa: E722, as we reraise the exception this is fine.
             # Ensure that we actually remove the entries in the push actions
             # staging area
             preserve_fn(self.store.remove_push_actions_from_staging)(event.event_id)
             raise
+
+    @defer.inlineCallbacks
+    def persist_and_notify_client_event(
+        self,
+        requester,
+        event,
+        context,
+        ratelimit=True,
+        extra_users=[],
+    ):
+        """Called when we have fully built and authed the event. This should
+        only be run on master.
+        """
+
+        # Before we actually persist we do some stuff that can only be done on
+        # master
+
+        if ratelimit:
+            yield self.base_handler.ratelimit(requester)
+
+        yield self.base_handler.maybe_kick_guest_users(event, context)
+
+        if event.type == EventTypes.CanonicalAlias:
+            # Check the alias is acually valid (at this time at least)
+            room_alias_str = event.content.get("alias", None)
+            if room_alias_str:
+                room_alias = RoomAlias.from_string(room_alias_str)
+                directory_handler = self.hs.get_handlers().directory_handler
+                mapping = yield directory_handler.get_association(room_alias)
+
+                if mapping["room_id"] != event.room_id:
+                    raise SynapseError(
+                        400,
+                        "Room alias %s does not point to the room" % (
+                            room_alias_str,
+                        )
+                    )
+
+        federation_handler = self.hs.get_handlers().federation_handler
+
+        if event.type == EventTypes.Member:
+            if event.content["membership"] == Membership.INVITE:
+                invitee = UserID.from_string(event.state_key)
+                if not self.hs.is_mine(invitee):
+                    # TODO: Can we add signature from remote server in a nicer
+                    # way? If we have been invited by a remote server, we need
+                    # to get them to sign the event.
+
+                    returned_invite = yield federation_handler.send_invite(
+                        invitee.domain,
+                        event,
+                    )
+
+                    event.unsigned.pop("room_state", None)
+
+                    # TODO: Make sure the signatures actually are correct.
+                    event.signatures.update(
+                        returned_invite.signatures
+                    )
+
+        (event_stream_id, max_stream_id) = yield self.store.persist_event(
+            event, context=context
+        )
 
         # this intentionally does not yield: we don't care about the result
         # and don't need to wait for it.
