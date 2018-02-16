@@ -137,14 +137,13 @@ class BulkPushRuleEvaluator(object):
 
     @defer.inlineCallbacks
     def action_for_event_by_user(self, event, context):
-        """Given an event and context, evaluate the push rules and return
-        the results
+        """Given an event and context, evaluate the push rules and insert the
+        results into the event_push_actions_staging table.
 
         Returns:
-            dict of user_id -> action
+            Deferred
         """
         rules_by_user = yield self._get_rules_for_event(event, context)
-        actions_by_user = {}
 
         room_members = yield self.store.get_joined_users_from_context(
             event, context
@@ -190,9 +189,13 @@ class BulkPushRuleEvaluator(object):
                 if matches:
                     actions = [x for x in rule['actions'] if x != 'dont_notify']
                     if actions and 'notify' in actions:
-                        actions_by_user[uid] = actions
+                        # Push rules say we should notify the user of this event,
+                        # so we mark it in the DB in the staging area. (This
+                        # will then get handled when we persist the event)
+                        yield self.store.add_push_actions_to_staging(
+                            event.event_id, uid, actions,
+                        )
                     break
-        defer.returnValue(actions_by_user)
 
 
 def _condition_checker(evaluator, conditions, uid, display_name, cache):

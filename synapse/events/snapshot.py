@@ -52,7 +52,6 @@ class EventContext(object):
         "prev_state_ids",
         "state_group",
         "rejected",
-        "push_actions",
         "prev_group",
         "delta_ids",
         "prev_state_events",
@@ -67,7 +66,6 @@ class EventContext(object):
         self.state_group = None
 
         self.rejected = False
-        self.push_actions = []
 
         # A previously persisted state group and a delta between that
         # and this state.
@@ -104,7 +102,6 @@ class EventContext(object):
             "event_state_key": event.state_key if event.is_state() else None,
             "state_group": self.state_group,
             "rejected": self.rejected,
-            "push_actions": self.push_actions,
             "prev_group": self.prev_group,
             "delta_ids": _encode_state_dict(self.delta_ids),
             "prev_state_events": self.prev_state_events,
@@ -127,7 +124,6 @@ class EventContext(object):
         context = EventContext()
         context.state_group = input["state_group"]
         context.rejected = input["rejected"]
-        context.push_actions = input["push_actions"]
         context.prev_group = input["prev_group"]
         context.delta_ids = _decode_state_dict(input["delta_ids"])
         context.prev_state_events = input["prev_state_events"]
