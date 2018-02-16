@@ -190,6 +190,11 @@ class SlavedEventStore(StateGroupWorkerStore, BaseSlavedStore):
         SignatureStore.__dict__["get_event_reference_hash"]
     )
 
+    add_push_actions_to_staging = DataStore.add_push_actions_to_staging.__func__
+    remove_push_actions_from_staging = (
+        DataStore.remove_push_actions_from_staging.__func__
+    )
+
     def stream_positions(self):
         result = super(SlavedEventStore, self).stream_positions()
         result["events"] = self._stream_id_gen.get_current_token()

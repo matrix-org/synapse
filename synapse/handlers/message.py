@@ -553,30 +553,107 @@ class EventCreationHandler(object):
         event,
         context,
         ratelimit=True,
-        extra_users=[]
+        extra_users=[],
+        calculate_push_actions=True,
+        do_auth=True,
     ):
-        # We now need to go and hit out to wherever we need to hit out to.
+        """Processes a new event. This includes persisting it, notifying users,
+        sending to remote servers, etc.
 
-        # If we're a worker we need to hit out to the master.
-        if self.config.worker_app:
-            yield send_event_to_master(
-                self.http_client,
-                host=self.config.worker_replication_host,
-                port=self.config.worker_replication_http_port,
-                requester=requester,
-                event=event,
-                context=context,
+        Args:
+            requester (Requester)
+            event (FrozenEvent)
+            context (EventContext)
+            ratelimit (bool)
+            extra_users (list(str)): Any extra users to notify about event
+            calculate_push_actions (bool): Whether we should generate the push
+                actions or not. Events created on workers will generate the
+                push actions themselves.
+            do_auth (bool): Whether we should check if the event is
+                authorized. Events created on workers will have already been
+                checked.
+        """
+
+        if do_auth:
+            try:
+                yield self.auth.check_from_context(event, context)
+            except AuthError as err:
+                logger.warn("Denying new event %r because %s", event, err)
+                raise err
+
+            if event.type == EventTypes.Redaction:
+                auth_events_ids = yield self.auth.compute_auth_events(
+                    event, context.prev_state_ids, for_verification=True,
+                )
+                auth_events = yield self.store.get_events(auth_events_ids)
+                auth_events = {
+                    (e.type, e.state_key): e for e in auth_events.values()
+                }
+                if self.auth.check_redaction(event, auth_events=auth_events):
+                    original_event = yield self.store.get_event(
+                        event.redacts,
+                        check_redacted=False,
+                        get_prev_content=False,
+                        allow_rejected=False,
+                        allow_none=False
+                    )
+                    if event.user_id != original_event.user_id:
+                        raise AuthError(
+                            403,
+                            "You don't have permission to redact events"
+                        )
+
+            if event.type == EventTypes.Create and context.prev_state_ids:
+                raise AuthError(
+                    403,
+                    "Changing the room create event is forbidden",
+                )
+
+        if calculate_push_actions:
+            yield self.action_generator.handle_push_actions_for_event(
+                event, context
             )
-            return
-
-        if ratelimit:
-            yield self.base_handler.ratelimit(requester)
 
         try:
-            yield self.auth.check_from_context(event, context)
-        except AuthError as err:
-            logger.warn("Denying new event %r because %s", event, err)
-            raise err
+            # We now need to go and hit out to wherever we need to hit out to.
+
+            # If we're a worker we need to hit out to the master.
+            if self.config.worker_app:
+                yield send_event_to_master(
+                    self.http_client,
+                    host=self.config.worker_replication_host,
+                    port=self.config.worker_replication_http_port,
+                    requester=requester,
+                    event=event,
+                    context=context,
+                )
+                return
+
+            yield self._handle_new_client_event_impl(
+                requester,
+                event,
+                context,
+                ratelimit=ratelimit,
+                extra_users=extra_users,
+            )
+        except:  # noqa: E722, as we reraise the exception this is fine.
+            # Ensure that we actually remove the entries in the push actions
+            # staging area, if we calculated them.
+            if calculate_push_actions:
+                preserve_fn(self.store.remove_push_actions_from_staging)(event.event_id)
+            raise
+
+    @defer.inlineCallbacks
+    def _handle_new_client_event_impl(
+        self,
+        requester,
+        event,
+        context,
+        ratelimit=True,
+        extra_users=[],
+    ):
+        if ratelimit:
+            yield self.base_handler.ratelimit(requester)
 
         # Ensure that we can round trip before trying to persist in db
         try:
@@ -651,47 +728,9 @@ class EventCreationHandler(object):
                         returned_invite.signatures
                     )
 
-        if event.type == EventTypes.Redaction:
-            auth_events_ids = yield self.auth.compute_auth_events(
-                event, context.prev_state_ids, for_verification=True,
-            )
-            auth_events = yield self.store.get_events(auth_events_ids)
-            auth_events = {
-                (e.type, e.state_key): e for e in auth_events.values()
-            }
-            if self.auth.check_redaction(event, auth_events=auth_events):
-                original_event = yield self.store.get_event(
-                    event.redacts,
-                    check_redacted=False,
-                    get_prev_content=False,
-                    allow_rejected=False,
-                    allow_none=False
-                )
-                if event.user_id != original_event.user_id:
-                    raise AuthError(
-                        403,
-                        "You don't have permission to redact events"
-                    )
-
-        if event.type == EventTypes.Create and context.prev_state_ids:
-            raise AuthError(
-                403,
-                "Changing the room create event is forbidden",
-            )
-
-        yield self.action_generator.handle_push_actions_for_event(
-            event, context
+        (event_stream_id, max_stream_id) = yield self.store.persist_event(
+            event, context=context
         )
-
-        try:
-            (event_stream_id, max_stream_id) = yield self.store.persist_event(
-                event, context=context
-            )
-        except:  # noqa: E722, as we reraise the exception this is fine.
-            # Ensure that we actually remove the entries in the push actions
-            # staging area
-            preserve_fn(self.store.remove_push_actions_from_staging)(event.event_id)
-            raise
 
         # this intentionally does not yield: we don't care about the result
         # and don't need to wait for it.

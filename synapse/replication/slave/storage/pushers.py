@@ -17,6 +17,7 @@ from ._base import BaseSlavedStore
 from ._slaved_id_tracker import SlavedIdTracker
 
 from synapse.storage import DataStore
+from synapse.storage.pusher import PusherStore
 
 
 class SlavedPusherStore(BaseSlavedStore):
@@ -34,6 +35,9 @@ class SlavedPusherStore(BaseSlavedStore):
         DataStore.get_pushers_by_app_id_and_pushkey.__func__
     )
     _decode_pushers_rows = DataStore._decode_pushers_rows.__func__
+
+    get_if_user_has_pusher = PusherStore.__dict__["get_if_user_has_pusher"]
+    get_if_users_have_pushers = PusherStore.__dict__["get_if_users_have_pushers"]
 
     def stream_positions(self):
         result = super(SlavedPusherStore, self).stream_positions()
