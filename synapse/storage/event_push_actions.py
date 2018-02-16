@@ -769,7 +769,7 @@ class EventPushActionsStore(SQLBaseStore):
             Deferred
         """
 
-        is_highlight = is_highlight = 1 if _action_has_highlight(actions) else 0
+        is_highlight = 1 if _action_has_highlight(actions) else 0
 
         return self._simple_insert(
             table="event_push_actions_staging",
