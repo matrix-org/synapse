@@ -104,9 +104,6 @@ class DataStore(RoomMemberStore, RoomStore,
             db_conn, "events", "stream_ordering", step=-1,
             extra_tables=[("ex_outlier_stream", "event_stream_ordering")]
         )
-        self._account_data_id_gen = StreamIdGenerator(
-            db_conn, "account_data_max_stream_id", "stream_id"
-        )
         self._presence_id_gen = StreamIdGenerator(
             db_conn, "presence_stream", "stream_id"
         )
@@ -157,11 +154,6 @@ class DataStore(RoomMemberStore, RoomStore,
 
         self._membership_stream_cache = StreamChangeCache(
             "MembershipStreamChangeCache", events_max,
-        )
-
-        account_max = self._account_data_id_gen.get_current_token()
-        self._account_data_stream_cache = StreamChangeCache(
-            "AccountDataAndTagsChangeCache", account_max,
         )
 
         self._presence_on_startup = self._get_active_presence(db_conn)
