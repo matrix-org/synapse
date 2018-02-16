@@ -234,12 +234,17 @@ class PusherStore(PusherWorkerStore):
             if newly_inserted:
                 # get_if_user_has_pusher only cares if the user has
                 # at least *one* pusher.
-                self.get_if_user_has_pusher.invalidate(user_id,)
+                yield self.runInteraction(
+                    "add_pusher", self._invalidate_cache_and_stream,
+                    self.get_if_user_has_pusher, (user_id,),
+                )
 
     @defer.inlineCallbacks
     def delete_pusher_by_app_id_pushkey_user_id(self, app_id, pushkey, user_id):
         def delete_pusher_txn(txn, stream_id):
-            txn.call_after(self.get_if_user_has_pusher.invalidate, (user_id,))
+            self._invalidate_cache_and_stream(
+                txn, self.get_if_user_has_pusher, (user_id,),
+            )
 
             self._simple_delete_one_txn(
                 txn,
