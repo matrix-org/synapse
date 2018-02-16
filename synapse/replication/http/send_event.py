@@ -19,7 +19,7 @@ from synapse.api.errors import (
     SynapseError, MatrixCodeMessageException, CodeMessageException,
 )
 from synapse.events import FrozenEvent
-from synapse.events.snapshot import EventContext
+from synapse.events.snapshot import StatelessEventContext
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.util.async import sleep
 from synapse.util.caches.response_cache import ResponseCache
@@ -44,7 +44,7 @@ def send_event_to_master(client, host, port, requester, event, context,
         port (int): port on master listening for HTTP replication
         requester (Requester)
         event (FrozenEvent)
-        context (EventContext)
+        context (StatelessEventContext)
         ratelimit (bool)
         extra_users (list(UserID)): Any extra users to notify about event
     """
@@ -56,7 +56,7 @@ def send_event_to_master(client, host, port, requester, event, context,
         "event": event.get_pdu_json(),
         "internal_metadata": event.internal_metadata.get_dict(),
         "rejected_reason": event.rejected_reason,
-        "context": context.serialize(event),
+        "context": context.serialize(),
         "requester": requester.serialize(),
         "ratelimit": ratelimit,
         "extra_users": [u.to_string() for u in extra_users],
@@ -140,7 +140,9 @@ class ReplicationSendEventRestServlet(RestServlet):
             event = FrozenEvent(event_dict, internal_metadata, rejected_reason)
 
             requester = Requester.deserialize(self.store, content["requester"])
-            context = yield EventContext.deserialize(self.store, content["context"])
+            context = yield StatelessEventContext.deserialize(
+                self.store, content["context"],
+            )
 
             ratelimit = content["ratelimit"]
             extra_users = [UserID.from_string(u) for u in content["extra_users"]]
