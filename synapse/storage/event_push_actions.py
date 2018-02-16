@@ -762,7 +762,8 @@ class EventPushActionsStore(SQLBaseStore):
         Args:
             event_id (str)
             user_id (str)
-            actions (list)
+            actions (list[dict|str]): An action can either be a string or
+                dict.
 
         Returns:
             Deferred

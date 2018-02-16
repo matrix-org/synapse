@@ -13,6 +13,10 @@
  * limitations under the License.
  */
 
+-- Temporary staging area for push actions that have been calculated for an
+-- event, but the event hasn't yet been persisted.
+-- When the event is persisted the rows are moved over to the
+-- event_push_actions table.
 CREATE TABLE event_push_actions_staging (
     event_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
