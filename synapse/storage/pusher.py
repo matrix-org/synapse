@@ -27,7 +27,7 @@ import types
 logger = logging.getLogger(__name__)
 
 
-class PusherStore(SQLBaseStore):
+class PusherWorkerStore(SQLBaseStore):
     def _decode_pushers_rows(self, rows):
         for r in rows:
             dataJson = r['data']
@@ -101,9 +101,6 @@ class PusherStore(SQLBaseStore):
 
         rows = yield self.runInteraction("get_all_pushers", get_pushers)
         defer.returnValue(rows)
-
-    def get_pushers_stream_token(self):
-        return self._pushers_id_gen.get_current_token()
 
     def get_all_updated_pushers(self, last_id, current_id, limit):
         if last_id == current_id:
@@ -197,6 +194,11 @@ class PusherStore(SQLBaseStore):
         result.update({r['user_name']: True for r in rows})
 
         defer.returnValue(result)
+
+
+class PusherStore(PusherWorkerStore):
+    def get_pushers_stream_token(self):
+        return self._pushers_id_gen.get_current_token()
 
     @defer.inlineCallbacks
     def add_pusher(self, user_id, access_token, kind, app_id,
