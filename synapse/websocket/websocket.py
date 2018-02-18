@@ -347,7 +347,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
 
         yield self.factory.presence_handler.bump_presence_active_time(self.requester.user)
 
-        event = yield self.factory.message_handler.create_and_send_nonmember_event(
+        event = yield self.factory.event_creation_handler.create_and_send_nonmember_event(
             self.requester,
             {
                 "type": params["event_type"],
@@ -396,15 +396,12 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
                 content=params["content"],
             )
         else:
-            msg_handler = self.handlers.message_handler
-            event, context = yield msg_handler.create_event(
+            event_creation_handler = self.factory.event_creation_handler
+            event = yield event_creation_handler.create_and_send_nonmember_event(
                 self.requester,
                 event_dict,
-                token_id=self.requester.token_id,
                 txn_id=msg["id"],
             )
-
-            yield msg_handler.send_nonmember_event(self.requester, event, context)
 
         ret = {"id": msg["id"]}
         if event:
@@ -455,7 +452,7 @@ class SynapseWebsocketFactory(WebSocketServerFactory):
         self.clock = hs.get_clock()
         self.filtering = hs.get_filtering()
         self.handlers = hs.get_handlers()
-        self.message_handler = self.handlers.message_handler
+        self.event_creation_handler = hs.get_event_creation_handler()
         self.presence_handler = hs.get_presence_handler()
         self.receipts_handler = hs.get_receipts_handler()
         self.read_marker_handler = hs.get_read_marker_handler()
