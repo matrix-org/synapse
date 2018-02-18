@@ -115,6 +115,18 @@ To manipulate a specific worker, you pass the -w option to synctl::
     synctl -w $CONFIG/workers/synchrotron.yaml restart
 
 
+After setting up your workers, you'll need to create a worker configuration for
+the main synapse process. That worker configuration should look like this:::
+
+    worker_app: synapse.app.homeserver
+    daemonize: true
+
+Be sure to keep this particular configuration limited as synapse may refuse to
+start if the regular ``worker_*`` options are given. The ``homeserver.yaml``
+configuration will be used to set up the main synapse process.
+
+**You must have a worker configuration for the main synapse process!**
+
 Available worker applications
 -----------------------------
 
