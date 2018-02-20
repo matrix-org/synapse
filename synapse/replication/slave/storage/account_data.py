@@ -15,13 +15,12 @@
 
 from ._base import BaseSlavedStore
 from ._slaved_id_tracker import SlavedIdTracker
-from synapse.storage import DataStore
-from synapse.storage.account_data import AccountDataStore
-from synapse.storage.tags import TagsStore
+from synapse.storage.account_data import AccountDataWorkerStore
+from synapse.storage.tags import TagsWorkerStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 
-class SlavedAccountDataStore(BaseSlavedStore):
+class SlavedAccountDataStore(AccountDataWorkerStore, TagsWorkerStore, BaseSlavedStore):
 
     def __init__(self, db_conn, hs):
         super(SlavedAccountDataStore, self).__init__(db_conn, hs)
@@ -32,31 +31,6 @@ class SlavedAccountDataStore(BaseSlavedStore):
             "AccountDataAndTagsChangeCache",
             self._account_data_id_gen.get_current_token(),
         )
-
-    get_account_data_for_user = (
-        AccountDataStore.__dict__["get_account_data_for_user"]
-    )
-
-    get_global_account_data_by_type_for_users = (
-        AccountDataStore.__dict__["get_global_account_data_by_type_for_users"]
-    )
-
-    get_global_account_data_by_type_for_user = (
-        AccountDataStore.__dict__["get_global_account_data_by_type_for_user"]
-    )
-
-    get_tags_for_user = TagsStore.__dict__["get_tags_for_user"]
-    get_tags_for_room = (
-        DataStore.get_tags_for_room.__func__
-    )
-    get_account_data_for_room = (
-        DataStore.get_account_data_for_room.__func__
-    )
-
-    get_updated_tags = DataStore.get_updated_tags.__func__
-    get_updated_account_data_for_user = (
-        DataStore.get_updated_account_data_for_user.__func__
-    )
 
     def get_max_account_data_stream_id(self):
         return self._account_data_id_gen.get_current_token()
