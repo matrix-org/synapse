@@ -71,7 +71,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
             event.depth = stream
 
             yield self.store.add_push_actions_to_staging(
-                event.event_id, user_id, action,
+                event.event_id, {user_id: action},
             )
             yield self.store.runInteraction(
                 "", self.store._set_push_actions_for_event_and_users_txn,
