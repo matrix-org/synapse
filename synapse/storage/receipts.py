@@ -52,7 +52,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         Returns:
             int
         """
-        pass
+        raise NotImplementedError()
 
     @cachedInlineCallbacks()
     def get_users_with_read_receipts_in_room(self, room_id):
