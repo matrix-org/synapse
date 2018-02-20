@@ -31,11 +31,16 @@ from synapse.storage.receipts import ReceiptsWorkerStore
 class SlavedReceiptsStore(ReceiptsWorkerStore, BaseSlavedStore):
 
     def __init__(self, db_conn, hs):
-        receipts_id_gen = SlavedIdTracker(
+        # We instansiate this first as the ReceiptsWorkerStore constructor
+        # needs to be able to call get_max_receipt_stream_id
+        self._receipts_id_gen = SlavedIdTracker(
             db_conn, "receipts_linearized", "stream_id"
         )
 
-        super(SlavedReceiptsStore, self).__init__(receipts_id_gen, db_conn, hs)
+        super(SlavedReceiptsStore, self).__init__(db_conn, hs)
+
+    def get_max_receipt_stream_id(self):
+        return self._receipts_id_gen.get_current_token()
 
     def stream_positions(self):
         result = super(SlavedReceiptsStore, self).stream_positions()
