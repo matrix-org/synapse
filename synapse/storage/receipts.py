@@ -295,7 +295,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
 class ReceiptsStore(ReceiptsWorkerStore):
     def __init__(self, db_conn, hs):
-        # We instansiate this first as the ReceiptsWorkerStore constructor
+        # We instantiate this first as the ReceiptsWorkerStore constructor
         # needs to be able to call get_max_receipt_stream_id
         self._receipts_id_gen = StreamIdGenerator(
             db_conn, "receipts_linearized", "stream_id"
