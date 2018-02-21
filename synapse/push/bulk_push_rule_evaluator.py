@@ -190,12 +190,13 @@ class BulkPushRuleEvaluator(object):
                 if matches:
                     actions = [x for x in rule['actions'] if x != 'dont_notify']
                     if actions and 'notify' in actions:
+                        # Push rules say we should notify the user of this event
                         actions_by_user[uid] = actions
                     break
 
-        # Push rules say we should notify the user of this event,
-        # so we mark it in the DB in the staging area. (This
-        # will then get handled when we persist the event)
+        # Mark in the DB staging area the push actions for users who should be
+        # notified for this event. (This will then get handled when we persist
+        # the event)
         yield self.store.add_push_actions_to_staging(
             event.event_id, actions_by_user,
         )
