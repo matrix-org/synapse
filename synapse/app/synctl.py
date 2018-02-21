@@ -108,7 +108,7 @@ def stop(pidfile, app):
 
 
 Worker = collections.namedtuple("Worker", [
-    "app", "configfile", "pidfile", "cache_factor"
+    "app", "configfile", "pidfile", "cache_factor", "cache_factors",
 ])
 
 
@@ -215,6 +215,10 @@ def main():
                 or pidfile
             )
             worker_cache_factor = worker_config.get("synctl_cache_factor") or cache_factor
+            worker_cache_factors = (
+                worker_config.get("synctl_cache_factors")
+                or cache_factors
+            )
             daemonize = worker_config.get("daemonize") or config.get("daemonize")
             assert daemonize, "Main process must have daemonize set to true"
 
@@ -230,8 +234,10 @@ def main():
             assert worker_daemonize, "In config %r: expected '%s' to be True" % (
                 worker_configfile, "worker_daemonize")
             worker_cache_factor = worker_config.get("synctl_cache_factor")
+            worker_cache_factors = worker_config.get("synctl_cache_factors", {})
         workers.append(Worker(
             worker_app, worker_configfile, worker_pidfile, worker_cache_factor,
+            worker_cache_factors,
         ))
 
     action = options.action
@@ -266,15 +272,19 @@ def main():
             start(configfile)
 
         for worker in workers:
+            env = os.environ.copy()
+
             if worker.cache_factor:
                 os.environ["SYNAPSE_CACHE_FACTOR"] = str(worker.cache_factor)
 
+            for cache_name, factor in worker.cache_factors.iteritems():
+                os.environ["SYNAPSE_CACHE_FACTOR_" + cache_name.upper()] = str(factor)
+
             start_worker(worker.app, configfile, worker.configfile)
 
-            if cache_factor:
-                os.environ["SYNAPSE_CACHE_FACTOR"] = str(cache_factor)
-            else:
-                os.environ.pop("SYNAPSE_CACHE_FACTOR", None)
+            # Reset env back to the original
+            os.environ.clear()
+            os.environ.update(env)
 
 
 if __name__ == "__main__":
