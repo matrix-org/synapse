@@ -19,7 +19,7 @@ from synapse.storage import DataStore
 from synapse.storage.event_federation import EventFederationStore
 from synapse.storage.event_push_actions import EventPushActionsStore
 from synapse.storage.events import EventsWorkerStore
-from synapse.storage.roommember import RoomMemberStore
+from synapse.storage.roommember import RoomMemberWorkerStore
 from synapse.storage.state import StateGroupWorkerStore
 from synapse.storage.stream import StreamStore
 from synapse.storage.signatures import SignatureStore
@@ -39,7 +39,8 @@ logger = logging.getLogger(__name__)
 # the method descriptor on the DataStore and chuck them into our class.
 
 
-class SlavedEventStore(EventsWorkerStore, StateGroupWorkerStore, BaseSlavedStore):
+class SlavedEventStore(RoomMemberWorkerStore, EventsWorkerStore,
+                       StateGroupWorkerStore, BaseSlavedStore):
 
     def __init__(self, db_conn, hs):
         super(SlavedEventStore, self).__init__(db_conn, hs)
@@ -69,17 +70,8 @@ class SlavedEventStore(EventsWorkerStore, StateGroupWorkerStore, BaseSlavedStore
 
     # Cached functions can't be accessed through a class instance so we need
     # to reach inside the __dict__ to extract them.
-    get_rooms_for_user = RoomMemberStore.__dict__["get_rooms_for_user"]
-    get_users_in_room = RoomMemberStore.__dict__["get_users_in_room"]
-    get_hosts_in_room = RoomMemberStore.__dict__["get_hosts_in_room"]
-    get_users_who_share_room_with_user = (
-        RoomMemberStore.__dict__["get_users_who_share_room_with_user"]
-    )
     get_latest_event_ids_in_room = EventFederationStore.__dict__[
         "get_latest_event_ids_in_room"
-    ]
-    get_invited_rooms_for_user = RoomMemberStore.__dict__[
-        "get_invited_rooms_for_user"
     ]
     get_unread_event_push_actions_by_room_for_user = (
         EventPushActionsStore.__dict__["get_unread_event_push_actions_by_room_for_user"]
@@ -93,7 +85,6 @@ class SlavedEventStore(EventsWorkerStore, StateGroupWorkerStore, BaseSlavedStore
     get_recent_event_ids_for_room = (
         StreamStore.__dict__["get_recent_event_ids_for_room"]
     )
-    _get_joined_hosts_cache = RoomMemberStore.__dict__["_get_joined_hosts_cache"]
     has_room_changed_since = DataStore.has_room_changed_since.__func__
 
     get_unread_push_actions_for_user_in_range_for_http = (
@@ -105,9 +96,6 @@ class SlavedEventStore(EventsWorkerStore, StateGroupWorkerStore, BaseSlavedStore
     get_push_action_users_in_range = (
         DataStore.get_push_action_users_in_range.__func__
     )
-    get_rooms_for_user_where_membership_is = (
-        DataStore.get_rooms_for_user_where_membership_is.__func__
-    )
     get_membership_changes_for_user = (
         DataStore.get_membership_changes_for_user.__func__
     )
@@ -116,27 +104,15 @@ class SlavedEventStore(EventsWorkerStore, StateGroupWorkerStore, BaseSlavedStore
         DataStore.get_room_events_stream_for_room.__func__
     )
     get_events_around = DataStore.get_events_around.__func__
-    get_joined_users_from_state = DataStore.get_joined_users_from_state.__func__
-    get_joined_users_from_context = DataStore.get_joined_users_from_context.__func__
-    _get_joined_users_from_context = (
-        RoomMemberStore.__dict__["_get_joined_users_from_context"]
-    )
-
-    get_joined_hosts = DataStore.get_joined_hosts.__func__
-    _get_joined_hosts = RoomMemberStore.__dict__["_get_joined_hosts"]
 
     get_recent_events_for_room = DataStore.get_recent_events_for_room.__func__
     get_room_events_stream_for_rooms = (
         DataStore.get_room_events_stream_for_rooms.__func__
     )
-    is_host_joined = RoomMemberStore.__dict__["is_host_joined"]
     get_stream_token_for_event = DataStore.get_stream_token_for_event.__func__
 
     _set_before_and_after = staticmethod(DataStore._set_before_and_after)
 
-    _get_rooms_for_user_where_membership_is_txn = (
-        DataStore._get_rooms_for_user_where_membership_is_txn.__func__
-    )
     _get_events_around_txn = DataStore._get_events_around_txn.__func__
 
     get_backfill_events = DataStore.get_backfill_events.__func__
