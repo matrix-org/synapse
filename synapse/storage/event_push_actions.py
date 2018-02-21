@@ -140,11 +140,13 @@ class EventPushActionsStore(SQLBaseStore):
                     (event.room_id, uid,)
                 )
 
+        # Now we delete the staging area for *all* events that were being
+        # persisted.
         txn.executemany(
             "DELETE FROM event_push_actions_staging WHERE event_id = ?",
             (
                 (event.event_id,)
-                for event, _ in events_and_contexts
+                for event, _ in all_events_and_contexts
             )
         )
 
