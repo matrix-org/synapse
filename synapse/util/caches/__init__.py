@@ -18,6 +18,16 @@ import os
 
 CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.5))
 
+
+def get_cache_factor_for(cache_name):
+    env_var = "SYNAPSE_CACHE_FACTOR_" + cache_name.upper()
+    factor = os.environ.get(env_var)
+    if factor:
+        return float(factor)
+
+    return CACHE_SIZE_FACTOR
+
+
 metrics = synapse.metrics.get_metrics_for("synapse.util.caches")
 
 caches_by_name = {}
