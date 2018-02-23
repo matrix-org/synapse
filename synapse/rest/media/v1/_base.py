@@ -76,7 +76,40 @@ def respond_with_file(request, media_type, file_path,
 
         add_file_headers(request, media_type, file_size, upload_name)
 
+        request.setHeader(
+            b"Accept-Ranges", b"bytes"
+        )
         with open(file_path, "rb") as f:
+            rangeStr = request.getHeader(b"Range")
+            if rangeStr:
+                parts = rangeStr.split('=')
+                if len(parts) == 2 and parts[0].lower() == "bytes":
+                    range = parts[1].split('-')
+                    if len(range) == 2:
+                        try:
+                            rangeFrom = int(range[0])
+                            if rangeFrom >= file_size or rangeFrom < 0:
+                                raise Exception
+                            f.seek(rangeFrom)
+                            request.setHeader(
+                                b"Content-Length",
+                                b"%d" % (file_size - rangeFrom)
+                            )
+                            request.setHeader(
+                                b"Content-Range",
+                                b"bytes %d-%d/%d" % (
+                                    rangeFrom,
+                                    file_size - 1,
+                                    file_size
+                                )
+                            )
+                            request.setResponseCode(206)
+                        except Exception:
+                            raise SynapseError(
+                                500,
+                                "Invalid range header %s" % (rangeStr,),
+                                Codes.UNKNOWN,
+                            )
             yield logcontext.make_deferred_yieldable(
                 FileSender().beginFileTransfer(f, request)
             )
