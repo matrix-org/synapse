@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .account_data import AccountDataWorkerStore
+from synapse.storage.account_data import AccountDataWorkerStore
 
 from synapse.util.caches.descriptors import cached
 from twisted.internet import defer

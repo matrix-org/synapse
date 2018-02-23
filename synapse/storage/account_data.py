@@ -15,8 +15,8 @@
 
 from twisted.internet import defer
 
-from ._base import SQLBaseStore
-from .util.id_generators import StreamIdGenerator
+from synapse.storage._base import SQLBaseStore
+from synapse.storage.util.id_generators import StreamIdGenerator
 
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.caches.descriptors import cached, cachedList, cachedInlineCallbacks
