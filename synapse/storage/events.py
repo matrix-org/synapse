@@ -550,7 +550,6 @@ class EventsStore(EventsWorkerStore):
 
     def __init__(self, db_conn, hs):
         super(EventsStore, self).__init__(db_conn, hs)
-        self._clock = hs.get_clock()
         self.register_background_update_handler(
             self.EVENT_ORIGIN_SERVER_TS_NAME, self._background_reindex_origin_server_ts
         )
@@ -578,8 +577,6 @@ class EventsStore(EventsWorkerStore):
             unique=True,
             psql_only=True,
         )
-
-
 
         self._event_persist_queue = _EventPeristenceQueue()
 
