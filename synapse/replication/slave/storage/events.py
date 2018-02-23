@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +19,7 @@ from synapse.api.constants import EventTypes
 from synapse.storage import DataStore
 from synapse.storage.event_federation import EventFederationStore
 from synapse.storage.event_push_actions import EventPushActionsStore
+from synapse.storage.events_worker import EventsWorkerStore
 from synapse.storage.roommember import RoomMemberStore
 from synapse.storage.state import StateGroupWorkerStore
 from synapse.storage.stream import StreamStore
@@ -38,7 +40,7 @@ logger = logging.getLogger(__name__)
 # the method descriptor on the DataStore and chuck them into our class.
 
 
-class SlavedEventStore(StateGroupWorkerStore, BaseSlavedStore):
+class SlavedEventStore(EventsWorkerStore, StateGroupWorkerStore, BaseSlavedStore):
 
     def __init__(self, db_conn, hs):
         super(SlavedEventStore, self).__init__(db_conn, hs)
@@ -104,8 +106,6 @@ class SlavedEventStore(StateGroupWorkerStore, BaseSlavedStore):
     get_push_action_users_in_range = (
         DataStore.get_push_action_users_in_range.__func__
     )
-    get_event = DataStore.get_event.__func__
-    get_events = DataStore.get_events.__func__
     get_rooms_for_user_where_membership_is = (
         DataStore.get_rooms_for_user_where_membership_is.__func__
     )
@@ -135,14 +135,6 @@ class SlavedEventStore(StateGroupWorkerStore, BaseSlavedStore):
 
     _set_before_and_after = staticmethod(DataStore._set_before_and_after)
 
-    _get_events = DataStore._get_events.__func__
-    _get_events_from_cache = DataStore._get_events_from_cache.__func__
-
-    _invalidate_get_event_cache = DataStore._invalidate_get_event_cache.__func__
-    _enqueue_events = DataStore._enqueue_events.__func__
-    _do_fetch = DataStore._do_fetch.__func__
-    _fetch_event_rows = DataStore._fetch_event_rows.__func__
-    _get_event_from_row = DataStore._get_event_from_row.__func__
     _get_rooms_for_user_where_membership_is_txn = (
         DataStore._get_rooms_for_user_where_membership_is_txn.__func__
     )
