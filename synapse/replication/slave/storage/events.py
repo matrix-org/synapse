@@ -19,7 +19,7 @@ from synapse.api.constants import EventTypes
 from synapse.storage import DataStore
 from synapse.storage.event_federation import EventFederationStore
 from synapse.storage.event_push_actions import EventPushActionsStore
-from synapse.storage.events import EventsWorkerStore
+from synapse.storage.events_worker import EventsWorkerStore
 from synapse.storage.roommember import RoomMemberStore
 from synapse.storage.state import StateGroupWorkerStore
 from synapse.storage.stream import StreamStore
