@@ -18,7 +18,7 @@ import logging
 from synapse.api.constants import EventTypes
 from synapse.storage import DataStore
 from synapse.storage.event_federation import EventFederationStore
-from synapse.storage.event_push_actions import EventPushActionsStore
+from synapse.storage.event_push_actions import EventPushActionsWorkerStore
 from synapse.storage.events_worker import EventsWorkerStore
 from synapse.storage.roommember import RoomMemberStore
 from synapse.storage.state import StateGroupWorkerStore
@@ -40,7 +40,8 @@ logger = logging.getLogger(__name__)
 # the method descriptor on the DataStore and chuck them into our class.
 
 
-class SlavedEventStore(EventsWorkerStore, StateGroupWorkerStore, BaseSlavedStore):
+class SlavedEventStore(EventPushActionsWorkerStore, EventsWorkerStore,
+                       StateGroupWorkerStore, BaseSlavedStore):
 
     def __init__(self, db_conn, hs):
         super(SlavedEventStore, self).__init__(db_conn, hs)
@@ -82,30 +83,12 @@ class SlavedEventStore(EventsWorkerStore, StateGroupWorkerStore, BaseSlavedStore
     get_invited_rooms_for_user = RoomMemberStore.__dict__[
         "get_invited_rooms_for_user"
     ]
-    get_unread_event_push_actions_by_room_for_user = (
-        EventPushActionsStore.__dict__["get_unread_event_push_actions_by_room_for_user"]
-    )
-    _get_unread_counts_by_receipt_txn = (
-        DataStore._get_unread_counts_by_receipt_txn.__func__
-    )
-    _get_unread_counts_by_pos_txn = (
-        DataStore._get_unread_counts_by_pos_txn.__func__
-    )
     get_recent_event_ids_for_room = (
         StreamStore.__dict__["get_recent_event_ids_for_room"]
     )
     _get_joined_hosts_cache = RoomMemberStore.__dict__["_get_joined_hosts_cache"]
     has_room_changed_since = DataStore.has_room_changed_since.__func__
 
-    get_unread_push_actions_for_user_in_range_for_http = (
-        DataStore.get_unread_push_actions_for_user_in_range_for_http.__func__
-    )
-    get_unread_push_actions_for_user_in_range_for_email = (
-        DataStore.get_unread_push_actions_for_user_in_range_for_email.__func__
-    )
-    get_push_action_users_in_range = (
-        DataStore.get_push_action_users_in_range.__func__
-    )
     get_rooms_for_user_where_membership_is = (
         DataStore.get_rooms_for_user_where_membership_is.__func__
     )
