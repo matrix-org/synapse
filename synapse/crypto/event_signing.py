@@ -22,6 +22,8 @@ from canonicaljson import encode_canonical_json
 from unpaddedbase64 import encode_base64, decode_base64
 from signedjson.sign import sign_json
 
+from frozendict import frozendict
+
 import hashlib
 import logging
 
@@ -36,7 +38,7 @@ def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
     # some malformed events lack a 'hashes'. Protect against it being missing
     # or a weird type by basically treating it the same as an unhashed event.
     hashes = event.get("hashes")
-    if not isinstance(hashes, dict):
+    if not (isinstance(hashes, dict) or isinstance(hashes, frozendict)):
         raise SynapseError(400, "Malformed 'hashes'", Codes.UNAUTHORIZED)
 
     if name not in hashes:

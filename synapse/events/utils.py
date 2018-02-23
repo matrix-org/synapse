@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from synapse.api.constants import EventTypes
-from . import EventBase
+from . import EventBase, CompactEvent
 
 from frozendict import frozendict
 
@@ -242,7 +242,7 @@ def serialize_event(e, time_now_ms, as_client_event=True,
         dict
     """
     # FIXME(erikj): To handle the case of presence events and the like
-    if not isinstance(e, EventBase):
+    if not (isinstance(e, EventBase) or isinstance(e, CompactEvent)):
         return e
 
     time_now_ms = int(time_now_ms)

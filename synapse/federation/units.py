@@ -121,9 +121,12 @@ class Transaction(JsonEncodedObject):
                 "Require 'transaction_id' to construct a Transaction"
             )
 
+        pdu_dicts = []
         for p in pdus:
-            p.transaction_id = kwargs["transaction_id"]
+            d = p.get_pdu_json()
+            # d["transaction_id"] = kwargs["transaction_id"]
+            pdu_dicts.append(d)
 
-        kwargs["pdus"] = [p.get_pdu_json() for p in pdus]
+        kwargs["pdus"] = pdu_dicts
 
         return Transaction(**kwargs)

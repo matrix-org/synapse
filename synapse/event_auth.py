@@ -83,6 +83,7 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
         # FIXME
         return True
 
+    logger.info("auth_events %r", auth_events)
     creation_event = auth_events.get((EventTypes.Create, ""), None)
 
     if not creation_event:

@@ -16,7 +16,7 @@ from ._base import SQLBaseStore
 
 from twisted.internet import defer, reactor
 
-from synapse.events import FrozenEvent, USE_FROZEN_DICTS
+from synapse.events import CompactEvent, FrozenEvent, USE_FROZEN_DICTS
 from synapse.events.utils import prune_event
 
 from synapse.util.async import ObservableDeferred
@@ -1310,7 +1310,7 @@ class EventsStore(SQLBaseStore):
                 event = ev_map[row["event_id"]]
                 if not row["rejects"] and not row["redacts"]:
                     to_prefill.append(_EventCacheEntry(
-                        event=event,
+                        event=CompactEvent.from_event(event),
                         redacted_event=None,
                     ))
 
@@ -1653,7 +1653,7 @@ class EventsStore(SQLBaseStore):
                     redacted_event.unsigned["redacted_because"] = because
 
             cache_entry = _EventCacheEntry(
-                event=original_ev,
+                event=CompactEvent.from_event(original_ev),
                 redacted_event=redacted_event,
             )
 
