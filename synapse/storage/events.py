@@ -200,10 +200,6 @@ def _retry_on_integrity_error(func):
 
 
 class EventsWorkerStore(SQLBaseStore):
-    def __init__(self, db_conn, hs):
-        super(EventsWorkerStore, self).__init__(db_conn, hs)
-
-        self._event_persist_queue = _EventPeristenceQueue()
 
     @defer.inlineCallbacks
     def get_event(self, event_id, check_redacted=True,
@@ -582,6 +578,10 @@ class EventsStore(EventsWorkerStore):
             unique=True,
             psql_only=True,
         )
+
+
+
+        self._event_persist_queue = _EventPeristenceQueue()
 
         self._state_resolution_handler = hs.get_state_resolution_handler()
 
