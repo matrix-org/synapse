@@ -75,7 +75,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
             )
             yield self.store.runInteraction(
                 "", self.store._set_push_actions_for_event_and_users_txn,
-                event,
+                [(event, None)], [(event, None)],
             )
 
         def _rotate(stream):
