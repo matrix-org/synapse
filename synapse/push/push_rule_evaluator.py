@@ -237,10 +237,10 @@ def _re_word_boundary(r):
 def _flatten_dict(d, prefix=[], result=None):
     if result is None:
         result = {}
-    for key, value in d.items():
+    for key, value in d.iteritems():
         if isinstance(value, basestring):
             result[".".join(prefix + [key])] = value.lower()
-        elif hasattr(value, "items"):
+        elif hasattr(value, "iteritems"):
             _flatten_dict(value, prefix=(prefix + [key]), result=result)
 
     return result

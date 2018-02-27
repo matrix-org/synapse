@@ -127,8 +127,8 @@ class EventBase(object):
     def __set__(self, instance, value):
         raise AttributeError("Unrecognized attribute %s" % (instance,))
 
-    def items(self):
-        return self._event_dict.items()
+    def iteritems(self):
+        return self._event_dict.iteritems()
 
 
 class FrozenEvent(EventBase):
