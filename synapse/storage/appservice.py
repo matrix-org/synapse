@@ -441,4 +441,8 @@ class ApplicationServiceTransactionWorkerStore(ApplicationServiceWorkerStore,
 
 
 class ApplicationServiceTransactionStore(ApplicationServiceTransactionWorkerStore):
+    # This is currently empty due to there not being any AS storage functions
+    # that can't be run on the workers. Since this may change in future, and
+    # to keep consistency with the other stores, we keep this empty class for
+    # now.
     pass
