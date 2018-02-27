@@ -62,8 +62,6 @@ logger = logging.getLogger("synapse.app.synchrotron")
 
 
 class SynchrotronSlavedStore(
-    SlavedPushRuleStore,
-    SlavedEventStore,
     SlavedReceiptsStore,
     SlavedAccountDataStore,
     SlavedApplicationServiceStore,
@@ -73,14 +71,12 @@ class SynchrotronSlavedStore(
     SlavedGroupServerStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
+    SlavedPushRuleStore,
+    SlavedEventStore,
     SlavedClientIpStore,
     RoomStore,
     BaseSlavedStore,
 ):
-    who_forgot_in_room = (
-        RoomMemberStore.__dict__["who_forgot_in_room"]
-    )
-
     did_forget = (
         RoomMemberStore.__dict__["did_forget"]
     )
