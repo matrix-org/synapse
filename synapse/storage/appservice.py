@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +21,7 @@ from twisted.internet import defer
 from synapse.api.constants import Membership
 from synapse.appservice import AppServiceTransaction
 from synapse.config.appservice import load_appservices
+from synapse.storage.events import EventsWorkerStore
 from synapse.storage.roommember import RoomsForUser
 from ._base import SQLBaseStore
 
@@ -46,16 +48,15 @@ def _make_exclusive_regex(services_cache):
     return exclusive_user_regex
 
 
-class ApplicationServiceStore(SQLBaseStore):
-
+class ApplicationServiceWorkerStore(SQLBaseStore):
     def __init__(self, db_conn, hs):
-        super(ApplicationServiceStore, self).__init__(db_conn, hs)
-        self.hostname = hs.hostname
         self.services_cache = load_appservices(
             hs.hostname,
             hs.config.app_service_config_files
         )
         self.exclusive_user_regex = _make_exclusive_regex(self.services_cache)
+
+        super(ApplicationServiceWorkerStore, self).__init__(db_conn, hs)
 
     def get_app_services(self):
         return self.services_cache
@@ -111,6 +112,13 @@ class ApplicationServiceStore(SQLBaseStore):
             if service.id == as_id:
                 return service
         return None
+
+
+class ApplicationServiceStore(ApplicationServiceWorkerStore):
+
+    def __init__(self, db_conn, hs):
+        super(ApplicationServiceStore, self).__init__(db_conn, hs)
+        self.hostname = hs.hostname
 
     def get_app_service_rooms(self, service):
         """Get a list of RoomsForUser for this application service.
@@ -184,11 +192,8 @@ class ApplicationServiceStore(SQLBaseStore):
         return rooms_for_user_matching_user_id
 
 
-class ApplicationServiceTransactionStore(SQLBaseStore):
-
-    def __init__(self, db_conn, hs):
-        super(ApplicationServiceTransactionStore, self).__init__(db_conn, hs)
-
+class ApplicationServiceTransactionWorkerStore(ApplicationServiceWorkerStore,
+                                               EventsWorkerStore):
     @defer.inlineCallbacks
     def get_appservices_by_state(self, state):
         """Get a list of application services based on their state.
@@ -433,3 +438,11 @@ class ApplicationServiceTransactionStore(SQLBaseStore):
         events = yield self._get_events(event_ids)
 
         defer.returnValue((upper_bound, events))
+
+
+class ApplicationServiceTransactionStore(ApplicationServiceTransactionWorkerStore):
+    # This is currently empty due to there not being any AS storage functions
+    # that can't be run on the workers. Since this may change in future, and
+    # to keep consistency with the other stores, we keep this empty class for
+    # now.
+    pass
