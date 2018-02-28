@@ -175,11 +175,6 @@ class PusherWorkerStore(SQLBaseStore):
             "get_all_updated_pushers_rows", get_all_updated_pushers_rows_txn
         )
 
-
-class PusherStore(PusherWorkerStore):
-    def get_pushers_stream_token(self):
-        return self._pushers_id_gen.get_current_token()
-
     @cachedInlineCallbacks(num_args=1, max_entries=15000)
     def get_if_user_has_pusher(self, user_id):
         # This only exists for the cachedList decorator
@@ -200,6 +195,11 @@ class PusherStore(PusherWorkerStore):
         result.update({r['user_name']: True for r in rows})
 
         defer.returnValue(result)
+
+
+class PusherStore(PusherWorkerStore):
+    def get_pushers_stream_token(self):
+        return self._pushers_id_gen.get_current_token()
 
     @defer.inlineCallbacks
     def add_pusher(self, user_id, access_token, kind, app_id,
@@ -233,14 +233,18 @@ class PusherStore(PusherWorkerStore):
             )
 
             if newly_inserted:
-                # get_if_user_has_pusher only cares if the user has
-                # at least *one* pusher.
-                self.get_if_user_has_pusher.invalidate(user_id,)
+                self.runInteraction(
+                    "add_pusher",
+                    self._invalidate_cache_and_stream,
+                    self.get_if_user_has_pusher, (user_id,)
+                )
 
     @defer.inlineCallbacks
     def delete_pusher_by_app_id_pushkey_user_id(self, app_id, pushkey, user_id):
         def delete_pusher_txn(txn, stream_id):
-            txn.call_after(self.get_if_user_has_pusher.invalidate, (user_id,))
+            self._invalidate_cache_and_stream(
+                txn, self.get_if_user_has_pusher, (user_id,)
+            )
 
             self._simple_delete_one_txn(
                 txn,

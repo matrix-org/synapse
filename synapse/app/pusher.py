@@ -32,7 +32,6 @@ from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.engines import create_engine
-from synapse.storage.roommember import RoomMemberStore
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext, preserve_fn
 from synapse.util.manhole import manhole
@@ -73,10 +72,6 @@ class PusherSlaveStore(
 
     get_profile_displayname = (
         DataStore.get_profile_displayname.__func__
-    )
-
-    who_forgot_in_room = (
-        RoomMemberStore.__dict__["who_forgot_in_room"]
     )
 
 
