@@ -624,6 +624,7 @@ class EventCreationHandler(object):
             context.app_service = requester.app_service
 
         if builder.is_state():
+            logger.info("Added prev_state")
             builder.prev_state = yield self.store.add_event_hashes(
                 context.prev_state_events
             )

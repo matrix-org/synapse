@@ -16,6 +16,8 @@
 from synapse.util.frozenutils import freeze
 from synapse.util.caches import intern_dict
 
+import abc
+
 
 # Whether we should use frozen_dict in FrozenEvent. Using frozen_dicts prevents
 # bugs where we accidentally share e.g. signature dicts. However, converting
@@ -64,30 +66,46 @@ def _event_dict_property(key):
 
 
 class EventBase(object):
-    def __init__(self, event_dict, signatures={}, unsigned={},
+    __metaclass__ = abc.ABCMeta
+
+    def __init__(self, signatures={}, unsigned={},
                  internal_metadata_dict={}, rejected_reason=None):
         self.signatures = signatures
         self.unsigned = unsigned
         self.rejected_reason = rejected_reason
 
-        self._event_dict = event_dict
-
         self.internal_metadata = _EventInternalMetadata(
             internal_metadata_dict
         )
 
-    auth_events = _event_dict_property("auth_events")
-    depth = _event_dict_property("depth")
-    content = _event_dict_property("content")
-    hashes = _event_dict_property("hashes")
-    origin = _event_dict_property("origin")
-    origin_server_ts = _event_dict_property("origin_server_ts")
-    prev_events = _event_dict_property("prev_events")
-    prev_state = _event_dict_property("prev_state")
-    redacts = _event_dict_property("redacts")
-    room_id = _event_dict_property("room_id")
-    sender = _event_dict_property("sender")
-    user_id = _event_dict_property("sender")
+    auth_events = abc.abstractproperty()
+    depth = abc.abstractproperty()
+    content = abc.abstractproperty()
+    hashes = abc.abstractproperty()
+    origin = abc.abstractproperty()
+    origin_server_ts = abc.abstractproperty()
+    prev_events = abc.abstractproperty()
+    prev_state = abc.abstractproperty()
+    redacts = abc.abstractproperty()
+    room_id = abc.abstractproperty()
+    sender = abc.abstractproperty()
+    user_id = abc.abstractproperty()
+
+    event_id = abc.abstractproperty()
+    state_key = abc.abstractproperty()
+    type = abc.abstractproperty()
+
+    @abc.abstractmethod
+    def get_dict(self):
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def get(self, key, default=None):
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def iteritems(self):
+        raise NotImplementedError()
 
     @property
     def membership(self):
@@ -95,18 +113,6 @@ class EventBase(object):
 
     def is_state(self):
         return hasattr(self, "state_key") and self.state_key is not None
-
-    def get_dict(self):
-        d = dict(self._event_dict)
-        d.update({
-            "signatures": self.signatures,
-            "unsigned": dict(self.unsigned),
-        })
-
-        return d
-
-    def get(self, key, default=None):
-        return self._event_dict.get(key, default)
 
     def get_internal_metadata_dict(self):
         return self.internal_metadata.get_dict()
@@ -126,9 +132,6 @@ class EventBase(object):
 
     def __set__(self, instance, value):
         raise AttributeError("Unrecognized attribute %s" % (instance,))
-
-    def iteritems(self):
-        return self._event_dict.iteritems()
 
 
 class FrozenEvent(EventBase):
@@ -153,18 +156,59 @@ class FrozenEvent(EventBase):
         else:
             frozen_dict = event_dict
 
-        self.event_id = event_dict["event_id"]
-        self.type = event_dict["type"]
+        self._event_id = event_dict["event_id"]
+        self._type = event_dict["type"]
         if "state_key" in event_dict:
-            self.state_key = event_dict["state_key"]
+            self._state_key = event_dict["state_key"]
+
+        self._event_dict = frozen_dict
 
         super(FrozenEvent, self).__init__(
-            frozen_dict,
             signatures=signatures,
             unsigned=unsigned,
             internal_metadata_dict=internal_metadata_dict,
             rejected_reason=rejected_reason,
         )
+
+    auth_events = _event_dict_property("auth_events")
+    depth = _event_dict_property("depth")
+    content = _event_dict_property("content")
+    hashes = _event_dict_property("hashes")
+    origin = _event_dict_property("origin")
+    origin_server_ts = _event_dict_property("origin_server_ts")
+    prev_events = _event_dict_property("prev_events")
+    prev_state = _event_dict_property("prev_state")
+    redacts = _event_dict_property("redacts")
+    room_id = _event_dict_property("room_id")
+    sender = _event_dict_property("sender")
+    user_id = _event_dict_property("sender")
+
+    @property
+    def event_id(self):
+        return self._event_id
+
+    @property
+    def type(self):
+        return self._type
+
+    @property
+    def state_key(self):
+        return self._state_key
+
+    def get_dict(self):
+        d = dict(self._event_dict)
+        d.update({
+            "signatures": self.signatures,
+            "unsigned": dict(self.unsigned),
+        })
+
+        return d
+
+    def get(self, key, default=None):
+        return self._event_dict.get(key, default)
+
+    def iteritems(self):
+        return self._event_dict.iteritems()
 
     @staticmethod
     def from_event(event):

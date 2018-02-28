@@ -27,8 +27,9 @@ class EventBuilder(EventBase):
         signatures = copy.deepcopy(key_values.pop("signatures", {}))
         unsigned = copy.deepcopy(key_values.pop("unsigned", {}))
 
+        self._event_dict = key_values
+
         super(EventBuilder, self).__init__(
-            key_values,
             signatures=signatures,
             unsigned=unsigned,
             internal_metadata_dict=internal_metadata_dict,
@@ -37,6 +38,34 @@ class EventBuilder(EventBase):
     event_id = _event_dict_property("event_id")
     state_key = _event_dict_property("state_key")
     type = _event_dict_property("type")
+
+    auth_events = _event_dict_property("auth_events")
+    depth = _event_dict_property("depth")
+    content = _event_dict_property("content")
+    hashes = _event_dict_property("hashes")
+    origin = _event_dict_property("origin")
+    origin_server_ts = _event_dict_property("origin_server_ts")
+    prev_events = _event_dict_property("prev_events")
+    prev_state = _event_dict_property("prev_state")
+    redacts = _event_dict_property("redacts")
+    room_id = _event_dict_property("room_id")
+    sender = _event_dict_property("sender")
+    user_id = _event_dict_property("sender")
+
+    def get_dict(self):
+        d = dict(self._event_dict)
+        d.update({
+            "signatures": self.signatures,
+            "unsigned": dict(self.unsigned),
+        })
+
+        return d
+
+    def get(self, key, default=None):
+        return self._event_dict.get(key, default)
+
+    def iteritems(self):
+        return self._event_dict.iteritems()
 
     def build(self):
         return FrozenEvent.from_event(self)
