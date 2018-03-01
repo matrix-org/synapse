@@ -20,7 +20,6 @@ from synapse.storage.devices import DeviceStore
 from .appservice import (
     ApplicationServiceStore, ApplicationServiceTransactionStore
 )
-from ._base import LoggingTransaction
 from .directory import DirectoryStore
 from .events import EventsStore
 from .presence import PresenceStore, UserPresenceState
@@ -211,20 +210,6 @@ class DataStore(RoomMemberStore, RoomStore,
         self._group_updates_stream_cache = StreamChangeCache(
             "_group_updates_stream_cache", min_group_updates_id,
             prefilled_cache=_group_updates_prefill,
-        )
-
-        cur = LoggingTransaction(
-            db_conn.cursor(),
-            name="_find_stream_orderings_for_times_txn",
-            database_engine=self.database_engine,
-            after_callbacks=[],
-            final_callbacks=[],
-        )
-        self._find_stream_orderings_for_times_txn(cur)
-        cur.close()
-
-        self.find_stream_orderings_looping_call = self._clock.looping_call(
-            self._find_stream_orderings_for_times, 10 * 60 * 1000
         )
 
         self._stream_order_on_start = self.get_room_max_stream_ordering()

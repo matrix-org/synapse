@@ -53,8 +53,6 @@ class SlavedEventStore(RoomMemberWorkerStore, EventPushActionsWorkerStore,
 
         super(SlavedEventStore, self).__init__(db_conn, hs)
 
-        self.stream_ordering_month_ago = 0
-
     # Cached functions can't be accessed through a class instance so we need
     # to reach inside the __dict__ to extract them.
     get_latest_event_ids_in_room = EventFederationStore.__dict__[
