@@ -68,8 +68,8 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         super(EventPushActionsWorkerStore, self).__init__(db_conn, hs)
 
         # These get correctly set by _find_stream_orderings_for_times_txn
-        self.stream_ordering_month_ago = 0
-        self.stream_ordering_day_ago = 0
+        self.stream_ordering_month_ago = None
+        self.stream_ordering_day_ago = None
 
         cur = LoggingTransaction(
             db_conn.cursor(),
