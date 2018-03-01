@@ -148,6 +148,11 @@ def filter_to_clause(event_filter):
 
 
 class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
+    """This is an abstract base class where subclasses must implement
+    `get_room_max_stream_ordering` and `get_room_min_stream_ordering`
+    which can be called in the initializer.
+    """
+
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, db_conn, hs):
@@ -169,6 +174,14 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         self._stream_order_on_start = self.get_room_max_stream_ordering()
+
+    @abc.abstractmethod
+    def get_room_max_stream_ordering(self):
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def get_room_min_stream_ordering(self):
+        raise NotImplementedError()
 
     @defer.inlineCallbacks
     def get_room_events_stream_for_rooms(self, room_ids, from_key, to_key, limit=0,
@@ -420,14 +433,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 room_id,
             )
             defer.returnValue("t%d-%d" % (topo, token))
-
-    @abc.abstractmethod
-    def get_room_max_stream_ordering(self):
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def get_room_min_stream_ordering(self):
-        raise NotImplementedError()
 
     def get_stream_token_for_event(self, event_id):
         """The stream token for an event
