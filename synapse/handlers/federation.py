@@ -1447,16 +1447,24 @@ class FederationHandler(BaseHandler):
             auth_events=auth_events,
         )
 
-        if not event.internal_metadata.is_outlier() and not backfilled:
-            yield self.action_generator.handle_push_actions_for_event(
-                event, context
-            )
+        try:
+            if not event.internal_metadata.is_outlier() and not backfilled:
+                yield self.action_generator.handle_push_actions_for_event(
+                    event, context
+                )
 
-        event_stream_id, max_stream_id = yield self.store.persist_event(
-            event,
-            context=context,
-            backfilled=backfilled,
-        )
+            event_stream_id, max_stream_id = yield self.store.persist_event(
+                event,
+                context=context,
+                backfilled=backfilled,
+            )
+        except:  # noqa: E722, as we reraise the exception this is fine.
+            # Ensure that we actually remove the entries in the push actions
+            # staging area
+            logcontext.preserve_fn(
+                self.store.remove_push_actions_from_staging
+            )(event.event_id)
+            raise
 
         if not backfilled:
             # this intentionally does not yield: we don't care about the result
