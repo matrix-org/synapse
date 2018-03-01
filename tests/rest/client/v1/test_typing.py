@@ -95,7 +95,7 @@ class RoomTypingTestCase(RestTestCase):
                 else:
                     if remotedomains is not None:
                         remotedomains.add(member.domain)
-        hs.get_handlers().room_member_handler.fetch_room_distributions_into = (
+        hs.get_room_member_handler().fetch_room_distributions_into = (
             fetch_room_distributions_into
         )
 

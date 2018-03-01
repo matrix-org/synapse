@@ -233,7 +233,7 @@ class ProfileHandler(BaseHandler):
         )
 
         for room_id in room_ids:
-            handler = self.hs.get_handlers().room_member_handler
+            handler = self.hs.get_room_member_handler()
             try:
                 # Assume the target_user isn't a guest,
                 # because we don't let guests set profile or avatar data.

@@ -180,6 +180,7 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
         self.handlers = hs.get_handlers()
         self.state = hs.get_state_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.room_member_handler = hs.get_room_member_handler()
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id):
@@ -238,7 +239,7 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
             logger.info("Kicking %r from %r...", user_id, room_id)
 
             target_requester = create_requester(user_id)
-            yield self.handlers.room_member_handler.update_membership(
+            yield self.room_member_handler.update_membership(
                 requester=target_requester,
                 target=target_requester.user,
                 room_id=room_id,
@@ -247,9 +248,9 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
                 ratelimit=False
             )
 
-            yield self.handlers.room_member_handler.forget(target_requester.user, room_id)
+            yield self.room_member_handler.forget(target_requester.user, room_id)
 
-            yield self.handlers.room_member_handler.update_membership(
+            yield self.room_member_handler.update_membership(
                 requester=target_requester,
                 target=target_requester.user,
                 room_id=new_room_id,

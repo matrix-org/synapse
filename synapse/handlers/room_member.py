@@ -30,24 +30,32 @@ from synapse.api.errors import AuthError, SynapseError, Codes
 from synapse.types import UserID, RoomID
 from synapse.util.async import Linearizer
 from synapse.util.distributor import user_left_room, user_joined_room
-from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
 id_server_scheme = "https://"
 
 
-class RoomMemberHandler(BaseHandler):
+class RoomMemberHandler(object):
     # TODO(paul): This handler currently contains a messy conflation of
     #   low-level API that works on UserID objects and so on, and REST-level
     #   API that takes ID strings and returns pagination chunks. These concerns
     #   ought to be separated out a lot better.
 
     def __init__(self, hs):
-        super(RoomMemberHandler, self).__init__(hs)
+        self.hs = hs
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.state_handler = hs.get_state_handler()
+        self.config = hs.config
+        self.simple_http_client = hs.get_simple_http_client()
 
+        self.federation_handler = hs.get_handlers().federation_handler
+        self.directory_handler = hs.get_handlers().directory_handler
+        self.registration_handler = hs.get_handlers().registration_handler
         self.profile_handler = hs.get_profile_handler()
         self.event_creation_hander = hs.get_event_creation_handler()
+        self.replication_layer = hs.get_replication_layer()
 
         self.member_linearizer = Linearizer(name="member")
 
@@ -138,7 +146,7 @@ class RoomMemberHandler(BaseHandler):
         # join dance for now, since we're kinda implicitly checking
         # that we are allowed to join when we decide whether or not we
         # need to do the invite/join dance.
-        yield self.hs.get_handlers().federation_handler.do_invite_join(
+        yield self.federation_handler.do_invite_join(
             remote_room_hosts,
             room_id,
             user.to_string(),
@@ -204,8 +212,7 @@ class RoomMemberHandler(BaseHandler):
         # if this is a join with a 3pid signature, we may need to turn a 3pid
         # invite into a normal invite before we can handle the join.
         if third_party_signed is not None:
-            replication = self.hs.get_replication_layer()
-            yield replication.exchange_third_party_invite(
+            yield self.replication_layer.exchange_third_party_invite(
                 third_party_signed["sender"],
                 target.to_string(),
                 room_id,
@@ -226,7 +233,7 @@ class RoomMemberHandler(BaseHandler):
                 requester.user,
             )
             if not is_requester_admin:
-                if self.hs.config.block_non_admin_invites:
+                if self.config.block_non_admin_invites:
                     logger.info(
                         "Blocking invite: user is not admin and non-admin "
                         "invites disabled"
@@ -321,7 +328,7 @@ class RoomMemberHandler(BaseHandler):
                 else:
                     # send the rejection to the inviter's HS.
                     remote_room_hosts = remote_room_hosts + [inviter.domain]
-                    fed_handler = self.hs.get_handlers().federation_handler
+                    fed_handler = self.federation_handler
                     try:
                         ret = yield fed_handler.do_remotely_reject_invite(
                             remote_room_hosts,
@@ -477,7 +484,7 @@ class RoomMemberHandler(BaseHandler):
         Raises:
             SynapseError if room alias could not be found.
         """
-        directory_handler = self.hs.get_handlers().directory_handler
+        directory_handler = self.directory_handler
         mapping = yield directory_handler.get_association(room_alias)
 
         if not mapping:
@@ -508,7 +515,7 @@ class RoomMemberHandler(BaseHandler):
             requester,
             txn_id
     ):
-        if self.hs.config.block_non_admin_invites:
+        if self.config.block_non_admin_invites:
             is_requester_admin = yield self.auth.is_server_admin(
                 requester.user,
             )
@@ -555,7 +562,7 @@ class RoomMemberHandler(BaseHandler):
             str: the matrix ID of the 3pid, or None if it is not recognized.
         """
         try:
-            data = yield self.hs.get_simple_http_client().get_json(
+            data = yield self.simple_http_client.get_json(
                 "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server,),
                 {
                     "medium": medium,
@@ -578,7 +585,7 @@ class RoomMemberHandler(BaseHandler):
         if server_hostname not in data["signatures"]:
             raise AuthError(401, "No signature from server %s" % (server_hostname,))
         for key_name, signature in data["signatures"][server_hostname].items():
-            key_data = yield self.hs.get_simple_http_client().get_json(
+            key_data = yield self.simple_http_client.get_json(
                 "%s%s/_matrix/identity/api/v1/pubkey/%s" %
                 (id_server_scheme, server_hostname, key_name,),
             )
@@ -603,7 +610,7 @@ class RoomMemberHandler(BaseHandler):
             user,
             txn_id
     ):
-        room_state = yield self.hs.get_state_handler().get_current_state(room_id)
+        room_state = yield self.state_handler.get_current_state(room_id)
 
         inviter_display_name = ""
         inviter_avatar_url = ""
@@ -727,15 +734,15 @@ class RoomMemberHandler(BaseHandler):
             "sender_avatar_url": inviter_avatar_url,
         }
 
-        if self.hs.config.invite_3pid_guest:
-            registration_handler = self.hs.get_handlers().registration_handler
+        if self.config.invite_3pid_guest:
+            registration_handler = self.registration_handler
             guest_access_token = yield registration_handler.guest_access_token_for(
                 medium=medium,
                 address=address,
                 inviter_user_id=inviter_user_id,
             )
 
-            guest_user_info = yield self.hs.get_auth().get_user_by_access_token(
+            guest_user_info = yield self.auth.get_user_by_access_token(
                 guest_access_token
             )
 
@@ -744,7 +751,7 @@ class RoomMemberHandler(BaseHandler):
                 "guest_user_id": guest_user_info["user"].to_string(),
             })
 
-        data = yield self.hs.get_simple_http_client().post_urlencoded_get_json(
+        data = yield self.simple_http_client.post_urlencoded_get_json(
             is_url,
             invite_config
         )
