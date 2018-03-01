@@ -157,6 +157,38 @@ class AccountDataWorkerStore(SQLBaseStore):
             "get_account_data_for_room", get_account_data_for_room_txn
         )
 
+    @cached(num_args=3, max_entries=5000)
+    def get_account_data_for_room_and_type(self, user_id, room_id, account_data_type):
+        """Get all the client account_data for a user for a room.
+
+        Args:
+            user_id(str): The user to get the account_data for.
+            room_id(str): The room to get the account_data for.
+            account_data_type (str): The account data type to get.
+        Returns:
+            A deferred dict of the room account_data for that type, or None if
+            there isn't any set.
+        """
+        def get_account_data_for_room_and_type_txn(txn):
+            content_json = self._simple_select_one_onecol_txn(
+                txn,
+                table="room_account_data",
+                keyvalues={
+                    "user_id": user_id,
+                    "room_id": room_id,
+                    "account_data_type": account_data_type,
+                },
+                retcol="content",
+                allow_none=True
+            )
+
+            return json.loads(content_json) if content_json else None
+
+        return self.runInteraction(
+            "get_account_data_for_room_and_type",
+            get_account_data_for_room_and_type_txn,
+        )
+
     def get_all_updated_account_data(self, last_global_id, last_room_id,
                                      current_id, limit):
         """Get all the client account_data that has changed on the server
@@ -312,6 +344,9 @@ class AccountDataStore(AccountDataWorkerStore):
             self._account_data_stream_cache.entity_has_changed(user_id, next_id)
             self.get_account_data_for_user.invalidate((user_id,))
             self.get_account_data_for_room.invalidate((user_id, room_id,))
+            self.get_account_data_for_room_and_type.prefill(
+                (user_id, room_id, account_data_type,), content,
+            )
 
         result = self._account_data_id_gen.get_current_token()
         defer.returnValue(result)

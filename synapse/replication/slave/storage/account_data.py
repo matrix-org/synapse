@@ -57,6 +57,9 @@ class SlavedAccountDataStore(TagsWorkerStore, AccountDataWorkerStore, BaseSlaved
                     )
                 self.get_account_data_for_user.invalidate((row.user_id,))
                 self.get_account_data_for_room.invalidate((row.user_id, row.room_id,))
+                self.get_account_data_for_room_and_type.invalidate(
+                    (row.user_id, row.room_id, row.account_data_type,),
+                )
                 self._account_data_stream_cache.entity_has_changed(
                     row.user_id, token
                 )
