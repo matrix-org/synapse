@@ -122,10 +122,11 @@ class ReplicationSendEventRestServlet(RestServlet):
             logger.warn("Returning cached response")
             result = self.response_cache.set(
                 event_id,
-                preserve_fn(self._handle_request)(request)
+                self._handle_request(request)
             )
         return make_deferred_yieldable(result)
 
+    @preserve_fn
     @defer.inlineCallbacks
     def _handle_request(self, request):
         with Measure(self.clock, "repl_send_event_parse"):
