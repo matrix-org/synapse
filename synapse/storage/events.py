@@ -28,7 +28,7 @@ from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.types import get_domain_from_id
 
 from canonicaljson import encode_canonical_json
@@ -2040,7 +2040,7 @@ class EventsStore(EventsWorkerStore):
         to_2, so_2 = yield self._get_event_ordering(event_id2)
         defer.returnValue((to_1, so_1) > (to_2, so_2))
 
-    @defer.inlineCallbacks
+    @cachedInlineCallbacks(max_entries=5000)
     def _get_event_ordering(self, event_id):
         res = yield self._simple_select_one(
             table="events",
