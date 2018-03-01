@@ -72,8 +72,9 @@ def send_event_to_master(client, host, port, requester, event, context,
                 break
             except CodeMessageException as e:
                 if e.code != 504:
-                    logger.warn("send_event request timed out")
                     raise
+
+            logger.warn("send_event request timed out")
 
             # If we timed out we probably don't need to worry about backing
             # off too much, but lets just wait a little anyway.
@@ -119,11 +120,12 @@ class ReplicationSendEventRestServlet(RestServlet):
     def on_PUT(self, request, event_id):
         result = self.response_cache.get(event_id)
         if not result:
-            logger.warn("Returning cached response")
             result = self.response_cache.set(
                 event_id,
                 self._handle_request(request)
             )
+        else:
+            logger.warn("Returning cached response")
         return make_deferred_yieldable(result)
 
     @preserve_fn
