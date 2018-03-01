@@ -52,16 +52,12 @@ class MessageHandler(BaseHandler):
         self.pagination_lock = ReadWriteLock()
 
     @defer.inlineCallbacks
-    def purge_history(self, room_id, event_id, delete_local_events=False):
-        event = yield self.store.get_event(event_id)
-
-        if event.room_id != room_id:
-            raise SynapseError(400, "Event is for wrong room.")
-
-        depth = event.depth
-
+    def purge_history(self, room_id, topological_ordering,
+                      delete_local_events=False):
         with (yield self.pagination_lock.write(room_id)):
-            yield self.store.purge_history(room_id, depth, delete_local_events)
+            yield self.store.purge_history(
+                room_id, topological_ordering, delete_local_events,
+            )
 
     @defer.inlineCallbacks
     def get_messages(self, requester, room_id=None, pagin_config=None,

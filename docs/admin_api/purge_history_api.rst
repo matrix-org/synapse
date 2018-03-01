@@ -8,9 +8,9 @@ Depending on the amount of history being purged a call to the API may take
 several minutes or longer. During this period users will not be able to
 paginate further back in the room from the point being purged from.
 
-The API is simply:
+The API is:
 
-``POST /_matrix/client/r0/admin/purge_history/<room_id>/<event_id>``
+``POST /_matrix/client/r0/admin/purge_history/<room_id>[/<event_id>]``
 
 including an ``access_token`` of a server admin.
 
@@ -25,3 +25,10 @@ To delete local events as well, set ``delete_local_events`` in the body:
    {
        "delete_local_events": true
    }
+
+The caller must specify the point in the room to purge up to. This can be
+specified by including an event_id in the URI, or by setting a
+``purge_up_to_event_id`` or ``purge_up_to_ts`` in the request body. If an event
+id is given, that event (and others at the same graph depth) will be retained.
+If ``purge_up_to_ts`` is given, it should be a timestamp since the unix epoch,
+in milliseconds.
