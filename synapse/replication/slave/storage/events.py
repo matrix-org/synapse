@@ -16,7 +16,6 @@
 import logging
 
 from synapse.api.constants import EventTypes
-from synapse.storage import DataStore
 from synapse.storage.event_federation import EventFederationWorkerStore
 from synapse.storage.event_push_actions import EventPushActionsWorkerStore
 from synapse.storage.events_worker import EventsWorkerStore
