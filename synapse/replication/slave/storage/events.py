@@ -16,14 +16,13 @@
 import logging
 
 from synapse.api.constants import EventTypes
-from synapse.storage import DataStore
-from synapse.storage.event_federation import EventFederationStore
+from synapse.storage.event_federation import EventFederationWorkerStore
 from synapse.storage.event_push_actions import EventPushActionsWorkerStore
 from synapse.storage.events_worker import EventsWorkerStore
 from synapse.storage.roommember import RoomMemberWorkerStore
 from synapse.storage.state import StateGroupWorkerStore
 from synapse.storage.stream import StreamWorkerStore
-from synapse.storage.signatures import SignatureStore
+from synapse.storage.signatures import SignatureWorkerStore
 from ._base import BaseSlavedStore
 from ._slaved_id_tracker import SlavedIdTracker
 
@@ -39,8 +38,13 @@ logger = logging.getLogger(__name__)
 # the method descriptor on the DataStore and chuck them into our class.
 
 
-class SlavedEventStore(RoomMemberWorkerStore, EventPushActionsWorkerStore,
-                       StreamWorkerStore, EventsWorkerStore, StateGroupWorkerStore,
+class SlavedEventStore(EventFederationWorkerStore,
+                       RoomMemberWorkerStore,
+                       EventPushActionsWorkerStore,
+                       StreamWorkerStore,
+                       EventsWorkerStore,
+                       StateGroupWorkerStore,
+                       SignatureWorkerStore,
                        BaseSlavedStore):
 
     def __init__(self, db_conn, hs):
@@ -55,54 +59,12 @@ class SlavedEventStore(RoomMemberWorkerStore, EventPushActionsWorkerStore,
 
     # Cached functions can't be accessed through a class instance so we need
     # to reach inside the __dict__ to extract them.
-    get_latest_event_ids_in_room = EventFederationStore.__dict__[
-        "get_latest_event_ids_in_room"
-    ]
-
-    get_backfill_events = DataStore.get_backfill_events.__func__
-    _get_backfill_events = DataStore._get_backfill_events.__func__
-    get_missing_events = DataStore.get_missing_events.__func__
-    _get_missing_events = DataStore._get_missing_events.__func__
-
-    get_auth_chain = DataStore.get_auth_chain.__func__
-    get_auth_chain_ids = DataStore.get_auth_chain_ids.__func__
-    _get_auth_chain_ids_txn = DataStore._get_auth_chain_ids_txn.__func__
-
-    get_room_max_stream_ordering = DataStore.get_room_max_stream_ordering.__func__
-
-    get_forward_extremeties_for_room = (
-        DataStore.get_forward_extremeties_for_room.__func__
-    )
-    _get_forward_extremeties_for_room = (
-        EventFederationStore.__dict__["_get_forward_extremeties_for_room"]
-    )
-
-    get_all_new_events_stream = DataStore.get_all_new_events_stream.__func__
 
     def get_room_max_stream_ordering(self):
         return self._stream_id_gen.get_current_token()
 
     def get_room_min_stream_ordering(self):
         return self._backfill_id_gen.get_current_token()
-
-    get_latest_event_ids_and_hashes_in_room = (
-        DataStore.get_latest_event_ids_and_hashes_in_room.__func__
-    )
-    _get_latest_event_ids_and_hashes_in_room = (
-        DataStore._get_latest_event_ids_and_hashes_in_room.__func__
-    )
-    _get_event_reference_hashes_txn = (
-        DataStore._get_event_reference_hashes_txn.__func__
-    )
-    add_event_hashes = (
-        DataStore.add_event_hashes.__func__
-    )
-    get_event_reference_hashes = (
-        SignatureStore.__dict__["get_event_reference_hashes"]
-    )
-    get_event_reference_hash = (
-        SignatureStore.__dict__["get_event_reference_hash"]
-    )
 
     def stream_positions(self):
         result = super(SlavedEventStore, self).stream_positions()
