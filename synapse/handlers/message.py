@@ -583,6 +583,8 @@ class EventCreationHandler(object):
                     requester=requester,
                     event=event,
                     context=context,
+                    ratelimit=ratelimit,
+                    extra_users=extra_users,
                 )
                 return
 
