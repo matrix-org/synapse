@@ -299,10 +299,6 @@ def preserve_fn(f):
     Useful for wrapping functions that return a deferred which you don't yield
     on.
     """
-    def reset_context(result):
-        LoggingContext.set_current_context(LoggingContext.sentinel)
-        return result
-
     def g(*args, **kwargs):
         current = LoggingContext.current_context()
         res = f(*args, **kwargs)
@@ -323,12 +319,11 @@ def preserve_fn(f):
             # which is supposed to have a single entry and exit point. But
             # by spawning off another deferred, we are effectively
             # adding a new exit point.)
-            res.addBoth(reset_context)
+            res.addBoth(_set_context_cb, LoggingContext.sentinel)
         return res
     return g
 
 
-@defer.inlineCallbacks
 def make_deferred_yieldable(deferred):
     """Given a deferred, make it follow the Synapse logcontext rules:
 
@@ -342,9 +337,16 @@ def make_deferred_yieldable(deferred):
 
     (This is more-or-less the opposite operation to preserve_fn.)
     """
-    with PreserveLoggingContext():
-        r = yield deferred
-    defer.returnValue(r)
+    if isinstance(deferred, defer.Deferred) and not deferred.called:
+        prev_context = LoggingContext.set_current_context(LoggingContext.sentinel)
+        deferred.addBoth(_set_context_cb, prev_context)
+    return deferred
+
+
+def _set_context_cb(result, context):
+    """A callback function which just sets the logging context"""
+    LoggingContext.set_current_context(context)
+    return result
 
 
 # modules to ignore in `logcontext_tracer`
