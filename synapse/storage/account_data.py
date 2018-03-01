@@ -133,6 +133,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             for row in rows
         })
 
+    @cached(num_args=2)
     def get_account_data_for_room(self, user_id, room_id):
         """Get all the client account_data for a user for a room.
 
@@ -310,6 +311,7 @@ class AccountDataStore(AccountDataWorkerStore):
 
             self._account_data_stream_cache.entity_has_changed(user_id, next_id)
             self.get_account_data_for_user.invalidate((user_id,))
+            self.get_account_data_for_room.invalidate((user_id, room_id,))
 
         result = self._account_data_id_gen.get_current_token()
         defer.returnValue(result)
