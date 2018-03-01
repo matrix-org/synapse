@@ -45,6 +45,7 @@ from synapse.handlers.device import DeviceHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.room_list import RoomListHandler
+from synapse.handlers.room_member import RoomMemberHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import TypingHandler
@@ -145,6 +146,7 @@ class HomeServer(object):
         'groups_attestation_signing',
         'groups_attestation_renewer',
         'spam_checker',
+        'room_member_handler',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -381,6 +383,9 @@ class HomeServer(object):
 
     def build_spam_checker(self):
         return SpamChecker(self)
+
+    def build_room_member_handler(self):
+        return RoomMemberHandler(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
