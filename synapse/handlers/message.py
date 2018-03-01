@@ -574,8 +574,6 @@ class EventCreationHandler(object):
         )
 
         try:
-            # We now need to go and hit out to wherever we need to hit out to.
-
             # If we're a worker we need to hit out to the master.
             if self.config.worker_app:
                 yield send_event_to_master(
@@ -610,8 +608,10 @@ class EventCreationHandler(object):
         ratelimit=True,
         extra_users=[],
     ):
-        """Called when we have fully built and authed the event. This should
-        only be run on master.
+        """Called when we have fully built the event, and have already
+        calculated the push actions for the event.
+
+        This should only be run on master.
         """
         assert not self.config.worker_app
 
