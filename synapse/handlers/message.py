@@ -553,24 +553,21 @@ class EventCreationHandler(object):
         event,
         context,
         ratelimit=True,
-        extra_users=[]
+        extra_users=[],
     ):
-        # We now need to go and hit out to wherever we need to hit out to.
+        """Processes a new event. This includes checking auth, persisting it,
+        notifying users, sending to remote servers, etc.
 
-        # If we're a worker we need to hit out to the master.
-        if self.config.worker_app:
-            yield send_event_to_master(
-                self.http_client,
-                host=self.config.worker_replication_host,
-                port=self.config.worker_replication_http_port,
-                requester=requester,
-                event=event,
-                context=context,
-            )
-            return
+        If called from a worker will hit out to the master process for final
+        processing.
 
-        if ratelimit:
-            yield self.base_handler.ratelimit(requester)
+        Args:
+            requester (Requester)
+            event (FrozenEvent)
+            context (EventContext)
+            ratelimit (bool)
+            extra_users (list(str)): Any extra users to notify about event
+        """
 
         try:
             yield self.auth.check_from_context(event, context)
@@ -585,6 +582,57 @@ class EventCreationHandler(object):
         except Exception:
             logger.exception("Failed to encode content: %r", event.content)
             raise
+
+        yield self.action_generator.handle_push_actions_for_event(
+            event, context
+        )
+
+        try:
+            # If we're a worker we need to hit out to the master.
+            if self.config.worker_app:
+                yield send_event_to_master(
+                    self.http_client,
+                    host=self.config.worker_replication_host,
+                    port=self.config.worker_replication_http_port,
+                    requester=requester,
+                    event=event,
+                    context=context,
+                    ratelimit=ratelimit,
+                    extra_users=extra_users,
+                )
+                return
+
+            yield self.persist_and_notify_client_event(
+                requester,
+                event,
+                context,
+                ratelimit=ratelimit,
+                extra_users=extra_users,
+            )
+        except:  # noqa: E722, as we reraise the exception this is fine.
+            # Ensure that we actually remove the entries in the push actions
+            # staging area, if we calculated them.
+            preserve_fn(self.store.remove_push_actions_from_staging)(event.event_id)
+            raise
+
+    @defer.inlineCallbacks
+    def persist_and_notify_client_event(
+        self,
+        requester,
+        event,
+        context,
+        ratelimit=True,
+        extra_users=[],
+    ):
+        """Called when we have fully built the event, have already
+        calculated the push actions for the event, and checked auth.
+
+        This should only be run on master.
+        """
+        assert not self.config.worker_app
+
+        if ratelimit:
+            yield self.base_handler.ratelimit(requester)
 
         yield self.base_handler.maybe_kick_guest_users(event, context)
 
@@ -679,19 +727,9 @@ class EventCreationHandler(object):
                 "Changing the room create event is forbidden",
             )
 
-        yield self.action_generator.handle_push_actions_for_event(
-            event, context
+        (event_stream_id, max_stream_id) = yield self.store.persist_event(
+            event, context=context
         )
-
-        try:
-            (event_stream_id, max_stream_id) = yield self.store.persist_event(
-                event, context=context
-            )
-        except:  # noqa: E722, as we reraise the exception this is fine.
-            # Ensure that we actually remove the entries in the push actions
-            # staging area
-            preserve_fn(self.store.remove_push_actions_from_staging)(event.event_id)
-            raise
 
         # this intentionally does not yield: we don't care about the result
         # and don't need to wait for it.

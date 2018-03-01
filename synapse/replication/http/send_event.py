@@ -29,7 +29,8 @@ logger = logging.getLogger(__name__)
 
 
 @defer.inlineCallbacks
-def send_event_to_master(client, host, port, requester, event, context):
+def send_event_to_master(client, host, port, requester, event, context,
+                         ratelimit, extra_users):
     """Send event to be handled on the master
 
     Args:
@@ -39,6 +40,8 @@ def send_event_to_master(client, host, port, requester, event, context):
         requester (Requester)
         event (FrozenEvent)
         context (EventContext)
+        ratelimit (bool)
+        extra_users (list(str)): Any extra users to notify about event
     """
     uri = "http://%s:%s/_synapse/replication/send_event" % (host, port,)
 
@@ -48,6 +51,8 @@ def send_event_to_master(client, host, port, requester, event, context):
         "rejected_reason": event.rejected_reason,
         "context": context.serialize(event),
         "requester": requester.serialize(),
+        "ratelimit": ratelimit,
+        "extra_users": extra_users,
     }
 
     try:
@@ -74,6 +79,8 @@ class ReplicationSendEventRestServlet(RestServlet):
             "rejected_reason": ..,   // The event.rejected_reason field
             "context": { .. serialized event context .. },
             "requester": { .. serialized requester .. },
+            "ratelimit": true,
+            "extra_users": [],
         }
     """
     PATTERNS = [re.compile("^/_synapse/replication/send_event$")]
@@ -98,6 +105,9 @@ class ReplicationSendEventRestServlet(RestServlet):
             requester = Requester.deserialize(self.store, content["requester"])
             context = yield EventContext.deserialize(self.store, content["context"])
 
+            ratelimit = content["ratelimit"]
+            extra_users = content["extra_users"]
+
         if requester.user:
             request.authenticated_entity = requester.user.to_string()
 
@@ -106,8 +116,10 @@ class ReplicationSendEventRestServlet(RestServlet):
             event.event_id, event.room_id,
         )
 
-        yield self.event_creation_handler.handle_new_client_event(
+        yield self.event_creation_handler.persist_and_notify_client_event(
             requester, event, context,
+            ratelimit=ratelimit,
+            extra_users=extra_users,
         )
 
         defer.returnValue((200, {}))
