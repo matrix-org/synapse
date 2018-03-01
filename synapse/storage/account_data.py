@@ -159,14 +159,14 @@ class AccountDataWorkerStore(SQLBaseStore):
 
     @cached(num_args=3, max_entries=5000)
     def get_account_data_for_room_and_type(self, user_id, room_id, account_data_type):
-        """Get all the client account_data for a user for a room.
+        """Get the client account_data of given type for a user for a room.
 
         Args:
             user_id(str): The user to get the account_data for.
             room_id(str): The room to get the account_data for.
             account_data_type (str): The account data type to get.
         Returns:
-            A deferred dict of the room account_data for that type, or None if
+            A deferred of the room account_data for that type, or None if
             there isn't any set.
         """
         def get_account_data_for_room_and_type_txn(txn):
