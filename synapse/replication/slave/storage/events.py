@@ -67,7 +67,6 @@ class SlavedEventStore(RoomMemberWorkerStore, EventPushActionsWorkerStore,
             "MembershipStreamChangeCache", events_max,
         )
 
-        self.stream_ordering_month_ago = 0
         self._stream_order_on_start = self.get_room_max_stream_ordering()
 
     # Cached functions can't be accessed through a class instance so we need
