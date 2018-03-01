@@ -569,6 +569,20 @@ class EventCreationHandler(object):
             extra_users (list(str)): Any extra users to notify about event
         """
 
+        try:
+            yield self.auth.check_from_context(event, context)
+        except AuthError as err:
+            logger.warn("Denying new event %r because %s", event, err)
+            raise err
+
+        # Ensure that we can round trip before trying to persist in db
+        try:
+            dump = ujson.dumps(unfreeze(event.content))
+            ujson.loads(dump)
+        except Exception:
+            logger.exception("Failed to encode content: %r", event.content)
+            raise
+
         yield self.action_generator.handle_push_actions_for_event(
             event, context
         )
@@ -610,8 +624,8 @@ class EventCreationHandler(object):
         ratelimit=True,
         extra_users=[],
     ):
-        """Called when we have fully built the event, and have already
-        calculated the push actions for the event.
+        """Called when we have fully built the event, have already
+        calculated the push actions for the event, and checked auth.
 
         This should only be run on master.
         """
@@ -619,20 +633,6 @@ class EventCreationHandler(object):
 
         if ratelimit:
             yield self.base_handler.ratelimit(requester)
-
-        try:
-            yield self.auth.check_from_context(event, context)
-        except AuthError as err:
-            logger.warn("Denying new event %r because %s", event, err)
-            raise err
-
-        # Ensure that we can round trip before trying to persist in db
-        try:
-            dump = ujson.dumps(unfreeze(event.content))
-            ujson.loads(dump)
-        except Exception:
-            logger.exception("Failed to encode content: %r", event.content)
-            raise
 
         yield self.base_handler.maybe_kick_guest_users(event, context)
 
