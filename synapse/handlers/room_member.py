@@ -155,6 +155,30 @@ class RoomMemberHandler(object):
         yield user_joined_room(self.distributor, user, room_id)
 
     @defer.inlineCallbacks
+    def _remote_reject_invite(self, remote_room_hosts, room_id, target):
+        fed_handler = self.federation_handler
+        try:
+            ret = yield fed_handler.do_remotely_reject_invite(
+                remote_room_hosts,
+                room_id,
+                target.to_string(),
+            )
+            defer.returnValue(ret)
+        except Exception as e:
+            # if we were unable to reject the exception, just mark
+            # it as rejected on our end and plough ahead.
+            #
+            # The 'except' clause is very broad, but we need to
+            # capture everything from DNS failures upwards
+            #
+            logger.warn("Failed to reject invite: %s", e)
+
+            yield self.store.locally_reject_invite(
+                target.to_string(), room_id
+            )
+            defer.returnValue({})
+
+    @defer.inlineCallbacks
     def update_membership(
             self,
             requester,
@@ -328,28 +352,10 @@ class RoomMemberHandler(object):
                 else:
                     # send the rejection to the inviter's HS.
                     remote_room_hosts = remote_room_hosts + [inviter.domain]
-                    fed_handler = self.federation_handler
-                    try:
-                        ret = yield fed_handler.do_remotely_reject_invite(
-                            remote_room_hosts,
-                            room_id,
-                            target.to_string(),
-                        )
-                        defer.returnValue(ret)
-                    except Exception as e:
-                        # if we were unable to reject the exception, just mark
-                        # it as rejected on our end and plough ahead.
-                        #
-                        # The 'except' clause is very broad, but we need to
-                        # capture everything from DNS failures upwards
-                        #
-                        logger.warn("Failed to reject invite: %s", e)
-
-                        yield self.store.locally_reject_invite(
-                            target.to_string(), room_id
-                        )
-
-                        defer.returnValue({})
+                    res = yield self._remote_reject_invite(
+                        remote_room_hosts, room_id, target,
+                    )
+                    defer.returnValue(res)
 
         res = yield self._local_membership_update(
             requester=requester,
