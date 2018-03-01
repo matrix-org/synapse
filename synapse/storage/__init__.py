@@ -148,14 +148,6 @@ class DataStore(RoomMemberStore, RoomStore,
             stream_column="stream_ordering",
             max_value=events_max,
         )
-        self._events_stream_cache = StreamChangeCache(
-            "EventsRoomStreamChangeCache", min_event_val,
-            prefilled_cache=event_cache_prefill,
-        )
-
-        self._membership_stream_cache = StreamChangeCache(
-            "MembershipStreamChangeCache", events_max,
-        )
 
         self._presence_on_startup = self._get_active_presence(db_conn)
 
