@@ -43,12 +43,11 @@ class RoomMemberHandler(object):
     #   ought to be separated out a lot better.
 
     def __init__(self, hs):
+        self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.config = hs.config
-        self.is_mine = hs.is_mine
-        self.is_mine_id = hs.is_mine_id
         self.simple_http_client = hs.get_simple_http_client()
 
         self.federation_handler = hs.get_handlers().federation_handler
@@ -294,7 +293,7 @@ class RoomMemberHandler(object):
 
             if not is_host_in_room:
                 inviter = yield self.get_inviter(target.to_string(), room_id)
-                if inviter and not self.is_mine(inviter):
+                if inviter and not self.hs.is_mine(inviter):
                     remote_room_hosts.append(inviter.domain)
 
                 content["membership"] = Membership.JOIN
@@ -319,7 +318,7 @@ class RoomMemberHandler(object):
                 if not inviter:
                     raise SynapseError(404, "Not a known room")
 
-                if self.is_mine(inviter):
+                if self.hs.is_mine(inviter):
                     # the inviter was on our server, but has now left. Carry on
                     # with the normal rejection codepath.
                     #
@@ -401,7 +400,7 @@ class RoomMemberHandler(object):
                 "Sender (%s) must be same as requester (%s)" %
                 (sender, requester.user)
             )
-            assert self.is_mine(sender), "Sender must be our own: %s" % (sender,)
+            assert self.hs.is_mine(sender), "Sender must be our own: %s" % (sender,)
         else:
             requester = synapse.types.create_requester(target_user)
 
@@ -801,10 +800,10 @@ class RoomMemberHandler(object):
         # first member event?
         create_event_id = current_state_ids.get(("m.room.create", ""))
         if len(current_state_ids) == 1 and create_event_id:
-            defer.returnValue(self.is_mine_id(create_event_id))
+            defer.returnValue(self.hs.is_mine_id(create_event_id))
 
         for etype, state_key in current_state_ids:
-            if etype != EventTypes.Member or not self.is_mine_id(state_key):
+            if etype != EventTypes.Member or not self.hs.is_mine_id(state_key):
                 continue
 
             event_id = current_state_ids[(etype, state_key)]
