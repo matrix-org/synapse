@@ -573,7 +573,7 @@ class RoomMemberHandler(object):
             if "mxid" in data:
                 if "signatures" not in data:
                     raise AuthError(401, "No signatures on 3pid binding")
-                self.verify_any_signature(data, id_server)
+                yield self.verify_any_signature(data, id_server)
                 defer.returnValue(data["mxid"])
 
         except IOError as e:
