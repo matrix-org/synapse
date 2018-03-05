@@ -145,7 +145,6 @@ class DirectoryStore(DirectoryWorkerStore):
             room_alias,
         )
 
-        self.get_aliases_for_room.invalidate((room_id,))
         defer.returnValue(room_id)
 
     def _delete_room_alias_txn(self, txn, room_alias):
@@ -168,6 +167,10 @@ class DirectoryStore(DirectoryWorkerStore):
         txn.execute(
             "DELETE FROM room_alias_servers WHERE room_alias = ?",
             (room_alias.to_string(),)
+        )
+
+        self._invalidate_cache_and_stream(
+            txn, self.get_aliases_for_room, (room_id,)
         )
 
         return room_id
