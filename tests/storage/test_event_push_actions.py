@@ -172,7 +172,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
         self.assertEqual(r, 3,
                          "First event after 110ms should be 3, was %i" % r)
 
-        # 4 and 5 are both after 12: we want 4 rather than 5
+        # 4 and 5 are both after 120: we want 4 rather than 5
         r = yield self.store.find_first_stream_ordering_after_ts(120)
         self.assertEqual(r, 4,
                          "First event after 120ms should be 4, was %i" % r)
