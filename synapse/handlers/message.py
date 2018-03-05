@@ -261,6 +261,8 @@ class MessageHandler(BaseHandler):
 
         time_now = self.clock.time_msec()
 
+        logger.info("Returning event: %r", events)
+
         chunk = {
             "chunk": [
                 serialize_event(e, time_now, as_client_event)

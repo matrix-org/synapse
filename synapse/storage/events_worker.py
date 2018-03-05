@@ -16,7 +16,7 @@ from ._base import SQLBaseStore
 
 from twisted.internet import defer, reactor
 
-from synapse.events import FrozenEvent
+from synapse.events import CompactEvent
 from synapse.events.utils import prune_event
 
 from synapse.util.logcontext import (
@@ -69,7 +69,7 @@ class EventsWorkerStore(SQLBaseStore):
                 False throw an exception.
 
         Returns:
-            Deferred : A FrozenEvent.
+            Deferred : A CompactEvent.
         """
         events = yield self._get_events(
             [event_id],
@@ -354,7 +354,7 @@ class EventsWorkerStore(SQLBaseStore):
                     desc="_get_event_from_row_rejected_reason",
                 )
 
-            original_ev = FrozenEvent(
+            original_ev = CompactEvent(
                 d,
                 internal_metadata_dict=internal_metadata,
                 rejected_reason=rejected_reason,

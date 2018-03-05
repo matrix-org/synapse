@@ -18,7 +18,7 @@ from synapse.storage.events_worker import EventsWorkerStore
 
 from twisted.internet import defer
 
-from synapse.events import USE_FROZEN_DICTS
+from synapse.events import USE_FROZEN_DICTS, CompactEvent
 
 from synapse.util.async import ObservableDeferred
 from synapse.util.logcontext import (
@@ -1254,7 +1254,7 @@ class EventsStore(EventsWorkerStore):
                 event = ev_map[row["event_id"]]
                 if not row["rejects"] and not row["redacts"]:
                     to_prefill.append(_EventCacheEntry(
-                        event=event,
+                        event=CompactEvent.from_event(event),
                         redacted_event=None,
                     ))
 

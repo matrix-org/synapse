@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.frozenutils import freeze
-from synapse.util.caches import intern_dict
+from synapse.util.frozenutils import freeze, unfreeze
+from synapse.util.caches import intern_dict, intern_string
 
 import abc
+import simplejson as json
 
 
 # Whether we should use frozen_dict in FrozenEvent. Using frozen_dicts prevents
@@ -229,3 +230,200 @@ class FrozenEvent(EventBase):
             self.get("type", None),
             self.get("state_key", None),
         )
+
+
+def _compact_property(key):
+    def getter(self):
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(
+                "AttributeError: '%s' object has no attribute '%s'" % (
+                    self.__name__, key,
+                )
+            )
+
+    return property(getter)
+
+
+class _Unsigned(object):
+    __slots__ = [
+        "age_ts",
+        "replaces_state",
+        "redacted_because",
+        "invite_room_state",
+        "prev_content",
+        "prev_sender",
+        "redacted_by",
+    ]
+
+    def __init__(self, **kwargs):
+        for s in self.__slots__:
+            try:
+                setattr(self, s, kwargs[s])
+            except KeyError:
+                continue
+
+    def __getitem__(self, field):
+        try:
+            return getattr(self, field)
+        except AttributeError:
+            raise KeyError(field)
+
+    def __setitem__(self, field, value):
+        try:
+            setattr(self, field, value)
+        except AttributeError:
+            raise KeyError(field)
+
+    def __delitem__(self, field):
+        try:
+            return delattr(self, field)
+        except AttributeError:
+            raise KeyError(field)
+
+    def __contains__(self, field):
+        return hasattr(self, field)
+
+    def get(self, key, default=None):
+        return getattr(self, key, default)
+
+    def pop(self, key, default):
+        r = self.get(key, default)
+        try:
+            delattr(self, key)
+        except AttributeError:
+            pass
+        return r
+
+    def __iter__(self):
+        for key in self.__slots__:
+            if hasattr(self, key):
+                yield (key, getattr(self, key))
+
+
+class CompactEvent(EventBase):
+    __slots__ = [
+        "event_json",
+
+        "internal_metadata",
+        "rejected_reason",
+
+        "signatures",
+        "unsigned",
+
+        "event_id",
+        "room_id",
+        "type",
+        "state_key",
+        "sender",
+    ]
+
+    def __init__(self, event_dict, internal_metadata_dict={}, rejected_reason=None):
+        event_dict = dict(unfreeze(event_dict))
+
+        object.__setattr__(self, "unsigned", _Unsigned(**event_dict.pop("unsigned", {})))
+
+        signatures = {
+            intern_string(name): {
+                intern_string(sig_id): sig.encode("utf-8")
+                for sig_id, sig in sigs.iteritems()
+            }
+            for name, sigs in event_dict.pop("signatures", {}).iteritems()
+        }
+        object.__setattr__(self, "signatures", signatures)
+
+        object.__setattr__(self, "event_json", json.dumps(event_dict))
+
+        object.__setattr__(self, "rejected_reason", rejected_reason)
+        object.__setattr__(self, "internal_metadata", _EventInternalMetadata(
+            internal_metadata_dict
+        ))
+
+        object.__setattr__(self, "event_id", event_dict["event_id"])
+        object.__setattr__(self, "room_id", event_dict["room_id"])
+        object.__setattr__(self, "type", event_dict["type"])
+        if "state_key" in event_dict:
+            object.__setattr__(self, "state_key", event_dict["state_key"])
+        object.__setattr__(self, "sender", event_dict["sender"])
+
+    auth_events = _compact_property("auth_events")
+    depth = _compact_property("depth")
+    content = _compact_property("content")
+    hashes = _compact_property("hashes")
+    origin = _compact_property("origin")
+    origin_server_ts = _compact_property("origin_server_ts")
+    prev_events = _compact_property("prev_events")
+    prev_state = _compact_property("prev_state")
+    redacts = _compact_property("redacts")
+
+    @property
+    def user_id(self):
+        return self.sender
+
+    @property
+    def membership(self):
+        return self.content["membership"]
+
+    def is_state(self):
+        return hasattr(self, "state_key") and self.state_key is not None
+
+    def get_dict(self):
+        d = json.loads(self.event_json)
+        d.update({
+            "signatures": dict(self.signatures),
+            "unsigned": dict(self.unsigned),
+        })
+
+        return d
+
+    def get(self, key, default=None):
+        if key in self.__slots__:
+            return freeze(getattr(self, key, default))
+
+        d = json.loads(self.event_json)
+        return d.get(key, default)
+
+    def get_internal_metadata_dict(self):
+        return self.internal_metadata.get_dict()
+
+    def __getitem__(self, field):
+        if field in self.__slots__:
+            try:
+                return freeze(getattr(self, field))
+            except AttributeError:
+                raise KeyError(field)
+
+        d = json.loads(self.event_json)
+        return d[field]
+
+    def __contains__(self, field):
+        if field in self.__slots__:
+            return hasattr(self, field)
+
+        d = json.loads(self.event_json)
+        return field in d
+
+    @staticmethod
+    def from_event(event):
+        return CompactEvent(
+            event.get_pdu_json(),
+            event.get_internal_metadata_dict(),
+            event.rejected_reason,
+        )
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __repr__(self):
+        return "<CompactEvent event_id='%s', type='%s', state_key='%s'>" % (
+            self.get("event_id", None),
+            self.get("type", None),
+            self.get("state_key", None),
+        )
+
+    def iteritems(self):
+        return json.loads(self.event_json).iteritems()
+
+    def __eq__(self, other):
+        return self.event_id == other.event_id
