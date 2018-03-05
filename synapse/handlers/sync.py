@@ -1395,7 +1395,7 @@ class SyncHandler(object):
                 joined_room_ids.add(room_id)
                 continue
 
-            logger.info("SH joined_room_ids membership after current token")
+            logger.info("User joined room after current token: %s", room_id)
 
             extrems = yield self.store.get_forward_extremeties_for_room(
                 room_id, stream_ordering,
