@@ -489,6 +489,27 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             self.stream_ordering_day_ago
         )
 
+    def find_first_stream_ordering_after_ts(self, ts):
+        """Gets the stream ordering corresponding to a given timestamp.
+
+        Specifically, finds the stream_ordering of the first event that was
+        received after the timestamp. This is done by a binary search on the
+        events table, since there is no index on received_ts, so is
+        relatively slow.
+
+        Args:
+            ts (int): timestamp in millis
+
+        Returns:
+            Deferred[int]: stream ordering of the first event received after
+                the timestamp
+        """
+        return self.runInteraction(
+            "_find_first_stream_ordering_after_ts_txn",
+            self._find_first_stream_ordering_after_ts_txn,
+            ts,
+        )
+
     def _find_first_stream_ordering_after_ts_txn(self, txn, ts):
         """
         Find the stream_ordering of the first event that was received after
