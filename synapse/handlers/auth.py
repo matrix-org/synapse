@@ -863,8 +863,10 @@ class AuthHandler(BaseHandler):
         """
 
         def _do_validate_hash():
-            return bcrypt.hashpw(password.encode('utf8') + self.hs.config.password_pepper,
-                                 stored_hash.encode('utf8')) == stored_hash
+            return bcrypt.checkpw(
+                password.encode('utf8') + self.hs.config.password_pepper,
+                stored_hash.encode('utf8')
+            )
 
         if stored_hash:
             return make_deferred_yieldable(threads.deferToThread(_do_validate_hash))
