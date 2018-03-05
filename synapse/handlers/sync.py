@@ -1390,8 +1390,8 @@ class SyncHandler(object):
         # If the membership's stream ordering is after the given stream
         # ordering, we need to go and work out if the user was in the room
         # before.
-        for room_id, membeship_stream_ordering in joined_rooms:
-            if membeship_stream_ordering <= stream_ordering:
+        for room_id, membership_stream_ordering in joined_rooms:
+            if membership_stream_ordering <= stream_ordering:
                 joined_room_ids.add(room_id)
                 continue
 
