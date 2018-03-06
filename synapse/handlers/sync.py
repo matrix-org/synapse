@@ -998,8 +998,9 @@ class SyncHandler(object):
 
         app_service = self.store.get_app_service_by_user_id(user_id)
         if app_service:
-            rooms = yield self.store.get_app_service_rooms(app_service)
-            joined_room_ids = set(r.room_id for r in rooms)
+            # We no longer support AS users using /sync directly.
+            # See https://github.com/matrix-org/matrix-doc/issues/1144
+            raise NotImplementedError()
         else:
             joined_room_ids = yield self.store.get_rooms_for_user(user_id)
 
@@ -1030,8 +1031,9 @@ class SyncHandler(object):
 
         app_service = self.store.get_app_service_by_user_id(user_id)
         if app_service:
-            rooms = yield self.store.get_app_service_rooms(app_service)
-            joined_room_ids = set(r.room_id for r in rooms)
+            # We no longer support AS users using /sync directly.
+            # See https://github.com/matrix-org/matrix-doc/issues/1144
+            raise NotImplementedError()
         else:
             joined_room_ids = yield self.store.get_rooms_for_user(user_id)
 
