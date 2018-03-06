@@ -17,7 +17,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
-from synapse.api.errors import AuthError, SynapseError
+from synapse.api.errors import AuthError, SynapseError, Codes
 from synapse.types import UserID, create_requester
 from synapse.http.servlet import parse_json_object_from_request
 
@@ -114,12 +114,18 @@ class PurgeMediaCacheRestServlet(ClientV1RestServlet):
 
 class PurgeHistoryRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns(
-        "/admin/purge_history/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+        "/admin/purge_history/(?P<room_id>[^/]*)(/(?P<event_id>[^/]+))?"
     )
 
     def __init__(self, hs):
+        """
+
+        Args:
+            hs (synapse.server.HomeServer)
+        """
         super(PurgeHistoryRestServlet, self).__init__(hs)
         self.handlers = hs.get_handlers()
+        self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_id):
@@ -133,8 +139,54 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
 
         delete_local_events = bool(body.get("delete_local_events", False))
 
+        # establish the topological ordering we should keep events from. The
+        # user can provide an event_id in the URL or the request body, or can
+        # provide a timestamp in the request body.
+        if event_id is None:
+            event_id = body.get('purge_up_to_event_id')
+
+        if event_id is not None:
+            event = yield self.store.get_event(event_id)
+
+            if event.room_id != room_id:
+                raise SynapseError(400, "Event is for wrong room.")
+
+            depth = event.depth
+            logger.info(
+                "[purge] purging up to depth %i (event_id %s)",
+                depth, event_id,
+            )
+        elif 'purge_up_to_ts' in body:
+            ts = body['purge_up_to_ts']
+            if not isinstance(ts, int):
+                raise SynapseError(
+                    400, "purge_up_to_ts must be an int",
+                    errcode=Codes.BAD_JSON,
+                )
+
+            stream_ordering = (
+                yield self.store.find_first_stream_ordering_after_ts(ts)
+            )
+
+            (_, depth, _) = (
+                yield self.store.get_room_event_after_stream_ordering(
+                    room_id, stream_ordering,
+                )
+            )
+            logger.info(
+                "[purge] purging up to depth %i (received_ts %i => "
+                "stream_ordering %i)",
+                depth, ts, stream_ordering,
+            )
+        else:
+            raise SynapseError(
+                400,
+                "must specify purge_up_to_event_id or purge_up_to_ts",
+                errcode=Codes.BAD_JSON,
+            )
+
         yield self.handlers.message_handler.purge_history(
-            room_id, event_id,
+            room_id, depth,
             delete_local_events=delete_local_events,
         )
 
