@@ -50,14 +50,25 @@ class MessageHandler(BaseHandler):
         self.clock = hs.get_clock()
 
         self.pagination_lock = ReadWriteLock()
+        self._purges_in_progress_by_room = set()
 
     @defer.inlineCallbacks
     def purge_history(self, room_id, topological_ordering,
                       delete_local_events=False):
-        with (yield self.pagination_lock.write(room_id)):
-            yield self.store.purge_history(
-                room_id, topological_ordering, delete_local_events,
+        if room_id in self._purges_in_progress_by_room:
+            raise SynapseError(
+                400,
+                "History purge already in progress for %s" % (room_id, ),
             )
+
+        self._purges_in_progress_by_room.add(room_id)
+        try:
+            with (yield self.pagination_lock.write(room_id)):
+                yield self.store.purge_history(
+                    room_id, topological_ordering, delete_local_events,
+                )
+        finally:
+            self._purges_in_progress_by_room.discard(room_id)
 
     @defer.inlineCallbacks
     def get_messages(self, requester, room_id=None, pagin_config=None,
