@@ -163,7 +163,7 @@ class LoggingContext(object):
         current = self.set_current_context(self.previous_context)
         if current is not self:
             if current is self.sentinel:
-                logger.debug("Expected logging context %s has been lost", self)
+                logger.warn("Expected logging context %s has been lost", self)
             else:
                 logger.warn(
                     "Current logging context %s is not expected context %s",
@@ -278,7 +278,7 @@ class PreserveLoggingContext(object):
         context = LoggingContext.set_current_context(self.current_context)
 
         if context != self.new_context:
-            logger.debug(
+            logger.warn(
                 "Unexpected logging context: %s is not %s",
                 context, self.new_context,
             )
