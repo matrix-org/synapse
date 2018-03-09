@@ -60,6 +60,11 @@ response_count = metrics.register_counter(
     )
 )
 
+requests_counter = metrics.register_counter(
+    "requests_received",
+    labels=["method", "servlet", ],
+)
+
 outgoing_responses_counter = metrics.register_counter(
     "responses",
     labels=["method", "code"],
@@ -146,7 +151,8 @@ def wrap_request_handler(request_handler, include_metrics=False):
                 # at the servlet name. For most requests that name will be
                 # JsonResource (or a subclass), and JsonResource._async_render
                 # will update it once it picks a servlet.
-                request_metrics.start(self.clock, name=self.__class__.__name__)
+                servlet_name = self.__class__.__name__
+                request_metrics.start(self.clock, name=servlet_name)
 
                 request_context.request = request_id
                 with request.processing():
@@ -155,6 +161,7 @@ def wrap_request_handler(request_handler, include_metrics=False):
                             if include_metrics:
                                 yield request_handler(self, request, request_metrics)
                             else:
+                                requests_counter.inc(request.method, servlet_name)
                                 yield request_handler(self, request)
                     except CodeMessageException as e:
                         code = e.code
@@ -286,6 +293,7 @@ class JsonResource(HttpServer, resource.Resource):
             servlet_classname = "%r" % callback
 
         request_metrics.name = servlet_classname
+        requests_counter.inc(request.method, servlet_classname)
 
         # Now trigger the callback. If it returns a response, we send it
         # here. If it throws an exception, that is handled by the wrapper
@@ -342,7 +350,7 @@ class JsonResource(HttpServer, resource.Resource):
 
 
 def _options_handler(request):
-    return {}
+    return 200, {}
 
 
 def _unrecognised_request_handler(request):
