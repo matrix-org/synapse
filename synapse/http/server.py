@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -276,49 +277,54 @@ class JsonResource(HttpServer, resource.Resource):
             This checks if anyone has registered a callback for that method and
             path.
         """
+        callback, group_dict = self._get_handler_for_request(request)
+
+        servlet_instance = getattr(callback, "__self__", None)
+        if servlet_instance is not None:
+            servlet_classname = servlet_instance.__class__.__name__
+        else:
+            servlet_classname = "%r" % callback
+
+        request_metrics.name = servlet_classname
+
+        # Now trigger the callback. If it returns a response, we send it
+        # here. If it throws an exception, that is handled by the wrapper
+        # installed by @request_handler.
+
+        kwargs = intern_dict({
+            name: urllib.unquote(value).decode("UTF-8") if value else value
+            for name, value in group_dict.items()
+        })
+
+        callback_return = yield callback(request, **kwargs)
+        if callback_return is not None:
+            code, response = callback_return
+            self._send_response(request, code, response)
+
+    def _get_handler_for_request(self, request):
+        """Finds a callback method to handle the given request
+
+        Args:
+            request (twisted.web.http.Request):
+
+        Returns:
+            Tuple[Callable, dict[str, str]]: callback method, and the dict
+                mapping keys to path components as specified in the handler's
+                path match regexp
+        """
         if request.method == "OPTIONS":
-            self._send_response(request, 200, {})
-            return
+            return _options_handler, {}
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
         for path_entry in self.path_regexs.get(request.method, []):
             m = path_entry.pattern.match(request.path)
-            if not m:
-                continue
-
-            # We found a match! First update the metrics object to indicate
-            # which servlet is handling the request.
-
-            callback = path_entry.callback
-
-            servlet_instance = getattr(callback, "__self__", None)
-            if servlet_instance is not None:
-                servlet_classname = servlet_instance.__class__.__name__
-            else:
-                servlet_classname = "%r" % callback
-
-            request_metrics.name = servlet_classname
-
-            # Now trigger the callback. If it returns a response, we send it
-            # here. If it throws an exception, that is handled by the wrapper
-            # installed by @request_handler.
-
-            kwargs = intern_dict({
-                name: urllib.unquote(value).decode("UTF-8") if value else value
-                for name, value in m.groupdict().items()
-            })
-
-            callback_return = yield callback(request, **kwargs)
-            if callback_return is not None:
-                code, response = callback_return
-                self._send_response(request, code, response)
-
-            return
+            if m:
+                # We found a match!
+                return path_entry.callback, m.groupdict()
 
         # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
-        request_metrics.name = self.__class__.__name__ + ".UnrecognizedRequest"
-        raise UnrecognizedRequestError()
+        return _unrecognised_request_handler, {}
 
     def _send_response(self, request, code, response_json_object,
                        response_code_message=None):
@@ -333,6 +339,14 @@ class JsonResource(HttpServer, resource.Resource):
             version_string=self.version_string,
             canonical_json=self.canonical_json,
         )
+
+
+def _options_handler(request):
+    return {}
+
+
+def _unrecognised_request_handler(request):
+    raise UnrecognizedRequestError()
 
 
 class RequestMetrics(object):
