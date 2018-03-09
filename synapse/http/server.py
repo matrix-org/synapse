@@ -237,7 +237,7 @@ class JsonResource(HttpServer, resource.Resource):
     """ This implements the HttpServer interface and provides JSON support for
     Resources.
 
-    Register callbacks via register_path()
+    Register callbacks via register_paths()
 
     Callbacks can return a tuple of status code and a dict in which case the
     the dict will automatically be sent to the client as a JSON object.
@@ -318,7 +318,11 @@ class JsonResource(HttpServer, resource.Resource):
         Returns:
             Tuple[Callable, dict[str, str]]: callback method, and the dict
                 mapping keys to path components as specified in the handler's
-                path match regexp
+                path match regexp.
+
+                The callback will normally be a method registered via
+                register_paths, so will return (possibly via Deferred) either
+                None, or a tuple of (http code, response body).
         """
         if request.method == "OPTIONS":
             return _options_handler, {}
@@ -350,10 +354,30 @@ class JsonResource(HttpServer, resource.Resource):
 
 
 def _options_handler(request):
+    """Request handler for OPTIONS requests
+
+    This is a request handler suitable for return from
+    _get_handler_for_request. It returns a 200 and an empty body.
+
+    Args:
+        request (twisted.web.http.Request):
+
+    Returns:
+        Tuple[int, dict]: http code, response body.
+    """
     return 200, {}
 
 
 def _unrecognised_request_handler(request):
+    """Request handler for unrecognised requests
+
+    This is a request handler suitable for return from
+    _get_handler_for_request. It actually just raises an
+    UnrecognizedRequestError.
+
+    Args:
+        request (twisted.web.http.Request):
+    """
     raise UnrecognizedRequestError()
 
 
