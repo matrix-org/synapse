@@ -43,7 +43,7 @@ class TransportLayerServer(JsonResource):
         self.hs = hs
         self.clock = hs.get_clock()
 
-        super(TransportLayerServer, self).__init__(hs, canonical_json=False)
+        super(TransportLayerServer, self).__init__(hs)
 
         self.authenticator = Authenticator(hs)
         self.ratelimiter = FederationRateLimiter(
