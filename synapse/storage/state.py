@@ -198,8 +198,15 @@ class StateGroupWorkerStore(SQLBaseStore):
 
     def _get_state_groups_from_groups_txn(self, txn, groups, types=None):
         results = {group: {} for group in groups}
+
+        include_other_types = False
+
         if types is not None:
-            types = list(set(types))  # deduplicate types list
+            type_set = set(types)
+            if (None, None) in type_set:
+                include_other_types = True
+                type_set.remove((None, None))
+            types = list(type_set)  # deduplicate types list
 
         if isinstance(self.database_engine, PostgresEngine):
             # Temporarily disable sequential scans in this transaction. This is
@@ -238,11 +245,21 @@ class StateGroupWorkerStore(SQLBaseStore):
             if types:
                 clause_to_args = [
                     (
-                        "AND type = ? AND state_key = ?",
-                        (etype, state_key)
+                        "AND type = ? AND state_key = ?" if state_key is not None else "AND type = ?",
+                        (etype, state_key) if state_key is not None else (etype)
                     )
                     for etype, state_key in types
                 ]
+
+                if include_other_types:
+                    # XXX: check whether this slows postgres down like a list of
+                    # ORs does too?
+                    clause_to_args.append(
+                        (
+                            "AND type <> ? " * len(types),
+                            [t for (t, _) in types]
+                        )
+                    )
             else:
                 # If types is None we fetch all the state, and so just use an
                 # empty where clause with no extra args.
@@ -263,6 +280,10 @@ class StateGroupWorkerStore(SQLBaseStore):
                 where_clause = "AND (%s)" % (
                     " OR ".join(["(type = ? AND state_key = ?)"] * len(types)),
                 )
+                if include_other_types:
+                    where_clause += " AND (%s)" % (
+                        " AND ".join(["type <> ?"] * len(types)),
+                    )
             else:
                 where_clause = ""
 
@@ -449,17 +470,27 @@ class StateGroupWorkerStore(SQLBaseStore):
             group: The state group to lookup
             types (list): List of 2-tuples of the form (`type`, `state_key`),
                 where a `state_key` of `None` matches all state_keys for the
-                `type`.
+                `type`. Presence of type of `None` indicates that types not
+                in the list should not be filtered out.
         """
         is_all, known_absent, state_dict_ids = self._state_group_cache.get(group)
 
         type_to_key = {}
         missing_types = set()
 
+        include_other_types = False
+
         for typ, state_key in types:
             key = (typ, state_key)
+
+            if typ is None:
+                include_other_types = True
+                next
+
             if state_key is None:
                 type_to_key[typ] = None
+                # XXX: why do we mark the type as missing from our cache just
+                # because we weren't filtering on a specific value of state_key?
                 missing_types.add(key)
             else:
                 if type_to_key.get(typ, object()) is not None:
@@ -478,7 +509,7 @@ class StateGroupWorkerStore(SQLBaseStore):
                 return True
             if state_key in valid_state_keys:
                 return True
-            return False
+            return include_other_types
 
         got_all = is_all or not missing_types
 
@@ -507,6 +538,12 @@ class StateGroupWorkerStore(SQLBaseStore):
         with matching types. `types` is a list of `(type, state_key)`, where
         a `state_key` of None matches all state_keys. If `types` is None then
         all events are returned.
+
+        XXX: is it really true that `state_key` of None in `types` matches all
+        state_keys? it looks like _get-some_state_from_cache does the right thing,
+        but _get_state_groups_from_groups_txn treats ths None is turned into
+        'AND state_key = NULL' or similar (at least until i just fixed it) --Matthew
+        I've filed this as https://github.com/matrix-org/synapse/issues/2969
         """
         if types:
             types = frozenset(types)
