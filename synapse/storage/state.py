@@ -301,6 +301,8 @@ class StateGroupWorkerStore(SQLBaseStore):
                     args = [next_group]
                     if types:
                         args.extend(i for typ in types for i in typ)
+                        if include_other_types:
+                            args.extend(typ for (typ, _) in types)
 
                     txn.execute(
                         "SELECT type, state_key, event_id FROM state_groups_state"

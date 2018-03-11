@@ -471,13 +471,13 @@ class SyncHandler(object):
             if filter_members:
                 # We only request state for the members needed to display the
                 # timeline:
-                types = (
+                types = [
                     (EventTypes.Member, state_key)
                     for state_key in set(
                         event.sender  # FIXME: we also care about targets etc.
                         for event in batch.events
                     )
-                )
+                ]
                 types.append((None, None))  # don't just filter to room members
 
                 # TODO: we should opportunistically deduplicate these members too
