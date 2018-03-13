@@ -304,7 +304,7 @@ class StateGroupWorkerStore(SQLBaseStore):
                         if (typ, state_key) not in results[group]
                     )
 
-                    # If the number of entries inthe (type,state_key)->event_id dict
+                    # If the number of entries in the (type,state_key)->event_id dict
                     # matches the number of (type,state_keys) types we were searching
                     # for, then we must have found them all, so no need to go walk
                     # further down the tree... UNLESS our types filter contained
