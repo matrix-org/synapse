@@ -52,7 +52,7 @@ class ProfileTestCase(unittest.TestCase):
             handlers=None,
             resource_for_federation=Mock(),
             replication_client=self.mock_federation,
-            replication_server=Mock(),
+            federation_server=Mock(),
             federation_registry=self.mock_registry,
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
