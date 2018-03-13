@@ -139,6 +139,19 @@ class RoomMemberHandler(object):
 
     @defer.inlineCallbacks
     def remote_join(self, remote_room_hosts, room_id, user, content):
+        """Try and join a room that this server is not in
+
+        Args:
+            remote_room_hosts (list[str]): List of servers that can be used
+                to join via.
+            room_id (str): Room that we are trying to join
+            user (UserID): User who is trying to join
+            content (dict): A dict that should be used as the content of the
+                join event.
+
+        Returns:
+            Deferred
+        """
         if len(remote_room_hosts) == 0:
             raise SynapseError(404, "No known servers")
 
@@ -156,6 +169,19 @@ class RoomMemberHandler(object):
 
     @defer.inlineCallbacks
     def _remote_reject_invite(self, remote_room_hosts, room_id, target):
+        """Attempt to reject an invite for a room this server is not in. If we
+        fail to do so we locally mark the invite as rejected.
+
+        Args:
+            remote_room_hosts (list[str]): List of servers to use to try and
+                reject invite
+            room_id (str)
+            target (UserID): The user rejecting the invite
+
+        Returns:
+            Deferred[dict]: A dictionary to be returned to the client, may
+            include event_id etc, or nothing if we locally rejected
+        """
         fed_handler = self.federation_handler
         try:
             ret = yield fed_handler.do_remotely_reject_invite(
