@@ -51,7 +51,7 @@ class ProfileTestCase(unittest.TestCase):
             http_client=None,
             handlers=None,
             resource_for_federation=Mock(),
-            replication_client=self.mock_federation,
+            federation_client=self.mock_federation,
             federation_server=Mock(),
             federation_registry=self.mock_registry,
             ratelimiter=NonCallableMock(spec_set=[

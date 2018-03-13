@@ -101,7 +101,7 @@ class HomeServer(object):
     DEPENDENCIES = [
         'http_client',
         'db_pool',
-        'replication_client',
+        'federation_client',
         'federation_server',
         'handlers',
         'v1auth',
@@ -199,7 +199,7 @@ class HomeServer(object):
     def get_ratelimiter(self):
         return self.ratelimiter
 
-    def build_replication_client(self):
+    def build_federation_client(self):
         return FederationClient(self)
 
     def build_federation_server(self):
