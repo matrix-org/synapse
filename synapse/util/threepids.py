@@ -42,7 +42,10 @@ def check_3pid_allowed(hs, medium, address):
             ),
             {'medium': medium, 'address': address}
         )
-        defer.returnValue(data['hs_url'] + "/" == hs.config.public_baseurl)
+        if hs.config.allow_invited_3pids and data.get('invited'):
+            defer.returnValue(True)
+        else:
+            defer.returnValue(data['hs_url'] + "/" == hs.config.public_baseurl)
         return
 
     if hs.config.allowed_local_3pids:
