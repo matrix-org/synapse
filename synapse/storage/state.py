@@ -263,18 +263,16 @@ class StateGroupWorkerStore(SQLBaseStore):
                         results[group][key] = event_id
         else:
             where_args = []
+            where_clauses = []
             if types is not None:
-                where_clause = "AND ("
                 for typ in types:
                     if typ[1] is None:
-                        where_clause += "(type = ?)"
+                        where_clauses.append("(type = ?)")
                         where_args.extend(typ[0])
                     else:
-                        where_clause += "(type = ? AND state_key = ?)"
+                        where_clauses.append("(type = ? AND state_key = ?)")
                         where_args.extend([typ[0], typ[1]])
-                    if typ != types[-1]:
-                        where_clause += " OR "
-                where_clause += ")"
+                where_clause = "AND (%s)" % (" OR ".join(where_clauses))
             else:
                 where_clause = ""
 
