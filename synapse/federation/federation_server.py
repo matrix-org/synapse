@@ -581,7 +581,7 @@ class FederationHandlerRegistry(object):
 
         Args:
             edu_type (str): The type of the incoming EDU to register handler for
-            handler (Callable[str, dict]): A callable invoked on incoming EDU
+            handler (Callable[[str, dict]]): A callable invoked on incoming EDU
                 of the given type. The arguments are the origin server name and
                 the EDU contents.
         """
@@ -597,7 +597,7 @@ class FederationHandlerRegistry(object):
         Args:
             query_type (str): Category name of the query, which should match
                 the string used by make_query.
-            handler (Callable[dict] -> Deferred[dict]): Invoked to handle
+            handler (Callable[[dict], Deferred[dict]]): Invoked to handle
                 incoming queries of this type. The return will be yielded
                 on and the result used as the response to the query request.
         """
