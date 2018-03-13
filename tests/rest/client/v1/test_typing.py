@@ -47,7 +47,7 @@ class RoomTypingTestCase(RestTestCase):
             "red",
             clock=self.clock,
             http_client=None,
-            replication_layer=Mock(),
+            replication_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
