@@ -70,6 +70,7 @@ class RoomMemberHandler(object):
         """Try and join a room that this server is not in
 
         Args:
+            requester (Requester)
             remote_room_hosts (list[str]): List of servers that can be used
                 to join via.
             room_id (str): Room that we are trying to join
@@ -88,6 +89,7 @@ class RoomMemberHandler(object):
         fail to do so we locally mark the invite as rejected.
 
         Args:
+            requester (Requester)
             remote_room_hosts (list[str]): List of servers to use to try and
                 reject invite
             room_id (str)
@@ -105,6 +107,7 @@ class RoomMemberHandler(object):
         one doesn't already exist.
 
         Args:
+            requester (Requester)
             medium (str)
             address (str)
             inviter_user_id (str): The user ID who is trying to invite the
