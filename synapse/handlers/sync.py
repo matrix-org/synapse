@@ -542,7 +542,7 @@ class SyncHandler(object):
                 if filter_members:
                     member_state_ids = {
                         t: state_at_timeline_start[t]
-                        for t in state_ids if t[0] == EventTypes.Member
+                        for t in state_at_timeline_start if t[0] == EventTypes.Member
                     }
 
                 timeline_state = {
