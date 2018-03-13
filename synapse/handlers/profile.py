@@ -31,7 +31,7 @@ class ProfileHandler(BaseHandler):
     def __init__(self, hs):
         super(ProfileHandler, self).__init__(hs)
 
-        self.federation = hs.get_replication_client()
+        self.federation = hs.get_federation_client()
         hs.get_federation_registry().register_query_handler(
             "profile", self.on_profile_query
         )

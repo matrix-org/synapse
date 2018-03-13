@@ -348,7 +348,7 @@ def setup(config_options):
         hs.get_state_handler().start_caching()
         hs.get_datastore().start_profiling()
         hs.get_datastore().start_doing_background_updates()
-        hs.get_replication_client().start_get_pdu_cache()
+        hs.get_federation_client().start_get_pdu_cache()
 
         register_memory_metrics(hs)
 

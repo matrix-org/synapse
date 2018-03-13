@@ -47,7 +47,7 @@ class DirectoryTestCase(unittest.TestCase):
         hs = yield setup_test_homeserver(
             http_client=None,
             resource_for_federation=Mock(),
-            replication_client=self.mock_federation,
+            federation_client=self.mock_federation,
             federation_registry=self.mock_registry,
         )
         hs.handlers = DirectoryHandlers(hs)

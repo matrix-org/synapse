@@ -431,7 +431,7 @@ class DeviceListEduUpdater(object):
 
     def __init__(self, hs, device_handler):
         self.store = hs.get_datastore()
-        self.federation = hs.get_replication_client()
+        self.federation = hs.get_federation_client()
         self.clock = hs.get_clock()
         self.device_handler = device_handler
 
