@@ -116,6 +116,34 @@ class RoomMemberHandler(object):
         """
         raise NotImplementedError()
 
+    @abc.abstractmethod
+    def _user_joined_room(self, target, room_id):
+        """Notifies distributor on master process that the user has joined the
+        room.
+
+        Args:
+            target (UserID)
+            room_id (str)
+
+        Returns:
+            Deferred|None
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def _user_left_room(self, target, room_id):
+        """Notifies distributor on master process that the user has left the
+        room.
+
+        Args:
+            target (UserID)
+            room_id (str)
+
+        Returns:
+            Deferred|None
+        """
+        raise NotImplementedError()
+
     @defer.inlineCallbacks
     def _local_membership_update(
         self, requester, target, room_id, membership,
@@ -178,12 +206,12 @@ class RoomMemberHandler(object):
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
-                yield user_joined_room(self.distributor, target, room_id)
+                yield self._user_joined_room(target, room_id)
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
                 if prev_member_event.membership == Membership.JOIN:
-                    user_left_room(self.distributor, target, room_id)
+                    yield self._user_left_room(target, room_id)
 
         defer.returnValue(event)
 
@@ -460,12 +488,12 @@ class RoomMemberHandler(object):
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
-                yield user_joined_room(self.distributor, target_user, room_id)
+                yield self._user_joined_room(target_user, room_id)
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
                 if prev_member_event.membership == Membership.JOIN:
-                    user_left_room(self.distributor, target_user, room_id)
+                    yield self._user_left_room(target_user, room_id)
 
     @defer.inlineCallbacks
     def _can_guest_join(self, current_state_ids):
@@ -811,6 +839,13 @@ class RoomMemberHandler(object):
 
 
 class RoomMemberMasterHandler(RoomMemberHandler):
+    def __init__(self, hs):
+        super(RoomMemberMasterHandler, self).__init__(hs)
+
+        self.distributor = hs.get_distributor()
+        self.distributor.declare("user_joined_room")
+        self.distributor.declare("user_left_room")
+
     @defer.inlineCallbacks
     def _remote_join(self, remote_room_hosts, room_id, user, content):
         """Implements RoomMemberHandler._remote_join
@@ -828,7 +863,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             user.to_string(),
             content,
         )
-        yield user_joined_room(self.distributor, user, room_id)
+        yield self._user_joined_room(user, room_id)
 
     @defer.inlineCallbacks
     def _remote_reject_invite(self, remote_room_hosts, room_id, target):
@@ -861,6 +896,16 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         """
         rg = self.registration_handler
         return rg.get_or_register_3pid_guest(medium, address, inviter_user_id)
+
+    def _user_joined_room(self, target, room_id):
+        """Implements RoomMemberHandler._user_joined_room
+        """
+        return user_joined_room(self.distributor, target, room_id)
+
+    def _user_left_room(self, target, room_id):
+        """Implements RoomMemberHandler._user_left_room
+        """
+        return user_left_room(self.distributor, target, room_id)
 
     @defer.inlineCallbacks
     def forget(self, user, room_id):
