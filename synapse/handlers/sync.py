@@ -498,7 +498,7 @@ class SyncHandler(object):
                     if filter_members:
                         member_state_ids = {
                             t: state_ids[t]
-                            for t in state_ids if t[0] == EventTypes.member
+                            for t in state_ids if t[0] == EventTypes.Member
                         }
 
                 else:
@@ -511,7 +511,7 @@ class SyncHandler(object):
                     if filter_members:
                         member_state_ids = {
                             t: state_ids[t]
-                            for t in state_ids if t[0] == EventTypes.member
+                            for t in state_ids if t[0] == EventTypes.Member
                         }
 
                 timeline_state = {
@@ -542,7 +542,7 @@ class SyncHandler(object):
                 if filter_members:
                     member_state_ids = {
                         t: state_at_timeline_start[t]
-                        for t in state_ids if t[0] == EventTypes.member
+                        for t in state_ids if t[0] == EventTypes.Member
                     }
 
                 timeline_state = {

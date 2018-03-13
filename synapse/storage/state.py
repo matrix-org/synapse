@@ -257,10 +257,11 @@ class StateGroupWorkerStore(SQLBaseStore):
                 if include_other_types:
                     # XXX: check whether this slows postgres down like a list of
                     # ORs does too?
+                    unique_types = set([ t for (t, _) in types ])
                     clause_to_args.append(
                         (
-                            "AND type <> ? " * len(types),
-                            [t for (t, _) in types]
+                            "AND type <> ? " * len(unique_types),
+                            list(unique_types)
                         )
                     )
             else:
@@ -293,10 +294,11 @@ class StateGroupWorkerStore(SQLBaseStore):
                         where_args.extend([typ[0], typ[1]])
 
                 if include_other_types:
+                    unique_types = set([ t for (t, _) in types ])                    
                     where_clauses.append(
-                        "(" + " AND ".join(["type <> ?"] * len(types)) + ")"
+                        "(" + " AND ".join(["type <> ?"] * len(unique_types)) + ")"
                     )
-                    where_args.extend(t for (t, _) in types)
+                    where_args.extend(list(unique_types))
 
                 where_clause = "AND (%s)" % (" OR ".join(where_clauses))
             else:
