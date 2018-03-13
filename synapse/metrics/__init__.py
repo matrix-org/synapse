@@ -57,15 +57,31 @@ class Metrics(object):
         return metric
 
     def register_counter(self, *args, **kwargs):
+        """
+        Returns:
+            CounterMetric
+        """
         return self._register(CounterMetric, *args, **kwargs)
 
     def register_callback(self, *args, **kwargs):
+        """
+        Returns:
+            CallbackMetric
+        """
         return self._register(CallbackMetric, *args, **kwargs)
 
     def register_distribution(self, *args, **kwargs):
+        """
+        Returns:
+            DistributionMetric
+        """
         return self._register(DistributionMetric, *args, **kwargs)
 
     def register_cache(self, *args, **kwargs):
+        """
+        Returns:
+            CacheMetric
+        """
         return self._register(CacheMetric, *args, **kwargs)
 
 

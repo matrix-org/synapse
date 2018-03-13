@@ -17,7 +17,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
-from synapse.api.errors import AuthError, SynapseError, Codes
+from synapse.api.errors import AuthError, SynapseError, Codes, NotFoundError
 from synapse.types import UserID, create_requester
 from synapse.http.servlet import parse_json_object_from_request
 
@@ -185,12 +185,43 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
                 errcode=Codes.BAD_JSON,
             )
 
-        yield self.handlers.message_handler.purge_history(
+        purge_id = yield self.handlers.message_handler.start_purge_history(
             room_id, depth,
             delete_local_events=delete_local_events,
         )
 
-        defer.returnValue((200, {}))
+        defer.returnValue((200, {
+            "purge_id": purge_id,
+        }))
+
+
+class PurgeHistoryStatusRestServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns(
+        "/admin/purge_history_status/(?P<purge_id>[^/]+)"
+    )
+
+    def __init__(self, hs):
+        """
+
+        Args:
+            hs (synapse.server.HomeServer)
+        """
+        super(PurgeHistoryStatusRestServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, purge_id):
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+
+        purge_status = self.handlers.message_handler.get_purge_status(purge_id)
+        if purge_status is None:
+            raise NotFoundError("purge id '%s' not found" % purge_id)
+
+        defer.returnValue((200, purge_status.asdict()))
 
 
 class DeactivateAccountRestServlet(ClientV1RestServlet):
@@ -561,6 +592,7 @@ class SearchUsersRestServlet(ClientV1RestServlet):
 def register_servlets(hs, http_server):
     WhoisRestServlet(hs).register(http_server)
     PurgeMediaCacheRestServlet(hs).register(http_server)
+    PurgeHistoryStatusRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
     PurgeHistoryRestServlet(hs).register(http_server)
     UsersRestServlet(hs).register(http_server)

@@ -292,36 +292,41 @@ class PreserveLoggingContext(object):
 
 
 def preserve_fn(f):
-    """Wraps a function, to ensure that the current context is restored after
+    """Function decorator which wraps the function with run_in_background"""
+    def g(*args, **kwargs):
+        return run_in_background(f, *args, **kwargs)
+    return g
+
+
+def run_in_background(f, *args, **kwargs):
+    """Calls a function, ensuring that the current context is restored after
     return from the function, and that the sentinel context is set once the
     deferred returned by the funtion completes.
 
     Useful for wrapping functions that return a deferred which you don't yield
     on.
     """
-    def g(*args, **kwargs):
-        current = LoggingContext.current_context()
-        res = f(*args, **kwargs)
-        if isinstance(res, defer.Deferred) and not res.called:
-            # The function will have reset the context before returning, so
-            # we need to restore it now.
-            LoggingContext.set_current_context(current)
+    current = LoggingContext.current_context()
+    res = f(*args, **kwargs)
+    if isinstance(res, defer.Deferred) and not res.called:
+        # The function will have reset the context before returning, so
+        # we need to restore it now.
+        LoggingContext.set_current_context(current)
 
-            # The original context will be restored when the deferred
-            # completes, but there is nothing waiting for it, so it will
-            # get leaked into the reactor or some other function which
-            # wasn't expecting it. We therefore need to reset the context
-            # here.
-            #
-            # (If this feels asymmetric, consider it this way: we are
-            # effectively forking a new thread of execution. We are
-            # probably currently within a ``with LoggingContext()`` block,
-            # which is supposed to have a single entry and exit point. But
-            # by spawning off another deferred, we are effectively
-            # adding a new exit point.)
-            res.addBoth(_set_context_cb, LoggingContext.sentinel)
-        return res
-    return g
+        # The original context will be restored when the deferred
+        # completes, but there is nothing waiting for it, so it will
+        # get leaked into the reactor or some other function which
+        # wasn't expecting it. We therefore need to reset the context
+        # here.
+        #
+        # (If this feels asymmetric, consider it this way: we are
+        # effectively forking a new thread of execution. We are
+        # probably currently within a ``with LoggingContext()`` block,
+        # which is supposed to have a single entry and exit point. But
+        # by spawning off another deferred, we are effectively
+        # adding a new exit point.)
+        res.addBoth(_set_context_cb, LoggingContext.sentinel)
+    return res
 
 
 def make_deferred_yieldable(deferred):
