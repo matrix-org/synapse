@@ -23,6 +23,8 @@ from synapse.federation.federation_base import (
     FederationBase,
     event_from_pdu_json,
 )
+
+from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
 import synapse.metrics
 from synapse.types import get_domain_from_id
@@ -55,6 +57,10 @@ class FederationServer(FederationBase):
 
         self._server_linearizer = async.Linearizer("fed_server")
         self._transaction_linearizer = async.Linearizer("fed_txn_handler")
+
+        self.transaction_actions = TransactionActions(self.store)
+
+        self.handler = None
 
         self.registry = hs.get_federation_registry()
 
