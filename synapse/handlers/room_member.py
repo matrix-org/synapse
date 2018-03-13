@@ -138,6 +138,19 @@ class RoomMemberHandler(object):
 
     @defer.inlineCallbacks
     def _remote_join(self, remote_room_hosts, room_id, user, content):
+        """Try and join a room that this server is not in
+
+        Args:
+            remote_room_hosts (list[str]): List of servers that can be used
+                to join via.
+            room_id (str): Room that we are trying to join
+            user (UserID): User who is trying to join
+            content (dict): A dict that should be used as the content of the
+                join event.
+
+        Returns:
+            Deferred
+        """
         if len(remote_room_hosts) == 0:
             raise SynapseError(404, "No known servers")
 
@@ -152,6 +165,43 @@ class RoomMemberHandler(object):
             content,
         )
         yield user_joined_room(self.distributor, user, room_id)
+
+    @defer.inlineCallbacks
+    def _remote_reject_invite(self, remote_room_hosts, room_id, target):
+        """Attempt to reject an invite for a room this server is not in. If we
+        fail to do so we locally mark the invite as rejected.
+
+        Args:
+            remote_room_hosts (list[str]): List of servers to use to try and
+                reject invite
+            room_id (str)
+            target (UserID): The user rejecting the invite
+
+        Returns:
+            Deferred[dict]: A dictionary to be returned to the client, may
+            include event_id etc, or nothing if we locally rejected
+        """
+        fed_handler = self.federation_handler
+        try:
+            ret = yield fed_handler.do_remotely_reject_invite(
+                remote_room_hosts,
+                room_id,
+                target.to_string(),
+            )
+            defer.returnValue(ret)
+        except Exception as e:
+            # if we were unable to reject the exception, just mark
+            # it as rejected on our end and plough ahead.
+            #
+            # The 'except' clause is very broad, but we need to
+            # capture everything from DNS failures upwards
+            #
+            logger.warn("Failed to reject invite: %s", e)
+
+            yield self.store.locally_reject_invite(
+                target.to_string(), room_id
+            )
+            defer.returnValue({})
 
     @defer.inlineCallbacks
     def update_membership(
@@ -327,28 +377,10 @@ class RoomMemberHandler(object):
                 else:
                     # send the rejection to the inviter's HS.
                     remote_room_hosts = remote_room_hosts + [inviter.domain]
-                    fed_handler = self.federation_handler
-                    try:
-                        ret = yield fed_handler.do_remotely_reject_invite(
-                            remote_room_hosts,
-                            room_id,
-                            target.to_string(),
-                        )
-                        defer.returnValue(ret)
-                    except Exception as e:
-                        # if we were unable to reject the exception, just mark
-                        # it as rejected on our end and plough ahead.
-                        #
-                        # The 'except' clause is very broad, but we need to
-                        # capture everything from DNS failures upwards
-                        #
-                        logger.warn("Failed to reject invite: %s", e)
-
-                        yield self.store.locally_reject_invite(
-                            target.to_string(), room_id
-                        )
-
-                        defer.returnValue({})
+                    res = yield self._remote_reject_invite(
+                        remote_room_hosts, room_id, target,
+                    )
+                    defer.returnValue(res)
 
         res = yield self._local_membership_update(
             requester=requester,
