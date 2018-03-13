@@ -34,6 +34,7 @@ from synapse.events.builder import EventBuilderFactory
 from synapse.events.spamcheck import SpamChecker
 from synapse.federation import initialize_http_replication
 from synapse.federation.send_queue import FederationRemoteSendQueue
+from synapse.federation.federation_server import FederationHandlerRegistry
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.federation.transaction_queue import TransactionQueue
 from synapse.handlers import Handlers
@@ -147,6 +148,7 @@ class HomeServer(object):
         'groups_attestation_renewer',
         'spam_checker',
         'room_member_handler',
+        'federation_registry',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -386,6 +388,9 @@ class HomeServer(object):
 
     def build_room_member_handler(self):
         return RoomMemberHandler(self)
+
+    def build_federation_registry(self):
+        return FederationHandlerRegistry()
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
