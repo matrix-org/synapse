@@ -264,11 +264,13 @@ class StateGroupWorkerStore(SQLBaseStore):
         else:
             where_args = []
             where_clauses = []
+            wildcard_types = False
             if types is not None:
                 for typ in types:
                     if typ[1] is None:
                         where_clauses.append("(type = ?)")
                         where_args.extend(typ[0])
+                        wildcard_types = True
                     else:
                         where_clauses.append("(type = ? AND state_key = ?)")
                         where_args.extend([typ[0], typ[1]])
@@ -302,9 +304,17 @@ class StateGroupWorkerStore(SQLBaseStore):
                         if (typ, state_key) not in results[group]
                     )
 
-                    # If the lengths match then we must have all the types,
-                    # so no need to go walk further down the tree.
-                    if types is not None and len(results[group]) == len(types):
+                    # If the number of entries inthe (type,state_key)->event_id dict
+                    # matches the number of (type,state_keys) types we were searching
+                    # for, then we must have found them all, so no need to go walk
+                    # further down the tree... UNLESS our types filter contained
+                    # wildcards (i.e. Nones) in which case we have to do an exhaustive
+                    # search
+                    if (
+                        types is not None and
+                        not wildcard_types and
+                        len(results[group]) == len(types)
+                    ):
                         break
 
                     next_group = self._simple_select_one_onecol_txn(
