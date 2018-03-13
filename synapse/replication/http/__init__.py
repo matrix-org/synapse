@@ -15,6 +15,7 @@
 
 
 import send_event
+import membership
 
 from synapse.http.server import JsonResource
 
@@ -29,3 +30,4 @@ class ReplicationRestResource(JsonResource):
 
     def register_servlets(self, hs):
         send_event.register_servlets(hs, self)
+        membership.register_servlets(hs, self)
