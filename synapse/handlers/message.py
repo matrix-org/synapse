@@ -667,7 +667,7 @@ class EventCreationHandler(object):
             event (FrozenEvent)
             context (EventContext)
             ratelimit (bool)
-            extra_users (list(str)): Any extra users to notify about event
+            extra_users (list(UserID)): Any extra users to notify about event
         """
 
         try:
