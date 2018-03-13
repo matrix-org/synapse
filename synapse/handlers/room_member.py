@@ -735,20 +735,16 @@ class RoomMemberHandler(object):
         }
 
         if self.config.invite_3pid_guest:
-            registration_handler = self.registration_handler
-            guest_access_token = yield registration_handler.guest_access_token_for(
+            rh = self.registration_handler
+            guest_user_id, guest_access_token = yield rh.get_or_register_3pid_guest(
                 medium=medium,
                 address=address,
                 inviter_user_id=inviter_user_id,
             )
 
-            guest_user_info = yield self.auth.get_user_by_access_token(
-                guest_access_token
-            )
-
             invite_config.update({
                 "guest_access_token": guest_access_token,
-                "guest_user_id": guest_user_info["user"].to_string(),
+                "guest_user_id": guest_user_id,
             })
 
         data = yield self.simple_http_client.post_urlencoded_get_json(
