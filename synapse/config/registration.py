@@ -33,7 +33,9 @@ class RegistrationConfig(Config):
 
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
-        self.check_is_for_allowed_local_3pids = config.get("check_is_for_allowed_local_3pids", False)
+        self.check_is_for_allowed_local_3pids = config.get(
+            "check_is_for_allowed_local_3pids", False
+        )
         self.registration_shared_secret = config.get("registration_shared_secret")
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)

@@ -40,7 +40,7 @@ def check_3pid_allowed(hs, medium, address):
                 hs.config.check_is_for_allowed_local_3pids,
                 "/_matrix/identity/api/v1/discover_urls"
             ),
-            {'medium': medium, 'address': address }
+            {'medium': medium, 'address': address}
         )
         defer.returnValue(data['hs_url'] + "/" == hs.config.public_baseurl)
         return
