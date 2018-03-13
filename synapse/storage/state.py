@@ -561,12 +561,6 @@ class StateGroupWorkerStore(SQLBaseStore):
         with matching types. `types` is a list of `(type, state_key)`, where
         a `state_key` of None matches all state_keys. If `types` is None then
         all events are returned.
-
-        XXX: is it really true that `state_key` of None in `types` matches all
-        state_keys? it looks like _get-some_state_from_cache does the right thing,
-        but _get_state_groups_from_groups_txn treats ths None is turned into
-        'AND state_key = NULL' or similar (at least until i just fixed it) --Matthew
-        I've filed this as https://github.com/matrix-org/synapse/issues/2969
         """
         if types:
             types = frozenset(types)
