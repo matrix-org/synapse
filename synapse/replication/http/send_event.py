@@ -25,7 +25,7 @@ from synapse.util.async import sleep
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
 from synapse.util.metrics import Measure
-from synapse.types import Requester
+from synapse.types import Requester, UserID
 
 import logging
 import re
@@ -46,7 +46,7 @@ def send_event_to_master(client, host, port, requester, event, context,
         event (FrozenEvent)
         context (EventContext)
         ratelimit (bool)
-        extra_users (list(str)): Any extra users to notify about event
+        extra_users (list(UserID)): Any extra users to notify about event
     """
     uri = "http://%s:%s/_synapse/replication/send_event/%s" % (
         host, port, event.event_id,
@@ -59,7 +59,7 @@ def send_event_to_master(client, host, port, requester, event, context,
         "context": context.serialize(event),
         "requester": requester.serialize(),
         "ratelimit": ratelimit,
-        "extra_users": extra_users,
+        "extra_users": [u.to_string() for u in extra_users],
     }
 
     try:
@@ -143,7 +143,7 @@ class ReplicationSendEventRestServlet(RestServlet):
             context = yield EventContext.deserialize(self.store, content["context"])
 
             ratelimit = content["ratelimit"]
-            extra_users = content["extra_users"]
+            extra_users = [UserID.from_string(u) for u in content["extra_users"]]
 
         if requester.user:
             request.authenticated_entity = requester.user.to_string()
