@@ -47,7 +47,7 @@ from synapse.handlers.device import DeviceHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.room_list import RoomListHandler
-from synapse.handlers.room_member import RoomMemberHandler
+from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import TypingHandler
@@ -392,7 +392,9 @@ class HomeServer(object):
         return SpamChecker(self)
 
     def build_room_member_handler(self):
-        return RoomMemberHandler(self)
+        if self.config.worker_app:
+            raise Exception("Can't use RoomMemberHandler on workers")
+        return RoomMemberMasterHandler(self)
 
     def build_federation_registry(self):
         return FederationHandlerRegistry()
