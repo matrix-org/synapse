@@ -33,6 +33,7 @@ class RegistrationConfig(Config):
 
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
+        self.check_is_for_allowed_local_3pids = config.get("check_is_for_allowed_local_3pids", False)
         self.registration_shared_secret = config.get("registration_shared_secret")
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
@@ -63,6 +64,10 @@ class RegistrationConfig(Config):
         # Mandate that users are only allowed to associate certain formats of
         # 3PIDs with accounts on this server.
         #
+        # Use an Identity Server to establish which 3PIDs are allowed to register?
+        # Overrides allowed_local_3pids below.
+        # check_is_for_allowed_local_3pids: matrix.org
+        #
         # allowed_local_3pids:
         #     - medium: email
         #       pattern: ".*@matrix\\.org"
@@ -70,6 +75,7 @@ class RegistrationConfig(Config):
         #       pattern: ".*@vector\\.im"
         #     - medium: msisdn
         #       pattern: "\\+44"
+
 
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.
