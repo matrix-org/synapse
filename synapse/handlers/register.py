@@ -308,7 +308,7 @@ class RegistrationHandler(BaseHandler):
             logger.info("got threepid with medium '%s' and address '%s'",
                         threepid['medium'], threepid['address'])
 
-            if not check_3pid_allowed(self.hs, threepid['medium'], threepid['address']):
+            if not (yield check_3pid_allowed(self.hs, threepid['medium'], threepid['address'])):
                 raise RegistrationError(
                     403, "Third party identifier is not allowed"
                 )
