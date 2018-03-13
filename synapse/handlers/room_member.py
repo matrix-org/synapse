@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import abc
+import logging
+
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 from twisted.internet import defer
@@ -27,9 +30,6 @@ from synapse.api.errors import AuthError, SynapseError, Codes
 from synapse.types import UserID, RoomID
 from synapse.util.async import Linearizer
 from synapse.util.distributor import user_left_room, user_joined_room
-
-import abc
-import logging
 
 
 logger = logging.getLogger(__name__)
