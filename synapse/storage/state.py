@@ -240,10 +240,9 @@ class StateGroupWorkerStore(SQLBaseStore):
                     (
                         "AND type = ? AND state_key = ?",
                         (etype, state_key)
-                    ) if state_key is not None else
-                    (
+                    ) if state_key is not None else (
                         "AND type = ?",
-                        (etype)
+                        (etype,)
                     )
                     for etype, state_key in types
                 ]
