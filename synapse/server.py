@@ -388,7 +388,7 @@ class HomeServer(object):
 
     def build_room_member_handler(self):
         if self.config.worker_app:
-            return Exception("Can't use RoomMemberHandler on workers")
+            raise Exception("Can't use RoomMemberHandler on workers")
         return RoomMemberMasterHandler(self)
 
     def build_federation_registry(self):
