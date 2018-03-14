@@ -20,6 +20,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events.utils import serialize_event
+from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.types import (
     UserID, RoomAlias, RoomStreamToken,
@@ -665,7 +666,7 @@ class EventCreationHandler(object):
         Args:
             requester (Requester)
             event (FrozenEvent)
-            context (EventContext)
+            context (StatelessEventContext)
             ratelimit (bool)
             extra_users (list(UserID)): Any extra users to notify about event
         """
@@ -763,9 +764,18 @@ class EventCreationHandler(object):
                         e.sender == event.sender
                     )
 
+                # We get the current state at the event. If we have a full
+                # EventContext, use it, otherwise we hit the DB.
+                if isinstance(context, EventContext):
+                    current_state_ids = context.current_state_ids
+                else:
+                    current_state_ids = yield self.store.get_state_ids_for_group(
+                        context.state_group,
+                    )
+
                 state_to_include_ids = [
                     e_id
-                    for k, e_id in context.current_state_ids.iteritems()
+                    for k, e_id in current_state_ids.iteritems()
                     if k[0] in self.hs.config.room_invite_state_types
                     or k == (EventTypes.Member, event.sender)
                 ]
