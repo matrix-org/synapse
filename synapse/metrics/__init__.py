@@ -57,15 +57,31 @@ class Metrics(object):
         return metric
 
     def register_counter(self, *args, **kwargs):
+        """
+        Returns:
+            CounterMetric
+        """
         return self._register(CounterMetric, *args, **kwargs)
 
     def register_callback(self, *args, **kwargs):
+        """
+        Returns:
+            CallbackMetric
+        """
         return self._register(CallbackMetric, *args, **kwargs)
 
     def register_distribution(self, *args, **kwargs):
+        """
+        Returns:
+            DistributionMetric
+        """
         return self._register(DistributionMetric, *args, **kwargs)
 
     def register_cache(self, *args, **kwargs):
+        """
+        Returns:
+            CacheMetric
+        """
         return self._register(CacheMetric, *args, **kwargs)
 
 
@@ -146,10 +162,15 @@ def runUntilCurrentTimer(func):
             num_pending += 1
 
         num_pending += len(reactor.threadCallQueue)
-
         start = time.time() * 1000
         ret = func(*args, **kwargs)
         end = time.time() * 1000
+
+        # record the amount of wallclock time spent running pending calls.
+        # This is a proxy for the actual amount of time between reactor polls,
+        # since about 25% of time is actually spent running things triggered by
+        # I/O events, but that is harder to capture without rewriting half the
+        # reactor.
         tick_time.inc_by(end - start)
         pending_calls_metric.inc_by(num_pending)
 

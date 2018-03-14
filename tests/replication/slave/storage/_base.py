@@ -31,7 +31,7 @@ class BaseSlavedStoreTestCase(unittest.TestCase):
         self.hs = yield setup_test_homeserver(
             "blue",
             http_client=None,
-            replication_layer=Mock(),
+            federation_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),

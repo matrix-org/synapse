@@ -34,6 +34,9 @@ class HomeServer(object):
     def get_state_handler(self) -> synapse.state.StateHandler:
         pass
 
+    def get_state_resolution_handler(self) -> synapse.state.StateResolutionHandler:
+        pass
+
     def get_deactivate_account_handler(self) -> synapse.handlers.deactivate_account.DeactivateAccountHandler:
         pass
 

@@ -45,7 +45,7 @@ class ProfileTestCase(unittest.TestCase):
             http_client=None,
             resource_for_client=self.mock_resource,
             federation=Mock(),
-            replication_layer=Mock(),
+            federation_client=Mock(),
             profile_handler=self.mock_handler
         )
 
