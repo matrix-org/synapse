@@ -1,15 +1,16 @@
 Unreleased
 ==========
 
+
+
+Changes in synapse v0.27.0-rc1 (2018-03-14)
+===========================================
+
 synctl no longer starts the main synapse when using ``-a`` option with workers.
 A new worker file should be added with ``worker_app: synapse.app.homeserver``.
 
 This release also begins the process of renaming a number of the metrics
 reported to prometheus. See `docs/metrics-howto.rst <docs/metrics-howto.rst#block-and-response-metrics-renamed-for-0-27-0>`_.
-
-
-Changes in synapse v0.27.0-rc1 (2018-03-14)
-===========================================
 
 Features:
 * Add support for a remote media repository backed by S3 (PR 2867, 2777, 2783, 2789, 2791, 2804, 2812,2814, 2857, 2868, 2767)
@@ -27,7 +28,7 @@ Features:
 
 Changes:
 
-* Major refactor to move computation out of the main process and into a series of worker processes with a view to taking advantage of multicore machines. New workers are XXXXXX, (PR #2892, #2893, #2894, #2896, #2897, #2898, #2899, #2900, #2901, #2902, #2903, #2904, #2913, #2920, #2921, #2922, #2923, #2924, #2925, #2926, #2947, #2847, #2854, #2872, #2873, #2874, #2928, #2929, #2934, #2856)
+* Major refactor to move computation out of the main process and into a series of worker processes with a view to taking advantage of multicore machines. See more [here](https://github.com/matrix-org/synapse/blob/master/docs/workers.rst), (PR #2892-#2904, #2913, #2920 - #2926, #2947, #2847, #2854, #2872, #2873, #2874, #2928, #2929, #2934, #2856, #2976 - #2984, #2987 - #2989, #2991 - #2993, #2995)
 * Use StateResolutionHandler to resolve state in persist_events (PR #2864, #2871, #2802, #2835, #2836, #2841, #2842, #2849)
 * Adapt the default config to bind on both IPv4 and IPv6 on all platforms (PR #2435) Thanks to @silkeh!
 * Allow use of higher versions of saml2 (PR #2695) Thanks to @okurz!
@@ -64,11 +65,8 @@ Changes:
 * Factor run_in_background out from preserve_fn (PR #2961)
 * Add a metric which increments when a request is received (PR #2965)
 * Improve caching for read_marker API (PR #2927)
+* Add Measure block for persist_events (PR #2975)
  
-
-Synapse 0.27.0 begins the process of rationalising metric names. To enable a graceful migration path, this release just adds new names for the metrics being renamed. A future release will remove the old ones. For more info see [here](https://github.com/matrix-org/synapse/blob/develop/docs/metrics-howto.rst#block-and-response-metrics-renamed-for-0270)
-
-
 
 Bug fixes:
 
