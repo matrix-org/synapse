@@ -23,7 +23,7 @@ from synapse.api.errors import (
 )
 from synapse.http.client import CaptchaServerHttpClient
 from synapse import types
-from synapse.types import UserID
+from synapse.types import UserID, create_requester, RoomID, RoomAlias
 from synapse.util.async import run_on_reactor
 from synapse.util.threepids import check_3pid_allowed
 from ._base import BaseHandler
@@ -201,10 +201,17 @@ class RegistrationHandler(BaseHandler):
                     token = None
                     attempts += 1
 
+        # auto-join the user to any rooms we're supposed to dump them into
+        fake_requester = create_requester(user_id)
+        for r in self.hs.config.auto_join_rooms:
+            try:
+                yield self._join_user_to_room(fake_requester, r)
+            except Exception as e:
+                logger.error("Failed to join new user to %r: %r", r, e)
+
         # We used to generate default identicons here, but nowadays
         # we want clients to generate their own as part of their branding
         # rather than there being consistent matrix-wide ones, so we don't.
-
         defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
@@ -477,3 +484,28 @@ class RegistrationHandler(BaseHandler):
         )
 
         defer.returnValue((user_id, access_token))
+
+    @defer.inlineCallbacks
+    def _join_user_to_room(self, requester, room_identifier):
+        room_id = None
+        room_member_handler = self.hs.get_room_member_handler()
+        if RoomID.is_valid(room_identifier):
+            room_id = room_identifier
+        elif RoomAlias.is_valid(room_identifier):
+            room_alias = RoomAlias.from_string(room_identifier)
+            room_id, remote_room_hosts = (
+                yield room_member_handler.lookup_room_alias(room_alias)
+            )
+            room_id = room_id.to_string()
+        else:
+            raise SynapseError(400, "%s was not legal room ID or room alias" % (
+                room_identifier,
+            ))
+
+        yield room_member_handler.update_membership(
+            requester=requester,
+            target=requester.user,
+            room_id=room_id,
+            remote_room_hosts=remote_room_hosts,
+            action="join",
+        )
