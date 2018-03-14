@@ -14,10 +14,10 @@ Changes in synapse v0.27.0-rc1 (2018-03-14)
 Features:
 * Add support for a remote media repository backed by S3 (PR 2867, 2777, 2783, 2789, 2791, 2804, 2812,2814, 2857, 2868, 2767)
 * Add shiney new purge API. New implementation is:-
-  * Faster 
-  * Supports clearing by timestamp
-  * Supports deleting of local events
-  * Is transactional (PR #2858,2867,2882, 2946,2962,2943)
+ * Faster 
+ * Supports clearing by timestamp
+ * Supports deleting of local events
+ * Is transactional (PR #2858,2867,2882, 2946,2962,2943)
 
 * Let homeservers specify a whitelist for the format of 3PIDs that users are allowed to register with or add to their HS accounts. (PR #2813)
 * Add /room/{id}/event/{id} to synapse (PR #2766)
