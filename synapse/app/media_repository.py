@@ -158,7 +158,6 @@ def start(config_options):
     )
 
     ss.setup()
-    ss.get_handlers()
     ss.start_listening(config.worker_listeners)
 
     def start():

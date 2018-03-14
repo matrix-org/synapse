@@ -31,14 +31,20 @@ from synapse.replication.slave.storage.account_data import SlavedAccountDataStor
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
 from synapse.replication.slave.storage.devices import SlavedDeviceStore
+from synapse.replication.slave.storage.directory import DirectoryStore
 from synapse.replication.slave.storage.events import SlavedEventStore
+from synapse.replication.slave.storage.profile import SlavedProfileStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.pushers import SlavedPusherStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.room import RoomStore
+from synapse.replication.slave.storage.transactions import TransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
-from synapse.rest.client.v1.room import RoomSendEventRestServlet
+from synapse.rest.client.v1.room import (
+    RoomSendEventRestServlet, RoomMembershipRestServlet, RoomStateEventRestServlet,
+    JoinRoomAliasServlet,
+)
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.util.httpresourcetree import create_resource_tree
@@ -52,6 +58,9 @@ logger = logging.getLogger("synapse.app.event_creator")
 
 
 class EventCreatorSlavedStore(
+    DirectoryStore,
+    TransactionStore,
+    SlavedProfileStore,
     SlavedAccountDataStore,
     SlavedPusherStore,
     SlavedReceiptsStore,
@@ -85,6 +94,9 @@ class EventCreatorServer(HomeServer):
                 elif name == "client":
                     resource = JsonResource(self, canonical_json=False)
                     RoomSendEventRestServlet(self).register(resource)
+                    RoomMembershipRestServlet(self).register(resource)
+                    RoomStateEventRestServlet(self).register(resource)
+                    JoinRoomAliasServlet(self).register(resource)
                     resources.update({
                         "/_matrix/client/r0": resource,
                         "/_matrix/client/unstable": resource,
@@ -161,7 +173,6 @@ def start(config_options):
     )
 
     ss.setup()
-    ss.get_handlers()
     ss.start_listening(config.worker_listeners)
 
     def start():
