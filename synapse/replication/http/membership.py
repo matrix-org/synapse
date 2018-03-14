@@ -13,15 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+import re
+
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, MatrixCodeMessageException
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import Requester, UserID
 from synapse.util.distributor import user_left_room, user_joined_room
-
-import logging
-import re
 
 logger = logging.getLogger(__name__)
 

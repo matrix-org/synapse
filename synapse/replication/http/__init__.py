@@ -13,11 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import send_event
-import membership
-
 from synapse.http.server import JsonResource
+from synapse.replication.http import membership, send_event
 
 
 REPLICATION_PREFIX = "/_synapse/replication"
