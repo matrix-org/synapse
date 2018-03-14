@@ -31,8 +31,8 @@ class ProfileHandler(BaseHandler):
     def __init__(self, hs):
         super(ProfileHandler, self).__init__(hs)
 
-        self.federation = hs.get_replication_layer()
-        self.federation.register_query_handler(
+        self.federation = hs.get_federation_client()
+        hs.get_federation_registry().register_query_handler(
             "profile", self.on_profile_query
         )
 
@@ -233,7 +233,7 @@ class ProfileHandler(BaseHandler):
         )
 
         for room_id in room_ids:
-            handler = self.hs.get_handlers().room_member_handler
+            handler = self.hs.get_room_member_handler()
             try:
                 # Assume the target_user isn't a guest,
                 # because we don't let guests set profile or avatar data.

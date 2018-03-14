@@ -164,7 +164,8 @@ class ThumbnailResource(Resource):
 
         # Okay, so we generate one.
         file_path = yield self.media_repo.generate_local_exact_thumbnail(
-            media_id, desired_width, desired_height, desired_method, desired_type
+            media_id, desired_width, desired_height, desired_method, desired_type,
+            url_cache=media_info["url_cache"],
         )
 
         if file_path:

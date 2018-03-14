@@ -33,8 +33,16 @@ class WorkerConfig(Config):
         self.worker_pid_file = config.get("worker_pid_file")
         self.worker_log_file = config.get("worker_log_file")
         self.worker_log_config = config.get("worker_log_config")
+
+        # The host used to connect to the main synapse
         self.worker_replication_host = config.get("worker_replication_host", None)
+
+        # The port on the main synapse for TCP replication
         self.worker_replication_port = config.get("worker_replication_port", None)
+
+        # The port on the main synapse for HTTP replication endpoint
+        self.worker_replication_http_port = config.get("worker_replication_http_port")
+
         self.worker_name = config.get("worker_name", self.worker_app)
 
         self.worker_main_http_uri = config.get("worker_main_http_uri", None)

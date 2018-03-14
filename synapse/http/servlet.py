@@ -148,11 +148,13 @@ def parse_string_from_args(args, name, default=None, required=False,
             return default
 
 
-def parse_json_value_from_request(request):
+def parse_json_value_from_request(request, allow_empty_body=False):
     """Parse a JSON value from the body of a twisted HTTP request.
 
     Args:
         request: the twisted HTTP request.
+        allow_empty_body (bool): if True, an empty body will be accepted and
+            turned into None
 
     Returns:
         The JSON value.
@@ -165,6 +167,9 @@ def parse_json_value_from_request(request):
     except Exception:
         raise SynapseError(400, "Error reading JSON content.")
 
+    if not content_bytes and allow_empty_body:
+        return None
+
     try:
         content = simplejson.loads(content_bytes)
     except Exception as e:
@@ -174,17 +179,24 @@ def parse_json_value_from_request(request):
     return content
 
 
-def parse_json_object_from_request(request):
+def parse_json_object_from_request(request, allow_empty_body=False):
     """Parse a JSON object from the body of a twisted HTTP request.
 
     Args:
         request: the twisted HTTP request.
+        allow_empty_body (bool): if True, an empty body will be accepted and
+            turned into an empty dict.
 
     Raises:
         SynapseError if the request body couldn't be decoded as JSON or
             if it wasn't a JSON object.
     """
-    content = parse_json_value_from_request(request)
+    content = parse_json_value_from_request(
+        request, allow_empty_body=allow_empty_body,
+    )
+
+    if allow_empty_body and content is None:
+        return {}
 
     if type(content) != dict:
         message = "Content must be a JSON object."

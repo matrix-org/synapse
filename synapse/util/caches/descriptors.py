@@ -75,6 +75,7 @@ class Cache(object):
         self.cache = LruCache(
             max_size=max_entries, keylen=keylen, cache_type=cache_type,
             size_callback=(lambda d: len(d)) if iterable else None,
+            evicted_callback=self._on_evicted,
         )
 
         self.name = name
@@ -82,6 +83,9 @@ class Cache(object):
         self.sequence = 0
         self.thread = None
         self.metrics = register_cache(name, self.cache)
+
+    def _on_evicted(self, evicted_count):
+        self.metrics.inc_evictions(evicted_count)
 
     def check_thread(self):
         expected_thread = self.thread

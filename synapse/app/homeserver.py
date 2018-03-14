@@ -38,6 +38,7 @@ from synapse.metrics import register_memory_metrics
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
 from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, \
     check_requirements
+from synapse.replication.http import ReplicationRestResource, REPLICATION_PREFIX
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
 from synapse.rest.key.v1.server_key_resource import LocalKey
@@ -219,6 +220,9 @@ class SynapseHomeServer(HomeServer):
         if name == "metrics" and self.get_config().enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(self)
 
+        if name == "replication":
+            resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
+
         return resources
 
     def start_listening(self):
@@ -265,19 +269,6 @@ class SynapseHomeServer(HomeServer):
             database_engine.check_database(db_conn.cursor())
         except IncorrectDatabaseSetup as e:
             quit_with_error(e.message)
-
-    def get_db_conn(self, run_new_connection=True):
-        # Any param beginning with cp_ is a parameter for adbapi, and should
-        # not be passed to the database engine.
-        db_params = {
-            k: v for k, v in self.db_config.get("args", {}).items()
-            if not k.startswith("cp_")
-        }
-        db_conn = self.database_engine.module.connect(**db_params)
-
-        if run_new_connection:
-            self.database_engine.on_new_connection(db_conn)
-        return db_conn
 
 
 def setup(config_options):
@@ -357,7 +348,7 @@ def setup(config_options):
         hs.get_state_handler().start_caching()
         hs.get_datastore().start_profiling()
         hs.get_datastore().start_doing_background_updates()
-        hs.get_replication_layer().start_get_pdu_cache()
+        hs.get_federation_client().start_get_pdu_cache()
 
         register_memory_metrics(hs)
 

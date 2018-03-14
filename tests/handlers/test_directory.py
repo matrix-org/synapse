@@ -35,21 +35,20 @@ class DirectoryTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        self.mock_federation = Mock(spec=[
-            "make_query",
-            "register_edu_handler",
-        ])
+        self.mock_federation = Mock()
+        self.mock_registry = Mock()
 
         self.query_handlers = {}
 
         def register_query_handler(query_type, handler):
             self.query_handlers[query_type] = handler
-        self.mock_federation.register_query_handler = register_query_handler
+        self.mock_registry.register_query_handler = register_query_handler
 
         hs = yield setup_test_homeserver(
             http_client=None,
             resource_for_federation=Mock(),
-            replication_layer=self.mock_federation,
+            federation_client=self.mock_federation,
+            federation_registry=self.mock_registry,
         )
         hs.handlers = DirectoryHandlers(hs)
 

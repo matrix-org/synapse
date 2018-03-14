@@ -46,7 +46,7 @@ class RoomPermissionsTestCase(RestTestCase):
         hs = yield setup_test_homeserver(
             "red",
             http_client=None,
-            replication_layer=Mock(),
+            federation_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.ratelimiter = hs.get_ratelimiter()
@@ -409,7 +409,7 @@ class RoomsMemberListTestCase(RestTestCase):
         hs = yield setup_test_homeserver(
             "red",
             http_client=None,
-            replication_layer=Mock(),
+            federation_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.ratelimiter = hs.get_ratelimiter()
@@ -493,7 +493,7 @@ class RoomsCreateTestCase(RestTestCase):
         hs = yield setup_test_homeserver(
             "red",
             http_client=None,
-            replication_layer=Mock(),
+            federation_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.ratelimiter = hs.get_ratelimiter()
@@ -582,7 +582,7 @@ class RoomTopicTestCase(RestTestCase):
         hs = yield setup_test_homeserver(
             "red",
             http_client=None,
-            replication_layer=Mock(),
+            federation_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.ratelimiter = hs.get_ratelimiter()
@@ -697,7 +697,7 @@ class RoomMemberStateTestCase(RestTestCase):
         hs = yield setup_test_homeserver(
             "red",
             http_client=None,
-            replication_layer=Mock(),
+            federation_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.ratelimiter = hs.get_ratelimiter()
@@ -829,7 +829,7 @@ class RoomMessagesTestCase(RestTestCase):
         hs = yield setup_test_homeserver(
             "red",
             http_client=None,
-            replication_layer=Mock(),
+            federation_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.ratelimiter = hs.get_ratelimiter()
@@ -929,7 +929,7 @@ class RoomInitialSyncTestCase(RestTestCase):
         hs = yield setup_test_homeserver(
             "red",
             http_client=None,
-            replication_layer=Mock(),
+            federation_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
@@ -1003,7 +1003,7 @@ class RoomMessageListTestCase(RestTestCase):
         hs = yield setup_test_homeserver(
             "red",
             http_client=None,
-            replication_layer=Mock(),
+            federation_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.ratelimiter = hs.get_ratelimiter()
