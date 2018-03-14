@@ -370,7 +370,7 @@ class RoomMemberHandler(object):
                     content["kind"] = "guest"
 
                 ret = yield self._remote_join(
-                    remote_room_hosts, room_id, target, content
+                    requester, remote_room_hosts, room_id, target, content
                 )
                 defer.returnValue(ret)
 
@@ -392,7 +392,7 @@ class RoomMemberHandler(object):
                     # send the rejection to the inviter's HS.
                     remote_room_hosts = remote_room_hosts + [inviter.domain]
                     res = yield self._remote_reject_invite(
-                        remote_room_hosts, room_id, target,
+                        requester, remote_room_hosts, room_id, target,
                     )
                     defer.returnValue(res)
 
@@ -849,7 +849,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         self.distributor.declare("user_left_room")
 
     @defer.inlineCallbacks
-    def _remote_join(self, remote_room_hosts, room_id, user, content):
+    def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
         """Implements RoomMemberHandler._remote_join
         """
         if len(remote_room_hosts) == 0:
@@ -868,7 +868,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         yield self._user_joined_room(user, room_id)
 
     @defer.inlineCallbacks
-    def _remote_reject_invite(self, remote_room_hosts, room_id, target):
+    def _remote_reject_invite(self, requester, remote_room_hosts, room_id, target):
         """Implements RoomMemberHandler._remote_reject_invite
         """
         fed_handler = self.federation_handler
