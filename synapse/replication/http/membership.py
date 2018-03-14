@@ -154,7 +154,7 @@ def notify_user_membership_change(client, host, port, user_id, room_id, change):
     Returns:
         Deferred
     """
-    assert change in ("join", "left")
+    assert change in ("joined", "left")
 
     uri = "http://%s:%s/_synapse/replication/user_%s_room" % (host, port, change)
 
@@ -297,7 +297,7 @@ class ReplicationRegister3PIDGuestRestServlet(RestServlet):
 
 
 class ReplicationUserJoinedLeftRoomRestServlet(RestServlet):
-    PATTERNS = [re.compile("^/_synapse/replication/user_(?P<change>join|left)_room$")]
+    PATTERNS = [re.compile("^/_synapse/replication/user_(?P<change>joined|left)_room$")]
 
     def __init__(self, hs):
         super(ReplicationUserJoinedLeftRoomRestServlet, self).__init__()
@@ -317,7 +317,7 @@ class ReplicationUserJoinedLeftRoomRestServlet(RestServlet):
 
         user = UserID.from_string(user_id)
 
-        if change == "join":
+        if change == "joined":
             user_joined_room(self.distributor, user, room_id)
         elif change == "left":
             user_left_room(self.distributor, user, room_id)

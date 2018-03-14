@@ -73,7 +73,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
             port=self.config.worker_replication_http_port,
             user_id=target.to_string(),
             room_id=room_id,
-            change="join",
+            change="joined",
         )
 
     def _user_left_room(self, target, room_id):
