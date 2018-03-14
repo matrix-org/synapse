@@ -34,7 +34,7 @@ class RegistrationConfig(Config):
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
         self.check_is_for_allowed_local_3pids = config.get(
-            "check_is_for_allowed_local_3pids", False
+            "check_is_for_allowed_local_3pids", None
         )
         self.allow_invited_3pids = config.get("allow_invited_3pids", False)
         self.registration_shared_secret = config.get("registration_shared_secret")
@@ -84,7 +84,6 @@ class RegistrationConfig(Config):
         #       pattern: ".*@vector\\.im"
         #     - medium: msisdn
         #       pattern: "\\+44"
-
 
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.

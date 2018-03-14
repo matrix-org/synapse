@@ -38,15 +38,14 @@ def check_3pid_allowed(hs, medium, address):
         data = yield hs.get_simple_http_client().get_json(
             "https://%s%s" % (
                 hs.config.check_is_for_allowed_local_3pids,
-                "/_matrix/identity/api/v1/discover_urls"
+                "/_matrix/identity/api/v1/info"
             ),
             {'medium': medium, 'address': address}
         )
         if hs.config.allow_invited_3pids and data.get('invited'):
             defer.returnValue(True)
         else:
-            defer.returnValue(data['hs_url'] + "/" == hs.config.public_baseurl)
-        return
+            defer.returnValue(data['hs'] == hs.config.server_name)
 
     if hs.config.allowed_local_3pids:
         for constraint in hs.config.allowed_local_3pids:
@@ -59,10 +58,7 @@ def check_3pid_allowed(hs, medium, address):
                 re.match(constraint['pattern'], address)
             ):
                 defer.returnValue(True)
-                return
     else:
         defer.returnValue(True)
-        return
 
     defer.returnValue(False)
-    return
