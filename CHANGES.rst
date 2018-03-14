@@ -12,66 +12,58 @@ Changes in synapse v0.27.0-rc1 (2018-03-14)
 ===========================================
 
 Features:
- * Add support for a remote media repository backed by S3 (PR 2867, 2777, 2783, 2789, 2791, 2804, 2812,2814, 2857, 2868, 2767)
- * Add shiney new purge API. New implementation is:-
+* Add support for a remote media repository backed by S3 (PR 2867, 2777, 2783, 2789, 2791, 2804, 2812,2814, 2857, 2868, 2767)
+* Add shiney new purge API. New implementation is:-
   * Faster 
   * Supports clearing by timestamp
   * Supports deleting of local events
-  * Is transactional 
-(PR #2858,2867,2882, 2946,2962,2943)
+  * Is transactional (PR #2858,2867,2882, 2946,2962,2943)
 
- * Let homeservers specify a whitelist for the format of 3PIDs that users are allowed to register with or add to their HS accounts. (PR #2813)
- * Add /room/{id}/event/{id} to synapse (PR #2766)
- * Add an admin route to get all the media in a room (PR #2818) Thanks to @turt2live!
- * Add federation_domain_whitelist option (PR #2820,2821)
+* Let homeservers specify a whitelist for the format of 3PIDs that users are allowed to register with or add to their HS accounts. (PR #2813)
+* Add /room/{id}/event/{id} to synapse (PR #2766)
+* Add an admin route to get all the media in a room (PR #2818) Thanks to @turt2live!
+* Add federation_domain_whitelist option (PR #2820,2821)
 
 
 Changes:
 
- * Major refactor to move computation out of the main process and into a series of worker processes with a view to taking advantage of multicore machines. New workers are:-
-   * Event Creation
-   * Push Actions
-
-With more to follow
-
- (PR #2892, #2893, #2894, #2896, #2897, #2898, #2899, #2900, #2901, #2902, #2903, #2904, #2913, #2920, #2921, #2922, #2923, #2924, #2925, #2926, #2947, #2847, #2854, #2872, #2873, #2874, #2928, #2929, #2934, #2856)
-
- * Use StateResolutionHandler to resolve state in persist_events (PR #2864, #2871, #2802, #2835, #2836, #2841, #2842, #2849)
- * Adapt the default config to bind on both IPv4 and IPv6 on all platforms (PR #2435) Thanks to @silkeh!
- * Allow use of higher versions of saml2 (PR #2695) Thanks to @okurz!
- * Better logging when login can't find a 3pid (PR #2744)
- * add ?ts massaging for ASes (PR #2754)
- * Remove 'verbosity'/'log_file' from generated cfg (PR #2755)
- * Make indentation of generated log config consistent (PR #2762)
- * Remove dead code related to default thumbnails (PR #2764)
- * Update http request metrics before calling servlet (PR #2770)
- * Do bcrypt hashing in a background thread (PR #2773)
- * When using synctl with workers, don't start the main synapse automatically (PR #2774)
- * Make Counter render floats (PR #2778)
- * Store state groups separately from events (PR #2784)
- * Reorganise request and block metrics (PR #2785)
- * Metrics for number of RDATA commands received (PR #2786)
- * Metrics for events processed in appservice and fed sender (PR #2787)
- * Optimise LoggingContext creation and copying (PR #2792)
- * Track db txn time in millisecs (PR #2793)
- * Track DB scheduling delay per-request (PR #2794, #2795)
- * Sanity checking for user ids (PR #2797)
- * better exception logging in callbackmetrics (PR #2809)
- * Fix bugs in block metrics (PR #2810)
- * Add some comments about the reactor tick time metric (PR #2816)
- * Use a connection pool for the SimpleHttpClient (PR #2817)
- * Remove unused/bitrotted MemoryDataStore (PR #2828)
- * Make it possible to run tests against postgres (PR #2829)
- * Factor out get_db_conn to HomeServer base class (PR #2830)
- * Logging and metrics for the http pusher (PR #2833)
- * Improve exception handling in persist_event (PR #2834)
- * montoring metrics for number of cache evictions (PR #2844)
- * Update pynacl dependency to 1.2.1 or higher (PR #2888) Thanks to @bachp!
- * Remove ability for AS users to call /events and /sync (PR #2948)
- * use bcrypt.checkpw (PR #2949) Thanks to @krombel!
- * Factor run_in_background out from preserve_fn (PR #2961)
- * Add a metric which increments when a request is received (PR #2965)
- * Improve caching for read_marker API (PR #2927)
+* Major refactor to move computation out of the main process and into a series of worker processes with a view to taking advantage of multicore machines. New workers are XXXXXX, (PR #2892, #2893, #2894, #2896, #2897, #2898, #2899, #2900, #2901, #2902, #2903, #2904, #2913, #2920, #2921, #2922, #2923, #2924, #2925, #2926, #2947, #2847, #2854, #2872, #2873, #2874, #2928, #2929, #2934, #2856)
+* Use StateResolutionHandler to resolve state in persist_events (PR #2864, #2871, #2802, #2835, #2836, #2841, #2842, #2849)
+* Adapt the default config to bind on both IPv4 and IPv6 on all platforms (PR #2435) Thanks to @silkeh!
+* Allow use of higher versions of saml2 (PR #2695) Thanks to @okurz!
+* Better logging when login can't find a 3pid (PR #2744)
+* add ?ts massaging for ASes (PR #2754)
+* Remove 'verbosity'/'log_file' from generated cfg (PR #2755)
+* Make indentation of generated log config consistent (PR #2762)
+* Remove dead code related to default thumbnails (PR #2764)
+* Update http request metrics before calling servlet (PR #2770)
+* Do bcrypt hashing in a background thread (PR #2773)
+* When using synctl with workers, don't start the main synapse automatically (PR #2774)
+* Make Counter render floats (PR #2778)
+* Store state groups separately from events (PR #2784)
+* Reorganise request and block metrics (PR #2785)
+* Metrics for number of RDATA commands received (PR #2786)
+* Metrics for events processed in appservice and fed sender (PR #2787)
+* Optimise LoggingContext creation and copying (PR #2792)
+* Track db txn time in millisecs (PR #2793)
+* Track DB scheduling delay per-request (PR #2794, #2795)
+* Sanity checking for user ids (PR #2797)
+* better exception logging in callbackmetrics (PR #2809)
+* Fix bugs in block metrics (PR #2810)
+* Add some comments about the reactor tick time metric (PR #2816)
+* Use a connection pool for the SimpleHttpClient (PR #2817)
+* Remove unused/bitrotted MemoryDataStore (PR #2828)
+* Make it possible to run tests against postgres (PR #2829)
+* Factor out get_db_conn to HomeServer base class (PR #2830)
+* Logging and metrics for the http pusher (PR #2833)
+* Improve exception handling in persist_event (PR #2834)
+* montoring metrics for number of cache evictions (PR #2844)
+* Update pynacl dependency to 1.2.1 or higher (PR #2888) Thanks to @bachp!
+* Remove ability for AS users to call /events and /sync (PR #2948)
+* use bcrypt.checkpw (PR #2949) Thanks to @krombel!
+* Factor run_in_background out from preserve_fn (PR #2961)
+* Add a metric which increments when a request is received (PR #2965)
+* Improve caching for read_marker API (PR #2927)
  
 
 Synapse 0.27.0 begins the process of rationalising metric names. To enable a graceful migration path, this release just adds new names for the metrics being renamed. A future release will remove the old ones. For more info see [here](https://github.com/matrix-org/synapse/blob/develop/docs/metrics-howto.rst#block-and-response-metrics-renamed-for-0270)
@@ -80,22 +72,22 @@ Synapse 0.27.0 begins the process of rationalising metric names. To enable a gra
 
 Bug fixes:
 
- * synapse/config/password_auth_providers: Fixed bracket typo (PR #2683) Thanks to @seckrv!
- * Check missing fields in event_from_pdu_json (PR #2745)
- * Fix templating error with unban permission message (PR #2761) Thanks to @turt2live!
- * Fix flaky test_rooms UTs (PR #2765)
- * Fix publicised groups GET API (singular) over federation (PR #2772)
- * Fix a logcontext leak in persist_events (PR #2790)
- * Fix 'NoneType' object has no attribute 'writeHeaders' (PR #2796)
- * fix SQL when searching all users (PR #2803)
- * Fix server 500 on public rooms call when no rooms exist (PR #2827)
- * Fix SQL for user search (PR #2831)
- * Fix sql error in quarantine_media (PR #2837)
- * Handle url_previews with no content-type (PR #2845)
- * Add missing yield during 3pid signature checks (PR #2933)
- * Fix race in sync when joining room (PR #2944)
- * Fix slow event search, switch back from GIST to GIN indexes (PR #2769, #2848)
- * Fix scary-looking dns resolution errors (PR #2838)
+* synapse/config/password_auth_providers: Fixed bracket typo (PR #2683) Thanks to @seckrv!
+* Check missing fields in event_from_pdu_json (PR #2745)
+* Fix templating error with unban permission message (PR #2761) Thanks to @turt2live!
+* Fix flaky test_rooms UTs (PR #2765)
+* Fix publicised groups GET API (singular) over federation (PR #2772)
+* Fix a logcontext leak in persist_events (PR #2790)
+* Fix 'NoneType' object has no attribute 'writeHeaders' (PR #2796)
+* fix SQL when searching all users (PR #2803)
+* Fix server 500 on public rooms call when no rooms exist (PR #2827)
+* Fix SQL for user search (PR #2831)
+* Fix sql error in quarantine_media (PR #2837)
+* Handle url_previews with no content-type (PR #2845)
+* Add missing yield during 3pid signature checks (PR #2933)
+* Fix race in sync when joining room (PR #2944)
+* Fix slow event search, switch back from GIST to GIN indexes (PR #2769, #2848)
+* Fix scary-looking dns resolution errors (PR #2838)
 
 
 
