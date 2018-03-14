@@ -14,80 +14,42 @@ reported to prometheus. See `docs/metrics-howto.rst <docs/metrics-howto.rst#bloc
 
 Features:
 
-* Add support for a remote media repository backed by S3 (PR 2867, 2777, 2783, 2789, 2791, 2804, 2812,2814, 2857, 2868, 2767)
-* Add shiney new purge API. New implementation is:
-
-  * Faster 
-  * Supports clearing by timestamp
-  * Supports deleting of local events
-  * Is transactional (PR #2858,2867,2882, 2946,2962,2943)
-
-* Let homeservers specify a whitelist for the format of 3PIDs that users are allowed to register with or add to their HS accounts. (PR #2813)
-* Add /room/{id}/event/{id} to synapse (PR #2766)
-* Add an admin route to get all the media in a room (PR #2818) Thanks to @turt2live!
-* Add federation_domain_whitelist option (PR #2820,2821)
+* Add ability for ASes to override message send time (PR #2754)
+* Add support for custom storage providers for media repository (PR #2867, #2777, #2783, #2789, #2791, #2804, #2812, #2814, #2857, #2868, #2767)
+* Add purge API features, see `docs/admin_api/purge_history_api.rst <docs/admin_api/purge_history_api.rst>`_ for full details (PR #2858, #2867, #2882, #2946, #2962, #2943)
+* Add support for whitelisting 3PIDs that users can register. (PR #2813)
+* Add ``/room/{id}/event/{id}`` API (PR #2766)
+* Add an admin API to get all the media in a room (PR #2818) Thanks to @turt2live!
+* Add ``federation_domain_whitelist`` option (PR #2820, #2821)
 
 
 Changes:
 
-* Major refactor to move computation out of the main process and into a series of worker processes with a view to taking advantage of multicore machines. See more at `docs/workers.rst <docs/metrics-howto.rst>`_ (PR #2892-#2904, #2913, #2920 - #2926, #2947, #2847, #2854, #2872, #2873, #2874, #2928, #2929, #2934, #2856, #2976 - #2984, #2987 - #2989, #2991 - #2993, #2995)
-* Use StateResolutionHandler to resolve state in persist_events (PR #2864, #2871, #2802, #2835, #2836, #2841, #2842, #2849)
-* Adapt the default config to bind on both IPv4 and IPv6 on all platforms (PR #2435) Thanks to @silkeh!
-* Allow use of higher versions of saml2 (PR #2695) Thanks to @okurz!
-* Better logging when login can't find a 3pid (PR #2744)
-* add ?ts massaging for ASes (PR #2754)
-* Remove 'verbosity'/'log_file' from generated cfg (PR #2755)
-* Make indentation of generated log config consistent (PR #2762)
-* Remove dead code related to default thumbnails (PR #2764)
-* Update http request metrics before calling servlet (PR #2770)
-* Do bcrypt hashing in a background thread (PR #2773)
+* Continue to factor out processing from main process and into worker processes. See updated `docs/workers.rst <docs/metrics-howto.rst>`_ (PR #2892 - #2904, #2913, #2920 - #2926, #2947, #2847, #2854, #2872, #2873, #2874, #2928, #2929, #2934, #2856, #2976 - #2984, #2987 - #2989, #2991 - #2993, #2995, #2784)
+* Ensure state cache is used when persisting events (PR #2864, #2871, #2802, #2835, #2836, #2841, #2842, #2849)
+* Change the default config to bind on both IPv4 and IPv6 on all platforms (PR #2435) Thanks to @silkeh!
+* No longer require a specific version of saml2 (PR #2695) Thanks to @okurz!
+* Remove ``verbosity``/``log_file`` from generated config (PR #2755)
+* Add and improve metrics and logging (PR #2770, #2778, #2785, #2786, #2787, #2793, #2794, #2795, #2809, #2810, #2833, #2834, #2844, #2965, #2927, #2975, #2790, #2796, #2838)
 * When using synctl with workers, don't start the main synapse automatically (PR #2774)
-* Make Counter render floats (PR #2778)
-* Store state groups separately from events (PR #2784)
-* Reorganise request and block metrics (PR #2785)
-* Metrics for number of RDATA commands received (PR #2786)
-* Metrics for events processed in appservice and fed sender (PR #2787)
-* Optimise LoggingContext creation and copying (PR #2792)
-* Track db txn time in millisecs (PR #2793)
-* Track DB scheduling delay per-request (PR #2794, #2795)
-* Sanity checking for user ids (PR #2797)
-* better exception logging in callbackmetrics (PR #2809)
-* Fix bugs in block metrics (PR #2810)
-* Add some comments about the reactor tick time metric (PR #2816)
-* Use a connection pool for the SimpleHttpClient (PR #2817)
-* Remove unused/bitrotted MemoryDataStore (PR #2828)
-* Make it possible to run tests against postgres (PR #2829)
-* Factor out get_db_conn to HomeServer base class (PR #2830)
-* Logging and metrics for the http pusher (PR #2833)
-* Improve exception handling in persist_event (PR #2834)
-* montoring metrics for number of cache evictions (PR #2844)
+* Minor performance improvements (PR #2773, #2792)
+* Use a connection pool for non-federation outbound connections (PR #2817)
+* Make it possible to run unit tests against postgres (PR #2829)
 * Update pynacl dependency to 1.2.1 or higher (PR #2888) Thanks to @bachp!
 * Remove ability for AS users to call /events and /sync (PR #2948)
-* use bcrypt.checkpw (PR #2949) Thanks to @krombel!
-* Factor run_in_background out from preserve_fn (PR #2961)
-* Add a metric which increments when a request is received (PR #2965)
-* Improve caching for read_marker API (PR #2927)
-* Add Measure block for persist_events (PR #2975)
- 
+* Use bcrypt.checkpw (PR #2949) Thanks to @krombel!
 
 Bug fixes:
 
-* synapse/config/password_auth_providers: Fixed bracket typo (PR #2683) Thanks to @seckrv!
-* Check missing fields in event_from_pdu_json (PR #2745)
-* Fix templating error with unban permission message (PR #2761) Thanks to @turt2live!
-* Fix flaky test_rooms UTs (PR #2765)
+* Fix broken ``ldap_config`` config option (PR #2683) Thanks to @seckrv!
+* Fix error message when user is not allowed to unban (PR #2761) Thanks to @turt2live!
 * Fix publicised groups GET API (singular) over federation (PR #2772)
-* Fix a logcontext leak in persist_events (PR #2790)
-* Fix 'NoneType' object has no attribute 'writeHeaders' (PR #2796)
-* fix SQL when searching all users (PR #2803)
-* Fix server 500 on public rooms call when no rooms exist (PR #2827)
-* Fix SQL for user search (PR #2831)
-* Fix sql error in quarantine_media (PR #2837)
-* Handle url_previews with no content-type (PR #2845)
-* Add missing yield during 3pid signature checks (PR #2933)
-* Fix race in sync when joining room (PR #2944)
+* Fix user directory when using ``user_directory_search_all_users`` config option (PR #2803, #2831)
+* Fix error on ``/publicRooms`` when no rooms exist (PR #2827)
+* Fix bug in quarantine_media (PR #2837)
+* Fix url_previews when no Content-Type is returned from URL (PR #2845)
+* Fix rare race in sync API when joining room (PR #2944)
 * Fix slow event search, switch back from GIST to GIN indexes (PR #2769, #2848)
-* Fix scary-looking dns resolution errors (PR #2838)
 
 
 
