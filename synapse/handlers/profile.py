@@ -38,7 +38,10 @@ class ProfileHandler(BaseHandler):
 
         self.user_directory_handler = hs.get_user_directory_handler()
 
-        self.clock.looping_call(self._update_remote_profile_cache, self.PROFILE_UPDATE_MS)
+        if hs.config.worker_app is None:
+            self.clock.looping_call(
+                self._update_remote_profile_cache, self.PROFILE_UPDATE_MS,
+            )
 
     @defer.inlineCallbacks
     def get_profile(self, user_id):
