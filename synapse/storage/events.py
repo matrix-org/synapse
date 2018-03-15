@@ -38,7 +38,7 @@ from functools import wraps
 import synapse.metrics
 
 import logging
-import ujson as json
+import simplejson as json
 
 # these are only included to make the type annotations work
 from synapse.events import EventBase    # noqa: F401
@@ -56,7 +56,7 @@ event_counter = metrics.register_counter(
 
 def encode_json(json_object):
     if USE_FROZEN_DICTS:
-        # ujson doesn't like frozen_dicts
+        # simplejson doesn't like frozen_dicts
         return encode_canonical_json(json_object)
     else:
         return json.dumps(json_object, ensure_ascii=False)

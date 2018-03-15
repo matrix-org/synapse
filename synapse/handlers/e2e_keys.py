@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ujson as json
+import simplejson as json
 import logging
 
 from canonicaljson import encode_canonical_json
