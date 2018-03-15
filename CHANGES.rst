@@ -1,3 +1,11 @@
+Changes in synapse v0.26.1 (2018-03-15)
+=======================================
+
+Bug fixes:
+
+* Fix bug where an invalid event caused server to stop functioning correctly,
+  due to parsing and serializing bugs in ujson library.
+
 Changes in synapse v0.26.0 (2018-01-05)
 =======================================
 
