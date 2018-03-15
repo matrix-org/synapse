@@ -5,8 +5,7 @@ The common case for running Synapse is not to run separate workers, but for thos
 
 This release also begins the process of renaming a number of the metrics
 reported to prometheus. See `docs/metrics-howto.rst <docs/metrics-howto.rst#block-and-response-metrics-renamed-for-0-27-0>`_.
-
-Note, old metrics will be removed from the 0.28.0 release.
+Note that the v0.28.0 release will remove the deprecated metric names.
 
 Features:
 
