@@ -38,6 +38,7 @@ import collections
 import logging
 import urllib
 import ujson
+import simplejson
 
 logger = logging.getLogger(__name__)
 
@@ -462,7 +463,7 @@ def respond_with_json(request, code, json_object, send_cors=False,
             json_bytes = encode_canonical_json(json_object)
         else:
             # ujson doesn't like frozen_dicts.
-            json_bytes = ujson.dumps(json_object, ensure_ascii=False)
+            json_bytes = simplejson.dumps(json_object)
 
     return respond_with_json_bytes(
         request, code, json_bytes,
