@@ -35,7 +35,7 @@ import os
 import re
 import fnmatch
 import cgi
-import ujson as json
+import simplejson as json
 import urlparse
 import itertools
 import datetime

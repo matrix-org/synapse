@@ -21,7 +21,7 @@ from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 import logging
 import re
-import ujson as json
+import simplejson as json
 
 
 logger = logging.getLogger(__name__)

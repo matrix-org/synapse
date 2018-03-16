@@ -23,7 +23,7 @@ from .engines import PostgresEngine, Sqlite3Engine
 
 import collections
 import logging
-import ujson as json
+import simplejson as json
 import re
 
 logger = logging.getLogger(__name__)

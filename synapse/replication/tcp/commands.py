@@ -19,7 +19,7 @@ allowed to be sent by which side.
 """
 
 import logging
-import ujson as json
+import simplejson as json
 
 
 logger = logging.getLogger(__name__)

@@ -17,7 +17,7 @@ from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached
 from twisted.internet import defer
 
-import ujson as json
+import simplejson as json
 import logging
 
 logger = logging.getLogger(__name__)

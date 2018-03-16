@@ -18,7 +18,7 @@ from twisted.internet import defer
 
 from synapse.util.caches.descriptors import cached, cachedList, cachedInlineCallbacks
 
-import ujson as json
+import simplejson as json
 import logging
 
 logger = logging.getLogger(__name__)
