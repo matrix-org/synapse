@@ -496,12 +496,6 @@ class SyncHandler(object):
                         batch.events[0].event_id, types=types
                     )
 
-                    if filter_members:
-                        member_state_ids = {
-                            t: state_ids[t]
-                            for t in state_ids if state_ids[t][0] == EventTypes.Member
-                        }
-
                 else:
                     current_state_ids = yield self.get_state_at(
                         room_id, stream_position=now_token, types=types
@@ -509,11 +503,13 @@ class SyncHandler(object):
 
                     state_ids = current_state_ids
 
-                    if filter_members:
-                        member_state_ids = {
-                            t: state_ids[t]
-                            for t in state_ids if state_ids[t][0] == EventTypes.Member
-                        }
+                if filter_members:
+                    logger.info("Finding members from %r", state_ids)
+                    member_state_ids = {
+                        e: state_ids[e]
+                        for e in state_ids if state_ids[e][0] == EventTypes.Member
+                    }
+                    logger.info("Found members %r", member_state_ids)
 
                 timeline_state = {
                     (event.type, event.state_key): event.event_id
@@ -541,11 +537,14 @@ class SyncHandler(object):
                 )
 
                 if filter_members:
+                    logger.info("Finding members from %r", state_at_timeline_start)
                     member_state_ids = {
-                        t: state_at_timeline_start[t]
-                        for t in state_at_timeline_start
-                        if state_at_timeline_start[t][0] == EventTypes.Member
+                        e: state_at_timeline_start[e]
+                        for e in state_at_timeline_start
+                        if state_at_timeline_start[e][0] == EventTypes.Member
                     }
+                    logger.info("Found members %r", member_state_ids)
+
 
                 timeline_state = {
                     (event.type, event.state_key): event.event_id
