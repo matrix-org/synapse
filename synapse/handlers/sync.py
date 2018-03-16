@@ -510,8 +510,8 @@ class SyncHandler(object):
                 if filter_members:
                     logger.info("Finding members from %r", state_ids)
                     member_state_ids = {
-                        e: state_ids[e]
-                        for e in state_ids if state_ids[e][0] == EventTypes.Member
+                        t: state_ids[t]
+                        for t in state_ids if t[0] == EventTypes.Member
                     }
                     logger.info("Found members %r", member_state_ids)
 
@@ -543,9 +543,8 @@ class SyncHandler(object):
                 if filter_members:
                     logger.info("Finding members from %r", state_at_timeline_start)
                     member_state_ids = {
-                        e: state_at_timeline_start[e]
-                        for e in state_at_timeline_start
-                        if state_at_timeline_start[e][0] == EventTypes.Member
+                        t: state_at_timeline_start[t]
+                        for t in state_at_timeline_start if t[0] == EventTypes.Member
                     }
                     logger.info("Found members %r", member_state_ids)
 
