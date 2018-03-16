@@ -474,6 +474,7 @@ class SyncHandler(object):
             if filter_members:
                 # We only request state for the members needed to display the
                 # timeline:
+
                 types = [
                     (EventTypes.Member, state_key)
                     for state_key in set(
@@ -481,10 +482,13 @@ class SyncHandler(object):
                         for event in batch.events
                     )
                 ]
-                types.append((None, None))  # don't just filter to room members
 
-                # TODO: we should opportunistically deduplicate these members too
+                # TODO: we should opportunistically deduplicate these members here
                 # within the same sync series (based on an in-memory cache)
+
+                if not types:
+                    filter_members = False
+                types.append((None, None))  # don't just filter to room members
 
             if full_state:
                 if batch:
@@ -545,7 +549,6 @@ class SyncHandler(object):
                     }
                     logger.info("Found members %r", member_state_ids)
 
-
                 timeline_state = {
                     (event.type, event.state_key): event.event_id
                     for event in batch.events if event.is_state()
@@ -559,7 +562,14 @@ class SyncHandler(object):
                     current=current_state_ids,
                 )
             else:
-                state_ids = {}
+                if filter_members:
+                    # strip off the (None, None) and filter to just room members
+                    types = types[:-1]
+                    state_ids = yield self.store.get_state_ids_for_event(
+                        batch.events[0].event_id, types=types
+                    )
+                else:
+                    state_ids = {}
 
         state = {}
         if state_ids:
