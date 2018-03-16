@@ -37,7 +37,6 @@ from twisted.web.util import redirectTo
 import collections
 import logging
 import urllib
-import ujson
 import simplejson
 
 logger = logging.getLogger(__name__)
