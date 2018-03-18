@@ -557,14 +557,14 @@ class SyncHandler(object):
                     current=current_state_ids,
                 )
             else:
+                state_ids = {}
                 if filter_members:
                     # strip off the (None, None) and filter to just room members
                     types = types[:-1]
-                    state_ids = yield self.store.get_state_ids_for_event(
-                        batch.events[0].event_id, types=types
-                    )
-                else:
-                    state_ids = {}
+                    if types:
+                        state_ids = yield self.store.get_state_ids_for_event(
+                            batch.events[0].event_id, types=types
+                        )
 
         state = {}
         if state_ids:
