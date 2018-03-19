@@ -107,7 +107,7 @@ class RdataCommand(Command):
         return " ".join((
             self.stream_name,
             str(self.token) if self.token is not None else "batch",
-            json.dumps(self.row),
+            json.dumps(self.row, namedtuple_as_object=False),
         ))
 
 
@@ -301,7 +301,9 @@ class InvalidateCacheCommand(Command):
         return cls(cache_func, json.loads(keys_json))
 
     def to_line(self):
-        return " ".join((self.cache_func, json.dumps(self.keys)))
+        return " ".join((
+            self.cache_func, json.dumps(self.keys, namedtuple_as_object=False)
+        ))
 
 
 class UserIpCommand(Command):
