@@ -22,7 +22,7 @@ from synapse.types import RoomStreamToken
 from .stream import lower_bound
 
 import logging
-import ujson as json
+import simplejson as json
 
 logger = logging.getLogger(__name__)
 

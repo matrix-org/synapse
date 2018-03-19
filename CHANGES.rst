@@ -1,11 +1,10 @@
-Unreleased
-==========
+Changes in synapse v0.26.1 (2018-03-15)
+=======================================
 
-synctl no longer starts the main synapse when using ``-a`` option with workers.
-A new worker file should be added with ``worker_app: synapse.app.homeserver``.
+Bug fixes:
 
-This release also begins the process of renaming a number of the metrics
-reported to prometheus. See `docs/metrics-howto.rst <docs/metrics-howto.rst#block-and-response-metrics-renamed-for-0-27-0>`_.
+* Fix bug where an invalid event caused server to stop functioning correctly,
+  due to parsing and serializing bugs in ujson library.
 
 
 Changes in synapse v0.26.0 (2018-01-05)
