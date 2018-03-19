@@ -442,7 +442,7 @@ class SyncHandler(object):
 
     @defer.inlineCallbacks
     def compute_state_delta(self, room_id, batch, sync_config, since_token, now_token,
-                            full_state, filter_members):
+                            full_state):
         """ Works out the differnce in state between the start of the timeline
         and the previous sync.
 
@@ -455,7 +455,7 @@ class SyncHandler(object):
                 be None.
             now_token(str): Token of the end of the current batch.
             full_state(bool): Whether to force returning the full state.
-            filter_members(bool): Whether to only return state for members
+            lazy_load_members(bool): Whether to only return state for members
                 referenced in this timeline segment
 
         Returns:
@@ -470,8 +470,9 @@ class SyncHandler(object):
 
             types = None
             member_state_ids = {}
+            lazy_load_members = sync_config.filter_collection.lazy_load_members()
 
-            if filter_members:
+            if lazy_load_members:
                 # We only request state for the members needed to display the
                 # timeline:
 
@@ -490,7 +491,7 @@ class SyncHandler(object):
                 if not types:
                     # an optimisation to stop needlessly trying to calculate
                     # member_state_ids
-                    filter_members = False
+                    lazy_load_members = False
 
                 types.append((None, None))  # don't just filter to room members
 
@@ -511,7 +512,7 @@ class SyncHandler(object):
 
                     state_ids = current_state_ids
 
-                if filter_members:
+                if lazy_load_members:
                     member_state_ids = {
                         t: state_ids[t]
                         for t in state_ids if t[0] == EventTypes.Member
@@ -542,7 +543,7 @@ class SyncHandler(object):
                     batch.events[0].event_id, types=types
                 )
 
-                if filter_members:
+                if lazy_load_members:
                     member_state_ids = {
                         t: state_at_timeline_start[t]
                         for t in state_at_timeline_start if t[0] == EventTypes.Member
@@ -562,7 +563,7 @@ class SyncHandler(object):
                 )
             else:
                 state_ids = {}
-                if filter_members:
+                if lazy_load_members:
                     # TODO: filter out redundant members based on their mxids (not their
                     # event_ids) at this point. We know we can do it based on mxid as this
                     # is an non-gappy incremental sync.
@@ -1380,8 +1381,7 @@ class SyncHandler(object):
             return
 
         state = yield self.compute_state_delta(
-            room_id, batch, sync_config, since_token, now_token,
-            full_state=full_state, filter_members=True
+            room_id, batch, sync_config, since_token, now_token, full_state=full_state
         )
 
         if room_builder.rtype == "joined":

@@ -260,6 +260,9 @@ class FilterCollection(object):
     def ephemeral_limit(self):
         return self._room_ephemeral_filter.limit()
 
+    def lazy_load_members(self):
+        return self._room_state_filter.lazy_load_members()
+
     def filter_presence(self, events):
         return self._presence_filter.filter(events)
 
@@ -415,6 +418,9 @@ class Filter(object):
 
     def limit(self):
         return self.filter_json.get("limit", 10)
+
+    def lazy_load_members(self):
+        return self.filter_json.get("lazy_load_members", False)
 
 
 def _matches_wildcard(actual_value, filter_value):
