@@ -483,11 +483,15 @@ class SyncHandler(object):
                     )
                 ]
 
-                # TODO: we should opportunistically deduplicate these members here
-                # within the same sync series (based on an in-memory cache)
+                # We can't remove redundant member types at this stage as it has
+                # to be done based on event_id, and we don't have the member
+                # event ids until we've pulled them out of the DB.
 
                 if not types:
+                    # an optimisation to stop needlessly trying to calculate
+                    # member_state_ids
                     filter_members = False
+
                 types.append((None, None))  # don't just filter to room members
 
             if full_state:
@@ -559,6 +563,10 @@ class SyncHandler(object):
             else:
                 state_ids = {}
                 if filter_members:
+                    # TODO: filter out redundant members based on their mxids (not their
+                    # event_ids) at this point. We know we can do it based on mxid as this
+                    # is an non-gappy incremental sync.
+
                     # strip off the (None, None) and filter to just room members
                     types = types[:-1]
                     if types:
