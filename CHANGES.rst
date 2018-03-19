@@ -1,3 +1,10 @@
+Changes in synapse v0.27.0-rc2 (2018-03-19)
+===========================================
+Bugs:
+
+* Fix bug introduced in v0.27.0-rc1 that causes much increased memory usage in state cache (PR #3005)
+
+
 Changes in synapse v0.27.0-rc1 (2018-03-14)
 ===========================================
 
