@@ -30,7 +30,7 @@ from synapse.http.servlet import (
 
 import logging
 import urllib
-import ujson as json
+import simplejson as json
 
 logger = logging.getLogger(__name__)
 

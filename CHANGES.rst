@@ -3,7 +3,8 @@ Changes in synapse v0.27.0-rc2 (2018-03-19)
 Bugs:
 
 * Fix bug introduced in v0.27.0-rc1 that causes much increased memory usage in state cache (PR #3005)
-
+* Fix bug where an invalid event caused server to stop functioning correctly,
+  due to parsing and serializing bugs in ujson library. (pulled in from 0.26.1)
 
 Changes in synapse v0.27.0-rc1 (2018-03-14)
 ===========================================
@@ -52,6 +53,15 @@ Bug fixes:
 * Fix url_previews when no Content-Type is returned from URL (PR #2845)
 * Fix rare race in sync API when joining room (PR #2944)
 * Fix slow event search, switch back from GIST to GIN indexes (PR #2769, #2848)
+
+
+Changes in synapse v0.26.1 (2018-03-15)
+=======================================
+
+Bug fixes:
+
+* Fix bug where an invalid event caused server to stop functioning correctly,
+  due to parsing and serializing bugs in ujson library.
 
 
 

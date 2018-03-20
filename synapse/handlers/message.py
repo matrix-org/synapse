@@ -38,7 +38,7 @@ from canonicaljson import encode_canonical_json
 
 import logging
 import random
-import ujson
+import simplejson
 
 logger = logging.getLogger(__name__)
 
@@ -678,8 +678,8 @@ class EventCreationHandler(object):
 
         # Ensure that we can round trip before trying to persist in db
         try:
-            dump = ujson.dumps(unfreeze(event.content))
-            ujson.loads(dump)
+            dump = simplejson.dumps(unfreeze(event.content))
+            simplejson.loads(dump)
         except Exception:
             logger.exception("Failed to encode content: %r", event.content)
             raise
