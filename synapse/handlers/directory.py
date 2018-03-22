@@ -70,6 +70,12 @@ class DirectoryHandler(BaseHandler):
             servers,
             creator=creator,
         )
+        self.hs.get_internal_api().raise_event("room_directory_association_created", {
+            "room_alias": room_alias.to_string(),
+            "room_id": room_id,
+            "servers": servers,
+            "creator": creator,
+        })
 
     @defer.inlineCallbacks
     def create_association(self, user_id, room_alias, room_id, servers=None):

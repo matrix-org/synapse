@@ -35,6 +35,7 @@ from .emailconfig import EmailConfig
 from .workers import WorkerConfig
 from .push import PushConfig
 from .spam_checker import SpamCheckerConfig
+from .internal_api import InternalApiConfig
 from .groups import GroupsConfig
 from .user_directory import UserDirectoryConfig
 from .consent_config import ConsentConfig
@@ -48,9 +49,7 @@ class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        JWTConfig, PasswordConfig, EmailConfig,
                        WorkerConfig, PasswordAuthProviderConfig, PushConfig,
                        SpamCheckerConfig, GroupsConfig, UserDirectoryConfig,
-                       ConsentConfig,
-                       ServerNoticesConfig,
-                       ):
+                       InternalApiConfig, ConsentConfig, ServerNoticesConfig):
     pass
 
 

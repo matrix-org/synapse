@@ -82,6 +82,7 @@ from synapse.storage import DataStore
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
+from synapse.internal_api import InternalApi
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +160,7 @@ class HomeServer(object):
         'groups_attestation_signing',
         'groups_attestation_renewer',
         'spam_checker',
+        'internal_api',
         'room_member_handler',
         'federation_registry',
         'server_notices_manager',
@@ -396,6 +398,9 @@ class HomeServer(object):
 
     def build_spam_checker(self):
         return SpamChecker(self)
+
+    def build_internal_api(self):
+        return InternalApi(self)
 
     def build_room_member_handler(self):
         if self.config.worker_app:
