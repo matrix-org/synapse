@@ -230,7 +230,7 @@ file. For example::
 ``synapse.app.event_creator``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Handles non-state event creation. It can handle REST endpoints matching:
+Handles non-state event creation. It can handle REST endpoints matching::
 
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/send
 
