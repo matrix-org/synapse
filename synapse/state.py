@@ -488,7 +488,7 @@ class StateResolutionHandler(object):
             # which will be used as a cache key for future resolutions, but
             # not get persisted.
             state_group = None
-            new_state_event_ids = frozenset(new_state.iteritems())
+            new_state_event_ids = frozenset(new_state.itervalues())
             for sg, events in state_groups_ids.iteritems():
                 if new_state_event_ids == frozenset(e_id for e_id in events):
                     state_group = sg
