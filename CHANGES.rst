@@ -1,3 +1,11 @@
+Changes in synapse v0.27.2 (2018-03-26)
+=======================================
+
+Bug fixes:
+
+* Fix bug which broke TCP replication between workers (PR #3015)
+
+
 Changes in synapse v0.27.1 (2018-03-26)
 =======================================
 
