@@ -31,7 +31,7 @@ class SetPasswordHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def set_password(self, user_id, newpassword, requester=None):
-        password_hash = self._auth_handler.hash(newpassword)
+        password_hash = yield self._auth_handler.hash(newpassword)
 
         except_device_id = requester.device_id if requester else None
         except_access_token_id = requester.access_token_id if requester else None

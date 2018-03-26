@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,36 +43,75 @@ logger = logging.getLogger(__name__)
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 
-incoming_requests_counter = metrics.register_counter(
-    "requests",
+# total number of responses served, split by method/servlet/tag
+response_count = metrics.register_counter(
+    "response_count",
     labels=["method", "servlet", "tag"],
+    alternative_names=(
+        # the following are all deprecated aliases for the same metric
+        metrics.name_prefix + x for x in (
+            "_requests",
+            "_response_time:count",
+            "_response_ru_utime:count",
+            "_response_ru_stime:count",
+            "_response_db_txn_count:count",
+            "_response_db_txn_duration:count",
+        )
+    )
 )
+
+requests_counter = metrics.register_counter(
+    "requests_received",
+    labels=["method", "servlet", ],
+)
+
 outgoing_responses_counter = metrics.register_counter(
     "responses",
     labels=["method", "code"],
 )
 
-response_timer = metrics.register_distribution(
-    "response_time",
-    labels=["method", "servlet", "tag"]
+response_timer = metrics.register_counter(
+    "response_time_seconds",
+    labels=["method", "servlet", "tag"],
+    alternative_names=(
+        metrics.name_prefix + "_response_time:total",
+    ),
 )
 
-response_ru_utime = metrics.register_distribution(
-    "response_ru_utime", labels=["method", "servlet", "tag"]
+response_ru_utime = metrics.register_counter(
+    "response_ru_utime_seconds", labels=["method", "servlet", "tag"],
+    alternative_names=(
+        metrics.name_prefix + "_response_ru_utime:total",
+    ),
 )
 
-response_ru_stime = metrics.register_distribution(
-    "response_ru_stime", labels=["method", "servlet", "tag"]
+response_ru_stime = metrics.register_counter(
+    "response_ru_stime_seconds", labels=["method", "servlet", "tag"],
+    alternative_names=(
+        metrics.name_prefix + "_response_ru_stime:total",
+    ),
 )
 
-response_db_txn_count = metrics.register_distribution(
-    "response_db_txn_count", labels=["method", "servlet", "tag"]
+response_db_txn_count = metrics.register_counter(
+    "response_db_txn_count", labels=["method", "servlet", "tag"],
+    alternative_names=(
+        metrics.name_prefix + "_response_db_txn_count:total",
+    ),
 )
 
-response_db_txn_duration = metrics.register_distribution(
-    "response_db_txn_duration", labels=["method", "servlet", "tag"]
+# seconds spent waiting for db txns, excluding scheduling time, when processing
+# this request
+response_db_txn_duration = metrics.register_counter(
+    "response_db_txn_duration_seconds", labels=["method", "servlet", "tag"],
+    alternative_names=(
+        metrics.name_prefix + "_response_db_txn_duration:total",
+    ),
 )
 
+# seconds spent waiting for a db connection, when processing this request
+response_db_sched_duration = metrics.register_counter(
+    "response_db_sched_duration_seconds", labels=["method", "servlet", "tag"]
+)
 
 _next_request_id = 0
 
@@ -107,7 +147,12 @@ def wrap_request_handler(request_handler, include_metrics=False):
         with LoggingContext(request_id) as request_context:
             with Measure(self.clock, "wrapped_request_handler"):
                 request_metrics = RequestMetrics()
-                request_metrics.start(self.clock, name=self.__class__.__name__)
+                # we start the request metrics timer here with an initial stab
+                # at the servlet name. For most requests that name will be
+                # JsonResource (or a subclass), and JsonResource._async_render
+                # will update it once it picks a servlet.
+                servlet_name = self.__class__.__name__
+                request_metrics.start(self.clock, name=servlet_name)
 
                 request_context.request = request_id
                 with request.processing():
@@ -116,6 +161,7 @@ def wrap_request_handler(request_handler, include_metrics=False):
                             if include_metrics:
                                 yield request_handler(self, request, request_metrics)
                             else:
+                                requests_counter.inc(request.method, servlet_name)
                                 yield request_handler(self, request)
                     except CodeMessageException as e:
                         code = e.code
@@ -191,7 +237,7 @@ class JsonResource(HttpServer, resource.Resource):
     """ This implements the HttpServer interface and provides JSON support for
     Resources.
 
-    Register callbacks via register_path()
+    Register callbacks via register_paths()
 
     Callbacks can return a tuple of status code and a dict in which case the
     the dict will automatically be sent to the client as a JSON object.
@@ -238,57 +284,62 @@ class JsonResource(HttpServer, resource.Resource):
             This checks if anyone has registered a callback for that method and
             path.
         """
+        callback, group_dict = self._get_handler_for_request(request)
+
+        servlet_instance = getattr(callback, "__self__", None)
+        if servlet_instance is not None:
+            servlet_classname = servlet_instance.__class__.__name__
+        else:
+            servlet_classname = "%r" % callback
+
+        request_metrics.name = servlet_classname
+        requests_counter.inc(request.method, servlet_classname)
+
+        # Now trigger the callback. If it returns a response, we send it
+        # here. If it throws an exception, that is handled by the wrapper
+        # installed by @request_handler.
+
+        kwargs = intern_dict({
+            name: urllib.unquote(value).decode("UTF-8") if value else value
+            for name, value in group_dict.items()
+        })
+
+        callback_return = yield callback(request, **kwargs)
+        if callback_return is not None:
+            code, response = callback_return
+            self._send_response(request, code, response)
+
+    def _get_handler_for_request(self, request):
+        """Finds a callback method to handle the given request
+
+        Args:
+            request (twisted.web.http.Request):
+
+        Returns:
+            Tuple[Callable, dict[str, str]]: callback method, and the dict
+                mapping keys to path components as specified in the handler's
+                path match regexp.
+
+                The callback will normally be a method registered via
+                register_paths, so will return (possibly via Deferred) either
+                None, or a tuple of (http code, response body).
+        """
         if request.method == "OPTIONS":
-            self._send_response(request, 200, {})
-            return
+            return _options_handler, {}
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
         for path_entry in self.path_regexs.get(request.method, []):
             m = path_entry.pattern.match(request.path)
-            if not m:
-                continue
-
-            # We found a match! Trigger callback and then return the
-            # returned response. We pass both the request and any
-            # matched groups from the regex to the callback.
-
-            callback = path_entry.callback
-
-            kwargs = intern_dict({
-                name: urllib.unquote(value).decode("UTF-8") if value else value
-                for name, value in m.groupdict().items()
-            })
-
-            callback_return = yield callback(request, **kwargs)
-            if callback_return is not None:
-                code, response = callback_return
-                self._send_response(request, code, response)
-
-            servlet_instance = getattr(callback, "__self__", None)
-            if servlet_instance is not None:
-                servlet_classname = servlet_instance.__class__.__name__
-            else:
-                servlet_classname = "%r" % callback
-
-            request_metrics.name = servlet_classname
-
-            return
+            if m:
+                # We found a match!
+                return path_entry.callback, m.groupdict()
 
         # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
-        raise UnrecognizedRequestError()
+        return _unrecognised_request_handler, {}
 
     def _send_response(self, request, code, response_json_object,
                        response_code_message=None):
-        # could alternatively use request.notifyFinish() and flip a flag when
-        # the Deferred fires, but since the flag is RIGHT THERE it seems like
-        # a waste.
-        if request._disconnected:
-            logger.warn(
-                "Not sending response to request %s, already disconnected.",
-                request)
-            return
-
         outgoing_responses_counter.inc(request.method, str(code))
 
         # TODO: Only enable CORS for the requests that need it.
@@ -300,6 +351,34 @@ class JsonResource(HttpServer, resource.Resource):
             version_string=self.version_string,
             canonical_json=self.canonical_json,
         )
+
+
+def _options_handler(request):
+    """Request handler for OPTIONS requests
+
+    This is a request handler suitable for return from
+    _get_handler_for_request. It returns a 200 and an empty body.
+
+    Args:
+        request (twisted.web.http.Request):
+
+    Returns:
+        Tuple[int, dict]: http code, response body.
+    """
+    return 200, {}
+
+
+def _unrecognised_request_handler(request):
+    """Request handler for unrecognised requests
+
+    This is a request handler suitable for return from
+    _get_handler_for_request. It actually just raises an
+    UnrecognizedRequestError.
+
+    Args:
+        request (twisted.web.http.Request):
+    """
+    raise UnrecognizedRequestError()
 
 
 class RequestMetrics(object):
@@ -322,7 +401,7 @@ class RequestMetrics(object):
                 )
                 return
 
-        incoming_requests_counter.inc(request.method, self.name, tag)
+        response_count.inc(request.method, self.name, tag)
 
         response_timer.inc_by(
             clock.time_msec() - self.start, request.method,
@@ -341,7 +420,10 @@ class RequestMetrics(object):
             context.db_txn_count, request.method, self.name, tag
         )
         response_db_txn_duration.inc_by(
-            context.db_txn_duration, request.method, self.name, tag
+            context.db_txn_duration_ms / 1000., request.method, self.name, tag
+        )
+        response_db_sched_duration.inc_by(
+            context.db_sched_duration_ms / 1000., request.method, self.name, tag
         )
 
 
@@ -364,6 +446,15 @@ class RootRedirect(resource.Resource):
 def respond_with_json(request, code, json_object, send_cors=False,
                       response_code_message=None, pretty_print=False,
                       version_string="", canonical_json=True):
+    # could alternatively use request.notifyFinish() and flip a flag when
+    # the Deferred fires, but since the flag is RIGHT THERE it seems like
+    # a waste.
+    if request._disconnected:
+        logger.warn(
+            "Not sending response to request %s, already disconnected.",
+            request)
+        return
+
     if pretty_print:
         json_bytes = encode_pretty_printed_json(json_object) + "\n"
     else:

@@ -31,6 +31,8 @@ class RegistrationConfig(Config):
                 strtobool(str(config["disable_registration"]))
             )
 
+        self.registrations_require_3pid = config.get("registrations_require_3pid", [])
+        self.allowed_local_3pids = config.get("allowed_local_3pids", [])
         self.registration_shared_secret = config.get("registration_shared_secret")
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
@@ -52,13 +54,32 @@ class RegistrationConfig(Config):
         # Enable registration for new users.
         enable_registration: False
 
+        # The user must provide all of the below types of 3PID when registering.
+        #
+        # registrations_require_3pid:
+        #     - email
+        #     - msisdn
+
+        # Mandate that users are only allowed to associate certain formats of
+        # 3PIDs with accounts on this server.
+        #
+        # allowed_local_3pids:
+        #     - medium: email
+        #       pattern: ".*@matrix\\.org"
+        #     - medium: email
+        #       pattern: ".*@vector\\.im"
+        #     - medium: msisdn
+        #       pattern: "\\+44"
+
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.
         registration_shared_secret: "%(registration_shared_secret)s"
 
         # Set the number of bcrypt rounds used to generate password hash.
         # Larger numbers increase the work factor needed to generate the hash.
-        # The default number of rounds is 12.
+        # The default number is 12 (which equates to 2^12 rounds).
+        # N.B. that increasing this will exponentially increase the time required
+        # to register or login - e.g. 24 => 2^24 rounds which will take >20 mins.
         bcrypt_rounds: 12
 
         # Allows users to register as guests without a password/email/etc, and

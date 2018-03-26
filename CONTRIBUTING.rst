@@ -30,8 +30,12 @@ use github's pull request workflow to review the contribution, and either ask
 you to make any refinements needed or merge it and make them ourselves. The
 changes will then land on master when we next do a release.
 
-We use Jenkins for continuous integration (http://matrix.org/jenkins), and
-typically all pull requests get automatically tested Jenkins: if your change breaks the build, Jenkins will yell about it in #matrix-dev:matrix.org so please lurk there and keep an eye open.
+We use `Jenkins <http://matrix.org/jenkins>`_ and 
+`Travis <https://travis-ci.org/matrix-org/synapse>`_ for continuous
+integration. All pull requests to synapse get automatically tested by Travis; 
+the Jenkins builds require an adminstrator to start them. If your change 
+breaks the build, this will be shown in github, so please keep an eye on the 
+pull request for feedback.
 
 Code style
 ~~~~~~~~~~

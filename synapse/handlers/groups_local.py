@@ -383,11 +383,12 @@ class GroupsLocalHandler(object):
 
             defer.returnValue({"groups": result})
         else:
-            result = yield self.transport_client.get_publicised_groups_for_user(
-                get_domain_from_id(user_id), user_id
+            bulk_result = yield self.transport_client.bulk_get_publicised_groups(
+                get_domain_from_id(user_id), [user_id],
             )
+            result = bulk_result.get("users", {}).get(user_id)
             # TODO: Verify attestations
-            defer.returnValue(result)
+            defer.returnValue({"groups": result})
 
     @defer.inlineCallbacks
     def bulk_get_publicised_groups(self, user_ids, proxy=True):

@@ -22,12 +22,12 @@ from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.util.caches.descriptors import cached, cachedList
 
 
-class SignatureStore(SQLBaseStore):
-    """Persistence for event signatures and hashes"""
-
+class SignatureWorkerStore(SQLBaseStore):
     @cached()
     def get_event_reference_hash(self, event_id):
-        return self._get_event_reference_hashes_txn(event_id)
+        # This is a dummy function to allow get_event_reference_hashes
+        # to use its cache
+        raise NotImplementedError()
 
     @cachedList(cached_method_name="get_event_reference_hash",
                 list_name="event_ids", num_args=1)
@@ -73,6 +73,10 @@ class SignatureStore(SQLBaseStore):
         )
         txn.execute(query, (event_id, ))
         return {k: v for k, v in txn}
+
+
+class SignatureStore(SignatureWorkerStore):
+    """Persistence for event signatures and hashes"""
 
     def _store_event_reference_hashes_txn(self, txn, events):
         """Store a hash for a PDU

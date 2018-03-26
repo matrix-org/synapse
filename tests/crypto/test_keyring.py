@@ -68,7 +68,7 @@ class KeyringTestCase(unittest.TestCase):
 
     def check_context(self, _, expected):
         self.assertEquals(
-            getattr(LoggingContext.current_context(), "test_key", None),
+            getattr(LoggingContext.current_context(), "request", None),
             expected
         )
 
@@ -82,7 +82,7 @@ class KeyringTestCase(unittest.TestCase):
         lookup_2_deferred = defer.Deferred()
 
         with LoggingContext("one") as context_one:
-            context_one.test_key = "one"
+            context_one.request = "one"
 
             wait_1_deferred = kr.wait_for_previous_lookups(
                 ["server1"],
@@ -96,7 +96,7 @@ class KeyringTestCase(unittest.TestCase):
             wait_1_deferred.addBoth(self.check_context, "one")
 
         with LoggingContext("two") as context_two:
-            context_two.test_key = "two"
+            context_two.request = "two"
 
             # set off another wait. It should block because the first lookup
             # hasn't yet completed.
@@ -137,7 +137,7 @@ class KeyringTestCase(unittest.TestCase):
         @defer.inlineCallbacks
         def get_perspectives(**kwargs):
             self.assertEquals(
-                LoggingContext.current_context().test_key, "11",
+                LoggingContext.current_context().request, "11",
             )
             with logcontext.PreserveLoggingContext():
                 yield persp_deferred
@@ -145,7 +145,7 @@ class KeyringTestCase(unittest.TestCase):
         self.http_client.post_json.side_effect = get_perspectives
 
         with LoggingContext("11") as context_11:
-            context_11.test_key = "11"
+            context_11.request = "11"
 
             # start off a first set of lookups
             res_deferreds = kr.verify_json_objects_for_server(
@@ -167,13 +167,13 @@ class KeyringTestCase(unittest.TestCase):
 
             # wait a tick for it to send the request to the perspectives server
             # (it first tries the datastore)
-            yield async.sleep(0.005)
+            yield async.sleep(1)   # XXX find out why this takes so long!
             self.http_client.post_json.assert_called_once()
 
             self.assertIs(LoggingContext.current_context(), context_11)
 
             context_12 = LoggingContext("12")
-            context_12.test_key = "12"
+            context_12.request = "12"
             with logcontext.PreserveLoggingContext(context_12):
                 # a second request for a server with outstanding requests
                 # should block rather than start a second call
@@ -183,7 +183,7 @@ class KeyringTestCase(unittest.TestCase):
                 res_deferreds_2 = kr.verify_json_objects_for_server(
                     [("server10", json1)],
                 )
-                yield async.sleep(0.005)
+                yield async.sleep(01)
                 self.http_client.post_json.assert_not_called()
                 res_deferreds_2[0].addBoth(self.check_context, None)
 
@@ -211,7 +211,7 @@ class KeyringTestCase(unittest.TestCase):
         sentinel_context = LoggingContext.current_context()
 
         with LoggingContext("one") as context_one:
-            context_one.test_key = "one"
+            context_one.request = "one"
 
             defer = kr.verify_json_for_server("server9", {})
             try:
