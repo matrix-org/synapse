@@ -1,4 +1,4 @@
-Changes in synapse v0.27.1 (2018-03-19)
+Changes in synapse v0.27.1 (2018-03-26)
 =======================================
 
 Meta release as v0.27.0 temporarily pointed to the wrong commit
