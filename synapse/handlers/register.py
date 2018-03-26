@@ -46,7 +46,9 @@ class RegistrationHandler(BaseHandler):
 
         self.macaroon_gen = hs.get_macaroon_generator()
 
-        self._generate_user_id_linearizer = Linearizer(name="_generate_user_id_linearizer")
+        self._generate_user_id_linearizer = Linearizer(
+            name="_generate_user_id_linearizer",
+        )
 
     @defer.inlineCallbacks
     def check_username(self, localpart, guest_access_token=None,
