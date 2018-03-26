@@ -23,7 +23,7 @@ from twisted.internet import defer
 
 import abc
 import logging
-import ujson as json
+import simplejson as json
 
 
 logger = logging.getLogger(__name__)

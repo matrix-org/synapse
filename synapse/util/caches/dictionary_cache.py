@@ -132,9 +132,13 @@ class DictionaryCache(object):
                 self._update_or_insert(key, value, known_absent)
 
     def _update_or_insert(self, key, value, known_absent):
-        entry = self.cache.setdefault(key, DictionaryEntry(False, set(), {}))
+        # We pop and reinsert as we need to tell the cache the size may have
+        # changed
+
+        entry = self.cache.pop(key, DictionaryEntry(False, set(), {}))
         entry.value.update(value)
         entry.known_absent.update(known_absent)
+        self.cache[key] = entry
 
     def _insert(self, key, value, known_absent):
         self.cache[key] = DictionaryEntry(True, known_absent, value)

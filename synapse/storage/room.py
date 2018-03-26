@@ -22,7 +22,7 @@ from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 import collections
 import logging
-import ujson as json
+import simplejson as json
 import re
 
 logger = logging.getLogger(__name__)

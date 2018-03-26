@@ -77,7 +77,9 @@ class RegistrationConfig(Config):
 
         # Set the number of bcrypt rounds used to generate password hash.
         # Larger numbers increase the work factor needed to generate the hash.
-        # The default number of rounds is 12.
+        # The default number is 12 (which equates to 2^12 rounds).
+        # N.B. that increasing this will exponentially increase the time required
+        # to register or login - e.g. 24 => 2^24 rounds which will take >20 mins.
         bcrypt_rounds: 12
 
         # Allows users to register as guests without a password/email/etc, and

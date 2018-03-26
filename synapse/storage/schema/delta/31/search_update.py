@@ -16,7 +16,7 @@ from synapse.storage.engines import PostgresEngine
 from synapse.storage.prepare_database import get_statements
 
 import logging
-import ujson
+import simplejson
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ def run_create(cur, database_engine, *args, **kwargs):
             "rows_inserted": 0,
             "have_added_indexes": False,
         }
-        progress_json = ujson.dumps(progress)
+        progress_json = simplejson.dumps(progress)
 
         sql = (
             "INSERT into background_updates (update_name, progress_json)"
