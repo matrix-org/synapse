@@ -401,6 +401,7 @@ def run(hs):
     start_time = clock.time()
 
     stats = {}
+    stats_process = None
 
     @defer.inlineCallbacks
     def phone_stats_home():
@@ -427,6 +428,10 @@ def run(hs):
 
         daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
         stats["daily_sent_messages"] = daily_sent_messages
+        if stats_process is not None:
+            with stats_process.oneshot():
+                stats["memory_rss"] = stats_process.memory_info().rss
+                stats["cpu_average"] = int(stats_process.cpu_info(interval=None))
 
         logger.info("Reporting stats to matrix.org: %s" % (stats,))
         try:
@@ -438,6 +443,21 @@ def run(hs):
             logger.warn("Error reporting stats: %s", e)
 
     if hs.config.report_stats:
+        try:
+            import psutil
+            stats_process = psutil.Process()
+            # Ensure we can fetch both, and make the initial request for cpu_percent
+            # so the next request will use this as the initial point.
+            stats_process.memory_info().rss
+            stats_process.cpu_percent(interval=None)
+        except (ImportError, AttributeError):
+            logger.warn(
+                    "report_stats enabled but psutil is not installed or incorrect version."
+                    " Disabling reporting of memory/cpu stats."
+                    " Ensuring psutil is available will help matrix track performance changes across releases."
+            )
+            stats_process = None
+
         logger.info("Scheduling stats reporting for 3 hour intervals")
         clock.looping_call(phone_stats_home, 3 * 60 * 60 * 1000)
 
