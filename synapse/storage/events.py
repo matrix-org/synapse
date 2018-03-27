@@ -423,7 +423,7 @@ class EventsStore(EventsWorkerStore):
                                     prev_event_ids = set(e for e, _ in ev.prev_events)
                                     if latest_event_ids == prev_event_ids:
                                         state_delta_reuse_delta_counter.inc()
-                                    break
+                                        break
 
                             logger.info(
                                 "Calculating state delta for room %s", room_id,
