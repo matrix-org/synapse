@@ -415,10 +415,11 @@ class EventsStore(EventsWorkerStore):
                                 # processing one of these events.
                                 # What we're interested in is if the latest extremities
                                 # were the same when we created the event as they are
-                                # now. We guess this by looking at the prev events and
-                                # checking if they match up, as when this server creates
-                                # a new event it will use the extremities as the prev
-                                # events.
+                                # now. When this server creates a new event (as opposed
+                                # to receiving it over federation) it will use the
+                                # forward extremities as the prev_events, so we can
+                                # guess this by looking at the prev_events and checking
+                                # if they match the current forward extremities.
                                 for ev, _ in ev_ctx_rm:
                                     prev_event_ids = set(e for e, _ in ev.prev_events)
                                     if latest_event_ids == prev_event_ids:
