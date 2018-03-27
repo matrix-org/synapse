@@ -488,6 +488,7 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
     request.setHeader(b"Content-Type", b"application/json")
     request.setHeader(b"Server", version_string)
     request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
+    request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
 
     if send_cors:
         set_cors_headers(request)
