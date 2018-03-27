@@ -354,8 +354,11 @@ def _exception_to_failure(e):
         }
 
     # include ConnectionRefused and other errors
+    #
+    # Note that some Exceptions (notably twisted's ResponseFailed etc) don't
+    # give a string for e.message, which simplejson then fails to serialize.
     return {
-        "status": 503, "message": e.message,
+        "status": 503, "message": str(e.message),
     }
 
 
