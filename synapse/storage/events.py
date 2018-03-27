@@ -52,12 +52,19 @@ persist_event_counter = metrics.register_counter("persisted_events")
 event_counter = metrics.register_counter(
     "persisted_events_sep", labels=["type", "origin_type", "origin_entity"]
 )
+
+# The number of times we are recalculating the current state
 state_delta_counter = metrics.register_counter(
     "state_delta",
 )
+# The number of times we are recalculating state when there is only a
+# single forward extremity
 state_delta_single_event_counter = metrics.register_counter(
     "state_delta_single_event",
 )
+# The number of times we are reculating state when we could have resonably
+# calculated the delta when we calculated the state for an event we were
+# persisting.
 state_delta_reuse_delta_counter = metrics.register_counter(
     "state_delta_reuse_delta",
 )
