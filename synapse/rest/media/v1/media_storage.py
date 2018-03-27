@@ -25,7 +25,6 @@ import contextlib
 import os
 import logging
 import shutil
-import sys
 
 
 logger = logging.getLogger(__name__)
@@ -114,12 +113,11 @@ class MediaStorage(object):
             with open(fname, "wb") as f:
                 yield f, fname, finish
         except Exception:
-            t, v, tb = sys.exc_info()
             try:
                 os.remove(fname)
             except Exception:
                 pass
-            raise t, v, tb
+            raise
 
         if not finished_called:
             raise Exception("Finished callback not called")
