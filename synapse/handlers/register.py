@@ -350,9 +350,10 @@ class RegistrationHandler(BaseHandler):
     def _generate_user_id(self, reseed=False):
         if reseed or self._next_generated_user_id is None:
             with (yield self._generate_user_id_linearizer.queue(())):
-                self._next_generated_user_id = (
-                    yield self.store.find_next_generated_user_id_localpart()
-                )
+                if reseed or self._next_generated_user_id is None:
+                    self._next_generated_user_id = (
+                        yield self.store.find_next_generated_user_id_localpart()
+                    )
 
         id = self._next_generated_user_id
         self._next_generated_user_id += 1
