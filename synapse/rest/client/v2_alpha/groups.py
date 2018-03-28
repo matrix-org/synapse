@@ -413,7 +413,7 @@ class GroupJoinableServlet(RestServlet):
         self.groups_handler = hs.get_groups_local_handler()
 
     @defer.inlineCallbacks
-    def on_POST(self, request, group_id):
+    def on_PUT(self, request, group_id):
         requester = yield self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
