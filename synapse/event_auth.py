@@ -676,3 +676,32 @@ def auth_types_for_event(event):
                 auth_types.append(key)
 
     return auth_types
+
+
+def filter_dependent_state(keys, state):
+    if (EventTypes.Create, "") in keys:
+        return state
+
+    if (EventTypes.PowerLevels, "") in keys:
+        return state
+
+    def _filter_state(entry):
+        etype, state_key, sender = entry
+
+        if (etype, state_key) in keys:
+            return True
+
+        if (EventTypes.Member, sender) in keys:
+            return True
+
+        if etype == EventTypes.Member:
+            if (EventTypes.JoinRules, "") in keys:
+                return True
+
+            for t, _ in keys:
+                if t == EventTypes.ThirdPartyInvite:
+                    return True
+
+        return False
+
+    return filter(_filter_state, state)
