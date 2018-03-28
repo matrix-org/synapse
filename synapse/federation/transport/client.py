@@ -859,7 +859,7 @@ class TransportLayerClient(object):
 
     @log_function
     def set_group_joinable(self, destination, group_id, requester_user_id,
-                                  content):
+                           content):
         """Sets whether a group is joinable without an invite or knock
         """
         path = PREFIX + "/groups/%s/joinable" % (group_id,)
@@ -871,7 +871,6 @@ class TransportLayerClient(object):
             data=content,
             ignore_backoff=True,
         )
-
 
     @log_function
     def delete_group_summary_user(self, destination, group_id, requester_user_id,
