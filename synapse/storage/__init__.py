@@ -260,7 +260,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 ) u
             """
 
-            txn.execute(sql, (yesterday,))
+            txn.execute(sql, (str(yesterday),))
             count, = txn.fetchone()
             return count
 
