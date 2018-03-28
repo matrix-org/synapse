@@ -157,8 +157,8 @@ if you prefer.
 
 In case of problems, please see the _`Troubleshooting` section below.
 
-Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
-above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
+Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a Dockerfile to automate the
+above in Docker at https://hub.docker.com/r/avhost/docker-matrix/tags/
 
 Also, Martin Giess has created an auto-deployment process with vagrant/ansible,
 tested with VirtualBox/AWS/DigitalOcean - see https://github.com/EMnify/matrix-synapse-auto-deploy
