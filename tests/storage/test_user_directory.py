@@ -62,7 +62,7 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
         self.assertFalse(r["limited"])
         self.assertEqual(1, len(r["results"]))
         self.assertDictEqual(r["results"][0], {
-            "d.user_id": BOB,
+            "user_id": BOB,
             "display_name": "bob",
             "avatar_url": None,
         })
