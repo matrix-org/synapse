@@ -1,3 +1,23 @@
+Changes in synapse v0.27.2 (2018-03-26)
+=======================================
+
+Bug fixes:
+
+* Fix bug which broke TCP replication between workers (PR #3015)
+
+
+Changes in synapse v0.27.1 (2018-03-26)
+=======================================
+
+Meta release as v0.27.0 temporarily pointed to the wrong commit
+
+
+Changes in synapse v0.27.0 (2018-03-26)
+=======================================
+
+No changes since v0.27.0-rc2
+
+
 Changes in synapse v0.27.0-rc2 (2018-03-19)
 ===========================================
 
