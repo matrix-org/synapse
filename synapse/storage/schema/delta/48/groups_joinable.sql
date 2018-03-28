@@ -13,4 +13,4 @@
  * limitations under the License.
  */
 
-ALTER TABLE groups ADD COLUMN is_joinable BOOL DEFAULT 0 NOT NULL;
+ALTER TABLE groups ADD COLUMN is_joinable SMALLINT DEFAULT 0 NOT NULL;
