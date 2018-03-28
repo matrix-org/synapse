@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
-# Copyright 2017 New Vector Ltd
+# Copyright 2017 - 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.internet import defer
+from twisted.internet import defer, reactor
+from twisted.python.failure import Failure
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
@@ -24,10 +25,12 @@ from synapse.types import (
     UserID, RoomAlias, RoomStreamToken,
 )
 from synapse.util.async import run_on_reactor, ReadWriteLock, Limiter
-from synapse.util.logcontext import preserve_fn
+from synapse.util.logcontext import preserve_fn, run_in_background
 from synapse.util.metrics import measure_func
 from synapse.util.frozenutils import unfreeze
+from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
+from synapse.replication.http.send_event import send_event_to_master
 
 from ._base import BaseHandler
 
@@ -35,9 +38,39 @@ from canonicaljson import encode_canonical_json
 
 import logging
 import random
-import ujson
+import simplejson
 
 logger = logging.getLogger(__name__)
+
+
+class PurgeStatus(object):
+    """Object tracking the status of a purge request
+
+    This class contains information on the progress of a purge request, for
+    return by get_purge_status.
+
+    Attributes:
+        status (int): Tracks whether this request has completed. One of
+            STATUS_{ACTIVE,COMPLETE,FAILED}
+    """
+
+    STATUS_ACTIVE = 0
+    STATUS_COMPLETE = 1
+    STATUS_FAILED = 2
+
+    STATUS_TEXT = {
+        STATUS_ACTIVE: "active",
+        STATUS_COMPLETE: "complete",
+        STATUS_FAILED: "failed",
+    }
+
+    def __init__(self):
+        self.status = PurgeStatus.STATUS_ACTIVE
+
+    def asdict(self):
+        return {
+            "status": PurgeStatus.STATUS_TEXT[self.status]
+        }
 
 
 class MessageHandler(BaseHandler):
@@ -47,32 +80,89 @@ class MessageHandler(BaseHandler):
         self.hs = hs
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
-        self.validator = EventValidator()
-        self.profile_handler = hs.get_profile_handler()
 
         self.pagination_lock = ReadWriteLock()
+        self._purges_in_progress_by_room = set()
+        # map from purge id to PurgeStatus
+        self._purges_by_id = {}
 
-        self.pusher_pool = hs.get_pusherpool()
+    def start_purge_history(self, room_id, topological_ordering,
+                            delete_local_events=False):
+        """Start off a history purge on a room.
 
-        # We arbitrarily limit concurrent event creation for a room to 5.
-        # This is to stop us from diverging history *too* much.
-        self.limiter = Limiter(max_count=5)
+        Args:
+            room_id (str): The room to purge from
 
-        self.action_generator = hs.get_action_generator()
+            topological_ordering (int): minimum topo ordering to preserve
+            delete_local_events (bool): True to delete local events as well as
+                remote ones
 
-        self.spam_checker = hs.get_spam_checker()
+        Returns:
+            str: unique ID for this purge transaction.
+        """
+        if room_id in self._purges_in_progress_by_room:
+            raise SynapseError(
+                400,
+                "History purge already in progress for %s" % (room_id, ),
+            )
+
+        purge_id = random_string(16)
+
+        # we log the purge_id here so that it can be tied back to the
+        # request id in the log lines.
+        logger.info("[purge] starting purge_id %s", purge_id)
+
+        self._purges_by_id[purge_id] = PurgeStatus()
+        run_in_background(
+            self._purge_history,
+            purge_id, room_id, topological_ordering, delete_local_events,
+        )
+        return purge_id
 
     @defer.inlineCallbacks
-    def purge_history(self, room_id, event_id):
-        event = yield self.store.get_event(event_id)
+    def _purge_history(self, purge_id, room_id, topological_ordering,
+                       delete_local_events):
+        """Carry out a history purge on a room.
 
-        if event.room_id != room_id:
-            raise SynapseError(400, "Event is for wrong room.")
+        Args:
+            purge_id (str): The id for this purge
+            room_id (str): The room to purge from
+            topological_ordering (int): minimum topo ordering to preserve
+            delete_local_events (bool): True to delete local events as well as
+                remote ones
 
-        depth = event.depth
+        Returns:
+            Deferred
+        """
+        self._purges_in_progress_by_room.add(room_id)
+        try:
+            with (yield self.pagination_lock.write(room_id)):
+                yield self.store.purge_history(
+                    room_id, topological_ordering, delete_local_events,
+                )
+            logger.info("[purge] complete")
+            self._purges_by_id[purge_id].status = PurgeStatus.STATUS_COMPLETE
+        except Exception:
+            logger.error("[purge] failed: %s", Failure().getTraceback().rstrip())
+            self._purges_by_id[purge_id].status = PurgeStatus.STATUS_FAILED
+        finally:
+            self._purges_in_progress_by_room.discard(room_id)
 
-        with (yield self.pagination_lock.write(room_id)):
-            yield self.store.delete_old_state(room_id, depth)
+            # remove the purge from the list 24 hours after it completes
+            def clear_purge():
+                del self._purges_by_id[purge_id]
+            reactor.callLater(24 * 3600, clear_purge)
+
+    def get_purge_status(self, purge_id):
+        """Get the current status of an active purge
+
+        Args:
+            purge_id (str): purge_id returned by start_purge_history
+
+        Returns:
+            PurgeStatus|None
+        """
+        return self._purges_by_id.get(purge_id)
 
     @defer.inlineCallbacks
     def get_messages(self, requester, room_id=None, pagin_config=None,
@@ -181,166 +271,6 @@ class MessageHandler(BaseHandler):
         }
 
         defer.returnValue(chunk)
-
-    @defer.inlineCallbacks
-    def create_event(self, requester, event_dict, token_id=None, txn_id=None,
-                     prev_event_ids=None):
-        """
-        Given a dict from a client, create a new event.
-
-        Creates an FrozenEvent object, filling out auth_events, prev_events,
-        etc.
-
-        Adds display names to Join membership events.
-
-        Args:
-            requester
-            event_dict (dict): An entire event
-            token_id (str)
-            txn_id (str)
-            prev_event_ids (list): The prev event ids to use when creating the event
-
-        Returns:
-            Tuple of created event (FrozenEvent), Context
-        """
-        builder = self.event_builder_factory.new(event_dict)
-
-        with (yield self.limiter.queue(builder.room_id)):
-            self.validator.validate_new(builder)
-
-            if builder.type == EventTypes.Member:
-                membership = builder.content.get("membership", None)
-                target = UserID.from_string(builder.state_key)
-
-                if membership in {Membership.JOIN, Membership.INVITE}:
-                    # If event doesn't include a display name, add one.
-                    profile = self.profile_handler
-                    content = builder.content
-
-                    try:
-                        if "displayname" not in content:
-                            content["displayname"] = yield profile.get_displayname(target)
-                        if "avatar_url" not in content:
-                            content["avatar_url"] = yield profile.get_avatar_url(target)
-                    except Exception as e:
-                        logger.info(
-                            "Failed to get profile information for %r: %s",
-                            target, e
-                        )
-
-            if token_id is not None:
-                builder.internal_metadata.token_id = token_id
-
-            if txn_id is not None:
-                builder.internal_metadata.txn_id = txn_id
-
-            event, context = yield self._create_new_client_event(
-                builder=builder,
-                requester=requester,
-                prev_event_ids=prev_event_ids,
-            )
-
-        defer.returnValue((event, context))
-
-    @defer.inlineCallbacks
-    def send_nonmember_event(self, requester, event, context, ratelimit=True):
-        """
-        Persists and notifies local clients and federation of an event.
-
-        Args:
-            event (FrozenEvent) the event to send.
-            context (Context) the context of the event.
-            ratelimit (bool): Whether to rate limit this send.
-            is_guest (bool): Whether the sender is a guest.
-        """
-        if event.type == EventTypes.Member:
-            raise SynapseError(
-                500,
-                "Tried to send member event through non-member codepath"
-            )
-
-        # We check here if we are currently being rate limited, so that we
-        # don't do unnecessary work. We check again just before we actually
-        # send the event.
-        yield self.ratelimit(requester, update=False)
-
-        user = UserID.from_string(event.sender)
-
-        assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
-
-        if event.is_state():
-            prev_state = yield self.deduplicate_state_event(event, context)
-            if prev_state is not None:
-                defer.returnValue(prev_state)
-
-        yield self.handle_new_client_event(
-            requester=requester,
-            event=event,
-            context=context,
-            ratelimit=ratelimit,
-        )
-
-        if event.type == EventTypes.Message:
-            presence = self.hs.get_presence_handler()
-            # We don't want to block sending messages on any presence code. This
-            # matters as sometimes presence code can take a while.
-            preserve_fn(presence.bump_presence_active_time)(user)
-
-    @defer.inlineCallbacks
-    def deduplicate_state_event(self, event, context):
-        """
-        Checks whether event is in the latest resolved state in context.
-
-        If so, returns the version of the event in context.
-        Otherwise, returns None.
-        """
-        prev_event_id = context.prev_state_ids.get((event.type, event.state_key))
-        prev_event = yield self.store.get_event(prev_event_id, allow_none=True)
-        if not prev_event:
-            return
-
-        if prev_event and event.user_id == prev_event.user_id:
-            prev_content = encode_canonical_json(prev_event.content)
-            next_content = encode_canonical_json(event.content)
-            if prev_content == next_content:
-                defer.returnValue(prev_event)
-        return
-
-    @defer.inlineCallbacks
-    def create_and_send_nonmember_event(
-        self,
-        requester,
-        event_dict,
-        ratelimit=True,
-        txn_id=None
-    ):
-        """
-        Creates an event, then sends it.
-
-        See self.create_event and self.send_nonmember_event.
-        """
-        event, context = yield self.create_event(
-            requester,
-            event_dict,
-            token_id=requester.access_token_id,
-            txn_id=txn_id
-        )
-
-        spam_error = self.spam_checker.check_event_for_spam(event)
-        if spam_error:
-            if not isinstance(spam_error, basestring):
-                spam_error = "Spam is not permitted here"
-            raise SynapseError(
-                403, spam_error, Codes.FORBIDDEN
-            )
-
-        yield self.send_nonmember_event(
-            requester,
-            event,
-            context,
-            ratelimit=ratelimit,
-        )
-        defer.returnValue(event)
 
     @defer.inlineCallbacks
     def get_room_data(self, user_id=None, room_id=None,
@@ -470,9 +400,189 @@ class MessageHandler(BaseHandler):
             for user_id, profile in users_with_profile.iteritems()
         })
 
-    @measure_func("_create_new_client_event")
+
+class EventCreationHandler(object):
+    def __init__(self, hs):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+        self.state = hs.get_state_handler()
+        self.clock = hs.get_clock()
+        self.validator = EventValidator()
+        self.profile_handler = hs.get_profile_handler()
+        self.event_builder_factory = hs.get_event_builder_factory()
+        self.server_name = hs.hostname
+        self.ratelimiter = hs.get_ratelimiter()
+        self.notifier = hs.get_notifier()
+        self.config = hs.config
+
+        self.http_client = hs.get_simple_http_client()
+
+        # This is only used to get at ratelimit function, and maybe_kick_guest_users
+        self.base_handler = BaseHandler(hs)
+
+        self.pusher_pool = hs.get_pusherpool()
+
+        # We arbitrarily limit concurrent event creation for a room to 5.
+        # This is to stop us from diverging history *too* much.
+        self.limiter = Limiter(max_count=5)
+
+        self.action_generator = hs.get_action_generator()
+
+        self.spam_checker = hs.get_spam_checker()
+
     @defer.inlineCallbacks
-    def _create_new_client_event(self, builder, requester=None, prev_event_ids=None):
+    def create_event(self, requester, event_dict, token_id=None, txn_id=None,
+                     prev_event_ids=None):
+        """
+        Given a dict from a client, create a new event.
+
+        Creates an FrozenEvent object, filling out auth_events, prev_events,
+        etc.
+
+        Adds display names to Join membership events.
+
+        Args:
+            requester
+            event_dict (dict): An entire event
+            token_id (str)
+            txn_id (str)
+            prev_event_ids (list): The prev event ids to use when creating the event
+
+        Returns:
+            Tuple of created event (FrozenEvent), Context
+        """
+        builder = self.event_builder_factory.new(event_dict)
+
+        with (yield self.limiter.queue(builder.room_id)):
+            self.validator.validate_new(builder)
+
+            if builder.type == EventTypes.Member:
+                membership = builder.content.get("membership", None)
+                target = UserID.from_string(builder.state_key)
+
+                if membership in {Membership.JOIN, Membership.INVITE}:
+                    # If event doesn't include a display name, add one.
+                    profile = self.profile_handler
+                    content = builder.content
+
+                    try:
+                        if "displayname" not in content:
+                            content["displayname"] = yield profile.get_displayname(target)
+                        if "avatar_url" not in content:
+                            content["avatar_url"] = yield profile.get_avatar_url(target)
+                    except Exception as e:
+                        logger.info(
+                            "Failed to get profile information for %r: %s",
+                            target, e
+                        )
+
+            if token_id is not None:
+                builder.internal_metadata.token_id = token_id
+
+            if txn_id is not None:
+                builder.internal_metadata.txn_id = txn_id
+
+            event, context = yield self.create_new_client_event(
+                builder=builder,
+                requester=requester,
+                prev_event_ids=prev_event_ids,
+            )
+
+        defer.returnValue((event, context))
+
+    @defer.inlineCallbacks
+    def send_nonmember_event(self, requester, event, context, ratelimit=True):
+        """
+        Persists and notifies local clients and federation of an event.
+
+        Args:
+            event (FrozenEvent) the event to send.
+            context (Context) the context of the event.
+            ratelimit (bool): Whether to rate limit this send.
+            is_guest (bool): Whether the sender is a guest.
+        """
+        if event.type == EventTypes.Member:
+            raise SynapseError(
+                500,
+                "Tried to send member event through non-member codepath"
+            )
+
+        user = UserID.from_string(event.sender)
+
+        assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
+
+        if event.is_state():
+            prev_state = yield self.deduplicate_state_event(event, context)
+            if prev_state is not None:
+                defer.returnValue(prev_state)
+
+        yield self.handle_new_client_event(
+            requester=requester,
+            event=event,
+            context=context,
+            ratelimit=ratelimit,
+        )
+
+    @defer.inlineCallbacks
+    def deduplicate_state_event(self, event, context):
+        """
+        Checks whether event is in the latest resolved state in context.
+
+        If so, returns the version of the event in context.
+        Otherwise, returns None.
+        """
+        prev_event_id = context.prev_state_ids.get((event.type, event.state_key))
+        prev_event = yield self.store.get_event(prev_event_id, allow_none=True)
+        if not prev_event:
+            return
+
+        if prev_event and event.user_id == prev_event.user_id:
+            prev_content = encode_canonical_json(prev_event.content)
+            next_content = encode_canonical_json(event.content)
+            if prev_content == next_content:
+                defer.returnValue(prev_event)
+        return
+
+    @defer.inlineCallbacks
+    def create_and_send_nonmember_event(
+        self,
+        requester,
+        event_dict,
+        ratelimit=True,
+        txn_id=None
+    ):
+        """
+        Creates an event, then sends it.
+
+        See self.create_event and self.send_nonmember_event.
+        """
+        event, context = yield self.create_event(
+            requester,
+            event_dict,
+            token_id=requester.access_token_id,
+            txn_id=txn_id
+        )
+
+        spam_error = self.spam_checker.check_event_for_spam(event)
+        if spam_error:
+            if not isinstance(spam_error, basestring):
+                spam_error = "Spam is not permitted here"
+            raise SynapseError(
+                403, spam_error, Codes.FORBIDDEN
+            )
+
+        yield self.send_nonmember_event(
+            requester,
+            event,
+            context,
+            ratelimit=ratelimit,
+        )
+        defer.returnValue(event)
+
+    @measure_func("create_new_client_event")
+    @defer.inlineCallbacks
+    def create_new_client_event(self, builder, requester=None, prev_event_ids=None):
         if prev_event_ids:
             prev_events = yield self.store.add_event_hashes(prev_event_ids)
             prev_max_depth = yield self.store.get_max_depth_of_events(prev_event_ids)
@@ -509,9 +619,7 @@ class MessageHandler(BaseHandler):
         builder.prev_events = prev_events
         builder.depth = depth
 
-        state_handler = self.state_handler
-
-        context = yield state_handler.compute_event_context(builder)
+        context = yield self.state.compute_event_context(builder)
         if requester:
             context.app_service = requester.app_service
 
@@ -546,12 +654,21 @@ class MessageHandler(BaseHandler):
         event,
         context,
         ratelimit=True,
-        extra_users=[]
+        extra_users=[],
     ):
-        # We now need to go and hit out to wherever we need to hit out to.
+        """Processes a new event. This includes checking auth, persisting it,
+        notifying users, sending to remote servers, etc.
 
-        if ratelimit:
-            yield self.ratelimit(requester)
+        If called from a worker will hit out to the master process for final
+        processing.
+
+        Args:
+            requester (Requester)
+            event (FrozenEvent)
+            context (EventContext)
+            ratelimit (bool)
+            extra_users (list(UserID)): Any extra users to notify about event
+        """
 
         try:
             yield self.auth.check_from_context(event, context)
@@ -561,13 +678,64 @@ class MessageHandler(BaseHandler):
 
         # Ensure that we can round trip before trying to persist in db
         try:
-            dump = ujson.dumps(unfreeze(event.content))
-            ujson.loads(dump)
+            dump = simplejson.dumps(unfreeze(event.content))
+            simplejson.loads(dump)
         except Exception:
             logger.exception("Failed to encode content: %r", event.content)
             raise
 
-        yield self.maybe_kick_guest_users(event, context)
+        yield self.action_generator.handle_push_actions_for_event(
+            event, context
+        )
+
+        try:
+            # If we're a worker we need to hit out to the master.
+            if self.config.worker_app:
+                yield send_event_to_master(
+                    self.http_client,
+                    host=self.config.worker_replication_host,
+                    port=self.config.worker_replication_http_port,
+                    requester=requester,
+                    event=event,
+                    context=context,
+                    ratelimit=ratelimit,
+                    extra_users=extra_users,
+                )
+                return
+
+            yield self.persist_and_notify_client_event(
+                requester,
+                event,
+                context,
+                ratelimit=ratelimit,
+                extra_users=extra_users,
+            )
+        except:  # noqa: E722, as we reraise the exception this is fine.
+            # Ensure that we actually remove the entries in the push actions
+            # staging area, if we calculated them.
+            preserve_fn(self.store.remove_push_actions_from_staging)(event.event_id)
+            raise
+
+    @defer.inlineCallbacks
+    def persist_and_notify_client_event(
+        self,
+        requester,
+        event,
+        context,
+        ratelimit=True,
+        extra_users=[],
+    ):
+        """Called when we have fully built the event, have already
+        calculated the push actions for the event, and checked auth.
+
+        This should only be run on master.
+        """
+        assert not self.config.worker_app
+
+        if ratelimit:
+            yield self.base_handler.ratelimit(requester)
+
+        yield self.base_handler.maybe_kick_guest_users(event, context)
 
         if event.type == EventTypes.CanonicalAlias:
             # Check the alias is acually valid (at this time at least)
@@ -660,10 +828,6 @@ class MessageHandler(BaseHandler):
                 "Changing the room create event is forbidden",
             )
 
-        yield self.action_generator.handle_push_actions_for_event(
-            event, context
-        )
-
         (event_stream_id, max_stream_id) = yield self.store.persist_event(
             event, context=context
         )
@@ -683,3 +847,9 @@ class MessageHandler(BaseHandler):
             )
 
         preserve_fn(_notify)()
+
+        if event.type == EventTypes.Message:
+            presence = self.hs.get_presence_handler()
+            # We don't want to block sending messages on any presence code. This
+            # matters as sometimes presence code can take a while.
+            preserve_fn(presence.bump_presence_active_time)(requester.user)

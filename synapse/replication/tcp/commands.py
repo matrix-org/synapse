@@ -19,7 +19,7 @@ allowed to be sent by which side.
 """
 
 import logging
-import ujson as json
+import simplejson
 
 
 logger = logging.getLogger(__name__)
@@ -100,14 +100,14 @@ class RdataCommand(Command):
         return cls(
             stream_name,
             None if token == "batch" else int(token),
-            json.loads(row_json)
+            simplejson.loads(row_json)
         )
 
     def to_line(self):
         return " ".join((
             self.stream_name,
             str(self.token) if self.token is not None else "batch",
-            json.dumps(self.row),
+            simplejson.dumps(self.row, namedtuple_as_object=False),
         ))
 
 
@@ -298,10 +298,12 @@ class InvalidateCacheCommand(Command):
     def from_line(cls, line):
         cache_func, keys_json = line.split(" ", 1)
 
-        return cls(cache_func, json.loads(keys_json))
+        return cls(cache_func, simplejson.loads(keys_json))
 
     def to_line(self):
-        return " ".join((self.cache_func, json.dumps(self.keys)))
+        return " ".join((
+            self.cache_func, simplejson.dumps(self.keys, namedtuple_as_object=False)
+        ))
 
 
 class UserIpCommand(Command):
@@ -325,14 +327,14 @@ class UserIpCommand(Command):
     def from_line(cls, line):
         user_id, jsn = line.split(" ", 1)
 
-        access_token, ip, user_agent, device_id, last_seen = json.loads(jsn)
+        access_token, ip, user_agent, device_id, last_seen = simplejson.loads(jsn)
 
         return cls(
             user_id, access_token, ip, user_agent, device_id, last_seen
         )
 
     def to_line(self):
-        return self.user_id + " " + json.dumps((
+        return self.user_id + " " + simplejson.dumps((
             self.access_token, self.ip, self.user_agent, self.device_id,
             self.last_seen,
         ))

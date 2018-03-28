@@ -23,7 +23,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import Membership
 from synapse.api.errors import (
-    CodeMessageException, HttpResponseException, SynapseError,
+    CodeMessageException, HttpResponseException, SynapseError, FederationDeniedError
 )
 from synapse.events import builder
 from synapse.federation.federation_base import (
@@ -58,6 +58,7 @@ class FederationClient(FederationBase):
             self._clear_tried_cache, 60 * 1000,
         )
         self.state = hs.get_state_handler()
+        self.transport_layer = hs.get_federation_transport_client()
 
     def _clear_tried_cache(self):
         """Clear pdu_destination_tried cache"""
@@ -264,6 +265,9 @@ class FederationClient(FederationBase):
                     event_id, destination, e,
                 )
             except NotRetryingDestination as e:
+                logger.info(e.message)
+                continue
+            except FederationDeniedError as e:
                 logger.info(e.message)
                 continue
             except Exception as e:

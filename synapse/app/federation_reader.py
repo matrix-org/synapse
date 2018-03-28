@@ -41,7 +41,7 @@ from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
 from twisted.internet import reactor
-from twisted.web.resource import Resource
+from twisted.web.resource import NoResource
 
 logger = logging.getLogger("synapse.app.federation_reader")
 
@@ -58,19 +58,6 @@ class FederationReaderSlavedStore(
 
 
 class FederationReaderServer(HomeServer):
-    def get_db_conn(self, run_new_connection=True):
-        # Any param beginning with cp_ is a parameter for adbapi, and should
-        # not be passed to the database engine.
-        db_params = {
-            k: v for k, v in self.db_config.get("args", {}).items()
-            if not k.startswith("cp_")
-        }
-        db_conn = self.database_engine.module.connect(**db_params)
-
-        if run_new_connection:
-            self.database_engine.on_new_connection(db_conn)
-        return db_conn
-
     def setup(self):
         logger.info("Setting up.")
         self.datastore = FederationReaderSlavedStore(self.get_db_conn(), self)
@@ -90,7 +77,7 @@ class FederationReaderServer(HomeServer):
                         FEDERATION_PREFIX: TransportLayerServer(self),
                     })
 
-        root_resource = create_resource_tree(resources, Resource())
+        root_resource = create_resource_tree(resources, NoResource())
 
         _base.listen_tcp(
             bind_addresses,
@@ -157,7 +144,6 @@ def start(config_options):
     )
 
     ss.setup()
-    ss.get_handlers()
     ss.start_listening(config.worker_listeners)
 
     def start():

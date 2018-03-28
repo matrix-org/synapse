@@ -114,7 +114,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
 
         hs = yield setup_test_homeserver(
             http_client=None,
-            replication_layer=Mock(),
+            federation_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
