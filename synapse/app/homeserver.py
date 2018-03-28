@@ -425,7 +425,9 @@ def run(hs):
         stats["daily_active_rooms"] = yield hs.get_datastore().count_daily_active_rooms()
         stats["daily_messages"] = yield hs.get_datastore().count_daily_messages()
 
-        stats["r30_users_all"] = yield hs.get_datastore().count_r30_users()
+        r30_results = yield hs.get_datastore().count_r30_users()
+        for name, count in r30_results.items():
+            stats["r30_users_" + name] = count
 
         daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
         stats["daily_sent_messages"] = daily_sent_messages

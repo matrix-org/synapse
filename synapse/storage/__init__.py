@@ -280,6 +280,15 @@ class DataStore(RoomMemberStore, RoomStore,
             now = int(self._clock.time_msec())
             thirty_days_ago_in_secs = now - thirty_days_in_secs
 
+            # Are these filters sufficiently robust?
+            filters = {
+                "ALL": "",
+                "IOS": "^(Vector|Riot|Riot\.im)\/.* iOS",
+                "ANDROID": "^(Dalvik|Riot|Riot\.im)\/.* Android",
+                "ELECTRON": "Electron",
+                "WEB": "(Gecko|Mozilla)",
+            }
+
             sql = """
                 SELECT COALESCE(count(*), 0) FROM (
                     SELECT users.name, users.creation_ts * 1000, MAX(user_ips.last_seen)
@@ -289,16 +298,27 @@ class DataStore(RoomMemberStore, RoomStore,
                     AND users.creation_ts < ?
                     AND user_ips.last_seen/1000 > ?
                     AND (user_ips.last_seen/1000) - users.creation_ts > ?
-                    GROUP BY users.name, users.creation_ts
-                ) u
             """
 
-            txn.execute(sql, (thirty_days_ago_in_secs,
-                              thirty_days_ago_in_secs,
-                              thirty_days_in_secs))
+            if isinstance(self.database_engine, PostgresEngine):
+                sql = sql + "AND user_ips.user_agent ~ ? "
+            sql = sql + "GROUP BY users.name, users.creation_ts ) u"
 
-            count, = txn.fetchone()
-            return count
+            results = {}
+            if isinstance(self.database_engine, PostgresEngine):
+                for filter_name, user_agent_filter in filters.items():
+                    txn.execute(sql, (thirty_days_ago_in_secs,
+                                      thirty_days_ago_in_secs,
+                                      thirty_days_in_secs,
+                                      user_agent_filter))
+                    results[filter_name], = txn.fetchone()
+
+            else:
+                txn.execute(sql, (thirty_days_ago_in_secs,
+                                  thirty_days_ago_in_secs,
+                                  thirty_days_in_secs))
+                results["ALL"], = txn.fetchone()
+            return results
 
         ret = yield self.runInteraction("count_r30_users", _count_r30_users)
         defer.returnValue(ret)
