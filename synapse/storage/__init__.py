@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
 from synapse.storage.devices import DeviceStore
 from .appservice import (
     ApplicationServiceStore, ApplicationServiceTransactionStore
@@ -264,7 +262,6 @@ class DataStore(RoomMemberStore, RoomStore,
             return count
 
         return self.runInteraction("count_users", _count_users)
-
 
     def count_r30_users(self):
         """
