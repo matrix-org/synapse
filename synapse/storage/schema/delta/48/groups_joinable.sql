@@ -13,4 +13,4 @@
  * limitations under the License.
  */
 
-ALTER TABLE groups ADD COLUMN is_joinable BOOLEAN NOT NULL DEFAULT (CAST(0 AS BOOLEAN));
+ALTER TABLE groups ADD COLUMN is_joinable BOOL DEFAULT 0 NOT NULL;
