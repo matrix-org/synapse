@@ -401,6 +401,9 @@ def run(hs):
     start_time = clock.time()
 
     stats = {}
+
+    # Contains the list of processes we will be monitoring
+    # currently either 0 or 1
     stats_process = []
 
     @defer.inlineCallbacks
@@ -428,13 +431,13 @@ def run(hs):
 
         daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
         stats["daily_sent_messages"] = daily_sent_messages
+
         if len(stats_process) > 0:
             stats["memory_rss"] = 0
             stats["cpu_average"] = 0
             for process in stats_process:
-                with process.oneshot():
-                    stats["memory_rss"] += process.memory_info().rss
-                    stats["cpu_average"] += int(process.cpu_percent(interval=None))
+                stats["memory_rss"] += process.memory_info().rss
+                stats["cpu_average"] += int(process.cpu_percent(interval=None))
 
         logger.info("Reporting stats to matrix.org: %s" % (stats,))
         try:
@@ -459,8 +462,8 @@ def run(hs):
             logger.warn(
                 "report_stats enabled but psutil is not installed or incorrect version."
                 " Disabling reporting of memory/cpu stats."
-                " Ensuring psutil is available will help matrix track performance changes"
-                " across releases."
+                " Ensuring psutil is available will help matrix.org track performance"
+                " changes across releases."
             )
 
     if hs.config.report_stats:
@@ -469,7 +472,7 @@ def run(hs):
 
         # We need to defer this init for the cases that we daemonize
         # otherwise the process ID we get is that of the non-daemon process
-        clock.call_later(15, performance_stats_init)
+        clock.call_later(0, performance_stats_init)
 
         # We wait 5 minutes to send the first set of stats as the server can
         # be quite busy the first few minutes
