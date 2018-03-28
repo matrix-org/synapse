@@ -24,7 +24,7 @@ from synapse.api.errors import (
 from synapse.http.client import CaptchaServerHttpClient
 from synapse import types
 from synapse.types import UserID, create_requester, RoomID, RoomAlias
-from synapse.util.async import run_on_reactor
+from synapse.util.async import run_on_reactor, Linearizer
 from synapse.util.threepids import check_3pid_allowed
 from ._base import BaseHandler
 
@@ -45,6 +45,10 @@ class RegistrationHandler(BaseHandler):
         self._next_generated_user_id = None
 
         self.macaroon_gen = hs.get_macaroon_generator()
+
+        self._generate_user_id_linearizer = Linearizer(
+            name="_generate_user_id_linearizer",
+        )
 
     @defer.inlineCallbacks
     def check_username(self, localpart, guest_access_token=None,
@@ -352,9 +356,11 @@ class RegistrationHandler(BaseHandler):
     @defer.inlineCallbacks
     def _generate_user_id(self, reseed=False):
         if reseed or self._next_generated_user_id is None:
-            self._next_generated_user_id = (
-                yield self.store.find_next_generated_user_id_localpart()
-            )
+            with (yield self._generate_user_id_linearizer.queue(())):
+                if reseed or self._next_generated_user_id is None:
+                    self._next_generated_user_id = (
+                        yield self.store.find_next_generated_user_id_localpart()
+                    )
 
         id = self._next_generated_user_id
         self._next_generated_user_id += 1

@@ -37,7 +37,7 @@ from twisted.web.util import redirectTo
 import collections
 import logging
 import urllib
-import ujson
+import simplejson
 
 logger = logging.getLogger(__name__)
 
@@ -461,8 +461,7 @@ def respond_with_json(request, code, json_object, send_cors=False,
         if canonical_json or synapse.events.USE_FROZEN_DICTS:
             json_bytes = encode_canonical_json(json_object)
         else:
-            # ujson doesn't like frozen_dicts.
-            json_bytes = ujson.dumps(json_object, ensure_ascii=False)
+            json_bytes = simplejson.dumps(json_object)
 
     return respond_with_json_bytes(
         request, code, json_bytes,
@@ -489,6 +488,7 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
     request.setHeader(b"Content-Type", b"application/json")
     request.setHeader(b"Server", version_string)
     request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
+    request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
 
     if send_cors:
         set_cors_headers(request)

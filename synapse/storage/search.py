@@ -16,7 +16,7 @@
 from collections import namedtuple
 import logging
 import re
-import ujson as json
+import simplejson as json
 
 from twisted.internet import defer
 

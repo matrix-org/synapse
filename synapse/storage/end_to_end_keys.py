@@ -17,7 +17,7 @@ from twisted.internet import defer
 from synapse.util.caches.descriptors import cached
 
 from canonicaljson import encode_canonical_json
-import ujson as json
+import simplejson as json
 
 from ._base import SQLBaseStore
 
