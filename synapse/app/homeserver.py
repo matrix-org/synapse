@@ -425,6 +425,8 @@ def run(hs):
         stats["daily_active_rooms"] = yield hs.get_datastore().count_daily_active_rooms()
         stats["daily_messages"] = yield hs.get_datastore().count_daily_messages()
 
+        stats["r30_users"] = yield hs.get_datastore().count_r30_users()
+
         daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
         stats["daily_sent_messages"] = daily_sent_messages
 

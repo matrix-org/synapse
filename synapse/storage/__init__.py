@@ -267,6 +267,42 @@ class DataStore(RoomMemberStore, RoomStore,
         ret = yield self.runInteraction("count_users", _count_users)
         defer.returnValue(ret)
 
+    @defer.inlineCallbacks
+    def count_r30_users(self):
+        """
+        Counts the number of 30 day retained users, defined as:-
+         * Users who have created their accounts more than 30 days
+         * Where last seen at most 30 days ago
+         * Where account creation and last_seen are > 30 days
+        """
+        def _count_r30_users(txn):
+            thirty_days_in_secs = 86400 * 30
+            now = int(self._clock.time_msec())
+            thirty_days_ago_in_secs = now - thirty_days_in_secs
+
+            sql = """
+                SELECT COALESCE(count(*), 0) FROM (
+                    SELECT users.name, users.creation_ts * 1000, MAX(user_ips.last_seen)
+                    FROM users, user_ips
+                    WHERE users.name = user_ips.user_id
+                    AND appservice_id is NULL
+                    AND users.creation_ts < ?
+                    AND user_ips.last_seen/1000 > ?
+                    AND (user_ips.last_seen/1000) - users.creation_ts > ?
+                    GROUP BY users.name, users.creation_ts
+                ) u
+            """
+
+            txn.execute(sql, (thirty_days_ago_in_secs,
+                              thirty_days_ago_in_secs,
+                              thirty_days_in_secs))
+
+            count, = txn.fetchone()
+            return count
+
+        ret = yield self.runInteraction("count_r30_users", _count_r30_users)
+        defer.returnValue(ret)
+
     def get_users(self):
         """Function to reterive a list of users in users table.
 
