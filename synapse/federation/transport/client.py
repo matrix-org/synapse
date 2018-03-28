@@ -615,6 +615,19 @@ class TransportLayerClient(object):
         )
 
     @log_function
+    def join_group(self, destination, group_id, user_id, content):
+        """Attempts to join a group
+        """
+        path = PREFIX + "/groups/%s/users/%s/join" % (group_id, user_id)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            data=content,
+            ignore_backoff=True,
+        )
+
+    @log_function
     def invite_to_group(self, destination, group_id, user_id, requester_user_id, content):
         """Invite a user to a group
         """

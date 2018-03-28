@@ -724,6 +724,51 @@ class GroupsServerHandler(object):
         })
 
     @defer.inlineCallbacks
+    def join_group(self, group_id, requester_user_id, content):
+        """User tries to join the group.
+
+        This will error if the group requires an invite/knock to join
+        """
+
+        yield self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
+
+        group_info = yield self.store.get_group(
+            group_id,
+        )
+        if not group_info['is_joinable']:
+            raise SynapseError(403, "Group is not publicly joinable")
+
+        if not self.hs.is_mine_id(requester_user_id):
+            local_attestation = self.attestations.create_attestation(
+                group_id, requester_user_id,
+            )
+            remote_attestation = content["attestation"]
+
+            yield self.attestations.verify_attestation(
+                remote_attestation,
+                user_id=requester_user_id,
+                group_id=group_id,
+            )
+        else:
+            local_attestation = None
+            remote_attestation = None
+
+        is_public = _parse_visibility_from_contents(content)
+
+        yield self.store.add_user_to_group(
+            group_id, requester_user_id,
+            is_admin=False,
+            is_public=is_public,
+            local_attestation=local_attestation,
+            remote_attestation=remote_attestation,
+        )
+
+        defer.returnValue({
+            "state": "join",
+            "attestation": local_attestation,
+        })
+
+    @defer.inlineCallbacks
     def knock(self, group_id, requester_user_id, content):
         """A user requests becoming a member of the group
         """

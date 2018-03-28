@@ -48,18 +48,24 @@ class GroupServerStore(SQLBaseStore):
             desc="set_group_join_policy",
         )
 
+    @defer.inlineCallbacks
     def get_group(self, group_id):
-        return self._simple_select_one(
+        ret = yield self._simple_select_one(
             table="groups",
             keyvalues={
                 "group_id": group_id,
             },
             retcols=(
-                "name", "short_description", "long_description", "avatar_url", "is_public"
+                "name", "short_description", "long_description", "avatar_url", "is_public", "is_joinable",
             ),
             allow_none=True,
-            desc="is_user_in_group",
+            desc="get_group",
         )
+
+        if ret and 'is_joinable' in ret:
+            ret['is_joinable'] = bool(ret['is_joinable'])
+
+        defer.returnValue(ret)
 
     def get_users_in_group(self, group_id, include_private=False):
         # TODO: Pagination
