@@ -250,7 +250,7 @@ class DataStore(RoomMemberStore, RoomStore,
         Counts the number of users who used this homeserver in the last 24 hours.
         """
         def _count_users(txn):
-            yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24),
+            yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24)
 
             sql = """
                 SELECT COALESCE(count(*), 0) FROM (
@@ -260,7 +260,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 ) u
             """
 
-            txn.execute(sql, (str(yesterday),))
+            txn.execute(sql, (yesterday,))
             count, = txn.fetchone()
             return count
 
