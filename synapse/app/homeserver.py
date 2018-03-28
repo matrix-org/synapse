@@ -401,7 +401,7 @@ def run(hs):
     start_time = clock.time()
 
     stats = {}
-    stats_process = None
+    stats_process = []
 
     @defer.inlineCallbacks
     def phone_stats_home():
@@ -428,10 +428,13 @@ def run(hs):
 
         daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
         stats["daily_sent_messages"] = daily_sent_messages
-        if stats_process is not None:
-            with stats_process.oneshot():
-                stats["memory_rss"] = stats_process.memory_info().rss
-                stats["cpu_average"] = int(stats_process.cpu_info(interval=None))
+        if len(stats_process) > 0:
+            stats["memory_rss"] = 0
+            stats["cpu_average"] = 0
+            for process in stats_process:
+                with process.oneshot():
+                    stats["memory_rss"] += process.memory_info().rss
+                    stats["cpu_average"] += int(process.cpu_percent(interval=None))
 
         logger.info("Reporting stats to matrix.org: %s" % (stats,))
         try:
@@ -442,24 +445,31 @@ def run(hs):
         except Exception as e:
             logger.warn("Error reporting stats: %s", e)
 
-    if hs.config.report_stats:
+    def performance_stats_init():
         try:
             import psutil
-            stats_process = psutil.Process()
+            process = psutil.Process()
             # Ensure we can fetch both, and make the initial request for cpu_percent
             # so the next request will use this as the initial point.
-            stats_process.memory_info().rss
-            stats_process.cpu_percent(interval=None)
+            process.memory_info().rss
+            process.cpu_percent(interval=None)
+            logger.info("report_stats can use psutil")
+            stats_process.append(process)
         except (ImportError, AttributeError):
             logger.warn(
-                    "report_stats enabled but psutil is not installed or incorrect version."
-                    " Disabling reporting of memory/cpu stats."
-                    " Ensuring psutil is available will help matrix track performance changes across releases."
+                "report_stats enabled but psutil is not installed or incorrect version."
+                " Disabling reporting of memory/cpu stats."
+                " Ensuring psutil is available will help matrix track performance changes"
+                " across releases."
             )
-            stats_process = None
 
+    if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
         clock.looping_call(phone_stats_home, 3 * 60 * 60 * 1000)
+
+        # We need to defer this init for the cases that we daemonize
+        # otherwise the process ID we get is that of the non-daemon process
+        clock.call_later(15, performance_stats_init)
 
         # We wait 5 minutes to send the first set of stats as the server can
         # be quite busy the first few minutes
