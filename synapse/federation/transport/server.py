@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1124,6 +1125,24 @@ class FederationGroupsBulkPublicisedServlet(BaseFederationServlet):
         defer.returnValue((200, resp))
 
 
+class FederationGroupsJoinableServlet(BaseFederationServlet):
+    """Sets whether a group is joinable without an invite or knock
+    """
+    PATH = "/groups/(?P<group_id>[^/]*)/joinable$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id):
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        if get_domain_from_id(requester_user_id) != origin:
+            raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        new_content = yield self.handler.set_group_joinable(
+            group_id, requester_user_id, content
+        )
+
+        defer.returnValue((200, new_content))
+
+
 FEDERATION_SERVLET_CLASSES = (
     FederationSendServlet,
     FederationPullServlet,
@@ -1172,6 +1191,7 @@ GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsSummaryUsersServlet,
     FederationGroupsAddRoomsServlet,
     FederationGroupsAddRoomsConfigServlet,
+    FederationGroupsJoinableServlet,
 )
 
 

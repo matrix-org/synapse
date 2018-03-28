@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -202,6 +203,24 @@ class GroupsServerHandler(object):
             room_id=room_id,
             category_id=category_id,
         )
+
+        defer.returnValue({})
+
+    @defer.inlineCallbacks
+    def set_group_joinable(self, group_id, requester_user_id, content):
+        """Sets whether a group is joinable without an invite or knock
+        """
+        yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        is_joinable = content.get('joinable')
+        if is_joinable is None:
+            raise SynapseError(
+                400, "No value specified for 'joinable'"
+            )
+
+        yield self.store.set_group_joinable(group_id, is_joinable=is_joinable)
 
         defer.returnValue({})
 

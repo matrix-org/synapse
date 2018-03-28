@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -855,6 +856,22 @@ class TransportLayerClient(object):
             data=content,
             ignore_backoff=True,
         )
+
+    @log_function
+    def set_group_joinable(self, destination, group_id, requester_user_id,
+                                  content):
+        """Sets whether a group is joinable without an invite or knock
+        """
+        path = PREFIX + "/groups/%s/joinable" % (group_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            data=content,
+            ignore_backoff=True,
+        )
+
 
     @log_function
     def delete_group_summary_user(self, destination, group_id, requester_user_id,

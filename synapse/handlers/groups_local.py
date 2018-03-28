@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -89,6 +90,8 @@ class GroupsLocalHandler(object):
     delete_group_role = _create_rerouter("delete_group_role")
     get_group_role = _create_rerouter("get_group_role")
     get_group_roles = _create_rerouter("get_group_roles")
+
+    set_group_joinable = _create_rerouter("set_group_joinable")
 
     @defer.inlineCallbacks
     def get_group_summary(self, group_id, requester_user_id):
