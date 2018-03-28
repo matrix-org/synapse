@@ -244,7 +244,6 @@ class DataStore(RoomMemberStore, RoomStore,
 
         return [UserPresenceState(**row) for row in rows]
 
-    @defer.inlineCallbacks
     def count_daily_users(self):
         """
         Counts the number of users who used this homeserver in the last 24 hours.
@@ -264,10 +263,9 @@ class DataStore(RoomMemberStore, RoomStore,
             count, = txn.fetchone()
             return count
 
-        ret = yield self.runInteraction("count_users", _count_users)
-        defer.returnValue(ret)
+        return self.runInteraction("count_users", _count_users)
 
-    @defer.inlineCallbacks
+
     def count_r30_users(self):
         """
         Counts the number of 30 day retained users, defined as:-
@@ -320,8 +318,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 results["ALL"], = txn.fetchone()
             return results
 
-        ret = yield self.runInteraction("count_r30_users", _count_r30_users)
-        defer.returnValue(ret)
+        return self.runInteraction("count_r30_users", _count_r30_users)
 
     def get_users(self):
         """Function to reterive a list of users in users table.
