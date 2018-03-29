@@ -269,50 +269,77 @@ class DataStore(RoomMemberStore, RoomStore,
          * Users who have created their accounts more than 30 days
          * Where last seen at most 30 days ago
          * Where account creation and last_seen are > 30 days
+
+         Returns counts globaly for a given user as well as breaking
+         by platform
         """
         def _count_r30_users(txn):
             thirty_days_in_secs = 86400 * 30
             now = int(self._clock.time_msec())
             thirty_days_ago_in_secs = now - thirty_days_in_secs
 
-            # Are these filters sufficiently robust?
-            filters = {
-                "ALL": "",
-                "IOS": "^(Vector|Riot|Riot\.im)\/.* iOS",
-                "ANDROID": "^(Dalvik|Riot|Riot\.im)\/.* Android",
-                "ELECTRON": "Electron",
-                "WEB": "(Gecko|Mozilla)",
-            }
+            sql = """
+                SELECT platform, COALESCE(count(*), 0) FROM (
+                     SELECT users.name, platform, users.creation_ts * 1000, MAX(uip.last_seen)
+                     FROM users
+                     INNER JOIN (
+                         SELECT
+                         user_id,
+                         last_seen,
+                         CASE
+                             WHEN user_agent LIKE '%Android%' THEN 'android'
+                             WHEN user_agent LIKE '%iOS%' THEN 'ios'
+                             WHEN user_agent LIKE '%Electron%' THEN 'electron'
+                             WHEN user_agent LIKE '%Mozilla%' THEN 'web'
+                             WHEN user_agent LIKE '%Gecko%' THEN 'web'
+                             ELSE 'unknown'
+                         END
+                         AS platform
+                         FROM user_ips
+                     ) uip
+                     ON users.name = uip.user_id
+                     AND users.appservice_id is NULL
+                     AND users.creation_ts < ?
+                     AND uip.last_seen/1000 > ?
+                     AND (uip.last_seen/1000) - users.creation_ts > 86400 * 30
+                     GROUP BY users.name, platform, users.creation_ts
+                ) u GROUP BY platform
+            """
+
+            results = {}
+            txn.execute(sql, (thirty_days_ago_in_secs,
+                              thirty_days_ago_in_secs))
+            rows = txn.fetchall()
+            for row in rows:
+                if row[0] is 'unknown':
+                    pass
+                results[row[0]] = row[1]
 
             sql = """
                 SELECT COALESCE(count(*), 0) FROM (
-                    SELECT users.name, users.creation_ts * 1000, MAX(user_ips.last_seen)
-                    FROM users, user_ips
-                    WHERE users.name = user_ips.user_id
+                    SELECT users.name, users.creation_ts * 1000, MAX(uip.last_seen)
+                    FROM users
+                    INNER JOIN (
+                        SELECT
+                        user_id,
+                        last_seen
+                        FROM user_ips
+                    ) uip
+                    ON users.name = uip.user_id
                     AND appservice_id is NULL
                     AND users.creation_ts < ?
-                    AND user_ips.last_seen/1000 > ?
-                    AND (user_ips.last_seen/1000) - users.creation_ts > ?
+                    AND uip.last_seen/1000 > ?
+                    AND (uip.last_seen/1000) - users.creation_ts > 86400 * 30
+                    GROUP BY users.name, users.creation_ts
+                ) u
             """
 
-            if isinstance(self.database_engine, PostgresEngine):
-                sql = sql + "AND user_ips.user_agent ~ ? "
-            sql = sql + "GROUP BY users.name, users.creation_ts ) u"
+            txn.execute(sql, (thirty_days_ago_in_secs,
+                              thirty_days_ago_in_secs))
 
-            results = {}
-            if isinstance(self.database_engine, PostgresEngine):
-                for filter_name, user_agent_filter in filters.items():
-                    txn.execute(sql, (thirty_days_ago_in_secs,
-                                      thirty_days_ago_in_secs,
-                                      thirty_days_in_secs,
-                                      user_agent_filter))
-                    results[filter_name], = txn.fetchone()
+            count, = txn.fetchone()
+            results['all'] = count
 
-            else:
-                txn.execute(sql, (thirty_days_ago_in_secs,
-                                  thirty_days_ago_in_secs,
-                                  thirty_days_in_secs))
-                results["ALL"], = txn.fetchone()
             return results
 
         return self.runInteraction("count_r30_users", _count_r30_users)
