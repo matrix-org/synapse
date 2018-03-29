@@ -280,7 +280,8 @@ class DataStore(RoomMemberStore, RoomStore,
 
             sql = """
                 SELECT platform, COALESCE(count(*), 0) FROM (
-                     SELECT users.name, platform, users.creation_ts * 1000, MAX(uip.last_seen)
+                     SELECT users.name, platform, users.creation_ts * 1000,
+                                                            MAX(uip.last_seen)
                      FROM users
                      INNER JOIN (
                          SELECT
@@ -317,7 +318,8 @@ class DataStore(RoomMemberStore, RoomStore,
 
             sql = """
                 SELECT COALESCE(count(*), 0) FROM (
-                    SELECT users.name, users.creation_ts * 1000, MAX(uip.last_seen)
+                    SELECT users.name, users.creation_ts * 1000,
+                                                        MAX(uip.last_seen)
                     FROM users
                     INNER JOIN (
                         SELECT
