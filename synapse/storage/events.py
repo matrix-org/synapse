@@ -14,15 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.events_worker import EventsWorkerStore
+from collections import OrderedDict, deque, namedtuple
+from functools import wraps
+import logging
 
+import simplejson as json
 from twisted.internet import defer
 
-from synapse.events import USE_FROZEN_DICTS
 
+from synapse.storage.events_worker import EventsWorkerStore
 from synapse.util.async import ObservableDeferred
+from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.logcontext import (
-    PreserveLoggingContext, make_deferred_yieldable
+    PreserveLoggingContext, make_deferred_yieldable,
 )
 from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
@@ -30,15 +34,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.types import get_domain_from_id
-
-from canonicaljson import encode_canonical_json
-from collections import deque, namedtuple, OrderedDict
-from functools import wraps
-
 import synapse.metrics
-
-import logging
-import simplejson as json
 
 # these are only included to make the type annotations work
 from synapse.events import EventBase    # noqa: F401
@@ -71,10 +67,7 @@ state_delta_reuse_delta_counter = metrics.register_counter(
 
 
 def encode_json(json_object):
-    if USE_FROZEN_DICTS:
-        return encode_canonical_json(json_object)
-    else:
-        return json.dumps(json_object, ensure_ascii=False)
+    return frozendict_json_encoder.encode(json_object)
 
 
 class _EventPeristenceQueue(object):
