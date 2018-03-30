@@ -186,8 +186,13 @@ class ApplicationService(object):
 
     @cachedInlineCallbacks(num_args=1, cache_context=True)
     def _matches_user_in_member_list(self, room_id, store, cache_context):
+
+        def invalidate_only_when_as_users_change(room_id, member):
+            if self.is_interested_in_user(member):
+                cache_context.invalidate(room_id)
+
         member_list = yield store.get_users_in_room(
-            room_id, on_invalidate=cache_context.invalidate
+            room_id, on_invalidate=invalidate_only_when_as_users_change
         )
 
         # check joined member events
