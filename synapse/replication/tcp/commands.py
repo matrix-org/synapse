@@ -109,7 +109,7 @@ class RdataCommand(Command):
         return " ".join((
             self.stream_name,
             str(self.token) if self.token is not None else "batch",
-            _json_encoder.dumps(self.row),
+            _json_encoder.encode(self.row),
         ))
 
 
