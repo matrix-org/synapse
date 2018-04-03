@@ -1125,10 +1125,10 @@ class FederationGroupsBulkPublicisedServlet(BaseFederationServlet):
         defer.returnValue((200, resp))
 
 
-class FederationGroupsJoinableServlet(BaseFederationServlet):
+class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
     """Sets whether a group is joinable without an invite or knock
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/joinable$"
+    PATH = "/groups/(?P<group_id>[^/]*)/setting/m.join_policy$"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id):
@@ -1136,7 +1136,7 @@ class FederationGroupsJoinableServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        new_content = yield self.handler.set_group_joinable(
+        new_content = yield self.handler.set_group_join_policy(
             group_id, requester_user_id, content
         )
 
@@ -1191,7 +1191,7 @@ GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsSummaryUsersServlet,
     FederationGroupsAddRoomsServlet,
     FederationGroupsAddRoomsConfigServlet,
-    FederationGroupsJoinableServlet,
+    FederationGroupsSettingJoinPolicyServlet,
 )
 
 

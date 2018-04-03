@@ -91,7 +91,7 @@ class GroupsLocalHandler(object):
     get_group_role = _create_rerouter("get_group_role")
     get_group_roles = _create_rerouter("get_group_roles")
 
-    set_group_joinable = _create_rerouter("set_group_joinable")
+    set_group_join_policy = _create_rerouter("set_group_join_policy")
 
     @defer.inlineCallbacks
     def get_group_summary(self, group_id, requester_user_id):

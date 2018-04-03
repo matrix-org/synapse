@@ -860,9 +860,9 @@ class TransportLayerClient(object):
     @log_function
     def set_group_joinable(self, destination, group_id, requester_user_id,
                            content):
-        """Sets whether a group is joinable without an invite or knock
+        """Sets the join policy for a group
         """
-        path = PREFIX + "/groups/%s/joinable" % (group_id,)
+        path = PREFIX + "/groups/%s/setting/m.join_policy" % (group_id,)
 
         return self.client.post_json(
             destination=destination,

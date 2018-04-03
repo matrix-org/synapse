@@ -30,16 +30,16 @@ _DEFAULT_ROLE_ID = ""
 
 
 class GroupServerStore(SQLBaseStore):
-    def set_group_joinable(self, group_id, is_joinable):
+    def set_group_join_policy(self, group_id, join_policy):
         return self._simple_update_one(
             table="groups",
             keyvalues={
                 "group_id": group_id,
             },
             updatevalues={
-                "is_joinable": is_joinable,
+                "join_policy": join_policy,
             },
-            desc="set_group_joinable",
+            desc="set_group_join_policy",
         )
 
     def get_group(self, group_id):

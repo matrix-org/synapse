@@ -402,13 +402,13 @@ class GroupInvitedUsersServlet(RestServlet):
         defer.returnValue((200, result))
 
 
-class GroupJoinableServlet(RestServlet):
-    """Set whether a group is joinable without an invite
+class GroupSettingJoinPolicyServlet(RestServlet):
+    """Set group join policy
     """
-    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/joinable$")
+    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/setting/m.join_policy$")
 
     def __init__(self, hs):
-        super(GroupJoinableServlet, self).__init__()
+        super(GroupSettingJoinPolicyServlet, self).__init__()
         self.auth = hs.get_auth()
         self.groups_handler = hs.get_groups_local_handler()
 
@@ -419,7 +419,7 @@ class GroupJoinableServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        result = yield self.groups_handler.set_group_joinable(
+        result = yield self.groups_handler.set_group_join_policy(
             group_id,
             requester_user_id,
             content,
@@ -765,7 +765,7 @@ def register_servlets(hs, http_server):
     GroupInvitedUsersServlet(hs).register(http_server)
     GroupUsersServlet(hs).register(http_server)
     GroupRoomServlet(hs).register(http_server)
-    GroupJoinableServlet(hs).register(http_server)
+    GroupSettingJoinPolicyServlet(hs).register(http_server)
     GroupCreateServlet(hs).register(http_server)
     GroupAdminRoomsServlet(hs).register(http_server)
     GroupAdminRoomsConfigServlet(hs).register(http_server)
