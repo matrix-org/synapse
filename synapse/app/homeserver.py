@@ -402,6 +402,10 @@ def run(hs):
 
     stats = {}
 
+    # Contains the list of processes we will be monitoring
+    # currently either 0 or 1
+    stats_process = []
+
     @defer.inlineCallbacks
     def phone_stats_home():
         logger.info("Gathering stats for reporting")
@@ -428,6 +432,13 @@ def run(hs):
         daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
         stats["daily_sent_messages"] = daily_sent_messages
 
+        if len(stats_process) > 0:
+            stats["memory_rss"] = 0
+            stats["cpu_average"] = 0
+            for process in stats_process:
+                stats["memory_rss"] += process.memory_info().rss
+                stats["cpu_average"] += int(process.cpu_percent(interval=None))
+
         logger.info("Reporting stats to matrix.org: %s" % (stats,))
         try:
             yield hs.get_simple_http_client().put_json(
@@ -437,9 +448,31 @@ def run(hs):
         except Exception as e:
             logger.warn("Error reporting stats: %s", e)
 
+    def performance_stats_init():
+        try:
+            import psutil
+            process = psutil.Process()
+            # Ensure we can fetch both, and make the initial request for cpu_percent
+            # so the next request will use this as the initial point.
+            process.memory_info().rss
+            process.cpu_percent(interval=None)
+            logger.info("report_stats can use psutil")
+            stats_process.append(process)
+        except (ImportError, AttributeError):
+            logger.warn(
+                "report_stats enabled but psutil is not installed or incorrect version."
+                " Disabling reporting of memory/cpu stats."
+                " Ensuring psutil is available will help matrix.org track performance"
+                " changes across releases."
+            )
+
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
         clock.looping_call(phone_stats_home, 3 * 60 * 60 * 1000)
+
+        # We need to defer this init for the cases that we daemonize
+        # otherwise the process ID we get is that of the non-daemon process
+        clock.call_later(0, performance_stats_init)
 
         # We wait 5 minutes to send the first set of stats as the server can
         # be quite busy the first few minutes
