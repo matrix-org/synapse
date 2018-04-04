@@ -12,11 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import string
 
 from synapse.api.errors import SynapseError
 
 from collections import namedtuple
-import re
 
 
 class Requester(namedtuple("Requester", [
@@ -214,8 +214,7 @@ class GroupID(DomainSpecificString):
         return group_id
 
 
-# A regex that matches any valid mxid characters
-MXID_LOCALPART_REGEX = re.compile("^[_\-./=a-z0-9]*$")
+mxid_localpart_allowed_characters = set("_-./=" + string.ascii_lowercase + string.digits)
 
 
 def contains_invalid_mxid_characters(localpart):
@@ -227,7 +226,7 @@ def contains_invalid_mxid_characters(localpart):
     Returns:
         bool: True if there are any naughty characters
     """
-    return not MXID_LOCALPART_REGEX.match(localpart)
+    return any(c not in mxid_localpart_allowed_characters for c in localpart)
 
 
 class StreamToken(
