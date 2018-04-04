@@ -65,8 +65,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         hosts = frozenset(get_domain_from_id(user_id) for user_id in user_ids)
         defer.returnValue(hosts)
 
-    @cached(max_entries=100000, iterable=True)
-    @defer.inlineCallbacks
+    @cachedInlineCallbacks(max_entries=100000, iterable=True)
     def get_users_in_room(self, room_id):
         def f(txn):
             sql = (
