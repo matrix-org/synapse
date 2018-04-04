@@ -786,6 +786,13 @@ class EventsStore(EventsWorkerStore):
                     self._invalidate_cache_and_stream(
                         txn, self.get_rooms_for_user_with_stream_ordering, (member,)
                     )
+                    # we call this once for each member to allow AS workers to
+                    # only invalidate their caches when AS members change.
+                    # other folks naively using a cached get_users_in_rooms will
+                    # just get prodded multiple times and can ignore the member key.
+                    self._invalidate_cache_and_stream(
+                        txn, self.get_users_in_room, (room_id, member)
+                    )
 
                 for host in set(get_domain_from_id(u) for u in members_changed):
                     self._invalidate_cache_and_stream(
@@ -794,10 +801,6 @@ class EventsStore(EventsWorkerStore):
                     self._invalidate_cache_and_stream(
                         txn, self.was_host_joined, (room_id, host)
                     )
-
-                self._invalidate_cache_and_stream(
-                    txn, self.get_users_in_room, (room_id,)
-                )
 
                 self._invalidate_cache_and_stream(
                     txn, self.get_current_state_ids, (room_id,)
