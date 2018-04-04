@@ -34,7 +34,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
     def setUp(self):
         self.hs = yield utils.setup_test_homeserver(
             handlers=None,
-            replication_layer=mock.Mock(),
+            federation_client=mock.Mock(),
         )
         self.handler = synapse.handlers.e2e_keys.E2eKeysHandler(self.hs)
 

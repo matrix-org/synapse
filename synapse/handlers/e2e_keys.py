@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ujson as json
+import simplejson as json
 import logging
 
 from canonicaljson import encode_canonical_json
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 class E2eKeysHandler(object):
     def __init__(self, hs):
         self.store = hs.get_datastore()
-        self.federation = hs.get_replication_layer()
+        self.federation = hs.get_federation_client()
         self.device_handler = hs.get_device_handler()
         self.is_mine = hs.is_mine
         self.clock = hs.get_clock()
@@ -40,7 +41,7 @@ class E2eKeysHandler(object):
         # doesn't really work as part of the generic query API, because the
         # query request requires an object POST, but we abuse the
         # "query handler" interface.
-        self.federation.register_query_handler(
+        hs.get_federation_registry().register_query_handler(
             "client_keys", self.on_federation_query_client_keys
         )
 
@@ -134,23 +135,8 @@ class E2eKeysHandler(object):
                     if user_id in destination_query:
                         results[user_id] = keys
 
-            except CodeMessageException as e:
-                failures[destination] = {
-                    "status": e.code, "message": e.message
-                }
-            except NotRetryingDestination as e:
-                failures[destination] = {
-                    "status": 503, "message": "Not ready for retry",
-                }
-            except FederationDeniedError as e:
-                failures[destination] = {
-                    "status": 403, "message": "Federation Denied",
-                }
             except Exception as e:
-                # include ConnectionRefused and other errors
-                failures[destination] = {
-                    "status": 503, "message": e.message
-                }
+                failures[destination] = _exception_to_failure(e)
 
         yield make_deferred_yieldable(defer.gatherResults([
             preserve_fn(do_remote_query)(destination)
@@ -252,19 +238,8 @@ class E2eKeysHandler(object):
                 for user_id, keys in remote_result["one_time_keys"].items():
                     if user_id in device_keys:
                         json_result[user_id] = keys
-            except CodeMessageException as e:
-                failures[destination] = {
-                    "status": e.code, "message": e.message
-                }
-            except NotRetryingDestination as e:
-                failures[destination] = {
-                    "status": 503, "message": "Not ready for retry",
-                }
             except Exception as e:
-                # include ConnectionRefused and other errors
-                failures[destination] = {
-                    "status": 503, "message": e.message
-                }
+                failures[destination] = _exception_to_failure(e)
 
         yield make_deferred_yieldable(defer.gatherResults([
             preserve_fn(claim_client_keys)(destination)
@@ -360,6 +335,31 @@ class E2eKeysHandler(object):
         yield self.store.add_e2e_one_time_keys(
             user_id, device_id, time_now, new_keys
         )
+
+
+def _exception_to_failure(e):
+    if isinstance(e, CodeMessageException):
+        return {
+            "status": e.code, "message": e.message,
+        }
+
+    if isinstance(e, NotRetryingDestination):
+        return {
+            "status": 503, "message": "Not ready for retry",
+        }
+
+    if isinstance(e, FederationDeniedError):
+        return {
+            "status": 403, "message": "Federation Denied",
+        }
+
+    # include ConnectionRefused and other errors
+    #
+    # Note that some Exceptions (notably twisted's ResponseFailed etc) don't
+    # give a string for e.message, which simplejson then fails to serialize.
+    return {
+        "status": 503, "message": str(e.message),
+    }
 
 
 def _one_time_keys_match(old_key_json, new_key):

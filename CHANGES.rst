@@ -1,11 +1,89 @@
-Unreleased
-==========
+Changes in synapse v0.27.2 (2018-03-26)
+=======================================
 
-synctl no longer starts the main synapse when using ``-a`` option with workers.
-A new worker file should be added with ``worker_app: synapse.app.homeserver``.
+Bug fixes:
+
+* Fix bug which broke TCP replication between workers (PR #3015)
+
+
+Changes in synapse v0.27.1 (2018-03-26)
+=======================================
+
+Meta release as v0.27.0 temporarily pointed to the wrong commit
+
+
+Changes in synapse v0.27.0 (2018-03-26)
+=======================================
+
+No changes since v0.27.0-rc2
+
+
+Changes in synapse v0.27.0-rc2 (2018-03-19)
+===========================================
+
+Pulls in v0.26.1
+
+Bug fixes:
+
+* Fix bug introduced in v0.27.0-rc1 that causes much increased memory usage in state cache (PR #3005)
+
+
+Changes in synapse v0.26.1 (2018-03-15)
+=======================================
+
+Bug fixes:
+
+* Fix bug where an invalid event caused server to stop functioning correctly,
+  due to parsing and serializing bugs in ujson library (PR #3008)
+
+
+Changes in synapse v0.27.0-rc1 (2018-03-14)
+===========================================
+
+The common case for running Synapse is not to run separate workers, but for those that do, be aware that synctl no longer starts the main synapse when using ``-a`` option with workers. A new worker file should be added with ``worker_app: synapse.app.homeserver``.
 
 This release also begins the process of renaming a number of the metrics
 reported to prometheus. See `docs/metrics-howto.rst <docs/metrics-howto.rst#block-and-response-metrics-renamed-for-0-27-0>`_.
+Note that the v0.28.0 release will remove the deprecated metric names.
+
+Features:
+
+* Add ability for ASes to override message send time (PR #2754)
+* Add support for custom storage providers for media repository (PR #2867, #2777, #2783, #2789, #2791, #2804, #2812, #2814, #2857, #2868, #2767)
+* Add purge API features, see `docs/admin_api/purge_history_api.rst <docs/admin_api/purge_history_api.rst>`_ for full details (PR #2858, #2867, #2882, #2946, #2962, #2943)
+* Add support for whitelisting 3PIDs that users can register. (PR #2813)
+* Add ``/room/{id}/event/{id}`` API (PR #2766)
+* Add an admin API to get all the media in a room (PR #2818) Thanks to @turt2live!
+* Add ``federation_domain_whitelist`` option (PR #2820, #2821)
+
+
+Changes:
+
+* Continue to factor out processing from main process and into worker processes. See updated `docs/workers.rst <docs/workers.rst>`_ (PR #2892 - #2904, #2913, #2920 - #2926, #2947, #2847, #2854, #2872, #2873, #2874, #2928, #2929, #2934, #2856, #2976 - #2984, #2987 - #2989, #2991 - #2993, #2995, #2784)
+* Ensure state cache is used when persisting events (PR #2864, #2871, #2802, #2835, #2836, #2841, #2842, #2849)
+* Change the default config to bind on both IPv4 and IPv6 on all platforms (PR #2435) Thanks to @silkeh!
+* No longer require a specific version of saml2 (PR #2695) Thanks to @okurz!
+* Remove ``verbosity``/``log_file`` from generated config (PR #2755)
+* Add and improve metrics and logging (PR #2770, #2778, #2785, #2786, #2787, #2793, #2794, #2795, #2809, #2810, #2833, #2834, #2844, #2965, #2927, #2975, #2790, #2796, #2838)
+* When using synctl with workers, don't start the main synapse automatically (PR #2774)
+* Minor performance improvements (PR #2773, #2792)
+* Use a connection pool for non-federation outbound connections (PR #2817)
+* Make it possible to run unit tests against postgres (PR #2829)
+* Update pynacl dependency to 1.2.1 or higher (PR #2888) Thanks to @bachp!
+* Remove ability for AS users to call /events and /sync (PR #2948)
+* Use bcrypt.checkpw (PR #2949) Thanks to @krombel!
+
+Bug fixes:
+
+* Fix broken ``ldap_config`` config option (PR #2683) Thanks to @seckrv!
+* Fix error message when user is not allowed to unban (PR #2761) Thanks to @turt2live!
+* Fix publicised groups GET API (singular) over federation (PR #2772)
+* Fix user directory when using ``user_directory_search_all_users`` config option (PR #2803, #2831)
+* Fix error on ``/publicRooms`` when no rooms exist (PR #2827)
+* Fix bug in quarantine_media (PR #2837)
+* Fix url_previews when no Content-Type is returned from URL (PR #2845)
+* Fix rare race in sync API when joining room (PR #2944)
+* Fix slow event search, switch back from GIST to GIN indexes (PR #2769, #2848)
 
 
 Changes in synapse v0.26.0 (2018-01-05)

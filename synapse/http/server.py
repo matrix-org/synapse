@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,7 +37,7 @@ from twisted.web.util import redirectTo
 import collections
 import logging
 import urllib
-import ujson
+import simplejson
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,11 @@ response_count = metrics.register_counter(
             "_response_db_txn_duration:count",
         )
     )
+)
+
+requests_counter = metrics.register_counter(
+    "requests_received",
+    labels=["method", "servlet", ],
 )
 
 outgoing_responses_counter = metrics.register_counter(
@@ -145,7 +151,8 @@ def wrap_request_handler(request_handler, include_metrics=False):
                 # at the servlet name. For most requests that name will be
                 # JsonResource (or a subclass), and JsonResource._async_render
                 # will update it once it picks a servlet.
-                request_metrics.start(self.clock, name=self.__class__.__name__)
+                servlet_name = self.__class__.__name__
+                request_metrics.start(self.clock, name=servlet_name)
 
                 request_context.request = request_id
                 with request.processing():
@@ -154,6 +161,7 @@ def wrap_request_handler(request_handler, include_metrics=False):
                             if include_metrics:
                                 yield request_handler(self, request, request_metrics)
                             else:
+                                requests_counter.inc(request.method, servlet_name)
                                 yield request_handler(self, request)
                     except CodeMessageException as e:
                         code = e.code
@@ -229,7 +237,7 @@ class JsonResource(HttpServer, resource.Resource):
     """ This implements the HttpServer interface and provides JSON support for
     Resources.
 
-    Register callbacks via register_path()
+    Register callbacks via register_paths()
 
     Callbacks can return a tuple of status code and a dict in which case the
     the dict will automatically be sent to the client as a JSON object.
@@ -276,49 +284,59 @@ class JsonResource(HttpServer, resource.Resource):
             This checks if anyone has registered a callback for that method and
             path.
         """
+        callback, group_dict = self._get_handler_for_request(request)
+
+        servlet_instance = getattr(callback, "__self__", None)
+        if servlet_instance is not None:
+            servlet_classname = servlet_instance.__class__.__name__
+        else:
+            servlet_classname = "%r" % callback
+
+        request_metrics.name = servlet_classname
+        requests_counter.inc(request.method, servlet_classname)
+
+        # Now trigger the callback. If it returns a response, we send it
+        # here. If it throws an exception, that is handled by the wrapper
+        # installed by @request_handler.
+
+        kwargs = intern_dict({
+            name: urllib.unquote(value).decode("UTF-8") if value else value
+            for name, value in group_dict.items()
+        })
+
+        callback_return = yield callback(request, **kwargs)
+        if callback_return is not None:
+            code, response = callback_return
+            self._send_response(request, code, response)
+
+    def _get_handler_for_request(self, request):
+        """Finds a callback method to handle the given request
+
+        Args:
+            request (twisted.web.http.Request):
+
+        Returns:
+            Tuple[Callable, dict[str, str]]: callback method, and the dict
+                mapping keys to path components as specified in the handler's
+                path match regexp.
+
+                The callback will normally be a method registered via
+                register_paths, so will return (possibly via Deferred) either
+                None, or a tuple of (http code, response body).
+        """
         if request.method == "OPTIONS":
-            self._send_response(request, 200, {})
-            return
+            return _options_handler, {}
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
         for path_entry in self.path_regexs.get(request.method, []):
             m = path_entry.pattern.match(request.path)
-            if not m:
-                continue
-
-            # We found a match! First update the metrics object to indicate
-            # which servlet is handling the request.
-
-            callback = path_entry.callback
-
-            servlet_instance = getattr(callback, "__self__", None)
-            if servlet_instance is not None:
-                servlet_classname = servlet_instance.__class__.__name__
-            else:
-                servlet_classname = "%r" % callback
-
-            request_metrics.name = servlet_classname
-
-            # Now trigger the callback. If it returns a response, we send it
-            # here. If it throws an exception, that is handled by the wrapper
-            # installed by @request_handler.
-
-            kwargs = intern_dict({
-                name: urllib.unquote(value).decode("UTF-8") if value else value
-                for name, value in m.groupdict().items()
-            })
-
-            callback_return = yield callback(request, **kwargs)
-            if callback_return is not None:
-                code, response = callback_return
-                self._send_response(request, code, response)
-
-            return
+            if m:
+                # We found a match!
+                return path_entry.callback, m.groupdict()
 
         # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
-        request_metrics.name = self.__class__.__name__ + ".UnrecognizedRequest"
-        raise UnrecognizedRequestError()
+        return _unrecognised_request_handler, {}
 
     def _send_response(self, request, code, response_json_object,
                        response_code_message=None):
@@ -333,6 +351,34 @@ class JsonResource(HttpServer, resource.Resource):
             version_string=self.version_string,
             canonical_json=self.canonical_json,
         )
+
+
+def _options_handler(request):
+    """Request handler for OPTIONS requests
+
+    This is a request handler suitable for return from
+    _get_handler_for_request. It returns a 200 and an empty body.
+
+    Args:
+        request (twisted.web.http.Request):
+
+    Returns:
+        Tuple[int, dict]: http code, response body.
+    """
+    return 200, {}
+
+
+def _unrecognised_request_handler(request):
+    """Request handler for unrecognised requests
+
+    This is a request handler suitable for return from
+    _get_handler_for_request. It actually just raises an
+    UnrecognizedRequestError.
+
+    Args:
+        request (twisted.web.http.Request):
+    """
+    raise UnrecognizedRequestError()
 
 
 class RequestMetrics(object):
@@ -415,8 +461,7 @@ def respond_with_json(request, code, json_object, send_cors=False,
         if canonical_json or synapse.events.USE_FROZEN_DICTS:
             json_bytes = encode_canonical_json(json_object)
         else:
-            # ujson doesn't like frozen_dicts.
-            json_bytes = ujson.dumps(json_object, ensure_ascii=False)
+            json_bytes = simplejson.dumps(json_object)
 
     return respond_with_json_bytes(
         request, code, json_bytes,
@@ -443,6 +488,7 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
     request.setHeader(b"Content-Type", b"application/json")
     request.setHeader(b"Server", version_string)
     request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
+    request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
 
     if send_cors:
         set_cors_headers(request)

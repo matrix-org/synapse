@@ -13,18 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import JsonResource
-from synapse.replication.http import membership, send_event
+from synapse.replication.slave.storage._base import BaseSlavedStore
+from synapse.storage.profile import ProfileWorkerStore
 
 
-REPLICATION_PREFIX = "/_synapse/replication"
-
-
-class ReplicationRestResource(JsonResource):
-    def __init__(self, hs):
-        JsonResource.__init__(self, hs, canonical_json=False)
-        self.register_servlets(hs)
-
-    def register_servlets(self, hs):
-        send_event.register_servlets(hs, self)
-        membership.register_servlets(hs, self)
+class SlavedProfileStore(ProfileWorkerStore, BaseSlavedStore):
+    pass

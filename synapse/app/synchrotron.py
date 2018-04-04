@@ -56,14 +56,12 @@ from synapse.util.manhole import manhole
 from synapse.util.stringutils import random_string
 from synapse.util.versionstring import get_version_string
 from twisted.internet import defer, reactor
-from twisted.web.resource import Resource
+from twisted.web.resource import NoResource
 
 logger = logging.getLogger("synapse.app.synchrotron")
 
 
 class SynchrotronSlavedStore(
-    SlavedPushRuleStore,
-    SlavedEventStore,
     SlavedReceiptsStore,
     SlavedAccountDataStore,
     SlavedApplicationServiceStore,
@@ -73,14 +71,12 @@ class SynchrotronSlavedStore(
     SlavedGroupServerStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
+    SlavedPushRuleStore,
+    SlavedEventStore,
     SlavedClientIpStore,
     RoomStore,
     BaseSlavedStore,
 ):
-    who_forgot_in_room = (
-        RoomMemberStore.__dict__["who_forgot_in_room"]
-    )
-
     did_forget = (
         RoomMemberStore.__dict__["did_forget"]
     )
@@ -273,7 +269,7 @@ class SynchrotronServer(HomeServer):
                         "/_matrix/client/api/v1": resource,
                     })
 
-        root_resource = create_resource_tree(resources, Resource())
+        root_resource = create_resource_tree(resources, NoResource())
 
         _base.listen_tcp(
             bind_addresses,
