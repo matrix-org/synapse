@@ -68,7 +68,7 @@ class RoomMemberHandler(object):
         self.event_creation_hander = hs.get_event_creation_handler()
 
         self.member_linearizer = Linearizer(name="member")
-        self.member_limiter = Limiter(3)
+        self.member_limiter = Limiter(20)
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
