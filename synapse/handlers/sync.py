@@ -30,6 +30,7 @@ import itertools
 
 logger = logging.getLogger(__name__)
 
+SYNC_RESPONSE_CACHE_MS = 2 * 60 * 1000
 
 SyncConfig = collections.namedtuple("SyncConfig", [
     "user",
@@ -169,7 +170,9 @@ class SyncHandler(object):
         self.presence_handler = hs.get_presence_handler()
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
-        self.response_cache = ResponseCache(hs, timeout_ms=2*60*1000)
+        self.response_cache = ResponseCache(
+            hs, timeout_ms=SYNC_RESPONSE_CACHE_MS,
+        )
         self.state = hs.get_state_handler()
 
     def wait_for_sync_for_user(self, sync_config, since_token=None, timeout=0,
