@@ -55,7 +55,12 @@ synapse process.)
 
 You then create a set of configs for the various worker processes.  These
 should be worker configuration files, and should be stored in a dedicated
-subdirectory, to allow synctl to manipulate them.
+subdirectory, to allow synctl to manipulate them. An additional configuration
+for the master synapse process will need to be created because the process will
+not be started automatically. That configuration should look like this::
+
+    worker_app: synapse.app.homeserver
+    daemonize: true
 
 Each worker configuration file inherits the configuration of the main homeserver
 configuration file.  You can then override configuration specific to that worker,
@@ -114,18 +119,6 @@ To manipulate a specific worker, you pass the -w option to synctl::
 
     synctl -w $CONFIG/workers/synchrotron.yaml restart
 
-
-After setting up your workers, you'll need to create a worker configuration for
-the main synapse process. That worker configuration should look like this:::
-
-    worker_app: synapse.app.homeserver
-    daemonize: true
-
-Be sure to keep this particular configuration limited as synapse may refuse to
-start if the regular ``worker_*`` options are given. The ``homeserver.yaml``
-configuration will be used to set up the main synapse process.
-
-**You must have a worker configuration for the main synapse process!**
 
 Available worker applications
 -----------------------------
