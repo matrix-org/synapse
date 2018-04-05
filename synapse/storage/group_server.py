@@ -48,9 +48,8 @@ class GroupServerStore(SQLBaseStore):
             desc="set_group_join_policy",
         )
 
-    @defer.inlineCallbacks
     def get_group(self, group_id):
-        ret = yield self._simple_select_one(
+        return self._simple_select_one(
             table="groups",
             keyvalues={
                 "group_id": group_id,
@@ -62,8 +61,6 @@ class GroupServerStore(SQLBaseStore):
             allow_none=True,
             desc="get_group",
         )
-
-        defer.returnValue(ret)
 
     def get_users_in_group(self, group_id, include_private=False):
         # TODO: Pagination
