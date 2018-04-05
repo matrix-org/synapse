@@ -55,7 +55,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
             _regex("@irc_.*")
         )
         self.event.sender = "@irc_foobar:matrix.org"
-        self.assertTrue((yield self.service.is_interested(self.event)))
+        self.assertTrue((yield self.service.is_interested(self.event, None)))
 
     @defer.inlineCallbacks
     def test_regex_user_id_prefix_no_match(self):
@@ -63,7 +63,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
             _regex("@irc_.*")
         )
         self.event.sender = "@someone_else:matrix.org"
-        self.assertFalse((yield self.service.is_interested(self.event)))
+        self.assertFalse((yield self.service.is_interested(self.event, None)))
 
     @defer.inlineCallbacks
     def test_regex_room_member_is_checked(self):
@@ -73,7 +73,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.event.sender = "@someone_else:matrix.org"
         self.event.type = "m.room.member"
         self.event.state_key = "@irc_foobar:matrix.org"
-        self.assertTrue((yield self.service.is_interested(self.event)))
+        self.assertTrue((yield self.service.is_interested(self.event, None)))
 
     @defer.inlineCallbacks
     def test_regex_room_id_match(self):
@@ -81,7 +81,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
             _regex("!some_prefix.*some_suffix:matrix.org")
         )
         self.event.room_id = "!some_prefixs0m3th1nGsome_suffix:matrix.org"
-        self.assertTrue((yield self.service.is_interested(self.event)))
+        self.assertTrue((yield self.service.is_interested(self.event, None)))
 
     @defer.inlineCallbacks
     def test_regex_room_id_no_match(self):
@@ -89,7 +89,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
             _regex("!some_prefix.*some_suffix:matrix.org")
         )
         self.event.room_id = "!XqBunHwQIXUiqCaoxq:matrix.org"
-        self.assertFalse((yield self.service.is_interested(self.event)))
+        self.assertFalse((yield self.service.is_interested(self.event, None)))
 
     @defer.inlineCallbacks
     def test_regex_alias_match(self):
@@ -160,7 +160,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.store.get_aliases_for_room.return_value = [
             "#xmpp_foobar:matrix.org", "#athing:matrix.org"
         ]
-        self.store.get_users_in_room.return_value = []
+        self.store.get_appservices_with_user_in_room.return_value = []
         self.assertFalse((yield self.service.is_interested(
             self.event, self.store
         )))
@@ -193,20 +193,3 @@ class ApplicationServiceTestCase(unittest.TestCase):
         }
         self.event.state_key = self.service.sender
         self.assertTrue((yield self.service.is_interested(self.event)))
-
-    @defer.inlineCallbacks
-    def test_member_list_match(self):
-        self.service.namespaces[ApplicationService.NS_USERS].append(
-            _regex("@irc_.*")
-        )
-        self.store.get_users_in_room.return_value = [
-            "@alice:here",
-            "@irc_fo:here",  # AS user
-            "@bob:here",
-        ]
-        self.store.get_aliases_for_room.return_value = []
-
-        self.event.sender = "@xmpp_foobar:matrix.org"
-        self.assertTrue((yield self.service.is_interested(
-            event=self.event, store=self.store
-        )))
