@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
 from synapse.storage.devices import DeviceStore
 from .appservice import (
     ApplicationServiceStore, ApplicationServiceTransactionStore
@@ -244,13 +242,12 @@ class DataStore(RoomMemberStore, RoomStore,
 
         return [UserPresenceState(**row) for row in rows]
 
-    @defer.inlineCallbacks
     def count_daily_users(self):
         """
         Counts the number of users who used this homeserver in the last 24 hours.
         """
         def _count_users(txn):
-            yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24),
+            yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24)
 
             sql = """
                 SELECT COALESCE(count(*), 0) FROM (
@@ -264,8 +261,91 @@ class DataStore(RoomMemberStore, RoomStore,
             count, = txn.fetchone()
             return count
 
-        ret = yield self.runInteraction("count_users", _count_users)
-        defer.returnValue(ret)
+        return self.runInteraction("count_users", _count_users)
+
+    def count_r30_users(self):
+        """
+        Counts the number of 30 day retained users, defined as:-
+         * Users who have created their accounts more than 30 days
+         * Where last seen at most 30 days ago
+         * Where account creation and last_seen are > 30 days
+
+         Returns counts globaly for a given user as well as breaking
+         by platform
+        """
+        def _count_r30_users(txn):
+            thirty_days_in_secs = 86400 * 30
+            now = int(self._clock.time_msec())
+            thirty_days_ago_in_secs = now - thirty_days_in_secs
+
+            sql = """
+                SELECT platform, COALESCE(count(*), 0) FROM (
+                     SELECT
+                        users.name, platform, users.creation_ts * 1000,
+                        MAX(uip.last_seen)
+                     FROM users
+                     INNER JOIN (
+                         SELECT
+                         user_id,
+                         last_seen,
+                         CASE
+                             WHEN user_agent LIKE '%Android%' THEN 'android'
+                             WHEN user_agent LIKE '%iOS%' THEN 'ios'
+                             WHEN user_agent LIKE '%Electron%' THEN 'electron'
+                             WHEN user_agent LIKE '%Mozilla%' THEN 'web'
+                             WHEN user_agent LIKE '%Gecko%' THEN 'web'
+                             ELSE 'unknown'
+                         END
+                         AS platform
+                         FROM user_ips
+                     ) uip
+                     ON users.name = uip.user_id
+                     AND users.appservice_id is NULL
+                     AND users.creation_ts < ?
+                     AND uip.last_seen/1000 > ?
+                     AND (uip.last_seen/1000) - users.creation_ts > 86400 * 30
+                     GROUP BY users.name, platform, users.creation_ts
+                ) u GROUP BY platform
+            """
+
+            results = {}
+            txn.execute(sql, (thirty_days_ago_in_secs,
+                              thirty_days_ago_in_secs))
+
+            for row in txn:
+                if row[0] is 'unknown':
+                    pass
+                results[row[0]] = row[1]
+
+            sql = """
+                SELECT COALESCE(count(*), 0) FROM (
+                    SELECT users.name, users.creation_ts * 1000,
+                                                        MAX(uip.last_seen)
+                    FROM users
+                    INNER JOIN (
+                        SELECT
+                        user_id,
+                        last_seen
+                        FROM user_ips
+                    ) uip
+                    ON users.name = uip.user_id
+                    AND appservice_id is NULL
+                    AND users.creation_ts < ?
+                    AND uip.last_seen/1000 > ?
+                    AND (uip.last_seen/1000) - users.creation_ts > 86400 * 30
+                    GROUP BY users.name, users.creation_ts
+                ) u
+            """
+
+            txn.execute(sql, (thirty_days_ago_in_secs,
+                              thirty_days_ago_in_secs))
+
+            count, = txn.fetchone()
+            results['all'] = count
+
+            return results
+
+        return self.runInteraction("count_r30_users", _count_r30_users)
 
     def get_users(self):
         """Function to reterive a list of users in users table.
