@@ -655,7 +655,12 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             content=event_content,
         )
 
-        defer.returnValue((200, {}))
+        return_value = {}
+
+        if membership_action == "join":
+            return_value["room_id"] = room_id
+
+        defer.returnValue((200, return_value))
 
     def _has_3pid_invite_keys(self, content):
         for key in {"id_server", "medium", "address"}:
