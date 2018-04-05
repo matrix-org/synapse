@@ -31,53 +31,28 @@ metrics = synapse.metrics.get_metrics_for(__name__)
 block_counter = metrics.register_counter(
     "block_count",
     labels=["block_name"],
-    alternative_names=(
-        # the following are all deprecated aliases for the same metric
-        metrics.name_prefix + x for x in (
-            "_block_timer:count",
-            "_block_ru_utime:count",
-            "_block_ru_stime:count",
-            "_block_db_txn_count:count",
-            "_block_db_txn_duration:count",
-        )
-    )
 )
 
 block_timer = metrics.register_counter(
     "block_time_seconds",
     labels=["block_name"],
-    alternative_names=(
-        metrics.name_prefix + "_block_timer:total",
-    ),
 )
 
 block_ru_utime = metrics.register_counter(
     "block_ru_utime_seconds", labels=["block_name"],
-    alternative_names=(
-        metrics.name_prefix + "_block_ru_utime:total",
-    ),
 )
 
 block_ru_stime = metrics.register_counter(
     "block_ru_stime_seconds", labels=["block_name"],
-    alternative_names=(
-        metrics.name_prefix + "_block_ru_stime:total",
-    ),
 )
 
 block_db_txn_count = metrics.register_counter(
     "block_db_txn_count", labels=["block_name"],
-    alternative_names=(
-        metrics.name_prefix + "_block_db_txn_count:total",
-    ),
 )
 
 # seconds spent waiting for db txns, excluding scheduling time, in this block
 block_db_txn_duration = metrics.register_counter(
     "block_db_txn_duration_seconds", labels=["block_name"],
-    alternative_names=(
-        metrics.name_prefix + "_block_db_txn_duration:total",
-    ),
 )
 
 # seconds spent waiting for a db connection, in this block
