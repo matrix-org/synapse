@@ -741,7 +741,9 @@ class GroupsServerHandler(object):
         This will error if the group requires an invite/knock to join
         """
 
-        group_info = yield self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
+        group_info = yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True
+        )
         if group_info['join_policy'] != "open":
             raise SynapseError(403, "Group is not publicly joinable")
 

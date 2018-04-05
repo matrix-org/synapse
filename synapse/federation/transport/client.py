@@ -872,7 +872,7 @@ class TransportLayerClient(object):
 
     @log_function
     def set_group_join_policy(self, destination, group_id, requester_user_id,
-                           content):
+                              content):
         """Sets the join policy for a group
         """
         path = PREFIX + "/groups/%s/settings/m.join_policy" % (group_id,)
