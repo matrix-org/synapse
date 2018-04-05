@@ -280,8 +280,9 @@ class DataStore(RoomMemberStore, RoomStore,
 
             sql = """
                 SELECT platform, COALESCE(count(*), 0) FROM (
-                     SELECT users.name, platform, users.creation_ts * 1000,
-                                                            MAX(uip.last_seen)
+                     SELECT
+                        users.name, platform, users.creation_ts * 1000,
+                        MAX(uip.last_seen)
                      FROM users
                      INNER JOIN (
                          SELECT
@@ -310,8 +311,8 @@ class DataStore(RoomMemberStore, RoomStore,
             results = {}
             txn.execute(sql, (thirty_days_ago_in_secs,
                               thirty_days_ago_in_secs))
-            rows = txn.fetchall()
-            for row in rows:
+
+            for row in txn:
                 if row[0] is 'unknown':
                     pass
                 results[row[0]] = row[1]
