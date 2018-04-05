@@ -19,4 +19,4 @@
  * NULL at the python store level as necessary so that existing
  * rows are given the correct default policy.
  */
-ALTER TABLE groups ADD COLUMN join_policy TEXT DEFAULT NULL;
+ALTER TABLE groups ADD COLUMN join_policy TEXT NON NULL DEFAULT 'invite';
