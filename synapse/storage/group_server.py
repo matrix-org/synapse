@@ -57,7 +57,7 @@ class GroupServerStore(SQLBaseStore):
             },
             retcols=(
                 "name", "short_description", "long_description",
-                "avatar_url", "is_public", "join_rule",
+                "avatar_url", "is_public", "join_policy",
             ),
             allow_none=True,
             desc="get_group",
