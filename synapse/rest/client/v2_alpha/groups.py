@@ -405,7 +405,7 @@ class GroupInvitedUsersServlet(RestServlet):
 class GroupSettingJoinPolicyServlet(RestServlet):
     """Set group join policy
     """
-    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/setting/m.join_policy$")
+    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/settings/m.join_policy$")
 
     def __init__(self, hs):
         super(GroupSettingJoinPolicyServlet, self).__init__()

@@ -862,7 +862,7 @@ class TransportLayerClient(object):
                            content):
         """Sets the join policy for a group
         """
-        path = PREFIX + "/groups/%s/setting/m.join_policy" % (group_id,)
+        path = PREFIX + "/groups/%s/settings/m.join_policy" % (group_id,)
 
         return self.client.post_json(
             destination=destination,

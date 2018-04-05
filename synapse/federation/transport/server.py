@@ -1128,7 +1128,7 @@ class FederationGroupsBulkPublicisedServlet(BaseFederationServlet):
 class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
     """Sets whether a group is joinable without an invite or knock
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/setting/m.join_policy$"
+    PATH = "/groups/(?P<group_id>[^/]*)/settings/m.join_policy$"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id):
