@@ -31,6 +31,12 @@ _DEFAULT_ROLE_ID = ""
 
 class GroupServerStore(SQLBaseStore):
     def set_group_join_policy(self, group_id, join_policy):
+        """Set the join policy of a group.
+
+        join_policy can be one of:
+         * "invite"
+         * "open"
+        """
         return self._simple_update_one(
             table="groups",
             keyvalues={
