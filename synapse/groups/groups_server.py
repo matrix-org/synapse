@@ -746,7 +746,7 @@ class GroupsServerHandler(object):
         group_info = yield self.store.get_group(
             group_id,
         )
-        if not group_info['is_joinable']:
+        if group_info['join_policy'] != "open":
             raise SynapseError(403, "Group is not publicly joinable")
 
         local_attestation = yield self.add_user(group_id, requester_user_id, content)

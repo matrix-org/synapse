@@ -57,14 +57,11 @@ class GroupServerStore(SQLBaseStore):
             },
             retcols=(
                 "name", "short_description", "long_description",
-                "avatar_url", "is_public", "is_joinable",
+                "avatar_url", "is_public", "join_rule",
             ),
             allow_none=True,
             desc="get_group",
         )
-
-        if ret and 'is_joinable' in ret:
-            ret['is_joinable'] = bool(ret['is_joinable'])
 
         defer.returnValue(ret)
 
