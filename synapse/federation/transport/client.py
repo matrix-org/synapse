@@ -871,7 +871,7 @@ class TransportLayerClient(object):
         )
 
     @log_function
-    def set_group_joinable(self, destination, group_id, requester_user_id,
+    def set_group_join_policy(self, destination, group_id, requester_user_id,
                            content):
         """Sets the join policy for a group
         """
