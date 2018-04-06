@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -491,7 +492,7 @@ class Porter(object):
 
             def create_port_table(txn):
                 txn.execute(
-                    "CREATE TABLE port_from_sqlite3 ("
+                    "CREATE TABLE IF NOT EXISTS port_from_sqlite3 ("
                     " table_name varchar(100) NOT NULL UNIQUE,"
                     " forward_rowid bigint NOT NULL,"
                     " backward_rowid bigint NOT NULL"
@@ -517,14 +518,11 @@ class Porter(object):
                     "alter_table", alter_table
                 )
             except Exception as e:
-                logger.info("Failed to create port table: %s", e)
+                pass
 
-            try:
-                yield self.postgres_store.runInteraction(
-                    "create_port_table", create_port_table
-                )
-            except Exception as e:
-                logger.info("Failed to create port table: %s", e)
+            yield self.postgres_store.runInteraction(
+                "create_port_table", create_port_table
+            )
 
             self.progress.set_state("Setting up")
 
