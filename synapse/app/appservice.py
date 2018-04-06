@@ -42,7 +42,7 @@ logger = logging.getLogger("synapse.app.appservice")
 
 
 class AppserviceSlaveStore(
-    DirectoryStore, SlavedEventStore, SlavedApplicationServiceStore,
+    DirectoryStore, SlavedApplicationServiceStore, SlavedEventStore,
     SlavedRegistrationStore,
 ):
     pass
