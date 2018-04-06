@@ -411,8 +411,8 @@ class GroupsServerHandler(object):
                 "name", "short_description", "long_description",
                 "avatar_url", "is_public",
             ]
-            group_description = { key: group[key] for key in cols }
-            group_description["is_openly_joinable"] = group['join_policy'] == "open"
+            group_description = {key: group[key] for key in cols}
+            group_description["is_openly_joinable"] = group["join_policy"] == "open"
 
             defer.returnValue(group_description)
         else:
