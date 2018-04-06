@@ -404,13 +404,15 @@ class GroupsServerHandler(object):
 
         yield self.check_group_is_ours(group_id, requester_user_id)
 
-        group_description = yield self.store.get_group(group_id)
+        group = yield self.store.get_group(group_id)
 
-        if group_description:
-            join_policy = group_description['join_policy']
-            del group_description['join_policy']
-
-            group_description['is_openly_joinable'] = join_policy == "open"
+        if group:
+            cols = [
+                "name", "short_description", "long_description",
+                "avatar_url", "is_public",
+            ]
+            group_description = { key: group[key] for key in cols }
+            group_description["is_openly_joinable"] = group['join_policy'] == "open"
 
             defer.returnValue(group_description)
         else:
