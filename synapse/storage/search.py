@@ -75,8 +75,9 @@ class SearchStore(BackgroundUpdateStore):
 
         def reindex_search_txn(txn):
             sql = (
-                "SELECT stream_ordering, event_id, room_id, type, content, "
+                "SELECT stream_ordering, event_id, room_id, type, json, "
                 " origin_server_ts FROM events"
+                " JOIN event_json USING (event_id)"
                 " WHERE ? <= stream_ordering AND stream_ordering < ?"
                 " AND (%s)"
                 " ORDER BY stream_ordering DESC"
@@ -104,7 +105,8 @@ class SearchStore(BackgroundUpdateStore):
                     stream_ordering = row["stream_ordering"]
                     origin_server_ts = row["origin_server_ts"]
                     try:
-                        content = json.loads(row["content"])
+                        event_json = json.loads(row["json"])
+                        content = event_json["content"]
                     except Exception:
                         continue
 

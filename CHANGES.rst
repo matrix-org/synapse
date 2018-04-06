@@ -1,3 +1,12 @@
+Changes in synapse v0.28.0 (2018-xx-xx)
+=======================================
+
+As previously advised, this release removes a number of redundant Prometheus
+metrics. Administrators may need to update their dashboards and alerting rules
+to use the updated metric names, if they have not already done so. See
+`docs/metrics-howto.rst <docs/metrics-howto.rst#deprecated-metrics-removed-in-0-28-0>`_
+for more details.
+
 Changes in synapse v0.27.2 (2018-03-26)
 =======================================
 

@@ -483,33 +483,34 @@ class StateResolutionHandler(object):
                     key: e_ids.pop() for key, e_ids in state.iteritems()
                 }
 
-            # if the new state matches any of the input state groups, we can
-            # use that state group again. Otherwise we will generate a state_id
-            # which will be used as a cache key for future resolutions, but
-            # not get persisted.
-            state_group = None
-            new_state_event_ids = frozenset(new_state.itervalues())
-            for sg, events in state_groups_ids.iteritems():
-                if new_state_event_ids == frozenset(e_id for e_id in events):
-                    state_group = sg
-                    break
+            with Measure(self.clock, "state.create_group_ids"):
+                # if the new state matches any of the input state groups, we can
+                # use that state group again. Otherwise we will generate a state_id
+                # which will be used as a cache key for future resolutions, but
+                # not get persisted.
+                state_group = None
+                new_state_event_ids = frozenset(new_state.itervalues())
+                for sg, events in state_groups_ids.iteritems():
+                    if new_state_event_ids == frozenset(e_id for e_id in events):
+                        state_group = sg
+                        break
 
-            # TODO: We want to create a state group for this set of events, to
-            # increase cache hits, but we need to make sure that it doesn't
-            # end up as a prev_group without being added to the database
+                # TODO: We want to create a state group for this set of events, to
+                # increase cache hits, but we need to make sure that it doesn't
+                # end up as a prev_group without being added to the database
 
-            prev_group = None
-            delta_ids = None
-            for old_group, old_ids in state_groups_ids.iteritems():
-                if not set(new_state) - set(old_ids):
-                    n_delta_ids = {
-                        k: v
-                        for k, v in new_state.iteritems()
-                        if old_ids.get(k) != v
-                    }
-                    if not delta_ids or len(n_delta_ids) < len(delta_ids):
-                        prev_group = old_group
-                        delta_ids = n_delta_ids
+                prev_group = None
+                delta_ids = None
+                for old_group, old_ids in state_groups_ids.iteritems():
+                    if not set(new_state) - set(old_ids):
+                        n_delta_ids = {
+                            k: v
+                            for k, v in new_state.iteritems()
+                            if old_ids.get(k) != v
+                        }
+                        if not delta_ids or len(n_delta_ids) < len(delta_ids):
+                            prev_group = old_group
+                            delta_ids = n_delta_ids
 
             cache = _StateCacheEntry(
                 state=new_state,

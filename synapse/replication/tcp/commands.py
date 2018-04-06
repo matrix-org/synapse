@@ -24,6 +24,8 @@ import simplejson
 
 logger = logging.getLogger(__name__)
 
+_json_encoder = simplejson.JSONEncoder(namedtuple_as_object=False)
+
 
 class Command(object):
     """The base command class.
@@ -107,7 +109,7 @@ class RdataCommand(Command):
         return " ".join((
             self.stream_name,
             str(self.token) if self.token is not None else "batch",
-            simplejson.dumps(self.row, namedtuple_as_object=False),
+            _json_encoder.encode(self.row),
         ))
 
 
@@ -302,7 +304,7 @@ class InvalidateCacheCommand(Command):
 
     def to_line(self):
         return " ".join((
-            self.cache_func, simplejson.dumps(self.keys, namedtuple_as_object=False)
+            self.cache_func, _json_encoder.encode(self.keys),
         ))
 
 
@@ -334,7 +336,7 @@ class UserIpCommand(Command):
         )
 
     def to_line(self):
-        return self.user_id + " " + simplejson.dumps((
+        return self.user_id + " " + _json_encoder.encode((
             self.access_token, self.ip, self.user_agent, self.device_id,
             self.last_seen,
         ))

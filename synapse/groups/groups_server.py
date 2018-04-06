@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -202,6 +203,28 @@ class GroupsServerHandler(object):
             room_id=room_id,
             category_id=category_id,
         )
+
+        defer.returnValue({})
+
+    @defer.inlineCallbacks
+    def set_group_join_policy(self, group_id, requester_user_id, content):
+        """Sets the group join policy.
+
+        Currently supported policies are:
+         - "invite": an invite must be received and accepted in order to join.
+         - "open": anyone can join.
+        """
+        yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        join_policy = _parse_join_policy_from_contents(content)
+        if join_policy is None:
+            raise SynapseError(
+                400, "No value specified for 'm.join_policy'"
+            )
+
+        yield self.store.set_group_join_policy(group_id, join_policy=join_policy)
 
         defer.returnValue({})
 
@@ -833,6 +856,31 @@ class GroupsServerHandler(object):
         defer.returnValue({
             "group_id": group_id,
         })
+
+
+def _parse_join_policy_from_contents(content):
+    """Given a content for a request, return the specified join policy or None
+    """
+
+    join_policy_dict = content.get("m.join_policy")
+    if join_policy_dict:
+        return _parse_join_policy_dict(join_policy_dict)
+    else:
+        return None
+
+
+def _parse_join_policy_dict(join_policy_dict):
+    """Given a dict for the "m.join_policy" config return the join policy specified
+    """
+    join_policy_type = join_policy_dict.get("type")
+    if not join_policy_type:
+        return True
+
+    if join_policy_type not in ("invite", "open"):
+        raise SynapseError(
+            400, "Synapse only supports 'invite'/'open' join rule"
+        )
+    return join_policy_type
 
 
 def _parse_visibility_from_contents(content):

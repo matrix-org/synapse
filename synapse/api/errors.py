@@ -15,8 +15,9 @@
 
 """Contains exceptions and error codes."""
 
-import json
 import logging
+
+import simplejson as json
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -847,6 +848,21 @@ class TransportLayerClient(object):
             )
         else:
             path = PREFIX + "/groups/%s/summary/users/%s" % (group_id, user_id,)
+
+        return self.client.post_json(
+            destination=destination,
+            path=path,
+            args={"requester_user_id": requester_user_id},
+            data=content,
+            ignore_backoff=True,
+        )
+
+    @log_function
+    def set_group_joinable(self, destination, group_id, requester_user_id,
+                           content):
+        """Sets the join policy for a group
+        """
+        path = PREFIX + "/groups/%s/settings/m.join_policy" % (group_id,)
 
         return self.client.post_json(
             destination=destination,

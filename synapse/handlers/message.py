@@ -27,7 +27,7 @@ from synapse.types import (
 from synapse.util.async import run_on_reactor, ReadWriteLock, Limiter
 from synapse.util.logcontext import preserve_fn, run_in_background
 from synapse.util.metrics import measure_func
-from synapse.util.frozenutils import unfreeze
+from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
 from synapse.replication.http.send_event import send_event_to_master
@@ -678,7 +678,7 @@ class EventCreationHandler(object):
 
         # Ensure that we can round trip before trying to persist in db
         try:
-            dump = simplejson.dumps(unfreeze(event.content))
+            dump = frozendict_json_encoder.encode(event.content)
             simplejson.loads(dump)
         except Exception:
             logger.exception("Failed to encode content: %r", event.content)
