@@ -407,6 +407,11 @@ class GroupsServerHandler(object):
         group_description = yield self.store.get_group(group_id)
 
         if group_description:
+            join_policy = group_description['join_policy']
+            del group_description['join_policy']
+
+            group_description['is_openly_joinable'] = join_policy == "open"
+
             defer.returnValue(group_description)
         else:
             raise SynapseError(404, "Unknown group")
