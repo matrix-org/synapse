@@ -50,11 +50,11 @@ logger = logging.getLogger("synapse.app.client_reader")
 
 
 class ClientReaderSlavedStore(
+    SlavedApplicationServiceStore,
     SlavedEventStore,
     SlavedKeyStore,
     RoomStore,
     DirectoryStore,
-    SlavedApplicationServiceStore,
     SlavedRegistrationStore,
     TransactionStore,
     SlavedClientIpStore,

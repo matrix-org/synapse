@@ -440,7 +440,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
     @cachedInlineCallbacks(num_args=2, max_entries=10000, iterable=True)
-    # @defer.inlineCallbacks
     def _get_joined_hosts(self, room_id, state_group, current_state_ids, state_entry):
         # We don't use `state_group`, its there so that we can cache based
         # on it. However, its important that its never None, since two current_state's

@@ -18,9 +18,14 @@ import re
 import simplejson as json
 from twisted.internet import defer
 
+from synapse.api.constants import EventTypes, Membership
 from synapse.appservice import AppServiceTransaction
 from synapse.config.appservice import load_appservices
 from synapse.storage.events import EventsWorkerStore
+from synapse.storage.roommember import RoomMemberWorkerStore
+from synapse.storage.state import StateGroupWorkerStore
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
+from synapse.util.async import Linearizer
 from ._base import SQLBaseStore
 
 
@@ -46,7 +51,8 @@ def _make_exclusive_regex(services_cache):
     return exclusive_user_regex
 
 
-class ApplicationServiceWorkerStore(SQLBaseStore):
+class ApplicationServiceWorkerStore(RoomMemberWorkerStore, StateGroupWorkerStore,
+                                    SQLBaseStore):
     def __init__(self, db_conn, hs):
         self.services_cache = load_appservices(
             hs.hostname,
@@ -110,6 +116,38 @@ class ApplicationServiceWorkerStore(SQLBaseStore):
             if service.id == as_id:
                 return service
         return None
+
+    @defer.inlineCallbacks
+    def get_appservices_with_user_in_room(self, event):
+        """Get the list of appservices in the room at the given event
+
+        Args:
+            event (Event)
+
+        Returns:
+            Deferred[set(str)]: The IDs of all ASes in the room
+        """
+        state_group = yield self._get_state_group_for_event(event.event_id)
+
+        if not state_group:
+            raise Exception("No state group for event %s", event.event_id)
+
+        ases_in_room = yield self._get_appservices_with_user_in_room(
+            event.room_id, state_group,
+        )
+
+        defer.returnValue(ases_in_room)
+
+    @cachedInlineCallbacks(num_args=2, max_entries=10000)
+    def _get_appservices_with_user_in_room(self, room_id, state_group):
+        cache = self._get_appservices_with_user_in_room_cache(room_id)
+        ases_in_room = yield cache.get_appservices_in_room_by_user(state_group)
+
+        defer.returnValue(ases_in_room)
+
+    @cached(max_entries=10000)
+    def _get_appservices_with_user_in_room_cache(self, room_id):
+        return _AppserviceUsersCache(self, room_id)
 
 
 class ApplicationServiceStore(ApplicationServiceWorkerStore):
@@ -346,6 +384,7 @@ class ApplicationServiceTransactionWorkerStore(ApplicationServiceWorkerStore,
                 " (SELECT stream_ordering FROM appservice_stream_position)"
                 "     < e.stream_ordering"
                 " AND e.stream_ordering <= ?"
+                " AND NOT e.outlier"
                 " ORDER BY e.stream_ordering ASC"
                 " LIMIT ?"
             )
@@ -374,3 +413,119 @@ class ApplicationServiceTransactionStore(ApplicationServiceTransactionWorkerStor
     # to keep consistency with the other stores, we keep this empty class for
     # now.
     pass
+
+
+class _AppserviceUsersCache(object):
+    """Attempts to calculate which appservices have users in a given room by
+    looking at state groups and their delta_ids
+    """
+
+    def __init__(self, store, room_id):
+        self.store = store
+        self.room_id = room_id
+
+        self.linearizer = Linearizer("_AppserviceUsersCache")
+
+        # The last state group we calculated the ASes in the room for.
+        self.state_group = object()
+
+        # A dict of all appservices in the room at the above state group,
+        # along with a user_id of an AS user in the room.
+        # Dict of as_id -> user_id.
+        self.appservices_in_room = {}
+
+    @defer.inlineCallbacks
+    def get_appservices_in_room_by_user(self, state_group):
+        """
+        Args:
+            state_group(str)
+
+        Returns:
+            Deferred[set(str)]: The IDs of all ASes in the room
+        """
+        assert state_group is not None
+
+        if state_group == self.state_group:
+            defer.returnValue(frozenset(self.appservices_in_room))
+
+        with (yield self.linearizer.queue(())):
+            # Set of ASes that we need to recalculate their membership of
+            # the room
+            uhandled_ases = set()
+
+            # If the state groups match then there is nothing to do
+            if state_group == self.state_group:
+                defer.returnValue(frozenset(self.appservices_in_room))
+
+            prev_group, delta_ids = yield self.store.get_state_group_delta(state_group)
+
+            # If the prev_group matches the last state group we can calculate
+            # the new value by looking at the deltas
+            if prev_group and prev_group == self.state_group:
+                for (typ, state_key), event_id in delta_ids.iteritems():
+                    if typ != EventTypes.Member:
+                        continue
+
+                    user_id = state_key
+
+                    event = yield self.store.get_event(event_id)
+
+                    is_join = event.membership == Membership.JOIN
+                    for appservice in self.store.get_app_services():
+                        as_id = appservice.id
+
+                        # If this is a join and the appservice is already in
+                        # the room then its a noop
+                        if is_join:
+                            if as_id in self.appservices_in_room:
+                                continue
+                        # If this is not a join, then we only need to recalculate
+                        # if the AS is in the room and the cached joined AS user
+                        # matches this event.
+                        elif self.appservices_in_room.get(as_id, None) != user_id:
+                            continue
+
+                        # If the AS is not interested in the user then its a
+                        # noop.
+                        if not appservice.is_interested_in_user(user_id):
+                            continue
+
+                        if is_join:
+                            # If an AS user is joining then the AS is now
+                            # interested in the room
+                            self.appservices_in_room[as_id] = user_id
+                        else:
+                            # If an AS user has left then we need to
+                            # recalcualte if they're in the room.
+                            uhandled_ases.add(appservice)
+                            self.appservices_in_room.pop(as_id, None)
+                else:
+                    uhandled_ases = set(self.store.get_app_services())
+
+            if uhandled_ases:
+                # We need to recalculate which ASes are in the room, so lets
+                # get the current state and try and find a join event
+                # that the AS is interested in.
+
+                current_state_ids = yield self.store.get_state_ids_for_group(state_group)
+
+                for appservice in uhandled_ases:
+                    as_id = appservice.id
+
+                    self.appservices_in_room.pop(as_id, None)
+
+                    for (etype, state_key), event_id in current_state_ids.iteritems():
+                        if etype != EventTypes.Member:
+                            continue
+
+                        if not appservice.is_interested_in_user(state_key):
+                            continue
+
+                        event = yield self.store.get_event(event_id)
+                        if event.membership == Membership.JOIN:
+                            self.appservices_in_room[as_id] = state_key
+                            break
+
+            self.state_group = state_group
+
+        defer.returnValue(frozenset(self.appservices_in_room))

@@ -64,6 +64,7 @@ logger = logging.getLogger("synapse.app.synchrotron")
 class SynchrotronSlavedStore(
     SlavedReceiptsStore,
     SlavedAccountDataStore,
+    SlavedPushRuleStore,
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
     SlavedFilteringStore,
@@ -71,7 +72,6 @@ class SynchrotronSlavedStore(
     SlavedGroupServerStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
-    SlavedPushRuleStore,
     SlavedEventStore,
     SlavedClientIpStore,
     RoomStore,

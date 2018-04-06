@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from synapse.api.constants import EventTypes
-from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.types import GroupID, get_domain_from_id
 
 from twisted.internet import defer
@@ -173,6 +172,7 @@ class ApplicationService(object):
 
         if self.is_interested_in_user(event.sender):
             defer.returnValue(True)
+
         # also check m.room.member state key
         if (event.type == EventTypes.Member and
                 self.is_interested_in_user(event.state_key)):
@@ -181,20 +181,18 @@ class ApplicationService(object):
         if not store:
             defer.returnValue(False)
 
-        does_match = yield self._matches_user_in_member_list(event.room_id, store)
+        does_match = yield self._matches_user_in_member_list(
+            event, store,
+        )
         defer.returnValue(does_match)
 
-    @cachedInlineCallbacks(num_args=1, cache_context=True)
-    def _matches_user_in_member_list(self, room_id, store, cache_context):
-        member_list = yield store.get_users_in_room(
-            room_id, on_invalidate=cache_context.invalidate
+    @defer.inlineCallbacks
+    def _matches_user_in_member_list(self, event, store):
+        ases = yield store.get_appservices_with_user_in_room(
+            event,
         )
 
-        # check joined member events
-        for user_id in member_list:
-            if self.is_interested_in_user(user_id):
-                defer.returnValue(True)
-        defer.returnValue(False)
+        defer.returnValue(self.id in ases)
 
     def _matches_room_id(self, event):
         if hasattr(event, "room_id"):

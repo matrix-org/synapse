@@ -49,8 +49,8 @@ logger = logging.getLogger("synapse.app.user_dir")
 
 
 class UserDirectorySlaveStore(
-    SlavedEventStore,
     SlavedApplicationServiceStore,
+    SlavedEventStore,
     SlavedRegistrationStore,
     SlavedClientIpStore,
     UserDirectoryStore,

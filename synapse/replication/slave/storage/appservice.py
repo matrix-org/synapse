@@ -17,8 +17,10 @@
 from synapse.storage.appservice import (
     ApplicationServiceWorkerStore, ApplicationServiceTransactionWorkerStore,
 )
+from synapse.replication.slave.storage.events import SlavedEventStore
 
 
 class SlavedApplicationServiceStore(ApplicationServiceTransactionWorkerStore,
-                                    ApplicationServiceWorkerStore):
+                                    ApplicationServiceWorkerStore,
+                                    SlavedEventStore):
     pass
