@@ -905,7 +905,7 @@ def _parse_join_policy_dict(join_policy_dict):
     """
     join_policy_type = join_policy_dict.get("type")
     if not join_policy_type:
-        return True
+        return "invite"
 
     if join_policy_type not in ("invite", "open"):
         raise SynapseError(
