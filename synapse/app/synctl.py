@@ -262,6 +262,7 @@ def main():
             for running_pid in running_pids:
                 while pid_running(running_pid):
                     time.sleep(0.2)
+            write("All processes exited; now restarting...")
 
     if action == "start" or action == "restart":
         if start_stop_synapse:
