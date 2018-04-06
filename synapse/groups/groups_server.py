@@ -678,7 +678,7 @@ class GroupsServerHandler(object):
             raise SynapseError(502, "Unknown state returned by HS")
 
     @defer.inlineCallbacks
-    def add_user(self, group_id, user_id, content):
+    def _add_user(self, group_id, user_id, content):
         """Add a user to a group based on a content dict.
 
         See accept_invite, join_group.
@@ -727,7 +727,7 @@ class GroupsServerHandler(object):
         if not is_invited:
             raise SynapseError(403, "User not invited to group")
 
-        local_attestation = yield self.add_user(group_id, requester_user_id, content)
+        local_attestation = yield self._add_user(group_id, requester_user_id, content)
 
         defer.returnValue({
             "state": "join",
@@ -747,7 +747,7 @@ class GroupsServerHandler(object):
         if group_info['join_policy'] != "open":
             raise SynapseError(403, "Group is not publicly joinable")
 
-        local_attestation = yield self.add_user(group_id, requester_user_id, content)
+        local_attestation = yield self._add_user(group_id, requester_user_id, content)
 
         defer.returnValue({
             "state": "join",
