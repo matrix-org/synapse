@@ -251,6 +251,12 @@ class Porter(object):
     @defer.inlineCallbacks
     def handle_table(self, table, postgres_size, table_size, forward_chunk,
                      backward_chunk):
+        logger.info(
+            "Table %s: %i/%i (rows %i-%i) already ported",
+            table, postgres_size, table_size,
+            backward_chunk+1, forward_chunk-1,
+        )
+
         if not table_size:
             return
 
@@ -468,28 +474,7 @@ class Porter(object):
             self.progress.set_state("Preparing PostgreSQL")
             self.setup_db(postgres_config, postgres_engine)
 
-            # Step 2. Get tables.
-            self.progress.set_state("Fetching tables")
-            sqlite_tables = yield self.sqlite_store._simple_select_onecol(
-                table="sqlite_master",
-                keyvalues={
-                    "type": "table",
-                },
-                retcol="name",
-            )
-
-            postgres_tables = yield self.postgres_store._simple_select_onecol(
-                table="information_schema.tables",
-                keyvalues={},
-                retcol="distinct table_name",
-            )
-
-            tables = set(sqlite_tables) & set(postgres_tables)
-
-            self.progress.set_state("Creating tables")
-
-            logger.info("Found %d tables", len(tables))
-
+            self.progress.set_state("Creating port tables")
             def create_port_table(txn):
                 txn.execute(
                     "CREATE TABLE IF NOT EXISTS port_from_sqlite3 ("
@@ -524,9 +509,27 @@ class Porter(object):
                 "create_port_table", create_port_table
             )
 
-            self.progress.set_state("Setting up")
+            # Step 2. Get tables.
+            self.progress.set_state("Fetching tables")
+            sqlite_tables = yield self.sqlite_store._simple_select_onecol(
+                table="sqlite_master",
+                keyvalues={
+                    "type": "table",
+                },
+                retcol="name",
+            )
 
-            # Set up tables.
+            postgres_tables = yield self.postgres_store._simple_select_onecol(
+                table="information_schema.tables",
+                keyvalues={},
+                retcol="distinct table_name",
+            )
+
+            tables = set(sqlite_tables) & set(postgres_tables)
+            logger.info("Found %d tables", len(tables))
+
+            # Step 3. Figure out what still needs copying
+            self.progress.set_state("Checking on port progress")
             setup_res = yield defer.gatherResults(
                 [
                     self.setup_table(table)
@@ -537,7 +540,8 @@ class Porter(object):
                 consumeErrors=True,
             )
 
-            # Process tables.
+            # Step 4. Do the copying.
+            self.progress.set_state("Copying to postgres")
             yield defer.gatherResults(
                 [
                     self.handle_table(*res)
