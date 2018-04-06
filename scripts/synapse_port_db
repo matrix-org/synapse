@@ -550,6 +550,9 @@ class Porter(object):
                 consumeErrors=True,
             )
 
+            # Step 5. Do final post-processing
+            yield self._setup_state_group_id_seq()
+
             self.progress.done()
         except:
             global end_error_exec_info
@@ -708,6 +711,16 @@ class Porter(object):
         done = int(done) if done else 0
 
         defer.returnValue((done, remaining + done))
+
+    def _setup_state_group_id_seq(self):
+        def r(txn):
+            txn.execute("SELECT MAX(id) FROM state_groups")
+            next_id = txn.fetchone()[0]+1
+            txn.execute(
+                "ALTER SEQUENCE state_group_id_seq RESTART WITH %s",
+                (next_id,),
+            )
+        return self.postgres_store.runInteraction("setup_state_group_id_seq", r)
 
 
 ##############################################
