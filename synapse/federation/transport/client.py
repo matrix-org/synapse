@@ -864,7 +864,7 @@ class TransportLayerClient(object):
         """
         path = PREFIX + "/groups/%s/settings/m.join_policy" % (group_id,)
 
-        return self.client.post_json(
+        return self.client.put_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},

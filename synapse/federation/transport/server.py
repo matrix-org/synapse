@@ -1131,7 +1131,7 @@ class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
     PATH = "/groups/(?P<group_id>[^/]*)/settings/m.join_policy$"
 
     @defer.inlineCallbacks
-    def on_POST(self, origin, content, query, group_id):
+    def on_PUT(self, origin, content, query, group_id):
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
