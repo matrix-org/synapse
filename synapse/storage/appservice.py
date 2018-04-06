@@ -129,6 +129,9 @@ class ApplicationServiceWorkerStore(RoomMemberWorkerStore, StateGroupWorkerStore
         """
         state_group = yield self._get_state_group_for_event(event.event_id)
 
+        if not state_group:
+            raise Exception("No state group for event %s", event.event_id)
+
         ases_in_room = yield self._get_appservices_with_user_in_room(
             event.room_id, state_group,
         )
@@ -381,6 +384,7 @@ class ApplicationServiceTransactionWorkerStore(ApplicationServiceWorkerStore,
                 " (SELECT stream_ordering FROM appservice_stream_position)"
                 "     < e.stream_ordering"
                 " AND e.stream_ordering <= ?"
+                " AND NOT e.outlier"
                 " ORDER BY e.stream_ordering ASC"
                 " LIMIT ?"
             )
@@ -439,6 +443,8 @@ class _AppserviceUsersCache(object):
         Returns:
             Deferred[set(str)]: The IDs of all ASes in the room
         """
+        assert state_group is not None
+
         if state_group == self.state_group:
             defer.returnValue(frozenset(self.appservices_in_room))
 
@@ -455,7 +461,7 @@ class _AppserviceUsersCache(object):
 
             # If the prev_group matches the last state group we can calculate
             # the new value by looking at the deltas
-            if prev_group == self.state_group:
+            if prev_group and prev_group == self.state_group:
                 for (typ, state_key), event_id in delta_ids.iteritems():
                     if typ != EventTypes.Member:
                         continue
