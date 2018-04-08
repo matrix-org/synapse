@@ -47,3 +47,5 @@ static/client/register/register_config.js
 
 env/
 *.config
+
+.vscode/

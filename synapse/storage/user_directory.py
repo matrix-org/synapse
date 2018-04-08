@@ -641,8 +641,12 @@ class UserDirectoryStore(SQLBaseStore):
         """
 
         if self.hs.config.user_directory_search_all_users:
-            join_clause = ""
-            where_clause = "?<>''"  # naughty hack to keep the same number of binds
+            # make s.user_id null to keep the ordering algorithm happy
+            join_clause = """
+                CROSS JOIN (SELECT NULL as user_id) AS s
+            """
+            join_args = ()
+            where_clause = "1=1"
         else:
             join_clause = """
                 LEFT JOIN users_in_public_rooms AS p USING (user_id)
@@ -651,6 +655,7 @@ class UserDirectoryStore(SQLBaseStore):
                     WHERE user_id = ? AND share_private
                 ) AS s USING (user_id)
             """
+            join_args = (user_id,)
             where_clause = "(s.user_id IS NOT NULL OR p.user_id IS NOT NULL)"
 
         if isinstance(self.database_engine, PostgresEngine):
@@ -692,7 +697,7 @@ class UserDirectoryStore(SQLBaseStore):
                     avatar_url IS NULL
                 LIMIT ?
             """ % (join_clause, where_clause)
-            args = (user_id, full_query, exact_query, prefix_query, limit + 1,)
+            args = join_args + (full_query, exact_query, prefix_query, limit + 1,)
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_sqlite(search_term)
 
@@ -710,7 +715,7 @@ class UserDirectoryStore(SQLBaseStore):
                     avatar_url IS NULL
                 LIMIT ?
             """ % (join_clause, where_clause)
-            args = (user_id, search_query, limit + 1)
+            args = join_args + (search_query, limit + 1)
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")

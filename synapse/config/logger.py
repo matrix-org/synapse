@@ -28,27 +28,27 @@ DEFAULT_LOG_CONFIG = Template("""
 version: 1
 
 formatters:
-  precise:
-   format: '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s\
-- %(message)s'
+    precise:
+        format: '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - \
+%(request)s - %(message)s'
 
 filters:
-  context:
-    (): synapse.util.logcontext.LoggingContextFilter
-    request: ""
+    context:
+        (): synapse.util.logcontext.LoggingContextFilter
+        request: ""
 
 handlers:
-  file:
-    class: logging.handlers.RotatingFileHandler
-    formatter: precise
-    filename: ${log_file}
-    maxBytes: 104857600
-    backupCount: 10
-    filters: [context]
-  console:
-    class: logging.StreamHandler
-    formatter: precise
-    filters: [context]
+    file:
+        class: logging.handlers.RotatingFileHandler
+        formatter: precise
+        filename: ${log_file}
+        maxBytes: 104857600
+        backupCount: 10
+        filters: [context]
+    console:
+        class: logging.StreamHandler
+        formatter: precise
+        filters: [context]
 
 loggers:
     synapse:
@@ -74,17 +74,10 @@ class LoggingConfig(Config):
         self.log_file = self.abspath(config.get("log_file"))
 
     def default_config(self, config_dir_path, server_name, **kwargs):
-        log_file = self.abspath("homeserver.log")
         log_config = self.abspath(
             os.path.join(config_dir_path, server_name + ".log.config")
         )
         return """
-        # Logging verbosity level. Ignored if log_config is specified.
-        verbose: 0
-
-        # File to write logging to. Ignored if log_config is specified.
-        log_file: "%(log_file)s"
-
         # A yaml python logging config file
         log_config: "%(log_config)s"
         """ % locals()
@@ -123,9 +116,10 @@ class LoggingConfig(Config):
     def generate_files(self, config):
         log_config = config.get("log_config")
         if log_config and not os.path.exists(log_config):
+            log_file = self.abspath("homeserver.log")
             with open(log_config, "wb") as log_config_file:
                 log_config_file.write(
-                    DEFAULT_LOG_CONFIG.substitute(log_file=config["log_file"])
+                    DEFAULT_LOG_CONFIG.substitute(log_file=log_file)
                 )
 
 
@@ -150,6 +144,9 @@ def setup_logging(config, use_worker_options=False):
     )
 
     if log_config is None:
+        # We don't have a logfile, so fall back to the 'verbosity' param from
+        # the config or cmdline. (Note that we generate a log config for new
+        # installs, so this will be an unusual case)
         level = logging.INFO
         level_for_storage = logging.INFO
         if config.verbosity:
@@ -157,11 +154,10 @@ def setup_logging(config, use_worker_options=False):
             if config.verbosity > 1:
                 level_for_storage = logging.DEBUG
 
-        # FIXME: we need a logging.WARN for a -q quiet option
         logger = logging.getLogger('')
         logger.setLevel(level)
 
-        logging.getLogger('synapse.storage').setLevel(level_for_storage)
+        logging.getLogger('synapse.storage.SQL').setLevel(level_for_storage)
 
         formatter = logging.Formatter(log_format)
         if log_file:
