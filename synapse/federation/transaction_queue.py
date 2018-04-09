@@ -213,9 +213,10 @@ class TransactionQueue(object):
 
                     self._send_pdu(event, destinations)
 
+                @defer.inlineCallbacks
                 def handle_room_events(events):
                     for event in events:
-                        return handle_event(event)
+                        yield handle_event(event)
 
                 events_by_room = {}
                 for event in events:
