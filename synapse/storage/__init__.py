@@ -275,9 +275,9 @@ class DataStore(RoomMemberStore, RoomStore,
         """
         def _count_r30_users(txn):
             thirty_days_in_secs = 86400 * 30
-            now = int(self._clock.time_msec())
-            thirty_days_ago_in_secs = now/1000 - thirty_days_in_secs
-
+            now = int(self._clock.time())
+            thirty_days_ago_in_secs = now - thirty_days_in_secs
+            print str(thirty_days_ago_in_secs)
             sql = """
                 SELECT platform, COALESCE(count(*), 0) FROM (
                      SELECT
