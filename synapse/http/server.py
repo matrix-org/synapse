@@ -329,7 +329,7 @@ class JsonResource(HttpServer, resource.Resource):
                 register_paths, so will return (possibly via Deferred) either
                 None, or a tuple of (http code, response body).
         """
-        if request.method == "OPTIONS":
+        if request.method == b"OPTIONS":
             return _options_handler, {}
 
         # Loop through all the registered callbacks to check if the method
@@ -543,7 +543,7 @@ def finish_request(request):
 
 def _request_user_agent_is_curl(request):
     user_agents = request.requestHeaders.getRawHeaders(
-        "User-Agent", default=[]
+        b"User-Agent", default=[]
     )
     for user_agent in user_agents:
         if "curl" in user_agent:
