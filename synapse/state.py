@@ -132,7 +132,7 @@ class StateHandler(object):
 
         state_map = yield self.store.get_events(state.values(), get_prev_content=False)
         state = {
-            key: state_map[e_id] for key, e_id in state.items() if e_id in state_map
+            key: state_map[e_id] for key, e_id in state.iteritems() if e_id in state_map
         }
 
         defer.returnValue(state)
@@ -378,7 +378,7 @@ class StateHandler(object):
             new_state = resolve_events_with_state_map(state_set_ids, state_map)
 
         new_state = {
-            key: state_map[ev_id] for key, ev_id in new_state.items()
+            key: state_map[ev_id] for key, ev_id in new_state.iteritems()
         }
 
         return new_state
@@ -458,15 +458,15 @@ class StateResolutionHandler(object):
             # build a map from state key to the event_ids which set that state.
             # dict[(str, str), set[str])
             state = {}
-            for st in state_groups_ids.values():
-                for key, e_id in st.items():
+            for st in state_groups_ids.itervalues():
+                for key, e_id in st.iteritems():
                     state.setdefault(key, set()).add(e_id)
 
             # build a map from state key to the event_ids which set that state,
             # including only those where there are state keys in conflict.
             conflicted_state = {
                 k: list(v)
-                for k, v in state.items()
+                for k, v in state.iteritems()
                 if len(v) > 1
             }
 
@@ -480,7 +480,7 @@ class StateResolutionHandler(object):
                     )
             else:
                 new_state = {
-                    key: e_ids.pop() for key, e_ids in state.items()
+                    key: e_ids.pop() for key, e_ids in state.iteritems()
                 }
 
             # if the new state matches any of the input state groups, we can
@@ -488,8 +488,8 @@ class StateResolutionHandler(object):
             # which will be used as a cache key for future resolutions, but
             # not get persisted.
             state_group = None
-            new_state_event_ids = frozenset(new_state.values())
-            for sg, events in state_groups_ids.items():
+            new_state_event_ids = frozenset(new_state.itervalues())
+            for sg, events in state_groups_ids.iteritems():
                 if new_state_event_ids == frozenset(e_id for e_id in events):
                     state_group = sg
                     break
@@ -702,7 +702,7 @@ def _resolve_with_state(unconflicted_state_ids, conflicted_state_ds, auth_event_
 
     auth_events = {
         key: state_map[ev_id]
-        for key, ev_id in auth_event_ids.items()
+        for key, ev_id in auth_event_ids.iteritems()
         if ev_id in state_map
     }
 
@@ -740,7 +740,7 @@ def _resolve_state_events(conflicted_state, auth_events):
 
     auth_events.update(resolved_state)
 
-    for key, events in conflicted_state.items():
+    for key, events in conflicted_state.iteritems():
         if key[0] == EventTypes.JoinRules:
             logger.debug("Resolving conflicted join rules %r", events)
             resolved_state[key] = _resolve_auth_events(
@@ -750,7 +750,7 @@ def _resolve_state_events(conflicted_state, auth_events):
 
     auth_events.update(resolved_state)
 
-    for key, events in conflicted_state.items():
+    for key, events in conflicted_state.iteritems():
         if key[0] == EventTypes.Member:
             logger.debug("Resolving conflicted member lists %r", events)
             resolved_state[key] = _resolve_auth_events(
@@ -760,7 +760,7 @@ def _resolve_state_events(conflicted_state, auth_events):
 
     auth_events.update(resolved_state)
 
-    for key, events in conflicted_state.items():
+    for key, events in conflicted_state.iteritems():
         if key not in resolved_state:
             logger.debug("Resolving conflicted state %r:%r", key, events)
             resolved_state[key] = _resolve_normal_events(
