@@ -19,6 +19,8 @@ import os
 import yaml
 from textwrap import dedent
 
+from six import integer_types
+
 
 class ConfigError(Exception):
     pass
@@ -49,7 +51,7 @@ Missing mandatory `server_name` config option.
 class Config(object):
     @staticmethod
     def parse_size(value):
-        if isinstance(value, int) or isinstance(value, long):
+        if isinstance(value, integer_types):
             return value
         sizes = {"K": 1024, "M": 1024 * 1024}
         size = 1
@@ -61,7 +63,7 @@ class Config(object):
 
     @staticmethod
     def parse_duration(value):
-        if isinstance(value, int) or isinstance(value, long):
+        if isinstance(value, integer_types):
             return value
         second = 1000
         minute = 60 * second
