@@ -1,4 +1,4 @@
-Changes in synapse v0.27.3 (2018-04-09)
+Changes in synapse v0.27.3-rc1 (2018-04-09)
 =======================================
 
 Notable changes include API support for joinability of groups. Also new metrics 
