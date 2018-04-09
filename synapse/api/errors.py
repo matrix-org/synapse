@@ -50,6 +50,7 @@ class Codes(object):
     THREEPID_DENIED = "M_THREEPID_DENIED"
     INVALID_USERNAME = "M_INVALID_USERNAME"
     SERVER_NOT_TRUSTED = "M_SERVER_NOT_TRUSTED"
+    WRONG_ROOM_KEYS_VERSION = "M_WRONG_ROOM_KEYS_VERSION"
 
 
 class CodeMessageException(RuntimeError):
@@ -274,6 +275,27 @@ class LimitExceededError(SynapseError):
             self.msg,
             self.errcode,
             retry_after_ms=self.retry_after_ms,
+        )
+
+
+class RoomKeysVersionError(SynapseError):
+    """A client has tried to upload to a non-current version of the room_keys store
+    """
+    def __init__(self, current_version):
+        """
+        Args:
+            current_version (str): the current version of the store they should have used
+        """
+        super(RoomKeysVersionError, self).__init__(
+            403, "Wrong room_keys version", Codes.WRONG_ROOM_KEYS_VERSION
+        )
+        self.current_version = current_version
+
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+            current_version=self.current_version,
         )
 
 

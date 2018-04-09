@@ -41,6 +41,7 @@ from synapse.rest.client.v2_alpha import (
     auth,
     receipts,
     read_marker,
+    room_keys,
     keys,
     tokenrefresh,
     tags,
@@ -92,6 +93,7 @@ class ClientRestResource(JsonResource):
         auth.register_servlets(hs, client_resource)
         receipts.register_servlets(hs, client_resource)
         read_marker.register_servlets(hs, client_resource)
+        room_keys.register_servlets(hs, client_resource)
         keys.register_servlets(hs, client_resource)
         tokenrefresh.register_servlets(hs, client_resource)
         tags.register_servlets(hs, client_resource)
