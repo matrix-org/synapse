@@ -47,6 +47,17 @@ metrics = synapse.metrics.get_metrics_for(__name__)
 response_count = metrics.register_counter(
     "response_count",
     labels=["method", "servlet", "tag"],
+    alternative_names=(
+        # the following are all deprecated aliases for the same metric
+        metrics.name_prefix + x for x in (
+            "_requests",
+            "_response_time:count",
+            "_response_ru_utime:count",
+            "_response_ru_stime:count",
+            "_response_db_txn_count:count",
+            "_response_db_txn_duration:count",
+        )
+    )
 )
 
 requests_counter = metrics.register_counter(
@@ -62,24 +73,39 @@ outgoing_responses_counter = metrics.register_counter(
 response_timer = metrics.register_counter(
     "response_time_seconds",
     labels=["method", "servlet", "tag"],
+    alternative_names=(
+        metrics.name_prefix + "_response_time:total",
+    ),
 )
 
 response_ru_utime = metrics.register_counter(
     "response_ru_utime_seconds", labels=["method", "servlet", "tag"],
+    alternative_names=(
+        metrics.name_prefix + "_response_ru_utime:total",
+    ),
 )
 
 response_ru_stime = metrics.register_counter(
     "response_ru_stime_seconds", labels=["method", "servlet", "tag"],
+    alternative_names=(
+        metrics.name_prefix + "_response_ru_stime:total",
+    ),
 )
 
 response_db_txn_count = metrics.register_counter(
     "response_db_txn_count", labels=["method", "servlet", "tag"],
+    alternative_names=(
+        metrics.name_prefix + "_response_db_txn_count:total",
+    ),
 )
 
 # seconds spent waiting for db txns, excluding scheduling time, when processing
 # this request
 response_db_txn_duration = metrics.register_counter(
     "response_db_txn_duration_seconds", labels=["method", "servlet", "tag"],
+    alternative_names=(
+        metrics.name_prefix + "_response_db_txn_duration:total",
+    ),
 )
 
 # seconds spent waiting for a db connection, when processing this request

@@ -34,17 +34,6 @@ How to monitor Synapse metrics using Prometheus
    Restart prometheus.
 
 
-Deprecated metrics removed in 0.28.0
-------------------------------------
-
-Synapse 0.28.0 removes all of the metrics deprecated by 0.27.0, which are those
-listed under "Old name" below. This has been done to reduce the bandwidth used
-by gathering metrics and the storage requirements for the Prometheus server, as
-well as reducing CPU overhead for both Synapse and Prometheus.
-
-Administrators should update any alerts or monitoring dashboards to use the
-"New name" listed below.
-
 Block and response metrics renamed for 0.27.0
 ---------------------------------------------
 
