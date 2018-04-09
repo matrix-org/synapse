@@ -6,13 +6,15 @@ and phone home stats. Phone home stats include better visibility of system usage
 so we can tweak synpase to work better for all users rather than our own experience
 with matrix.org. Also, recording 'r30' stat which is the measure we use to track 
 overal growth of the Matrix ecosystem. It is defined as:-
- "Counts the number of native 30 day retained users, defined as:-
+
+Counts the number of native 30 day retained users, defined as:-
          * Users who have created their accounts more than 30 days
          * Where last seen at most 30 days ago
          * Where account creation and last_seen are > 30 days"
 
 
-Features
+Features:
+
 * Add joinability for groups (PR #3045)
 * Implement group join API (PR #3046)
 * Add counter metrics for calculating state delta (PR #3033)
@@ -22,7 +24,8 @@ Features
 * Add response size metrics (PR #3071)
 * phone home cache size configurations (PR #3063)
 
-Changes
+Changes:
+
 * Add a blurb explaining the main synapse worker (PR #2886) Thanks to @turt2live!
 * Replace old style error catching with 'as' keyword (PR #3000) Thanks to @NotAFile!
 * Use .iter* to avoid copies in StateHandler (PR #3006)
@@ -33,7 +36,8 @@ Changes
 * Remove uses of events.content (PR #3060)
 * Improve database cache performance (PR #3068)
 
-Bug fixes
+Bug fixes:
+
 * Add room_id to the response of `rooms/{roomId}/join` (PR #2986) Thanks to @jplatte!
 * Fix replication after switch to simplejson (PR #3015)
 * Fix replication after switch to simplejson (PR #3015)
