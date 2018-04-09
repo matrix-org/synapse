@@ -289,11 +289,11 @@ class DataStore(RoomMemberStore, RoomStore,
                          user_id,
                          last_seen,
                          CASE
-                             WHEN user_agent LIKE '%Android%' THEN 'android'
-                             WHEN user_agent LIKE '%iOS%' THEN 'ios'
-                             WHEN user_agent LIKE '%Electron%' THEN 'electron'
-                             WHEN user_agent LIKE '%Mozilla%' THEN 'web'
-                             WHEN user_agent LIKE '%Gecko%' THEN 'web'
+                             WHEN user_agent LIKE '%%Android%%' THEN 'android'
+                             WHEN user_agent LIKE '%%iOS%%' THEN 'ios'
+                             WHEN user_agent LIKE '%%Electron%%' THEN 'electron'
+                             WHEN user_agent LIKE '%%Mozilla%%' THEN 'web'
+                             WHEN user_agent LIKE '%%Gecko%%' THEN 'web'
                              ELSE 'unknown'
                          END
                          AS platform
