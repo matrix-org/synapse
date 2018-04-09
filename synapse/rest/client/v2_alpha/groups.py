@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -401,6 +402,32 @@ class GroupInvitedUsersServlet(RestServlet):
         defer.returnValue((200, result))
 
 
+class GroupSettingJoinPolicyServlet(RestServlet):
+    """Set group join policy
+    """
+    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/settings/m.join_policy$")
+
+    def __init__(self, hs):
+        super(GroupSettingJoinPolicyServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.groups_handler = hs.get_groups_local_handler()
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, group_id):
+        requester = yield self.auth.get_user_by_req(request)
+        requester_user_id = requester.user.to_string()
+
+        content = parse_json_object_from_request(request)
+
+        result = yield self.groups_handler.set_group_join_policy(
+            group_id,
+            requester_user_id,
+            content,
+        )
+
+        defer.returnValue((200, result))
+
+
 class GroupCreateServlet(RestServlet):
     """Create a group
     """
@@ -738,6 +765,7 @@ def register_servlets(hs, http_server):
     GroupInvitedUsersServlet(hs).register(http_server)
     GroupUsersServlet(hs).register(http_server)
     GroupRoomServlet(hs).register(http_server)
+    GroupSettingJoinPolicyServlet(hs).register(http_server)
     GroupCreateServlet(hs).register(http_server)
     GroupAdminRoomsServlet(hs).register(http_server)
     GroupAdminRoomsConfigServlet(hs).register(http_server)

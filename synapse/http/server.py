@@ -113,6 +113,11 @@ response_db_sched_duration = metrics.register_counter(
     "response_db_sched_duration_seconds", labels=["method", "servlet", "tag"]
 )
 
+# size in bytes of the response written
+response_size = metrics.register_counter(
+    "response_size", labels=["method", "servlet", "tag"]
+)
+
 _next_request_id = 0
 
 
@@ -425,6 +430,8 @@ class RequestMetrics(object):
         response_db_sched_duration.inc_by(
             context.db_sched_duration_ms / 1000., request.method, self.name, tag
         )
+
+        response_size.inc_by(request.sentLength, request.method, self.name, tag)
 
 
 class RootRedirect(resource.Resource):
