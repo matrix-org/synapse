@@ -852,6 +852,14 @@ class RoomMemberMasterHandler(RoomMemberHandler):
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
         """Implements RoomMemberHandler._remote_join
         """
+        # filter ourselves out of remote_room_hosts: do_invite_join ignores it
+        # and if it is the only entry we'd like to return a 404 rather than a
+        # 500.
+
+        remote_room_hosts = [
+            host for host in remote_room_hosts if host != self.hs.hostname
+        ]
+
         if len(remote_room_hosts) == 0:
             raise SynapseError(404, "No known servers")
 
