@@ -404,9 +404,16 @@ class GroupsServerHandler(object):
 
         yield self.check_group_is_ours(group_id, requester_user_id)
 
-        group_description = yield self.store.get_group(group_id)
+        group = yield self.store.get_group(group_id)
 
-        if group_description:
+        if group:
+            cols = [
+                "name", "short_description", "long_description",
+                "avatar_url", "is_public",
+            ]
+            group_description = {key: group[key] for key in cols}
+            group_description["is_openly_joinable"] = group["join_policy"] == "open"
+
             defer.returnValue(group_description)
         else:
             raise SynapseError(404, "Unknown group")
@@ -678,6 +685,40 @@ class GroupsServerHandler(object):
             raise SynapseError(502, "Unknown state returned by HS")
 
     @defer.inlineCallbacks
+    def _add_user(self, group_id, user_id, content):
+        """Add a user to a group based on a content dict.
+
+        See accept_invite, join_group.
+        """
+        if not self.hs.is_mine_id(user_id):
+            local_attestation = self.attestations.create_attestation(
+                group_id, user_id,
+            )
+
+            remote_attestation = content["attestation"]
+
+            yield self.attestations.verify_attestation(
+                remote_attestation,
+                user_id=user_id,
+                group_id=group_id,
+            )
+        else:
+            local_attestation = None
+            remote_attestation = None
+
+        is_public = _parse_visibility_from_contents(content)
+
+        yield self.store.add_user_to_group(
+            group_id, user_id,
+            is_admin=False,
+            is_public=is_public,
+            local_attestation=local_attestation,
+            remote_attestation=remote_attestation,
+        )
+
+        defer.returnValue(local_attestation)
+
+    @defer.inlineCallbacks
     def accept_invite(self, group_id, requester_user_id, content):
         """User tries to accept an invite to the group.
 
@@ -693,30 +734,27 @@ class GroupsServerHandler(object):
         if not is_invited:
             raise SynapseError(403, "User not invited to group")
 
-        if not self.hs.is_mine_id(requester_user_id):
-            local_attestation = self.attestations.create_attestation(
-                group_id, requester_user_id,
-            )
-            remote_attestation = content["attestation"]
+        local_attestation = yield self._add_user(group_id, requester_user_id, content)
 
-            yield self.attestations.verify_attestation(
-                remote_attestation,
-                user_id=requester_user_id,
-                group_id=group_id,
-            )
-        else:
-            local_attestation = None
-            remote_attestation = None
+        defer.returnValue({
+            "state": "join",
+            "attestation": local_attestation,
+        })
 
-        is_public = _parse_visibility_from_contents(content)
+    @defer.inlineCallbacks
+    def join_group(self, group_id, requester_user_id, content):
+        """User tries to join the group.
 
-        yield self.store.add_user_to_group(
-            group_id, requester_user_id,
-            is_admin=False,
-            is_public=is_public,
-            local_attestation=local_attestation,
-            remote_attestation=remote_attestation,
+        This will error if the group requires an invite/knock to join
+        """
+
+        group_info = yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True
         )
+        if group_info['join_policy'] != "open":
+            raise SynapseError(403, "Group is not publicly joinable")
+
+        local_attestation = yield self._add_user(group_id, requester_user_id, content)
 
         defer.returnValue({
             "state": "join",
@@ -874,7 +912,7 @@ def _parse_join_policy_dict(join_policy_dict):
     """
     join_policy_type = join_policy_dict.get("type")
     if not join_policy_type:
-        return True
+        return "invite"
 
     if join_policy_type not in ("invite", "open"):
         raise SynapseError(

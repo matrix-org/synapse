@@ -803,6 +803,23 @@ class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
         defer.returnValue((200, new_content))
 
 
+class FederationGroupsJoinServlet(BaseFederationServlet):
+    """Attempt to join a group
+    """
+    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/join$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id, user_id):
+        if get_domain_from_id(user_id) != origin:
+            raise SynapseError(403, "user_id doesn't match origin")
+
+        new_content = yield self.handler.join_group(
+            group_id, user_id, content,
+        )
+
+        defer.returnValue((200, new_content))
+
+
 class FederationGroupsRemoveUserServlet(BaseFederationServlet):
     """Leave or kick a user from the group
     """
@@ -1131,7 +1148,7 @@ class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
     PATH = "/groups/(?P<group_id>[^/]*)/settings/m.join_policy$"
 
     @defer.inlineCallbacks
-    def on_POST(self, origin, content, query, group_id):
+    def on_PUT(self, origin, content, query, group_id):
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1182,6 +1199,7 @@ GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsInvitedUsersServlet,
     FederationGroupsInviteServlet,
     FederationGroupsAcceptInviteServlet,
+    FederationGroupsJoinServlet,
     FederationGroupsRemoveUserServlet,
     FederationGroupsSummaryRoomsServlet,
     FederationGroupsCategoriesServlet,

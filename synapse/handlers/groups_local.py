@@ -229,7 +229,45 @@ class GroupsLocalHandler(object):
     def join_group(self, group_id, user_id, content):
         """Request to join a group
         """
-        raise NotImplementedError()  # TODO
+        if self.is_mine_id(group_id):
+            yield self.groups_server_handler.join_group(
+                group_id, user_id, content
+            )
+            local_attestation = None
+            remote_attestation = None
+        else:
+            local_attestation = self.attestations.create_attestation(group_id, user_id)
+            content["attestation"] = local_attestation
+
+            res = yield self.transport_client.join_group(
+                get_domain_from_id(group_id), group_id, user_id, content,
+            )
+
+            remote_attestation = res["attestation"]
+
+            yield self.attestations.verify_attestation(
+                remote_attestation,
+                group_id=group_id,
+                user_id=user_id,
+                server_name=get_domain_from_id(group_id),
+            )
+
+        # TODO: Check that the group is public and we're being added publically
+        is_publicised = content.get("publicise", False)
+
+        token = yield self.store.register_user_group_membership(
+            group_id, user_id,
+            membership="join",
+            is_admin=False,
+            local_attestation=local_attestation,
+            remote_attestation=remote_attestation,
+            is_publicised=is_publicised,
+        )
+        self.notifier.on_new_event(
+            "groups_key", token, users=[user_id],
+        )
+
+        defer.returnValue({})
 
     @defer.inlineCallbacks
     def accept_invite(self, group_id, user_id, content):

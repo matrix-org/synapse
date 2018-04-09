@@ -52,20 +52,13 @@ Upgrading to $NEXT_VERSION
 ====================
 
 This release expands the anonymous usage stats sent if the opt-in
-``report_stats`` configuration is set to ``true``. We now capture RSS memory
+``report_stats`` configuration is set to ``true``. We now capture RSS memory 
 and cpu use at a very coarse level. This requires administrators to install
 the optional ``psutil`` python module.
 
 We would appreciate it if you could assist by ensuring this module is available
 and ``report_stats`` is enabled. This will let us see if performance changes to
 synapse are having an impact to the general community.
-
-This release also removes a number of redundant Prometheus metrics.
-Administrators may need to update their dashboards and alerting rules to use
-the updated metric names, if they have not already done so. See
-`docs/metrics-howto.rst <docs/metrics-howto.rst#deprecated-metrics-removed-in-0-28-0>`_
-for more details.
-
 
 Upgrading to v0.15.0
 ====================

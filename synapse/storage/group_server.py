@@ -55,10 +55,11 @@ class GroupServerStore(SQLBaseStore):
                 "group_id": group_id,
             },
             retcols=(
-                "name", "short_description", "long_description", "avatar_url", "is_public"
+                "name", "short_description", "long_description",
+                "avatar_url", "is_public", "join_policy",
             ),
             allow_none=True,
-            desc="is_user_in_group",
+            desc="get_group",
         )
 
     def get_users_in_group(self, group_id, include_private=False):
