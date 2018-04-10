@@ -19,6 +19,8 @@ import os
 import yaml
 from textwrap import dedent
 
+from six import integer_types
+
 
 class ConfigError(Exception):
     pass
@@ -49,7 +51,7 @@ Missing mandatory `server_name` config option.
 class Config(object):
     @staticmethod
     def parse_size(value):
-        if isinstance(value, int) or isinstance(value, long):
+        if isinstance(value, integer_types):
             return value
         sizes = {"K": 1024, "M": 1024 * 1024}
         size = 1
@@ -61,7 +63,7 @@ class Config(object):
 
     @staticmethod
     def parse_duration(value):
-        if isinstance(value, int) or isinstance(value, long):
+        if isinstance(value, integer_types):
             return value
         second = 1000
         minute = 60 * second
@@ -288,22 +290,22 @@ class Config(object):
                     )
                     obj.invoke_all("generate_files", config)
                     config_file.write(config_bytes)
-                print (
+                print((
                     "A config file has been generated in %r for server name"
                     " %r with corresponding SSL keys and self-signed"
                     " certificates. Please review this file and customise it"
                     " to your needs."
-                ) % (config_path, server_name)
-                print (
+                ) % (config_path, server_name))
+                print(
                     "If this server name is incorrect, you will need to"
                     " regenerate the SSL certificates"
                 )
                 return
             else:
-                print (
+                print((
                     "Config file %r already exists. Generating any missing key"
                     " files."
-                ) % (config_path,)
+                ) % (config_path,))
                 generate_keys = True
 
         parser = argparse.ArgumentParser(

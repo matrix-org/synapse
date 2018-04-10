@@ -5,19 +5,19 @@ groups:
     expr: "sum(synapse_federation_transaction_queue_pendingEdus or absent(synapse_federation_transaction_queue_pendingEdus)*0)"
   - record: "synapse_federation_transaction_queue_pendingPdus:total"
     expr:   "sum(synapse_federation_transaction_queue_pendingPdus or absent(synapse_federation_transaction_queue_pendingPdus)*0)"
-  - record: 'synapse_http_server_requests:method'
+  - record: 'synapse_http_server_request_count:method'
     labels:
       servlet: ""
-    expr: "sum(synapse_http_server_requests) by (method)"
-  - record: 'synapse_http_server_requests:servlet'
+    expr: "sum(synapse_http_server_request_count) by (method)"
+  - record: 'synapse_http_server_request_count:servlet'
     labels:
       method: ""
-    expr: 'sum(synapse_http_server_requests) by (servlet)'
+    expr: 'sum(synapse_http_server_request_count) by (servlet)'
 
-  - record: 'synapse_http_server_requests:total'
+  - record: 'synapse_http_server_request_count:total'
     labels:
       servlet: ""
-    expr: 'sum(synapse_http_server_requests:by_method) by (servlet)'
+    expr: 'sum(synapse_http_server_request_count:by_method) by (servlet)'
 
   - record: 'synapse_cache:hit_ratio_5m'
     expr: 'rate(synapse_util_caches_cache:hits[5m]) / rate(synapse_util_caches_cache:total[5m])'

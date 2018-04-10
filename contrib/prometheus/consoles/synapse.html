@@ -202,11 +202,11 @@ new PromConsole.Graph({
 <h1>Requests</h1>
 
 <h3>Requests by Servlet</h3>
-<div id="synapse_http_server_requests_servlet"></div>
+<div id="synapse_http_server_request_count_servlet"></div>
 <script>
 new PromConsole.Graph({
-  node: document.querySelector("#synapse_http_server_requests_servlet"),
-  expr: "rate(synapse_http_server_requests:servlet[2m])",
+  node: document.querySelector("#synapse_http_server_request_count_servlet"),
+  expr: "rate(synapse_http_server_request_count:servlet[2m])",
   name: "[[servlet]]",
   yAxisFormatter: PromConsole.NumberFormatter.humanize,
   yHoverFormatter: PromConsole.NumberFormatter.humanize,
@@ -215,11 +215,11 @@ new PromConsole.Graph({
 })
 </script>
 <h4>&nbsp;(without <tt>EventStreamRestServlet</tt> or <tt>SyncRestServlet</tt>)</h4>
-<div id="synapse_http_server_requests_servlet_minus_events"></div>
+<div id="synapse_http_server_request_count_servlet_minus_events"></div>
 <script>
 new PromConsole.Graph({
-  node: document.querySelector("#synapse_http_server_requests_servlet_minus_events"),
-  expr: "rate(synapse_http_server_requests:servlet{servlet!=\"EventStreamRestServlet\", servlet!=\"SyncRestServlet\"}[2m])",
+  node: document.querySelector("#synapse_http_server_request_count_servlet_minus_events"),
+  expr: "rate(synapse_http_server_request_count:servlet{servlet!=\"EventStreamRestServlet\", servlet!=\"SyncRestServlet\"}[2m])",
   name: "[[servlet]]",
   yAxisFormatter: PromConsole.NumberFormatter.humanize,
   yHoverFormatter: PromConsole.NumberFormatter.humanize,
@@ -233,7 +233,7 @@ new PromConsole.Graph({
 <script>
 new PromConsole.Graph({
   node: document.querySelector("#synapse_http_server_response_time_avg"),
-  expr: "rate(synapse_http_server_response_time:total[2m]) / rate(synapse_http_server_response_time:count[2m]) / 1000",
+  expr: "rate(synapse_http_server_response_time_seconds[2m]) / rate(synapse_http_server_response_count[2m]) / 1000",
   name: "[[servlet]]",
   yAxisFormatter: PromConsole.NumberFormatter.humanize,
   yHoverFormatter: PromConsole.NumberFormatter.humanize,
@@ -276,7 +276,7 @@ new PromConsole.Graph({
 <script>
 new PromConsole.Graph({
   node: document.querySelector("#synapse_http_server_response_ru_utime"),
-  expr: "rate(synapse_http_server_response_ru_utime:total[2m])",
+  expr: "rate(synapse_http_server_response_ru_utime_seconds[2m])",
   name: "[[servlet]]",
   yAxisFormatter: PromConsole.NumberFormatter.humanize,
   yHoverFormatter: PromConsole.NumberFormatter.humanize,
@@ -291,7 +291,7 @@ new PromConsole.Graph({
 <script>
 new PromConsole.Graph({
   node: document.querySelector("#synapse_http_server_response_db_txn_duration"),
-  expr: "rate(synapse_http_server_response_db_txn_duration:total[2m])",
+  expr: "rate(synapse_http_server_response_db_txn_duration_seconds[2m])",
   name: "[[servlet]]",
   yAxisFormatter: PromConsole.NumberFormatter.humanize,
   yHoverFormatter: PromConsole.NumberFormatter.humanize,
@@ -306,7 +306,7 @@ new PromConsole.Graph({
 <script>
 new PromConsole.Graph({
   node: document.querySelector("#synapse_http_server_send_time_avg"),
-  expr: "rate(synapse_http_server_response_time:total{servlet='RoomSendEventRestServlet'}[2m]) / rate(synapse_http_server_response_time:count{servlet='RoomSendEventRestServlet'}[2m]) / 1000",
+  expr: "rate(synapse_http_server_response_time_second{servlet='RoomSendEventRestServlet'}[2m]) / rate(synapse_http_server_response_count{servlet='RoomSendEventRestServlet'}[2m]) / 1000",
   name: "[[servlet]]",
   yAxisFormatter: PromConsole.NumberFormatter.humanize,
   yHoverFormatter: PromConsole.NumberFormatter.humanize,
