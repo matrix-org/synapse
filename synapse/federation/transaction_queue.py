@@ -226,7 +226,10 @@ class TransactionQueue(object):
                     events_by_room.setdefault(event.room_id, []).append(event)
 
                 yield logcontext.make_deferred_yieldable(defer.gatherResults(
-                    [handle_room_events(evs) for evs in events_by_room.itervalues()],
+                    [
+                        logcontext.preserve_fn(handle_room_events)(evs)
+                        for evs in events_by_room.itervalues()
+                    ],
                     consumeErrors=True
                 ))
 
