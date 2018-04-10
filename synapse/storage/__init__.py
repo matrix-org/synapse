@@ -275,7 +275,7 @@ class DataStore(RoomMemberStore, RoomStore,
         """
         def _count_r30_users(txn):
             thirty_days_in_secs = 86400 * 30
-            now = int(self._clock.time_msec())
+            now = int(self._clock.time())
             thirty_days_ago_in_secs = now - thirty_days_in_secs
 
             sql = """
@@ -289,11 +289,11 @@ class DataStore(RoomMemberStore, RoomStore,
                          user_id,
                          last_seen,
                          CASE
-                             WHEN user_agent LIKE '%Android%' THEN 'android'
-                             WHEN user_agent LIKE '%iOS%' THEN 'ios'
-                             WHEN user_agent LIKE '%Electron%' THEN 'electron'
-                             WHEN user_agent LIKE '%Mozilla%' THEN 'web'
-                             WHEN user_agent LIKE '%Gecko%' THEN 'web'
+                             WHEN user_agent LIKE '%%Android%%' THEN 'android'
+                             WHEN user_agent LIKE '%%iOS%%' THEN 'ios'
+                             WHEN user_agent LIKE '%%Electron%%' THEN 'electron'
+                             WHEN user_agent LIKE '%%Mozilla%%' THEN 'web'
+                             WHEN user_agent LIKE '%%Gecko%%' THEN 'web'
                              ELSE 'unknown'
                          END
                          AS platform
