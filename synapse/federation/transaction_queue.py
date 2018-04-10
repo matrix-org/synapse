@@ -227,7 +227,7 @@ class TransactionQueue(object):
 
                 yield logcontext.make_deferred_yieldable(defer.gatherResults(
                     [
-                        logcontext.preserve_fn(handle_room_events)(evs)
+                        logcontext.run_in_background(handle_room_events, evs)
                         for evs in events_by_room.itervalues()
                     ],
                     consumeErrors=True
