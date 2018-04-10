@@ -20,7 +20,6 @@ import synapse
 import synapse.types
 from synapse.api.auth import get_access_token_from_request, has_access_token
 from synapse.api.constants import LoginType
-from synapse.types import RoomID, RoomAlias
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
 from synapse.http.servlet import (
     RestServlet, parse_json_object_from_request, assert_params_in_request, parse_string
@@ -405,14 +404,6 @@ class RegisterRestServlet(RestServlet):
                 generate_token=False,
             )
 
-            # auto-join the user to any rooms we're supposed to dump them into
-            fake_requester = synapse.types.create_requester(registered_user_id)
-            for r in self.hs.config.auto_join_rooms:
-                try:
-                    yield self._join_user_to_room(fake_requester, r)
-                except Exception as e:
-                    logger.error("Failed to join new user to %r: %r", r, e)
-
             # remember that we've now registered that user account, and with
             #  what user ID (since the user may not have specified)
             self.auth_handler.set_session_data(
@@ -444,29 +435,6 @@ class RegisterRestServlet(RestServlet):
 
     def on_OPTIONS(self, _):
         return 200, {}
-
-    @defer.inlineCallbacks
-    def _join_user_to_room(self, requester, room_identifier):
-        room_id = None
-        if RoomID.is_valid(room_identifier):
-            room_id = room_identifier
-        elif RoomAlias.is_valid(room_identifier):
-            room_alias = RoomAlias.from_string(room_identifier)
-            room_id, remote_room_hosts = (
-                yield self.room_member_handler.lookup_room_alias(room_alias)
-            )
-            room_id = room_id.to_string()
-        else:
-            raise SynapseError(400, "%s was not legal room ID or room alias" % (
-                room_identifier,
-            ))
-
-        yield self.room_member_handler.update_membership(
-            requester=requester,
-            target=requester.user,
-            room_id=room_id,
-            action="join",
-        )
 
     @defer.inlineCallbacks
     def _do_appservice_registration(self, username, as_token, body):
