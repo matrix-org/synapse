@@ -198,7 +198,10 @@ class TransactionQueue(object):
                             ],
                         )
                     except Exception:
-                        logger.exception("Failed to calculate hosts in room")
+                        logger.exception(
+                            "Failed to calculate hosts in room for event: %s",
+                            event.event_id,
+                        )
                         return
 
                     destinations = set(destinations)
