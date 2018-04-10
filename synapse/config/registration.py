@@ -49,6 +49,10 @@ class RegistrationConfig(Config):
 
         self.auto_join_rooms = config.get("auto_join_rooms", [])
 
+        self.replicate_user_profiles_to = config.get("replicate_user_profiles_to", [])
+        if not isinstance(self.replicate_user_profiles_to, list):
+            self.replicate_user_profiles_to = [self.replicate_user_profiles_to,]
+
     def default_config(self, **kwargs):
         registration_shared_secret = random_string_with_symbols(50)
 
@@ -105,6 +109,10 @@ class RegistrationConfig(Config):
             - matrix.org
             - vector.im
             - riot.im
+
+        # If enabled, user IDs, display names and avatar URLs will be replicated
+        # to this server whenever they change.
+        # replicate_user_profiles_to: example.com
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
