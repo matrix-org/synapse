@@ -557,6 +557,11 @@ class EventCreationHandler(object):
         See self.create_event and self.send_nonmember_event.
         """
 
+        # We limit the number of concurrent event sends in a room so that we
+        # don't fork the DAG too much. If we don't limit then we can end up in
+        # a situation where event persistence can't keep up, causing
+        # extremities to pile up, which in turn leads to state resolution
+        # taking longer.
         with (yield self.limiter.queue(event_dict["room_id"])):
             event, context = yield self.create_event(
                 requester,
