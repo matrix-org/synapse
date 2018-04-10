@@ -949,4 +949,4 @@ def _create_path(prefix, path, *args):
     Returns:
         str
     """
-    return prefix + path % tuple(urllib.quote(arg) for arg in args)
+    return prefix + path % tuple(urllib.quote(arg, "") for arg in args)
