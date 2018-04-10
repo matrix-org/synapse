@@ -165,15 +165,10 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
                 content=content,
             )
         else:
-            event, context = yield self.event_creation_hander.create_event(
+            event = yield self.event_creation_hander.create_and_send_nonmember_event(
                 requester,
                 event_dict,
-                token_id=requester.access_token_id,
                 txn_id=txn_id,
-            )
-
-            yield self.event_creation_hander.send_nonmember_event(
-                requester, event, context,
             )
 
         ret = {}
