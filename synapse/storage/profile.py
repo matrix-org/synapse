@@ -64,11 +64,14 @@ class ProfileStore(SQLBaseStore):
             desc="get_profile_displayname",
         )
 
-    def set_profile_displayname(self, user_localpart, new_displayname):
+    def set_profile_displayname(self, user_localpart, new_displayname, batchnum):
         return self._simple_update_one(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            updatevalues={"displayname": new_displayname},
+            updatevalues={
+                "displayname": new_displayname,
+                "batch": batchnum,
+            },
             desc="set_profile_displayname",
         )
 
@@ -80,11 +83,14 @@ class ProfileStore(SQLBaseStore):
             desc="get_profile_avatar_url",
         )
 
-    def set_profile_avatar_url(self, user_localpart, new_avatar_url):
+    def set_profile_avatar_url(self, user_localpart, new_avatar_url, batchnum):
         return self._simple_update_one(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            updatevalues={"avatar_url": new_avatar_url},
+            updatevalues={
+                "avatar_url": new_avatar_url,
+                "batch": batchnum,
+            },
             desc="set_profile_avatar_url",
         )
 

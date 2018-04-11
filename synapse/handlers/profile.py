@@ -18,6 +18,7 @@ import logging
 from twisted.internet import defer, reactor
 
 from synapse.api.errors import SynapseError, AuthError, CodeMessageException
+from synapse.util.logcontext import run_in_background
 from synapse.types import UserID, get_domain_from_id
 from ._base import BaseHandler
 
@@ -205,8 +206,10 @@ class ProfileHandler(BaseHandler):
         if new_displayname == '':
             new_displayname = None
 
+        new_batchnum = (yield self.store.get_latest_profile_replication_batch_number()) + 1
+
         yield self.store.set_profile_displayname(
-            target_user.localpart, new_displayname
+            target_user.localpart, new_displayname, new_batchnum
         )
 
         if self.hs.config.user_directory_search_all_users:
@@ -216,6 +219,9 @@ class ProfileHandler(BaseHandler):
             )
 
         yield self._update_join_states(requester, target_user)
+
+        # start a profile replication push
+        run_in_background(self._replicate_profiles)
 
     @defer.inlineCallbacks
     def get_avatar_url(self, target_user):
@@ -255,8 +261,10 @@ class ProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
 
+        new_batchnum = yield self.store.get_latest_profile_replication_batch_number() + 1
+
         yield self.store.set_profile_avatar_url(
-            target_user.localpart, new_avatar_url
+            target_user.localpart, new_avatar_url, new_batchnum,
         )
 
         if self.hs.config.user_directory_search_all_users:
@@ -266,6 +274,9 @@ class ProfileHandler(BaseHandler):
             )
 
         yield self._update_join_states(requester, target_user)
+
+        # start a profile replication push
+        run_in_background(self._replicate_profiles)
 
     @defer.inlineCallbacks
     def on_profile_query(self, args):
