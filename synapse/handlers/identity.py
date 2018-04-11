@@ -15,6 +15,11 @@
 # limitations under the License.
 
 """Utilities for interacting with Identity Servers"""
+
+import logging
+
+import simplejson as json
+
 from twisted.internet import defer
 
 from synapse.api.errors import (
@@ -23,9 +28,6 @@ from synapse.api.errors import (
 from ._base import BaseHandler
 from synapse.util.async import run_on_reactor
 from synapse.api.errors import SynapseError, Codes
-
-import json
-import logging
 
 logger = logging.getLogger(__name__)
 

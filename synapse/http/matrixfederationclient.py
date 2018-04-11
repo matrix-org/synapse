@@ -286,7 +286,8 @@ class MatrixFederationHttpClient(object):
         headers_dict[b"Authorization"] = auth_headers
 
     @defer.inlineCallbacks
-    def put_json(self, destination, path, data={}, json_data_callback=None,
+    def put_json(self, destination, path, args={}, data={},
+                 json_data_callback=None,
                  long_retries=False, timeout=None,
                  ignore_backoff=False,
                  backoff_on_404=False):
@@ -296,6 +297,7 @@ class MatrixFederationHttpClient(object):
             destination (str): The remote server to send the HTTP request
                 to.
             path (str): The HTTP path.
+            args (dict): query params
             data (dict): A dict containing the data that will be used as
                 the request body. This will be encoded as JSON.
             json_data_callback (callable): A callable returning the dict to
@@ -342,6 +344,7 @@ class MatrixFederationHttpClient(object):
             path,
             body_callback=body_callback,
             headers_dict={"Content-Type": ["application/json"]},
+            query_bytes=encode_query_args(args),
             long_retries=long_retries,
             timeout=timeout,
             ignore_backoff=ignore_backoff,
@@ -373,6 +376,7 @@ class MatrixFederationHttpClient(object):
                 giving up. None indicates no timeout.
             ignore_backoff (bool): true to ignore the historical backoff data and
                 try the request anyway.
+            args (dict): query params
         Returns:
             Deferred: Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body.

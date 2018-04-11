@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +20,7 @@ from synapse.api.errors import SynapseError
 
 from ._base import SQLBaseStore
 
-import ujson as json
+import simplejson as json
 
 
 # The category ID for the "default" category. We don't store as null in the
@@ -29,6 +30,24 @@ _DEFAULT_ROLE_ID = ""
 
 
 class GroupServerStore(SQLBaseStore):
+    def set_group_join_policy(self, group_id, join_policy):
+        """Set the join policy of a group.
+
+        join_policy can be one of:
+         * "invite"
+         * "open"
+        """
+        return self._simple_update_one(
+            table="groups",
+            keyvalues={
+                "group_id": group_id,
+            },
+            updatevalues={
+                "join_policy": join_policy,
+            },
+            desc="set_group_join_policy",
+        )
+
     def get_group(self, group_id):
         return self._simple_select_one(
             table="groups",
@@ -36,10 +55,11 @@ class GroupServerStore(SQLBaseStore):
                 "group_id": group_id,
             },
             retcols=(
-                "name", "short_description", "long_description", "avatar_url", "is_public"
+                "name", "short_description", "long_description",
+                "avatar_url", "is_public", "join_policy",
             ),
             allow_none=True,
-            desc="is_user_in_group",
+            desc="get_group",
         )
 
     def get_users_in_group(self, group_id, include_private=False):

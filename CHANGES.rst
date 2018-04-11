@@ -1,3 +1,66 @@
+Changes in synapse v0.27.3 (2018-04-11)
+======================================
+
+Bug fixes:
+
+* URL quote path segments over federation (#3082)
+
+Changes in synapse v0.27.3-rc2 (2018-04-09)
+==========================================
+
+v0.27.3-rc1 used a stale version of the develop branch so the changelog overstates
+the functionality. v0.27.3-rc2 is up to date, rc1 should be ignored.
+
+Changes in synapse v0.27.3-rc1 (2018-04-09)
+=======================================
+
+Notable changes include API support for joinability of groups. Also new metrics 
+and phone home stats. Phone home stats include better visibility of system usage
+so we can tweak synpase to work better for all users rather than our own experience
+with matrix.org. Also, recording 'r30' stat which is the measure we use to track 
+overal growth of the Matrix ecosystem. It is defined as:-
+
+Counts the number of native 30 day retained users, defined as:-
+         * Users who have created their accounts more than 30 days
+         * Where last seen at most 30 days ago
+         * Where account creation and last_seen are > 30 days"
+
+
+Features:
+
+* Add joinability for groups (PR #3045)
+* Implement group join API (PR #3046)
+* Add counter metrics for calculating state delta (PR #3033)
+* R30 stats (PR #3041)
+* Measure time it takes to calculate state group ID (PR #3043)
+* Add basic performance statistics to phone home (PR #3044)
+* Add response size metrics (PR #3071)
+* phone home cache size configurations (PR #3063)
+
+Changes:
+
+* Add a blurb explaining the main synapse worker (PR #2886) Thanks to @turt2live!
+* Replace old style error catching with 'as' keyword (PR #3000) Thanks to @NotAFile!
+* Use .iter* to avoid copies in StateHandler (PR #3006)
+* Linearize calls to _generate_user_id (PR #3029)
+* Remove last usage of ujson (PR #3030)
+* Use simplejson throughout (PR #3048)
+* Use static JSONEncoders (PR #3049)
+* Remove uses of events.content (PR #3060)
+* Improve database cache performance (PR #3068)
+
+Bug fixes:
+
+* Add room_id to the response of `rooms/{roomId}/join` (PR #2986) Thanks to @jplatte!
+* Fix replication after switch to simplejson (PR #3015)
+* Fix replication after switch to simplejson (PR #3015)
+* 404 correctly on missing paths via NoResource (PR #3022)
+* Fix error when claiming e2e keys from offline servers (PR #3034)
+* fix tests/storage/test_user_directory.py (PR #3042)
+* use PUT instead of POST for federating groups/m.join_policy (PR #3070) Thanks to @krombel!
+* postgres port script: fix state_groups_pkey error (PR #3072)
+
+
 Changes in synapse v0.27.2 (2018-03-26)
 =======================================
 
@@ -59,7 +122,7 @@ Features:
 
 Changes:
 
-* Continue to factor out processing from main process and into worker processes. See updated `docs/workers.rst <docs/metrics-howto.rst>`_ (PR #2892 - #2904, #2913, #2920 - #2926, #2947, #2847, #2854, #2872, #2873, #2874, #2928, #2929, #2934, #2856, #2976 - #2984, #2987 - #2989, #2991 - #2993, #2995, #2784)
+* Continue to factor out processing from main process and into worker processes. See updated `docs/workers.rst <docs/workers.rst>`_ (PR #2892 - #2904, #2913, #2920 - #2926, #2947, #2847, #2854, #2872, #2873, #2874, #2928, #2929, #2934, #2856, #2976 - #2984, #2987 - #2989, #2991 - #2993, #2995, #2784)
 * Ensure state cache is used when persisting events (PR #2864, #2871, #2802, #2835, #2836, #2841, #2842, #2849)
 * Change the default config to bind on both IPv4 and IPv6 on all platforms (PR #2435) Thanks to @silkeh!
 * No longer require a specific version of saml2 (PR #2695) Thanks to @okurz!

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.web.resource import Resource
+from twisted.web.resource import NoResource
 
 import logging
 
@@ -45,7 +45,7 @@ def create_resource_tree(desired_tree, root_resource):
         for path_seg in full_path.split('/')[1:-1]:
             if path_seg not in last_resource.listNames():
                 # resource doesn't exist, so make a "dummy resource"
-                child_resource = Resource()
+                child_resource = NoResource()
                 last_resource.putChild(path_seg, child_resource)
                 res_id = _resource_id(last_resource, path_seg)
                 resource_mappings[res_id] = child_resource
