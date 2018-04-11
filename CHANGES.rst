@@ -1,5 +1,13 @@
+Changes in synapse v0.27.3 (2018-04-11)
+======================================
+
+Bug fixes:
+
+* URL quote path segments over federation (#3082)
+
 Changes in synapse v0.27.3-rc2 (2018-04-09)
 ==========================================
+
 v0.27.3-rc1 used a stale version of the develop branch so the changelog overstates
 the functionality. v0.27.3-rc2 is up to date, rc1 should be ignored.
 
