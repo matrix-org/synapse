@@ -111,6 +111,10 @@ class ApplicationServicesHandler(object):
                     events_processed_counter.inc_by(len(events))
 
                     yield self.store.set_appservice_last_pos(upper_bound)
+
+                    synapse.metrics.event_processing_positions.set(
+                        upper_bound, "appservice_sender",
+                    )
             finally:
                 self.is_processing = False
 

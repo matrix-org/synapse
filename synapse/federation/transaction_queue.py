@@ -239,6 +239,10 @@ class TransactionQueue(object):
                     "events", next_token
                 )
 
+                synapse.metrics.event_processing_positions.set(
+                    next_token, "federation_sender",
+                )
+
         finally:
             self._is_processing = False
 
