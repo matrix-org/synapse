@@ -23,7 +23,7 @@ from twisted.internet import reactor
 
 from .metric import (
     CounterMetric, CallbackMetric, DistributionMetric, CacheMetric,
-    MemoryUsageMetric,
+    MemoryUsageMetric, GaugeMetric,
 )
 from .process_collector import register_process_collector
 
@@ -64,6 +64,13 @@ class Metrics(object):
             CounterMetric
         """
         return self._register(CounterMetric, *args, **kwargs)
+
+    def register_gauge(self, *args, **kwargs):
+        """
+        Returns:
+            GaugeMetric
+        """
+        return self._register(GaugeMetric, *args, **kwargs)
 
     def register_callback(self, *args, **kwargs):
         """
