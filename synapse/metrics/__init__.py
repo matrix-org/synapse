@@ -164,6 +164,19 @@ event_persisted_position = synapse_metrics.register_gauge(
     "event_persisted_position",
 )
 
+# Used to track the received_ts of the last event processed by various
+# components
+event_processing_last_ts = synapse_metrics.register_gauge(
+    "event_processing_last_ts", labels=["name"],
+)
+
+# Used to track the lag processing events. This is the time difference
+# between the last processed event's received_ts and the time it was
+# finished being processed.
+event_processing_lag = synapse_metrics.register_gauge(
+    "event_processing_lag", labels=["name"],
+)
+
 
 def runUntilCurrentTimer(func):
 
