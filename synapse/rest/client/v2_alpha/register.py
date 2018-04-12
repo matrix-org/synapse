@@ -377,9 +377,18 @@ class RegisterRestServlet(RestServlet):
             # we should always have an auth_result if we're going to progress
             # to register the user (i.e. we haven't picked up a registered_user_id)
             # from our session store
-            if auth_result and self.hs.config.register_mxid_from_3pid in auth_result:
-                address = auth_result[login_type]['address']
-                desired_username = address.lower()
+            if auth_result:
+                if (
+                    (
+                        self.hs.config.register_mxid_from_3pid == 'email' and
+                        LoginType.EMAIL_IDENTITY in auth_result
+                    ) or (
+                        self.hs.config.register_mxid_from_3pid == 'msisdn' and
+                        LoginType.MSISDN in auth_result
+                    )
+                ):
+                    address = auth_result[login_type]['address']
+                    desired_username = address.replace('@', '.').lower()
 
         if desired_username is not None:
             yield self.registration_handler.check_username(
