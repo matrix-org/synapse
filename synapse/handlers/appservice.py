@@ -125,9 +125,23 @@ class ApplicationServicesHandler(object):
                         for evs in events_by_room.itervalues()
                     ], consumeErrors=True))
 
+                    yield self.store.set_appservice_last_pos(upper_bound)
+
+                    now = self.clock.time_msec()
+                    ts = yield self.store.get_received_ts(events[-1].event_id)
+
+                    synapse.metrics.event_processing_positions.set(
+                        upper_bound, "appservice_sender",
+                    )
+
                     events_processed_counter.inc_by(len(events))
 
-                    yield self.store.set_appservice_last_pos(upper_bound)
+                    synapse.metrics.event_processing_lag.set(
+                        now - ts, "appservice_sender",
+                    )
+                    synapse.metrics.event_processing_last_ts.set(
+                        ts, "appservice_sender",
+                    )
             finally:
                 self.is_processing = False
 
