@@ -30,7 +30,7 @@ from synapse.http.servlet import (
 
 import logging
 import urllib
-import ujson as json
+import simplejson as json
 
 logger = logging.getLogger(__name__)
 
@@ -165,15 +165,10 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
                 content=content,
             )
         else:
-            event, context = yield self.event_creation_hander.create_event(
+            event = yield self.event_creation_hander.create_and_send_nonmember_event(
                 requester,
                 event_dict,
-                token_id=requester.access_token_id,
                 txn_id=txn_id,
-            )
-
-            yield self.event_creation_hander.send_nonmember_event(
-                requester, event, context,
             )
 
         ret = {}
@@ -655,7 +650,12 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             content=event_content,
         )
 
-        defer.returnValue((200, {}))
+        return_value = {}
+
+        if membership_action == "join":
+            return_value["room_id"] = room_id
+
+        defer.returnValue((200, return_value))
 
     def _has_3pid_invite_keys(self, content):
         for key in {"id_server", "medium", "address"}:
