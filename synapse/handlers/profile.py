@@ -89,19 +89,20 @@ class ProfileHandler(BaseHandler):
         batch_rows = yield self.store.get_profile_batch(batchnum)
         batch = {
             UserID(r["user_id"], self.hs.hostname).to_string(): {
-                "displayname": r["displayname"],
+                "display_name": r["displayname"],
                 "avatar_url": r["avatar_url"],
             } for r in batch_rows
         }
 
         url = "https://%s/_matrix/federation/v1/replicate_profiles" % (host,)
-        signed_batch = {
+        body = {
             "batchnum": batchnum,
-            "signed_batch": sign_json(batch, self.hs.hostname, self.hs.config.signing_key[0]),
+            "batch": batch,
             "origin_server": self.hs.hostname,
         }
+        signed_body = sign_json(body, self.hs.hostname, self.hs.config.signing_key[0])
         try:
-            yield self.http_client.post_json_get_json(url, signed_batch)
+            yield self.http_client.post_json_get_json(url, signed_body)
             self.store.update_replication_batch_for_host(host, batchnum)
             logger.info("Sucessfully replicated profile batch %d to %s", batchnum, host)
         except:
