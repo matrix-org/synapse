@@ -52,13 +52,14 @@ _EventCacheEntry = namedtuple("_EventCacheEntry", ("event", "redacted_event"))
 
 class EventsWorkerStore(SQLBaseStore):
     def get_received_ts(self, event_id):
-        """Get received_ts (when it was persisted) for the event
+        """Get received_ts (when it was persisted) for the event. Raises an
+        exception for unknown events.
 
         Args:
             event_id (str)
 
         Returns:
-            Deferred[int|None]: Timstamp in milliseconds, or None for events
+            Deferred[int|None]: Timestamp in milliseconds, or None for events
             that were persisted before received_ts was implemented.
         """
         return self._simple_select_one_onecol(
