@@ -115,7 +115,7 @@ class CounterMetric(BaseMetric):
         # dict[list[str]]: value for each set of label values. the keys are the
         # label values, in the same order as the labels in self.labels.
         #
-        # (if the metric is a scalar, the (single) key is the empty list).
+        # (if the metric is a scalar, the (single) key is the empty tuple).
         self.counts = {}
 
         # Scalar metrics are never empty
@@ -155,7 +155,7 @@ class GaugeMetric(BaseMetric):
         # dict[list[str]]: value for each set of label values. the keys are the
         # label values, in the same order as the labels in self.labels.
         #
-        # (if the metric is a scalar, the (single) key is the empty list).
+        # (if the metric is a scalar, the (single) key is the empty tuple).
         self.guages = {}
 
     def set(self, v, *values):
