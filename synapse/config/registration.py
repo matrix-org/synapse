@@ -34,6 +34,7 @@ class RegistrationConfig(Config):
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
         self.registration_shared_secret = config.get("registration_shared_secret")
+        self.register_mxid_from_3pid = config.get("register_mxid_from_3pid")
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
         self.trusted_third_party_id_servers = config["trusted_third_party_id_servers"]
@@ -59,6 +60,13 @@ class RegistrationConfig(Config):
         # registrations_require_3pid:
         #     - email
         #     - msisdn
+
+        # Derive the user's matrix ID from a type of 3PID used when registering.
+        # This overrides any matrix ID the user proposes when calling /register
+        # The 3PID type should be present in registrations_require_3pid to avoid
+        # users failing to register if they don't specify the right kind of 3pid.
+        #
+        # register_mxid_from_3pid: email
 
         # Mandate that users are only allowed to associate certain formats of
         # 3PIDs with accounts on this server.

@@ -297,13 +297,6 @@ class RegisterRestServlet(RestServlet):
                 session_id, "registered_user_id", None
             )
 
-        if desired_username is not None:
-            yield self.registration_handler.check_username(
-                desired_username,
-                guest_access_token=guest_access_token,
-                assigned_user_id=registered_user_id,
-            )
-
         # Only give msisdn flows if the x_show_msisdn flag is given:
         # this is a hack to work around the fact that clients were shipped
         # that use fallback registration if they see any flows that they don't
@@ -376,6 +369,25 @@ class RegisterRestServlet(RestServlet):
                             Codes.THREEPID_DENIED,
                         )
 
+        if self.hs.config.register_mxid_from_3pid:
+            # override the desired_username based on the 3PID if any.
+            # reset it first to avoid folks picking their own username.
+            desired_username = None
+
+            # we should always have an auth_result if we're going to progress
+            # to register the user (i.e. we haven't picked up a registered_user_id)
+            # from our session store
+            if auth_result and self.hs.config.register_mxid_from_3pid in auth_result:
+                address = auth_result[login_type]['address']
+                desired_username = address.lower()
+
+        if desired_username is not None:
+            yield self.registration_handler.check_username(
+                desired_username,
+                guest_access_token=guest_access_token,
+                assigned_user_id=registered_user_id,
+            )
+
         if registered_user_id is not None:
             logger.info(
                 "Already registered user ID %r for this session",
@@ -390,9 +402,17 @@ class RegisterRestServlet(RestServlet):
                 raise SynapseError(400, "Missing password.",
                                    Codes.MISSING_PARAM)
 
-            desired_username = params.get("username", None)
+            if not self.hs.config.register_mxid_from_3pid:
+                desired_username = params.get("username", None)
+            else:
+                # we keep the original desired_username derived from the 3pid above
+                pass
+
             new_password = params.get("password", None)
             guest_access_token = params.get("guest_access_token", None)
+
+            # XXX: don't we need to validate these for length etc like we did on
+            # the ones from the JSON body earlier on in the method?
 
             if desired_username is not None:
                 desired_username = desired_username.lower()
