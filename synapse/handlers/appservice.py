@@ -108,16 +108,16 @@ class ApplicationServicesHandler(object):
                                 service, event
                             )
 
-                    events_processed_counter.inc_by(len(events))
-
                     yield self.store.set_appservice_last_pos(upper_bound)
+
+                    now = self.clock.time_msec()
+                    ts = yield self.store.get_received_ts(events[-1].event_id)
 
                     synapse.metrics.event_processing_positions.set(
                         upper_bound, "appservice_sender",
                     )
 
-                    now = self.clock.time_msec()
-                    ts = yield self.store.get_received_ts(events[-1].event_id)
+                    events_processed_counter.inc_by(len(events))
 
                     synapse.metrics.event_processing_lag.set(
                         now - ts, "appservice_sender",

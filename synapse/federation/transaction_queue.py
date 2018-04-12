@@ -233,14 +233,8 @@ class TransactionQueue(object):
                     consumeErrors=True
                 ))
 
-                events_processed_counter.inc_by(len(events))
-
                 yield self.store.update_federation_out_pos(
                     "events", next_token
-                )
-
-                synapse.metrics.event_processing_positions.set(
-                    next_token, "federation_sender",
                 )
 
                 if events:
@@ -253,6 +247,12 @@ class TransactionQueue(object):
                     synapse.metrics.event_processing_last_ts.set(
                         ts, "federation_sender",
                     )
+
+                events_processed_counter.inc_by(len(events))
+
+                synapse.metrics.event_processing_positions.set(
+                    next_token, "federation_sender",
+                )
 
         finally:
             self._is_processing = False
