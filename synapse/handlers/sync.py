@@ -171,7 +171,8 @@ class SyncHandler(object):
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
         self.response_cache = ResponseCache(
-            hs, timeout_ms=SYNC_RESPONSE_CACHE_MS,
+            hs, "sync",
+            timeout_ms=SYNC_RESPONSE_CACHE_MS,
         )
         self.state = hs.get_state_handler()
 

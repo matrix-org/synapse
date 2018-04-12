@@ -266,9 +266,9 @@ class DataStore(RoomMemberStore, RoomStore,
     def count_r30_users(self):
         """
         Counts the number of 30 day retained users, defined as:-
-         * Users who have created their accounts more than 30 days
+         * Users who have created their accounts more than 30 days ago
          * Where last seen at most 30 days ago
-         * Where account creation and last_seen are > 30 days
+         * Where account creation and last_seen are > 30 days apart
 
          Returns counts globaly for a given user as well as breaking
          by platform
