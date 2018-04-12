@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from synapse.util.async import ObservableDeferred
+from synapse.util.caches import metrics as cache_metrics
 
 
 class ResponseCache(object):
@@ -24,11 +25,20 @@ class ResponseCache(object):
     used rather than trying to compute a new response.
     """
 
-    def __init__(self, hs, timeout_ms=0):
+    def __init__(self, hs, name, timeout_ms=0):
         self.pending_result_cache = {}  # Requests that haven't finished yet.
 
         self.clock = hs.get_clock()
         self.timeout_sec = timeout_ms / 1000.
+
+        self._metrics = cache_metrics.register_cache(
+            "response_cache",
+            size_callback=lambda: self.size(),
+            cache_name=name,
+        )
+
+    def size(self):
+        return len(self.pending_result_cache)
 
     def get(self, key):
         """Look up the given key.
@@ -45,8 +55,10 @@ class ResponseCache(object):
         """
         result = self.pending_result_cache.get(key)
         if result is not None:
+            self._metrics.inc_hits()
             return result.observe()
         else:
+            self._metrics.inc_misses()
             return None
 
     def set(self, key, deferred):
