@@ -22,7 +22,7 @@ REQUIREMENTS = {
     "jsonschema>=2.5.1": ["jsonschema>=2.5.1"],
     "frozendict>=0.4": ["frozendict"],
     "unpaddedbase64>=1.1.0": ["unpaddedbase64>=1.1.0"],
-    "canonicaljson>=1.0.0": ["canonicaljson>=1.0.0"],
+    "canonicaljson>=1.1.3": ["canonicaljson>=1.1.3"],
     "signedjson>=1.0.0": ["signedjson>=1.0.0"],
     "pynacl>=1.2.1": ["nacl>=1.2.1", "nacl.bindings"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
