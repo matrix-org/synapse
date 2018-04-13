@@ -94,12 +94,6 @@ class Authenticator(object):
             "signatures": {},
         }
 
-        if (
-            self.federation_domain_whitelist is not None and
-            self.server_name not in self.federation_domain_whitelist
-        ):
-            raise FederationDeniedError(self.server_name)
-
         if content is not None:
             json_request["content"] = content
 
@@ -137,6 +131,12 @@ class Authenticator(object):
                 (origin, key, sig) = parse_auth_header(auth)
                 json_request["origin"] = origin
                 json_request["signatures"].setdefault(origin, {})[key] = sig
+
+        if (
+            self.federation_domain_whitelist is not None and
+            origin not in self.federation_domain_whitelist
+        ):
+            raise FederationDeniedError(origin)
 
         if not json_request["signatures"]:
             raise NoAuthenticationError(
