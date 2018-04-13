@@ -1,3 +1,11 @@
+Changes in synapse v0.27.4 (2018-04-13)
+======================================
+
+Changes:
+
+* Update canonicaljson dependency (#3095)
+
+
 Changes in synapse v0.27.3 (2018-04-11)
 ======================================
 
