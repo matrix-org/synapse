@@ -35,7 +35,7 @@ from synapse.storage.presence import UserPresenceState
 from synapse.util.metrics import Measure
 import synapse.metrics
 
-from sortedcontainers import SortedDict
+from blist import sorteddict
 from collections import namedtuple
 
 import logging
@@ -56,19 +56,19 @@ class FederationRemoteSendQueue(object):
         self.is_mine_id = hs.is_mine_id
 
         self.presence_map = {}  # Pending presence map user_id -> UserPresenceState
-        self.presence_changed = SortedDict()  # Stream position -> user_id
+        self.presence_changed = sorteddict()  # Stream position -> user_id
 
         self.keyed_edu = {}  # (destination, key) -> EDU
-        self.keyed_edu_changed = SortedDict()  # stream position -> (destination, key)
+        self.keyed_edu_changed = sorteddict()  # stream position -> (destination, key)
 
-        self.edus = SortedDict()  # stream position -> Edu
+        self.edus = sorteddict()  # stream position -> Edu
 
-        self.failures = SortedDict()  # stream position -> (destination, Failure)
+        self.failures = sorteddict()  # stream position -> (destination, Failure)
 
-        self.device_messages = SortedDict()  # stream position -> destination
+        self.device_messages = sorteddict()  # stream position -> destination
 
         self.pos = 1
-        self.pos_time = SortedDict()
+        self.pos_time = sorteddict()
 
         # EVERYTHING IS SAD. In particular, python only makes new scopes when
         # we make a new function, so we need to make a new function so the inner
