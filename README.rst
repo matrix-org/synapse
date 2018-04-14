@@ -614,6 +614,9 @@ should have the format ``_matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port>
     $ dig -t srv _matrix._tcp.example.com
     _matrix._tcp.example.com. 3600    IN      SRV     10 0 8448 synapse.example.com.
 
+Note that the server hostname cannot be an alias (CNAME record): it has to point
+directly to the server hosting the synapse instance.
+
 You can then configure your homeserver to use ``<yourdomain.com>`` as the domain in
 its user-ids, by setting ``server_name``::
 
