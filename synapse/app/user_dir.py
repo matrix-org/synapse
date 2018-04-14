@@ -43,7 +43,7 @@ from synapse.util.logcontext import LoggingContext, preserve_fn
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
 from twisted.internet import reactor
-from twisted.web.resource import Resource
+from twisted.web.resource import NoResource
 
 logger = logging.getLogger("synapse.app.user_dir")
 
@@ -116,7 +116,7 @@ class UserDirectoryServer(HomeServer):
                         "/_matrix/client/api/v1": resource,
                     })
 
-        root_resource = create_resource_tree(resources, Resource())
+        root_resource = create_resource_tree(resources, NoResource())
 
         _base.listen_tcp(
             bind_addresses,

@@ -594,7 +594,8 @@ class RoomStore(RoomWorkerStore, SearchStore):
 
         while next_token:
             sql = """
-                SELECT stream_ordering, content FROM events
+                SELECT stream_ordering, json FROM events
+                JOIN event_json USING (event_id)
                 WHERE room_id = ?
                     AND stream_ordering < ?
                     AND contains_url = ? AND outlier = ?
@@ -606,8 +607,8 @@ class RoomStore(RoomWorkerStore, SearchStore):
             next_token = None
             for stream_ordering, content_json in txn:
                 next_token = stream_ordering
-                content = json.loads(content_json)
-
+                event_json = json.loads(content_json)
+                content = event_json["content"]
                 content_url = content.get("url")
                 thumbnail_url = content.get("info", {}).get("thumbnail_url")
 

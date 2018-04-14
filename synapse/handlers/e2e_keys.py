@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -134,23 +135,8 @@ class E2eKeysHandler(object):
                     if user_id in destination_query:
                         results[user_id] = keys
 
-            except CodeMessageException as e:
-                failures[destination] = {
-                    "status": e.code, "message": e.message
-                }
-            except NotRetryingDestination as e:
-                failures[destination] = {
-                    "status": 503, "message": "Not ready for retry",
-                }
-            except FederationDeniedError as e:
-                failures[destination] = {
-                    "status": 403, "message": "Federation Denied",
-                }
             except Exception as e:
-                # include ConnectionRefused and other errors
-                failures[destination] = {
-                    "status": 503, "message": e.message
-                }
+                failures[destination] = _exception_to_failure(e)
 
         yield make_deferred_yieldable(defer.gatherResults([
             preserve_fn(do_remote_query)(destination)
@@ -252,19 +238,8 @@ class E2eKeysHandler(object):
                 for user_id, keys in remote_result["one_time_keys"].items():
                     if user_id in device_keys:
                         json_result[user_id] = keys
-            except CodeMessageException as e:
-                failures[destination] = {
-                    "status": e.code, "message": e.message
-                }
-            except NotRetryingDestination as e:
-                failures[destination] = {
-                    "status": 503, "message": "Not ready for retry",
-                }
             except Exception as e:
-                # include ConnectionRefused and other errors
-                failures[destination] = {
-                    "status": 503, "message": e.message
-                }
+                failures[destination] = _exception_to_failure(e)
 
         yield make_deferred_yieldable(defer.gatherResults([
             preserve_fn(claim_client_keys)(destination)
@@ -360,6 +335,31 @@ class E2eKeysHandler(object):
         yield self.store.add_e2e_one_time_keys(
             user_id, device_id, time_now, new_keys
         )
+
+
+def _exception_to_failure(e):
+    if isinstance(e, CodeMessageException):
+        return {
+            "status": e.code, "message": e.message,
+        }
+
+    if isinstance(e, NotRetryingDestination):
+        return {
+            "status": 503, "message": "Not ready for retry",
+        }
+
+    if isinstance(e, FederationDeniedError):
+        return {
+            "status": 403, "message": "Federation Denied",
+        }
+
+    # include ConnectionRefused and other errors
+    #
+    # Note that some Exceptions (notably twisted's ResponseFailed etc) don't
+    # give a string for e.message, which simplejson then fails to serialize.
+    return {
+        "status": 503, "message": str(e.message),
+    }
 
 
 def _one_time_keys_match(old_key_json, new_key):

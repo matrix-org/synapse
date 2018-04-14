@@ -38,7 +38,7 @@ def pid_running(pid):
     try:
         os.kill(pid, 0)
         return True
-    except OSError, err:
+    except OSError as err:
         if err.errno == errno.EPERM:
             return True
         return False
@@ -98,7 +98,7 @@ def stop(pidfile, app):
         try:
             os.kill(pid, signal.SIGTERM)
             write("stopped %s" % (app,), colour=GREEN)
-        except OSError, err:
+        except OSError as err:
             if err.errno == errno.ESRCH:
                 write("%s not running" % (app,), colour=YELLOW)
             elif err.errno == errno.EPERM:
@@ -252,6 +252,7 @@ def main():
             for running_pid in running_pids:
                 while pid_running(running_pid):
                     time.sleep(0.2)
+            write("All processes exited; now restarting...")
 
     if action == "start" or action == "restart":
         if start_stop_synapse:
