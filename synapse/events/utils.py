@@ -20,6 +20,8 @@ from frozendict import frozendict
 
 import re
 
+from six import string_types
+
 # Split strings on "." but not "\." This uses a negative lookbehind assertion for '\'
 # (?<!stuff) matches if the current position in the string is not preceded
 # by a match for 'stuff'.
@@ -277,7 +279,7 @@ def serialize_event(e, time_now_ms, as_client_event=True,
 
     if only_event_fields:
         if (not isinstance(only_event_fields, list) or
-                not all(isinstance(f, basestring) for f in only_event_fields)):
+                not all(isinstance(f, string_types) for f in only_event_fields)):
             raise TypeError("only_event_fields must be a list of strings")
         d = only_fields(d, only_event_fields)
 
