@@ -61,7 +61,6 @@ Bug fixes:
 
 * Add room_id to the response of `rooms/{roomId}/join` (PR #2986) Thanks to @jplatte!
 * Fix replication after switch to simplejson (PR #3015)
-* Fix replication after switch to simplejson (PR #3015)
 * 404 correctly on missing paths via NoResource (PR #3022)
 * Fix error when claiming e2e keys from offline servers (PR #3034)
 * fix tests/storage/test_user_directory.py (PR #3042)
