@@ -22,6 +22,8 @@ from twisted.internet import defer
 
 logger = logging.getLogger(__name__)
 
+from six import string_types
+
 
 # TODO: Allow users to "knock" or simpkly join depending on rules
 # TODO: Federation admin APIs
@@ -431,7 +433,7 @@ class GroupsServerHandler(object):
                         "long_description"):
             if keyname in content:
                 value = content[keyname]
-                if not isinstance(value, basestring):
+                if not isinstance(value, string_types):
                     raise SynapseError(400, "%r value is not a string" % (keyname,))
                 profile[keyname] = value
 
