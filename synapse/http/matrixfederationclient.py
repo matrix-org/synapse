@@ -42,6 +42,8 @@ import random
 import sys
 import urllib
 from six.moves.urllib import parse as urlparse
+from six import string_types
+
 
 logger = logging.getLogger(__name__)
 outbound_logger = logging.getLogger("synapse.http.outbound")
@@ -553,7 +555,7 @@ class MatrixFederationHttpClient(object):
 
         encoded_args = {}
         for k, vs in args.items():
-            if isinstance(vs, basestring):
+            if isinstance(vs, string_types):
                 vs = [vs]
             encoded_args[k] = [v.encode("UTF-8") for v in vs]
 
@@ -668,7 +670,7 @@ def check_content_type_is_json(headers):
         RuntimeError if the
 
     """
-    c_type = headers.getRawHeaders("Content-Type")
+    c_type = headers.getRawHeaders(b"Content-Type")
     if c_type is None:
         raise RuntimeError(
             "No Content-Type header"
@@ -685,7 +687,7 @@ def check_content_type_is_json(headers):
 def encode_query_args(args):
     encoded_args = {}
     for k, vs in args.items():
-        if isinstance(vs, basestring):
+        if isinstance(vs, string_types):
             vs = [vs]
         encoded_args[k] = [v.encode("UTF-8") for v in vs]
 
