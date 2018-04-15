@@ -16,7 +16,7 @@
 import hashlib
 from inspect import getcallargs
 import urllib
-import urlparse
+from six.moves.urllib import parse as urlparse
 
 from mock import Mock, patch
 from twisted.internet import defer, reactor
@@ -234,7 +234,7 @@ class MockHttpResource(HttpServer):
             if matcher:
                 try:
                     args = [
-                        urllib.unquote(u).decode("UTF-8")
+                        urlparse.unquote(u).decode("UTF-8")
                         for u in matcher.groups()
                     ]
 
