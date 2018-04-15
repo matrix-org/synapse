@@ -25,7 +25,7 @@ from .base import ClientV1RestServlet, client_path_patterns
 
 import simplejson as json
 import urllib
-import urlparse
+from six.moves.urllib import parse as urlparse
 
 import logging
 from saml2 import BINDING_HTTP_POST
