@@ -33,7 +33,7 @@ from ._base import set_timeline_upper_limit
 import itertools
 import logging
 
-import ujson as json
+import simplejson as json
 
 logger = logging.getLogger(__name__)
 

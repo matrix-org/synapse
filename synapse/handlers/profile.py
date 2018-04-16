@@ -47,6 +47,11 @@ class ProfileHandler(BaseHandler):
 
         self.clock.looping_call(self._update_remote_profile_cache, self.PROFILE_UPDATE_MS)
 
+        if hs.config.worker_app is None:
+            self.clock.looping_call(
+                self._update_remote_profile_cache, self.PROFILE_UPDATE_MS,
+            )
+
         reactor.callWhenRunning(self._assign_profile_replication_batches)
         reactor.callWhenRunning(self._replicate_profiles)
         self.clock.looping_call(self._replicate_profiles, self.PROFILE_REPLICATE_INTERVAL)

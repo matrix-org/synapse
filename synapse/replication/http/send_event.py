@@ -115,7 +115,7 @@ class ReplicationSendEventRestServlet(RestServlet):
         self.clock = hs.get_clock()
 
         # The responses are tiny, so we may as well cache them for a while
-        self.response_cache = ResponseCache(hs, timeout_ms=30 * 60 * 1000)
+        self.response_cache = ResponseCache(hs, "send_event", timeout_ms=30 * 60 * 1000)
 
     def on_PUT(self, request, event_id):
         result = self.response_cache.get(event_id)

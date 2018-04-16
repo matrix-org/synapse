@@ -23,7 +23,7 @@ import re
 import shutil
 import sys
 import traceback
-import ujson as json
+import simplejson as json
 import urlparse
 
 from twisted.web.server import NOT_DONE_YET

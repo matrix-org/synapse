@@ -155,7 +155,7 @@ class DeviceHandler(BaseHandler):
 
         try:
             yield self.store.delete_device(user_id, device_id)
-        except errors.StoreError, e:
+        except errors.StoreError as e:
             if e.code == 404:
                 # no match
                 pass
@@ -204,7 +204,7 @@ class DeviceHandler(BaseHandler):
 
         try:
             yield self.store.delete_devices(user_id, device_ids)
-        except errors.StoreError, e:
+        except errors.StoreError as e:
             if e.code == 404:
                 # no match
                 pass
@@ -243,7 +243,7 @@ class DeviceHandler(BaseHandler):
                 new_display_name=content.get("display_name")
             )
             yield self.notify_device_update(user_id, [device_id])
-        except errors.StoreError, e:
+        except errors.StoreError as e:
             if e.code == 404:
                 raise errors.NotFoundError()
             else:

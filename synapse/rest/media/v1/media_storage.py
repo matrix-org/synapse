@@ -16,6 +16,8 @@
 from twisted.internet import defer, threads
 from twisted.protocols.basic import FileSender
 
+import six
+
 from ._base import Responder
 
 from synapse.util.file_consumer import BackgroundFileConsumer
@@ -119,7 +121,7 @@ class MediaStorage(object):
                 os.remove(fname)
             except Exception:
                 pass
-            raise t, v, tb
+            six.reraise(t, v, tb)
 
         if not finished_called:
             raise Exception("Finished callback not called")

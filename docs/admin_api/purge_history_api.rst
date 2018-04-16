@@ -16,9 +16,11 @@ including an ``access_token`` of a server admin.
 
 By default, events sent by local users are not deleted, as they may represent
 the only copies of this content in existence. (Events sent by remote users are
-deleted, and room state data before the cutoff is always removed).
+deleted.)
 
-To delete local events as well, set ``delete_local_events`` in the body:
+Room state data (such as joins, leaves, topic) is always preserved.
+
+To delete local message events as well, set ``delete_local_events`` in the body:
 
 .. code:: json
 

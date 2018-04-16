@@ -23,7 +23,7 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.caches.descriptors import cached, cachedList, cachedInlineCallbacks
 
 import abc
-import ujson as json
+import simplejson as json
 import logging
 
 logger = logging.getLogger(__name__)

@@ -23,7 +23,7 @@ from canonicaljson import encode_canonical_json
 from collections import namedtuple
 
 import logging
-import ujson as json
+import simplejson as json
 
 logger = logging.getLogger(__name__)
 

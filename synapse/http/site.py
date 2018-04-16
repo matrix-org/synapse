@@ -20,7 +20,7 @@ import logging
 import re
 import time
 
-ACCESS_TOKEN_RE = re.compile(r'(\?.*access(_|%5[Ff])token=)[^&]*(.*)$')
+ACCESS_TOKEN_RE = re.compile(br'(\?.*access(_|%5[Ff])token=)[^&]*(.*)$')
 
 
 class SynapseRequest(Request):
@@ -43,12 +43,12 @@ class SynapseRequest(Request):
 
     def get_redacted_uri(self):
         return ACCESS_TOKEN_RE.sub(
-            r'\1<redacted>\3',
+            br'\1<redacted>\3',
             self.uri
         )
 
     def get_user_agent(self):
-        return self.requestHeaders.getRawHeaders("User-Agent", [None])[-1]
+        return self.requestHeaders.getRawHeaders(b"User-Agent", [None])[-1]
 
     def started_processing(self):
         self.site.access_logger.info(

@@ -24,14 +24,7 @@ from ._base import SQLBaseStore
 BATCH_SIZE = 100
 
 
-class ProfileStore(SQLBaseStore):
-    def create_profile(self, user_localpart):
-        return self._simple_insert(
-            table="profiles",
-            values={"user_id": user_localpart},
-            desc="create_profile",
-        )
-
+class ProfileWorkerStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_profileinfo(self, user_localpart):
         try:
@@ -64,34 +57,12 @@ class ProfileStore(SQLBaseStore):
             desc="get_profile_displayname",
         )
 
-    def set_profile_displayname(self, user_localpart, new_displayname, batchnum):
-        return self._simple_update_one(
-            table="profiles",
-            keyvalues={"user_id": user_localpart},
-            updatevalues={
-                "displayname": new_displayname,
-                "batch": batchnum,
-            },
-            desc="set_profile_displayname",
-        )
-
     def get_profile_avatar_url(self, user_localpart):
         return self._simple_select_one_onecol(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             retcol="avatar_url",
             desc="get_profile_avatar_url",
-        )
-
-    def set_profile_avatar_url(self, user_localpart, new_avatar_url, batchnum):
-        return self._simple_update_one(
-            table="profiles",
-            keyvalues={"user_id": user_localpart},
-            updatevalues={
-                "avatar_url": new_avatar_url,
-                "batch": batchnum,
-            },
-            desc="set_profile_avatar_url",
         )
 
     @defer.inlineCallbacks
@@ -154,6 +125,37 @@ class ProfileStore(SQLBaseStore):
             retcols=("displayname", "avatar_url",),
             allow_none=True,
             desc="get_from_remote_profile_cache",
+        )
+
+
+class ProfileStore(ProfileWorkerStore):
+    def create_profile(self, user_localpart):
+        return self._simple_insert(
+            table="profiles",
+            values={"user_id": user_localpart},
+            desc="create_profile",
+        )
+
+    def set_profile_displayname(self, user_localpart, new_displayname, batchnum):
+        return self._simple_update_one(
+            table="profiles",
+            keyvalues={"user_id": user_localpart},
+            updatevalues={
+                "displayname": new_displayname,
+                "batch": batchnum,
+            },
+            desc="set_profile_displayname",
+        )
+
+    def set_profile_avatar_url(self, user_localpart, new_avatar_url, batchnum):
+        return self._simple_update_one(
+            table="profiles",
+            keyvalues={"user_id": user_localpart},
+            updatevalues={
+                "avatar_url": new_avatar_url,
+                "batch": batchnum,
+            },
+            desc="set_profile_avatar_url",
         )
 
     def add_remote_profile_cache(self, user_id, displayname, avatar_url):

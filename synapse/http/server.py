@@ -37,7 +37,7 @@ from twisted.web.util import redirectTo
 import collections
 import logging
 import urllib
-import ujson
+import simplejson
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +111,11 @@ response_db_txn_duration = metrics.register_counter(
 # seconds spent waiting for a db connection, when processing this request
 response_db_sched_duration = metrics.register_counter(
     "response_db_sched_duration_seconds", labels=["method", "servlet", "tag"]
+)
+
+# size in bytes of the response written
+response_size = metrics.register_counter(
+    "response_size", labels=["method", "servlet", "tag"]
 )
 
 _next_request_id = 0
@@ -324,7 +329,7 @@ class JsonResource(HttpServer, resource.Resource):
                 register_paths, so will return (possibly via Deferred) either
                 None, or a tuple of (http code, response body).
         """
-        if request.method == "OPTIONS":
+        if request.method == b"OPTIONS":
             return _options_handler, {}
 
         # Loop through all the registered callbacks to check if the method
@@ -426,6 +431,8 @@ class RequestMetrics(object):
             context.db_sched_duration_ms / 1000., request.method, self.name, tag
         )
 
+        response_size.inc_by(request.sentLength, request.method, self.name, tag)
+
 
 class RootRedirect(resource.Resource):
     """Redirects the root '/' path to another path."""
@@ -461,8 +468,7 @@ def respond_with_json(request, code, json_object, send_cors=False,
         if canonical_json or synapse.events.USE_FROZEN_DICTS:
             json_bytes = encode_canonical_json(json_object)
         else:
-            # ujson doesn't like frozen_dicts.
-            json_bytes = ujson.dumps(json_object, ensure_ascii=False)
+            json_bytes = simplejson.dumps(json_object)
 
     return respond_with_json_bytes(
         request, code, json_bytes,
@@ -489,6 +495,7 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
     request.setHeader(b"Content-Type", b"application/json")
     request.setHeader(b"Server", version_string)
     request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
+    request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
 
     if send_cors:
         set_cors_headers(request)
@@ -536,7 +543,7 @@ def finish_request(request):
 
 def _request_user_agent_is_curl(request):
     user_agents = request.requestHeaders.getRawHeaders(
-        "User-Agent", default=[]
+        b"User-Agent", default=[]
     )
     for user_agent in user_agents:
         if "curl" in user_agent:

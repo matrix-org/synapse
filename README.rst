@@ -354,6 +354,10 @@ https://matrix.org/docs/projects/try-matrix-now.html (or build your own with one
 Fedora
 ------
 
+Synapse is in the Fedora repositories as ``matrix-synapse``::
+
+    sudo dnf install matrix-synapse
+
 Oleg Girko provides Fedora RPMs at
 https://obs.infoserver.lv/project/monitor/matrix-synapse
 
@@ -890,6 +894,17 @@ This should end with a 'PASSED' result::
 
     PASSED (successes=143)
 
+Running the Integration Tests
+=============================
+
+Synapse is accompanied by `SyTest <https://github.com/matrix-org/sytest>`_,
+a Matrix homeserver integration testing suite, which uses HTTP requests to
+access the API as a Matrix client would. It is able to run Synapse directly from
+the source tree, so installation of the server is not required.
+
+Testing with SyTest is recommended for verifying that changes related to the
+Client-Server API are functioning correctly. See the `installation instructions
+<https://github.com/matrix-org/sytest#installing>`_ for details.
 
 Building Internal API Documentation
 ===================================

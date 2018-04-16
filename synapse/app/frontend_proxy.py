@@ -44,7 +44,7 @@ from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
 from twisted.internet import defer, reactor
-from twisted.web.resource import Resource
+from twisted.web.resource import NoResource
 
 logger = logging.getLogger("synapse.app.frontend_proxy")
 
@@ -90,7 +90,7 @@ class KeyUploadServlet(RestServlet):
             # They're actually trying to upload something, proxy to main synapse.
             # Pass through the auth headers, if any, in case the access token
             # is there.
-            auth_headers = request.requestHeaders.getRawHeaders("Authorization", [])
+            auth_headers = request.requestHeaders.getRawHeaders(b"Authorization", [])
             headers = {
                 "Authorization": auth_headers,
             }
@@ -142,7 +142,7 @@ class FrontendProxyServer(HomeServer):
                         "/_matrix/client/api/v1": resource,
                     })
 
-        root_resource = create_resource_tree(resources, Resource())
+        root_resource = create_resource_tree(resources, NoResource())
 
         _base.listen_tcp(
             bind_addresses,
