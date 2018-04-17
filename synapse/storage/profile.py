@@ -71,7 +71,9 @@ class ProfileWorkerStore(SQLBaseStore):
             txn.execute("SELECT MAX(batch) as maxbatch FROM profiles")
             rows = self.cursor_to_dict(txn)
             return rows[0]['maxbatch']
-        max_batch = yield self.runInteraction("get_latest_profile_replication_batch_number", f)
+        max_batch = yield self.runInteraction(
+            "get_latest_profile_replication_batch_number", f,
+        )
         defer.returnValue(max_batch)
 
     def get_profile_batch(self, batchnum):
@@ -104,7 +106,7 @@ class ProfileWorkerStore(SQLBaseStore):
         def f(txn):
             txn.execute("SELECT host, last_synced_batch FROM profile_replication_status")
             rows = self.cursor_to_dict(txn)
-            return { r['host']: r['last_synced_batch'] for r in rows }
+            return {r['host']: r['last_synced_batch'] for r in rows}
         result = yield self.runInteraction("get_replication_hosts", f)
         defer.returnValue(result)
 

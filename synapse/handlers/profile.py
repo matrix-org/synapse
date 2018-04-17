@@ -83,7 +83,7 @@ class ProfileHandler(BaseHandler):
             try:
                 for i in xrange(host_batches[repl_host] + 1, latest_batch + 1):
                     yield self._replicate_host_profile_batch(repl_host, i)
-            except:
+            except Exception:
                 logger.exception(
                     "Exception while replicating to %s: aborting for now", repl_host,
                 )
@@ -110,7 +110,7 @@ class ProfileHandler(BaseHandler):
             yield self.http_client.post_json_get_json(url, signed_body)
             self.store.update_replication_batch_for_host(host, batchnum)
             logger.info("Sucessfully replicated profile batch %d to %s", batchnum, host)
-        except:
+        except Exception:
             # This will get retried when the looping call next comes around
             logger.exception("Failed to replicate profile batch %d to %s", batchnum, host)
             raise

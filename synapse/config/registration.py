@@ -51,7 +51,7 @@ class RegistrationConfig(Config):
 
         self.replicate_user_profiles_to = config.get("replicate_user_profiles_to", [])
         if not isinstance(self.replicate_user_profiles_to, list):
-            self.replicate_user_profiles_to = [self.replicate_user_profiles_to,]
+            self.replicate_user_profiles_to = [self.replicate_user_profiles_to, ]
 
     def default_config(self, **kwargs):
         registration_shared_secret = random_string_with_symbols(50)
