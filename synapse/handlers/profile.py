@@ -212,7 +212,8 @@ class ProfileHandler(BaseHandler):
         if new_displayname == '':
             new_displayname = None
 
-        new_batchnum = (yield self.store.get_latest_profile_replication_batch_number()) + 1
+        cur_batchnum = yield self.store.get_latest_profile_replication_batch_number()
+        new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
 
         yield self.store.set_profile_displayname(
             target_user.localpart, new_displayname, new_batchnum
@@ -267,7 +268,8 @@ class ProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
 
-        new_batchnum = yield self.store.get_latest_profile_replication_batch_number() + 1
+        cur_batchnum = yield self.store.get_latest_profile_replication_batch_number()
+        new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
 
         yield self.store.set_profile_avatar_url(
             target_user.localpart, new_avatar_url, new_batchnum,
