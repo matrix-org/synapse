@@ -15,8 +15,14 @@
 # limitations under the License.
 
 """Contains handlers for federation events."""
+
+import httplib
+import itertools
+import logging
+
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
+from twisted.internet import defer
 from unpaddedbase64 import decode_base64
 
 from ._base import BaseHandler
@@ -43,10 +49,6 @@ from synapse.util.retryutils import NotRetryingDestination
 
 from synapse.util.distributor import user_joined_room
 
-from twisted.internet import defer
-
-import itertools
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +116,28 @@ class FederationHandler(BaseHandler):
         if already_seen:
             logger.debug("Already seen pdu %s", pdu.event_id)
             return
+
+        # do some initial sanity-checking of the event. In particular, make
+        # sure it doesn't have hundreds of prev_events or auth_events, which
+        # could cause a huge state resolution or cascade of event fetches
+        if len(pdu.prev_events) > 20:
+            logger.warn("Rejecting event %s which has %i prev_events",
+                        pdu.event_id, len(pdu.prev_events))
+            raise FederationError(
+                "ERROR",
+                httplib.BAD_REQUEST,
+                "Too many prev_events",
+                affected=pdu.event_id,
+            )
+        if len(pdu.auth_events) > 10:
+            logger.warn("Rejecting event %s which has %i auth_events",
+                        pdu.event_id, len(pdu.auth_events))
+            raise FederationError(
+                "ERROR",
+                httplib.BAD_REQUEST,
+                "Too many auth_events",
+                affected=pdu.event_id,
+            )
 
         # If we are currently in the process of joining this room, then we
         # queue up events for later processing.
