@@ -50,9 +50,10 @@ class ProfileHandler(BaseHandler):
                 self._update_remote_profile_cache, self.PROFILE_UPDATE_MS,
             )
 
-            reactor.callWhenRunning(self._assign_profile_replication_batches)
-            reactor.callWhenRunning(self._replicate_profiles)
-            self.clock.looping_call(self._replicate_profiles, self.PROFILE_REPLICATE_INTERVAL)
+            if len(self.hs.config.replicate_user_profiles_to) > 0:
+                reactor.callWhenRunning(self._assign_profile_replication_batches)
+                reactor.callWhenRunning(self._replicate_profiles)
+                self.clock.looping_call(self._replicate_profiles, self.PROFILE_REPLICATE_INTERVAL)
 
     @defer.inlineCallbacks
     def _assign_profile_replication_batches(self):
@@ -210,8 +211,11 @@ class ProfileHandler(BaseHandler):
         if new_displayname == '':
             new_displayname = None
 
-        cur_batchnum = yield self.store.get_latest_profile_replication_batch_number()
-        new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
+        if len(self.hs.config.replicate_user_profiles_to) > 0:
+            cur_batchnum = yield self.store.get_latest_profile_replication_batch_number()
+            new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
+        else:
+            new_batchnum = None
 
         yield self.store.set_profile_displayname(
             target_user.localpart, new_displayname, new_batchnum
@@ -266,8 +270,11 @@ class ProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
 
-        cur_batchnum = yield self.store.get_latest_profile_replication_batch_number()
-        new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
+        if len(self.hs.config.replicate_user_profiles_to) > 0:
+            cur_batchnum = yield self.store.get_latest_profile_replication_batch_number()
+            new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
+        else:
+            new_batchnum = None
 
         yield self.store.set_profile_avatar_url(
             target_user.localpart, new_avatar_url, new_batchnum,
