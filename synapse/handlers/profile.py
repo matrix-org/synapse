@@ -53,7 +53,9 @@ class ProfileHandler(BaseHandler):
             if len(self.hs.config.replicate_user_profiles_to) > 0:
                 reactor.callWhenRunning(self._assign_profile_replication_batches)
                 reactor.callWhenRunning(self._replicate_profiles)
-                self.clock.looping_call(self._replicate_profiles, self.PROFILE_REPLICATE_INTERVAL)
+                self.clock.looping_call(
+                    self._replicate_profiles, self.PROFILE_REPLICATE_INTERVAL
+                )
 
     @defer.inlineCallbacks
     def _assign_profile_replication_batches(self):
