@@ -119,23 +119,14 @@ class FederationHandler(BaseHandler):
 
         # do some initial sanity-checking of the event. In particular, make
         # sure it doesn't have hundreds of prev_events or auth_events, which
-        # could cause a huge state resolution or cascade of event fetches
-        if len(pdu.prev_events) > 20:
-            logger.warn("Rejecting event %s which has %i prev_events",
-                        pdu.event_id, len(pdu.prev_events))
+        # could cause a huge state resolution or cascade of event fetches.
+        try:
+            self._sanity_check_event(pdu)
+        except SynapseError as err:
             raise FederationError(
                 "ERROR",
-                httplib.BAD_REQUEST,
-                "Too many prev_events",
-                affected=pdu.event_id,
-            )
-        if len(pdu.auth_events) > 10:
-            logger.warn("Rejecting event %s which has %i auth_events",
-                        pdu.event_id, len(pdu.auth_events))
-            raise FederationError(
-                "ERROR",
-                httplib.BAD_REQUEST,
-                "Too many auth_events",
+                err.code,
+                err.msg,
                 affected=pdu.event_id,
             )
 
@@ -565,6 +556,9 @@ class FederationHandler(BaseHandler):
             extremities=extremities,
         )
 
+        for ev in events:
+            self._sanity_check_event(ev)
+
         # Don't bother processing events we already have.
         seen_events = yield self.store.have_events_in_timeline(
             set(e.event_id for e in events)
@@ -866,6 +860,39 @@ class FederationHandler(BaseHandler):
             tried_domains.update(likely_domains)
 
         defer.returnValue(False)
+
+    def _sanity_check_event(self, ev):
+        """
+        Do some early sanity checks of a received event
+
+        In particular, checks it doesn't have an excessive number of
+        prev_events or auth_events, which could cause a huge state resolution
+        or cascade of event fetches.
+
+        Args:
+            ev (synapse.events.EventBase): event to be checked
+
+        Returns: None
+
+        Raises:
+            SynapseError if the event does not pass muster
+        """
+        if len(ev.prev_events) > 20:
+            logger.warn("Rejecting event %s which has %i prev_events",
+                        ev.event_id, len(ev.prev_events))
+            raise SynapseError(
+                httplib.BAD_REQUEST,
+                "Too many prev_events",
+            )
+
+        if len(ev.auth_events) > 10:
+            logger.warn("Rejecting event %s which has %i auth_events",
+                        ev.event_id, len(ev.auth_events))
+            raise SynapseError(
+                "ERROR",
+                httplib.BAD_REQUEST,
+                "Too many auth_events",
+            )
 
     @defer.inlineCallbacks
     def send_invite(self, target_host, event):
