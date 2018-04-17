@@ -388,7 +388,7 @@ class RegisterRestServlet(RestServlet):
                     )
                 ):
                     address = auth_result[login_type]['address']
-                    desired_username = address.replace('@', '.').lower()
+                    desired_username = address.replace('@', '-').lower()
 
         if desired_username is not None:
             yield self.registration_handler.check_username(
