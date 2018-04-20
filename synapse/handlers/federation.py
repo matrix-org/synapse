@@ -563,10 +563,15 @@ class FederationHandler(BaseHandler):
             extremities=extremities,
         )
 
-        # do some sanity-checking of the received events, before we go and
-        # do state resolution across 1000 events.
-        for ev in events:
-            self._sanity_check_event(ev)
+        # ideally we'd sanity check the events here for excess prev_events etc,
+        # but it's hard to reject events at this point without completely
+        # breaking backfill in the same way that it is currently broken by
+        # events whose signature we cannot verify (#3121).
+        #
+        # So for now we accept the events anyway. #3124 tracks this.
+        #
+        # for ev in events:
+        #     self._sanity_check_event(ev)
 
         # Don't bother processing events we already have.
         seen_events = yield self.store.have_events_in_timeline(
