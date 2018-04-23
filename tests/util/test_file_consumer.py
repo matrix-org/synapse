@@ -20,7 +20,7 @@ from mock import NonCallableMock
 from synapse.util.file_consumer import BackgroundFileConsumer
 
 from tests import unittest
-from StringIO import StringIO
+from six import StringIO
 
 import threading
 
