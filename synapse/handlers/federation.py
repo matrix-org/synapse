@@ -903,7 +903,6 @@ class FederationHandler(BaseHandler):
             logger.warn("Rejecting event %s which has %i auth_events",
                         ev.event_id, len(ev.auth_events))
             raise SynapseError(
-                "ERROR",
                 httplib.BAD_REQUEST,
                 "Too many auth_events",
             )
