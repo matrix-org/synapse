@@ -3,7 +3,8 @@ Changes in synapse v0.28.0-rc1 (2018-04-24)
 
 Minor performance improvement to federation sending and bug fixes.
 
-(Note: This release does not include state resolutions discussed in matrix live)
+(Note: This release does not include the delta state resolution implementation discussed in matrix live)
+
 
 Features:
 
