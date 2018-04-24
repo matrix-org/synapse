@@ -58,6 +58,8 @@ from synapse.util.versionstring import get_version_string
 from twisted.internet import defer, reactor
 from twisted.web.resource import NoResource
 
+from six import iteritems
+
 logger = logging.getLogger("synapse.app.synchrotron")
 
 
@@ -214,7 +216,7 @@ class SynchrotronPresence(object):
         # presence is disabled on matrix.org, so we return the empty set
         return set()
         return [
-            user_id for user_id, count in self.user_to_num_current_syncs.iteritems()
+            user_id for user_id, count in iteritems(self.user_to_num_current_syncs)
             if count > 0
         ]
 

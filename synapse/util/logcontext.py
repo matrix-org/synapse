@@ -92,6 +92,7 @@ class LoggingContext(object):
 
         def __nonzero__(self):
             return False
+        __bool__ = __nonzero__  # python3
 
     sentinel = Sentinel()
 
