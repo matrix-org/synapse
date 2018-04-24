@@ -16,8 +16,7 @@ Changes:
 * move handling of auto_join_rooms to RegisterHandler (PR #2996) Thanks to @krombel!
 * Improve handling of SRV records for federation connections (PR #3016) Thanks to @silkeh!
 * Document the behaviour of ResponseCache (PR #3059)
-* Preparation for py3 (PR #3061, #3073, #3074, #3075, #3103, #3104, #3106, #3107
-#3109, #3110) Thanks to @NotAFile!
+* Preparation for py3 (PR #3061, #3073, #3074, #3075, #3103, #3104, #3106, #3107, #3109, #3110) Thanks to @NotAFile!
 * update prometheus dashboard to use new metric names (PR #3069) Thanks to @krombel!
 * use python3-compatible prints (PR #3074) Thanks to @NotAFile!
 * Send federation events concurrently (PR #3078)
