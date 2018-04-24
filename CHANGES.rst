@@ -1,3 +1,41 @@
+Changes in synapse v0.28.0-rc1 (2018-04-24)
+===========================================
+
+Minor performance improvement to federation sending and bug fixes.
+
+(Note: This release does not include state resolutions discussed in matrix live)
+
+Features:
+* Add metrics for event processing lag (PR #3090)
+* Add metrics for ResponseCache (PR #3092)
+
+Changes:
+* Synapse on PyPy (PR #2760) Thanks to @Valodim!
+* move handling of auto_join_rooms to RegisterHandler (PR #2996) Thanks to @krombel!
+* Improve handling of SRV records for federation connections (PR #3016) Thanks to @silkeh!
+* Document the behaviour of ResponseCache (PR #3059)
+* Preparation for py3 (PR #3061, #3073, #3074, #3075, #3103, #3104, #3106, #3107
+#3109, #3110) Thanks to @NotAFile!
+* update prometheus dashboard to use new metric names (PR #3069) Thanks to @krombel!
+* use python3-compatible prints (PR #3074) Thanks to @NotAFile!
+* Send federation events concurrently (PR #3078)
+* Limit concurrent event sends for a room (PR #3079)
+* Improve R30 stat definition (PR #3086)
+* Send events to ASes concurrently (PR #3088)
+* Refactor ResponseCache usage (PR #3093)
+* Clarify that SRV may not point to a CNAME (PR #3100) Thanks to @silkeh!
+* Use str(e) instead of e.message (PR #3103) Thanks to @NotAFile!
+* Use six.itervalues in some places (PR #3106) Thanks to @NotAFile!
+* Refactor store.have_events (PR #3117)
+
+Bug Fixes:
+* Return 401 for invalid access_token on logout (PR #2938) Thanks to @dklug!
+* Return a 404 rather than a 500 on rejoining empty rooms (PR #3080)
+* fix federation_domain_whitelist (PR #3099)
+* Avoid creating events with huge numbers of prev_events (PR #3113)
+* Reject events which have lots of prev_events (PR #3118)
+
+
 Changes in synapse v0.27.4 (2018-04-13)
 ======================================
 
@@ -22,10 +60,10 @@ the functionality. v0.27.3-rc2 is up to date, rc1 should be ignored.
 Changes in synapse v0.27.3-rc1 (2018-04-09)
 =======================================
 
-Notable changes include API support for joinability of groups. Also new metrics 
+Notable changes include API support for joinability of groups. Also new metrics
 and phone home stats. Phone home stats include better visibility of system usage
 so we can tweak synpase to work better for all users rather than our own experience
-with matrix.org. Also, recording 'r30' stat which is the measure we use to track 
+with matrix.org. Also, recording 'r30' stat which is the measure we use to track
 overal growth of the Matrix ecosystem. It is defined as:-
 
 Counts the number of native 30 day retained users, defined as:-
