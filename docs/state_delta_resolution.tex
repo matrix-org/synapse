@@ -3,8 +3,15 @@
 \usepackage{amsfonts}
 \usepackage{amsthm}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{algorithmic}
 \usepackage{algorithm}
+\usepackage{appendix}
+\usepackage{listings}
+
+\widowpenalties 1 10000
+\raggedbottom
+
 
 \title{State Delta Resolution Algorithm}
 \author{Erik Johnston}
@@ -22,6 +29,8 @@
 \begin{document}
 	
 \maketitle
+
+\section{Definitions}
 	
 We first define some basic functions that correspond to the synapse code.
 
@@ -33,7 +42,9 @@ g: G \rightarrow E\\
 \end{split}
 \end{equation} which we call state maps, for $F, G \subset K$.
 
-We can then compute the set of all ``unconflicted events":
+State maps have the additional properties that they are injective and that $\forall$ state maps $f, g$ then $f(x) = g(y) \Rightarrow x = y$ (i.e. a given event can only be mapped to from a single state key).
+
+We can compute the set of all ``unconflicted state keys":
 \begin{equation}
 U_{f,g} = \{x\ |\ \forall x \in F \cap G,\ f(x) = g(x)\} \cup (F \bigtriangleup G)
 \end{equation} i.e. the set of state keys where $f$ and $g$ don't conflict. Similarly, we define:
@@ -41,17 +52,17 @@ U_{f,g} = \{x\ |\ \forall x \in F \cap G,\ f(x) = g(x)\} \cup (F \bigtriangleup 
 \begin{split}
 u_{f,g} : U_{f,g} \longrightarrow &\ E\\
 x \longmapsto &\ \begin{cases}
-	f(x), & \text{if}\ f \in F \\
+	f(x), & \text{if}\ x \in F \\
 	g(x), & \text{otherwise}
 \end{cases}
 \end{split}
 \end{equation} which gets the unconflicted event for a given state key.
 
 
-We can also define a function on $C_{f,g} = F \cup G \setminus U_{f,g}$:
+We can also define a function on $C_{f,g} = (F \cup G) \setminus U_{f,g}$:
 \begin{equation}
 c_{f,g}: C_{f,g} \rightarrow E
-\end{equation} which is used to resolve conflicts between $f$ and $g$. Note that $c_{f,g}$ is either $f(x)$ or $g(x)$. 
+\end{equation} which is used to resolve conflicts between $f$ and $g$. Note that $c_{f,g}(x)$ is either $f(x)$ or $g(x)$.
 
 Now we define:
 \begin{equation} 
@@ -62,66 +73,83 @@ u_{f,g}(x), & \text{if}\ x \in U_{f,g}\\
 c_{f,g}(x), & \text{otherwise}
 \end{cases} 
 \end{split}
-\end{equation} which we call the resolved state of $f$ and $g$.
+\end{equation} which we call the resolved state of $f$ and $g$. 
 
-\begin{lemma}
-	$\forall x \in U_{f,g} \ s.t.\ g(x) = g'(x)$ then $r_{f,g}(x) = r_{f,g'}(x)$
-\end{lemma}
+Note that this definition immediately implies that $\forall x \in U_{f,g}$ s.t. $g(x) = g'(x)$ then $r_{f,g}(x) = r_{f,g'}(x)$.
 
 We define 
 \begin{equation}
 \alpha: E \rightarrow \mathbb{P}(K)
 \end{equation} to be the mapping of an event to the type/state keys needed to auth the event, and
 \begin{equation}
-\alpha_{f,g}(x) = \alpha f(x) \cup \alpha g(x)
+\alpha_{f,g}(x) = (\alpha f(x)) \cup (\alpha g(x))
 \end{equation} which is the set of auth events required for $f(x)$ and $g(x)$. Note that $\alpha_{f,g}(x) \subset F \cup G$.
 
 Further, we can define
 \begin{equation}
-a_{f,g}(x) = \bigcup_{n=0}^\infty (\alpha_{f,g})^n(x)
-\end{equation} to be the auth chain of $f(x)$ and $g(x)$. This is well defined as there are a finite number of elements in $F \cup G$ and $a_{f,g} \rightarrow F \cup G$.
+\rho_{f,g}(x) = \bigcup_{n=0}^\infty (\alpha_{f,g})^n(x)
+\end{equation} to be the auth chain of $f(x)$ and $g(x)$. This is well defined as there are a finite number of elements in $F \cup G$ and $\rho_{f,g} \rightarrow F \cup G$.
 
-If we consider the implementation of $c_{f,g}$ in Synapse we can see that it depends not only on the values of $x$, but also on the resolved state of their auth events, i.e. $r_{f,g}(\alpha_{f,g}(x))$. By ``depends on" we mean that if those are the same for different values of $f$ and $g$, then the result of $c_{f,g}(x)$ is the same.
+For examples of what $\alpha$ and $\rho$ look like, see the appendix.
+
+\newpage
+\section{Results}
+
+If we consider the implementation of $c_{f,g}$ in Synapse we can see that it depends not only on $f$ and $g$, but also on the resolved state of their auth events, i.e. $r_{f,g}\alpha_{f,g}$.
+
+We can formalise this idea by defining the notion of dependency relations, which we do in the appendix. Using that notation, we can say that:
+\[
+c_{f,g} \propto \{f,\ g,\ r_{f,g}\alpha_{f,g}\}
+\]
+which leads to the following results.:
 
 \begin{lemma}
-	 $c_{f,g}$ depends only on $a_{f,g}(x)$
+	 $r_{f,g} \propto \{f\rho_{f,g}, g\rho_{f,g}\}$
 \end{lemma}
 
 \begin{proof}
-	$c_{f,g}(x)$ depends on $x \in a_{f,g}(x)$, and $r_{f,g}(\alpha_{f,g}(x))$. Now:
+	
+	First:
 	\[
 		\begin{split}
-		r_{f,g}(\alpha_{f,g}(x))\ =\ & u_{f,g}(\alpha_{f,g}(x)) \cup c_{f,g}(\alpha_{f,g}(x))\\
+		r_{f,g}\alpha_{f,g}(x)\ =\ & (u_{f,g}\alpha_{f,g}(x)) \cup (c_{f,g}\alpha_{f,g}(x))\\
 		\end{split}
-	\] but by definition $u_{f,g}(\alpha_{f,g}(x))$ depends only on $\alpha_{f,g}(x)$, so $r_{f,g}(\alpha_{f,g}(x))$ depends on $a_{f,g}(x)$ and $c_{f,g}\alpha_{f,g}(x)$.
-	
-	By induction, $c_{f,g}\alpha_{f,g}(x)$ depends on $a_{f,g}(x)$ and $c_{f,g}(\alpha_{f,g})^n(x), \forall n$. Since $(\alpha_{f,g})^n(x)$ repeats and we know $c_{f,g}$ is well defined, we can infer that $c_{f,g}(x)$ depends only on $\bigcup_{n=0}^\infty (\alpha_{f,g})^n(x) = a_{f,g}(x)$.
+	\]\footnotemark but by definition $u_{f,g} \alpha_{f,g}(x) \propto \alpha_{f,g}(x)$, therefore:
+	\footnotetext{Note that e.g. $u_{f,g}\alpha_{f,g}(x)$ is shorthand for \{$u_{f,g}(y)\ |\ \forall y \in \alpha_{f,g}(x) \cap U_{f,g}\}$, i.e. we apply the function to the values in the given set that are also in the functions domain.}
+	\[
+		r_{f,g}\alpha_{f,g} \propto \{f\alpha_{f,g},\ g\alpha_{f,g},\ c_{f,g}\alpha_{f,g}\}
+	\]
+	so by induction, starting from $c_{f,g} \propto \{f,\ g,\ r_{f,g}\alpha_{f,g}\}$:
+	\[
+		r_{f,g} \propto \{ f(\alpha_{f,g})^i \ |\ \forall i \ge 0 \} \cup \{ g(\alpha_{f,g})^i \ |\ \forall i \ge 0 \}
+	\]
+    and the result follows since $f (\alpha_{f,g})^i \propto f \rho_{f,g}$
 	
 \end{proof}
 
-By inspecting the actual implementation of $\alpha$ we can define $a_{f,g}^{-1}(x)$ to be a function which $\forall x$, $x \in a_{f,g}^{-1}a_{f,g}(x)$. We can similarly define $\alpha_{f,g}^{-1}(x)$. Note that $\forall x$, $x \in a_{f,g}^{-1}(x)$
+By inspecting the actual implementation of $\alpha$ we can define $\rho_{f,g}^{-1}(x)$ to be a function which $\forall y \in \rho_{f,g}(x)$ then $x \in \rho_{f,g}^{-1}(y)$. We can similarly define $\alpha_{f,g}^{-1}(x)$. Note that $\forall x$, $x \in \rho_{f,g}^{-1}(x)$
 
 We now consider $g': G' \rightarrow E$, where $g(x) = g'(x)$ except for $x \in G_\delta$, i.e. $g'$ is a state map based on $g$.
 
 \begin{lemma}
-	For $f, g, g'$ s.t. $\forall x \notin G_\delta,\ g(x) = g'(x)$, then $\forall x \notin a_{f,g'}^{-1}(G_\delta),\ r_{f,g}(x) = r_{f,g'}(x)$.
+	For $f, g, g'$ s.t. $\forall x \notin G_\delta,\ g(x) = g'(x)$, then $\forall x \notin \rho_{f,g'}^{-1}(G_\delta),\ r_{f,g}(x) = r_{f,g'}(x)$.
 \end{lemma}
 
 \begin{proof}
 	Let $x$ be s.t. $r_{f,g}(x) \neq r_{f,g'}(x)$:
 	\[
 	\begin{split}
-		&\Rightarrow a_{f,g}(x) \neq a_{f,g'}(x)\\
-		&\Rightarrow \exists y \in a_{f,g}(x) \text{ s.t. } g(y) \neq g'(y)\\
+		&\Rightarrow f\rho_{f,g}(x) \neq f\rho_{f,g'}(x) \text{ or } g\rho_{f,g}(x) \neq g'\rho_{f,g'}(x)\\
+		&\Rightarrow \exists y \in \rho_{f,g'}(x) \text{ s.t. } g(y) \neq g'(y)\\
 		&\Rightarrow y \in G_\delta\\
-		&\Rightarrow a_{f,g'}^{-1}(y) \subseteq a_{f,g'}^{-1}(G_\delta)\\
-		&\Rightarrow x \in a_{f,g'}^{-1}(G_\delta)
+		&\therefore \rho_{f,g'}^{-1}(y) \subseteq \rho_{f,g'}^{-1}(G_\delta)\\
+		&\Rightarrow x \in \rho_{f,g'}^{-1}(G_\delta)
 	\end{split}
 	\]
 \end{proof}
 
 \begin{corollary}
-	For $f, g, g'$ s.t. $\forall x \notin G_\delta$, $g(x) = g'(x)$, then $\forall x \notin C_{f,g} \cap a_{f,g'}^{-1}(G_\delta)$, $r_{f,g}(x) = r_{f,g'}(x)$
+	For $f, g, g'$ s.t. $\forall x \notin G_\delta$, $g(x) = g'(x)$, then $\forall x \notin C_{f,g} \cap \rho_{f,g'}^{-1}(G_\delta)$, $r_{f,g}(x) = r_{f,g'}(x)$
 \end{corollary}
 
 \begin{proof}
@@ -130,32 +158,34 @@ We now consider $g': G' \rightarrow E$, where $g(x) = g'(x)$ except for $x \in G
 
 This allows us to reuse most of the results of $r_{f,g}$ when calculating $r_{f,g'}$ if $G_\delta$ is small. In particular we can calculate the delta between the two functions without having to inspect $U_{f,g}$, which dramatically cuts down the amount of data used to compute deltas of resolved state of large state maps.
 
-However, we can do better than this. We can note that $r_{f,g}(x)$ only depends on $r_{f,g}(\alpha_{f,g}(x))$ for values of $\alpha_{f,g}(x)$ not in $U_{f,g}$. Concretely, this means for example that if $G_\delta$ includes the membership of the sender of a power level event, but the power level event is in $U_{f,g}$, then we don't need to recalculate all conflicted events---despite the membership event being in every event's auth chain.
+However, we can do better than this. We can note that $r_{f,g}(x)$ only depends on $r_{f,g}\alpha_{f,g}(x)$ for values of $\alpha_{f,g}(x)$ not in $U_{f,g}$. Concretely, this means for example that if $G_\delta$ includes the membership of the sender of a power level event, but the power level event is in $U_{f,g}$, then we don't need to recalculate all conflicted events---despite the membership event being in every event's auth chain.
 
 \begin{lemma}
 	$\forall x$ s.t. $r_{f,g}(x) \neq r_{f,g'}(x)$ then $\exists y_1, ..., y_n$ s.t. $y_n \in G_\delta$, $y_i \notin U_{f,g}$ and $y_{i+1} \in \alpha_{f,g'}(y_i)$
 \end{lemma}
 
 \begin{proof}
-	If $r_{f,g}(x) \neq r_{f,g'}(x)$ then $\exists y \in G_\delta$ s.t. $y \in a_{f,g'}(x)$. By definition of $a_{f,g'}(x)$, $\exists y_0, ..., y_n$ s.t. $y_0 = x$ and $y_{i+1} \in \alpha_{f,g'}(y_i)$. 
+	If $r_{f,g}(x) \neq r_{f,g'}(x)$ then $\exists y \in G_\delta$ s.t. $y \in \rho_{f,g'}(x)$. By definition of $\rho_{f,g'}(x)$, $\exists y_0, ..., y_n$ s.t. $y_0 = x$ and $y_{i+1} \in \alpha_{f,g'}(y_i)$. 
 	
 	We know that $r_{f,g'}(x)$ depends on either $u_{f,g'}(x)$ or $c_{f,g'}(x)$, but if $x \in U_{f,g'}$ then there is no dependency on $x$'s auth events and so $y_n = y_0 = x \in G_\delta$. Otherwise, we have $c_{f,g}(x) \neq c_{f,g'}(x)$, which depends on $f(x)$, $g'(x)$ or $r_{f,g'}(\alpha_{f,g'}(x))$. If $x \notin G_\delta$ then we know $f(x)$ and $g'(x)$ are the same, and so $r_{f,g}(\alpha_{f,g'}(x)) \neq r_{f,g'}(\alpha_{f,g'}(x)) \Rightarrow \exists y_1 \in \alpha_{f,g'}(x)$ s.t. $r_{f,g}(y_1) \neq r_{f,g'}(y_1)$.
 	
 	 Applying the above to $y_1$ then if $y_1 \in U_{f,g'} \Rightarrow y_1 = y_n \in G_\delta$. By induction $y_i \notin U_{f,g'}$ for $i < n$.
 	 
-	 Note that we can assume $y_i \notin G_\delta$ as otherwise we would pick $n = i$,  and so if $y_i \notin U_{f,g} \Leftrightarrow y_i \notin U_{f,g'}$
+	 (Note that we can assume $y_i \notin G_\delta$ as otherwise we would pick $n = i$,  and so if $y_i \notin U_{f,g} \Leftrightarrow y_i \notin U_{f,g'}$)
 \end{proof}
+
+\begin{minipage}{\textwidth}
 
 We can use this approach and create an iterative algorithm for computing the set of state keys that need to be recalculated:
 
-\begin{algorithm}
+\begin{algorithm}[H]
 \caption{Calculate state keys needing to be recalculated}
 \begin{algorithmic}
 	\STATE $to\_recalculate \leftarrow \text{empty set of state keys}$
 	\STATE $pending \leftarrow G_\delta$
-	\WHILE{$pending$ is empty}
+	\WHILE{$pending$ is not empty}
 		\STATE $x \leftarrow \text{pop from}\ pending$
-		\IF{$x \notin U_{f,g}$}
+		\IF{$x \notin U_{f,g}$ and $x \notin to\_recalculate$}
 			\STATE $\text{add all in}\ \alpha_{f,g'}^{-1}(x)\ \text{to}\ pending$
 			\STATE $\text{add}\ x\ \text{to}\ to\_recalculate$
 		\ENDIF
@@ -164,5 +194,83 @@ We can use this approach and create an iterative algorithm for computing the set
 \end{algorithmic}
 \end{algorithm}
 
+\end{minipage}
+
+It should be noted that this only gives the set of keys that need to be recalculated, and not the full set that would be needed to actually recalculate them. The full set needs to include the auth events for each key, i.e.:
+\[
+T \cup \bigcup_{x \in T} \alpha_{f,g}(x)
+\]
+where $T$ is the set $to\_reacalculate$.
+
+\clearpage
+\appendix
+\appendixpage
+\addappheadtotoc
+\section{Dependency Relations}
+
+If we have functions $a_f$, $b_f$, etc we can define a notion of dependency. We say that $a_f$ ``depends only on" $b_f$, which is written as $a_f \propto b_f$, if
+\[
+	\forall x, g \text{ s.t. } a_f(x) \neq a_g(x) \implies b_f(x) \neq b_g(x)
+\]
+This relation is transitive, i.e. if $a_f \propto b_f \propto c_f$ then $a_f \propto c_f$ as:
+\[
+\begin{split}
+	\forall x, g \text{ s.t. } & a_f(x) \neq a_g(x)\\
+	\implies & b_f(x) \neq b_g(x)\\
+	\implies & c_f(x) \neq c_g(x)\\
+\end{split}
+\]
+
+Most functions depend on more than one other function, so we introduce the notation $a_f \propto \{b_f, c_f\}$ ($a_f$ depends on the set of functions $\{b_f, c_f\}$) to mean
+\[
+\begin{split}
+	\forall x, g \text{ s.t. }& a_f(x) \neq a_g(x)\\
+	\implies \text{either }& b_f(x) \neq b_g(x),\\
+	\text{or }& c_f(x) \neq c_g(x)\\
+\end{split}
+\]
+
+
+\section{Auth Functions}
+
+\begin{minipage}{\textwidth}
+
+The following is the implementation of $\alpha$ in Synapse:
+
+\begin{lstlisting}[language=Python, frame=tb, caption={Definition of $\alpha$},basicstyle=\small]
+def auth_types_for_event(event):
+    if event.type == EventTypes.Create:
+        return []
+
+    auth_types = []
+
+    auth_types.append((EventTypes.PowerLevels, "", ))
+    auth_types.append((EventTypes.Member, event.user_id, ))
+    auth_types.append((EventTypes.Create, "", ))
+
+    if event.type == EventTypes.Member:
+        membership = event.content["membership"]
+        if membership in [Membership.JOIN, Membership.INVITE]:
+            auth_types.append((EventTypes.JoinRules, "", ))
+
+        auth_types.append((EventTypes.Member, event.state_key, ))
+
+        if membership == Membership.INVITE:
+            if "third_party_invite" in event.content:
+                key = (
+                    EventTypes.ThirdPartyInvite,
+                    event.content["third_party_invite"]["signed"]["token"]
+                )
+                auth_types.append(key)
+
+    return auth_types
+\end{lstlisting}
+\end{minipage}
+
+In particular the auth types are the same for all events except membership events. This means that $\alpha_{f,g}(x)$ is always the set $\{$ $\text{(``m.room.create", ``")},$ $\text{(``m.room.power\_levels", ``")}, $ $\text{(``m.room.member", sender)}$ $\}$ for non membership events.
+
+If we have a room created by user $u_1$ (so the power levels, join rules etc. were all sent by them) and a state event sent by $u_2$, then the auth chain of that event (with state key $x$) is $\rho_{f,g}(x) = $ $\{ x,$ $\text{(``m.room.create", ``")},$ $\text{(``m.room.power\_levels", ``")}, $ $\text{(``m.room.join\_rules", ``")},$ $(\text{``m.room.member", } u_1), $ $(\text{``m.room.member", } u_2 )$ $ \}$.
+
+This gives a valid, though imperfect, possible definition of $\rho_{f,g}^{-1}$ where $\rho_{f,g}^{-1}(x) = \{x\}$ for all state tuples that aren't create/power\_levels/membership/etc., and $\rho_{f,g}^{-1}(x) = F \cup G$ for those keys. This trivially satisfies the property that $\forall y \in \rho_{f,g}(x)$ then $x \in \rho_{f,g}^{-1}(y)$
 
 \end{document}
