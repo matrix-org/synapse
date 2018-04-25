@@ -347,7 +347,6 @@ class DataStore(RoomMemberStore, RoomStore,
 
         return self.runInteraction("count_r30_users", _count_r30_users)
 
-
     def generate_user_daily_visits(self):
         """
         Generates daily visit data for use in cohort/ retention analysis
@@ -390,14 +389,16 @@ class DataStore(RoomMemberStore, RoomStore,
             txn.execute(sql, (yesterday_start_time,))
 
             sql = """
-                    INSERT INTO user_daily_visits (user_id, user_agent, device_id, timestamp)
+                    INSERT INTO user_daily_visits (user_id. user_agent,
+                                                   device_id, timestamp)
                     VALUES (?, ?, ?, ?)
             """
 
             for row in txn:
                 txn.execute(sql, (row + (yesterday_start_time,)))
 
-        return self.runInteraction("generate_user_daily_visits", _generate_user_daily_visits)
+        return self.runInteraction("generate_user_daily_visits",
+                                   _generate_user_daily_visits)
 
     def get_users(self):
         """Function to reterive a list of users in users table.
