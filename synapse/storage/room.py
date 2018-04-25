@@ -595,7 +595,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
         while next_token:
             sql = """
                 SELECT stream_ordering, json FROM events
-                JOIN event_json USING (event_id)
+                JOIN event_json USING (room_id, event_id)
                 WHERE room_id = ?
                     AND stream_ordering < ?
                     AND contains_url = ? AND outlier = ?
