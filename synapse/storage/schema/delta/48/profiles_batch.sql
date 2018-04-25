@@ -13,10 +13,23 @@
  * limitations under the License.
  */
 
+/*
+ * Add a batch number to track changes to profiles and the
+ * order they're made in so we can replicate user profiles
+ * to other hosts as they change
+ */
 ALTER TABLE profiles ADD COLUMN batch BIGINT DEFAULT NULL;
 
+/*
+ * Index on the batch number so we can get profiles
+ * by their batch
+ */
 CREATE INDEX profiles_batch_idx ON profiles(batch);
 
+/*
+ * A table to track what batch of user profiles has been
+ * synced to what profile replication target.
+ */
 CREATE TABLE profile_replication_status (
     host TEXT NOT NULL,
     last_synced_batch BIGINT NOT NULL

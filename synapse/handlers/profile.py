@@ -112,7 +112,7 @@ class ProfileHandler(BaseHandler):
         signed_body = sign_json(body, self.hs.hostname, self.hs.config.signing_key[0])
         try:
             yield self.http_client.post_json_get_json(url, signed_body)
-            self.store.update_replication_batch_for_host(host, batchnum)
+            yield self.store.update_replication_batch_for_host(host, batchnum)
             logger.info("Sucessfully replicated profile batch %d to %s", batchnum, host)
         except Exception:
             # This will get retried when the looping call next comes around
