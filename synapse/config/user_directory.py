@@ -47,6 +47,7 @@ class UserDirectoryConfig(Config):
         #   search_all_users: false
         #
         #   If this is set, user search will be delegated to this ID server instead
-        #   of synapse performing the saerch itself.
+        #   of synapse performing the search itself.
+        #   This is an experimental API.
         #   defer_to_id_server: id.example.com
         """
