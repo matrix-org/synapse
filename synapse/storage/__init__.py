@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
+import time
+import logging
+
 from synapse.storage.devices import DeviceStore
 from .appservice import (
     ApplicationServiceStore, ApplicationServiceTransactionStore
@@ -54,10 +58,6 @@ from .engines import PostgresEngine
 
 from synapse.api.constants import PresenceState
 from synapse.util.caches.stream_change_cache import StreamChangeCache
-
-
-import logging
-
 
 logger = logging.getLogger(__name__)
 
@@ -346,6 +346,58 @@ class DataStore(RoomMemberStore, RoomStore,
             return results
 
         return self.runInteraction("count_r30_users", _count_r30_users)
+
+
+    def generate_user_daily_visits(self):
+        """
+        Generates daily visit data for use in cohort/ retention analysis
+        """
+        def _generate_user_daily_visits(txn):
+            logger.info("Calling _generate_user_daily_visits")
+            # determine timestamp of previous days
+            yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
+            yesterday_start = datetime.datetime(yesterday.year,
+                                                yesterday.month,
+                                                yesterday.day, 0, 0, 0, 0)
+            yesterday_start_time = int(time.mktime(yesterday_start.timetuple())) * 1000
+
+            # Check that this job has not already been completed
+            sql = """
+                SELECT timestamp
+                FROM user_daily_visits
+                ORDER by timestamp desc limit 1
+            """
+            txn.execute(sql)
+            row = txn.fetchone()
+
+            # Bail if the most recent time is yesterday
+            if row and row[0] == yesterday_start_time:
+                logger.info("Bailing from _generate_user_daily_visits, already completed")
+                return
+            logger.info("inserting into user_daily_visits")
+            # Not specificying an upper bound means that if the update is run at
+            # 10 mins past midnight and the user is active during a 30 min session
+            # that the user is still included in the previous days stats
+            # This does mean that if the update is run hours late, then it is possible
+            # to overstate the cohort, but this seems a reasonable trade off
+            # The alternative is to insert on every request - but prefer to avoid
+            # for performance reasons
+            sql = """
+                    SELECT user_id, user_agent, device_id
+                    FROM user_ips
+                    WHERE last_seen > ?
+            """
+            txn.execute(sql, (yesterday_start_time,))
+
+            sql = """
+                    INSERT INTO user_daily_visits (user_id, user_agent, device_id, timestamp)
+                    VALUES (?, ?, ?, ?)
+            """
+
+            for row in txn:
+                txn.execute(sql, (row + (yesterday_start_time,)))
+
+        return self.runInteraction("generate_user_daily_visits", _generate_user_daily_visits)
 
     def get_users(self):
         """Function to reterive a list of users in users table.
