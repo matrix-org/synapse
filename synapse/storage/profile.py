@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +20,8 @@ from synapse.storage.roommember import ProfileInfo
 from synapse.api.errors import StoreError
 
 from ._base import SQLBaseStore
+
+BATCH_SIZE = 100
 
 
 class ProfileWorkerStore(SQLBaseStore):
@@ -62,6 +65,55 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="get_profile_avatar_url",
         )
 
+    def get_latest_profile_replication_batch_number(self):
+        def f(txn):
+            txn.execute("SELECT MAX(batch) as maxbatch FROM profiles")
+            rows = self.cursor_to_dict(txn)
+            return rows[0]['maxbatch']
+        return self.runInteraction(
+            "get_latest_profile_replication_batch_number", f,
+        )
+
+    def get_profile_batch(self, batchnum):
+        return self._simple_select_list(
+            table="profiles",
+            keyvalues={
+                "batch": batchnum,
+            },
+            retcols=("user_id", "displayname", "avatar_url"),
+            desc="get_profile_batch",
+        )
+
+    def assign_profile_batch(self):
+        def f(txn):
+            sql = (
+                "UPDATE profiles SET batch = "
+                "(SELECT IFNULL(MAX(batch), -1) + 1 FROM profiles) "
+                "WHERE user_id in ("
+                "    SELECT user_id FROM profiles WHERE batch is NULL limit ?"
+                ")"
+            )
+            txn.execute(sql, (BATCH_SIZE,))
+            return txn.rowcount
+        return self.runInteraction("assign_profile_batch", f)
+
+    def get_replication_hosts(self):
+        def f(txn):
+            txn.execute("SELECT host, last_synced_batch FROM profile_replication_status")
+            rows = self.cursor_to_dict(txn)
+            return {r['host']: r['last_synced_batch'] for r in rows}
+        return self.runInteraction("get_replication_hosts", f)
+
+    def update_replication_batch_for_host(self, host, last_synced_batch):
+        return self._simple_upsert(
+            table="profile_replication_status",
+            keyvalues={"host": host},
+            values={
+                "last_synced_batch": last_synced_batch,
+            },
+            desc="update_replication_batch_for_host",
+        )
+
     def get_from_remote_profile_cache(self, user_id):
         return self._simple_select_one(
             table="remote_profile_cache",
@@ -80,19 +132,25 @@ class ProfileStore(ProfileWorkerStore):
             desc="create_profile",
         )
 
-    def set_profile_displayname(self, user_localpart, new_displayname):
+    def set_profile_displayname(self, user_localpart, new_displayname, batchnum):
         return self._simple_update_one(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            updatevalues={"displayname": new_displayname},
+            updatevalues={
+                "displayname": new_displayname,
+                "batch": batchnum,
+            },
             desc="set_profile_displayname",
         )
 
-    def set_profile_avatar_url(self, user_localpart, new_avatar_url):
+    def set_profile_avatar_url(self, user_localpart, new_avatar_url, batchnum):
         return self._simple_update_one(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            updatevalues={"avatar_url": new_avatar_url},
+            updatevalues={
+                "avatar_url": new_avatar_url,
+                "batch": batchnum,
+            },
             desc="set_profile_avatar_url",
         )
 

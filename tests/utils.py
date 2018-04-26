@@ -60,6 +60,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.block_non_admin_invites = False
         config.federation_domain_whitelist = None
         config.user_directory_search_all_users = False
+        config.replicate_user_profiles_to = []
 
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
