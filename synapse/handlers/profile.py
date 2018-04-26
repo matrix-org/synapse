@@ -53,6 +53,9 @@ class ProfileHandler(BaseHandler):
             if len(self.hs.config.replicate_user_profiles_to) > 0:
                 reactor.callWhenRunning(self._assign_profile_replication_batches)
                 reactor.callWhenRunning(self._replicate_profiles)
+                # Add a looping call to replicate_profiles: this handles retries
+                # if the replication is unsuccessful when the user updated their
+                # profile.
                 self.clock.looping_call(
                     self._replicate_profiles, self.PROFILE_REPLICATE_INTERVAL
                 )
@@ -109,7 +112,7 @@ class ProfileHandler(BaseHandler):
         signed_body = sign_json(body, self.hs.hostname, self.hs.config.signing_key[0])
         try:
             yield self.http_client.post_json_get_json(url, signed_body)
-            self.store.update_replication_batch_for_host(host, batchnum)
+            yield self.store.update_replication_batch_for_host(host, batchnum)
             logger.info("Sucessfully replicated profile batch %d to %s", batchnum, host)
         except Exception:
             # This will get retried when the looping call next comes around

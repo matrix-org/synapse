@@ -114,6 +114,8 @@ class RegistrationConfig(Config):
 
         # If enabled, user IDs, display names and avatar URLs will be replicated
         # to this server whenever they change.
+        # This is an experimental API currently implemented by sydent to support
+        # cross-homeserver user directories.
         # replicate_user_profiles_to: example.com
 
         # Users who register on this homeserver will automatically be joined

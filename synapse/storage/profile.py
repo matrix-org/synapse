@@ -65,16 +65,14 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="get_profile_avatar_url",
         )
 
-    @defer.inlineCallbacks
     def get_latest_profile_replication_batch_number(self):
         def f(txn):
             txn.execute("SELECT MAX(batch) as maxbatch FROM profiles")
             rows = self.cursor_to_dict(txn)
             return rows[0]['maxbatch']
-        max_batch = yield self.runInteraction(
+        return self.runInteraction(
             "get_latest_profile_replication_batch_number", f,
         )
-        defer.returnValue(max_batch)
 
     def get_profile_batch(self, batchnum):
         return self._simple_select_list(
@@ -86,7 +84,6 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="get_profile_batch",
         )
 
-    @defer.inlineCallbacks
     def assign_profile_batch(self):
         def f(txn):
             sql = (
@@ -98,17 +95,14 @@ class ProfileWorkerStore(SQLBaseStore):
             )
             txn.execute(sql, (BATCH_SIZE,))
             return txn.rowcount
-        assigned = yield self.runInteraction("assign_profile_batch", f)
-        defer.returnValue(assigned)
+        return self.runInteraction("assign_profile_batch", f)
 
-    @defer.inlineCallbacks
     def get_replication_hosts(self):
         def f(txn):
             txn.execute("SELECT host, last_synced_batch FROM profile_replication_status")
             rows = self.cursor_to_dict(txn)
             return {r['host']: r['last_synced_batch'] for r in rows}
-        result = yield self.runInteraction("get_replication_hosts", f)
-        defer.returnValue(result)
+        return self.runInteraction("get_replication_hosts", f)
 
     def update_replication_batch_for_host(self, host, last_synced_batch):
         return self._simple_upsert(
