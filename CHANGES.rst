@@ -1,3 +1,12 @@
+Changes in synapse v0.28.0-rc1 (2018-04-26)
+===========================================
+
+Bug Fixes:
+
+* Fix quarantine media admin API and search reindex (PR #3130)
+* Fix media admin APIs (PR #3134)
+
+
 Changes in synapse v0.28.0-rc1 (2018-04-24)
 ===========================================
 
