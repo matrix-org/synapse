@@ -165,28 +165,32 @@ class GroupAttestionRenewer(object):
 
         @defer.inlineCallbacks
         def _renew_attestation(group_id, user_id):
-            if not self.is_mine_id(group_id):
-                destination = get_domain_from_id(group_id)
-            elif not self.is_mine_id(user_id):
-                destination = get_domain_from_id(user_id)
-            else:
-                logger.warn(
-                    "Incorrectly trying to do attestations for user: %r in %r",
-                    user_id, group_id,
+            try:
+                if not self.is_mine_id(group_id):
+                    destination = get_domain_from_id(group_id)
+                elif not self.is_mine_id(user_id):
+                    destination = get_domain_from_id(user_id)
+                else:
+                    logger.warn(
+                        "Incorrectly trying to do attestations for user: %r in %r",
+                        user_id, group_id,
+                    )
+                    yield self.store.remove_attestation_renewal(group_id, user_id)
+                    return
+
+                attestation = self.attestations.create_attestation(group_id, user_id)
+
+                yield self.transport_client.renew_group_attestation(
+                    destination, group_id, user_id,
+                    content={"attestation": attestation},
                 )
-                yield self.store.remove_attestation_renewal(group_id, user_id)
-                return
 
-            attestation = self.attestations.create_attestation(group_id, user_id)
-
-            yield self.transport_client.renew_group_attestation(
-                destination, group_id, user_id,
-                content={"attestation": attestation},
-            )
-
-            yield self.store.update_attestation_renewal(
-                group_id, user_id, attestation
-            )
+                yield self.store.update_attestation_renewal(
+                    group_id, user_id, attestation
+                )
+            except Exception:
+                logger.exception("Error renewing attestation of %r in %r",
+                                 user_id, group_id)
 
         for row in rows:
             group_id = row["group_id"]

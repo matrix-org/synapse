@@ -1,9 +1,19 @@
+Changes in synapse v0.28.0 (2018-04-26)
+===========================================
+
+Bug Fixes:
+
+* Fix quarantine media admin API and search reindex (PR #3130)
+* Fix media admin APIs (PR #3134)
+
+
 Changes in synapse v0.28.0-rc1 (2018-04-24)
 ===========================================
 
 Minor performance improvement to federation sending and bug fixes.
 
-(Note: This release does not include state resolutions discussed in matrix live)
+(Note: This release does not include the delta state resolution implementation discussed in matrix live)
+
 
 Features:
 
@@ -16,8 +26,7 @@ Changes:
 * move handling of auto_join_rooms to RegisterHandler (PR #2996) Thanks to @krombel!
 * Improve handling of SRV records for federation connections (PR #3016) Thanks to @silkeh!
 * Document the behaviour of ResponseCache (PR #3059)
-* Preparation for py3 (PR #3061, #3073, #3074, #3075, #3103, #3104, #3106, #3107
-#3109, #3110) Thanks to @NotAFile!
+* Preparation for py3 (PR #3061, #3073, #3074, #3075, #3103, #3104, #3106, #3107, #3109, #3110) Thanks to @NotAFile!
 * update prometheus dashboard to use new metric names (PR #3069) Thanks to @krombel!
 * use python3-compatible prints (PR #3074) Thanks to @NotAFile!
 * Send federation events concurrently (PR #3078)

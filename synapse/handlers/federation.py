@@ -19,9 +19,11 @@
 import httplib
 import itertools
 import logging
+import sys
 
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
+import six
 from twisted.internet import defer
 from unpaddedbase64 import decode_base64
 
@@ -1513,12 +1515,14 @@ class FederationHandler(BaseHandler):
                 backfilled=backfilled,
             )
         except:  # noqa: E722, as we reraise the exception this is fine.
-            # Ensure that we actually remove the entries in the push actions
-            # staging area
-            logcontext.preserve_fn(
-                self.store.remove_push_actions_from_staging
-            )(event.event_id)
-            raise
+            tp, value, tb = sys.exc_info()
+
+            logcontext.run_in_background(
+                self.store.remove_push_actions_from_staging,
+                event.event_id,
+            )
+
+            six.reraise(tp, value, tb)
 
         if not backfilled:
             # this intentionally does not yield: we don't care about the result

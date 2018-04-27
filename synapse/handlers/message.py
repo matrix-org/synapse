@@ -13,6 +13,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
+import simplejson
+import sys
+
+from canonicaljson import encode_canonical_json
+import six
 from twisted.internet import defer, reactor
 from twisted.python.failure import Failure
 
@@ -33,11 +39,6 @@ from synapse.visibility import filter_events_for_client
 from synapse.replication.http.send_event import send_event_to_master
 
 from ._base import BaseHandler
-
-from canonicaljson import encode_canonical_json
-
-import logging
-import simplejson
 
 logger = logging.getLogger(__name__)
 
@@ -729,8 +730,14 @@ class EventCreationHandler(object):
         except:  # noqa: E722, as we reraise the exception this is fine.
             # Ensure that we actually remove the entries in the push actions
             # staging area, if we calculated them.
-            preserve_fn(self.store.remove_push_actions_from_staging)(event.event_id)
-            raise
+            tp, value, tb = sys.exc_info()
+
+            run_in_background(
+                self.store.remove_push_actions_from_staging,
+                event.event_id,
+            )
+
+            six.reraise(tp, value, tb)
 
     @defer.inlineCallbacks
     def persist_and_notify_client_event(
@@ -857,15 +864,25 @@ class EventCreationHandler(object):
         @defer.inlineCallbacks
         def _notify():
             yield run_on_reactor()
-            self.notifier.on_new_room_event(
-                event, event_stream_id, max_stream_id,
-                extra_users=extra_users
-            )
+            try:
+                self.notifier.on_new_room_event(
+                    event, event_stream_id, max_stream_id,
+                    extra_users=extra_users
+                )
+            except Exception:
+                logger.exception("Error notifying about new room event")
 
         preserve_fn(_notify)()
 
         if event.type == EventTypes.Message:
-            presence = self.hs.get_presence_handler()
             # We don't want to block sending messages on any presence code. This
             # matters as sometimes presence code can take a while.
-            preserve_fn(presence.bump_presence_active_time)(requester.user)
+            run_in_background(self._bump_active_time, requester.user)
+
+    @defer.inlineCallbacks
+    def _bump_active_time(self, user):
+        try:
+            presence = self.hs.get_presence_handler()
+            yield presence.bump_presence_active_time(user)
+        except Exception:
+            logger.exception("Error bumping presence active time")
