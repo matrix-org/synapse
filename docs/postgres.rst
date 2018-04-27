@@ -28,6 +28,7 @@ virtual env::
 
     sudo apt-get install libpq-dev
     pip install psycopg2
+    pip install psycopg2-binary
 
 Set up client in RHEL/CentOs 7
 ==============================
