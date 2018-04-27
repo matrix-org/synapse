@@ -323,6 +323,8 @@ class TransactionQueue(object):
                     break
 
                 yield self._process_presence_inner(states_map.values())
+        except Exception:
+            logger.exception("Error sending presence states to servers")
         finally:
             self._processing_pending_presence = False
 

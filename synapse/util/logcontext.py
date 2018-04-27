@@ -305,7 +305,12 @@ def run_in_background(f, *args, **kwargs):
     deferred returned by the funtion completes.
 
     Useful for wrapping functions that return a deferred which you don't yield
-    on.
+    on (for instance because you want to pass it to deferred.gatherResults()).
+
+    Note that if you completely discard the result, you should make sure that
+    `f` doesn't raise any deferred exceptions, otherwise a scary-looking
+    CRITICAL error about an unhandled error will be logged without much
+    indication about where it came from.
     """
     current = LoggingContext.current_context()
     res = f(*args, **kwargs)

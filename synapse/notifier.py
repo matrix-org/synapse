@@ -21,7 +21,7 @@ from synapse.handlers.presence import format_user_presence_state
 from synapse.util import DeferredTimedOutError
 from synapse.util.logutils import log_function
 from synapse.util.async import ObservableDeferred
-from synapse.util.logcontext import PreserveLoggingContext, preserve_fn
+from synapse.util.logcontext import PreserveLoggingContext, run_in_background
 from synapse.util.metrics import Measure
 from synapse.types import StreamToken
 from synapse.visibility import filter_events_for_client
@@ -251,9 +251,7 @@ class Notifier(object):
     def _on_new_room_event(self, event, room_stream_id, extra_users=[]):
         """Notify any user streams that are interested in this room event"""
         # poke any interested application service.
-        preserve_fn(self.appservice_handler.notify_interested_services)(
-            room_stream_id
-        )
+        run_in_background(self._notify_app_services, room_stream_id)
 
         if self.federation_sender:
             self.federation_sender.notify_new_events(room_stream_id)
@@ -266,6 +264,13 @@ class Notifier(object):
             users=extra_users,
             rooms=[event.room_id],
         )
+
+    @defer.inlineCallbacks
+    def _notify_app_services(self, room_stream_id):
+        try:
+            yield self.appservice_handler.notify_interested_services(room_stream_id)
+        except Exception:
+            logger.exception("Error notifying application services of event")
 
     def on_new_event(self, stream_key, new_token, users=[], rooms=[]):
         """ Used to inform listeners that something has happend event wise.

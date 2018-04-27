@@ -146,52 +146,55 @@ class Keyring(object):
             verify_requests (List[VerifyKeyRequest]):
         """
 
-        # create a deferred for each server we're going to look up the keys
-        # for; we'll resolve them once we have completed our lookups.
-        # These will be passed into wait_for_previous_lookups to block
-        # any other lookups until we have finished.
-        # The deferreds are called with no logcontext.
-        server_to_deferred = {
-            rq.server_name: defer.Deferred()
-            for rq in verify_requests
-        }
+        try:
+            # create a deferred for each server we're going to look up the keys
+            # for; we'll resolve them once we have completed our lookups.
+            # These will be passed into wait_for_previous_lookups to block
+            # any other lookups until we have finished.
+            # The deferreds are called with no logcontext.
+            server_to_deferred = {
+                rq.server_name: defer.Deferred()
+                for rq in verify_requests
+            }
 
-        # We want to wait for any previous lookups to complete before
-        # proceeding.
-        yield self.wait_for_previous_lookups(
-            [rq.server_name for rq in verify_requests],
-            server_to_deferred,
-        )
-
-        # Actually start fetching keys.
-        self._get_server_verify_keys(verify_requests)
-
-        # When we've finished fetching all the keys for a given server_name,
-        # resolve the deferred passed to `wait_for_previous_lookups` so that
-        # any lookups waiting will proceed.
-        #
-        # map from server name to a set of request ids
-        server_to_request_ids = {}
-
-        for verify_request in verify_requests:
-            server_name = verify_request.server_name
-            request_id = id(verify_request)
-            server_to_request_ids.setdefault(server_name, set()).add(request_id)
-
-        def remove_deferreds(res, verify_request):
-            server_name = verify_request.server_name
-            request_id = id(verify_request)
-            server_to_request_ids[server_name].discard(request_id)
-            if not server_to_request_ids[server_name]:
-                d = server_to_deferred.pop(server_name, None)
-                if d:
-                    d.callback(None)
-            return res
-
-        for verify_request in verify_requests:
-            verify_request.deferred.addBoth(
-                remove_deferreds, verify_request,
+            # We want to wait for any previous lookups to complete before
+            # proceeding.
+            yield self.wait_for_previous_lookups(
+                [rq.server_name for rq in verify_requests],
+                server_to_deferred,
             )
+
+            # Actually start fetching keys.
+            self._get_server_verify_keys(verify_requests)
+
+            # When we've finished fetching all the keys for a given server_name,
+            # resolve the deferred passed to `wait_for_previous_lookups` so that
+            # any lookups waiting will proceed.
+            #
+            # map from server name to a set of request ids
+            server_to_request_ids = {}
+
+            for verify_request in verify_requests:
+                server_name = verify_request.server_name
+                request_id = id(verify_request)
+                server_to_request_ids.setdefault(server_name, set()).add(request_id)
+
+            def remove_deferreds(res, verify_request):
+                server_name = verify_request.server_name
+                request_id = id(verify_request)
+                server_to_request_ids[server_name].discard(request_id)
+                if not server_to_request_ids[server_name]:
+                    d = server_to_deferred.pop(server_name, None)
+                    if d:
+                        d.callback(None)
+                return res
+
+            for verify_request in verify_requests:
+                verify_request.deferred.addBoth(
+                    remove_deferreds, verify_request,
+                )
+        except Exception:
+            logger.exception("Error starting key lookups")
 
     @defer.inlineCallbacks
     def wait_for_previous_lookups(self, server_names, server_to_deferred):
