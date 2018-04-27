@@ -1,4 +1,4 @@
-Changes in synapse v0.28.0-rc1 (2018-04-26)
+Changes in synapse v0.28.0 (2018-04-26)
 ===========================================
 
 Bug Fixes:
