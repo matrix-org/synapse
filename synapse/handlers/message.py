@@ -857,15 +857,25 @@ class EventCreationHandler(object):
         @defer.inlineCallbacks
         def _notify():
             yield run_on_reactor()
-            self.notifier.on_new_room_event(
-                event, event_stream_id, max_stream_id,
-                extra_users=extra_users
-            )
+            try:
+                self.notifier.on_new_room_event(
+                    event, event_stream_id, max_stream_id,
+                    extra_users=extra_users
+                )
+            except Exception:
+                logger.exception("Error notifying about new room event")
 
         preserve_fn(_notify)()
 
         if event.type == EventTypes.Message:
-            presence = self.hs.get_presence_handler()
             # We don't want to block sending messages on any presence code. This
             # matters as sometimes presence code can take a while.
-            preserve_fn(presence.bump_presence_active_time)(requester.user)
+            run_in_background(self._bump_active_time, requester.user)
+
+    @defer.inlineCallbacks
+    def _bump_active_time(self, user):
+        try:
+            presence = self.hs.get_presence_handler()
+            yield presence.bump_presence_active_time(user)
+        except Exception:
+            logger.exception("Error bumping presence active time")

@@ -25,7 +25,7 @@ from synapse.http.servlet import (
 )
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.versionstring import get_version_string
-from synapse.util.logcontext import preserve_fn
+from synapse.util.logcontext import run_in_background
 from synapse.types import ThirdPartyInstanceID, get_domain_from_id
 
 import functools
@@ -152,10 +152,17 @@ class Authenticator(object):
         # alive
         retry_timings = yield self.store.get_destination_retry_timings(origin)
         if retry_timings and retry_timings["retry_last_ts"]:
-            logger.info("Marking origin %r as up", origin)
-            preserve_fn(self.store.set_destination_retry_timings)(origin, 0, 0)
+            run_in_background(self._reset_retry_timings, origin)
 
         defer.returnValue(origin)
+
+    @defer.inlineCallbacks
+    def _reset_retry_timings(self, origin):
+        try:
+            logger.info("Marking origin %r as up", origin)
+            yield self.store.set_destination_retry_timings(origin, 0, 0)
+        except Exception:
+            logger.exception("Error resetting retry timings on %s", origin)
 
 
 class BaseFederationServlet(object):
