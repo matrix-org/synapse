@@ -20,6 +20,7 @@ from synapse.api.errors import (
     CodeMessageException, MatrixCodeMessageException, SynapseError, Codes,
 )
 from synapse.http import cancelled_to_request_timed_out_error
+from synapse.util.async import add_timeout_to_deferred
 from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.logcontext import make_deferred_yieldable
 import synapse.metrics
@@ -102,8 +103,9 @@ class SimpleHttpClient(object):
             request_deferred = self.agent.request(
                 method, uri, *args, **kwargs
             )
-            request_deferred.addTimeout(
-                60, reactor, cancelled_to_request_timed_out_error,
+            add_timeout_to_deferred(
+                request_deferred,
+                60, cancelled_to_request_timed_out_error,
             )
             response = yield make_deferred_yieldable(request_deferred)
 

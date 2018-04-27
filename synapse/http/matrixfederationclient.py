@@ -22,7 +22,7 @@ from twisted.web._newclient import ResponseDone
 from synapse.http import cancelled_to_request_timed_out_error
 from synapse.http.endpoint import matrix_federation_endpoint
 import synapse.metrics
-from synapse.util.async import sleep
+from synapse.util.async import sleep, add_timeout_to_deferred
 from synapse.util import logcontext
 from synapse.util.logcontext import make_deferred_yieldable
 import synapse.util.retryutils
@@ -193,9 +193,10 @@ class MatrixFederationHttpClient(object):
                             Headers(headers_dict),
                             producer
                         )
-                        request_deferred.addTimeout(
+                        add_timeout_to_deferred(
+                            request_deferred,
                             timeout / 1000. if timeout else 60,
-                            reactor, cancelled_to_request_timed_out_error,
+                            cancelled_to_request_timed_out_error,
                         )
                         response = yield make_deferred_yieldable(
                             request_deferred,
