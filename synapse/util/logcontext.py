@@ -341,7 +341,7 @@ def make_deferred_yieldable(deferred):
     returning a deferred. Then, when the deferred completes, restores the
     current logcontext before running callbacks/errbacks.
 
-    (This is more-or-less the opposite operation to preserve_fn.)
+    (This is more-or-less the opposite operation to run_in_background.)
     """
     if isinstance(deferred, defer.Deferred) and not deferred.called:
         prev_context = LoggingContext.set_current_context(LoggingContext.sentinel)

@@ -850,7 +850,8 @@ class EventCreationHandler(object):
 
         # this intentionally does not yield: we don't care about the result
         # and don't need to wait for it.
-        preserve_fn(self.pusher_pool.on_new_notifications)(
+        run_in_background(
+            self.pusher_pool.on_new_notifications,
             event_stream_id, max_stream_id
         )
 
@@ -862,7 +863,7 @@ class EventCreationHandler(object):
                 extra_users=extra_users
             )
 
-        preserve_fn(_notify)()
+        run_in_background(_notify)
 
         if event.type == EventTypes.Message:
             presence = self.hs.get_presence_handler()

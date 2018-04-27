@@ -637,7 +637,8 @@ class FederationHandler(BaseHandler):
 
                 results = yield logcontext.make_deferred_yieldable(defer.gatherResults(
                     [
-                        logcontext.preserve_fn(self.replication_layer.get_pdu)(
+                        logcontext.run_in_background(
+                            self.replication_layer.get_pdu,
                             [dest],
                             event_id,
                             outlier=True,
@@ -1023,7 +1024,7 @@ class FederationHandler(BaseHandler):
             # lots of requests for missing prev_events which we do actually
             # have. Hence we fire off the deferred, but don't wait for it.
 
-            logcontext.preserve_fn(self._handle_queued_pdus)(room_queue)
+            logcontext.run_in_background(self._handle_queued_pdus, room_queue)
 
         defer.returnValue(True)
 
@@ -1523,8 +1524,9 @@ class FederationHandler(BaseHandler):
         if not backfilled:
             # this intentionally does not yield: we don't care about the result
             # and don't need to wait for it.
-            logcontext.preserve_fn(self.pusher_pool.on_new_notifications)(
-                event_stream_id, max_stream_id
+            logcontext.run_in_background(
+                self.pusher_pool.on_new_notifications,
+                event_stream_id, max_stream_id,
             )
 
         defer.returnValue((context, event_stream_id, max_stream_id))
@@ -1538,7 +1540,8 @@ class FederationHandler(BaseHandler):
         """
         contexts = yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
-                logcontext.preserve_fn(self._prep_event)(
+                logcontext.run_in_background(
+                    self._prep_event,
                     origin,
                     ev_info["event"],
                     state=ev_info.get("state"),
@@ -1867,7 +1870,8 @@ class FederationHandler(BaseHandler):
 
             different_events = yield logcontext.make_deferred_yieldable(
                 defer.gatherResults([
-                    logcontext.preserve_fn(self.store.get_event)(
+                    logcontext.run_in_background(
+                        self.store.get_event,
                         d,
                         allow_none=True,
                         allow_rejected=False,
