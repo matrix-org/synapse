@@ -26,6 +26,10 @@ TOX_BIN=$TOX_DIR/py27/bin
 # anyway, make sure that we have a recent enough setuptools.
 $TOX_BIN/pip install 'setuptools>=18.5'
 
+# we also need a semi-recent version of pip, because old ones fail to install
+# the "enum34" dependency of cryptography.
+$TOX_BIN/pip install 'pip>=10'
+
 { python synapse/python_dependencies.py
   echo lxml psycopg2
 } | xargs $TOX_BIN/pip install
