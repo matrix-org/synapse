@@ -19,7 +19,7 @@ import synapse
 from synapse.api.constants import EventTypes
 from synapse.util.metrics import Measure
 from synapse.util.logcontext import (
-    make_deferred_yieldable, preserve_fn, run_in_background,
+    make_deferred_yieldable, run_in_background,
 )
 
 import logging
@@ -111,9 +111,7 @@ class ApplicationServicesHandler(object):
 
                         # Fork off pushes to these services
                         for service in services:
-                            preserve_fn(self.scheduler.submit_event_for_as)(
-                                service, event
-                            )
+                            self.scheduler.submit_event_for_as(service, event)
 
                     @defer.inlineCallbacks
                     def handle_room_events(events):
