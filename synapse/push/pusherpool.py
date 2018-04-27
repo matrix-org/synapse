@@ -143,7 +143,9 @@ class PusherPool:
                             )
                         )
 
-            yield make_deferred_yieldable(defer.gatherResults(deferreds))
+            yield make_deferred_yieldable(
+                defer.gatherResults(deferreds, consumeErrors=True),
+            )
         except Exception:
             logger.exception("Exception in pusher on_new_notifications")
 
@@ -171,7 +173,9 @@ class PusherPool:
                             )
                         )
 
-            yield make_deferred_yieldable(defer.gatherResults(deferreds))
+            yield make_deferred_yieldable(
+                defer.gatherResults(deferreds, consumeErrors=True),
+            )
         except Exception:
             logger.exception("Exception in pusher on_new_receipts")
 

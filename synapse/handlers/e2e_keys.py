@@ -141,7 +141,7 @@ class E2eKeysHandler(object):
         yield make_deferred_yieldable(defer.gatherResults([
             run_in_background(do_remote_query, destination)
             for destination in remote_queries_not_in_cache
-        ]))
+        ], consumeErrors=True))
 
         defer.returnValue({
             "device_keys": results, "failures": failures,
@@ -244,7 +244,7 @@ class E2eKeysHandler(object):
         yield make_deferred_yieldable(defer.gatherResults([
             run_in_background(claim_client_keys, destination)
             for destination in remote_queries
-        ]))
+        ], consumeErrors=True))
 
         logger.info(
             "Claimed one-time-keys: %s",

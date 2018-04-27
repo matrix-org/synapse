@@ -18,7 +18,7 @@ from twisted.internet import defer, threads
 from .media_storage import FileResponder
 
 from synapse.config._base import Config
-from synapse.util.logcontext import preserve_fn
+from synapse.util.logcontext import run_in_background
 
 import logging
 import os
@@ -87,7 +87,12 @@ class StorageProviderWrapper(StorageProvider):
             return self.backend.store_file(path, file_info)
         else:
             # TODO: Handle errors.
-            preserve_fn(self.backend.store_file)(path, file_info)
+            def store():
+                try:
+                    return self.backend.store_file(path, file_info)
+                except Exception:
+                    logger.exception("Error storing file")
+            run_in_background(store)
             return defer.succeed(None)
 
     def fetch(self, path, file_info):
