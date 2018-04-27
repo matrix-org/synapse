@@ -142,7 +142,9 @@ class PusherPool:
                             )
                         )
 
-            yield make_deferred_yieldable(defer.gatherResults(deferreds))
+            yield make_deferred_yieldable(
+                defer.gatherResults(deferreds, consumeErrors=True),
+            )
         except Exception:
             logger.exception("Exception in pusher on_new_notifications")
 
@@ -167,7 +169,9 @@ class PusherPool:
                             preserve_fn(p.on_new_receipts)(min_stream_id, max_stream_id)
                         )
 
-            yield make_deferred_yieldable(defer.gatherResults(deferreds))
+            yield make_deferred_yieldable(
+                defer.gatherResults(deferreds, consumeErrors=True),
+            )
         except Exception:
             logger.exception("Exception in pusher on_new_receipts")
 

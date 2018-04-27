@@ -202,7 +202,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                     room_id, from_key, to_key, limit, order=order,
                 )
                 for room_id in rm_ids
-            ]))
+            ], consumeErrors=True))
             results.update(dict(zip(rm_ids, res)))
 
         defer.returnValue(results)
