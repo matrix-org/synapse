@@ -15,6 +15,7 @@
 
 import os
 
+from six import iteritems
 
 TICKS_PER_SEC = 100
 BYTES_PER_PAGE = 4096
@@ -55,7 +56,7 @@ def update_resource_metrics():
             # line is PID (command) more stats go here ...
             raw_stats = line.split(") ", 1)[1].split(" ")
 
-            for (name, index) in STAT_FIELDS.iteritems():
+            for (name, index) in iteritems(STAT_FIELDS):
                 # subtract 3 from the index, because proc(5) is 1-based, and
                 # we've lost the first two fields in PID and COMMAND above
                 stats[name] = int(raw_stats[index - 3])

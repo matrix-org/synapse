@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from twisted.internet import defer
+from six import iteritems
 
 from synapse.api.errors import SynapseError
 from synapse.types import get_domain_from_id
@@ -449,7 +450,7 @@ class GroupsLocalHandler(object):
 
         results = {}
         failed_results = []
-        for destination, dest_user_ids in destinations.iteritems():
+        for destination, dest_user_ids in iteritems(destinations):
             try:
                 r = yield self.transport_client.bulk_get_publicised_groups(
                     destination, list(dest_user_ids),
