@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-import StringIO
+from six import StringIO
 import logging
 import traceback
 
