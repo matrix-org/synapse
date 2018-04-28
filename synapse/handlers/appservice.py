@@ -259,11 +259,15 @@ class ApplicationServicesHandler(object):
             event based on the service regex.
         """
         services = self.store.get_app_services()
-        interested_list = [
-            s for s in services if (
-                yield s.is_interested(event, self.store)
-            )
-        ]
+
+        # we can't use a list comprehension here. Since python 3, list
+        # comprehensions use a generator internally. This means you can't yield
+        # inside of a list comprehension anymore.
+        interested_list = []
+        for s in services:
+            if (yield s.is_interested(event, self.store)):
+                interested_list.append(s)
+
         defer.returnValue(interested_list)
 
     def _get_services_for_user(self, user_id):
