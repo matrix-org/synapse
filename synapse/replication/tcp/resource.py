@@ -18,8 +18,8 @@
 from twisted.internet import defer, reactor
 from twisted.internet.protocol import Factory
 
-from streams import STREAMS_MAP, FederationStream
-from protocol import ServerReplicationStreamProtocol
+from .streams import STREAMS_MAP, FederationStream
+from .protocol import ServerReplicationStreamProtocol
 
 from synapse.util.metrics import Measure, measure_func
 
