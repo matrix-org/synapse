@@ -19,6 +19,8 @@ import itertools
 import logging
 import random
 
+from six.moves import range
+
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
@@ -413,7 +415,7 @@ class FederationClient(FederationBase):
 
         batch_size = 20
         missing_events = list(missing_events)
-        for i in xrange(0, len(missing_events), batch_size):
+        for i in range(0, len(missing_events), batch_size):
             batch = set(missing_events[i:i + batch_size])
 
             deferreds = [
