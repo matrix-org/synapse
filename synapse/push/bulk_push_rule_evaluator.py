@@ -30,6 +30,7 @@ from synapse.state import POWER_KEY
 
 from collections import namedtuple
 
+from six import itervalues, iteritems
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +127,7 @@ class BulkPushRuleEvaluator(object):
             )
             auth_events = yield self.store.get_events(auth_events_ids)
             auth_events = {
-                (e.type, e.state_key): e for e in auth_events.itervalues()
+                (e.type, e.state_key): e for e in itervalues(auth_events)
             }
 
         sender_level = get_user_power_level(event.sender, auth_events)
@@ -160,7 +161,7 @@ class BulkPushRuleEvaluator(object):
 
         condition_cache = {}
 
-        for uid, rules in rules_by_user.iteritems():
+        for uid, rules in iteritems(rules_by_user):
             if event.sender == uid:
                 continue
 
@@ -406,7 +407,7 @@ class RulesForRoom(object):
         # If the event is a join event then it will be in current state evnts
         # map but not in the DB, so we have to explicitly insert it.
         if event.type == EventTypes.Member:
-            for event_id in member_event_ids.itervalues():
+            for event_id in itervalues(member_event_ids):
                 if event_id == event.event_id:
                     members[event_id] = (event.state_key, event.membership)
 
@@ -414,7 +415,7 @@ class RulesForRoom(object):
             logger.debug("Found members %r: %r", self.room_id, members.values())
 
         interested_in_user_ids = set(
-            user_id for user_id, membership in members.itervalues()
+            user_id for user_id, membership in itervalues(members)
             if membership == Membership.JOIN
         )
 
@@ -426,7 +427,7 @@ class RulesForRoom(object):
         )
 
         user_ids = set(
-            uid for uid, have_pusher in if_users_with_pushers.iteritems() if have_pusher
+            uid for uid, have_pusher in iteritems(if_users_with_pushers) if have_pusher
         )
 
         logger.debug("With pushers: %r", user_ids)
@@ -447,7 +448,7 @@ class RulesForRoom(object):
         )
 
         ret_rules_by_user.update(
-            item for item in rules_by_user.iteritems() if item[0] is not None
+            item for item in iteritems(rules_by_user) if item[0] is not None
         )
 
         self.update_cache(sequence, members, ret_rules_by_user, state_group)

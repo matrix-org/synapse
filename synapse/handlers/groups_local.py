@@ -449,7 +449,7 @@ class GroupsLocalHandler(object):
 
         results = {}
         failed_results = []
-        for destination, dest_user_ids in destinations.iteritems():
+        for destination, dest_user_ids in iteritems(destinations):
             try:
                 r = yield self.transport_client.bulk_get_publicised_groups(
                     destination, list(dest_user_ids),
