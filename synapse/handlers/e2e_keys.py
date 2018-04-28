@@ -29,6 +29,8 @@ from synapse.util.retryutils import NotRetryingDestination
 
 logger = logging.getLogger(__name__)
 
+from six import iteritems
+
 
 class E2eKeysHandler(object):
     def __init__(self, hs):
@@ -92,7 +94,7 @@ class E2eKeysHandler(object):
         remote_queries_not_in_cache = {}
         if remote_queries:
             query_list = []
-            for user_id, device_ids in remote_queries.iteritems():
+            for user_id, device_ids in iteritems(remote_queries):
                 if device_ids:
                     query_list.extend((user_id, device_id) for device_id in device_ids)
                 else:
@@ -103,9 +105,9 @@ class E2eKeysHandler(object):
                     query_list
                 )
             )
-            for user_id, devices in remote_results.iteritems():
+            for user_id, devices in iteritems(remote_results):
                 user_devices = results.setdefault(user_id, {})
-                for device_id, device in devices.iteritems():
+                for device_id, device in iteritems(devices):
                     keys = device.get("keys", None)
                     device_display_name = device.get("device_display_name", None)
                     if keys:
@@ -250,9 +252,9 @@ class E2eKeysHandler(object):
             "Claimed one-time-keys: %s",
             ",".join((
                 "%s for %s:%s" % (key_id, user_id, device_id)
-                for user_id, user_keys in json_result.iteritems()
-                for device_id, device_keys in user_keys.iteritems()
-                for key_id, _ in device_keys.iteritems()
+                for user_id, user_keys in iteritems(json_result)
+                for device_id, device_keys in iteritems(user_keys)
+                for key_id, _ in iteritems(device_keys)
             )),
         )
 

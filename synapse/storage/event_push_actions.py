@@ -24,6 +24,8 @@ from .stream import lower_bound
 import logging
 import simplejson as json
 
+from six import iteritems
+
 logger = logging.getLogger(__name__)
 
 
@@ -441,7 +443,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
 
             txn.executemany(sql, (
                 _gen_entry(user_id, actions)
-                for user_id, actions in user_id_actions.iteritems()
+                for user_id, actions in iteritems(user_id_actions)
             ))
 
         return self.runInteraction(
