@@ -81,15 +81,15 @@ class UploadResource(Resource):
         headers = request.requestHeaders
 
         if headers.hasHeader("Content-Type"):
-            media_type = headers.getRawHeaders("Content-Type")[0]
+            media_type = headers.getRawHeaders(b"Content-Type")[0]
         else:
             raise SynapseError(
                 msg="Upload request missing 'Content-Type'",
                 code=400,
             )
 
-        # if headers.hasHeader("Content-Disposition"):
-        #     disposition = headers.getRawHeaders("Content-Disposition")[0]
+        # if headers.hasHeader(b"Content-Disposition"):
+        #     disposition = headers.getRawHeaders(b"Content-Disposition")[0]
         # TODO(markjh): parse content-dispostion
 
         content_uri = yield self.media_repo.create_content(
