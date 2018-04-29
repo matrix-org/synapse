@@ -34,8 +34,8 @@ class ServerContextFactory(ssl.ContextFactory):
         try:
             # This was removed in https://github.com/twisted/twisted/pull/928
             # _ecCurve = _OpenSSLECCurve()
-            _evCurve = crypto.get_elliptic_curve(_defaultCurveName)
-            context.set_tmp_ecdh(_evCurve)
+            _ecCurve = crypto.get_elliptic_curve(_defaultCurveName)
+            context.set_tmp_ecdh(_ecCurve)
 
         except Exception:
             logger.exception("Failed to enable elliptic curve for TLS")
