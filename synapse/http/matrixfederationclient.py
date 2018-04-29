@@ -41,8 +41,7 @@ import logging
 import random
 import sys
 import urllib
-import urlparse
-
+from six.moves.urllib import parse as urlparse
 
 logger = logging.getLogger(__name__)
 outbound_logger = logging.getLogger("synapse.http.outbound")
