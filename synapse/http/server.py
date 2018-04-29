@@ -546,6 +546,6 @@ def _request_user_agent_is_curl(request):
         b"User-Agent", default=[]
     )
     for user_agent in user_agents:
-        if "curl" in user_agent:
+        if b"curl" in user_agent:
             return True
     return False
