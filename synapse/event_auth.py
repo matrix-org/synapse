@@ -75,7 +75,7 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
 
     if event.type == EventTypes.Create:
         # Depth used to be 0, but now SHOULD be 1.
-        if event.depth != 1 && event.depth != 0:
+        if event.depth != 1 and event.depth != 0:
             raise AuthError(
                 403,
                 "Creation event's depth must be 1"
