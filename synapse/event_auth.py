@@ -74,6 +74,12 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
         return True
 
     if event.type == EventTypes.Create:
+        # Depth used to be 0, but now SHOULD be 1.
+        if event.depth != 1 and event.depth != 0:
+            raise AuthError(
+                403,
+                "Creation event's depth must be 1"
+            )
         room_id_domain = get_domain_from_id(event.room_id)
         if room_id_domain != sender_domain:
             raise AuthError(
@@ -82,6 +88,14 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
             )
         # FIXME
         return True
+
+    expected_depth = (max(event.prev_events, lambda x: x.depth) + 1)
+
+    if event.depth != expected_depth:
+        raise SynapseError(
+            403,
+            "Event depth %i MUST be %i" % (event.depth, expected_depth)
+        )
 
     creation_event = auth_events.get((EventTypes.Create, ""), None)
 
