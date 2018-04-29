@@ -13,8 +13,8 @@
 # limitations under the License.
 
 from twisted.internet import ssl
-from OpenSSL import SSL
-from twisted.internet._sslverify import _OpenSSLECCurve, _defaultCurveName
+from OpenSSL import SSL, crypto
+from twisted.internet._sslverify import _defaultCurveName
 
 import logging
 
@@ -32,8 +32,11 @@ class ServerContextFactory(ssl.ContextFactory):
     @staticmethod
     def configure_context(context, config):
         try:
-            _ecCurve = _OpenSSLECCurve(_defaultCurveName)
-            _ecCurve.addECKeyToContext(context)
+            # This was removed in https://github.com/twisted/twisted/pull/928
+            # _ecCurve = _OpenSSLECCurve()
+            _evCurve = crypto.get_elliptic_curve(_defaultCurveName)
+            context.set_tmp_ecdh(_evCurve)
+
         except Exception:
             logger.exception("Failed to enable elliptic curve for TLS")
         context.set_options(SSL.OP_NO_SSLv2 | SSL.OP_NO_SSLv3)
