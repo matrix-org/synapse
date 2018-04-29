@@ -32,8 +32,6 @@ class ServerContextFactory(ssl.ContextFactory):
     @staticmethod
     def configure_context(context, config):
         try:
-            # This was removed in https://github.com/twisted/twisted/pull/928
-            # _ecCurve = _OpenSSLECCurve()
             _ecCurve = crypto.get_elliptic_curve(_defaultCurveName)
             context.set_tmp_ecdh(_ecCurve)
 
