@@ -35,7 +35,7 @@ from ._base import FileInfo
 from synapse.api.errors import (
     SynapseError, Codes,
 )
-from synapse.util.logcontext import preserve_fn, make_deferred_yieldable
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.util.stringutils import random_string
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.http.client import SpiderHttpClient
@@ -144,7 +144,8 @@ class PreviewUrlResource(Resource):
         observable = self._cache.get(url)
 
         if not observable:
-            download = preserve_fn(self._do_preview)(
+            download = run_in_background(
+                self._do_preview,
                 url, requester.user, ts,
             )
             observable = ObservableDeferred(
