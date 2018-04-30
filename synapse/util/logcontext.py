@@ -313,7 +313,13 @@ def run_in_background(f, *args, **kwargs):
     indication about where it came from.
     """
     current = LoggingContext.current_context()
-    res = f(*args, **kwargs)
+    try:
+        res = f(*args, **kwargs)
+    except:   # noqa: E722
+        # the assumption here is that the caller doesn't want to be disturbed
+        # by synchronous exceptions, so let's turn them into Failures.
+        return defer.fail()
+
     if isinstance(res, defer.Deferred) and not res.called:
         # The function will have reset the context before returning, so
         # we need to restore it now.
