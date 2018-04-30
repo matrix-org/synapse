@@ -24,7 +24,7 @@ from synapse.api.errors import (
     SynapseError, CodeMessageException, FederationDeniedError,
 )
 from synapse.types import get_domain_from_id, UserID
-from synapse.util.logcontext import preserve_fn, make_deferred_yieldable
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.util.retryutils import NotRetryingDestination
 
 logger = logging.getLogger(__name__)
@@ -139,7 +139,7 @@ class E2eKeysHandler(object):
                 failures[destination] = _exception_to_failure(e)
 
         yield make_deferred_yieldable(defer.gatherResults([
-            preserve_fn(do_remote_query)(destination)
+            run_in_background(do_remote_query, destination)
             for destination in remote_queries_not_in_cache
         ], consumeErrors=True))
 
@@ -242,7 +242,7 @@ class E2eKeysHandler(object):
                 failures[destination] = _exception_to_failure(e)
 
         yield make_deferred_yieldable(defer.gatherResults([
-            preserve_fn(claim_client_keys)(destination)
+            run_in_background(claim_client_keys, destination)
             for destination in remote_queries
         ], consumeErrors=True))
 

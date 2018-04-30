@@ -28,7 +28,7 @@ import os
 
 import logging
 import urllib
-import urlparse
+from six.moves.urllib import parse as urlparse
 
 logger = logging.getLogger(__name__)
 

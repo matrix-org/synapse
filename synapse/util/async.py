@@ -19,7 +19,7 @@ from twisted.internet.defer import CancelledError
 from twisted.python import failure
 
 from .logcontext import (
-    PreserveLoggingContext, make_deferred_yieldable, preserve_fn
+    PreserveLoggingContext, make_deferred_yieldable, run_in_background
 )
 from synapse.util import logcontext, unwrapFirstError
 
@@ -165,7 +165,7 @@ def concurrently_execute(func, args, limit):
             pass
 
     return logcontext.make_deferred_yieldable(defer.gatherResults([
-        preserve_fn(_concurrently_execute_inner)()
+        run_in_background(_concurrently_execute_inner)
         for _ in range(limit)
     ], consumeErrors=True)).addErrback(unwrapFirstError)
 

@@ -198,7 +198,10 @@ class ApplicationServicesHandler(object):
         services = yield self._get_services_for_3pn(protocol)
 
         results = yield make_deferred_yieldable(defer.DeferredList([
-            preserve_fn(self.appservice_api.query_3pe)(service, kind, protocol, fields)
+            run_in_background(
+                self.appservice_api.query_3pe,
+                service, kind, protocol, fields,
+            )
             for service in services
         ], consumeErrors=True))
 

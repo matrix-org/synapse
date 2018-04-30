@@ -41,7 +41,7 @@ from synapse.storage.events import EventsWorkerStore
 from synapse.util.caches.descriptors import cached
 from synapse.types import RoomStreamToken
 from synapse.util.caches.stream_change_cache import StreamChangeCache
-from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 import abc
@@ -200,7 +200,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         room_ids = list(room_ids)
         for rm_ids in (room_ids[i:i + 20] for i in range(0, len(room_ids), 20)):
             res = yield make_deferred_yieldable(defer.gatherResults([
-                preserve_fn(self.get_room_events_stream_for_room)(
+                run_in_background(
+                    self.get_room_events_stream_for_room,
                     room_id, from_key, to_key, limit, order=order,
                 )
                 for room_id in rm_ids

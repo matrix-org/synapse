@@ -42,7 +42,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.types import get_domain_from_id
-from synapse.util.logcontext import preserve_fn
+from synapse.util.logcontext import run_in_background
 
 from signedjson.sign import sign_json
 
@@ -196,4 +196,4 @@ class GroupAttestionRenewer(object):
             group_id = row["group_id"]
             user_id = row["user_id"]
 
-            preserve_fn(_renew_attestation)(group_id, user_id)
+            run_in_background(_renew_attestation, group_id, user_id)
