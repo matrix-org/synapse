@@ -53,12 +53,12 @@ from twisted.internet import defer
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
 
-from commands import (
+from .commands import (
     COMMAND_MAP, VALID_CLIENT_COMMANDS, VALID_SERVER_COMMANDS,
     ErrorCommand, ServerCommand, RdataCommand, PositionCommand, PingCommand,
     NameCommand, ReplicateCommand, UserSyncCommand, SyncCommand,
 )
-from streams import STREAMS_MAP
+from .streams import STREAMS_MAP
 
 from synapse.util.stringutils import random_string
 from synapse.metrics.metric import CounterMetric
