@@ -168,11 +168,24 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
                 yield self.store.find_first_stream_ordering_after_ts(ts)
             )
 
-            (_, depth, _) = (
+            room_event_after_stream_ordering = (
                 yield self.store.get_room_event_after_stream_ordering(
                     room_id, stream_ordering,
                 )
             )
+            if room_event_after_stream_ordering:
+                (_, depth, _) = room_event_after_stream_ordering
+            else:
+                logger.warn(
+                    "[purge] purging events not possible: No event found "
+                    "(received_ts %i => stream_ordering %i)",
+                    ts, stream_ordering,
+                )
+                raise SynapseError(
+                    404,
+                    "there is no event to be purged",
+                    errcode=Codes.NOT_FOUND,
+                )
             logger.info(
                 "[purge] purging up to depth %i (received_ts %i => "
                 "stream_ordering %i)",
