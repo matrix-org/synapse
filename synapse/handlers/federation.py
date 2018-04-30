@@ -16,7 +16,6 @@
 
 """Contains handlers for federation events."""
 
-import httplib
 import itertools
 import logging
 import sys
@@ -24,6 +23,7 @@ import sys
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 import six
+from six.moves import http_client
 from twisted.internet import defer
 from unpaddedbase64 import decode_base64
 
@@ -890,7 +890,7 @@ class FederationHandler(BaseHandler):
             logger.warn("Rejecting event %s which has %i prev_events",
                         ev.event_id, len(ev.prev_events))
             raise SynapseError(
-                httplib.BAD_REQUEST,
+                http_client.BAD_REQUEST,
                 "Too many prev_events",
             )
 
@@ -898,7 +898,7 @@ class FederationHandler(BaseHandler):
             logger.warn("Rejecting event %s which has %i auth_events",
                         ev.event_id, len(ev.auth_events))
             raise SynapseError(
-                httplib.BAD_REQUEST,
+                http_client.BAD_REQUEST,
                 "Too many auth_events",
             )
 
