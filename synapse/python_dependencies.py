@@ -40,10 +40,10 @@ REQUIREMENTS = {
     "pynacl>=1.2.1": ["nacl>=1.2.1", "nacl.bindings"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
     "Twisted>=16.0.0": ["twisted>=16.0.0"],
-    
+
     # We use crypto.get_elliptic_curve which is only supported in >=0.15
     "pyopenssl>=0.15": ["OpenSSL>=0.15"],
-    
+
     "pyyaml": ["yaml"],
     "pyasn1": ["pyasn1"],
     "daemonize": ["daemonize"],
