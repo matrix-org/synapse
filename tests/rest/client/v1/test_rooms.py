@@ -60,7 +60,7 @@ class RoomPermissionsTestCase(RestTestCase):
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -70,7 +70,7 @@ class RoomPermissionsTestCase(RestTestCase):
 
         synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
-        self.auth = hs.get_v1auth()
+        self.auth = hs.get_auth()
 
         # create some rooms under the name rmcreator_id
         self.uncreated_rmid = "!aa:test"
@@ -425,7 +425,7 @@ class RoomsMemberListTestCase(RestTestCase):
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -507,7 +507,7 @@ class RoomsCreateTestCase(RestTestCase):
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -597,7 +597,7 @@ class RoomTopicTestCase(RestTestCase):
                 "is_guest": False,
             }
 
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -711,7 +711,7 @@ class RoomMemberStateTestCase(RestTestCase):
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -843,7 +843,7 @@ class RoomMessagesTestCase(RestTestCase):
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -945,7 +945,7 @@ class RoomInitialSyncTestCase(RestTestCase):
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -1017,7 +1017,7 @@ class RoomMessageListTestCase(RestTestCase):
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
