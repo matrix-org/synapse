@@ -48,3 +48,4 @@ env/
 *.config
 
 .vscode/
+.ropeproject/
