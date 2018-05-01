@@ -16,10 +16,6 @@
 
 CREATE TABLE user_daily_visits ( user_id TEXT NOT NULL,
                                  device_id TEXT,
-                                 user_agent TEXT NOT NULL,
                                  timestamp BIGINT NOT NULL );
-
-/* What indexes should I include?
- * Reads are offline so should optimise for writes
- * Need to check if already an entry so user,day
- */
+CREATE INDEX user_daily_visits_uts_idx ON user_daily_visits(user_id, timestamp);
+CREATE INDEX user_daily_visits_ts_idx ON user_daily_visits(timestamp);
