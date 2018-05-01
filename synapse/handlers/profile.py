@@ -81,6 +81,7 @@ class ProfileHandler(BaseHandler):
         """
         host_batches = yield self.store.get_replication_hosts()
         latest_batch = yield self.store.get_latest_profile_replication_batch_number()
+        if latest_batch is None latest_batch = -1
         for repl_host in self.hs.config.replicate_user_profiles_to:
             if repl_host not in host_batches:
                 host_batches[repl_host] = -1
