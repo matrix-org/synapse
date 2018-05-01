@@ -16,6 +16,9 @@
 
 """Contains constants from the specification."""
 
+# the "depth" field on events is limited to 2**63 - 1
+MAX_DEPTH = 2**63 - 1
+
 
 class Membership(object):
 
