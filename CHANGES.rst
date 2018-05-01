@@ -10,7 +10,7 @@ SECURITY UPDATE
   of events in such a room will default to using stream_ordering rather than depth
   (topological_ordering).
 
-  This is a temporary solution to mitigate abuse in the wild, whilst a long solution
+  This is a temporary solution to mitigate abuse in the wild, whilst a long term solution
   is being implemented to improve how the depth parameter is used.
 
   Full details at
