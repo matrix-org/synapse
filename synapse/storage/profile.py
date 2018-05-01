@@ -88,7 +88,7 @@ class ProfileWorkerStore(SQLBaseStore):
         def f(txn):
             sql = (
                 "UPDATE profiles SET batch = "
-                "(SELECT IFNULL(MAX(batch), -1) + 1 FROM profiles) "
+                "(SELECT COALESCE(MAX(batch), -1) + 1 FROM profiles) "
                 "WHERE user_id in ("
                 "    SELECT user_id FROM profiles WHERE batch is NULL limit ?"
                 ")"
