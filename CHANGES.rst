@@ -1,5 +1,26 @@
-Changes in synapse v0.28.0-rc1 (2018-04-26)
-===========================================
+Changes in synapse v0.28.1 (2018-05-01)
+=======================================
+
+SECURITY UPDATE
+
+* Clamp the allowed values of event depth received over federation to be
+  [0, 2**63 - 1].  This mitigates an attack where malicious events
+  injected with depth = 2**63 - 1 render rooms unusable.  Depth is used to
+  determine the cosmetic ordering of events within a room, and so the ordering
+  of events in such a room will default to using stream_ordering rather than depth
+  (topological_ordering).
+
+  This is a temporary solution to mitigate abuse in the wild, whilst a long solution
+  is being implemented to improve how the depth parameter is used.
+
+  Full details at
+  https://docs.google.com/document/d/1I3fi2S-XnpO45qrpCsowZv8P8dHcNZ4fsBsbOW7KABI/edit#
+
+* Pin Twisted to <18.4 until we stop using the private _OpenSSLECCurve API.
+
+
+Changes in synapse v0.28.0 (2018-04-26)
+=======================================
 
 Bug Fixes:
 
