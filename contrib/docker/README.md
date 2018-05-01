@@ -135,7 +135,7 @@ Shared secrets, that will be initialized to random values if not set:
 
 Database specific values (will use SQLite if not set):
 
-* `POSTGRES_DATABASE` - The database name for the synapse postgres database. [default: `matrix`]
+* `POSTGRES_DB` - The database name for the synapse postgres database. [default: `synapse`]
 * `POSTGRES_HOST` - The host of the postgres database if you wish to use postgresql instead of sqlite3. [default: `db` which is useful when using a container on the same docker network in a compose file where the postgres service is called `db`]
 * `POSTGRES_PASSWORD` - The password for the synapse postgres database. **If this is set then postgres will be used instead of sqlite3.** [default: none] **NOTE**: You are highly encouraged to use postgresql! Please use the compose file to make it easier to deploy.
 * `POSTGRES_USER` - The user for the synapse postgres database. [default: `matrix`]
