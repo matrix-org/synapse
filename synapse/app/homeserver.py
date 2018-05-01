@@ -488,7 +488,7 @@ def run(hs):
         # be quite busy the first few minutes
         clock.call_later(5 * 60, phone_stats_home)
 
-    clock.looping_call(generate_user_daily_visit_stats, 60 * 1000)
+    clock.looping_call(generate_user_daily_visit_stats, 10 * 60 * 1000)
     clock.call_later(5 * 60, generate_user_daily_visit_stats)
 
     if hs.config.daemonize and hs.config.print_pidfile:
