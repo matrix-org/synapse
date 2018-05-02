@@ -25,7 +25,7 @@ class RequestTimedOutError(SynapseError):
         super(RequestTimedOutError, self).__init__(504, "Timed out")
 
 
-def cancelled_to_request_timed_out_error(value):
+def cancelled_to_request_timed_out_error(value, timeout):
     """Turns CancelledErrors into RequestTimedOutErrors.
 
     For use with async.add_timeout_to_deferred
