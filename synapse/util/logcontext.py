@@ -302,7 +302,7 @@ def preserve_fn(f):
 def run_in_background(f, *args, **kwargs):
     """Calls a function, ensuring that the current context is restored after
     return from the function, and that the sentinel context is set once the
-    deferred returned by the funtion completes.
+    deferred returned by the function completes.
 
     Useful for wrapping functions that return a deferred which you don't yield
     on (for instance because you want to pass it to deferred.gatherResults()).
@@ -320,24 +320,31 @@ def run_in_background(f, *args, **kwargs):
         # by synchronous exceptions, so let's turn them into Failures.
         return defer.fail()
 
-    if isinstance(res, defer.Deferred) and not res.called:
-        # The function will have reset the context before returning, so
-        # we need to restore it now.
-        LoggingContext.set_current_context(current)
+    if not isinstance(res, defer.Deferred):
+        return res
 
-        # The original context will be restored when the deferred
-        # completes, but there is nothing waiting for it, so it will
-        # get leaked into the reactor or some other function which
-        # wasn't expecting it. We therefore need to reset the context
-        # here.
-        #
-        # (If this feels asymmetric, consider it this way: we are
-        # effectively forking a new thread of execution. We are
-        # probably currently within a ``with LoggingContext()`` block,
-        # which is supposed to have a single entry and exit point. But
-        # by spawning off another deferred, we are effectively
-        # adding a new exit point.)
-        res.addBoth(_set_context_cb, LoggingContext.sentinel)
+    if res.called and not res.paused:
+        # The function should have maintained the logcontext, so we can
+        # optimise out the messing about
+        return res
+
+    # The function may have reset the context before returning, so
+    # we need to restore it now.
+    ctx = LoggingContext.set_current_context(current)
+
+    # The original context will be restored when the deferred
+    # completes, but there is nothing waiting for it, so it will
+    # get leaked into the reactor or some other function which
+    # wasn't expecting it. We therefore need to reset the context
+    # here.
+    #
+    # (If this feels asymmetric, consider it this way: we are
+    # effectively forking a new thread of execution. We are
+    # probably currently within a ``with LoggingContext()`` block,
+    # which is supposed to have a single entry and exit point. But
+    # by spawning off another deferred, we are effectively
+    # adding a new exit point.)
+    res.addBoth(_set_context_cb, ctx)
     return res
 
 
@@ -354,9 +361,18 @@ def make_deferred_yieldable(deferred):
 
     (This is more-or-less the opposite operation to run_in_background.)
     """
-    if isinstance(deferred, defer.Deferred) and not deferred.called:
-        prev_context = LoggingContext.set_current_context(LoggingContext.sentinel)
-        deferred.addBoth(_set_context_cb, prev_context)
+    if not isinstance(deferred, defer.Deferred):
+        return deferred
+
+    if deferred.called and not deferred.paused:
+        # it looks like this deferred is ready to run any callbacks we give it
+        # immediately. We may as well optimise out the logcontext faffery.
+        return deferred
+
+    # ok, we can't be sure that a yield won't block, so let's reset the
+    # logcontext, and add a callback to the deferred to restore it.
+    prev_context = LoggingContext.set_current_context(LoggingContext.sentinel)
+    deferred.addBoth(_set_context_cb, prev_context)
     return deferred
 
 
