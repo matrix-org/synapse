@@ -352,7 +352,7 @@ class Keyring(object):
                 logger.exception(
                     "Unable to get key from %r: %s %s",
                     perspective_name,
-                    type(e).__name__, str(e.message),
+                    type(e).__name__, str(e),
                 )
                 defer.returnValue({})
 
@@ -384,7 +384,7 @@ class Keyring(object):
                 logger.info(
                     "Unable to get key %r for %r directly: %s %s",
                     key_ids, server_name,
-                    type(e).__name__, str(e.message),
+                    type(e).__name__, str(e),
                 )
 
             if not keys:
@@ -734,7 +734,7 @@ def _handle_key_deferred(verify_request):
     except IOError as e:
         logger.warn(
             "Got IOError when downloading keys for %s: %s %s",
-            server_name, type(e).__name__, str(e.message),
+            server_name, type(e).__name__, str(e),
         )
         raise SynapseError(
             502,
@@ -744,7 +744,7 @@ def _handle_key_deferred(verify_request):
     except Exception as e:
         logger.exception(
             "Got Exception when downloading keys for %s: %s %s",
-            server_name, type(e).__name__, str(e.message),
+            server_name, type(e).__name__, str(e),
         )
         raise SynapseError(
             401,
