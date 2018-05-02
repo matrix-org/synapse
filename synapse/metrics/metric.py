@@ -301,9 +301,17 @@ class MemoryUsageMetric(object):
         ]
 
 
-def _escape_character(c):
+def _escape_character(m):
     """Replaces a single character with its escape sequence.
+
+    Args:
+        m (re.MatchObject): A match object whose first group is the single
+            character to replace
+
+    Returns:
+        str
     """
+    c = m.group(1)
     if c == "\\":
         return "\\\\"
     elif c == "\"":
@@ -316,4 +324,4 @@ def _escape_character(c):
 def _escape_label_value(value):
     """Takes a label value and escapes quotes, newlines and backslashes
     """
-    return re.sub(r"([\n\"\\])", lambda m: _escape_character(m.group(1)), value)
+    return re.sub(r"([\n\"\\])", _escape_character, value)
