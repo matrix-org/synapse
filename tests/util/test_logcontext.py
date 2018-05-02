@@ -99,7 +99,6 @@ class LoggingContextTestCase(unittest.TestCase):
 
         return self._test_run_in_background(nonblocking_function)
 
-    @unittest.DEBUG
     def test_run_in_background_with_chained_deferred(self):
         # a function which returns a deferred which looks like it has been
         # called, but is actually paused
