@@ -204,8 +204,8 @@ class Auth(object):
 
             ip_addr = self.hs.get_ip_from_request(request)
             user_agent = request.requestHeaders.getRawHeaders(
-                "User-Agent",
-                default=[""]
+                b"User-Agent",
+                default=[b""]
             )[0]
             if user and access_token and ip_addr:
                 self.store.insert_client_ip(
@@ -672,7 +672,7 @@ def has_access_token(request):
         bool: False if no access_token was given, True otherwise.
     """
     query_params = request.args.get("access_token")
-    auth_headers = request.requestHeaders.getRawHeaders("Authorization")
+    auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
     return bool(query_params) or bool(auth_headers)
 
 
@@ -692,8 +692,8 @@ def get_access_token_from_request(request, token_not_found_http_status=401):
         AuthError: If there isn't an access_token in the request.
     """
 
-    auth_headers = request.requestHeaders.getRawHeaders("Authorization")
-    query_params = request.args.get("access_token")
+    auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
+    query_params = request.args.get(b"access_token")
     if auth_headers:
         # Try the get the access_token from a "Authorization: Bearer"
         # header

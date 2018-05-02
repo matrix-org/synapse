@@ -59,6 +59,10 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.email_enable_notifs = False
         config.block_non_admin_invites = False
         config.federation_domain_whitelist = None
+        config.federation_rc_reject_limit = 10
+        config.federation_rc_sleep_limit = 10
+        config.federation_rc_concurrent = 10
+        config.filter_timeline_limit = 5000
         config.user_directory_search_all_users = False
 
         # disable user directory updates, because they get done in the
@@ -212,7 +216,7 @@ class MockHttpResource(HttpServer):
 
         headers = {}
         if federation_auth:
-            headers["Authorization"] = ["X-Matrix origin=test,key=,sig="]
+            headers[b"Authorization"] = ["X-Matrix origin=test,key=,sig="]
         mock_request.requestHeaders.getRawHeaders = mock_getRawHeaders(headers)
 
         # return the right path if the event requires it
