@@ -637,6 +637,16 @@ largest boxes pause for thought.)
 
 .. __: `Connecting to Synapse from a client`_
 
+Adding a firewall rule
+----------------------
+
+If you are on a system which uses firewalld as a firewall service, import the
+rule to your system:
+
+    firewall-cmd --permanent --new-service-from-file=/contrib/firewalld/synapse.xml
+    firewall-cmd --permanent --add-service=synapse
+    systemctl reload firewalld.service
+
 Troubleshooting
 ---------------
 

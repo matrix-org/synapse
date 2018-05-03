@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <short>Matrix federation</short>
+  <description>Federation is the process by which users on different servers can participate in the same room.</description>
+  <port port="8448" protocol="tcp"/>
+</service>
