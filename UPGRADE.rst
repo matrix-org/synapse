@@ -48,6 +48,18 @@ returned by the Client-Server API:
     # configured on port 443.
     curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
 
+Upgrading to $NEXT_VERSION
+====================
+
+This release expands the anonymous usage stats sent if the opt-in
+``report_stats`` configuration is set to ``true``. We now capture RSS memory 
+and cpu use at a very coarse level. This requires administrators to install
+the optional ``psutil`` python module.
+
+We would appreciate it if you could assist by ensuring this module is available
+and ``report_stats`` is enabled. This will let us see if performance changes to
+synapse are having an impact to the general community.
+
 Upgrading to v0.15.0
 ====================
 

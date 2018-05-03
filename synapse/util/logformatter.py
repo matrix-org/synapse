@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-import StringIO
+from six import StringIO
 import logging
 import traceback
 
@@ -32,7 +32,7 @@ class LogFormatter(logging.Formatter):
         super(LogFormatter, self).__init__(*args, **kwargs)
 
     def formatException(self, ei):
-        sio = StringIO.StringIO()
+        sio = StringIO()
         (typ, val, tb) = ei
 
         # log the stack above the exception capture point if possible, but

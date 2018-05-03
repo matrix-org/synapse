@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2017 Vector Creations Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,22 +12,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse import util
-from twisted.internet import defer
+import sys
+
+from synapse.util.logformatter import LogFormatter
 from tests import unittest
 
 
-class ClockTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
-    def test_time_bound_deferred(self):
-        # just a deferred which never resolves
-        slow_deferred = defer.Deferred()
+class TestException(Exception):
+    pass
 
-        clock = util.Clock()
-        time_bound = clock.time_bound_deferred(slow_deferred, 0.001)
+
+class LogFormatterTestCase(unittest.TestCase):
+    def test_formatter(self):
+        formatter = LogFormatter()
 
         try:
-            yield time_bound
-            self.fail("Expected timedout error, but got nothing")
-        except util.DeferredTimedOutError:
-            pass
+            raise TestException("testytest")
+        except TestException:
+            ei = sys.exc_info()
+
+        output = formatter.formatException(ei)
+
+        # check the output looks vaguely sane
+        self.assertIn("testytest", output)
+        self.assertIn("Capture point", output)

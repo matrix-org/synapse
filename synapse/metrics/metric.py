@@ -16,6 +16,7 @@
 
 from itertools import chain
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +57,7 @@ class BaseMetric(object):
         return not len(self.labels)
 
     def _render_labelvalue(self, value):
-        # TODO: escape backslashes, quotes and newlines
-        return '"%s"' % (value)
+        return '"%s"' % (_escape_label_value(value),)
 
     def _render_key(self, values):
         if self.is_scalar():
@@ -115,7 +115,7 @@ class CounterMetric(BaseMetric):
         # dict[list[str]]: value for each set of label values. the keys are the
         # label values, in the same order as the labels in self.labels.
         #
-        # (if the metric is a scalar, the (single) key is the empty list).
+        # (if the metric is a scalar, the (single) key is the empty tuple).
         self.counts = {}
 
         # Scalar metrics are never empty
@@ -142,6 +142,36 @@ class CounterMetric(BaseMetric):
         return flatten(
             self._render_for_labels(k, self.counts[k])
             for k in sorted(self.counts.keys())
+        )
+
+
+class GaugeMetric(BaseMetric):
+    """A metric that can go up or down
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(GaugeMetric, self).__init__(*args, **kwargs)
+
+        # dict[list[str]]: value for each set of label values. the keys are the
+        # label values, in the same order as the labels in self.labels.
+        #
+        # (if the metric is a scalar, the (single) key is the empty tuple).
+        self.guages = {}
+
+    def set(self, v, *values):
+        if len(values) != self.dimension():
+            raise ValueError(
+                "Expected as many values to inc() as labels (%d)" % (self.dimension())
+            )
+
+        # TODO: should assert that the tag values are all strings
+
+        self.guages[values] = v
+
+    def render(self):
+        return flatten(
+            self._render_for_labels(k, self.guages[k])
+            for k in sorted(self.guages.keys())
         )
 
 
@@ -269,3 +299,29 @@ class MemoryUsageMetric(object):
             "process_psutil_rss:total %d" % sum_rss,
             "process_psutil_rss:count %d" % len_rss,
         ]
+
+
+def _escape_character(m):
+    """Replaces a single character with its escape sequence.
+
+    Args:
+        m (re.MatchObject): A match object whose first group is the single
+            character to replace
+
+    Returns:
+        str
+    """
+    c = m.group(1)
+    if c == "\\":
+        return "\\\\"
+    elif c == "\"":
+        return "\\\""
+    elif c == "\n":
+        return "\\n"
+    return c
+
+
+def _escape_label_value(value):
+    """Takes a label value and escapes quotes, newlines and backslashes
+    """
+    return re.sub(r"([\n\"\\])", _escape_character, value)

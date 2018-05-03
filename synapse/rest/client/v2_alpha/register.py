@@ -20,7 +20,6 @@ import synapse
 import synapse.types
 from synapse.api.auth import get_access_token_from_request, has_access_token
 from synapse.api.constants import LoginType
-from synapse.types import RoomID, RoomAlias
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
 from synapse.http.servlet import (
     RestServlet, parse_json_object_from_request, assert_params_in_request, parse_string
@@ -35,6 +34,8 @@ import hmac
 from hashlib import sha1
 from synapse.util.async import run_on_reactor
 from synapse.util.ratelimitutils import FederationRateLimiter
+
+from six import string_types
 
 
 # We ought to be using hmac.compare_digest() but on older pythons it doesn't
@@ -211,14 +212,14 @@ class RegisterRestServlet(RestServlet):
         # in sessions. Pull out the username/password provided to us.
         desired_password = None
         if 'password' in body:
-            if (not isinstance(body['password'], basestring) or
+            if (not isinstance(body['password'], string_types) or
                     len(body['password']) > 512):
                 raise SynapseError(400, "Invalid password")
             desired_password = body["password"]
 
         desired_username = None
         if 'username' in body:
-            if (not isinstance(body['username'], basestring) or
+            if (not isinstance(body['username'], string_types) or
                     len(body['username']) > 512):
                 raise SynapseError(400, "Invalid username")
             desired_username = body['username']
@@ -244,7 +245,7 @@ class RegisterRestServlet(RestServlet):
 
             access_token = get_access_token_from_request(request)
 
-            if isinstance(desired_username, basestring):
+            if isinstance(desired_username, string_types):
                 result = yield self._do_appservice_registration(
                     desired_username, access_token, body
                 )
@@ -405,14 +406,6 @@ class RegisterRestServlet(RestServlet):
                 generate_token=False,
             )
 
-            # auto-join the user to any rooms we're supposed to dump them into
-            fake_requester = synapse.types.create_requester(registered_user_id)
-            for r in self.hs.config.auto_join_rooms:
-                try:
-                    yield self._join_user_to_room(fake_requester, r)
-                except Exception as e:
-                    logger.error("Failed to join new user to %r: %r", r, e)
-
             # remember that we've now registered that user account, and with
             #  what user ID (since the user may not have specified)
             self.auth_handler.set_session_data(
@@ -446,29 +439,6 @@ class RegisterRestServlet(RestServlet):
         return 200, {}
 
     @defer.inlineCallbacks
-    def _join_user_to_room(self, requester, room_identifier):
-        room_id = None
-        if RoomID.is_valid(room_identifier):
-            room_id = room_identifier
-        elif RoomAlias.is_valid(room_identifier):
-            room_alias = RoomAlias.from_string(room_identifier)
-            room_id, remote_room_hosts = (
-                yield self.room_member_handler.lookup_room_alias(room_alias)
-            )
-            room_id = room_id.to_string()
-        else:
-            raise SynapseError(400, "%s was not legal room ID or room alias" % (
-                room_identifier,
-            ))
-
-        yield self.room_member_handler.update_membership(
-            requester=requester,
-            target=requester.user,
-            room_id=room_id,
-            action="join",
-        )
-
-    @defer.inlineCallbacks
     def _do_appservice_registration(self, username, as_token, body):
         user_id = yield self.registration_handler.appservice_register(
             username, as_token
@@ -496,7 +466,7 @@ class RegisterRestServlet(RestServlet):
         # includes the password and admin flag in the hashed text. Why are
         # these different?
         want_mac = hmac.new(
-            key=self.hs.config.registration_shared_secret,
+            key=self.hs.config.registration_shared_secret.encode(),
             msg=user,
             digestmod=sha1,
         ).hexdigest()

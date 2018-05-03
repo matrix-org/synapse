@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, AuthError
-from synapse.util.logcontext import preserve_fn
+from synapse.util.logcontext import run_in_background
 from synapse.util.metrics import Measure
 from synapse.util.wheel_timer import WheelTimer
 from synapse.types import UserID, get_domain_from_id
@@ -97,7 +97,8 @@ class TypingHandler(object):
             if self.hs.is_mine_id(member.user_id):
                 last_fed_poke = self._member_last_federation_poke.get(member, None)
                 if not last_fed_poke or last_fed_poke + FEDERATION_PING_INTERVAL <= now:
-                    preserve_fn(self._push_remote)(
+                    run_in_background(
+                        self._push_remote,
                         member=member,
                         typing=True
                     )
@@ -196,7 +197,7 @@ class TypingHandler(object):
     def _push_update(self, member, typing):
         if self.hs.is_mine_id(member.user_id):
             # Only send updates for changes to our own users.
-            preserve_fn(self._push_remote)(member, typing)
+            run_in_background(self._push_remote, member, typing)
 
         self._push_update_local(
             member=member,
@@ -205,28 +206,31 @@ class TypingHandler(object):
 
     @defer.inlineCallbacks
     def _push_remote(self, member, typing):
-        users = yield self.state.get_current_user_in_room(member.room_id)
-        self._member_last_federation_poke[member] = self.clock.time_msec()
+        try:
+            users = yield self.state.get_current_user_in_room(member.room_id)
+            self._member_last_federation_poke[member] = self.clock.time_msec()
 
-        now = self.clock.time_msec()
-        self.wheel_timer.insert(
-            now=now,
-            obj=member,
-            then=now + FEDERATION_PING_INTERVAL,
-        )
+            now = self.clock.time_msec()
+            self.wheel_timer.insert(
+                now=now,
+                obj=member,
+                then=now + FEDERATION_PING_INTERVAL,
+            )
 
-        for domain in set(get_domain_from_id(u) for u in users):
-            if domain != self.server_name:
-                self.federation.send_edu(
-                    destination=domain,
-                    edu_type="m.typing",
-                    content={
-                        "room_id": member.room_id,
-                        "user_id": member.user_id,
-                        "typing": typing,
-                    },
-                    key=member,
-                )
+            for domain in set(get_domain_from_id(u) for u in users):
+                if domain != self.server_name:
+                    self.federation.send_edu(
+                        destination=domain,
+                        edu_type="m.typing",
+                        content={
+                            "room_id": member.room_id,
+                            "user_id": member.user_id,
+                            "typing": typing,
+                        },
+                        key=member,
+                    )
+        except Exception:
+            logger.exception("Error pushing typing notif to remotes")
 
     @defer.inlineCallbacks
     def _recv_edu(self, origin, content):

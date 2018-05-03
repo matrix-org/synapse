@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import socket
-
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
 from twisted.internet import defer, reactor
 from twisted.internet.error import ConnectError
@@ -33,7 +31,7 @@ SERVER_CACHE = {}
 
 # our record of an individual server which can be tried to reach a destination.
 #
-# "host" is actually a dotted-quad or ipv6 address string. Except when there's
+# "host" is the hostname acquired from the SRV record. Except when there's
 # no SRV record, in which case it is the original hostname.
 _Server = collections.namedtuple(
     "_Server", "priority weight host port expires"
@@ -117,10 +115,15 @@ class _WrappedConnection(object):
         if time.time() - self.last_request >= 2.5 * 60:
             self.abort()
             # Abort the underlying TLS connection. The abort() method calls
-            # loseConnection() on the underlying TLS connection which tries to
+            # loseConnection() on the TLS connection which tries to
             # shutdown the connection cleanly. We call abortConnection()
-            # since that will promptly close the underlying TCP connection.
-            self.transport.abortConnection()
+            # since that will promptly close the TLS connection.
+            #
+            # In Twisted >18.4; the TLS connection will be None if it has closed
+            # which will make abortConnection() throw. Check that the TLS connection
+            # is not None before trying to close it.
+            if self.transport.getHandle() is not None:
+                self.transport.abortConnection()
 
     def request(self, request):
         self.last_request = time.time()
@@ -288,7 +291,7 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
         if (len(answers) == 1
                 and answers[0].type == dns.SRV
                 and answers[0].payload
-                and answers[0].payload.target == dns.Name('.')):
+                and answers[0].payload.target == dns.Name(b'.')):
             raise ConnectError("Service %s unavailable" % service_name)
 
         for answer in answers:
@@ -297,20 +300,13 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
 
             payload = answer.payload
 
-            hosts = yield _get_hosts_for_srv_record(
-                dns_client, str(payload.target)
-            )
-
-            for (ip, ttl) in hosts:
-                host_ttl = min(answer.ttl, ttl)
-
-                servers.append(_Server(
-                    host=ip,
-                    port=int(payload.port),
-                    priority=int(payload.priority),
-                    weight=int(payload.weight),
-                    expires=int(clock.time()) + host_ttl,
-                ))
+            servers.append(_Server(
+                host=str(payload.target),
+                port=int(payload.port),
+                priority=int(payload.priority),
+                weight=int(payload.weight),
+                expires=int(clock.time()) + answer.ttl,
+            ))
 
         servers.sort()
         cache[service_name] = list(servers)
@@ -328,81 +324,3 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
             raise e
 
     defer.returnValue(servers)
-
-
-@defer.inlineCallbacks
-def _get_hosts_for_srv_record(dns_client, host):
-    """Look up each of the hosts in a SRV record
-
-    Args:
-        dns_client (twisted.names.dns.IResolver):
-        host (basestring): host to look up
-
-    Returns:
-        Deferred[list[(str, int)]]: a list of (host, ttl) pairs
-
-    """
-    ip4_servers = []
-    ip6_servers = []
-
-    def cb(res):
-        # lookupAddress and lookupIP6Address return a three-tuple
-        # giving the answer, authority, and additional sections of the
-        # response.
-        #
-        # we only care about the answers.
-
-        return res[0]
-
-    def eb(res, record_type):
-        if res.check(DNSNameError):
-            return []
-        logger.warn("Error looking up %s for %s: %s", record_type, host, res)
-        return res
-
-    # no logcontexts here, so we can safely fire these off and gatherResults
-    d1 = dns_client.lookupAddress(host).addCallbacks(
-        cb, eb, errbackArgs=("A", ))
-    d2 = dns_client.lookupIPV6Address(host).addCallbacks(
-        cb, eb, errbackArgs=("AAAA", ))
-    results = yield defer.DeferredList(
-        [d1, d2], consumeErrors=True)
-
-    # if all of the lookups failed, raise an exception rather than blowing out
-    # the cache with an empty result.
-    if results and all(s == defer.FAILURE for (s, _) in results):
-        defer.returnValue(results[0][1])
-
-    for (success, result) in results:
-        if success == defer.FAILURE:
-            continue
-
-        for answer in result:
-            if not answer.payload:
-                continue
-
-            try:
-                if answer.type == dns.A:
-                    ip = answer.payload.dottedQuad()
-                    ip4_servers.append((ip, answer.ttl))
-                elif answer.type == dns.AAAA:
-                    ip = socket.inet_ntop(
-                        socket.AF_INET6, answer.payload.address,
-                    )
-                    ip6_servers.append((ip, answer.ttl))
-                else:
-                    # the most likely candidate here is a CNAME record.
-                    # rfc2782 says srvs may not point to aliases.
-                    logger.warn(
-                        "Ignoring unexpected DNS record type %s for %s",
-                        answer.type, host,
-                    )
-                    continue
-            except Exception as e:
-                logger.warn("Ignoring invalid DNS response for %s: %s",
-                            host, e)
-                continue
-
-    # keep the ipv4 results before the ipv6 results, mostly to match historical
-    # behaviour.
-    defer.returnValue(ip4_servers + ip6_servers)
