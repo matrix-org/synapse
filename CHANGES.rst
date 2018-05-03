@@ -1,3 +1,18 @@
+Changes in synapse <unreleased>
+===============================
+
+Potentially breaking change:
+
+* Make Client-Server API return 403 for invalid token (PR #3161).
+
+  This changes the Client-server spec to return a 403 error code instead of 401
+  when the access token is unrecognised. This is the behaviour required by the
+  specification, but some clients may be relying on the old, incorrect
+  behaviour.
+
+  Thanks to @NotAFile for fixing this.
+
+
 Changes in synapse v0.28.1 (2018-05-01)
 =======================================
 
