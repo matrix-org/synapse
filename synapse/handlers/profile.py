@@ -105,7 +105,7 @@ class ProfileHandler(BaseHandler):
             } for r in batch_rows
         }
 
-        url = "https://%s/_matrix/federation/v1/replicate_profiles" % (host,)
+        url = "https://%s/_matrix/identity/api/v1/replicate_profiles" % (host,)
         body = {
             "batchnum": batchnum,
             "batch": batch,
