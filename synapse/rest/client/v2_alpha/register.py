@@ -384,13 +384,8 @@ class RegisterRestServlet(RestServlet):
             # desired_username
             if auth_result:
                 if (
-                    (
-                        self.hs.config.register_mxid_from_3pid == 'email' and
-                        LoginType.EMAIL_IDENTITY in auth_result
-                    ) or (
-                        self.hs.config.register_mxid_from_3pid == 'msisdn' and
-                        LoginType.MSISDN in auth_result
-                    )
+                    self.hs.config.register_mxid_from_3pid == 'email' and
+                    LoginType.EMAIL_IDENTITY in auth_result
                 ):
                     address = auth_result[login_type]['address']
                     desired_username = types.strip_invalid_mxid_characters(
@@ -427,6 +422,15 @@ class RegisterRestServlet(RestServlet):
                     desired_display_name = (
                         capwords(parts[0]) +
                         " [" + capwords(parts[1].split(' ')[0]) + "]"
+                    )
+                elif (
+                    self.hs.config.register_mxid_from_3pid == 'msisdn' and
+                    LoginType.MSISDN in auth_result
+                ):
+                    desired_username = auth_result[login_type]['address']
+                else:
+                    raise SynapseError(
+                        400, "Cannot derive mxid from 3pid; no recognised 3pid"
                     )
 
         if desired_username is not None:
