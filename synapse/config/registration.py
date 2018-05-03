@@ -95,7 +95,7 @@ class RegistrationConfig(Config):
         # If true, stop users from trying to change the 3PIDs associated with
         # their accounts.
         #
-        # disable_3pid_changes: True
+        # disable_3pid_changes: False
 
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.
