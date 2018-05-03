@@ -324,4 +324,4 @@ def _escape_character(m):
 def _escape_label_value(value):
     """Takes a label value and escapes quotes, newlines and backslashes
     """
-    return re.sub(r"([\n\"\\])", _escape_character, value)
+    return re.sub(r"([\n\"\\])", _escape_character, str(value))
