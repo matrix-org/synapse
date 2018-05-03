@@ -387,7 +387,7 @@ class RegisterRestServlet(RestServlet):
                     self.hs.config.register_mxid_from_3pid == 'email' and
                     LoginType.EMAIL_IDENTITY in auth_result
                 ):
-                    address = auth_result[login_type]['address']
+                    address = auth_result[LoginType.EMAIL_IDENTITY]['address']
                     desired_username = types.strip_invalid_mxid_characters(
                         address.replace('@', '-').lower()
                     )
@@ -427,7 +427,7 @@ class RegisterRestServlet(RestServlet):
                     self.hs.config.register_mxid_from_3pid == 'msisdn' and
                     LoginType.MSISDN in auth_result
                 ):
-                    desired_username = auth_result[login_type]['address']
+                    desired_username = auth_result[LoginType.MSISDN]['address']
                 else:
                     raise SynapseError(
                         400, "Cannot derive mxid from 3pid; no recognised 3pid"
