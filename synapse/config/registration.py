@@ -37,6 +37,9 @@ class RegistrationConfig(Config):
             "check_is_for_allowed_local_3pids", None
         )
         self.allow_invited_3pids = config.get("allow_invited_3pids", False)
+
+        self.disable_3pid_changes = config.get("disable_3pid_changes", False)
+
         self.registration_shared_secret = config.get("registration_shared_secret")
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
@@ -91,6 +94,11 @@ class RegistrationConfig(Config):
         #       pattern: ".*@vector\\.im"
         #     - medium: msisdn
         #       pattern: "\\+44"
+
+        # If true, stop users from trying to change the 3PIDs associated with
+        # their accounts.
+        #
+        # disable_3pid_changes: False
 
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.
