@@ -363,6 +363,7 @@ class ThreepidDeleteRestServlet(RestServlet):
 
     def __init__(self, hs):
         super(ThreepidDeleteRestServlet, self).__init__()
+        self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
 
