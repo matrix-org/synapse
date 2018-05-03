@@ -18,6 +18,7 @@
 import logging
 
 import simplejson as json
+from six import iteritems
 
 logger = logging.getLogger(__name__)
 
@@ -297,7 +298,7 @@ def cs_error(msg, code=Codes.UNKNOWN, **kwargs):
         A dict representing the error response JSON.
     """
     err = {"error": msg, "errcode": code}
-    for key, value in kwargs.iteritems():
+    for key, value in iteritems(kwargs):
         err[key] = value
     return err
 

@@ -62,7 +62,7 @@ class DistributorTestCase(unittest.TestCase):
     def test_signal_catch(self):
         self.dist.declare("alarm")
 
-        observers = [Mock() for i in 1, 2]
+        observers = [Mock() for i in (1, 2)]
         for o in observers:
             self.dist.observe("alarm", o)
 

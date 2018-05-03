@@ -1,0 +1,10 @@
+Bonjour {{ user_display_name }},
+
+{{ summary_text }}
+
+{% for room in rooms %}
+{% include 'room.txt' with context %}
+{% endfor %}
+
+Vous pouvez désactiver ces notifications en cliquant ici {{ unsubscribe_link }}
+

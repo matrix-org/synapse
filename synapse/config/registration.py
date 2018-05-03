@@ -33,6 +33,10 @@ class RegistrationConfig(Config):
 
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
+        self.check_is_for_allowed_local_3pids = config.get(
+            "check_is_for_allowed_local_3pids", None
+        )
+        self.allow_invited_3pids = config.get("allow_invited_3pids", False)
         self.registration_shared_secret = config.get("registration_shared_secret")
         self.register_mxid_from_3pid = config.get("register_mxid_from_3pid")
 
@@ -45,6 +49,10 @@ class RegistrationConfig(Config):
         )
 
         self.auto_join_rooms = config.get("auto_join_rooms", [])
+
+        self.replicate_user_profiles_to = config.get("replicate_user_profiles_to", [])
+        if not isinstance(self.replicate_user_profiles_to, list):
+            self.replicate_user_profiles_to = [self.replicate_user_profiles_to, ]
 
     def default_config(self, **kwargs):
         registration_shared_secret = random_string_with_symbols(50)
@@ -70,6 +78,16 @@ class RegistrationConfig(Config):
 
         # Mandate that users are only allowed to associate certain formats of
         # 3PIDs with accounts on this server.
+        #
+        # Use an Identity Server to establish which 3PIDs are allowed to register?
+        # Overrides allowed_local_3pids below.
+        # check_is_for_allowed_local_3pids: matrix.org
+        #
+        # If you are using an IS you can also check whether that IS registers
+        # pending invites for the given 3PID (and then allow it to sign up on
+        # the platform):
+        #
+        # allow_invited_3pids: False
         #
         # allowed_local_3pids:
         #     - medium: email
@@ -101,6 +119,12 @@ class RegistrationConfig(Config):
             - matrix.org
             - vector.im
             - riot.im
+
+        # If enabled, user IDs, display names and avatar URLs will be replicated
+        # to this server whenever they change.
+        # This is an experimental API currently implemented by sydent to support
+        # cross-homeserver user directories.
+        # replicate_user_profiles_to: example.com
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms

@@ -48,7 +48,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             'id_server', 'client_secret', 'email', 'send_attempt'
         ])
 
-        if not check_3pid_allowed(self.hs, "email", body['email']):
+        if not (yield check_3pid_allowed(self.hs, "email", body['email'])):
             raise SynapseError(
                 403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
             )
@@ -84,7 +84,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
 
         msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
 
-        if not check_3pid_allowed(self.hs, "msisdn", msisdn):
+        if not (yield check_3pid_allowed(self.hs, "msisdn", msisdn)):
             raise SynapseError(
                 403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
             )
@@ -228,7 +228,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         if absent:
             raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
 
-        if not check_3pid_allowed(self.hs, "email", body['email']):
+        if not (yield check_3pid_allowed(self.hs, "email", body['email'])):
             raise SynapseError(
                 403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
             )
@@ -271,7 +271,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
 
         msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
 
-        if not check_3pid_allowed(self.hs, "msisdn", msisdn):
+        if not (yield check_3pid_allowed(self.hs, "msisdn", msisdn)):
             raise SynapseError(
                 403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
             )
