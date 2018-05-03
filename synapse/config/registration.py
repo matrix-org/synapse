@@ -37,6 +37,9 @@ class RegistrationConfig(Config):
             "check_is_for_allowed_local_3pids", None
         )
         self.allow_invited_3pids = config.get("allow_invited_3pids", False)
+
+        self.disable_3pid_changes = config.get("disable_3pid_changes", False)
+
         self.registration_shared_secret = config.get("registration_shared_secret")
         self.register_mxid_from_3pid = config.get("register_mxid_from_3pid")
 
@@ -49,6 +52,9 @@ class RegistrationConfig(Config):
         )
 
         self.auto_join_rooms = config.get("auto_join_rooms", [])
+
+        self.disable_set_displayname = config.get("disable_set_displayname", False)
+        self.disable_set_avatar_url = config.get("disable_set_avatar_url", False)
 
         self.replicate_user_profiles_to = config.get("replicate_user_profiles_to", [])
         if not isinstance(self.replicate_user_profiles_to, list):
@@ -97,6 +103,11 @@ class RegistrationConfig(Config):
         #     - medium: msisdn
         #       pattern: "\\+44"
 
+        # If true, stop users from trying to change the 3PIDs associated with
+        # their accounts.
+        #
+        # disable_3pid_changes: False
+
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.
         registration_shared_secret: "%(registration_shared_secret)s"
@@ -126,10 +137,19 @@ class RegistrationConfig(Config):
         # cross-homeserver user directories.
         # replicate_user_profiles_to: example.com
 
+        # If enabled, don't let users set their own display names/avatars
+        # other than for the very first time (unless they are a server admin).
+        # Useful when provisioning users based on the contents of a 3rd party
+        # directory and to avoid ambiguities.
+        #
+        # disable_set_displayname: False
+        # disable_set_avatar_url: False
+
         # Users who register on this homeserver will automatically be joined
         # to these rooms
         #auto_join_rooms:
         #    - "#example:example.com"
+
         """ % locals()
 
     def add_arguments(self, parser):

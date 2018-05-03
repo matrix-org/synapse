@@ -105,7 +105,7 @@ class ProfileHandler(BaseHandler):
             } for r in batch_rows
         }
 
-        url = "https://%s/_matrix/federation/v1/replicate_profiles" % (host,)
+        url = "https://%s/_matrix/identity/api/v1/replicate_profiles" % (host,)
         body = {
             "batchnum": batchnum,
             "batch": batch,
@@ -215,6 +215,11 @@ class ProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's displayname")
 
+        if not by_admin and self.hs.config.disable_set_displayname:
+            profile = yield self.store.get_profileinfo(target_user.localpart)
+            if profile.display_name:
+                raise SynapseError(400, "Changing displayname is disabled on this server")
+
         if new_displayname == '':
             new_displayname = None
 
@@ -276,6 +281,11 @@ class ProfileHandler(BaseHandler):
 
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
+
+        if not by_admin and self.hs.config.disable_set_avatar_url:
+            profile = yield self.store.get_profileinfo(target_user.localpart)
+            if profile.avatar_url:
+                raise SynapseError(400, "Changing avatar url is disabled on this server")
 
         if len(self.hs.config.replicate_user_profiles_to) > 0:
             cur_batchnum = yield self.store.get_latest_profile_replication_batch_number()
