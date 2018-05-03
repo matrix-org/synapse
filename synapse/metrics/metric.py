@@ -16,6 +16,7 @@
 
 from itertools import chain
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +57,7 @@ class BaseMetric(object):
         return not len(self.labels)
 
     def _render_labelvalue(self, value):
-        # TODO: escape backslashes, quotes and newlines
-        return '"%s"' % (value)
+        return '"%s"' % (_escape_label_value(value),)
 
     def _render_key(self, values):
         if self.is_scalar():
@@ -299,3 +299,29 @@ class MemoryUsageMetric(object):
             "process_psutil_rss:total %d" % sum_rss,
             "process_psutil_rss:count %d" % len_rss,
         ]
+
+
+def _escape_character(m):
+    """Replaces a single character with its escape sequence.
+
+    Args:
+        m (re.MatchObject): A match object whose first group is the single
+            character to replace
+
+    Returns:
+        str
+    """
+    c = m.group(1)
+    if c == "\\":
+        return "\\\\"
+    elif c == "\"":
+        return "\\\""
+    elif c == "\n":
+        return "\\n"
+    return c
+
+
+def _escape_label_value(value):
+    """Takes a label value and escapes quotes, newlines and backslashes
+    """
+    return re.sub(r"([\n\"\\])", _escape_character, value)
