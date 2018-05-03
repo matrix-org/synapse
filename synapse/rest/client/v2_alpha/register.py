@@ -17,7 +17,7 @@
 from twisted.internet import defer
 
 import synapse
-import synapse.types
+from synapse import types
 from synapse.api.auth import get_access_token_from_request, has_access_token
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
@@ -31,6 +31,8 @@ from ._base import client_v2_patterns, interactive_auth_handler
 
 import logging
 import hmac
+import re
+from string import capwords
 from hashlib import sha1
 from synapse.util.async import run_on_reactor
 from synapse.util.ratelimitutils import FederationRateLimiter
@@ -222,6 +224,8 @@ class RegisterRestServlet(RestServlet):
                 raise SynapseError(400, "Invalid username")
             desired_username = body['username']
 
+        desired_display_name = None
+
         appservice = None
         if has_access_token(request):
             appservice = yield self.auth.get_appservice_by_req(request)
@@ -374,9 +378,10 @@ class RegisterRestServlet(RestServlet):
             # reset it first to avoid folks picking their own username.
             desired_username = None
 
-            # we should always have an auth_result if we're going to progress
-            # to register the user (i.e. we haven't picked up a registered_user_id)
-            # from our session store
+            # we should have an auth_result at this point if we're going to progress
+            # to register the user (i.e. we haven't picked up a registered_user_id
+            # from our session store), in which case get ready and gen the
+            # desired_username
             if auth_result:
                 if (
                     (
@@ -388,7 +393,41 @@ class RegisterRestServlet(RestServlet):
                     )
                 ):
                     address = auth_result[login_type]['address']
-                    desired_username = address.replace('@', '-').lower()
+                    desired_username = types.strip_invalid_mxid_characters(
+                        address.replace('@', '-').lower()
+                    )
+
+                    # find a unique mxid for the account, suffixing numbers
+                    # if needed
+                    while True:
+                        try:
+                            yield self.registration_handler.check_username(
+                                desired_username,
+                                guest_access_token=guest_access_token,
+                                assigned_user_id=registered_user_id,
+                            )
+                            # if we got this far we passed the check.
+                            break
+                        except SynapseError as e:
+                            if e.errcode == Codes.USER_IN_USE:
+                                m = re.match(r'^(.*)(\d+)$', desired_username)
+                                if m:
+                                    desired_username = m.group(1) + str(
+                                        int(m.group(2)) + 1
+                                    )
+                                else:
+                                    desired_username += "1"
+                            else:
+                                # something else went wrong.
+                                break
+
+                    # XXX: a nasty heuristic to turn an email address into
+                    # a displayname, as part of register_mxid_from_3pid
+                    parts = address.replace('.', ' ').split('@')
+                    desired_display_name = (
+                        capwords(parts[0]) +
+                        " [" + capwords(parts[1].split(' ')[0]) + "]"
+                    )
 
         if desired_username is not None:
             yield self.registration_handler.check_username(
@@ -431,6 +470,7 @@ class RegisterRestServlet(RestServlet):
                 password=new_password,
                 guest_access_token=guest_access_token,
                 generate_token=False,
+                display_name=desired_display_name,
             )
 
             # remember that we've now registered that user account, and with
