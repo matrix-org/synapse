@@ -150,7 +150,7 @@ class PushersRemoveRestServlet(RestServlet):
         super(RestServlet, self).__init__()
         self.hs = hs
         self.notifier = hs.get_notifier()
-        self.auth = hs.get_v1auth()
+        self.auth = hs.get_auth()
         self.pusher_pool = self.hs.get_pusherpool()
 
     @defer.inlineCallbacks
