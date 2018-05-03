@@ -71,7 +71,8 @@ class BaseMetric(object):
         """Render this metric for a single set of labels
 
         Args:
-            label_values (list[str]): values for each of the labels
+            label_values (list[object]): values for each of the labels,
+                (which get stringified).
             value: value of the metric at with these labels
 
         Returns:
