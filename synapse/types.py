@@ -238,7 +238,7 @@ def strip_invalid_mxid_characters(localpart):
     Returns:
         localpart (basestring): the localpart having been stripped
     """
-    return filter(lambda c: c not in mxid_localpart_allowed_characters, localpart)
+    return filter(lambda c: c in mxid_localpart_allowed_characters, localpart)
 
 
 class StreamToken(
