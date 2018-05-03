@@ -25,6 +25,7 @@ from .download_resource import DownloadResource
 from .thumbnail_resource import ThumbnailResource
 from .identicon_resource import IdenticonResource
 from .preview_url_resource import PreviewUrlResource
+from .limits_resource import MediaLimitsResource
 from .filepath import MediaFilePaths
 from .thumbnailer import Thumbnailer
 from .storage_provider import StorageProviderWrapper
@@ -745,7 +746,6 @@ class MediaRepositoryResource(Resource):
         Resource.__init__(self)
 
         media_repo = hs.get_media_repository()
-
         self.putChild("upload", UploadResource(hs, media_repo))
         self.putChild("download", DownloadResource(hs, media_repo))
         self.putChild("thumbnail", ThumbnailResource(
@@ -756,3 +756,4 @@ class MediaRepositoryResource(Resource):
             self.putChild("preview_url", PreviewUrlResource(
                 hs, media_repo, media_repo.media_storage,
             ))
+        self.putChild("limits", MediaLimitsResource(hs))
