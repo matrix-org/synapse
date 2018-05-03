@@ -49,6 +49,9 @@ class RegistrationConfig(Config):
 
         self.auto_join_rooms = config.get("auto_join_rooms", [])
 
+        self.disable_set_displayname = config.get("disable_set_displayname", False)
+        self.disable_set_avatar_url = config.get("disable_set_avatar_url", False)
+
         self.replicate_user_profiles_to = config.get("replicate_user_profiles_to", [])
         if not isinstance(self.replicate_user_profiles_to, list):
             self.replicate_user_profiles_to = [self.replicate_user_profiles_to, ]
@@ -118,10 +121,19 @@ class RegistrationConfig(Config):
         # cross-homeserver user directories.
         # replicate_user_profiles_to: example.com
 
+        # If enabled, don't let users set their own display names/avatars
+        # other than for the very first time (unless they are a server admin).
+        # Useful when provisioning users based on the contents of a 3rd party
+        # directory and to avoid ambiguities.
+        #
+        # disable_set_displayname: True
+        # disable_set_avatar_url: True
+
         # Users who register on this homeserver will automatically be joined
         # to these rooms
         #auto_join_rooms:
         #    - "#example:example.com"
+
         """ % locals()
 
     def add_arguments(self, parser):
