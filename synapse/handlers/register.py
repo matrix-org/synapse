@@ -170,7 +170,7 @@ class RegistrationHandler(BaseHandler):
                 admin=admin,
             )
 
-            if display_name is not None:
+            if display_name is None:
                 display_name = (
                     # If the user was a guest then they already have a profile
                     None if was_guest else user.localpart
