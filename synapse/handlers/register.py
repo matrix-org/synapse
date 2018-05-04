@@ -178,7 +178,7 @@ class RegistrationHandler(BaseHandler):
 
             if display_name:
                 yield self.profile_handler.set_displayname(
-                    user, user, display_name, by_admin=True,
+                    user, None, display_name, by_admin=True,
                 )
 
             if self.hs.config.user_directory_search_all_users:
@@ -208,7 +208,7 @@ class RegistrationHandler(BaseHandler):
                     )
 
                     yield self.profile_handler.set_displayname(
-                        user, user, user.localpart, by_admin=True,
+                        user, None, user.localpart, by_admin=True,
                     )
 
                 except SynapseError:
@@ -257,7 +257,7 @@ class RegistrationHandler(BaseHandler):
         )
 
         yield self.profile_handler.set_displayname(
-            user, user, user.localpart, by_admin=True,
+            user, None, user.localpart, by_admin=True,
         )
 
         defer.returnValue(user_id)
@@ -308,7 +308,7 @@ class RegistrationHandler(BaseHandler):
             )
 
             yield self.profile_handler.set_displayname(
-                user, user, user.localpart, by_admin=True,
+                user, None, user.localpart, by_admin=True,
             )
         except Exception as e:
             yield self.store.add_access_token_to_user(user_id, token)
@@ -466,7 +466,7 @@ class RegistrationHandler(BaseHandler):
             )
             if displayname is not None:
                 yield self.profile_handler.set_displayname(
-                    user, user, displayname, by_admin=True,
+                    user, None, displayname, by_admin=True,
                 )
         else:
             yield self._auth_handler.delete_access_tokens_for_user(user_id)
