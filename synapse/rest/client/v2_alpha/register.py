@@ -405,7 +405,7 @@ class RegisterRestServlet(RestServlet):
                             break
                         except SynapseError as e:
                             if e.errcode == Codes.USER_IN_USE:
-                                m = re.match(r'^(.*)(\d+)$', desired_username)
+                                m = re.match(r'^(.*?)(\d+)$', desired_username)
                                 if m:
                                     desired_username = m.group(1) + str(
                                         int(m.group(2)) + 1
