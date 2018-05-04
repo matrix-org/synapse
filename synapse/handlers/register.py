@@ -113,6 +113,7 @@ class RegistrationHandler(BaseHandler):
         generate_token=True,
         guest_access_token=None,
         make_guest=False,
+        display_name=None,
         admin=False,
     ):
         """Registers a new client on the server.
@@ -128,6 +129,7 @@ class RegistrationHandler(BaseHandler):
               since it offers no means of associating a device_id with the
               access_token. Instead you should call auth_handler.issue_access_token
               after registration.
+            display_name (str): The displayname to set for this user, if any
         Returns:
             A tuple of (user_id, access_token).
         Raises:
@@ -165,12 +167,19 @@ class RegistrationHandler(BaseHandler):
                 password_hash=password_hash,
                 was_guest=was_guest,
                 make_guest=make_guest,
-                create_profile_with_localpart=(
-                    # If the user was a guest then they already have a profile
-                    None if was_guest else user.localpart
-                ),
                 admin=admin,
             )
+
+            if display_name is None:
+                display_name = (
+                    # If the user was a guest then they already have a profile
+                    None if was_guest else user.localpart
+                )
+
+            if display_name:
+                yield self.profile_handler.set_displayname(
+                    user, None, display_name, by_admin=True,
+                )
 
             if self.hs.config.user_directory_search_all_users:
                 profile = yield self.store.get_profileinfo(localpart)
@@ -196,8 +205,12 @@ class RegistrationHandler(BaseHandler):
                         token=token,
                         password_hash=password_hash,
                         make_guest=make_guest,
-                        create_profile_with_localpart=user.localpart,
                     )
+
+                    yield self.profile_handler.set_displayname(
+                        user, None, user.localpart, by_admin=True,
+                    )
+
                 except SynapseError:
                     # if user id is taken, just generate another
                     user = None
@@ -241,8 +254,12 @@ class RegistrationHandler(BaseHandler):
             user_id=user_id,
             password_hash="",
             appservice_id=service_id,
-            create_profile_with_localpart=user.localpart,
         )
+
+        yield self.profile_handler.set_displayname(
+            user, None, user.localpart, by_admin=True,
+        )
+
         defer.returnValue(user_id)
 
     @defer.inlineCallbacks
@@ -288,7 +305,10 @@ class RegistrationHandler(BaseHandler):
                 user_id=user_id,
                 token=token,
                 password_hash=None,
-                create_profile_with_localpart=user.localpart,
+            )
+
+            yield self.profile_handler.set_displayname(
+                user, None, user.localpart, by_admin=True,
             )
         except Exception as e:
             yield self.store.add_access_token_to_user(user_id, token)
@@ -443,17 +463,14 @@ class RegistrationHandler(BaseHandler):
                 user_id=user_id,
                 token=token,
                 password_hash=password_hash,
-                create_profile_with_localpart=user.localpart,
             )
+            if displayname is not None:
+                yield self.profile_handler.set_displayname(
+                    user, None, displayname, by_admin=True,
+                )
         else:
             yield self._auth_handler.delete_access_tokens_for_user(user_id)
             yield self.store.add_access_token_to_user(user_id=user_id, token=token)
-
-        if displayname is not None:
-            logger.info("setting user display name: %s -> %s", user_id, displayname)
-            yield self.profile_handler.set_displayname(
-                user, requester, displayname, by_admin=True,
-            )
 
         defer.returnValue((user_id, token))
 

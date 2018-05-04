@@ -125,33 +125,28 @@ class ProfileWorkerStore(SQLBaseStore):
 
 
 class ProfileStore(ProfileWorkerStore):
-    def create_profile(self, user_localpart):
-        return self._simple_insert(
-            table="profiles",
-            values={"user_id": user_localpart},
-            desc="create_profile",
-        )
-
     def set_profile_displayname(self, user_localpart, new_displayname, batchnum):
-        return self._simple_update_one(
+        return self._simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            updatevalues={
+            values={
                 "displayname": new_displayname,
                 "batch": batchnum,
             },
             desc="set_profile_displayname",
+            lock=False  # we can do this because user_id has a unique index
         )
 
     def set_profile_avatar_url(self, user_localpart, new_avatar_url, batchnum):
-        return self._simple_update_one(
+        return self._simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            updatevalues={
+            values={
                 "avatar_url": new_avatar_url,
                 "batch": batchnum,
             },
             desc="set_profile_avatar_url",
+            lock=False  # we can do this because user_id has a unique index
         )
 
     def add_remote_profile_cache(self, user_id, displayname, avatar_url):

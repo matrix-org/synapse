@@ -207,12 +207,12 @@ class ProfileHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def set_displayname(self, target_user, requester, new_displayname, by_admin=False):
-        """target_user is the user whose displayname is to be changed;
-        auth_user is the user attempting to make this change."""
+        """target_user is the UserID whose displayname is to be changed;
+        requester is the authenticated user attempting to make this change."""
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 
-        if not by_admin and target_user != requester.user:
+        if not by_admin and requester and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's displayname")
 
         if not by_admin and self.hs.config.disable_set_displayname:
@@ -239,7 +239,8 @@ class ProfileHandler(BaseHandler):
                 target_user.to_string(), profile
             )
 
-        yield self._update_join_states(requester, target_user)
+        if requester:
+            yield self._update_join_states(requester, target_user)
 
         # start a profile replication push
         run_in_background(self._replicate_profiles)

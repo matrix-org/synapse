@@ -128,7 +128,7 @@ class RegistrationStore(RegistrationWorkerStore,
 
     def register(self, user_id, token=None, password_hash=None,
                  was_guest=False, make_guest=False, appservice_id=None,
-                 create_profile_with_localpart=None, admin=False):
+                 admin=False):
         """Attempts to register an account.
 
         Args:
@@ -142,8 +142,6 @@ class RegistrationStore(RegistrationWorkerStore,
             make_guest (boolean): True if the the new user should be guest,
                 false to add a regular user account.
             appservice_id (str): The ID of the appservice registering the user.
-            create_profile_with_localpart (str): Optionally create a profile for
-                the given localpart.
         Raises:
             StoreError if the user_id could not be registered.
         """
@@ -156,7 +154,6 @@ class RegistrationStore(RegistrationWorkerStore,
             was_guest,
             make_guest,
             appservice_id,
-            create_profile_with_localpart,
             admin
         )
 
@@ -169,7 +166,6 @@ class RegistrationStore(RegistrationWorkerStore,
         was_guest,
         make_guest,
         appservice_id,
-        create_profile_with_localpart,
         admin,
     ):
         now = int(self.clock.time())
@@ -232,14 +228,6 @@ class RegistrationStore(RegistrationWorkerStore,
                 "INSERT INTO access_tokens(id, user_id, token)"
                 " VALUES (?,?,?)",
                 (next_id, user_id, token,)
-            )
-
-        if create_profile_with_localpart:
-            # set a default displayname serverside to avoid ugly race
-            # between auto-joins and clients trying to set displaynames
-            txn.execute(
-                "INSERT INTO profiles(user_id, displayname) VALUES (?,?)",
-                (create_profile_with_localpart, create_profile_with_localpart)
             )
 
         self._invalidate_cache_and_stream(
