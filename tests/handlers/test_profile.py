@@ -121,7 +121,6 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_incoming_fed_query(self):
-        yield self.store.create_profile("caroline")
         yield self.store.set_profile_displayname("caroline", "Caroline", 1)
 
         response = yield self.query_handlers["profile"](
