@@ -68,8 +68,6 @@ class ProfileTestCase(unittest.TestCase):
         self.bob = UserID.from_string("@4567:test")
         self.alice = UserID.from_string("@alice:remote")
 
-        yield self.store.create_profile(self.frank.localpart)
-
         self.handler = hs.get_profile_handler()
 
     @defer.inlineCallbacks
