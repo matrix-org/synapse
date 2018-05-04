@@ -22,6 +22,8 @@ from ._base import BaseHandler
 from synapse.api.constants import (
     EventTypes, JoinRules,
 )
+from synapse.api.errors import HttpResponseException, SynapseError
+
 from synapse.util.async import concurrently_execute
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.util.caches.response_cache import ResponseCache
@@ -385,12 +387,14 @@ class RoomListHandler(BaseHandler):
             # to do it manually without pagination
             limit = None
             since_token = None
-
-        res = yield self._get_remote_list_cached(
-            server_name, limit=limit, since_token=since_token,
-            include_all_networks=include_all_networks,
-            third_party_instance_id=third_party_instance_id,
-        )
+        try:
+            res = yield self._get_remote_list_cached(
+                server_name, limit=limit, since_token=since_token,
+                include_all_networks=include_all_networks,
+                third_party_instance_id=third_party_instance_id,
+            )
+        except HttpResponseException as e:
+            raise SynapseError(e.code, "Failed to fetch Remote Room List")
 
         if search_filter:
             res = {"chunk": [
