@@ -60,3 +60,6 @@ Niklas Riekenbrauck <nikriek at gmail dot.com>
 
 Christoph Witzany <christoph at web.crofting.com>
  * Add LDAP support for authentication
+
+Pierre Jaury <pierre at jaury.eu>
+* Docker packaging
