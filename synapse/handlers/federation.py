@@ -24,6 +24,7 @@ from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 import six
 from six.moves import http_client
+from six import iteritems
 from twisted.internet import defer
 from unpaddedbase64 import decode_base64
 
@@ -1367,7 +1368,7 @@ class FederationHandler(BaseHandler):
         )
 
         if state_groups:
-            _, state = state_groups.items().pop()
+            _, state = list(iteritems(state_groups)).pop()
             results = {
                 (e.type, e.state_key): e for e in state
             }
@@ -2013,7 +2014,7 @@ class FederationHandler(BaseHandler):
                 this will not be included in the current_state in the context.
         """
         state_updates = {
-            k: a.event_id for k, a in auth_events.iteritems()
+            k: a.event_id for k, a in iteritems(auth_events)
             if k != event_key
         }
         context.current_state_ids = dict(context.current_state_ids)
@@ -2023,7 +2024,7 @@ class FederationHandler(BaseHandler):
             context.delta_ids.update(state_updates)
         context.prev_state_ids = dict(context.prev_state_ids)
         context.prev_state_ids.update({
-            k: a.event_id for k, a in auth_events.iteritems()
+            k: a.event_id for k, a in iteritems(auth_events)
         })
         context.state_group = yield self.store.store_state_group(
             event.event_id,
@@ -2075,7 +2076,7 @@ class FederationHandler(BaseHandler):
 
         def get_next(it, opt=None):
             try:
-                return it.next()
+                return next(it)
             except Exception:
                 return opt
 
