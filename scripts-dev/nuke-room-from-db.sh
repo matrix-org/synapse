@@ -29,6 +29,7 @@ DELETE FROM state_groups WHERE room_id = '$ROOMID';
 DELETE FROM state_groups_state WHERE room_id = '$ROOMID';
 DELETE FROM receipts_graph WHERE room_id = '$ROOMID';
 DELETE FROM receipts_linearized WHERE room_id = '$ROOMID';
+DELETE FROM event_search WHERE room_id = '$ROOMID'; 
 DELETE FROM guest_access WHERE room_id = '$ROOMID';
 DELETE FROM history_visibility WHERE room_id = '$ROOMID';
 DELETE FROM room_tags WHERE room_id = '$ROOMID';
