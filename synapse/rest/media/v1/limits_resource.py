@@ -23,9 +23,10 @@ class MediaLimitsResource(Resource):
 
     def __init__(self, hs):
         Resource.__init__(self)
-        self.limits_dict = {}
         config = hs.get_config()
-        self.limits_dict["upload_size"] = config.max_upload_size
+        self.limits_dict = {
+            "upload_size": config.max_upload_size,
+        }
 
     def render_GET(self, request):
         respond_with_json(request, 200, self.limits_dict, send_cors=True)
