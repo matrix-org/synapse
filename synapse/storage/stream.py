@@ -796,7 +796,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             limit_str = ""
 
         sql = (
-            "SELECT * FROM events"
+            "SELECT event_id, topological_ordering, stream_ordering"
+            " FROM events"
             " WHERE outlier = ? AND room_id = ? AND %(bounds)s"
             " ORDER BY topological_ordering %(order)s,"
             " stream_ordering %(order)s %(limit)s"
