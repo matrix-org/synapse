@@ -19,7 +19,7 @@ from synapse.http.server import respond_with_json, respond_with_json_bytes
 
 
 class MediaLimitsResource(Resource):
-    # isLeaf = True
+    isLeaf = True
 
     def __init__(self, hs):
         Resource.__init__(self)
