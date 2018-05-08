@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2017 New Vector Ltd
+# Copyright 2017, 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 from twisted.internet import defer
 
 from ._base import BaseHandler
+from synapse.types import UserID, create_requester
 
 import logging
 
@@ -27,6 +28,7 @@ class DeactivateAccountHandler(BaseHandler):
         super(DeactivateAccountHandler, self).__init__(hs)
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
+        self._room_member_handler = hs.get_room_member_handler()
 
     @defer.inlineCallbacks
     def deactivate_account(self, user_id):
@@ -50,3 +52,15 @@ class DeactivateAccountHandler(BaseHandler):
 
         yield self.store.user_delete_threepids(user_id)
         yield self.store.user_set_password_hash(user_id, None)
+
+        user = UserID.from_string(user_id)
+
+        rooms_for_user = yield self.store.get_rooms_for_user(user_id)
+        for room_id in rooms_for_user:
+            yield self._room_member_handler.update_membership(
+                create_requester(user),
+                user,
+                room_id,
+                "leave",
+                ratelimit=False,
+            )
