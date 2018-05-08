@@ -6,9 +6,19 @@
 
 ## Do not run it lightly.
 
+set -e
+
+if [ "$1" == "-h" ] || [ "$1" == "" ]; then
+  echo "Call with ROOM_ID as first option and then pipe it into the database. So for instance you might run"
+  echo " nuke-room-from-db.sh <room_id> | sqlite3 homeserver.db"
+  echo "or"
+  echo " nuke-room-from-db.sh <room_id> | psql --dbname=synapse"
+  exit
+fi
+
 ROOMID="$1"
 
-sqlite3 homeserver.db <<EOF
+cat <<EOF
 DELETE FROM event_forward_extremities WHERE room_id = '$ROOMID';
 DELETE FROM event_backward_extremities WHERE room_id = '$ROOMID';
 DELETE FROM event_edges WHERE room_id = '$ROOMID';
