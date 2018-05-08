@@ -15,7 +15,7 @@
 
 from ._base import IncorrectDatabaseSetup
 from .postgres import PostgresEngine
-from .sqlite3 import Sqlite3Engine
+from .sqlite3_engine import Sqlite3Engine
 
 import importlib
 import platform

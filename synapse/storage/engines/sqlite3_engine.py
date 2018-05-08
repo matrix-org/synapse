@@ -15,6 +15,7 @@
 
 from synapse.storage.prepare_database import prepare_database
 
+import sqlite3
 import struct
 import threading
 
@@ -24,6 +25,11 @@ class Sqlite3Engine(object):
 
     def __init__(self, database_module, database_config):
         self.module = database_module
+
+        if sqlite3.sqlite_version_info < (3, 15, 0):
+            raise RuntimeError(
+                "SQLite3 version is too old, Synapse requires 3.15 or later",
+            )
 
         # The current max state_group, or None if we haven't looked
         # in the DB yet.
