@@ -35,6 +35,8 @@ spam_checker:
 
 Don't forget to consider if you can invite users from your own domain.
 """
+
+
 class DomainRuleChecker(object):
 
     def __init__(self, config):
