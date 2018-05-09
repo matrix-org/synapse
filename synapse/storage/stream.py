@@ -346,9 +346,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def get_recent_events_for_room(self, room_id, limit, end_token, from_token=None):
+    def get_recent_events_for_room(self, room_id, limit, end_token):
         rows, token = yield self.get_recent_event_ids_for_room(
-            room_id, limit, end_token, from_token
+            room_id, limit, end_token,
         )
 
         logger.debug("stream before")
@@ -363,14 +363,13 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         defer.returnValue((events, token))
 
     @defer.inlineCallbacks
-    def get_recent_event_ids_for_room(self, room_id, limit, end_token, from_token=None):
+    def get_recent_event_ids_for_room(self, room_id, limit, end_token):
         """Get the most recent events in the room in topological ordering.
 
         Args:
             room_id (str)
             limit (int)
             end_token (str): The stream token representing now.
-            from_token(str|None): Token to not return events before, if given.
 
         Returns:
             Deferred[tuple[list[dict], tuple[str, str]]]: Returns a list of
@@ -384,12 +383,10 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             defer.returnValue(([], (end_token, end_token)))
 
         end_token = RoomStreamToken.parse_stream_token(end_token)
-        if from_token is not None:
-            from_token = RoomStreamToken.parse(from_token)
 
         rows, token = yield self.runInteraction(
             "get_recent_event_ids_for_room", self._paginate_room_events_txn,
-            room_id, from_token=end_token, to_token=from_token, limit=limit,
+            room_id, from_token=end_token, limit=limit,
         )
 
         # We want to return the results in ascending order.
