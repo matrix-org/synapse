@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.logcontext import LoggingContext
-from twisted.web.server import Site, Request
-
 import contextlib
 import logging
 import re
 import time
+
+from twisted.web.server import Site, Request
+
+from synapse.http.request_metrics import RequestMetrics
+from synapse.util.logcontext import LoggingContext
+
+logger = logging.getLogger(__name__)
 
 ACCESS_TOKEN_RE = re.compile(br'(\?.*access(_|%5[Ff])token=)[^&]*(.*)$')
 
@@ -26,6 +30,20 @@ _next_request_seq = 0
 
 
 class SynapseRequest(Request):
+    """Class which encapsulates an HTTP request to synapse.
+
+    All of the requests processed in synapse are of this type.
+
+    It extends twisted's twisted.web.server.Request, and adds:
+     * Unique request ID
+     * Redaction of access_token query-params in __repr__
+     * Logging at start and end
+     * Metrics to record CPU, wallclock and DB time by endpoint.
+
+    It provides a method `processing` which should be called by the Resource
+    which is handling the request, and returns a context manager.
+
+    """
     def __init__(self, site, *args, **kw):
         Request.__init__(self, *args, **kw)
         self.site = site
@@ -59,7 +77,11 @@ class SynapseRequest(Request):
     def get_user_agent(self):
         return self.requestHeaders.getRawHeaders(b"User-Agent", [None])[-1]
 
-    def started_processing(self):
+    def _started_processing(self, servlet_name):
+        self.start_time = int(time.time() * 1000)
+        self.request_metrics = RequestMetrics()
+        self.request_metrics.start(self.start_time, name=servlet_name)
+
         self.site.access_logger.info(
             "%s - %s - Received request: %s %s",
             self.getClientIP(),
@@ -67,10 +89,8 @@ class SynapseRequest(Request):
             self.method,
             self.get_redacted_uri()
         )
-        self.start_time = int(time.time() * 1000)
 
-    def finished_processing(self):
-
+    def _finished_processing(self):
         try:
             context = LoggingContext.current_context()
             ru_utime, ru_stime = context.get_resource_usage()
@@ -81,6 +101,8 @@ class SynapseRequest(Request):
             ru_utime, ru_stime = (0, 0)
             db_txn_count, db_txn_duration_ms = (0, 0)
 
+        end_time = int(time.time() * 1000)
+
         self.site.access_logger.info(
             "%s - %s - {%s}"
             " Processed request: %dms (%dms, %dms) (%dms/%dms/%d)"
@@ -88,7 +110,7 @@ class SynapseRequest(Request):
             self.getClientIP(),
             self.site.site_tag,
             self.authenticated_entity,
-            int(time.time() * 1000) - self.start_time,
+            end_time - self.start_time,
             int(ru_utime * 1000),
             int(ru_stime * 1000),
             db_sched_duration_ms,
@@ -102,11 +124,36 @@ class SynapseRequest(Request):
             self.get_user_agent(),
         )
 
+        try:
+            self.request_metrics.stop(end_time, self)
+        except Exception as e:
+            logger.warn("Failed to stop metrics: %r", e)
+
     @contextlib.contextmanager
-    def processing(self):
-        self.started_processing()
+    def processing(self, servlet_name):
+        """Record the fact that we are processing this request.
+
+        Returns a context manager; the correct way to use this is:
+
+        @defer.inlineCallbacks
+        def handle_request(request):
+            with request.processing("FooServlet"):
+                yield really_handle_the_request()
+
+        This will log the request's arrival. Once the context manager is
+        closed, the completion of the request will be logged, and the various
+        metrics will be updated.
+
+        Args:
+            servlet_name (str): the name of the servlet which will be
+                processing this request. This is used in the metrics.
+
+                It is possible to update this afterwards by updating
+                self.request_metrics.servlet_name.
+        """
+        self._started_processing(servlet_name)
         yield
-        self.finished_processing()
+        self._finished_processing()
 
 
 class XForwardedForRequest(SynapseRequest):

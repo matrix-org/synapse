@@ -19,7 +19,7 @@ from synapse.api.errors import (
     cs_exception, SynapseError, CodeMessageException, UnrecognizedRequestError, Codes
 )
 from synapse.http.request_metrics import (
-    RequestMetrics, requests_counter,
+    requests_counter,
     outgoing_responses_counter,
 )
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
@@ -81,19 +81,18 @@ def wrap_request_handler(request_handler, include_metrics=False):
         with LoggingContext(request_id) as request_context:
             request_context.request = request_id
             with Measure(self.clock, "wrapped_request_handler"):
-                request_metrics = RequestMetrics()
                 # we start the request metrics timer here with an initial stab
                 # at the servlet name. For most requests that name will be
                 # JsonResource (or a subclass), and JsonResource._async_render
                 # will update it once it picks a servlet.
                 servlet_name = self.__class__.__name__
-                request_metrics.start(self.clock.time_msec(), name=servlet_name)
-
-                with request.processing():
+                with request.processing(servlet_name):
                     try:
                         with PreserveLoggingContext(request_context):
                             if include_metrics:
-                                yield request_handler(self, request, request_metrics)
+                                yield request_handler(
+                                    self, request, request.request_metrics,
+                                )
                             else:
                                 requests_counter.inc(request.method, servlet_name)
                                 yield request_handler(self, request)
@@ -135,13 +134,7 @@ def wrap_request_handler(request_handler, include_metrics=False):
                             pretty_print=_request_user_agent_is_curl(request),
                             version_string=self.version_string,
                         )
-                    finally:
-                        try:
-                            request_metrics.stop(
-                                self.clock.time_msec(), request
-                            )
-                        except Exception as e:
-                            logger.warn("Failed to stop metrics: %r", e)
+
     return wrapped_request_handler
 
 
