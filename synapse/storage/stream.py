@@ -407,7 +407,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         if limit == 0:
             defer.returnValue(([], end_token))
 
-        end_token = RoomStreamToken.parse_stream_token(end_token)
+        end_token = RoomStreamToken.parse(end_token)
 
         rows, token = yield self.runInteraction(
             "get_recent_event_ids_for_room", self._paginate_room_events_txn,
