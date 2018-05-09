@@ -368,7 +368,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         Returns:
             Deferred[tuple[list[FrozenEvent],  str]]: Returns a list of
-            events and a token pointint to the start of the returned
+            events and a token pointing to the start of the returned
             events.
             The events returned are in ascending order.
         """
