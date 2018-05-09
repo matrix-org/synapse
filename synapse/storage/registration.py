@@ -526,3 +526,30 @@ class RegistrationStore(RegistrationWorkerStore,
         except self.database_engine.module.IntegrityError:
             ret = yield self.get_3pid_guest_access_token(medium, address)
             defer.returnValue(ret)
+
+    def add_user_pending_deactivation(self, user_id):
+        return self._simple_insert(
+            "users_pending_deactivation",
+            values={
+                "user_id": user_id,
+            },
+            desc="add_user_pending_deactivation",
+        )
+
+    def del_user_pending_deactivation(self, user_id):
+        return self._simple_delete_one(
+            "users_pending_deactivation",
+            keyvalues={
+                "user_id": user_id,
+            },
+            desc="del_user_pending_deactivation",
+        )
+
+    def get_user_pending_deactivation(self):
+        return self._simple_select_one_onecol(
+            "users_pending_deactivation",
+            keyvalues={},
+            retcol="user_id",
+            allow_none=True,
+            desc="get_users_pending_deactivation",
+        )
