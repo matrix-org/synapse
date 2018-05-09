@@ -119,6 +119,8 @@ class RequestMetrics(object):
                 )
                 return
 
+        outgoing_responses_counter.inc(request.method, str(request.code))
+
         response_count.inc(request.method, self.name, tag)
 
         response_timer.inc_by(

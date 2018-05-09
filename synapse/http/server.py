@@ -20,7 +20,6 @@ from synapse.api.errors import (
 )
 from synapse.http.request_metrics import (
     requests_counter,
-    outgoing_responses_counter,
 )
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.caches import intern_dict
@@ -112,7 +111,6 @@ def wrap_request_handler(request_handler, include_metrics=False):
                             )
                         else:
                             logger.exception(e)
-                        outgoing_responses_counter.inc(request.method, str(code))
                         respond_with_json(
                             request, code, cs_exception(e), send_cors=True,
                             pretty_print=_request_user_agent_is_curl(request),
@@ -274,8 +272,6 @@ class JsonResource(HttpServer, resource.Resource):
 
     def _send_response(self, request, code, response_json_object,
                        response_code_message=None):
-        outgoing_responses_counter.inc(request.method, str(code))
-
         # TODO: Only enable CORS for the requests that need it.
         respond_with_json(
             request, code, response_json_object,
