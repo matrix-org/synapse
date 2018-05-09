@@ -46,38 +46,40 @@ import simplejson
 logger = logging.getLogger(__name__)
 
 
-_next_request_id = 0
-
-
 def request_handler(include_metrics=False):
     """Decorator for ``wrap_request_handler``"""
     return lambda request_handler: wrap_request_handler(request_handler, include_metrics)
 
 
 def wrap_request_handler(request_handler, include_metrics=False):
-    """Wraps a method that acts as a request handler with the necessary logging
-    and exception handling.
+    """Wraps a request handler method with the necessary logging and exception
+     handling.
 
-    The method must have a signature of "handle_foo(self, request)". The
-    argument "self" must have "version_string" and "clock" attributes. The
-    argument "request" must be a twisted HTTP request.
+    The handler method must have a signature of "handle_foo(self, request)",
+    where "self" must have "version_string" and "clock" attributes (and
+    "request" must be a SynapseRequest).
 
-    The method must return a deferred. If the deferred succeeds we assume that
+    The handler must return a deferred. If the deferred succeeds we assume that
     a response has been sent. If the deferred fails with a SynapseError we use
     it to send a JSON response with the appropriate HTTP reponse code. If the
     deferred fails with any other type of error we send a 500 reponse.
 
-    We insert a unique request-id into the logging context for this request and
-    log the response and duration for this request.
+    As well as calling `request.processing` (which will log the response and
+    duration for this request), the wrapped request handler will insert the
+    request id into the logging context.
     """
 
     @defer.inlineCallbacks
     def wrapped_request_handler(self, request):
-        global _next_request_id
-        request_id = "%s-%s" % (request.method, _next_request_id)
-        _next_request_id += 1
+        """
+        Args:
+            self:
+            request (synapse.http.site.SynapseRequest):
+        """
 
+        request_id = request.get_request_id()
         with LoggingContext(request_id) as request_context:
+            request_context.request = request_id
             with Measure(self.clock, "wrapped_request_handler"):
                 request_metrics = RequestMetrics()
                 # we start the request metrics timer here with an initial stab
@@ -87,7 +89,6 @@ def wrap_request_handler(request_handler, include_metrics=False):
                 servlet_name = self.__class__.__name__
                 request_metrics.start(self.clock, name=servlet_name)
 
-                request_context.request = request_id
                 with request.processing():
                     try:
                         with PreserveLoggingContext(request_context):

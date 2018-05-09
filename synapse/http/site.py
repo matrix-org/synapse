@@ -22,6 +22,8 @@ import time
 
 ACCESS_TOKEN_RE = re.compile(br'(\?.*access(_|%5[Ff])token=)[^&]*(.*)$')
 
+_next_request_seq = 0
+
 
 class SynapseRequest(Request):
     def __init__(self, site, *args, **kw):
@@ -29,6 +31,10 @@ class SynapseRequest(Request):
         self.site = site
         self.authenticated_entity = None
         self.start_time = 0
+
+        global _next_request_seq
+        self.request_seq = _next_request_seq
+        _next_request_seq += 1
 
     def __repr__(self):
         # We overwrite this so that we don't log ``access_token``
@@ -40,6 +46,9 @@ class SynapseRequest(Request):
             self.clientproto,
             self.site.site_tag,
         )
+
+    def get_request_id(self):
+        return "%s-%i" % (self.method, self.request_seq)
 
     def get_redacted_uri(self):
         return ACCESS_TOKEN_RE.sub(
