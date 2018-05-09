@@ -181,8 +181,8 @@ class InitialSyncHandler(BaseHandler):
                     self.store, user_id, messages
                 )
 
-                start_token = now_token.copy_and_replace("room_key", token[0])
-                end_token = now_token.copy_and_replace("room_key", token[1])
+                start_token = now_token.copy_and_replace("room_key", token)
+                end_token = now_token.copy_and_replace("room_key", room_end_token)
                 time_now = self.clock.time_msec()
 
                 d["messages"] = {
@@ -325,8 +325,8 @@ class InitialSyncHandler(BaseHandler):
             self.store, user_id, messages, is_peeking=is_peeking
         )
 
-        start_token = StreamToken.START.copy_and_replace("room_key", token[0])
-        end_token = StreamToken.START.copy_and_replace("room_key", token[1])
+        start_token = StreamToken.START.copy_and_replace("room_key", token)
+        end_token = StreamToken.START.copy_and_replace("room_key", stream_token)
 
         time_now = self.clock.time_msec()
 
@@ -408,8 +408,8 @@ class InitialSyncHandler(BaseHandler):
             self.store, user_id, messages, is_peeking=is_peeking,
         )
 
-        start_token = now_token.copy_and_replace("room_key", token[0])
-        end_token = now_token.copy_and_replace("room_key", token[1])
+        start_token = now_token.copy_and_replace("room_key", token)
+        end_token = now_token
 
         time_now = self.clock.time_msec()
 

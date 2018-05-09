@@ -345,6 +345,20 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_recent_events_for_room(self, room_id, limit, end_token):
+        """Get the most recent events in the room in topological ordering.
+
+        Args:
+            room_id (str)
+            limit (int)
+            end_token (str): The stream token representing now.
+
+        Returns:
+            Deferred[tuple[list[FrozenEvent],  str]]: Returns a list of
+            events and a token pointing to the start of the returned
+            events.
+            The events returned are in ascending order.
+        """
+
         rows, token = yield self.get_recent_event_ids_for_room(
             room_id, limit, end_token,
         )
@@ -358,7 +372,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         self._set_before_and_after(events, rows)
 
-        defer.returnValue((events, (token, end_token)))
+        defer.returnValue((events, token))
 
     @defer.inlineCallbacks
     def get_recent_event_ids_for_room(self, room_id, limit, end_token):
