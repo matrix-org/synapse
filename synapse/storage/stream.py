@@ -607,12 +607,12 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             results["stream_ordering"],
         )
 
-        rows, start_token = self.paginate_room_events_txn(
+        rows, start_token = self._paginate_room_events_txn(
             txn, room_id, before_token, direction='b', limit=before_limit,
         )
         events_before = [r["event_id"] for r in rows]
 
-        rows, end_token = self.paginate_room_events_txn(
+        rows, end_token = self._paginate_room_events_txn(
             txn, room_id, after_token, direction='f', limit=after_limit,
         )
         events_after = [r["event_id"] for r in rows]
@@ -678,8 +678,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
     def has_room_changed_since(self, room_id, stream_id):
         return self._events_stream_cache.has_entity_changed(room_id, stream_id)
 
-    def paginate_room_events_txn(self, txn, room_id, from_token, to_token=None,
-                                 direction='b', limit=-1, event_filter=None):
+    def _paginate_room_events_txn(self, txn, room_id, from_token, to_token=None,
+                                  direction='b', limit=-1, event_filter=None):
         """Returns list of events before or after a given token.
 
         Args:
@@ -697,8 +697,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         Returns:
             tuple[list[dict], str]: Returns the results as a list of dicts and
-            a token that points to the end of the result set. The dicts haveq
-            the keys "event_id", "toplogical_ordering" and "stream_orderign".
+            a token that points to the end of the result set. The dicts have
+            the keys "event_id", "toplogical_ordering" and "stream_ordering".
         """
         # Tokens really represent positions between elements, but we use
         # the convention of pointing to the event before the gap. Hence
@@ -796,7 +796,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             to_key = RoomStreamToken.parse(to_key)
 
         rows, token = yield self.runInteraction(
-            "paginate_room_events", self.paginate_room_events_txn,
+            "paginate_room_events", self._paginate_room_events_txn,
             room_id, from_key, to_key, direction, limit, event_filter,
         )
 
