@@ -385,7 +385,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         Returns:
             Deferred[tuple[list[_EventDictReturn],  str]]: Returns a list of
-            _EventDictReturn and a token pointint to the start of the returned
+            _EventDictReturn and a token pointing to the start of the returned
             events.
             The events returned are in ascending order.
         """
@@ -514,7 +514,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             events (list[FrozenEvent])
             rows (list[_EventDictReturn])
             topo_order (bool): Whether the events were ordered topologically
-                or by stream ordering
+                or by stream ordering. If true then all rows should have a non
+                null topological_ordering.
         """
         for event, row in zip(events, rows):
             stream = row.stream_ordering
@@ -692,9 +693,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 those that match the filter.
 
         Returns:
-            tuple[list[_EventDictReturn], str]: Returns the results as a list
-            of _EventDictReturn and a token that points to the end of the
-            result set.
+            Deferred[tuple[list[_EventDictReturn], str]]: Returns the results
+            as a list of _EventDictReturn and a token that points to the end
+            of the result set.
         """
         # Tokens really represent positions between elements, but we use
         # the convention of pointing to the event before the gap. Hence
