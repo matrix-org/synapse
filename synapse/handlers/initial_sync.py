@@ -408,7 +408,7 @@ class InitialSyncHandler(BaseHandler):
             self.store, user_id, messages, is_peeking=is_peeking,
         )
 
-        start_token = now_token.copy_and_replace("room_key", token[0])
+        start_token = now_token.copy_and_replace("room_key", token)
         end_token = now_token
 
         time_now = self.clock.time_msec()
