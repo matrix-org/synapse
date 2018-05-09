@@ -304,10 +304,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_membership_changes_for_user(self, user_id, from_key, to_key):
-        if from_key is not None:
-            from_id = RoomStreamToken.parse_stream_token(from_key).stream
-        else:
-            from_id = None
+        from_id = RoomStreamToken.parse_stream_token(from_key).stream
         to_id = RoomStreamToken.parse_stream_token(to_key).stream
 
         if from_key == to_key:
@@ -321,26 +318,15 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 defer.returnValue([])
 
         def f(txn):
-            if from_id is not None:
-                sql = (
-                    "SELECT m.event_id, stream_ordering FROM events AS e,"
-                    " room_memberships AS m"
-                    " WHERE e.event_id = m.event_id"
-                    " AND m.user_id = ?"
-                    " AND e.stream_ordering > ? AND e.stream_ordering <= ?"
-                    " ORDER BY e.stream_ordering ASC"
-                )
-                txn.execute(sql, (user_id, from_id, to_id,))
-            else:
-                sql = (
-                    "SELECT m.event_id, stream_ordering FROM events AS e,"
-                    " room_memberships AS m"
-                    " WHERE e.event_id = m.event_id"
-                    " AND m.user_id = ?"
-                    " AND stream_ordering <= ?"
-                    " ORDER BY stream_ordering ASC"
-                )
-                txn.execute(sql, (user_id, to_id,))
+            sql = (
+                "SELECT m.event_id, stream_ordering FROM events AS e,"
+                " room_memberships AS m"
+                " WHERE e.event_id = m.event_id"
+                " AND m.user_id = ?"
+                " AND e.stream_ordering > ? AND e.stream_ordering <= ?"
+                " ORDER BY e.stream_ordering ASC"
+            )
+            txn.execute(sql, (user_id, from_id, to_id,))
 
             rows = [_EventDictReturn(row[0], None, row[1]) for row in txn]
 
