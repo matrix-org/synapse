@@ -90,12 +90,20 @@ def wrap_request_handler(request_handler, include_metrics=False):
                     try:
                         with PreserveLoggingContext(request_context):
                             if include_metrics:
-                                yield request_handler(
+                                d = request_handler(
                                     self, request, request.request_metrics,
                                 )
                             else:
-                                requests_counter.inc(request.method, servlet_name)
-                                yield request_handler(self, request)
+                                d = request_handler(self, request)
+
+                            # record the arrival of the request *after*
+                            # dispatching to the handler, so that the handler
+                            # can update the servlet name in the request
+                            # metrics
+                            requests_counter.inc(request.method,
+                                                 request.request_metrics.name)
+                            yield d
+
                     except CodeMessageException as e:
                         code = e.code
                         if isinstance(e, SynapseError):
@@ -220,7 +228,6 @@ class JsonResource(HttpServer, resource.Resource):
             servlet_classname = "%r" % callback
 
         request_metrics.name = servlet_classname
-        requests_counter.inc(request.method, servlet_classname)
 
         # Now trigger the callback. If it returns a response, we send it
         # here. If it throws an exception, that is handled by the wrapper
