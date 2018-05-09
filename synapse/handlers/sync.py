@@ -429,7 +429,7 @@ class SyncHandler(object):
         Returns:
             A Deferred map from ((type, state_key)->Event)
         """
-        last_events, token = yield self.store.get_recent_events_for_room(
+        last_events, _ = yield self.store.get_recent_events_for_room(
             room_id, end_token=stream_position.room_key, limit=1,
         )
 
