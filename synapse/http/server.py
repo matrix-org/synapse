@@ -87,7 +87,7 @@ def wrap_request_handler(request_handler, include_metrics=False):
                 # JsonResource (or a subclass), and JsonResource._async_render
                 # will update it once it picks a servlet.
                 servlet_name = self.__class__.__name__
-                request_metrics.start(self.clock, name=servlet_name)
+                request_metrics.start(self.clock.time_msec(), name=servlet_name)
 
                 with request.processing():
                     try:
@@ -138,7 +138,7 @@ def wrap_request_handler(request_handler, include_metrics=False):
                     finally:
                         try:
                             request_metrics.stop(
-                                self.clock, request
+                                self.clock.time_msec(), request
                             )
                         except Exception as e:
                             logger.warn("Failed to stop metrics: %r", e)

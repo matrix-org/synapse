@@ -100,12 +100,12 @@ response_size = metrics.register_counter(
 
 
 class RequestMetrics(object):
-    def start(self, clock, name):
-        self.start = clock.time_msec()
+    def start(self, time_msec, name):
+        self.start = time_msec
         self.start_context = LoggingContext.current_context()
         self.name = name
 
-    def stop(self, clock, request):
+    def stop(self, time_msec, request):
         context = LoggingContext.current_context()
 
         tag = ""
@@ -122,7 +122,7 @@ class RequestMetrics(object):
         response_count.inc(request.method, self.name, tag)
 
         response_timer.inc_by(
-            clock.time_msec() - self.start, request.method,
+            time_msec - self.start, request.method,
             self.name, tag
         )
 
