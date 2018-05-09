@@ -45,12 +45,12 @@ import simplejson
 logger = logging.getLogger(__name__)
 
 
-def request_handler(include_metrics=False):
+def request_handler():
     """Decorator for ``wrap_request_handler``"""
-    return lambda request_handler: wrap_request_handler(request_handler, include_metrics)
+    return wrap_request_handler
 
 
-def wrap_request_handler(request_handler, include_metrics=False):
+def wrap_request_handler(request_handler):
     """Wraps a request handler method with the necessary logging and exception
      handling.
 
@@ -88,12 +88,7 @@ def wrap_request_handler(request_handler, include_metrics=False):
                 with request.processing(servlet_name):
                     try:
                         with PreserveLoggingContext(request_context):
-                            if include_metrics:
-                                d = request_handler(
-                                    self, request, request.request_metrics,
-                                )
-                            else:
-                                d = request_handler(self, request)
+                            d = request_handler(self, request)
 
                             # record the arrival of the request *after*
                             # dispatching to the handler, so that the handler
@@ -206,13 +201,9 @@ class JsonResource(HttpServer, resource.Resource):
         self._async_render(request)
         return server.NOT_DONE_YET
 
-    # Disable metric reporting because _async_render does its own metrics.
-    # It does its own metric reporting because _async_render dispatches to
-    # a callback and it's the class name of that callback we want to report
-    # against rather than the JsonResource itself.
-    @request_handler(include_metrics=True)
+    @request_handler()
     @defer.inlineCallbacks
-    def _async_render(self, request, request_metrics):
+    def _async_render(self, request):
         """ This gets called from render() every time someone sends us a request.
             This checks if anyone has registered a callback for that method and
             path.
@@ -224,8 +215,7 @@ class JsonResource(HttpServer, resource.Resource):
             servlet_classname = servlet_instance.__class__.__name__
         else:
             servlet_classname = "%r" % callback
-
-        request_metrics.name = servlet_classname
+        request.request_metrics.name = servlet_classname
 
         # Now trigger the callback. If it returns a response, we send it
         # here. If it throws an exception, that is handled by the wrapper
