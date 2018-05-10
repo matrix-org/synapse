@@ -64,7 +64,7 @@ class DeactivateAccountHandler(BaseHandler):
 
     def _start_user_parting(self):
         if not self._user_parter_running:
-            run_in_background(self._user_parter_loop())
+            run_in_background(self._user_parter_loop)
 
     @defer.inlineCallbacks
     def _user_parter_loop(self):
