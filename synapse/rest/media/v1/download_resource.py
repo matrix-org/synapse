@@ -37,9 +37,8 @@ class DownloadResource(Resource):
         self.media_repo = media_repo
         self.server_name = hs.hostname
 
-        # Both of these are expected by @request_handler()
+        # this is expected by @wrap_json_request_handler
         self.clock = hs.get_clock()
-        self.version_string = hs.version_string
 
     def render_GET(self, request):
         self._async_render_GET(request)

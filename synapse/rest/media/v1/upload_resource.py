@@ -41,7 +41,6 @@ class UploadResource(Resource):
         self.server_name = hs.hostname
         self.auth = hs.get_auth()
         self.max_upload_size = hs.config.max_upload_size
-        self.version_string = hs.version_string
         self.clock = hs.get_clock()
 
     def render_POST(self, request):

@@ -42,8 +42,7 @@ class AdditionalResource(Resource):
         Resource.__init__(self)
         self._handler = handler
 
-        # these are required by the request_handler wrapper
-        self.version_string = hs.version_string
+        # required by the request_handler wrapper
         self.clock = hs.get_clock()
 
     def render(self, request):

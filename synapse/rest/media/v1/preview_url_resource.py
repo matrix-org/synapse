@@ -58,7 +58,6 @@ class PreviewUrlResource(Resource):
 
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.version_string = hs.version_string
         self.filepaths = media_repo.filepaths
         self.max_spider_size = hs.config.max_spider_size
         self.server_name = hs.hostname

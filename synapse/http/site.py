@@ -77,6 +77,11 @@ class SynapseRequest(Request):
     def get_user_agent(self):
         return self.requestHeaders.getRawHeaders(b"User-Agent", [None])[-1]
 
+    def render(self, resrc):
+        # override the Server header which is set by twisted
+        self.setHeader("Server", self.site.server_version_string)
+        return Request.render(self, resrc)
+
     def _started_processing(self, servlet_name):
         self.start_time = int(time.time() * 1000)
         self.request_metrics = RequestMetrics()
@@ -151,6 +156,8 @@ class SynapseRequest(Request):
                 It is possible to update this afterwards by updating
                 self.request_metrics.servlet_name.
         """
+        # TODO: we should probably just move this into render() and finish(),
+        # to save having to call a separate method.
         self._started_processing(servlet_name)
         yield
         self._finished_processing()
@@ -191,7 +198,8 @@ class SynapseSite(Site):
     Subclass of a twisted http Site that does access logging with python's
     standard logging
     """
-    def __init__(self, logger_name, site_tag, config, resource, *args, **kwargs):
+    def __init__(self, logger_name, site_tag, config, resource,
+                 server_version_string, *args, **kwargs):
         Site.__init__(self, resource, *args, **kwargs)
 
         self.site_tag = site_tag
@@ -199,6 +207,7 @@ class SynapseSite(Site):
         proxied = config.get("x_forwarded", False)
         self.requestFactory = SynapseRequestFactory(self, proxied)
         self.access_logger = logging.getLogger(logger_name)
+        self.server_version_string = server_version_string
 
     def log(self, request):
         pass

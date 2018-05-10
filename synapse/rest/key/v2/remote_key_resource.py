@@ -93,7 +93,6 @@ class RemoteKey(Resource):
     def __init__(self, hs):
         self.keyring = hs.get_keyring()
         self.store = hs.get_datastore()
-        self.version_string = hs.version_string
         self.clock = hs.get_clock()
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
 
@@ -242,5 +241,4 @@ class RemoteKey(Resource):
 
             respond_with_json_bytes(
                 request, 200, result_io.getvalue(),
-                version_string=self.version_string
             )

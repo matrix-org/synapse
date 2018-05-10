@@ -44,7 +44,6 @@ class ThumbnailResource(Resource):
         self.media_storage = media_storage
         self.dynamic_thumbnails = hs.config.dynamic_thumbnails
         self.server_name = hs.hostname
-        self.version_string = hs.version_string
         self.clock = hs.get_clock()
 
     def render_GET(self, request):
