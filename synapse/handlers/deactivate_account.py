@@ -31,8 +31,11 @@ class DeactivateAccountHandler(BaseHandler):
         self._device_handler = hs.get_device_handler()
         self._room_member_handler = hs.get_room_member_handler()
 
+        # Flag that indicates whether the process to part users from rooms is running
         self._user_parter_running = False
 
+        # Start the user parter loop so it can resume parting users from rooms where
+        # it left off (if it has work left to do).
         reactor.callWhenRunning(self._start_user_parting)
 
     @defer.inlineCallbacks
@@ -58,16 +61,32 @@ class DeactivateAccountHandler(BaseHandler):
         yield self.store.user_delete_threepids(user_id)
         yield self.store.user_set_password_hash(user_id, None)
 
+        # Add the user to a table of users penpding deactivation (ie.
+        # removal from all the rooms they're a member of)
         yield self.store.add_user_pending_deactivation(user_id)
 
+        # Now start the process that goes through that list and
+        # parts users from rooms (if it isn't already running)
         self._start_user_parting()
 
     def _start_user_parting(self):
+        """
+        Start the process that goes through the table of users
+        pending deactivation, if it isn't already running.
+
+        Returns:
+            None
+        """
         if not self._user_parter_running:
             run_in_background(self._user_parter_loop)
 
     @defer.inlineCallbacks
     def _user_parter_loop(self):
+        """Loop that parts deactivated users from rooms
+
+        Returns:
+            None
+        """
         self._user_parter_running = True
         logger.info("Starting user parter")
         try:
@@ -85,6 +104,11 @@ class DeactivateAccountHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _part_user(self, user_id):
+        """Causes the given user_id to leave all the rooms they're joined to
+
+        Returns:
+            None
+        """
         user = UserID.from_string(user_id)
 
         rooms_for_user = yield self.store.get_rooms_for_user(user_id)

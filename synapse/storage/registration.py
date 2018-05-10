@@ -528,6 +528,10 @@ class RegistrationStore(RegistrationWorkerStore,
             defer.returnValue(ret)
 
     def add_user_pending_deactivation(self, user_id):
+        """
+        Adds a user to the table of users who need to be parted from all the rooms they're
+        in
+        """
         return self._simple_insert(
             "users_pending_deactivation",
             values={
@@ -537,6 +541,10 @@ class RegistrationStore(RegistrationWorkerStore,
         )
 
     def del_user_pending_deactivation(self, user_id):
+        """
+        Removes the given user to the table of users who need to be parted from all the
+        rooms they're in, effectively marking that user as fully deactivated.
+        """
         return self._simple_delete_one(
             "users_pending_deactivation",
             keyvalues={
@@ -546,6 +554,10 @@ class RegistrationStore(RegistrationWorkerStore,
         )
 
     def get_user_pending_deactivation(self):
+        """
+        Gets one user from the table of users waiting to be parted from all the rooms
+        they're in.
+        """
         return self._simple_select_one_onecol(
             "users_pending_deactivation",
             keyvalues={},
