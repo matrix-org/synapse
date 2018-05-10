@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import request_handler, respond_with_json_bytes
+from synapse.http.server import (
+    respond_with_json_bytes, wrap_json_request_handler,
+)
 from synapse.http.servlet import parse_integer, parse_json_object_from_request
 from synapse.api.errors import SynapseError, Codes
 from synapse.crypto.keyring import KeyLookupError
@@ -99,7 +101,7 @@ class RemoteKey(Resource):
         self.async_render_GET(request)
         return NOT_DONE_YET
 
-    @request_handler()
+    @wrap_json_request_handler
     @defer.inlineCallbacks
     def async_render_GET(self, request):
         if len(request.postpath) == 1:
@@ -124,7 +126,7 @@ class RemoteKey(Resource):
         self.async_render_POST(request)
         return NOT_DONE_YET
 
-    @request_handler()
+    @wrap_json_request_handler
     @defer.inlineCallbacks
     def async_render_POST(self, request):
         content = parse_json_object_from_request(request)

@@ -18,6 +18,9 @@
 from synapse.api.errors import (
     cs_exception, SynapseError, CodeMessageException, UnrecognizedRequestError, Codes
 )
+from synapse.http.request_metrics import (
+    requests_counter,
+)
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.caches import intern_dict
 from synapse.util.metrics import Measure
@@ -41,178 +44,105 @@ import simplejson
 
 logger = logging.getLogger(__name__)
 
-metrics = synapse.metrics.get_metrics_for(__name__)
 
-# total number of responses served, split by method/servlet/tag
-response_count = metrics.register_counter(
-    "response_count",
-    labels=["method", "servlet", "tag"],
-    alternative_names=(
-        # the following are all deprecated aliases for the same metric
-        metrics.name_prefix + x for x in (
-            "_requests",
-            "_response_time:count",
-            "_response_ru_utime:count",
-            "_response_ru_stime:count",
-            "_response_db_txn_count:count",
-            "_response_db_txn_duration:count",
-        )
-    )
-)
+def wrap_json_request_handler(h):
+    """Wraps a request handler method with exception handling.
 
-requests_counter = metrics.register_counter(
-    "requests_received",
-    labels=["method", "servlet", ],
-)
+    Also adds logging as per wrap_request_handler_with_logging.
 
-outgoing_responses_counter = metrics.register_counter(
-    "responses",
-    labels=["method", "code"],
-)
+    The handler method must have a signature of "handle_foo(self, request)",
+    where "self" must have "version_string" and "clock" attributes (and
+    "request" must be a SynapseRequest).
 
-response_timer = metrics.register_counter(
-    "response_time_seconds",
-    labels=["method", "servlet", "tag"],
-    alternative_names=(
-        metrics.name_prefix + "_response_time:total",
-    ),
-)
-
-response_ru_utime = metrics.register_counter(
-    "response_ru_utime_seconds", labels=["method", "servlet", "tag"],
-    alternative_names=(
-        metrics.name_prefix + "_response_ru_utime:total",
-    ),
-)
-
-response_ru_stime = metrics.register_counter(
-    "response_ru_stime_seconds", labels=["method", "servlet", "tag"],
-    alternative_names=(
-        metrics.name_prefix + "_response_ru_stime:total",
-    ),
-)
-
-response_db_txn_count = metrics.register_counter(
-    "response_db_txn_count", labels=["method", "servlet", "tag"],
-    alternative_names=(
-        metrics.name_prefix + "_response_db_txn_count:total",
-    ),
-)
-
-# seconds spent waiting for db txns, excluding scheduling time, when processing
-# this request
-response_db_txn_duration = metrics.register_counter(
-    "response_db_txn_duration_seconds", labels=["method", "servlet", "tag"],
-    alternative_names=(
-        metrics.name_prefix + "_response_db_txn_duration:total",
-    ),
-)
-
-# seconds spent waiting for a db connection, when processing this request
-response_db_sched_duration = metrics.register_counter(
-    "response_db_sched_duration_seconds", labels=["method", "servlet", "tag"]
-)
-
-# size in bytes of the response written
-response_size = metrics.register_counter(
-    "response_size", labels=["method", "servlet", "tag"]
-)
-
-_next_request_id = 0
-
-
-def request_handler(include_metrics=False):
-    """Decorator for ``wrap_request_handler``"""
-    return lambda request_handler: wrap_request_handler(request_handler, include_metrics)
-
-
-def wrap_request_handler(request_handler, include_metrics=False):
-    """Wraps a method that acts as a request handler with the necessary logging
-    and exception handling.
-
-    The method must have a signature of "handle_foo(self, request)". The
-    argument "self" must have "version_string" and "clock" attributes. The
-    argument "request" must be a twisted HTTP request.
-
-    The method must return a deferred. If the deferred succeeds we assume that
+    The handler must return a deferred. If the deferred succeeds we assume that
     a response has been sent. If the deferred fails with a SynapseError we use
     it to send a JSON response with the appropriate HTTP reponse code. If the
     deferred fails with any other type of error we send a 500 reponse.
-
-    We insert a unique request-id into the logging context for this request and
-    log the response and duration for this request.
     """
 
     @defer.inlineCallbacks
     def wrapped_request_handler(self, request):
-        global _next_request_id
-        request_id = "%s-%s" % (request.method, _next_request_id)
-        _next_request_id += 1
+        try:
+            yield h(self, request)
+        except CodeMessageException as e:
+            code = e.code
+            if isinstance(e, SynapseError):
+                logger.info(
+                    "%s SynapseError: %s - %s", request, code, e.msg
+                )
+            else:
+                logger.exception(e)
+            respond_with_json(
+                request, code, cs_exception(e), send_cors=True,
+                pretty_print=_request_user_agent_is_curl(request),
+                version_string=self.version_string,
+            )
 
+        except Exception:
+            # failure.Failure() fishes the original Failure out
+            # of our stack, and thus gives us a sensible stack
+            # trace.
+            f = failure.Failure()
+            logger.error(
+                "Failed handle request via %r: %r: %s",
+                h,
+                request,
+                f.getTraceback().rstrip(),
+            )
+            respond_with_json(
+                request,
+                500,
+                {
+                    "error": "Internal server error",
+                    "errcode": Codes.UNKNOWN,
+                },
+                send_cors=True,
+                pretty_print=_request_user_agent_is_curl(request),
+                version_string=self.version_string,
+            )
+
+    return wrap_request_handler_with_logging(wrapped_request_handler)
+
+
+def wrap_request_handler_with_logging(h):
+    """Wraps a request handler to provide logging and metrics
+
+    The handler method must have a signature of "handle_foo(self, request)",
+    where "self" must have a "clock" attribute (and "request" must be a
+    SynapseRequest).
+
+    As well as calling `request.processing` (which will log the response and
+    duration for this request), the wrapped request handler will insert the
+    request id into the logging context.
+    """
+    @defer.inlineCallbacks
+    def wrapped_request_handler(self, request):
+        """
+        Args:
+            self:
+            request (synapse.http.site.SynapseRequest):
+        """
+
+        request_id = request.get_request_id()
         with LoggingContext(request_id) as request_context:
+            request_context.request = request_id
             with Measure(self.clock, "wrapped_request_handler"):
-                request_metrics = RequestMetrics()
                 # we start the request metrics timer here with an initial stab
                 # at the servlet name. For most requests that name will be
                 # JsonResource (or a subclass), and JsonResource._async_render
                 # will update it once it picks a servlet.
                 servlet_name = self.__class__.__name__
-                request_metrics.start(self.clock, name=servlet_name)
+                with request.processing(servlet_name):
+                    with PreserveLoggingContext(request_context):
+                        d = h(self, request)
 
-                request_context.request = request_id
-                with request.processing():
-                    try:
-                        with PreserveLoggingContext(request_context):
-                            if include_metrics:
-                                yield request_handler(self, request, request_metrics)
-                            else:
-                                requests_counter.inc(request.method, servlet_name)
-                                yield request_handler(self, request)
-                    except CodeMessageException as e:
-                        code = e.code
-                        if isinstance(e, SynapseError):
-                            logger.info(
-                                "%s SynapseError: %s - %s", request, code, e.msg
-                            )
-                        else:
-                            logger.exception(e)
-                        outgoing_responses_counter.inc(request.method, str(code))
-                        respond_with_json(
-                            request, code, cs_exception(e), send_cors=True,
-                            pretty_print=_request_user_agent_is_curl(request),
-                            version_string=self.version_string,
-                        )
-                    except Exception:
-                        # failure.Failure() fishes the original Failure out
-                        # of our stack, and thus gives us a sensible stack
-                        # trace.
-                        f = failure.Failure()
-                        logger.error(
-                            "Failed handle request %s.%s on %r: %r: %s",
-                            request_handler.__module__,
-                            request_handler.__name__,
-                            self,
-                            request,
-                            f.getTraceback().rstrip(),
-                        )
-                        respond_with_json(
-                            request,
-                            500,
-                            {
-                                "error": "Internal server error",
-                                "errcode": Codes.UNKNOWN,
-                            },
-                            send_cors=True,
-                            pretty_print=_request_user_agent_is_curl(request),
-                            version_string=self.version_string,
-                        )
-                    finally:
-                        try:
-                            request_metrics.stop(
-                                self.clock, request
-                            )
-                        except Exception as e:
-                            logger.warn("Failed to stop metrics: %r", e)
+                        # record the arrival of the request *after*
+                        # dispatching to the handler, so that the handler
+                        # can update the servlet name in the request
+                        # metrics
+                        requests_counter.inc(request.method,
+                                             request.request_metrics.name)
+                        yield d
     return wrapped_request_handler
 
 
@@ -278,13 +208,9 @@ class JsonResource(HttpServer, resource.Resource):
         self._async_render(request)
         return server.NOT_DONE_YET
 
-    # Disable metric reporting because _async_render does its own metrics.
-    # It does its own metric reporting because _async_render dispatches to
-    # a callback and it's the class name of that callback we want to report
-    # against rather than the JsonResource itself.
-    @request_handler(include_metrics=True)
+    @wrap_json_request_handler
     @defer.inlineCallbacks
-    def _async_render(self, request, request_metrics):
+    def _async_render(self, request):
         """ This gets called from render() every time someone sends us a request.
             This checks if anyone has registered a callback for that method and
             path.
@@ -296,9 +222,7 @@ class JsonResource(HttpServer, resource.Resource):
             servlet_classname = servlet_instance.__class__.__name__
         else:
             servlet_classname = "%r" % callback
-
-        request_metrics.name = servlet_classname
-        requests_counter.inc(request.method, servlet_classname)
+        request.request_metrics.name = servlet_classname
 
         # Now trigger the callback. If it returns a response, we send it
         # here. If it throws an exception, that is handled by the wrapper
@@ -345,8 +269,6 @@ class JsonResource(HttpServer, resource.Resource):
 
     def _send_response(self, request, code, response_json_object,
                        response_code_message=None):
-        outgoing_responses_counter.inc(request.method, str(code))
-
         # TODO: Only enable CORS for the requests that need it.
         respond_with_json(
             request, code, response_json_object,
@@ -384,54 +306,6 @@ def _unrecognised_request_handler(request):
         request (twisted.web.http.Request):
     """
     raise UnrecognizedRequestError()
-
-
-class RequestMetrics(object):
-    def start(self, clock, name):
-        self.start = clock.time_msec()
-        self.start_context = LoggingContext.current_context()
-        self.name = name
-
-    def stop(self, clock, request):
-        context = LoggingContext.current_context()
-
-        tag = ""
-        if context:
-            tag = context.tag
-
-            if context != self.start_context:
-                logger.warn(
-                    "Context have unexpectedly changed %r, %r",
-                    context, self.start_context
-                )
-                return
-
-        response_count.inc(request.method, self.name, tag)
-
-        response_timer.inc_by(
-            clock.time_msec() - self.start, request.method,
-            self.name, tag
-        )
-
-        ru_utime, ru_stime = context.get_resource_usage()
-
-        response_ru_utime.inc_by(
-            ru_utime, request.method, self.name, tag
-        )
-        response_ru_stime.inc_by(
-            ru_stime, request.method, self.name, tag
-        )
-        response_db_txn_count.inc_by(
-            context.db_txn_count, request.method, self.name, tag
-        )
-        response_db_txn_duration.inc_by(
-            context.db_txn_duration_ms / 1000., request.method, self.name, tag
-        )
-        response_db_sched_duration.inc_by(
-            context.db_sched_duration_ms / 1000., request.method, self.name, tag
-        )
-
-        response_size.inc_by(request.sentLength, request.method, self.name, tag)
 
 
 class RootRedirect(resource.Resource):
