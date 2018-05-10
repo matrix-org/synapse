@@ -45,12 +45,7 @@ import simplejson
 logger = logging.getLogger(__name__)
 
 
-def request_handler():
-    """Decorator for ``wrap_request_handler``"""
-    return wrap_request_handler
-
-
-def wrap_request_handler(h):
+def wrap_json_request_handler(h):
     """Wraps a request handler method with exception handling.
 
     Also adds logging as per wrap_request_handler_with_logging.
@@ -213,7 +208,7 @@ class JsonResource(HttpServer, resource.Resource):
         self._async_render(request)
         return server.NOT_DONE_YET
 
-    @request_handler()
+    @wrap_json_request_handler
     @defer.inlineCallbacks
     def _async_render(self, request):
         """ This gets called from render() every time someone sends us a request.
