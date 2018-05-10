@@ -50,9 +50,10 @@ def request_handler():
     return wrap_request_handler
 
 
-def wrap_request_handler(request_handler):
-    """Wraps a request handler method with the necessary logging and exception
-     handling.
+def wrap_request_handler(h):
+    """Wraps a request handler method with exception handling.
+
+    Also adds logging as per wrap_request_handler_with_logging.
 
     The handler method must have a signature of "handle_foo(self, request)",
     where "self" must have "version_string" and "clock" attributes (and
@@ -62,12 +63,63 @@ def wrap_request_handler(request_handler):
     a response has been sent. If the deferred fails with a SynapseError we use
     it to send a JSON response with the appropriate HTTP reponse code. If the
     deferred fails with any other type of error we send a 500 reponse.
+    """
+
+    @defer.inlineCallbacks
+    def wrapped_request_handler(self, request):
+        try:
+            yield h(self, request)
+        except CodeMessageException as e:
+            code = e.code
+            if isinstance(e, SynapseError):
+                logger.info(
+                    "%s SynapseError: %s - %s", request, code, e.msg
+                )
+            else:
+                logger.exception(e)
+            respond_with_json(
+                request, code, cs_exception(e), send_cors=True,
+                pretty_print=_request_user_agent_is_curl(request),
+                version_string=self.version_string,
+            )
+
+        except Exception:
+            # failure.Failure() fishes the original Failure out
+            # of our stack, and thus gives us a sensible stack
+            # trace.
+            f = failure.Failure()
+            logger.error(
+                "Failed handle request via %r: %r: %s",
+                h,
+                request,
+                f.getTraceback().rstrip(),
+            )
+            respond_with_json(
+                request,
+                500,
+                {
+                    "error": "Internal server error",
+                    "errcode": Codes.UNKNOWN,
+                },
+                send_cors=True,
+                pretty_print=_request_user_agent_is_curl(request),
+                version_string=self.version_string,
+            )
+
+    return wrap_request_handler_with_logging(wrapped_request_handler)
+
+
+def wrap_request_handler_with_logging(h):
+    """Wraps a request handler to provide logging and metrics
+
+    The handler method must have a signature of "handle_foo(self, request)",
+    where "self" must have a "clock" attribute (and "request" must be a
+    SynapseRequest).
 
     As well as calling `request.processing` (which will log the response and
     duration for this request), the wrapped request handler will insert the
     request id into the logging context.
     """
-
     @defer.inlineCallbacks
     def wrapped_request_handler(self, request):
         """
@@ -86,56 +138,16 @@ def wrap_request_handler(request_handler):
                 # will update it once it picks a servlet.
                 servlet_name = self.__class__.__name__
                 with request.processing(servlet_name):
-                    try:
-                        with PreserveLoggingContext(request_context):
-                            d = request_handler(self, request)
+                    with PreserveLoggingContext(request_context):
+                        d = h(self, request)
 
-                            # record the arrival of the request *after*
-                            # dispatching to the handler, so that the handler
-                            # can update the servlet name in the request
-                            # metrics
-                            requests_counter.inc(request.method,
-                                                 request.request_metrics.name)
-                            yield d
-
-                    except CodeMessageException as e:
-                        code = e.code
-                        if isinstance(e, SynapseError):
-                            logger.info(
-                                "%s SynapseError: %s - %s", request, code, e.msg
-                            )
-                        else:
-                            logger.exception(e)
-                        respond_with_json(
-                            request, code, cs_exception(e), send_cors=True,
-                            pretty_print=_request_user_agent_is_curl(request),
-                            version_string=self.version_string,
-                        )
-                    except Exception:
-                        # failure.Failure() fishes the original Failure out
-                        # of our stack, and thus gives us a sensible stack
-                        # trace.
-                        f = failure.Failure()
-                        logger.error(
-                            "Failed handle request %s.%s on %r: %r: %s",
-                            request_handler.__module__,
-                            request_handler.__name__,
-                            self,
-                            request,
-                            f.getTraceback().rstrip(),
-                        )
-                        respond_with_json(
-                            request,
-                            500,
-                            {
-                                "error": "Internal server error",
-                                "errcode": Codes.UNKNOWN,
-                            },
-                            send_cors=True,
-                            pretty_print=_request_user_agent_is_curl(request),
-                            version_string=self.version_string,
-                        )
-
+                        # record the arrival of the request *after*
+                        # dispatching to the handler, so that the handler
+                        # can update the servlet name in the request
+                        # metrics
+                        requests_counter.inc(request.method,
+                                             request.request_metrics.name)
+                        yield d
     return wrapped_request_handler
 
 
