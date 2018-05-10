@@ -114,10 +114,16 @@ class DeactivateAccountHandler(BaseHandler):
         rooms_for_user = yield self.store.get_rooms_for_user(user_id)
         for room_id in rooms_for_user:
             logger.info("User parter parting %r from %r", user_id, room_id)
-            yield self._room_member_handler.update_membership(
-                create_requester(user),
-                user,
-                room_id,
-                "leave",
-                ratelimit=False,
-            )
+            try:
+                yield self._room_member_handler.update_membership(
+                    create_requester(user),
+                    user,
+                    room_id,
+                    "leave",
+                    ratelimit=False,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to part user %r from room %r: ignoring and continuing",
+                    user_id, room_id,
+                )
