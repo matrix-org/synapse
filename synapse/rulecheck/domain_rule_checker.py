@@ -19,25 +19,25 @@ from synapse.config._base import ConfigError
 
 logger = logging.getLogger(__name__)
 
-"""
-DomainRuleChecker
-
-Takes a config in the format:
-
-spam_checker:
-    module: "rulecheck.DomainRuleChecker"
-    config:
-      domain_mapping:
-        "inviter_domain": [ "invitee_domain_permitted", "other_invitee_domain_permitted" ]
-        "other_inviter_domain": [ "invitee_domain_permitted" ]
-      default: False
-    }
-
-Don't forget to consider if you can invite users from your own domain.
-"""
-
 
 class DomainRuleChecker(object):
+    """
+    A re-implementation of the SpamChecker that prevents users in one domain from
+    inviting users in other domains to rooms, based on a configuration.
+
+    Takes a config in the format:
+
+    spam_checker:
+        module: "rulecheck.DomainRuleChecker"
+        config:
+          domain_mapping:
+            "inviter_domain": [ "invitee_domain_permitted", "other_domain_permitted" ]
+            "other_inviter_domain": [ "invitee_domain_permitted" ]
+          default: False
+        }
+
+    Don't forget to consider if you can invite users from your own domain.
+    """
 
     def __init__(self, config):
         self.domain_mapping = config["domain_mapping"] or {}
@@ -50,11 +50,10 @@ class DomainRuleChecker(object):
         inviter_domain = self._get_domain_from_id(inviter_userid)
         invitee_domain = self._get_domain_from_id(invitee_userid)
 
-        valid_targets = self.domain_mapping.get(inviter_domain)
-        if not valid_targets:
+        if inviter_domain not in self.domain_mapping:
             return self.default
 
-        return invitee_domain in valid_targets
+        return invitee_domain in self.domain_mapping.get(inviter_domain)
 
     def user_may_create_room(self, userid):
         return True

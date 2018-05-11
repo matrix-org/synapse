@@ -43,7 +43,8 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
             "default": True,
             "domain_mapping": {
                 "source_one": ["target_one", "target_two"],
-                "source_two": ["target_two"]
+                "source_two": ["target_two"],
+                "source_four": []
             }
         }
         check = DomainRuleChecker(config)
@@ -52,6 +53,8 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
         self.assertFalse(check.user_may_invite("test:source_two",
                                                "test:target_three", "room"))
         self.assertFalse(check.user_may_invite("test:source_two",
+                                               "test:target_one", "room"))
+        self.assertFalse(check.user_may_invite("test:source_four",
                                                "test:target_one", "room"))
 
     def test_default_allow(self):
