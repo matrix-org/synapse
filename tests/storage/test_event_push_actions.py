@@ -55,7 +55,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
         def _assert_counts(noitf_count, highlight_count):
             counts = yield self.store.runInteraction(
                 "", self.store._get_unread_counts_by_pos_txn,
-                room_id, user_id, 0, 0
+                room_id, user_id, 0
             )
             self.assertEquals(
                 counts,
@@ -86,7 +86,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
         def _mark_read(stream, depth):
             return self.store.runInteraction(
                 "", self.store._remove_old_push_actions_before_txn,
-                room_id, user_id, depth, stream
+                room_id, user_id, stream
             )
 
         yield _assert_counts(0, 0)
