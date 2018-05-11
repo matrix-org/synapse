@@ -51,8 +51,8 @@ def wrap_json_request_handler(h):
     Also adds logging as per wrap_request_handler_with_logging.
 
     The handler method must have a signature of "handle_foo(self, request)",
-    where "self" must have "version_string" and "clock" attributes (and
-    "request" must be a SynapseRequest).
+    where "self" must have a "clock" attribute (and "request" must be a
+    SynapseRequest).
 
     The handler must return a deferred. If the deferred succeeds we assume that
     a response has been sent. If the deferred fails with a SynapseError we use
@@ -75,7 +75,6 @@ def wrap_json_request_handler(h):
             respond_with_json(
                 request, code, cs_exception(e), send_cors=True,
                 pretty_print=_request_user_agent_is_curl(request),
-                version_string=self.version_string,
             )
 
         except Exception:
@@ -98,7 +97,6 @@ def wrap_json_request_handler(h):
                 },
                 send_cors=True,
                 pretty_print=_request_user_agent_is_curl(request),
-                version_string=self.version_string,
             )
 
     return wrap_request_handler_with_logging(wrapped_request_handler)
@@ -192,7 +190,6 @@ class JsonResource(HttpServer, resource.Resource):
         self.canonical_json = canonical_json
         self.clock = hs.get_clock()
         self.path_regexs = {}
-        self.version_string = hs.version_string
         self.hs = hs
 
     def register_paths(self, method, path_patterns, callback):
@@ -275,7 +272,6 @@ class JsonResource(HttpServer, resource.Resource):
             send_cors=True,
             response_code_message=response_code_message,
             pretty_print=_request_user_agent_is_curl(request),
-            version_string=self.version_string,
             canonical_json=self.canonical_json,
         )
 
@@ -326,7 +322,7 @@ class RootRedirect(resource.Resource):
 
 def respond_with_json(request, code, json_object, send_cors=False,
                       response_code_message=None, pretty_print=False,
-                      version_string="", canonical_json=True):
+                      canonical_json=True):
     # could alternatively use request.notifyFinish() and flip a flag when
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
@@ -348,12 +344,11 @@ def respond_with_json(request, code, json_object, send_cors=False,
         request, code, json_bytes,
         send_cors=send_cors,
         response_code_message=response_code_message,
-        version_string=version_string
     )
 
 
 def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
-                            version_string="", response_code_message=None):
+                            response_code_message=None):
     """Sends encoded JSON in response to the given request.
 
     Args:
@@ -367,7 +362,6 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
 
     request.setResponseCode(code, message=response_code_message)
     request.setHeader(b"Content-Type", b"application/json")
-    request.setHeader(b"Server", version_string)
     request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
     request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
 
