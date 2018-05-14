@@ -353,48 +353,22 @@ class DataStore(RoomMemberStore, RoomStore,
         Generates daily visit data for use in cohort/ retention analysis
         """
         def _generate_user_daily_visits(txn):
-            logger.info("Calling _generate_user_daily_visits")
-            # determine timestamp of previous days
-            yesterday = datetime.datetime.utcnow() - datetime.timedelta(days=1)
-            yesterday_start = datetime.datetime(yesterday.year, yesterday.month,
-                                                yesterday.day, tzinfo=tz.tzutc())
-            yesterday_start_time = int(time.mktime(yesterday_start.timetuple())) * 1000
 
-            # Check that this job has not already been completed
+            # determine timestamp of the day start
+            now = datetime.datetime.utcnow()
+            today_start = datetime.datetime(now.year, now.month,
+                                            now.day, tzinfo=tz.tzutc())
+            today_start_time = int(time.mktime(today_start.timetuple())) * 1000
+            logger.info(today_start_time)
             sql = """
-                SELECT timestamp
-                FROM user_daily_visits
-                ORDER by timestamp desc limit 1
-            """
-            txn.execute(sql)
-            row = txn.fetchone()
-
-            # Bail if the most recent time is yesterday
-            if row and row[0] == yesterday_start_time:
-                return
-
-            # Not specificying an upper bound means that if the update is run at
-            # 10 mins past midnight and the user is active during a 30 min session
-            # that the user is still included in the previous days stats
-            # This does mean that if the update is run hours late, then it is possible
-            # to overstate the cohort, but this seems a reasonable trade off
-            # The alternative is to insert on every request - but prefer to avoid
-            # for performance reasons
-            sql = """
-                    SELECT user_id, device_id
-                    FROM user_ips
-                    WHERE last_seen > ?
-            """
-            txn.execute(sql, (yesterday_start_time,))
-            user_visits = txn.fetchall()
-
-            sql = """
-                    INSERT INTO user_daily_visits (user_id, device_id, timestamp)
-                    VALUES (?, ?, ?)
-            """
-
-            for visit in user_visits:
-                txn.execute(sql, (visit + (yesterday_start_time,)))
+                INSERT INTO user_daily_visits (user_id, device_id, timestamp)
+                SELECT user_id, device_id, ?
+                FROM user_ips AS u
+                LEFT JOIN user_daily_visits USING (user_id, device_id)
+                WHERE last_seen > ? AND timestamp IS NULL
+                GROUP BY user_id, device_id;
+                """
+            txn.execute(sql, (today_start_time, today_start_time))
 
         return self.runInteraction("generate_user_daily_visits",
                                    _generate_user_daily_visits)

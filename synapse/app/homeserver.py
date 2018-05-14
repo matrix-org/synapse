@@ -17,6 +17,7 @@ import gc
 import logging
 import os
 import sys
+import datetime
 
 import synapse
 import synapse.config.logger
@@ -475,8 +476,23 @@ def run(hs):
                 " changes across releases."
             )
 
+    # def recurring_user_daily_visit_stats():
+
     def generate_user_daily_visit_stats():
         hs.get_datastore().generate_user_daily_visits()
+
+    # Since user daily stats are bucketed at midnight UTC,
+    # and user_ips.last_seen can be updated at any time, it is important to call
+    # generate_user_daily_visit_stats immediately prior to the day end. Assuming
+    # an hourly cadence, the simplist way is to allign all calls to the hour
+    # end
+    end_of_hour = datetime.datetime.now().replace(microsecond=0, second=0, minute=0) \
+        + datetime.timedelta(hours=1) \
+        - datetime.timedelta(seconds=10)  # Ensure method fires before day transistion
+
+    time_to_next_hour = end_of_hour - datetime.datetime.now()
+    clock.call_later(time_to_next_hour.seconds,
+                     clock.looping_call(generate_user_daily_visit_stats, 60 * 60 * 1000))
 
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
@@ -489,9 +505,6 @@ def run(hs):
         # We wait 5 minutes to send the first set of stats as the server can
         # be quite busy the first few minutes
         clock.call_later(5 * 60, phone_stats_home)
-
-    clock.looping_call(generate_user_daily_visit_stats, 10 * 60 * 1000)
-    clock.call_later(5 * 60, generate_user_daily_visit_stats)
 
     if hs.config.daemonize and hs.config.print_pidfile:
         print (hs.config.pid_file)
