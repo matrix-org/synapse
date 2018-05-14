@@ -26,11 +26,9 @@ Changes - General:
 * Part user from rooms on account deactivate (PR #3201)
 * Make 'unexpected logging context' into warnings (PR #3007)
 * Set Server header in SynapseRequest (PR #3208)
-* Use deferred.addTimeout instead of time_bound_deferred (PR #3127, #3178)
 * remove duplicates from groups tables (PR #3129)
 * Improve exception handling for background processes (PR #3138)
 * Add missing consumeErrors to improve exception handling (PR #3139)
-* Use run_in_background in preference to preserve_fn (PR #3140)
 * reraise exceptions more carefully (PR #3142)
 * Remove redundant call to preserve_fn (PR #3143)
 * Trap exceptions thrown within run_in_background (PR #3144)
@@ -46,6 +44,9 @@ Changes - Refactors:
 * Refactor request handling wrappers (PR #3203)
 * transaction_id, destination defined twice (PR #3209) Thanks to @damir-manapov!
 * Refactor event storage to prepare for changes in state calculations (PR #3141)
+* Set Server header in SynapseRequest (PR #3208)
+* Use deferred.addTimeout instead of time_bound_deferred (PR #3127, #3178)
+* Use run_in_background in preference to preserve_fn (PR #3140)
 
 Changes - Python 3 migration:
 
