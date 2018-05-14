@@ -18,8 +18,8 @@ import logging
 from twisted.internet import defer, reactor
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
-import push_rule_evaluator
-import push_tools
+from . import push_rule_evaluator
+from . import push_tools
 import synapse
 from synapse.push import PusherConfigException
 from synapse.util.logcontext import LoggingContext
@@ -94,7 +94,10 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def on_started(self):
-        yield self._process()
+        try:
+            yield self._process()
+        except Exception:
+            logger.exception("Error starting http pusher")
 
     @defer.inlineCallbacks
     def on_new_notifications(self, min_stream_ordering, max_stream_ordering):

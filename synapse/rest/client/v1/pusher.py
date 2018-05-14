@@ -150,7 +150,7 @@ class PushersRemoveRestServlet(RestServlet):
         super(RestServlet, self).__init__()
         self.hs = hs
         self.notifier = hs.get_notifier()
-        self.auth = hs.get_v1auth()
+        self.auth = hs.get_auth()
         self.pusher_pool = self.hs.get_pusherpool()
 
     @defer.inlineCallbacks
@@ -176,7 +176,6 @@ class PushersRemoveRestServlet(RestServlet):
 
         request.setResponseCode(200)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Server", self.hs.version_string)
         request.setHeader(b"Content-Length", b"%d" % (
             len(PushersRemoveRestServlet.SUCCESS_HTML),
         ))

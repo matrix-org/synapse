@@ -1,9 +1,55 @@
+Changes in synapse <unreleased>
+===============================
+
+Potentially breaking change:
+
+* Make Client-Server API return 401 for invalid token (PR #3161).
+
+  This changes the Client-server spec to return a 401 error code instead of 403
+  when the access token is unrecognised. This is the behaviour required by the
+  specification, but some clients may be relying on the old, incorrect
+  behaviour.
+
+  Thanks to @NotAFile for fixing this.
+
+
+Changes in synapse v0.28.1 (2018-05-01)
+=======================================
+
+SECURITY UPDATE
+
+* Clamp the allowed values of event depth received over federation to be
+  [0, 2^63 - 1].  This mitigates an attack where malicious events
+  injected with depth = 2^63 - 1 render rooms unusable.  Depth is used to
+  determine the cosmetic ordering of events within a room, and so the ordering
+  of events in such a room will default to using stream_ordering rather than depth
+  (topological_ordering).
+
+  This is a temporary solution to mitigate abuse in the wild, whilst a long term solution
+  is being implemented to improve how the depth parameter is used.
+
+  Full details at
+  https://docs.google.com/document/d/1I3fi2S-XnpO45qrpCsowZv8P8dHcNZ4fsBsbOW7KABI
+
+* Pin Twisted to <18.4 until we stop using the private _OpenSSLECCurve API.
+
+
+Changes in synapse v0.28.0 (2018-04-26)
+=======================================
+
+Bug Fixes:
+
+* Fix quarantine media admin API and search reindex (PR #3130)
+* Fix media admin APIs (PR #3134)
+
+
 Changes in synapse v0.28.0-rc1 (2018-04-24)
 ===========================================
 
 Minor performance improvement to federation sending and bug fixes.
 
-(Note: This release does not include state resolutions discussed in matrix live)
+(Note: This release does not include the delta state resolution implementation discussed in matrix live)
+
 
 Features:
 
@@ -16,8 +62,7 @@ Changes:
 * move handling of auto_join_rooms to RegisterHandler (PR #2996) Thanks to @krombel!
 * Improve handling of SRV records for federation connections (PR #3016) Thanks to @silkeh!
 * Document the behaviour of ResponseCache (PR #3059)
-* Preparation for py3 (PR #3061, #3073, #3074, #3075, #3103, #3104, #3106, #3107
-#3109, #3110) Thanks to @NotAFile!
+* Preparation for py3 (PR #3061, #3073, #3074, #3075, #3103, #3104, #3106, #3107, #3109, #3110) Thanks to @NotAFile!
 * update prometheus dashboard to use new metric names (PR #3069) Thanks to @krombel!
 * use python3-compatible prints (PR #3074) Thanks to @NotAFile!
 * Send federation events concurrently (PR #3078)

@@ -98,6 +98,7 @@ class ClientReaderServer(HomeServer):
                 site_tag,
                 listener_config,
                 root_resource,
+                self.version_string,
             )
         )
 

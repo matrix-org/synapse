@@ -354,12 +354,24 @@ class SyncHandler(object):
                 since_key = since_token.room_key
 
             while limited and len(recents) < timeline_limit and max_repeat:
-                events, end_key = yield self.store.get_room_events_stream_for_room(
-                    room_id,
-                    limit=load_limit + 1,
-                    from_key=since_key,
-                    to_key=end_key,
-                )
+                # If we have a since_key then we are trying to get any events
+                # that have happened since `since_key` up to `end_key`, so we
+                # can just use `get_room_events_stream_for_room`.
+                # Otherwise, we want to return the last N events in the room
+                # in toplogical ordering.
+                if since_key:
+                    events, end_key = yield self.store.get_room_events_stream_for_room(
+                        room_id,
+                        limit=load_limit + 1,
+                        from_key=since_key,
+                        to_key=end_key,
+                    )
+                else:
+                    events, end_key = yield self.store.get_recent_events_for_room(
+                        room_id,
+                        limit=load_limit + 1,
+                        end_token=end_key,
+                    )
                 loaded_recents = sync_config.filter_collection.filter_room_timeline(
                     events
                 )
@@ -429,7 +441,7 @@ class SyncHandler(object):
         Returns:
             A Deferred map from ((type, state_key)->Event)
         """
-        last_events, token = yield self.store.get_recent_events_for_room(
+        last_events, _ = yield self.store.get_recent_events_for_room(
             room_id, end_token=stream_position.room_key, limit=1,
         )
 

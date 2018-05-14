@@ -19,7 +19,7 @@ import synapse
 from synapse.api.constants import EventTypes
 from synapse.util.metrics import Measure
 from synapse.util.logcontext import (
-    make_deferred_yieldable, preserve_fn, run_in_background,
+    make_deferred_yieldable, run_in_background,
 )
 
 import logging
@@ -111,9 +111,7 @@ class ApplicationServicesHandler(object):
 
                         # Fork off pushes to these services
                         for service in services:
-                            preserve_fn(self.scheduler.submit_event_for_as)(
-                                service, event
-                            )
+                            self.scheduler.submit_event_for_as(service, event)
 
                     @defer.inlineCallbacks
                     def handle_room_events(events):
@@ -198,7 +196,10 @@ class ApplicationServicesHandler(object):
         services = yield self._get_services_for_3pn(protocol)
 
         results = yield make_deferred_yieldable(defer.DeferredList([
-            preserve_fn(self.appservice_api.query_3pe)(service, kind, protocol, fields)
+            run_in_background(
+                self.appservice_api.query_3pe,
+                service, kind, protocol, fields,
+            )
             for service in services
         ], consumeErrors=True))
 
@@ -259,11 +260,15 @@ class ApplicationServicesHandler(object):
             event based on the service regex.
         """
         services = self.store.get_app_services()
-        interested_list = [
-            s for s in services if (
-                yield s.is_interested(event, self.store)
-            )
-        ]
+
+        # we can't use a list comprehension here. Since python 3, list
+        # comprehensions use a generator internally. This means you can't yield
+        # inside of a list comprehension anymore.
+        interested_list = []
+        for s in services:
+            if (yield s.is_interested(event, self.store)):
+                interested_list.append(s)
+
         defer.returnValue(interested_list)
 
     def _get_services_for_user(self, user_id):

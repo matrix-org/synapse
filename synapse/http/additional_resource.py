@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import wrap_request_handler
+from synapse.http.server import wrap_json_request_handler
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
@@ -42,14 +42,13 @@ class AdditionalResource(Resource):
         Resource.__init__(self)
         self._handler = handler
 
-        # these are required by the request_handler wrapper
-        self.version_string = hs.version_string
+        # required by the request_handler wrapper
         self.clock = hs.get_clock()
 
     def render(self, request):
         self._async_render(request)
         return NOT_DONE_YET
 
-    @wrap_request_handler
+    @wrap_json_request_handler
     def _async_render(self, request):
         return self._handler(request)

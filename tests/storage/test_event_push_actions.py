@@ -128,7 +128,6 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
         yield _rotate(10)
         yield _assert_counts(1, 1)
 
-    @tests.unittest.DEBUG
     @defer.inlineCallbacks
     def test_find_first_stream_ordering_after_ts(self):
         def add_event(so, ts):

@@ -115,10 +115,15 @@ class _WrappedConnection(object):
         if time.time() - self.last_request >= 2.5 * 60:
             self.abort()
             # Abort the underlying TLS connection. The abort() method calls
-            # loseConnection() on the underlying TLS connection which tries to
+            # loseConnection() on the TLS connection which tries to
             # shutdown the connection cleanly. We call abortConnection()
-            # since that will promptly close the underlying TCP connection.
-            self.transport.abortConnection()
+            # since that will promptly close the TLS connection.
+            #
+            # In Twisted >18.4; the TLS connection will be None if it has closed
+            # which will make abortConnection() throw. Check that the TLS connection
+            # is not None before trying to close it.
+            if self.transport.getHandle() is not None:
+                self.transport.abortConnection()
 
     def request(self, request):
         self.last_request = time.time()
@@ -286,7 +291,7 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
         if (len(answers) == 1
                 and answers[0].type == dns.SRV
                 and answers[0].payload
-                and answers[0].payload.target == dns.Name('.')):
+                and answers[0].payload.target == dns.Name(b'.')):
             raise ConnectError("Service %s unavailable" % service_name)
 
         for answer in answers:

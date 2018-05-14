@@ -448,6 +448,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             "add_push_actions_to_staging", _add_push_actions_to_staging_txn
         )
 
+    @defer.inlineCallbacks
     def remove_push_actions_from_staging(self, event_id):
         """Called if we failed to persist the event to ensure that stale push
         actions don't build up in the DB
@@ -456,13 +457,22 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             event_id (str)
         """
 
-        return self._simple_delete(
-            table="event_push_actions_staging",
-            keyvalues={
-                "event_id": event_id,
-            },
-            desc="remove_push_actions_from_staging",
-        )
+        try:
+            res = yield self._simple_delete(
+                table="event_push_actions_staging",
+                keyvalues={
+                    "event_id": event_id,
+                },
+                desc="remove_push_actions_from_staging",
+            )
+            defer.returnValue(res)
+        except Exception:
+            # this method is called from an exception handler, so propagating
+            # another exception here really isn't helpful - there's nothing
+            # the caller can do about it. Just log the exception and move on.
+            logger.exception(
+                "Error removing push actions after event persistence failure",
+            )
 
     @defer.inlineCallbacks
     def _find_stream_orderings_for_times(self):

@@ -140,6 +140,7 @@ class SynapseHomeServer(HomeServer):
                     site_tag,
                     listener_config,
                     root_resource,
+                    self.version_string,
                 ),
                 self.tls_server_context_factory,
             )
@@ -153,6 +154,7 @@ class SynapseHomeServer(HomeServer):
                     site_tag,
                     listener_config,
                     root_resource,
+                    self.version_string,
                 )
             )
         logger.info("Synapse now listening on port %d", port)

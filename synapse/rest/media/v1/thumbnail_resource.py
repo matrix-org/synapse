@@ -14,18 +14,21 @@
 # limitations under the License.
 
 
+import logging
+
+from twisted.internet import defer
+from twisted.web.resource import Resource
+from twisted.web.server import NOT_DONE_YET
+
+from synapse.http.server import (
+    set_cors_headers,
+    wrap_json_request_handler,
+)
+from synapse.http.servlet import parse_integer, parse_string
 from ._base import (
-    parse_media_id, respond_404, respond_with_file, FileInfo,
+    FileInfo, parse_media_id, respond_404, respond_with_file,
     respond_with_responder,
 )
-from twisted.web.resource import Resource
-from synapse.http.servlet import parse_string, parse_integer
-from synapse.http.server import request_handler, set_cors_headers
-
-from twisted.web.server import NOT_DONE_YET
-from twisted.internet import defer
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -41,14 +44,13 @@ class ThumbnailResource(Resource):
         self.media_storage = media_storage
         self.dynamic_thumbnails = hs.config.dynamic_thumbnails
         self.server_name = hs.hostname
-        self.version_string = hs.version_string
         self.clock = hs.get_clock()
 
     def render_GET(self, request):
         self._async_render_GET(request)
         return NOT_DONE_YET
 
-    @request_handler()
+    @wrap_json_request_handler
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
         set_cors_headers(request)

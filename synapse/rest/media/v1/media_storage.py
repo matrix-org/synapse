@@ -255,7 +255,9 @@ class FileResponder(Responder):
         self.open_file = open_file
 
     def write_to_consumer(self, consumer):
-        return FileSender().beginFileTransfer(self.open_file, consumer)
+        return make_deferred_yieldable(
+            FileSender().beginFileTransfer(self.open_file, consumer)
+        )
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.open_file.close()
