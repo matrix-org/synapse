@@ -16,6 +16,9 @@
 import synapse.metrics
 import os
 
+from six.moves import intern
+import six
+
 CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.5))
 
 metrics = synapse.metrics.get_metrics_for("synapse.util.caches")
@@ -66,7 +69,9 @@ def intern_string(string):
         return None
 
     try:
-        string = string.encode("ascii")
+        if six.PY2:
+            string = string.encode("ascii")
+
         return intern(string)
     except UnicodeEncodeError:
         return string
