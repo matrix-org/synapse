@@ -17,7 +17,6 @@ import gc
 import logging
 import os
 import sys
-import datetime
 
 import synapse
 import synapse.config.logger
