@@ -476,23 +476,16 @@ def run(hs):
                 " changes across releases."
             )
 
-    # def recurring_user_daily_visit_stats():
-
     def generate_user_daily_visit_stats():
         hs.get_datastore().generate_user_daily_visits()
 
-    # Since user daily stats are bucketed at midnight UTC,
-    # and user_ips.last_seen can be updated at any time, it is important to call
-    # generate_user_daily_visit_stats immediately prior to the day end. Assuming
-    # an hourly cadence, the simplist way is to allign all calls to the hour
-    # end
-    end_of_hour = datetime.datetime.now().replace(microsecond=0, second=0, minute=0) \
-        + datetime.timedelta(hours=1) \
-        - datetime.timedelta(seconds=10)  # Ensure method fires before day transistion
+    def recurring_user_daily_visit_stats():
+        clock.looping_call(generate_user_daily_visit_stats, 60 * 60 * 1000)
 
-    time_to_next_hour = end_of_hour - datetime.datetime.now()
-    clock.call_later(time_to_next_hour.seconds,
-                     clock.looping_call(generate_user_daily_visit_stats, 60 * 60 * 1000))
+    # Rather than update on per session basis, batch up the requests.
+    # If you increase the loop period, the accuracy of user_daily_visits
+    # table will decrease
+    clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
 
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
