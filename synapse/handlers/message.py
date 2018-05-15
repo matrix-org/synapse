@@ -86,14 +86,14 @@ class MessageHandler(BaseHandler):
         # map from purge id to PurgeStatus
         self._purges_by_id = {}
 
-    def start_purge_history(self, room_id, topological_ordering,
+    def start_purge_history(self, room_id, token,
                             delete_local_events=False):
         """Start off a history purge on a room.
 
         Args:
             room_id (str): The room to purge from
 
-            topological_ordering (int): minimum topo ordering to preserve
+            token (str): topological token to delete events before
             delete_local_events (bool): True to delete local events as well as
                 remote ones
 
@@ -115,19 +115,19 @@ class MessageHandler(BaseHandler):
         self._purges_by_id[purge_id] = PurgeStatus()
         run_in_background(
             self._purge_history,
-            purge_id, room_id, topological_ordering, delete_local_events,
+            purge_id, room_id, token, delete_local_events,
         )
         return purge_id
 
     @defer.inlineCallbacks
-    def _purge_history(self, purge_id, room_id, topological_ordering,
+    def _purge_history(self, purge_id, room_id, token,
                        delete_local_events):
         """Carry out a history purge on a room.
 
         Args:
             purge_id (str): The id for this purge
             room_id (str): The room to purge from
-            topological_ordering (int): minimum topo ordering to preserve
+            token (str): topological token to delete events before
             delete_local_events (bool): True to delete local events as well as
                 remote ones
 
@@ -138,7 +138,7 @@ class MessageHandler(BaseHandler):
         try:
             with (yield self.pagination_lock.write(room_id)):
                 yield self.store.purge_history(
-                    room_id, topological_ordering, delete_local_events,
+                    room_id, token, delete_local_events,
                 )
             logger.info("[purge] complete")
             self._purges_by_id[purge_id].status = PurgeStatus.STATUS_COMPLETE
