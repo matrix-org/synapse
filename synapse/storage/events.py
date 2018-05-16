@@ -1825,8 +1825,10 @@ class EventsStore(EventsWorkerStore):
         )
 
     def _purge_history_txn(
-        self, txn, room_id, token, delete_local_events,
+        self, txn, room_id, token_str, delete_local_events,
     ):
+        token = RoomStreamToken.parse(token_str)
+
         # Tables that should be pruned:
         #     event_auth
         #     event_backward_extremities
@@ -1854,8 +1856,6 @@ class EventsStore(EventsWorkerStore):
         #
         # furthermore, we might already have the table from a previous (failed)
         # purge attempt, so let's drop the table first.
-
-        token = RoomStreamToken.parse(token)
 
         txn.execute("DROP TABLE IF EXISTS events_to_purge")
 
