@@ -368,6 +368,7 @@ class DataStore(RoomMemberStore, RoomStore,
             logger.info("Calling _generate_user_daily_visits")
             today_start = self._get_start_of_day()
             a_day_in_milliseconds = 24 * 60 * 60 * 1000
+            now = self.clock.time_msec()
 
             sql = """
                 INSERT INTO user_daily_visits (user_id, device_id, timestamp)
@@ -386,23 +387,26 @@ class DataStore(RoomMemberStore, RoomStore,
             # where if the user logs in at 23:59 and overwrites their
             # last_seen at 00:01 then they will not be counted in the
             # previous day's stats - it is important that the query is run
-            # to minimise this case.
+            # often to minimise this case.
             if today_start > self._last_user_visit_update:
                 yesterday_start = today_start - a_day_in_milliseconds
-                txn.execute(sql, (yesterday_start, yesterday_start,
-                                  self._last_user_visit_update, today_start))
+                txn.execute(sql, (
+                    yesterday_start, yesterday_start,
+                    self._last_user_visit_update, today_start
+                ))
                 self._last_user_visit_update = today_start
 
-            txn.execute(sql, (today_start, today_start,
-                              self._last_user_visit_update,
-                              today_start + a_day_in_milliseconds))
+            txn.execute(sql, (
+                today_start, today_start,
+                self._last_user_visit_update,
+                now
+            ))
             # Update _last_user_visit_update to now. The reason to do this
             # rather just clamping to the beginning of the day is to limit
             # the size of the join - meaning that the query can be run more
             # frequently
 
-            now = datetime.datetime.utcnow()
-            self._last_user_visit_update = int(time.mktime(now.timetuple())) * 1000
+            self._last_user_visit_update = now
 
         return self.runInteraction("generate_user_daily_visits",
                                    _generate_user_daily_visits)
