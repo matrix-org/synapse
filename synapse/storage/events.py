@@ -1872,6 +1872,9 @@ class EventsStore(EventsWorkerStore):
             "CREATE INDEX events_to_purge_should_delete"
             " ON events_to_purge(should_delete)",
         )
+
+        # We do joins against events_to_purge for e.g. calculating state
+        # groups to purge, etc., so lets make an index.
         txn.execute(
             "CREATE INDEX events_to_purge_id"
             " ON events_to_purge(event_id)",
@@ -2119,6 +2122,11 @@ class EventsStore(EventsWorkerStore):
         #
         # So, let's stick it at the end so that we don't block event
         # persistence.
+        #
+        # We do this by calculating the minimum depth of the backwards
+        # extremities. However, the events in event_backward_extremities
+        # are ones we don't have yet so we need to look at the events that
+        # point to it via event_edges table.
         txn.execute("""
             SELECT COALESCE(MIN(depth), 0)
             FROM event_backward_extremities AS eb
