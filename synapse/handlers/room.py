@@ -72,10 +72,11 @@ class RoomCreationHandler(BaseHandler):
         """ Creates a new room.
 
         Args:
-            requester (Requester): The user who requested the room creation.
+            requester (synapse.types.Requester):
+                The user who requested the room creation.
             config (dict) : A dict of configuration options.
         Returns:
-            The new room ID.
+            Deferred[str]: the room id
         Raises:
             SynapseError if the room ID couldn't be stored, or something went
             horribly wrong.
@@ -234,14 +235,12 @@ class RoomCreationHandler(BaseHandler):
                 txn_id=None,
             )
 
-        result = {"room_id": room_id}
-
         if room_alias:
             yield directory_handler.send_room_alias_update_event(
                 requester, user_id, room_id
             )
 
-        defer.returnValue(result)
+        defer.returnValue(room_id)
 
     @defer.inlineCallbacks
     def _send_events_for_new_room(

@@ -46,6 +46,7 @@ from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.device import DeviceHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.presence import PresenceHandler
+from synapse.handlers.room import RoomCreationHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
@@ -109,6 +110,7 @@ class HomeServer(object):
         'federation_server',
         'handlers',
         'auth',
+        'room_creation_handler',
         'state_handler',
         'state_resolution_handler',
         'presence_handler',
@@ -226,6 +228,9 @@ class HomeServer(object):
 
     def build_simple_http_client(self):
         return SimpleHttpClient(self)
+
+    def build_room_creation_handler(self):
+        return RoomCreationHandler(self)
 
     def build_state_handler(self):
         return StateHandler(self)

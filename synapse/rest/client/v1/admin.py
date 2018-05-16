@@ -273,8 +273,8 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(ShutdownRoomRestServlet, self).__init__(hs)
         self.store = hs.get_datastore()
-        self.handlers = hs.get_handlers()
         self.state = hs.get_state_handler()
+        self._room_creation_handler = hs.get_room_creation_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
 
@@ -296,7 +296,7 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
         message = content.get("message", self.DEFAULT_MESSAGE)
         room_name = content.get("room_name", "Content Violation Notification")
 
-        info = yield self.handlers.room_creation_handler.create_room(
+        new_room_id = yield self.handlers.room_creation_handler.create_room(
             room_creator_requester,
             config={
                 "preset": "public_chat",
@@ -307,7 +307,6 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
             },
             ratelimit=False,
         )
-        new_room_id = info["room_id"]
 
         yield self.event_creation_handler.create_and_send_nonmember_event(
             room_creator_requester,

@@ -65,11 +65,11 @@ class RoomCreateRestServlet(ClientV1RestServlet):
         requester = yield self.auth.get_user_by_req(request)
 
         handler = self.handlers.room_creation_handler
-        info = yield handler.create_room(
+        room_id = yield handler.create_room(
             requester, self.get_room_config(request)
         )
 
-        defer.returnValue((200, info))
+        defer.returnValue((200, {"room_id": room_id}))
 
     def get_room_config(self, request):
         user_supplied_config = parse_json_object_from_request(request)
