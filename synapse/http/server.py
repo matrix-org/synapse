@@ -13,7 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import cgi
+from six.moves import http_client
 
 from synapse.api.errors import (
     cs_exception, SynapseError, CodeMessageException, UnrecognizedRequestError, Codes
@@ -43,6 +44,18 @@ import urllib
 import simplejson
 
 logger = logging.getLogger(__name__)
+
+HTML_ERROR_TEMPLATE = """<!DOCTYPE html>
+<html lang=en>
+  <head>
+    <meta charset="utf-8">
+    <title>Error {code}</title>
+  </head>
+  <body>
+     <p>{msg}</p>
+  </body>
+</html>
+"""
 
 
 def wrap_json_request_handler(h):
@@ -102,6 +115,65 @@ def wrap_json_request_handler(h):
     return wrap_request_handler_with_logging(wrapped_request_handler)
 
 
+def wrap_html_request_handler(h):
+    """Wraps a request handler method with exception handling.
+
+    Also adds logging as per wrap_request_handler_with_logging.
+
+    The handler method must have a signature of "handle_foo(self, request)",
+    where "self" must have a "clock" attribute (and "request" must be a
+    SynapseRequest).
+    """
+    def wrapped_request_handler(self, request):
+        d = defer.maybeDeferred(h, self, request)
+        d.addErrback(_return_html_error, request)
+        return d
+
+    return wrap_request_handler_with_logging(wrapped_request_handler)
+
+
+def _return_html_error(f, request):
+    """Sends an HTML error page corresponding to the given failure
+
+    Args:
+        f (twisted.python.failure.Failure):
+        request (twisted.web.iweb.IRequest):
+    """
+    if f.check(CodeMessageException):
+        cme = f.value
+        code = cme.code
+        msg = cme.msg
+
+        if isinstance(cme, SynapseError):
+            logger.info(
+                "%s SynapseError: %s - %s", request, code, msg
+            )
+        else:
+            logger.error(
+                "Failed handle request %r: %s",
+                request,
+                f.getTraceback().rstrip(),
+            )
+    else:
+        code = http_client.INTERNAL_SERVER_ERROR
+        msg = "Internal server error"
+
+        logger.error(
+            "Failed handle request %r: %s",
+            request,
+            f.getTraceback().rstrip(),
+        )
+
+    body = HTML_ERROR_TEMPLATE.format(
+        code=code, msg=cgi.escape(msg),
+    ).encode("utf-8")
+    request.setResponseCode(code)
+    request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+    request.setHeader(b"Content-Length", b"%i" % (len(body),))
+    request.write(body)
+    finish_request(request)
+
+
 def wrap_request_handler_with_logging(h):
     """Wraps a request handler to provide logging and metrics
 
@@ -132,7 +204,7 @@ def wrap_request_handler_with_logging(h):
                 servlet_name = self.__class__.__name__
                 with request.processing(servlet_name):
                     with PreserveLoggingContext(request_context):
-                        d = h(self, request)
+                        d = defer.maybeDeferred(h, self, request)
 
                         # record the arrival of the request *after*
                         # dispatching to the handler, so that the handler

@@ -286,6 +286,24 @@ class RegistrationStore(RegistrationWorkerStore,
             "user_set_password_hash", user_set_password_hash_txn
         )
 
+    def user_set_consent_version(self, user_id, consent_version):
+        """Updates the user table to record privacy policy consent
+
+        Args:
+            user_id (str): full mxid of the user to update
+            consent_version (str): version of the policy the user has consented
+                to
+
+        Raises:
+            StoreError(404) if user not found
+        """
+        return self._simple_update_one(
+            table='users',
+            keyvalues={'name': user_id, },
+            updatevalues={'consent_version': consent_version, },
+            desc="user_set_consent_version"
+        )
+
     def user_delete_access_tokens(self, user_id, except_token_id=None,
                                   device_id=None):
         """

@@ -41,6 +41,7 @@ from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, \
 from synapse.replication.http import ReplicationRestResource, REPLICATION_PREFIX
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
+from synapse.rest.consent.consent_resource import ConsentResource
 from synapse.rest.key.v1.server_key_resource import LocalKey
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
@@ -182,6 +183,14 @@ class SynapseHomeServer(HomeServer):
                 "/_matrix/client/unstable": client_resource,
                 "/_matrix/client/v2_alpha": client_resource,
                 "/_matrix/client/versions": client_resource,
+            })
+
+        if name == "consent":
+            consent_resource = ConsentResource(self)
+            if compress:
+                consent_resource = gz_wrap(consent_resource)
+            resources.update({
+                "/_matrix/consent": consent_resource,
             })
 
         if name == "federation":
