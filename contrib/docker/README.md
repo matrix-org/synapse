@@ -1,6 +1,6 @@
 # Synapse Docker
 
-This Docker image will run Synapse as a single process. It does not provide any
+The `matrixdotorg/synapse` Docker image will run Synapse as a single process. It does not provide any
 database server or TURN server that you should run separately.
 
 If you run a Postgres server, you should simply have it in the same Compose
@@ -37,10 +37,15 @@ then run the server:
 docker-compose up -d
 ```
 
+If secrets are not specified in the environment variables, they will be generated 
+as part of the startup. Please ensure these secrets are kept between launches of the
+Docker container, as their loss may require users to log in again.
+
 ### Manual configuration
 
 A sample ``docker-compose.yml`` is provided, including example labels for
-reverse proxying and other artifacts.
+reverse proxying and other artifacts. The docker-compose file is an example,
+please comment/uncomment sections that are not suitable for your usecase.
 
 Specify a ``SYNAPSE_CONFIG_PATH``, preferably to a persistent path,
 to use manual configuration. To generate a fresh ``homeserver.yaml``, simply run:
