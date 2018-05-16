@@ -405,7 +405,6 @@ class DataStore(RoomMemberStore, RoomStore,
             # rather just clamping to the beginning of the day is to limit
             # the size of the join - meaning that the query can be run more
             # frequently
-
             self._last_user_visit_update = now
 
         return self.runInteraction("generate_user_daily_visits",
