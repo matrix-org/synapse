@@ -111,8 +111,6 @@ variables are available for configuration:
 * ``SYNAPSE_SERVER_NAME`` (mandatory), the current server public hostname.
 * ``SYNAPSE_REPORT_STATS``, (mandatory, ``yes`` or ``no``), enable anonymous
   statistics reporting back to the Matrix project which helps us to get funding.
-* ``SYNAPSE_MACAROON_SECRET_KEY`` (mandatory) secret for signing access tokens
-  to the server, set this to a proper random key.
 * ``SYNAPSE_NO_TLS``, set this variable to disable TLS in Synapse (use this if
   you run your own TLS-capable reverse proxy).
 * ``SYNAPSE_ENABLE_REGISTRATION``, set this variable to enable registration on
@@ -132,6 +130,8 @@ Shared secrets, that will be initialized to random values if not set:
 
 * ``SYNAPSE_REGISTRATION_SHARED_SECRET``, secret for registrering users if
   registration is disable.
+* ``SYNAPSE_MACAROON_SECRET_KEY`` secret for signing access tokens
+  to the server.
 
 Database specific values (will use SQLite if not set):
 
