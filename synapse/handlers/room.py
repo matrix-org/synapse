@@ -237,7 +237,6 @@ class RoomCreationHandler(BaseHandler):
         result = {"room_id": room_id}
 
         if room_alias:
-            result["room_alias"] = room_alias.to_string()
             yield directory_handler.send_room_alias_update_event(
                 requester, user_id, room_id
             )
