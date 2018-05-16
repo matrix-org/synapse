@@ -478,9 +478,6 @@ def run(hs):
     def generate_user_daily_visit_stats():
         hs.get_datastore().generate_user_daily_visits()
 
-    def recurring_user_daily_visit_stats():
-        clock.looping_call(generate_user_daily_visit_stats, 60 * 60 * 1000)
-
     # Rather than update on per session basis, batch up the requests.
     # If you increase the loop period, the accuracy of user_daily_visits
     # table will decrease
