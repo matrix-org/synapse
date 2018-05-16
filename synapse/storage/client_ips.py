@@ -55,6 +55,13 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             columns=["user_id", "last_seen"],
         )
 
+        self.register_background_index_update(
+            "user_ips_last_seen_only_index",
+            index_name="user_ips_last_seen_only",
+            table="user_ips",
+            columns=["last_seen"],
+        )
+
         # (user_id, access_token, ip) -> (user_agent, device_id, last_seen)
         self._batch_row_update = {}
 

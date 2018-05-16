@@ -484,6 +484,14 @@ def run(hs):
                 " changes across releases."
             )
 
+    def generate_user_daily_visit_stats():
+        hs.get_datastore().generate_user_daily_visits()
+
+    # Rather than update on per session basis, batch up the requests.
+    # If you increase the loop period, the accuracy of user_daily_visits
+    # table will decrease
+    clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
+
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
         clock.looping_call(phone_stats_home, 3 * 60 * 60 * 1000)
