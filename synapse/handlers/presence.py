@@ -87,6 +87,11 @@ assert LAST_ACTIVE_GRANULARITY < IDLE_TIMER
 class PresenceHandler(object):
 
     def __init__(self, hs):
+        """
+
+        Args:
+            hs (synapse.server.HomeServer):
+        """
         self.is_mine = hs.is_mine
         self.is_mine_id = hs.is_mine_id
         self.clock = hs.get_clock()
@@ -94,8 +99,8 @@ class PresenceHandler(object):
         self.wheel_timer = WheelTimer()
         self.notifier = hs.get_notifier()
         self.federation = hs.get_federation_sender()
-
         self.state = hs.get_state_handler()
+        self._server_notices_sender = hs.get_server_notices_sender()
 
         federation_registry = hs.get_federation_registry()
 
@@ -427,6 +432,9 @@ class PresenceHandler(object):
                 yield self._update_states([prev_state.copy_and_replace(
                     last_user_sync_ts=self.clock.time_msec(),
                 )])
+
+        # send any outstanding server notices to the user.
+        yield self._server_notices_sender.on_user_syncing(user_id)
 
         @defer.inlineCallbacks
         def _end():

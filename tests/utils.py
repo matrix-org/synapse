@@ -63,6 +63,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.federation_rc_concurrent = 10
         config.filter_timeline_limit = 5000
         config.user_directory_search_all_users = False
+        config.consent_config = None
 
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.

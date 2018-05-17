@@ -69,6 +69,7 @@ class ReplicationStreamer(object):
         self.presence_handler = hs.get_presence_handler()
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
+        self._server_notices_sender = hs.get_server_notices_sender()
 
         # Current connections.
         self.connections = []
@@ -253,6 +254,7 @@ class ReplicationStreamer(object):
         yield self.store.insert_client_ip(
             user_id, access_token, ip, user_agent, device_id, last_seen,
         )
+        yield self._server_notices_sender.on_user_ip(user_id)
 
     def send_sync_to_all_connections(self, data):
         """Sends a SYNC command to all clients.

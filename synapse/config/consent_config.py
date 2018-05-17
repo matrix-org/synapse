@@ -30,9 +30,17 @@ DEFAULT_CONFIG = """\
 # the version to be served by the consent resource if there is no 'v'
 # parameter.
 #
+# 'server_notice_content', if enabled, will send a user a "Server Notice"
+# asking them to consent to the privacy policy. The 'server_notices' section
+# must also be configured for this to work.
+#
 # user_consent:
 #   template_dir: res/templates/privacy
 #   version: 1.0
+#   server_notice_content:
+#     msgtype: m.text
+#     body: |
+#       Pls do consent kthx
 """
 
 
