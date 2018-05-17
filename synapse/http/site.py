@@ -70,7 +70,7 @@ class SynapseRequest(Request):
 
     def get_redacted_uri(self):
         return ACCESS_TOKEN_RE.sub(
-            br'\1<redacted>\3',
+            br'\1<redacted>',
             self.uri
         )
 
