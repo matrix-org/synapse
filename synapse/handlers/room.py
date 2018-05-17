@@ -72,10 +72,14 @@ class RoomCreationHandler(BaseHandler):
         """ Creates a new room.
 
         Args:
-            requester (Requester): The user who requested the room creation.
+            requester (synapse.types.Requester):
+                The user who requested the room creation.
             config (dict) : A dict of configuration options.
+            ratelimit (bool): set to False to disable the rate limiter
         Returns:
-            The new room ID.
+            Deferred[dict]:
+                a dict containing the keys `room_id` and, if an alias was
+                requested, `room_alias`.
         Raises:
             SynapseError if the room ID couldn't be stored, or something went
             horribly wrong.
