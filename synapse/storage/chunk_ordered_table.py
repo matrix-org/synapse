@@ -122,7 +122,7 @@ class ChunkDBOrderedListStore(OrderedListStore):
             return row[0]
         return None
 
-    def insert_before(self, node_id, target_id):
+    def _insert_before(self, node_id, target_id):
         """Implements OrderedListStore"""
 
         rebalance = False  # Set to true if we need to trigger a rebalance
@@ -153,7 +153,7 @@ class ChunkDBOrderedListStore(OrderedListStore):
         if rebalance:
             self._rebalance(node_id)
 
-    def insert_after(self, node_id, target_id):
+    def _insert_after(self, node_id, target_id):
         """Implements OrderedListStore"""
 
         rebalance = False  # Set to true if we need to trigger a rebalance

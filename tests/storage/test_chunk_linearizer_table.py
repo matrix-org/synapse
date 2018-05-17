@@ -46,8 +46,8 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
             )
 
             table.add_node("A")
-            table.insert_after("B", "A")
-            table.insert_before("C", "A")
+            table._insert_after("B", "A")
+            table._insert_before("C", "A")
 
             sql = """
                 SELECT chunk_id FROM chunk_linearized
@@ -87,9 +87,9 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
                             break
 
                     if j < i:
-                        table.insert_after(node_id, target_id)
+                        table._insert_after(node_id, target_id)
                     else:
-                        table.insert_before(node_id, target_id)
+                        table._insert_before(node_id, target_id)
 
                 already_inserted.append((i, node_id))
                 already_inserted.sort()
@@ -122,12 +122,12 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
             for i in xrange(1, 1000):
                 node_id = "node_id_before_%d" % i
-                table.insert_before(node_id, expected[0])
+                table._insert_before(node_id, expected[0])
                 expected.insert(0, node_id)
 
             for i in xrange(1, 1000):
                 node_id = "node_id_after_%d" % i
-                table.insert_after(node_id, expected[-1])
+                table._insert_after(node_id, expected[-1])
                 expected.append(node_id)
 
             sql = """
@@ -162,10 +162,10 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
             for i in xrange(1, 100):
                 node_id = "node_id_%d" % i
                 if i % 2 == 0:
-                    table.insert_before(node_id, prev_node)
+                    table._insert_before(node_id, prev_node)
                     expected_prefix.append(node_id)
                 else:
-                    table.insert_after(node_id, prev_node)
+                    table._insert_after(node_id, prev_node)
                     expected_suffix.append(node_id)
                 prev_node = node_id
 
