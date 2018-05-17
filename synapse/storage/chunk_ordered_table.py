@@ -33,13 +33,18 @@ class ChunkDBOrderedListStore(OrderedListStore):
     """Used as the list store for room chunks, efficiently maintaining them in
     topological order on updates.
 
+    A room chunk is a connected portion of the room events DAG. As such it
+    inherits a DAG, i.e. if an event in one chunk references an event in a
+    second chunk, then we say that the first chunk references the second, and
+    thus forming a DAG.
+
     The class is designed for use inside transactions and so takes a
     transaction object in the constructor. This means that it needs to be
     re-instantiated in each transaction, so all state needs to be stored
     in the database.
 
     Internally the ordering is implemented using floats, and the average is
-    taken when a node is inserted inbetween other nodes. To avoid presicion
+    taken when a node is inserted between other nodes. To avoid precision
     errors a minimum difference between sucessive orderings is attempted to be
     kept; whenever the difference is too small we attempt to rebalance. See
     the `_rebalance` function for implementation details.
@@ -51,6 +56,10 @@ class ChunkDBOrderedListStore(OrderedListStore):
     edge is from B to A. This ensures that newer chunks get inserted at the
     end (rather than the start).
 
+    Note: Calls to `add_node` and `add_edge` cannot overlap for the same room,
+    and so callers should perform some form of per-room locking when using
+    this class.
+
     Args:
         txn
         room_id (str)
@@ -59,7 +68,7 @@ class ChunkDBOrderedListStore(OrderedListStore):
             in a range around the node, where the bounds are rounded to this
             number of digits.
         min_difference (int): A rebalance is triggered when the difference
-            between two successive orderings are less than the reverse of
+            between two successive orderings is less than the reciprocal of
             this.
     """
     def __init__(self,

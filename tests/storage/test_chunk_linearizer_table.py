@@ -23,6 +23,10 @@ from synapse.storage.chunk_ordered_table import ChunkDBOrderedListStore
 
 
 class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
+    """Tests to ensure that the ordering and rebalancing functions of
+    ChunkDBOrderedListStore work as expected.
+    """
+
     def __init__(self, *args, **kwargs):
         super(ChunkLinearizerStoreTestCase, self).__init__(*args, **kwargs)
 

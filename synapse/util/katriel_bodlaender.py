@@ -16,8 +16,9 @@
 """This module contains an implementation of the Katriel-Bodlaender algorithm,
 which is used to do online topological ordering of graphs.
 
-Note that the ordering derived from the graph has the first node one with no
-incoming edges at the start, and the last node one with no outgoing edges.
+Note that the ordering derived from the graph is such that the source node of
+an edge comes before the target node of the edge, i.e. a graph of A -> B -> C
+would produce the ordering [A, B, C].
 
 This ordering is therefore opposite to what one might expect when considering
 the room DAG, as newer messages would be added to the start rather than the
@@ -25,15 +26,46 @@ end.
 
 ***We therefore invert the direction of edges when using the algorithm***
 
-See https://www.sciencedirect.com/science/article/pii/S0304397507006573
+See:
+    A tight analysis of the Katriel–Bodlaender algorithm for online topological
+    ordering
+    Hsiao-Fei Liua and Kun-Mao Chao
+    https://www.sciencedirect.com/science/article/pii/S0304397507006573
+and:
+    Online Topological Ordering
+    Irit Katriel and Hans L. Bodlaender
+    http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.78.7933 )
 """
 
 from abc import ABCMeta, abstractmethod
 
 
 class OrderedListStore(object):
-    """An abstract base class that is used to store a topological ordering of
-    a graph. Suitable for use with the Katriel-Bodlaender algorithm.
+    """An abstract base class that is used to store a graph and maintain a
+    topological consistent, total ordering.
+
+    Internally this uses the Katriel-Bodlaender algorithm, which requires the
+    store expose an interface for the total ordering that supports:
+
+        - Insertion of the node into the ordering either immediately before or
+          after another node.
+        - Deletion of the node from the ordering
+        - Comparing the relative ordering of two arbitary nodes
+        - Get the node immediately before or after a given node in the ordering
+
+    It also needs to be able to interact with the graph in the following ways:
+
+        - Query the number of edges from a node in the graph
+        - Query the number of edges into a node in the graph
+        - Add an edge to the graph
+
+
+    Users of subclasses should call `add_node` and `add_edge` whenever editing
+    the graph. The total ordering exposed will remain constant until the next
+    call to one of these methods.
+
+    Note: Calls to `add_node` and `add_edge` cannot overlap, and so callers
+    should perform some form of locking.
     """
 
     __metaclass__ = ABCMeta
@@ -53,7 +85,8 @@ class OrderedListStore(object):
 
     @abstractmethod
     def get_prev(self, node_id):
-        """Gets the node immediately before the given node
+        """Gets the node immediately before the given node in the topological
+        ordering.
 
         Args:
             node_id (str)
@@ -65,7 +98,8 @@ class OrderedListStore(object):
 
     @abstractmethod
     def get_next(self, node_id):
-        """Gets the node immediately after the given node
+        """Gets the node immediately after the given node in the topological
+        ordering.
 
         Args:
             node_id (str)
@@ -125,7 +159,8 @@ class OrderedListStore(object):
             list[tuple[float, str]]: Returns a list of tuple of an ordering
             term and the node ID. The ordering term can be used to sort the
             returned list.
-            The ordering is valid until subsequent calls to insert_* functions
+            The ordering is valid until subsequent calls to `add_edge`
+            functions
         """
         pass
 
