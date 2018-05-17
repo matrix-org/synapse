@@ -72,6 +72,7 @@ from synapse.rest.media.v1.media_repository import (
     MediaRepository,
     MediaRepositoryResource,
 )
+from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.state import StateHandler, StateResolutionHandler
 from synapse.storage import DataStore
 from synapse.streams.events import EventSources
@@ -156,6 +157,7 @@ class HomeServer(object):
         'spam_checker',
         'room_member_handler',
         'federation_registry',
+        'server_notices_manager',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -397,6 +399,9 @@ class HomeServer(object):
 
     def build_federation_registry(self):
         return FederationHandlerRegistry()
+
+    def build_server_notices_manager(self):
+        return ServerNoticesManager(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
