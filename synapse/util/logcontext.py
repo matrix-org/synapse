@@ -271,7 +271,7 @@ class LoggingContextFilter(logging.Filter):
     def redact(self, msg):
         msg = isinstance(msg, basestring) and msg or str(msg)
         for pattern in self._patterns:
-            msg = pattern.sub(br'\1<redacted>\3',msg)
+            msg = pattern.sub(br'\1<redacted>',msg)
         return msg
 
 
