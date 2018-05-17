@@ -38,6 +38,10 @@ class ChunkDBOrderedListStore(OrderedListStore):
     second chunk, then we say that the first chunk references the second, and
     thus forming a DAG.
 
+    The server may only have a subset of all events in a room, in which case
+    its possible for the server to have chunks that are unconnected from each
+    other. The ordering between unconnected chunks is arbitrary.
+
     The class is designed for use inside transactions and so takes a
     transaction object in the constructor. This means that it needs to be
     re-instantiated in each transaction, so all state needs to be stored
