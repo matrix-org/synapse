@@ -264,15 +264,11 @@ class ChunkDBOrderedListStore(OrderedListStore):
         with Measure(self.clock, "chunk_rebalance"):
             # We pick the interval to try and minimise the number of decimal
             # places, i.e. we round to nearest float with `rebalance_digits` and
-            # use that as the middle of the interval
+            # use that as one side of the interval
             order = self._get_order(node_id)
             a = round(order, self.rebalance_digits)
-            if order > a:
-                min_order = a
-                max_order = a + 10 ** -self.rebalance_digits
-            else:
-                min_order = a - 10 ** -self.rebalance_digits
-                max_order = a
+            min_order = a - 10 ** -self.rebalance_digits
+            max_order = a + 10 ** -self.rebalance_digits
 
             # Now we get all the nodes in the range. We add the minimum difference
             # to the bounds to ensure that we don't accidentally move a node to be
