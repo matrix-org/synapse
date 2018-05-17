@@ -299,9 +299,10 @@ class RoomMemberHandler(object):
             if is_blocked:
                 raise SynapseError(403, "This room has been blocked on this server")
         else:
-            if self._is_server_notice_room(room_id):
-                # we don't allow people to reject invites to, or leave, the
-                # server notice room.
+            # we don't allow people to reject invites to, or leave, the
+            # server notice room.
+            is_blocked = yield self._is_server_notice_room(room_id)
+            if is_blocked:
                 raise SynapseError(
                     http_client.FORBIDDEN,
                     "You cannot leave this room",
