@@ -1,9 +1,9 @@
 # Synapse Docker
 
-The `matrixdotorg/synapse` Docker image will run Synapse as a single process. It does not provide any
-database server or TURN server that you should run separately.
+The `matrixdotorg/synapse` Docker image will run Synapse as a single process. It does not provide a
+database server or a TURN server, you should run these separately.
 
-If you run a Postgres server, you should simply have it in the same Compose
+If you run a Postgres server, you should simply include it in the same Compose
 project or set the proper environment variables and the image will automatically
 use that server.
 
@@ -37,7 +37,7 @@ then run the server:
 docker-compose up -d
 ```
 
-If secrets are not specified in the environment variables, they will be generated 
+If secrets are not specified in the environment variables, they will be generated
 as part of the startup. Please ensure these secrets are kept between launches of the
 Docker container, as their loss may require users to log in again.
 
