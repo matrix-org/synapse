@@ -33,10 +33,20 @@ class ChunkDBOrderedListStore(OrderedListStore):
     """Used as the list store for room chunks, efficiently maintaining them in
     topological order on updates.
 
-    A room chunk is a connected portion of the room events DAG. As such it
-    inherits a DAG, i.e. if an event in one chunk references an event in a
-    second chunk, then we say that the first chunk references the second, and
-    thus forming a DAG.
+    A room chunk is a connected portion of the room events DAG. As such the set
+    of chunks in a room inherits a DAG, i.e. if an event in one chunk references
+    an event in a second chunk, then we say that the first chunk references the
+    second, and thus forming a DAG.
+
+    Chunks are constructed so that they have the aditional property that for all
+    events in the chunk, either all of their prev_events are in that chunk or
+    none of them are. This ensures that no event that is subsequently received
+    needs to be inserted into the middle of a chunk, since it cannot both
+    reference an event in the chunk and be referenced by an event in the chunk
+    (assuming no cycles).
+
+    Multiple chunks can therefore happen when the server misses some events,
+    e.g. due to the server being offline for a time.
 
     The server may only have a subset of all events in a room, in which case
     its possible for the server to have chunks that are unconnected from each

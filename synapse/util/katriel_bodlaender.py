@@ -24,7 +24,7 @@ This ordering is therefore opposite to what one might expect when considering
 the room DAG, as newer messages would be added to the start rather than the
 end.
 
-***We therefore invert the direction of edges when using the algorithm***
+***The ChunkDBOrderedListStore therefore inverts the direction of edges***
 
 See:
     A tight analysis of the Katriel–Bodlaender algorithm for online topological
@@ -79,7 +79,7 @@ class OrderedListStore(object):
         self._insert_before(node_id, None)
 
     def add_edge(self, source, target):
-        """Adds a new edge is added to the graph and updates the ordering.
+        """Adds a new edge to the graph and updates the ordering.
 
         See module level docs.
 
