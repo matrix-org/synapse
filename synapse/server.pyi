@@ -40,6 +40,9 @@ class HomeServer(object):
     def get_deactivate_account_handler(self) -> synapse.handlers.deactivate_account.DeactivateAccountHandler:
         pass
 
+    def get_room_creation_handler(self) -> synapse.handlers.room.RoomCreationHandler:
+        pass
+
     def get_set_password_handler(self) -> synapse.handlers.set_password.SetPasswordHandler:
         pass
 
