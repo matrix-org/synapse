@@ -524,6 +524,8 @@ class PresenceHandler(object):
             is_syncing (bool): Whether or not the user is now syncing
             sync_time_msec(int): Time in ms when the user was last syncing
         """
+        # stub out presence
+        return
         with (yield self.external_sync_linearizer.queue(process_id)):
             prev_state = yield self.current_state_for_user(user_id)
 

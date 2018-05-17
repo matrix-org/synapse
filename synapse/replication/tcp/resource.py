@@ -221,8 +221,6 @@ class ReplicationStreamer(object):
         """A client has started/stopped syncing on a worker.
         """
         user_sync_counter.inc()
-        # stub out presence
-        return
         yield self.presence_handler.update_external_syncs_row(
             conn_id, user_id, is_syncing, last_sync_ms,
         )
