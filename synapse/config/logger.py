@@ -36,7 +36,7 @@ filters:
     context:
         (): synapse.util.logcontext.LoggingContextFilter
         request: ""
-        redactePattern:["(\?.*access(_|%5[Ff])token=)(.*)$"]
+        redactePattern:['(\?.*access(_|%5[Ff])token=)(.*)$']
 
 handlers:
     file:
