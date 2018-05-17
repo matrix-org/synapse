@@ -41,6 +41,7 @@ from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, \
 from synapse.replication.http import ReplicationRestResource, REPLICATION_PREFIX
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
+from synapse.rest.consent.consent_resource import ConsentResource
 from synapse.rest.key.v1.server_key_resource import LocalKey
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
@@ -140,6 +141,7 @@ class SynapseHomeServer(HomeServer):
                     site_tag,
                     listener_config,
                     root_resource,
+                    self.version_string,
                 ),
                 self.tls_server_context_factory,
             )
@@ -153,6 +155,7 @@ class SynapseHomeServer(HomeServer):
                     site_tag,
                     listener_config,
                     root_resource,
+                    self.version_string,
                 )
             )
         logger.info("Synapse now listening on port %d", port)
@@ -180,6 +183,14 @@ class SynapseHomeServer(HomeServer):
                 "/_matrix/client/unstable": client_resource,
                 "/_matrix/client/v2_alpha": client_resource,
                 "/_matrix/client/versions": client_resource,
+            })
+
+        if name == "consent":
+            consent_resource = ConsentResource(self)
+            if compress:
+                consent_resource = gz_wrap(consent_resource)
+            resources.update({
+                "/_matrix/consent": consent_resource,
             })
 
         if name == "federation":
@@ -472,6 +483,14 @@ def run(hs):
                 " Ensuring psutil is available will help matrix.org track performance"
                 " changes across releases."
             )
+
+    def generate_user_daily_visit_stats():
+        hs.get_datastore().generate_user_daily_visits()
+
+    # Rather than update on per session basis, batch up the requests.
+    # If you increase the loop period, the accuracy of user_daily_visits
+    # table will decrease
+    clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
 
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")

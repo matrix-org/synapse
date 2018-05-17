@@ -176,7 +176,6 @@ class PushersRemoveRestServlet(RestServlet):
 
         request.setResponseCode(200)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Server", self.hs.version_string)
         request.setHeader(b"Content-Length", b"%d" % (
             len(PushersRemoveRestServlet.SUCCESS_HTML),
         ))

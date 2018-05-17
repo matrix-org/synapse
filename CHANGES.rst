@@ -1,5 +1,13 @@
-Changes in synapse <unreleased>
-===============================
+Changes in synapse v0.29.0 (2018-05-16)
+===========================================
+
+
+Changes in synapse v0.29.0-rc1 (2018-05-14)
+===========================================
+
+Notable changes, a docker file for running Synapse (Thanks to @kaiyou!) and a
+closed spec bug in the Client Server API. Additionally further prep for Python 3
+migration.
 
 Potentially breaking change:
 
@@ -12,6 +20,66 @@ Potentially breaking change:
 
   Thanks to @NotAFile for fixing this.
 
+Features:
+
+* Add a Dockerfile for synapse (PR #2846) Thanks to @kaiyou!
+
+Changes - General:
+
+* nuke-room-from-db.sh: added postgresql option and help (PR #2337) Thanks to @rubo77!
+* Part user from rooms on account deactivate (PR #3201)
+* Make 'unexpected logging context' into warnings (PR #3007)
+* Set Server header in SynapseRequest (PR #3208)
+* remove duplicates from groups tables (PR #3129)
+* Improve exception handling for background processes (PR #3138)
+* Add missing consumeErrors to improve exception handling (PR #3139)
+* reraise exceptions more carefully (PR #3142)
+* Remove redundant call to preserve_fn (PR #3143)
+* Trap exceptions thrown within run_in_background (PR #3144)
+
+Changes - Refactors:
+
+* Refactor /context to reuse pagination storage functions (PR #3193)
+* Refactor recent events func to use pagination func (PR #3195)
+* Refactor pagination DB API to return concrete type (PR #3196)
+* Refactor get_recent_events_for_room return type (PR #3198)
+* Refactor sync APIs to reuse pagination API (PR #3199)
+* Remove unused code path from member change DB func (PR #3200)
+* Refactor request handling wrappers (PR #3203)
+* transaction_id, destination defined twice (PR #3209) Thanks to @damir-manapov!
+* Refactor event storage to prepare for changes in state calculations (PR #3141)
+* Set Server header in SynapseRequest (PR #3208)
+* Use deferred.addTimeout instead of time_bound_deferred (PR #3127, #3178)
+* Use run_in_background in preference to preserve_fn (PR #3140)
+
+Changes - Python 3 migration:
+
+* Construct HMAC as bytes on py3 (PR #3156) Thanks to @NotAFile!
+* run config tests on py3 (PR #3159) Thanks to @NotAFile!
+* Open certificate files as bytes (PR #3084) Thanks to @NotAFile!
+* Open config file in non-bytes mode (PR #3085) Thanks to @NotAFile!
+* Make event properties raise AttributeError instead (PR #3102) Thanks to @NotAFile!
+* Use six.moves.urlparse (PR #3108) Thanks to @NotAFile!
+* Add py3 tests to tox with folders that work (PR #3145) Thanks to @NotAFile!
+* Don't yield in list comprehensions (PR #3150) Thanks to @NotAFile!
+* Move more xrange to six (PR #3151) Thanks to @NotAFile!
+* make imports local (PR #3152) Thanks to @NotAFile!
+* move httplib import to six (PR #3153) Thanks to @NotAFile!
+* Replace stringIO imports with six (PR #3154, #3168) Thanks to @NotAFile!
+* more bytes strings (PR #3155) Thanks to @NotAFile!
+
+Bug Fixes:
+
+* synapse fails to start under Twisted >= 18.4 (PR #3157)
+* Fix a class of logcontext leaks (PR #3170)
+* Fix a couple of logcontext leaks in unit tests (PR #3172)
+* Fix logcontext leak in media repo (PR #3174)
+* Escape label values in prometheus metrics (PR #3175, #3186)
+* Fix 'Unhandled Error' logs with Twisted 18.4 (PR #3182) Thanks to @Half-Shot!
+* Fix logcontext leaks in rate limiter (PR #3183)
+* notifications: Convert next_token to string according to the spec (PR #3190) Thanks to @mujx!
+* nuke-room-from-db.sh: fix deletion from search table (PR #3194) Thanks to @rubo77!
+* add guard for None on purge_history api (PR #3160) Thanks to @krombel!
 
 Changes in synapse v0.28.1 (2018-05-01)
 =======================================

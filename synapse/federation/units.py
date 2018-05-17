@@ -74,8 +74,6 @@ class Transaction(JsonEncodedObject):
         "previous_ids",
         "pdus",
         "edus",
-        "transaction_id",
-        "destination",
         "pdu_failures",
     ]
 

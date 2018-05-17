@@ -32,6 +32,7 @@ demo/media_store.*
 demo/etc
 
 uploads
+cache
 
 .idea/
 media_store/
@@ -48,3 +49,4 @@ env/
 *.config
 
 .vscode/
+.ropeproject/

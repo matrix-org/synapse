@@ -97,6 +97,9 @@ class HomeServer(object):
     which must be implemented by the subclass. This code may call any of the
     required "get" methods on the instance to obtain the sub-dependencies that
     one requires.
+
+    Attributes:
+        config (synapse.config.homeserver.HomeserverConfig):
     """
 
     DEPENDENCIES = [
