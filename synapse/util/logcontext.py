@@ -237,17 +237,42 @@ class LoggingContextFilter(logging.Filter):
     """
     def __init__(self, **defaults):
         self.defaults = defaults
+        self._patterns = None
+        redacts = []
+        if "redactePattern" in self.defaults:
+            patterns = self.defaults["redactePattern"]
+            for pattern in patterns:
+                elem = re.compile(pattern)
+                redacts.append(elem) 
+            self._patterns = redacts
+            del self.defaults["redactePattern"]
+
 
     def filter(self, record):
         """Add each fields from the logging contexts to the record.
         Returns:
             True to include the record in the log output.
         """
+        
+        if self._patterns is not None:
+            msg = self.redact(record.msg)
+            if isinstance(record.args, dict):
+                for k in record.args.keys():
+                    record.args[k] = self.redact(record.args[k])
+            else:
+                record.args = tuple(self.redact(arg) for arg in record.args)
         context = LoggingContext.current_context()
         for key, value in self.defaults.items():
             setattr(record, key, value)
         context.copy_to(record)
         return True
+
+
+    def redact(self, msg):
+        msg = isinstance(msg, basestring) and msg or str(msg)
+        for pattern in self._patterns:
+            msg = pattern.sub(br'\1<redacted>\3',msg)
+        return msg
 
 
 class PreserveLoggingContext(object):
