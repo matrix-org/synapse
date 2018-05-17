@@ -24,6 +24,7 @@ See doc/log_contexts.rst for details on how this works.
 
 from twisted.internet import defer
 
+import re
 import threading
 import logging
 
