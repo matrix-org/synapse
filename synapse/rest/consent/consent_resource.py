@@ -116,7 +116,7 @@ class ConsentResource(Resource):
         loader = jinja2.FileSystemLoader(consent_template_directory)
         self._jinja_env = jinja2.Environment(loader=loader)
 
-        self._default_consent_verison = consent_config["default_version"]
+        self._default_consent_verison = consent_config["version"]
 
         if hs.config.form_secret is None:
             raise ConfigError(

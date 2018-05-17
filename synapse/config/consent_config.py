@@ -18,19 +18,21 @@ from ._base import Config
 DEFAULT_CONFIG = """\
 # User Consent configuration
 #
-# uncomment and configure if enabling the 'consent' resource under 'listeners'.
+# Parts of this section are required if enabling the 'consent' resource under
+# 'listeners', in particular 'template_dir' and 'version'.
 #
 # 'template_dir' gives the location of the templates for the HTML forms.
 # This directory should contain one subdirectory per language (eg, 'en', 'fr'),
 # and each language directory should contain the policy document (named as
 # '<version>.html') and a success page (success.html).
 #
-# 'default_version' gives the version of the policy document to serve up if
-# there is no 'v' parameter.
+# 'version' specifies the 'current' version of the policy document. It defines
+# the version to be served by the consent resource if there is no 'v'
+# parameter.
 #
 # user_consent:
 #   template_dir: res/templates/privacy
-#   default_version: 1.0
+#   version: 1.0
 """
 
 
