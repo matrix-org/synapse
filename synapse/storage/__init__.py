@@ -376,7 +376,7 @@ class DataStore(RoomMemberStore, RoomStore,
                     FROM user_ips AS u
                     LEFT JOIN (
                       SELECT user_id, device_id, timestamp FROM user_daily_visits
-                      WHERE timestamp IS ?
+                      WHERE timestamp = ?
                     ) udv
                     ON u.user_id = udv.user_id AND u.device_id=udv.device_id
                     WHERE last_seen > ? AND last_seen <= ? AND udv.timestamp IS NULL
