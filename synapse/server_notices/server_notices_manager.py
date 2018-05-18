@@ -37,10 +37,26 @@ class ServerNoticesManager(object):
         self._event_creation_handler = hs.get_event_creation_handler()
 
     def is_enabled(self):
+        """Checks if server notices are enabled on this server.
+
+        Returns:
+            bool
+        """
         return self._config.server_notices_mxid is not None
 
     @defer.inlineCallbacks
     def send_notice(self, user_id, event_content):
+        """Send a notice to the given user
+
+        Creates the server notices room, if none exists.
+
+        Args:
+            user_id (str): mxid of user to send event to.
+            event_content (dict): content of event to send
+
+        Returns:
+            Deferrred[None]
+        """
         room_id = yield self.get_notice_room_for_user(user_id)
 
         system_mxid = self._config.server_notices_mxid
