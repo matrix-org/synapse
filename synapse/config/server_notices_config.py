@@ -37,33 +37,25 @@ DEFAULT_CONFIG = """\
 
 
 class ServerNoticesConfig(Config):
+    """Configuration for the server notices room.
+
+    Attributes:
+        server_notices_mxid (str|None):
+            The MXID to use for server notices.
+            None if server notices are not enabled.
+
+        server_notices_mxid_display_name (str|None):
+            The display name to use for the server notices user.
+            None if server notices are not enabled.
+
+        server_notices_room_name (str|None):
+            The name to use for the server notices room.
+            None if server notices are not enabled.
+    """
     def __init__(self):
         super(ServerNoticesConfig, self).__init__()
-
-        """The MXID to use for server notices.
-
-        None if server notices are not enabled.
-
-        type: str|None
-        """
         self.server_notices_mxid = None
-
-        """The display name to use for the server notices user.
-
-        None if server notices are not enabled.
-
-        type: str|None
-        """
         self.server_notices_mxid_display_name = None
-
-        """The name to use for the server notices room.
-
-        None if server notices are not enabled.
-
-        (TODO: i18n)
-
-        type: str|None
-        """
         self.server_notices_room_name = None
 
     def read_config(self, config):
@@ -78,7 +70,7 @@ class ServerNoticesConfig(Config):
         self.server_notices_mxid_display_name = c.get(
             'system_mxid_display_name', 'Server Notices',
         )
-
+        # todo: i18n
         self.server_notices_room_name = c.get('room_name', "Server Notices")
 
     def default_config(self, **kwargs):
