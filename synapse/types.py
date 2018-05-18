@@ -96,6 +96,7 @@ def create_requester(user_id, access_token_id=None, is_guest=False,
 
 
 def get_domain_from_id(string):
+    string = str(string)  # FIXME(nota) DIRTY HACK
     idx = string.find(":")
     if idx == -1:
         raise SynapseError(400, "Invalid ID: %r" % (string,))

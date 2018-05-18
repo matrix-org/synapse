@@ -12,13 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import print_function
 import logging
+# import tracemalloc
 
 from synapse.api.errors import StoreError
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.caches.descriptors import Cache
 from synapse.storage.engines import PostgresEngine
 import synapse.metrics
+
+# tracemalloc.start()
 
 
 from twisted.internet import defer
@@ -115,6 +119,11 @@ class LoggingTransaction(object):
 
         start = time.time() * 1000
 
+        if isinstance(args, tuple) and False:
+            print('########### traceback ###########')
+            # print(tracemalloc.get_object_traceback(args))
+            print('########### end ###########')
+        print("args", args)
         try:
             return func(
                 sql, *args

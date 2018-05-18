@@ -484,7 +484,8 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def _look_up_user_by_access_token(self, token):
-        ret = yield self.store.get_user_by_access_token(token)
+        # TODO(nota): make this decode go somewhere more sensible
+        ret = yield self.store.get_user_by_access_token(token.decode())
         if not ret:
             logger.warn("Unrecognised access token - not in store: %s" % (token,))
             raise AuthError(

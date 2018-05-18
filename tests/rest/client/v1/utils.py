@@ -32,6 +32,8 @@ class RestTestCase(unittest.TestCase):
     This subclass assumes there are mock_resource and auth_user_id attributes.
     """
 
+    timeout = 1
+
     def __init__(self, *args, **kwargs):
         super(RestTestCase, self).__init__(*args, **kwargs)
         self.mock_resource = None
@@ -104,7 +106,7 @@ class RestTestCase(unittest.TestCase):
                 "password": "test",
                 "type": "m.login.password"
             }))
-        self.assertEquals(200, code)
+        self.assertEquals(200, code, msg=response)
         defer.returnValue(response)
 
     @defer.inlineCallbacks

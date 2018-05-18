@@ -237,7 +237,7 @@ class MockHttpResource(HttpServer):
             if matcher:
                 try:
                     args = [
-                        urlparse.unquote(u).decode("UTF-8")
+                        urlparse.unquote(u)# .decode("UTF-8") FIXME!!!!!!!
                         for u in matcher.groups()
                     ]
 

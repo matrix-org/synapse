@@ -146,7 +146,7 @@ class EventBase(object):
         return field in self._event_dict
 
     def items(self):
-        return self._event_dict.items()
+        return list(self._event_dict.items())
 
 
 class FrozenEvent(EventBase):

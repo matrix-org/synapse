@@ -81,4 +81,4 @@ def get_version_string(module):
     except Exception as e:
         logger.info("Failed to check for git repository: %s", e)
 
-    return module.__version__.encode("ascii")
+    return module.__version__  #.encode("ascii")
