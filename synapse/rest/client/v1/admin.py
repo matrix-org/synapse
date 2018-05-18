@@ -151,10 +151,11 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
             if event.room_id != room_id:
                 raise SynapseError(400, "Event is for wrong room.")
 
-            depth = event.depth
+            token = yield self.store.get_topological_token_for_event(event_id)
+
             logger.info(
-                "[purge] purging up to depth %i (event_id %s)",
-                depth, event_id,
+                "[purge] purging up to token %s (event_id %s)",
+                token, event_id,
             )
         elif 'purge_up_to_ts' in body:
             ts = body['purge_up_to_ts']
@@ -174,7 +175,9 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
                 )
             )
             if room_event_after_stream_ordering:
-                (_, depth, _) = room_event_after_stream_ordering
+                token = yield self.store.get_topological_token_for_event(
+                    room_event_after_stream_ordering,
+                )
             else:
                 logger.warn(
                     "[purge] purging events not possible: No event found "
@@ -187,9 +190,9 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
                     errcode=Codes.NOT_FOUND,
                 )
             logger.info(
-                "[purge] purging up to depth %i (received_ts %i => "
+                "[purge] purging up to token %d (received_ts %i => "
                 "stream_ordering %i)",
-                depth, ts, stream_ordering,
+                token, ts, stream_ordering,
             )
         else:
             raise SynapseError(
@@ -199,7 +202,7 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
             )
 
         purge_id = yield self.handlers.message_handler.start_purge_history(
-            room_id, depth,
+            room_id, token,
             delete_local_events=delete_local_events,
         )
 
