@@ -44,36 +44,57 @@ class DomainRuleChecker(object):
         self.default = config["default"]
 
     def check_event_for_spam(self, event):
+        """Implements synapse.events.SpamChecker.check_event_for_spam
+        """
         return False
 
     def user_may_invite(self, inviter_userid, invitee_userid, room_id):
+        """Implements synapse.events.SpamChecker.user_may_invite
+        """
         inviter_domain = self._get_domain_from_id(inviter_userid)
         invitee_domain = self._get_domain_from_id(invitee_userid)
 
         if inviter_domain not in self.domain_mapping:
             return self.default
 
-        return invitee_domain in self.domain_mapping.get(inviter_domain)
+        return invitee_domain in self.domain_mapping[inviter_domain]
 
     def user_may_create_room(self, userid):
+        """Implements synapse.events.SpamChecker.user_may_create_room
+        """
         return True
 
     def user_may_create_room_alias(self, userid, room_alias):
+        """Implements synapse.events.SpamChecker.user_may_create_room_alias
+        """
         return True
 
     def user_may_publish_room(self, userid, room_id):
+        """Implements synapse.events.SpamChecker.user_may_publish_room
+        """
         return True
 
     @staticmethod
     def parse_config(config):
+        """Implements synapse.events.SpamChecker.parse_config
+        """
         if "default" in config:
             return config
         else:
             raise ConfigError("No default set for spam_config DomainRuleChecker")
 
     @staticmethod
-    def _get_domain_from_id(string):
-        idx = string.find(":")
+    def _get_domain_from_id(mxid):
+        """Parses a string and returns the domain part of the mxid.
+
+        Args:
+           mxid (str): a valid mxid
+
+        Returns:
+           str: the domain part of the mxid
+
+        """
+        idx = mxid.find(":")
         if idx == -1:
-            raise Exception("Invalid ID: %r" % (string,))
-        return string[idx + 1:]
+            raise Exception("Invalid ID: %r" % (mxid,))
+        return mxid[idx + 1:]
