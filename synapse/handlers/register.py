@@ -34,6 +34,11 @@ logger = logging.getLogger(__name__)
 class RegistrationHandler(BaseHandler):
 
     def __init__(self, hs):
+        """
+
+        Args:
+            hs (synapse.server.HomeServer):
+        """
         super(RegistrationHandler, self).__init__(hs)
 
         self.auth = hs.get_auth()
@@ -49,6 +54,7 @@ class RegistrationHandler(BaseHandler):
         self._generate_user_id_linearizer = Linearizer(
             name="_generate_user_id_linearizer",
         )
+        self._server_notices_mxid = hs.config.server_notices_mxid
 
     @defer.inlineCallbacks
     def check_username(self, localpart, guest_access_token=None,
@@ -338,6 +344,14 @@ class RegistrationHandler(BaseHandler):
             yield identity_handler.bind_threepid(c, user_id)
 
     def check_user_id_not_appservice_exclusive(self, user_id, allowed_appservice=None):
+        # don't allow people to register the server notices mxid
+        if self._server_notices_mxid is not None:
+            if user_id == self._server_notices_mxid:
+                raise SynapseError(
+                    400, "This user ID is reserved.",
+                    errcode=Codes.EXCLUSIVE
+                )
+
         # valid user IDs must not clash with any user ID namespaces claimed by
         # application services.
         services = self.store.get_app_services()
