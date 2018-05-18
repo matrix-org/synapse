@@ -309,6 +309,13 @@ class RoomMemberHandler(object):
                 )
 
         if effective_membership_state == Membership.INVITE:
+            # block any attempts to invite the server notices mxid
+            if target.to_string() == self._server_notices_mxid:
+                raise SynapseError(
+                    http_client.FORBIDDEN,
+                    "Cannot invite this user",
+                )
+
             block_invite = False
 
             if (self._server_notices_mxid is not None and

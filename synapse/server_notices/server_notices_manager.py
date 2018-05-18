@@ -78,6 +78,11 @@ class ServerNoticesManager(object):
         )
         system_mxid = self._config.server_notices_mxid
         for room in rooms:
+            # it's worth noting that there is an asymmetry here in that we
+            # expect the user to be invited or joined, but the system user must
+            # be joined. This is kinda deliberate, in that if somebody somehow
+            # manages to invite the system user to a room, that doesn't make it
+            # the server notices room.
             user_ids = yield self._store.get_users_in_room(room.room_id)
             if system_mxid in user_ids:
                 # we found a room which our user shares with the system notice
