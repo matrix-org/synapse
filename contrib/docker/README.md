@@ -1,9 +1,9 @@
 # Synapse Docker
 
-This Docker image will run Synapse as a single process. It does not provide any
-database server or TURN server that you should run separately.
+The `matrixdotorg/synapse` Docker image will run Synapse as a single process. It does not provide a
+database server or a TURN server, you should run these separately.
 
-If you run a Postgres server, you should simply have it in the same Compose
+If you run a Postgres server, you should simply include it in the same Compose
 project or set the proper environment variables and the image will automatically
 use that server.
 
@@ -37,10 +37,15 @@ then run the server:
 docker-compose up -d
 ```
 
+If secrets are not specified in the environment variables, they will be generated
+as part of the startup. Please ensure these secrets are kept between launches of the
+Docker container, as their loss may require users to log in again.
+
 ### Manual configuration
 
 A sample ``docker-compose.yml`` is provided, including example labels for
-reverse proxying and other artifacts.
+reverse proxying and other artifacts. The docker-compose file is an example,
+please comment/uncomment sections that are not suitable for your usecase.
 
 Specify a ``SYNAPSE_CONFIG_PATH``, preferably to a persistent path,
 to use manual configuration. To generate a fresh ``homeserver.yaml``, simply run:
@@ -111,8 +116,6 @@ variables are available for configuration:
 * ``SYNAPSE_SERVER_NAME`` (mandatory), the current server public hostname.
 * ``SYNAPSE_REPORT_STATS``, (mandatory, ``yes`` or ``no``), enable anonymous
   statistics reporting back to the Matrix project which helps us to get funding.
-* ``SYNAPSE_MACAROON_SECRET_KEY`` (mandatory) secret for signing access tokens
-  to the server, set this to a proper random key.
 * ``SYNAPSE_NO_TLS``, set this variable to disable TLS in Synapse (use this if
   you run your own TLS-capable reverse proxy).
 * ``SYNAPSE_ENABLE_REGISTRATION``, set this variable to enable registration on
@@ -132,6 +135,8 @@ Shared secrets, that will be initialized to random values if not set:
 
 * ``SYNAPSE_REGISTRATION_SHARED_SECRET``, secret for registrering users if
   registration is disable.
+* ``SYNAPSE_MACAROON_SECRET_KEY`` secret for signing access tokens
+  to the server.
 
 Database specific values (will use SQLite if not set):
 
