@@ -45,8 +45,22 @@ DEFAULT_CONFIG = """\
 
 
 class ConsentConfig(Config):
+    def __init__(self):
+        super(ConsentConfig, self).__init__()
+
+        self.user_consent_version = None
+        self.user_consent_template_dir = None
+        self.user_consent_server_notice_content = None
+
     def read_config(self, config):
-        self.consent_config = config.get("user_consent")
+        consent_config = config.get("user_consent")
+        if consent_config is None:
+            return
+        self.user_consent_version = str(consent_config["version"])
+        self.user_consent_template_dir = consent_config["template_dir"]
+        self.user_consent_server_notice_content = consent_config.get(
+            "server_notice_content",
+        )
 
     def default_config(self, **kwargs):
         return DEFAULT_CONFIG

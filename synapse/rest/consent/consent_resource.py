@@ -95,8 +95,8 @@ class ConsentResource(Resource):
         # this is required by the request_handler wrapper
         self.clock = hs.get_clock()
 
-        consent_config = hs.config.consent_config
-        if consent_config is None:
+        self._default_consent_verison = hs.config.user_consent_version
+        if self._default_consent_verison is None:
             raise ConfigError(
                 "Consent resource is enabled but user_consent section is "
                 "missing in config file.",
@@ -104,7 +104,7 @@ class ConsentResource(Resource):
 
         # daemonize changes the cwd to /, so make the path absolute now.
         consent_template_directory = path.abspath(
-            consent_config["template_dir"],
+            hs.config.user_consent_template_dir,
         )
         if not path.isdir(consent_template_directory):
             raise ConfigError(
@@ -115,8 +115,6 @@ class ConsentResource(Resource):
 
         loader = jinja2.FileSystemLoader(consent_template_directory)
         self._jinja_env = jinja2.Environment(loader=loader)
-
-        self._default_consent_verison = consent_config["version"]
 
         if hs.config.form_secret is None:
             raise ConfigError(

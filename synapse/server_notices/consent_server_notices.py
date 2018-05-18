@@ -35,16 +35,10 @@ class ConsentServerNotices(object):
         self._server_notices_manager = hs.get_server_notices_manager()
         self._store = hs.get_datastore()
 
-        self._current_consent_version = None
-        self._server_notice_content = None
         self._users_in_progress = set()
 
-        consent_config = hs.config.consent_config
-        if consent_config is not None:
-            self._current_consent_version = str(consent_config["version"])
-            self._server_notice_content = consent_config.get(
-                "server_notice_content"
-            )
+        self._current_consent_version = hs.config.user_consent_version
+        self._server_notice_content = hs.config.user_consent_server_notice_content
 
         if self._server_notice_content is not None:
             if not self._server_notices_manager.is_enabled():
