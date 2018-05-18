@@ -1,5 +1,13 @@
+Changes in <unreleased>
+=======================
+
+This release adds an index to the events table. This means that on first
+startup there will be an inceased amount of IO until the index is created, and
+an increase in disk usage.
+
+
 Changes in synapse v0.29.0 (2018-05-16)
-===========================================
+=======================================
 
 
 Changes in synapse v0.29.0-rc1 (2018-05-14)

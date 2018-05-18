@@ -232,6 +232,15 @@ class EventsStore(EventsWorkerStore):
             psql_only=True,
         )
 
+        self.register_background_index_update(
+            "events_chunk_index",
+            index_name="events_chunk_index",
+            table="events",
+            columns=["room_id", "chunk_id", "topological_ordering", "stream_ordering"],
+            unique=True,
+            psql_only=True,
+        )
+
         self._event_persist_queue = _EventPeristenceQueue()
 
         self._state_resolution_handler = hs.get_state_resolution_handler()
