@@ -379,7 +379,11 @@ class DataStore(RoomMemberStore, RoomStore,
                       WHERE timestamp = ?
                     ) udv
                     ON u.user_id = udv.user_id AND u.device_id=udv.device_id
-                    WHERE last_seen > ? AND last_seen <= ? AND udv.timestamp IS NULL
+                    INNER JOIN users ON users.name=u.user_id
+                    WHERE last_seen > ? AND last_seen <= ?
+                    AND udv.timestamp IS NULL AND users.is_guest=0
+                    AND users.appservice_id IS NULL
+                    GROUP BY u.user_id, u.device_id
             """
 
             # This means that the day has rolled over but there could still
