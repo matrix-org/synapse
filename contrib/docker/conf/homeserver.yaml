@@ -1,10 +1,21 @@
 # vim:ft=yaml
 
 ## TLS ##
-
+{% if SYNAPSE_TLS_CERT_PATH is defined %}
+tls_certificate_path: "{{ SYNAPSE_TLS_CERT_PATH }}"
+{% else %}
 tls_certificate_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.crt"
+{% endif %}
+{% if SYNAPSE_TLS_KEY_PATH is defined %}
+tls_private_key_path: "{{ SYNAPSE_TLS_KEY_PATH }}"
+{% else %}
 tls_private_key_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.key"
+{% endif %}
+{% if SYNAPSE_DH_PARAMS_PATH is defined %}
+tls_dh_params_path: "{{ SYNAPSE_DH_PARAMS_PATH }}"
+{% else %}
 tls_dh_params_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.dh"
+{% endif %}
 no_tls: {{ "True" if SYNAPSE_NO_TLS else "False" }}
 tls_fingerprints: []
 
@@ -186,7 +197,11 @@ expire_access_token: False
 
 ## Signing Keys ##
 
+{% if SYNAPSE_SIGNING_KEY_PATH is defined %}
+signing_key_path: "{{ SYNAPSE_SIGNING_KEY_PATH }}"
+{% else %}
 signing_key_path: "/data/{{ SYNAPSE_SERVER_NAME }}.signing.key"
+{% endif %}
 old_signing_keys: {}
 key_refresh_interval: "1d" # 1 Day.
 

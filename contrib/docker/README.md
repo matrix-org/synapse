@@ -118,6 +118,10 @@ variables are available for configuration:
   statistics reporting back to the Matrix project which helps us to get funding.
 * ``SYNAPSE_NO_TLS``, set this variable to disable TLS in Synapse (use this if
   you run your own TLS-capable reverse proxy).
+* ``SYNAPSE_TLS_CERT_PATH``, path to the TLS certificate for Synapse's TLS port
+* ``SYNAPSE_TLS_KEY_PATH``, path to the TLS key for Synapse's TLS port
+* ``SYNAPSE_DH_PARAMS_PATH``, path to the DH params file for TLS
+* ``SYNAPSE_SIGNING_KEY_PATH``, path to your homeserver's signing key
 * ``SYNAPSE_ENABLE_REGISTRATION``, set this variable to enable registration on
   the Synapse instance.
 * ``SYNAPSE_ALLOW_GUEST``, set this variable to allow guest joining this server.
