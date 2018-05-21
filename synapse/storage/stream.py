@@ -905,6 +905,48 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         defer.returnValue((events, token, extremities))
 
+    def clamp_token_before(self, room_id, token, clamp_to):
+        token = RoomStreamToken.parse(token)
+        clamp_to = RoomStreamToken.parse(clamp_to)
+
+        def clamp_token_before_txn(txn, token):
+            if not token.topological:
+                sql = """
+                    SELECT chunk_id, topological_ordering FROM events
+                    WHERE room_id = ? AND stream_ordering <= ?
+                    ORDER BY stream_ordering DESC
+                """
+                txn.execute(sql, (room_id, token.stream,))
+                row = txn.fetchone()
+                if not row:
+                    return str(token)
+
+                chunk_id, topo = row
+                token = RoomStreamToken(chunk_id, topo, token.stream)
+
+            if token.chunk == clamp_to.chunk:
+                if token.topological < clamp_to.topological:
+                    return str(token)
+                else:
+                    return str(clamp_to)
+
+            sql = "SELECT rationale FROM chunk_linearized WHERE chunk_id = ?"
+
+            txn.execute(sql, (token.chunk,))
+            token_order, = txn.fetchone()
+
+            txn.execute(sql, (clamp_to.chunk,))
+            clamp_order, = txn.fetchone()
+
+            if token_order < clamp_order:
+                return str(token)
+            else:
+                return str(clamp_to)
+
+        return self.runInteraction(
+            "clamp_token_before", clamp_token_before_txn, token
+        )
+
 
 class StreamStore(StreamWorkerStore):
     def get_room_max_stream_ordering(self):
