@@ -306,7 +306,7 @@ StreamToken.START = StreamToken(
 )
 
 
-class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
+class RoomStreamToken(namedtuple("_StreamToken", "chunk topological stream")):
     """Tokens are positions between events. The token "s1" comes after event 1.
 
             s0    s1
@@ -334,10 +334,17 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
     def parse(cls, string):
         try:
             if string[0] == 's':
-                return cls(topological=None, stream=int(string[1:]))
-            if string[0] == 't':
+                return cls(chunk=None, topological=None, stream=int(string[1:]))
+            if string[0] == 't':  # For backwards compat with older tokens.
                 parts = string[1:].split('-', 1)
-                return cls(topological=int(parts[0]), stream=int(parts[1]))
+                return cls(chunk=None, topological=int(parts[0]), stream=int(parts[1]))
+            if string[0] == 'c':
+                parts = string[1:].split('~', 2)
+                return cls(
+                    chunk=int(parts[0]),
+                    topological=int(parts[1]),
+                    stream=int(parts[2]),
+                )
         except Exception:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
@@ -346,12 +353,14 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
     def parse_stream_token(cls, string):
         try:
             if string[0] == 's':
-                return cls(topological=None, stream=int(string[1:]))
+                return cls(chunk=None, topological=None, stream=int(string[1:]))
         except Exception:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
 
     def __str__(self):
+        if self.chunk is not None:
+            return "c%d~%d~%d" % (self.chunk, self.topological, self.stream)
         if self.topological is not None:
             return "t%d-%d" % (self.topological, self.stream)
         else:
