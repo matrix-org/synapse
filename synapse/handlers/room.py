@@ -534,7 +534,7 @@ class RoomEventSource(object):
 
     @defer.inlineCallbacks
     def get_pagination_rows(self, user, config, key):
-        events, next_key = yield self.store.paginate_room_events(
+        events, next_key, _ = yield self.store.paginate_room_events(
             room_id=key,
             from_key=config.from_key,
             to_key=config.to_key,
