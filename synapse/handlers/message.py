@@ -232,6 +232,20 @@ class MessageHandler(BaseHandler):
                 event_filter=event_filter,
             )
 
+            if source_config.direction == 'b' and extremities:
+                yield self.hs.get_handlers().federation_handler.maybe_backfill(
+                    room_id, extremities
+                )
+
+                events, next_key, extremities = yield self.store.paginate_room_events(
+                    room_id=room_id,
+                    from_key=source_config.from_key,
+                    to_key=source_config.to_key,
+                    direction=source_config.direction,
+                    limit=source_config.limit,
+                    event_filter=event_filter,
+                )
+
             next_token = pagin_config.from_token.copy_and_replace(
                 "room_key", next_key
             )
