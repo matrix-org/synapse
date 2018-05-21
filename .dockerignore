@@ -2,4 +2,6 @@ Dockerfile
 .travis.yml
 .gitignore
 demo/etc
+env
 tox.ini
+.git
