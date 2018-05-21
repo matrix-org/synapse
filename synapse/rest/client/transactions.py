@@ -87,19 +87,23 @@ class HttpTransactionCache(object):
 
         deferred = fn(*args, **kwargs)
 
-        # if the request fails with a Twisted failure, remove it
-        # from the transaction map. This is done to ensure that we don't
-        # cache transient errors like rate-limiting errors, etc.
+        observable = ObservableDeferred(deferred, consumeErrors=False)
+        self.transactions[txn_key] = (observable, self.clock.time_msec())
+
+        # if the request fails with an exception, remove it from the
+        # transaction map. This is done to ensure that we don't cache
+        # transient errors like rate-limiting errors, etc.
+        #
+        # (make sure we add this errback *after* adding the key above, in case
+        # the deferred has already failed and is running errbacks
+        # synchronously)
         def remove_from_map(err):
             self.transactions.pop(txn_key, None)
-            return err
+            # we deliberately do not propagate the error any further, as we
+            # expect the observers to have reported it.
+
         deferred.addErrback(remove_from_map)
 
-        # We don't add any other errbacks to the raw deferred, so we ask
-        # ObservableDeferred to swallow the error. This is fine as the error will
-        # still be reported to the observers.
-        observable = ObservableDeferred(deferred, consumeErrors=True)
-        self.transactions[txn_key] = (observable, self.clock.time_msec())
         return observable.observe()
 
     def _cleanup(self):
