@@ -85,7 +85,9 @@ class SynapseRequest(Request):
     def _started_processing(self, servlet_name):
         self.start_time = int(time.time() * 1000)
         self.request_metrics = RequestMetrics()
-        self.request_metrics.start(self.start_time, name=servlet_name)
+        self.request_metrics.start(
+            self.start_time, name=servlet_name, method=self.method,
+        )
 
         self.site.access_logger.info(
             "%s - %s - Received request: %s %s",
