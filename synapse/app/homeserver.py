@@ -34,8 +34,7 @@ from synapse.module_api import ModuleApi
 from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import RootRedirect
 from synapse.http.site import SynapseSite
-from synapse.metrics import register_memory_metrics
-from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
+from synapse.metrics.resource import METRICS_PREFIX
 from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, \
     check_requirements
 from synapse.replication.http import ReplicationRestResource, REPLICATION_PREFIX
@@ -221,7 +220,8 @@ class SynapseHomeServer(HomeServer):
             resources[WEB_CLIENT_PREFIX] = build_resource_for_web_client(self)
 
         if name == "metrics" and self.get_config().enable_metrics:
-            resources[METRICS_PREFIX] = MetricsResource(self)
+            from prometheus_client.twisted import MetricsResource
+            resources[METRICS_PREFIX] = MetricsResource()
 
         if name == "replication":
             resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
@@ -352,8 +352,6 @@ def setup(config_options):
         hs.get_datastore().start_profiling()
         hs.get_datastore().start_doing_background_updates()
         hs.get_federation_client().start_get_pdu_cache()
-
-        register_memory_metrics(hs)
 
     reactor.callWhenRunning(start)
 
