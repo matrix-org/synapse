@@ -1020,7 +1020,7 @@ class EventsStore(EventsWorkerStore):
                     }
                 )
 
-                chunk_id, _ = self._compute_chunk_id_txn(
+                chunk_id, topo = self._compute_chunk_id_txn(
                     txn, event.room_id, event.event_id,
                     [eid for eid, _ in event.prev_events],
                 )
@@ -1032,6 +1032,7 @@ class EventsStore(EventsWorkerStore):
                     updatevalues={
                         "outlier": False,
                         "chunk_id": chunk_id,
+                        "topological_ordering": topo,
                     },
                 )
 
@@ -1116,9 +1117,9 @@ class EventsStore(EventsWorkerStore):
         )
 
         if event.internal_metadata.is_outlier():
-            chunk_id, _topo = None, 0
+            chunk_id, topo = None, 0
         else:
-            chunk_id, _topo = self._compute_chunk_id_txn(
+            chunk_id, topo = self._compute_chunk_id_txn(
                 txn, event.room_id, event.event_id,
                 [eid for eid, _ in event.prev_events],
             )
@@ -1130,7 +1131,7 @@ class EventsStore(EventsWorkerStore):
                 {
                     "stream_ordering": event.internal_metadata.stream_ordering,
                     "chunk_id": chunk_id,
-                    "topological_ordering": event.depth,
+                    "topological_ordering": topo,
                     "depth": event.depth,
                     "event_id": event.event_id,
                     "room_id": event.room_id,
