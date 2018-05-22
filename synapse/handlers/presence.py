@@ -142,8 +142,9 @@ class PresenceHandler(object):
         }
 
         LaterGauge(
-            "user_to_current_state_size", "", [], lambda: len(self.user_to_current_state)
-        ).register()
+            "synapse_handlers_presence_user_to_current_state_size", "", [],
+            lambda: len(self.user_to_current_state)
+        )
 
         now = self.clock.time_msec()
         for state in active_presence:
@@ -212,7 +213,7 @@ class PresenceHandler(object):
             60 * 1000,
         )
 
-        LaterGauge("wheel_timer_size", "", [], lambda: len(self.wheel_timer)).register()
+        LaterGauge("synapse_handlers_presence_wheel_timer_size", "", [], lambda: len(self.wheel_timer))
 
     @defer.inlineCallbacks
     def _on_shutdown(self):

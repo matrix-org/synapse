@@ -71,24 +71,14 @@ in_flight_requests_db_sched_duration = Counter("synapse_http_request_in_flight_r
 _in_flight_requests = set()
 
 
-def _collect_in_flight():
-    """Called just before metrics are collected, so we use it to update all
-    the in flight request metrics
-    """
-
-    for rm in _in_flight_requests:
-        rm.update_metrics()
-
-
-metrics.register_collector(_collect_in_flight)
-
-
 def _get_in_flight_counts():
     """Returns a count of all in flight requests by (method, server_name)
 
     Returns:
         dict[tuple[str, str], int]
     """
+    for rm in _in_flight_requests:
+        rm.update_metrics()
 
     # Map from (method, name) -> int, the number of in flight requests of that
     # type
@@ -98,6 +88,7 @@ def _get_in_flight_counts():
         counts[key] = counts.get(key, 0) + 1
 
     return counts
+
 
 LaterGauge(
     "synapse_http_request_metrics_in_flight_requests_count", "",
