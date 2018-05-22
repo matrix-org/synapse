@@ -13,29 +13,52 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import synapse.metrics
+from prometheus_client.core import GaugeMetricFamily, REGISTRY
+
 import os
 
 CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.5))
 
-metrics = synapse.metrics.get_metrics_for("synapse.util.caches")
-
 caches_by_name = {}
-# cache_counter = metrics.register_cache(
-#     "cache",
-#     lambda: {(name,): len(caches_by_name[name]) for name in caches_by_name.keys()},
-#     labels=["name"],
-# )
+collectors_by_name = {}
 
+def register_cache(name, cache_name, cache):
 
-def register_cache(name, cache):
-    caches_by_name[name] = cache
-    return metrics.register_cache(
-        "cache",
-        lambda: len(cache),
-        name,
-    )
+    # Check if the metric is already registered. Unregister it, if so.
+    metric_name = "synapse_util_caches_%s:%s" % (name, cache_name,)
+    if metric_name in collectors_by_name.keys():
+        REGISTRY.unregister(collectors_by_name[metric_name])
 
+    class CacheMetric(object):
+
+        hits = 0
+        misses = 0
+        evicted_size = 0
+
+        def inc_hits(self):
+            self.hits += 1
+
+        def inc_misses(self):
+            self.misses += 1
+
+        def inc_evictions(self, size=1):
+            self.evicted_size += size
+
+        def collect(self):
+            cache_size = len(cache)
+
+            gm = GaugeMetricFamily(metric_name, "", labels=["size", "hits", "misses", "total"])
+            gm.add_metric(["size"], cache_size)
+            gm.add_metric(["hits"], self.hits)
+            gm.add_metric(["misses"], self.misses)
+            gm.add_metric(["total"], self.hits + self.misses)
+            yield gm
+
+    metric = CacheMetric()
+    REGISTRY.register(metric)
+    caches_by_name[cache_name] = cache
+    collectors_by_name[metric_name] = metric
+    return metric
 
 KNOWN_KEYS = {
     key: key for key in

@@ -43,19 +43,13 @@ import sys
 import urllib
 from six.moves.urllib import parse as urlparse
 
+from prometheus_client import Counter
+
 logger = logging.getLogger(__name__)
 outbound_logger = logging.getLogger("synapse.http.outbound")
 
-metrics = synapse.metrics.get_metrics_for(__name__)
-
-outgoing_requests_counter = metrics.register_counter(
-    "requests",
-    labels=["method"],
-)
-incoming_responses_counter = metrics.register_counter(
-    "responses",
-    labels=["method", "code"],
-)
+outgoing_requests_counter = Counter("synapse_http_matrixfederationclient_requests", "", ["method"])
+incoming_responses_counter = Counter("synapse_http_matrixfederationclient_responses", "", ["method", "code"])
 
 
 MAX_LONG_RETRIES = 10
