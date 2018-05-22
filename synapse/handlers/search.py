@@ -291,6 +291,11 @@ class SearchHandler(BaseHandler):
                     event.room_id, event.event_id, before_limit, after_limit
                 )
 
+                logger.info(
+                    "Context for search returned %d and %d events",
+                    len(res["events_before"]), len(res["events_after"]),
+                )
+
                 res["events_before"] = yield filter_events_for_client(
                     self.store, user.to_string(), res["events_before"]
                 )
