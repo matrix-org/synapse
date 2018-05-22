@@ -297,18 +297,22 @@ class ReceiptsWorkerStore(SQLBaseStore):
         if receipt_type != "m.read":
             return
 
-        # Returns an ObservableDeferred
+        # Returns either an ObservableDeferred or the raw result
         res = self.get_users_with_read_receipts_in_room.cache.get(
             room_id, None, update_metrics=False,
         )
 
-        if res:
-            if isinstance(res, defer.Deferred) and res.called:
+        # first handle the Deferred case
+        if isinstance(res, defer.Deferred):
+            if res.called:
                 res = res.result
-            if user_id in res:
-                # We'd only be adding to the set, so no point invalidating if the
-                # user is already there
-                return
+            else:
+                res = None
+
+        if res and user_id in res:
+            # We'd only be adding to the set, so no point invalidating if the
+            # user is already there
+            return
 
         self.get_users_with_read_receipts_in_room.invalidate((room_id,))
 
@@ -407,7 +411,6 @@ class ReceiptsStore(ReceiptsWorkerStore):
                 txn,
                 room_id=room_id,
                 user_id=user_id,
-                topological_ordering=topological_ordering,
                 stream_ordering=stream_ordering,
             )
 

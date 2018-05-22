@@ -60,7 +60,7 @@ class LoggingContext(object):
     __slots__ = [
         "previous_context", "name", "ru_stime", "ru_utime",
         "db_txn_count", "db_txn_duration_ms", "db_sched_duration_ms",
-        "usage_start", "usage_end",
+        "usage_start",
         "main_thread", "alive",
         "request", "tag",
     ]
@@ -109,8 +109,10 @@ class LoggingContext(object):
         # ms spent waiting for db txns to be scheduled
         self.db_sched_duration_ms = 0
 
+        # If alive has the thread resource usage when the logcontext last
+        # became active.
         self.usage_start = None
-        self.usage_end = None
+
         self.main_thread = threading.current_thread()
         self.request = None
         self.tag = ""
@@ -159,7 +161,7 @@ class LoggingContext(object):
         """Restore the logging context in thread local storage to the state it
         was before this context was entered.
         Returns:
-            None to avoid suppressing any exeptions that were thrown.
+            None to avoid suppressing any exceptions that were thrown.
         """
         current = self.set_current_context(self.previous_context)
         if current is not self:
@@ -185,29 +187,43 @@ class LoggingContext(object):
 
     def start(self):
         if threading.current_thread() is not self.main_thread:
+            logger.warning("Started logcontext %s on different thread", self)
             return
 
-        if self.usage_start and self.usage_end:
-            self.ru_utime += self.usage_end.ru_utime - self.usage_start.ru_utime
-            self.ru_stime += self.usage_end.ru_stime - self.usage_start.ru_stime
-            self.usage_start = None
-            self.usage_end = None
-
+        # If we haven't already started record the thread resource usage so
+        # far
         if not self.usage_start:
             self.usage_start = get_thread_resource_usage()
 
     def stop(self):
         if threading.current_thread() is not self.main_thread:
+            logger.warning("Stopped logcontext %s on different thread", self)
             return
 
+        # When we stop, let's record the resource used since we started
         if self.usage_start:
-            self.usage_end = get_thread_resource_usage()
+            usage_end = get_thread_resource_usage()
+
+            self.ru_utime += usage_end.ru_utime - self.usage_start.ru_utime
+            self.ru_stime += usage_end.ru_stime - self.usage_start.ru_stime
+
+            self.usage_start = None
+        else:
+            logger.warning("Called stop on logcontext %s without calling start", self)
 
     def get_resource_usage(self):
+        """Get CPU time used by this logcontext so far.
+
+        Returns:
+            tuple[float, float]: The user and system CPU usage in seconds
+        """
         ru_utime = self.ru_utime
         ru_stime = self.ru_stime
 
-        if self.usage_start and threading.current_thread() is self.main_thread:
+        # If we are on the correct thread and we're currently running then we
+        # can include resource usage so far.
+        is_main_thread = threading.current_thread() is self.main_thread
+        if self.alive and self.usage_start and is_main_thread:
             current = get_thread_resource_usage()
             ru_utime += current.ru_utime - self.usage_start.ru_utime
             ru_stime += current.ru_stime - self.usage_start.ru_stime

@@ -151,10 +151,11 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
             if event.room_id != room_id:
                 raise SynapseError(400, "Event is for wrong room.")
 
-            depth = event.depth
+            token = yield self.store.get_topological_token_for_event(event_id)
+
             logger.info(
-                "[purge] purging up to depth %i (event_id %s)",
-                depth, event_id,
+                "[purge] purging up to token %s (event_id %s)",
+                token, event_id,
             )
         elif 'purge_up_to_ts' in body:
             ts = body['purge_up_to_ts']
@@ -174,7 +175,9 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
                 )
             )
             if room_event_after_stream_ordering:
-                (_, depth, _) = room_event_after_stream_ordering
+                token = yield self.store.get_topological_token_for_event(
+                    room_event_after_stream_ordering,
+                )
             else:
                 logger.warn(
                     "[purge] purging events not possible: No event found "
@@ -187,9 +190,9 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
                     errcode=Codes.NOT_FOUND,
                 )
             logger.info(
-                "[purge] purging up to depth %i (received_ts %i => "
+                "[purge] purging up to token %d (received_ts %i => "
                 "stream_ordering %i)",
-                depth, ts, stream_ordering,
+                token, ts, stream_ordering,
             )
         else:
             raise SynapseError(
@@ -199,7 +202,7 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
             )
 
         purge_id = yield self.handlers.message_handler.start_purge_history(
-            room_id, depth,
+            room_id, token,
             delete_local_events=delete_local_events,
         )
 
@@ -273,8 +276,8 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(ShutdownRoomRestServlet, self).__init__(hs)
         self.store = hs.get_datastore()
-        self.handlers = hs.get_handlers()
         self.state = hs.get_state_handler()
+        self._room_creation_handler = hs.get_room_creation_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
 
@@ -296,7 +299,7 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
         message = content.get("message", self.DEFAULT_MESSAGE)
         room_name = content.get("room_name", "Content Violation Notification")
 
-        info = yield self.handlers.room_creation_handler.create_room(
+        info = yield self._room_creation_handler.create_room(
             room_creator_requester,
             config={
                 "preset": "public_chat",

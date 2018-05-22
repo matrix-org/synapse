@@ -46,6 +46,7 @@ from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.device import DeviceHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.presence import PresenceHandler
+from synapse.handlers.room import RoomCreationHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
@@ -70,6 +71,11 @@ from synapse.push.pusherpool import PusherPool
 from synapse.rest.media.v1.media_repository import (
     MediaRepository,
     MediaRepositoryResource,
+)
+from synapse.server_notices.server_notices_manager import ServerNoticesManager
+from synapse.server_notices.server_notices_sender import ServerNoticesSender
+from synapse.server_notices.worker_server_notices_sender import (
+    WorkerServerNoticesSender,
 )
 from synapse.state import StateHandler, StateResolutionHandler
 from synapse.storage import DataStore
@@ -97,6 +103,9 @@ class HomeServer(object):
     which must be implemented by the subclass. This code may call any of the
     required "get" methods on the instance to obtain the sub-dependencies that
     one requires.
+
+    Attributes:
+        config (synapse.config.homeserver.HomeserverConfig):
     """
 
     DEPENDENCIES = [
@@ -106,6 +115,7 @@ class HomeServer(object):
         'federation_server',
         'handlers',
         'auth',
+        'room_creation_handler',
         'state_handler',
         'state_resolution_handler',
         'presence_handler',
@@ -151,6 +161,8 @@ class HomeServer(object):
         'spam_checker',
         'room_member_handler',
         'federation_registry',
+        'server_notices_manager',
+        'server_notices_sender',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -223,6 +235,9 @@ class HomeServer(object):
 
     def build_simple_http_client(self):
         return SimpleHttpClient(self)
+
+    def build_room_creation_handler(self):
+        return RoomCreationHandler(self)
 
     def build_state_handler(self):
         return StateHandler(self)
@@ -389,6 +404,16 @@ class HomeServer(object):
 
     def build_federation_registry(self):
         return FederationHandlerRegistry()
+
+    def build_server_notices_manager(self):
+        if self.config.worker_app:
+            raise Exception("Workers cannot send server notices")
+        return ServerNoticesManager(self)
+
+    def build_server_notices_sender(self):
+        if self.config.worker_app:
+            return WorkerServerNoticesSender(self)
+        return ServerNoticesSender(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

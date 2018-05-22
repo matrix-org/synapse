@@ -62,8 +62,12 @@ class LaterGauge(object):
 
         yield g
 
-    def register(self):
+    def __attrs_post_init__(self):
+        self._register()
+
+    def _register(self):
         if self.name in all_gauges.keys():
+            logger.warning("%s already registered, reregistering" % (self.name,))
             REGISTRY.unregister(all_gauges.pop(self.name))
 
         REGISTRY.register(self)

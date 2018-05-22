@@ -87,6 +87,11 @@ assert LAST_ACTIVE_GRANULARITY < IDLE_TIMER
 class PresenceHandler(object):
 
     def __init__(self, hs):
+        """
+
+        Args:
+            hs (synapse.server.HomeServer):
+        """
         self.is_mine = hs.is_mine
         self.is_mine_id = hs.is_mine_id
         self.clock = hs.get_clock()
@@ -94,7 +99,6 @@ class PresenceHandler(object):
         self.wheel_timer = WheelTimer()
         self.notifier = hs.get_notifier()
         self.federation = hs.get_federation_sender()
-
         self.state = hs.get_state_handler()
 
         federation_registry = hs.get_federation_registry()
@@ -462,61 +466,6 @@ class PresenceHandler(object):
         for user_ids in self.external_process_to_current_syncs.values():
             syncing_user_ids.update(user_ids)
         return syncing_user_ids
-
-    @defer.inlineCallbacks
-    def update_external_syncs(self, process_id, syncing_user_ids):
-        """Update the syncing users for an external process
-
-        Args:
-            process_id(str): An identifier for the process the users are
-                syncing against. This allows synapse to process updates
-                as user start and stop syncing against a given process.
-            syncing_user_ids(set(str)): The set of user_ids that are
-                currently syncing on that server.
-        """
-
-        # Grab the previous list of user_ids that were syncing on that process
-        prev_syncing_user_ids = (
-            self.external_process_to_current_syncs.get(process_id, set())
-        )
-        # Grab the current presence state for both the users that are syncing
-        # now and the users that were syncing before this update.
-        prev_states = yield self.current_state_for_users(
-            syncing_user_ids | prev_syncing_user_ids
-        )
-        updates = []
-        time_now_ms = self.clock.time_msec()
-
-        # For each new user that is syncing check if we need to mark them as
-        # being online.
-        for new_user_id in syncing_user_ids - prev_syncing_user_ids:
-            prev_state = prev_states[new_user_id]
-            if prev_state.state == PresenceState.OFFLINE:
-                updates.append(prev_state.copy_and_replace(
-                    state=PresenceState.ONLINE,
-                    last_active_ts=time_now_ms,
-                    last_user_sync_ts=time_now_ms,
-                ))
-            else:
-                updates.append(prev_state.copy_and_replace(
-                    last_user_sync_ts=time_now_ms,
-                ))
-
-        # For each user that is still syncing or stopped syncing update the
-        # last sync time so that we will correctly apply the grace period when
-        # they stop syncing.
-        for old_user_id in prev_syncing_user_ids:
-            prev_state = prev_states[old_user_id]
-            updates.append(prev_state.copy_and_replace(
-                last_user_sync_ts=time_now_ms,
-            ))
-
-        yield self._update_states(updates)
-
-        # Update the last updated time for the process. We expire the entries
-        # if we don't receive an update in the given timeframe.
-        self.external_process_last_updated_ms[process_id] = self.clock.time_msec()
-        self.external_process_to_current_syncs[process_id] = syncing_user_ids
 
     @defer.inlineCallbacks
     def update_external_syncs_row(self, process_id, user_id, is_syncing, sync_time_msec):

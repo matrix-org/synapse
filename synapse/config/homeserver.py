@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from .tls import TlsConfig
 from .server import ServerConfig
 from .logger import LoggingConfig
@@ -37,6 +37,8 @@ from .push import PushConfig
 from .spam_checker import SpamCheckerConfig
 from .groups import GroupsConfig
 from .user_directory import UserDirectoryConfig
+from .consent_config import ConsentConfig
+from .server_notices_config import ServerNoticesConfig
 
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
@@ -45,12 +47,15 @@ class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        AppServiceConfig, KeyConfig, SAML2Config, CasConfig,
                        JWTConfig, PasswordConfig, EmailConfig,
                        WorkerConfig, PasswordAuthProviderConfig, PushConfig,
-                       SpamCheckerConfig, GroupsConfig, UserDirectoryConfig,):
+                       SpamCheckerConfig, GroupsConfig, UserDirectoryConfig,
+                       ConsentConfig,
+                       ServerNoticesConfig,
+                       ):
     pass
 
 
 if __name__ == '__main__':
     import sys
     sys.stdout.write(
-        HomeServerConfig().generate_config(sys.argv[1], sys.argv[2])[0]
+        HomeServerConfig().generate_config(sys.argv[1], sys.argv[2], True)[0]
     )
