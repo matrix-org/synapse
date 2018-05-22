@@ -853,10 +853,13 @@ class FederationHandler(BaseHandler):
             [resolve(room_id, [e]) for e in event_ids],
             consumeErrors=True,
         ))
+
+        # dict[str, dict[tuple, str]], a map from event_id to state map of
+        # event_ids.
         states = dict(zip(event_ids, [s.state for s in states]))
 
         state_map = yield self.store.get_events(
-            [e_id for ids in states.values() for e_id in ids],
+            [e_id for ids in states.values() for e_id in ids.itervalues()],
             get_prev_content=False
         )
         states = {
