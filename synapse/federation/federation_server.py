@@ -46,10 +46,13 @@ received_pdus_counter = Counter("synapse_federation_server_received_pdus", "")
 
 received_edus_counter = Counter("synapse_federation_server_received_edus", "")
 
-received_queries_counter = Counter("synapse_federation_server_received_queries", "", ["type"])
+received_queries_counter = Counter(
+    "synapse_federation_server_received_queries", "", ["type"]
+)
 
 
 class FederationServer(FederationBase):
+
     def __init__(self, hs):
         super(FederationServer, self).__init__(hs)
 

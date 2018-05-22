@@ -28,7 +28,10 @@ from synapse.handlers.presence import format_user_presence_state, get_interested
 import synapse.metrics
 from synapse.metrics import LaterGauge
 from synapse.metrics import (
-    sent_edus_counter, sent_transactions_counter, events_processed_counter)
+    sent_edus_counter,
+    sent_transactions_counter,
+    events_processed_counter,
+)
 
 from prometheus_client import Counter
 
@@ -37,7 +40,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-sent_pdus_destination_dist = Counter("synapse_federation_client_sent_pdu_destinations", "")
+sent_pdus_destination_dist = Counter(
+    "synapse_federation_client_sent_pdu_destinations", ""
+)
 
 
 class TransactionQueue(object):
@@ -64,7 +69,10 @@ class TransactionQueue(object):
         # done
         self.pending_transactions = {}
 
-        LaterGauge("synapse_federation_client_pending_destinations", "", [],
+        LaterGauge(
+            "synapse_federation_client_pending_destinations",
+            "",
+            [],
             lambda: len(self.pending_transactions),
         )
 
@@ -89,11 +97,15 @@ class TransactionQueue(object):
         self.pending_edus_keyed_by_dest = edus_keyed = {}
 
         LaterGauge(
-            "synapse_federation_client_pending_pdus", "", [],
+            "synapse_federation_client_pending_pdus",
+            "",
+            [],
             lambda: sum(map(len, pdus.values())),
         )
         LaterGauge(
-            "synapse_federation_client_pending_edus", "", [],
+            "synapse_federation_client_pending_edus",
+            "",
+            [],
             lambda: (
                 sum(map(len, edus.values()))
                 + sum(map(len, presence.values()))

@@ -40,7 +40,8 @@ logger = logging.getLogger(__name__)
 
 notified_events_counter = Counter("synapse_notifier_notified_events", "")
 
-users_woken_by_stream_counter = Counter("synapse_notifier_users_woken_by_stream", "", ["stream"])
+users_woken_by_stream_counter = Counter(
+    "synapse_notifier_users_woken_by_stream", "", ["stream"])
 
 
 # TODO(paul): Should be shared somewhere

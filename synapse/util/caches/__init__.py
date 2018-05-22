@@ -29,13 +29,16 @@ cache_total = Gauge("synapse_util_caches_cache:total", "", ["name"])
 
 response_cache_size = Gauge("synapse_util_caches_response_cache:size", "", ["name"])
 response_cache_hits = Gauge("synapse_util_caches_response_cache:hits", "", ["name"])
-response_cache_evicted = Gauge("synapse_util_caches_response_cache:evicted_size", "", ["name"])
+response_cache_evicted = Gauge(
+    "synapse_util_caches_response_cache:evicted_size", "", ["name"]
+)
 response_cache_total = Gauge("synapse_util_caches_response_cache:total", "", ["name"])
+
 
 def register_cache(cache_type, cache_name, cache):
 
     # Check if the metric is already registered. Unregister it, if so.
-    metric_name = "cache_%s_%s" % (cache_type, cache_name,)
+    metric_name = "cache_%s_%s" % (cache_type, cache_name)
     if metric_name in collectors_by_name.keys():
         REGISTRY.unregister(collectors_by_name[metric_name])
 
