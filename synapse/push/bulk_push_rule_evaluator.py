@@ -36,8 +36,10 @@ logger = logging.getLogger(__name__)
 rules_by_room = {}
 
 
-push_rules_invalidation_counter = Counter("synapse_push_bulk_push_role_evaluator_push_rules_invalidation_counter", "")
-push_rules_state_size_counter = Counter("synapse_push_bulk_push_role_evaluator_push_rules_state_size_counter", "")
+push_rules_invalidation_counter = Counter(
+    "synapse_push_bulk_push_role_evaluator_push_rules_invalidation_counter", "")
+push_rules_state_size_counter = Counter(
+    "synapse_push_bulk_push_role_evaluator_push_rules_state_size_counter", "")
 
 # Measures whether we use the fast path of using state deltas, or if we have to
 # recalculate from scratch

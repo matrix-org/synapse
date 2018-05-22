@@ -48,8 +48,10 @@ from prometheus_client import Counter
 logger = logging.getLogger(__name__)
 outbound_logger = logging.getLogger("synapse.http.outbound")
 
-outgoing_requests_counter = Counter("synapse_http_matrixfederationclient_requests", "", ["method"])
-incoming_responses_counter = Counter("synapse_http_matrixfederationclient_responses", "", ["method", "code"])
+outgoing_requests_counter = Counter("synapse_http_matrixfederationclient_requests",
+                                    "", ["method"])
+incoming_responses_counter = Counter("synapse_http_matrixfederationclient_responses",
+                                     "", ["method", "code"])
 
 
 MAX_LONG_RETRIES = 10

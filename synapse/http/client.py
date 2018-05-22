@@ -50,7 +50,8 @@ import urllib
 logger = logging.getLogger(__name__)
 
 outgoing_requests_counter = Counter("synapse_http_client_requests", "", ["method"])
-incoming_responses_counter = Counter("synapse_http_client_responses", "", ["method", "code"])
+incoming_responses_counter = Counter("synapse_http_client_responses", "",
+                                     ["method", "code"])
 
 
 class SimpleHttpClient(object):

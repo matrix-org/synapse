@@ -28,17 +28,22 @@ block_counter = Counter("synapse_util_metrics_block_count", "", ["block_name"])
 
 block_timer = Counter("synapse_util_metrics_block_time_seconds", "", ["block_name"])
 
-block_ru_utime = Counter("synapse_util_metrics_block_ru_utime_seconds", "", ["block_name"])
+block_ru_utime = Counter(
+    "synapse_util_metrics_block_ru_utime_seconds", "", ["block_name"])
 
-block_ru_stime = Counter("synapse_util_metrics_block_ru_stime_seconds", "", ["block_name"])
+block_ru_stime = Counter(
+    "synapse_util_metrics_block_ru_stime_seconds", "", ["block_name"])
 
-block_db_txn_count = Counter("synapse_util_metrics_block_db_txn_count", "", ["block_name"])
+block_db_txn_count = Counter(
+    "synapse_util_metrics_block_db_txn_count", "", ["block_name"])
 
 # seconds spent waiting for db txns, excluding scheduling time, in this block
-block_db_txn_duration = Counter("synapse_util_metrics_block_db_txn_duration_seconds", "", ["block_name"])
+block_db_txn_duration = Counter(
+    "synapse_util_metrics_block_db_txn_duration_seconds", "", ["block_name"])
 
 # seconds spent waiting for a db connection, in this block
-block_db_sched_duration = Counter("synapse_util_metrics_block_db_sched_duration_seconds", "", ["block_name"])
+block_db_sched_duration = Counter(
+    "synapse_util_metrics_block_db_sched_duration_seconds", "", ["block_name"])
 
 
 def measure_func(name):

@@ -47,7 +47,8 @@ logger = logging.getLogger(__name__)
 
 
 notified_presence_counter = Counter("synapse_handler_presence_notified_presence", "")
-federation_presence_out_counter = Counter("synapse_handler_presence_federation_presence_out", "")
+federation_presence_out_counter = Counter(
+    "synapse_handler_presence_federation_presence_out", "")
 presence_updates_counter = Counter("synapse_handler_presence_presence_updates", "")
 timers_fired_counter = Counter("synapse_handler_presence_timers_fired", "")
 federation_presence_counter = Counter("synapse_handler_presence_federation_presence", "")
@@ -55,8 +56,10 @@ bump_active_time_counter = Counter("synapse_handler_presence_bump_active_time", 
 
 get_updates_counter = Counter("synapse_handler_presence_get_updates", "", ["type"])
 
-notify_reason_counter = Counter("synapse_handler_presence_notify_reason", "", ["reason"])
-state_transition_counter = Counter("synapse_handler_presence_state_transition", "", ["from", "to"]
+notify_reason_counter = Counter(
+    "synapse_handler_presence_notify_reason", "", ["reason"])
+state_transition_counter = Counter(
+    "synapse_handler_presence_state_transition", "", ["from", "to"]
 )
 
 
@@ -213,7 +216,8 @@ class PresenceHandler(object):
             60 * 1000,
         )
 
-        LaterGauge("synapse_handlers_presence_wheel_timer_size", "", [], lambda: len(self.wheel_timer))
+        LaterGauge("synapse_handlers_presence_wheel_timer_size", "", [],
+                   lambda: len(self.wheel_timer))
 
     @defer.inlineCallbacks
     def _on_shutdown(self):

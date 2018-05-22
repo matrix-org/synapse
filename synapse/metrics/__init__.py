@@ -21,15 +21,14 @@ import platform
 import attr
 
 from prometheus_client import Gauge, Histogram, Counter
-from prometheus_client.core import (
-    GaugeMetricFamily, CounterMetricFamily, REGISTRY)
+from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily, REGISTRY
 
 from twisted.internet import reactor
 
 
 logger = logging.getLogger(__name__)
 
-running_on_pypy = platform.python_implementation() == 'PyPy'
+running_on_pypy = platform.python_implementation() == "PyPy"
 all_metrics = []
 all_collectors = []
 all_gauges = {}
@@ -87,9 +86,16 @@ class LaterGauge(object):
 #
 
 gc_unreachable = Gauge("python_gc_unreachable_total", "Unreachable GC objects", ["gen"])
-gc_time = Histogram("python_gc_time", "Time taken to GC (ms)", ["gen"], buckets=[1, 2, 5, 10, 25, 50, 100, 250, 500, 1000])
+gc_time = Histogram(
+    "python_gc_time",
+    "Time taken to GC (ms)",
+    ["gen"],
+    buckets=[1, 2, 5, 10, 25, 50, 100, 250, 500, 1000],
+)
+
 
 class GCCounts(object):
+
     def collect(self):
         gc_counts = gc.get_count()
 
@@ -99,14 +105,23 @@ class GCCounts(object):
 
         yield cm
 
+
 REGISTRY.register(GCCounts())
 
 #
 # Twisted reactor metrics
 #
 
-tick_time = Histogram("python_twisted_reactor_tick_time", "Tick time of the Twisted reactor (ms)", buckets=[1, 2, 5, 10, 50, 100, 250, 500, 1000, 2000])
-pending_calls_metric = Histogram("python_twisted_reactor_pending_calls", "Pending calls", buckets=[1, 2, 5, 10, 25, 50, 100, 250, 500, 1000])
+tick_time = Histogram(
+    "python_twisted_reactor_tick_time",
+    "Tick time of the Twisted reactor (ms)",
+    buckets=[1, 2, 5, 10, 50, 100, 250, 500, 1000, 2000],
+)
+pending_calls_metric = Histogram(
+    "python_twisted_reactor_pending_calls",
+    "Pending calls",
+    buckets=[1, 2, 5, 10, 25, 50, 100, 250, 500, 1000],
+)
 
 #
 # Federation Metrics
@@ -133,6 +148,7 @@ event_processing_last_ts = Gauge("synapse_event_processing_last_ts", "", ["name"
 # between the last processed event's received_ts and the time it was
 # finished being processed.
 event_processing_lag = Gauge("synapse_event_processing_lag", "", ["name"])
+
 
 def runUntilCurrentTimer(func):
 
