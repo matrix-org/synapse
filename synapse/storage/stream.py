@@ -736,7 +736,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         ) % {
             "bounds": bounds,
             "order": order,
-            "limit": limit_str
         }
 
         txn.execute(sql, args)
