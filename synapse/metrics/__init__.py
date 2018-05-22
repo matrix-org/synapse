@@ -21,7 +21,7 @@ import platform
 import attr
 
 from prometheus_client import Gauge, Histogram, Counter
-from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily, REGISTRY
+from prometheus_client.core import GaugeMetricFamily, REGISTRY
 
 from twisted.internet import reactor
 
@@ -97,8 +97,6 @@ gc_time = Histogram(
 class GCCounts(object):
 
     def collect(self):
-        gc_counts = gc.get_count()
-
         cm = GaugeMetricFamily("python_gc_counts", "GC cycle counts", labels=["gen"])
         for n, m in enumerate(gc.get_count()):
             cm.add_metric([str(n)], m)

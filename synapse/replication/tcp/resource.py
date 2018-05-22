@@ -28,12 +28,13 @@ import logging
 
 from prometheus_client import Counter
 
-stream_updates_counter = Counter("synapse_replication_tcp_resource_stream_updates", "", ["stream_name"]
-)
+stream_updates_counter = Counter("synapse_replication_tcp_resource_stream_updates",
+                                 "", ["stream_name"])
 user_sync_counter = Counter("synapse_replication_tcp_resource_user_sync", "")
 federation_ack_counter = Counter("synapse_replication_tcp_resource_federation_ack", "")
 remove_pusher_counter = Counter("synapse_replication_tcp_resource_remove_pusher", "")
-invalidate_cache_counter = Counter("synapse_replication_tcp_resource_invalidate_cache", "")
+invalidate_cache_counter = Counter("synapse_replication_tcp_resource_invalidate_cache",
+                                   "")
 user_ip_cache_counter = Counter("synapse_replication_tcp_resource_user_ip_cache", "")
 
 logger = logging.getLogger(__name__)

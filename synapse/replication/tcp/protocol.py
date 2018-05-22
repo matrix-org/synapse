@@ -197,7 +197,8 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
         self.last_received_command = self.clock.time_msec()
 
-        self.inbound_commands_counter[cmd_name] = self.inbound_commands_counter[cmd_name] + 1
+        self.inbound_commands_counter[cmd_name] = (
+            self.inbound_commands_counter[cmd_name] + 1)
 
         cmd_cls = COMMAND_MAP[cmd_name]
         try:
@@ -247,7 +248,8 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             self._queue_command(cmd)
             return
 
-        self.outbound_commands_counter[cmd.NAME] = self.outbound_commands_counter[cmd.NAME] + 1
+        self.outbound_commands_counter[cmd.NAME] = (
+            self.outbound_commands_counter[cmd.NAME] + 1)
         string = "%s %s" % (cmd.NAME, cmd.to_line(),)
         if "\n" in string:
             raise Exception("Unexpected newline in command: %r", string)
@@ -632,4 +634,5 @@ tcp_outbound_commands = LaterGauge(
     })
 
 # number of updates received for each RDATA stream
-inbound_rdata_count = Counter("synapse_replication_tcp_inbound_rdata_count", "", ["stream_name"])
+inbound_rdata_count = Counter("synapse_replication_tcp_inbound_rdata_count", "",
+                              ["stream_name"])
