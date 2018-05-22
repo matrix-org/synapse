@@ -100,7 +100,6 @@ class PresenceHandler(object):
         self.notifier = hs.get_notifier()
         self.federation = hs.get_federation_sender()
         self.state = hs.get_state_handler()
-        self._server_notices_sender = hs.get_server_notices_sender()
 
         federation_registry = hs.get_federation_registry()
 
@@ -432,9 +431,6 @@ class PresenceHandler(object):
                 yield self._update_states([prev_state.copy_and_replace(
                     last_user_sync_ts=self.clock.time_msec(),
                 )])
-
-        # send any outstanding server notices to the user.
-        yield self._server_notices_sender.on_user_syncing(user_id)
 
         @defer.inlineCallbacks
         def _end():

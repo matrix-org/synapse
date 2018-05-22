@@ -12,21 +12,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.server_notices.consent_server_notices import ConsentServerNotices
+from twisted.internet import defer
 
 
-class ServerNoticesSender(object):
-    """A centralised place which sends server notices automatically when
-    Certain Events take place
-    """
+class WorkerServerNoticesSender(object):
+    """Stub impl of ServerNoticesSender which does nothing"""
     def __init__(self, hs):
         """
-
         Args:
             hs (synapse.server.HomeServer):
         """
-        # todo: it would be nice to make this more dynamic
-        self._consent_server_notices = ConsentServerNotices(hs)
 
     def on_user_syncing(self, user_id):
         """Called when the user performs a sync operation.
@@ -37,9 +32,7 @@ class ServerNoticesSender(object):
         Returns:
             Deferred
         """
-        return self._consent_server_notices.maybe_send_server_notice_to_user(
-            user_id,
-        )
+        return defer.succeed()
 
     def on_user_ip(self, user_id):
         """Called on the master when a worker process saw a client request.
@@ -50,9 +43,4 @@ class ServerNoticesSender(object):
         Returns:
             Deferred
         """
-        # The synchrotrons use a stubbed version of ServerNoticesSender, so
-        # we check for notices to send to the user in on_user_ip as well as
-        # in on_user_syncing
-        return self._consent_server_notices.maybe_send_server_notice_to_user(
-            user_id,
-        )
+        raise AssertionError("on_user_ip unexpectedly called on worker")
