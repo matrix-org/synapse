@@ -95,8 +95,8 @@ class ConsentResource(Resource):
         # this is required by the request_handler wrapper
         self.clock = hs.get_clock()
 
-        self._default_consent_verison = hs.config.user_consent_version
-        if self._default_consent_verison is None:
+        self._default_consent_version = hs.config.user_consent_version
+        if self._default_consent_version is None:
             raise ConfigError(
                 "Consent resource is enabled but user_consent section is "
                 "missing in config file.",
@@ -132,6 +132,7 @@ class ConsentResource(Resource):
         return NOT_DONE_YET
 
     @wrap_html_request_handler
+    @defer.inlineCallbacks
     def _async_render_GET(self, request):
         """
         Args:
@@ -139,16 +140,26 @@ class ConsentResource(Resource):
         """
 
         version = parse_string(request, "v",
-                               default=self._default_consent_verison)
+                               default=self._default_consent_version)
         username = parse_string(request, "u", required=True)
         userhmac = parse_string(request, "h", required=True)
 
         self._check_hash(username, userhmac)
 
+        if username.startswith('@'):
+            qualified_user_id = username
+        else:
+            qualified_user_id = UserID(username, self.hs.hostname).to_string()
+
+        u = yield self.store.get_user_by_id(qualified_user_id)
+        if u is None:
+            raise NotFoundError("Unknown user")
+
         try:
             self._render_template(
                 request, "%s.html" % (version,),
                 user=username, userhmac=userhmac, version=version,
+                has_consented=(u["consent_version"] == version),
             )
         except TemplateNotFound:
             raise NotFoundError("Unknown policy version")
