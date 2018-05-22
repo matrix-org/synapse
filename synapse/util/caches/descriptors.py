@@ -80,7 +80,7 @@ class Cache(object):
         self.name = name
         self.keylen = keylen
         self.thread = None
-        self.metrics = register_cache("descriptor", name, self.cache)
+        self.metrics = register_cache("cache", name, self.cache)
 
     def _on_evicted(self, evicted_count):
         self.metrics.inc_evictions(evicted_count)

@@ -28,9 +28,9 @@ from prometheus_client import Counter
 
 logger = logging.getLogger(__name__)
 
-http_push_processed_counter = Counter("http_pushes_processed", "")
+http_push_processed_counter = Counter("synapse_http_httppusher_http_pushes_processed", "")
 
-http_push_failed_counter = Counter("http_pushes_failed", "")
+http_push_failed_counter = Counter("synapse_http_httppusher_http_pushes_failed", "")
 
 
 class HttpPusher(object):

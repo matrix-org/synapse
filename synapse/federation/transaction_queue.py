@@ -64,7 +64,7 @@ class TransactionQueue(object):
         # done
         self.pending_transactions = {}
 
-        LaterGauge("pending_destinations", "", [],
+        LaterGauge("synapse_federation_client_pending_destinations", "", [],
             lambda: len(self.pending_transactions),
         )
 
@@ -89,11 +89,11 @@ class TransactionQueue(object):
         self.pending_edus_keyed_by_dest = edus_keyed = {}
 
         LaterGauge(
-            "pending_pdus", "", [],
+            "synapse_federation_client_pending_pdus", "", [],
             lambda: sum(map(len, pdus.values())),
         )
         LaterGauge(
-            "pending_edus", "", [],
+            "synapse_federation_client_pending_edus", "", [],
             lambda: (
                 sum(map(len, edus.values()))
                 + sum(map(len, presence.values()))

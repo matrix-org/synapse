@@ -34,6 +34,7 @@ from synapse.module_api import ModuleApi
 from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import RootRedirect
 from synapse.http.site import SynapseSite
+from synapse.metrics import RegistryProxy
 from synapse.metrics.resource import METRICS_PREFIX
 from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, \
     check_requirements
@@ -59,6 +60,8 @@ from twisted.internet import defer, reactor
 from twisted.web.resource import EncodingResourceWrapper, NoResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
+
+from prometheus_client.twisted import MetricsResource
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -229,8 +232,7 @@ class SynapseHomeServer(HomeServer):
             resources[WEB_CLIENT_PREFIX] = build_resource_for_web_client(self)
 
         if name == "metrics" and self.get_config().enable_metrics:
-            from prometheus_client.twisted import MetricsResource
-            resources[METRICS_PREFIX] = MetricsResource()
+            resources[METRICS_PREFIX] = MetricsResource(RegistryProxy())
 
         if name == "replication":
             resources[REPLICATION_PREFIX] = ReplicationRestResource(self)

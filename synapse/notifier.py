@@ -194,14 +194,14 @@ class Notifier(object):
                 all_user_streams.add(x)
 
             return sum(stream.count_listeners() for stream in all_user_streams)
-        LaterGauge("listeners", "", [], count_listeners)
+        LaterGauge("synapse_notifier_listeners", "", [], count_listeners)
 
         LaterGauge(
-            "rooms", "", [],
+            "synapse_notifier_rooms", "", [],
             lambda: count(bool, self.room_to_user_streams.values()),
         )
         LaterGauge(
-            "users", "", [],
+            "synapse_notifier_users", "", [],
             lambda: len(self.user_to_user_stream),
         )
 

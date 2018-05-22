@@ -29,11 +29,19 @@ from twisted.internet import reactor
 
 logger = logging.getLogger(__name__)
 
-
 running_on_pypy = platform.python_implementation() == 'PyPy'
 all_metrics = []
 all_collectors = []
 all_gauges = {}
+
+
+class RegistryProxy(object):
+
+    def collect(self):
+        for metric in REGISTRY.collect():
+            if not metric.name.startswith("__"):
+                yield metric
+
 
 @attr.s(hash=True)
 class LaterGauge(object):
@@ -45,7 +53,7 @@ class LaterGauge(object):
 
     def collect(self):
 
-        g = GaugeMetricFamily(self.name, self.desc, self.labels)
+        g = GaugeMetricFamily(self.name, self.desc, labels=self.labels)
 
         try:
             calls = self.caller()

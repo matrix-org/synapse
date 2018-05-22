@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from prometheus_client.core import GaugeMetricFamily, REGISTRY
+from prometheus_client.core import Gauge, REGISTRY, GaugeMetricFamily
 
 import os
 
@@ -22,10 +22,20 @@ CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.5))
 caches_by_name = {}
 collectors_by_name = {}
 
-def register_cache(name, cache_name, cache):
+cache_size = Gauge("synapse_util_caches_cache:size", "", ["name"])
+cache_hits = Gauge("synapse_util_caches_cache:hits", "", ["name"])
+cache_evicted = Gauge("synapse_util_caches_cache:evicted_size", "", ["name"])
+cache_total = Gauge("synapse_util_caches_cache:total", "", ["name"])
+
+response_cache_size = Gauge("synapse_util_caches_response_cache:size", "", ["name"])
+response_cache_hits = Gauge("synapse_util_caches_response_cache:hits", "", ["name"])
+response_cache_evicted = Gauge("synapse_util_caches_response_cache:evicted_size", "", ["name"])
+response_cache_total = Gauge("synapse_util_caches_response_cache:total", "", ["name"])
+
+def register_cache(cache_type, cache_name, cache):
 
     # Check if the metric is already registered. Unregister it, if so.
-    metric_name = "synapse_util_caches_%s:%s" % (name, cache_name,)
+    metric_name = "cache_%s_%s" % (cache_type, cache_name,)
     if metric_name in collectors_by_name.keys():
         REGISTRY.unregister(collectors_by_name[metric_name])
 
@@ -44,21 +54,29 @@ def register_cache(name, cache_name, cache):
         def inc_evictions(self, size=1):
             self.evicted_size += size
 
-        def collect(self):
-            cache_size = len(cache)
+        def describe(self):
+            return []
 
-            gm = GaugeMetricFamily(metric_name, "", labels=["size", "hits", "misses", "total"])
-            gm.add_metric(["size"], cache_size)
-            gm.add_metric(["hits"], self.hits)
-            gm.add_metric(["misses"], self.misses)
-            gm.add_metric(["total"], self.hits + self.misses)
-            yield gm
+        def collect(self):
+            if cache_type == "response_cache":
+                response_cache_size.labels(cache_name).set(len(cache))
+                response_cache_hits.labels(cache_name).set(self.hits)
+                response_cache_evicted.labels(cache_name).set(self.evicted_size)
+                response_cache_total.labels(cache_name).set(self.hits + self.misses)
+            else:
+                cache_size.labels(cache_name).set(len(cache))
+                cache_hits.labels(cache_name).set(self.hits)
+                cache_evicted.labels(cache_name).set(self.evicted_size)
+                cache_total.labels(cache_name).set(self.hits + self.misses)
+
+            yield GaugeMetricFamily("__unused", "")
 
     metric = CacheMetric()
     REGISTRY.register(metric)
     caches_by_name[cache_name] = cache
     collectors_by_name[metric_name] = metric
     return metric
+
 
 KNOWN_KEYS = {
     key: key for key in
