@@ -16,86 +16,38 @@
 
 import logging
 
-import synapse.metrics
+from prometheus_client.core import Counter, Histogram
+
 from synapse.util.logcontext import LoggingContext
 
 logger = logging.getLogger(__name__)
 
-metrics = synapse.metrics.get_metrics_for("synapse.http.server")
 
 # total number of responses served, split by method/servlet/tag
-response_count = metrics.register_counter(
-    "response_count",
-    labels=["method", "servlet", "tag"],
-    alternative_names=(
-        # the following are all deprecated aliases for the same metric
-        metrics.name_prefix + x for x in (
-            "_requests",
-            "_response_time:count",
-            "_response_ru_utime:count",
-            "_response_ru_stime:count",
-            "_response_db_txn_count:count",
-            "_response_db_txn_duration:count",
-        )
-    )
-)
+response_count = Counter("synapse_http_server_response_count", "", ["method", "servlet", "tag"])
 
-requests_counter = metrics.register_counter(
-    "requests_received",
-    labels=["method", "servlet", ],
-)
+requests_counter = Counter("synapse_http_server_requests_received", "", ["method", "servlet"])
 
-outgoing_responses_counter = metrics.register_counter(
-    "responses",
-    labels=["method", "code"],
-)
+outgoing_responses_counter = Counter("synapse_http_server_responses", "", ["method", "code"])
 
-response_timer = metrics.register_counter(
-    "response_time_seconds",
-    labels=["method", "servlet", "tag"],
-    alternative_names=(
-        metrics.name_prefix + "_response_time:total",
-    ),
-)
+response_timer = Histogram("synapse_http_server_response_time_seconds", "", ["method", "servlet", "tag"])
 
-response_ru_utime = metrics.register_counter(
-    "response_ru_utime_seconds", labels=["method", "servlet", "tag"],
-    alternative_names=(
-        metrics.name_prefix + "_response_ru_utime:total",
-    ),
-)
+response_ru_utime = Counter("synapse_http_server_response_ru_utime_seconds", "", ["method", "servlet", "tag"])
 
-response_ru_stime = metrics.register_counter(
-    "response_ru_stime_seconds", labels=["method", "servlet", "tag"],
-    alternative_names=(
-        metrics.name_prefix + "_response_ru_stime:total",
-    ),
-)
+response_ru_stime = Counter("synapse_http_server_response_ru_stime_seconds", "", ["method", "servlet", "tag"])
 
-response_db_txn_count = metrics.register_counter(
-    "response_db_txn_count", labels=["method", "servlet", "tag"],
-    alternative_names=(
-        metrics.name_prefix + "_response_db_txn_count:total",
-    ),
-)
+response_db_txn_count = Counter("synapse_http_server_response_db_txn_count", "", ["method", "servlet", "tag"])
 
 # seconds spent waiting for db txns, excluding scheduling time, when processing
 # this request
-response_db_txn_duration = metrics.register_counter(
-    "response_db_txn_duration_seconds", labels=["method", "servlet", "tag"],
-    alternative_names=(
-        metrics.name_prefix + "_response_db_txn_duration:total",
-    ),
-)
+response_db_txn_duration = Counter("synapse_http_server_response_db_txn_duration_seconds", "", ["method", "servlet", "tag"])
 
 # seconds spent waiting for a db connection, when processing this request
-response_db_sched_duration = metrics.register_counter(
-    "response_db_sched_duration_seconds", labels=["method", "servlet", "tag"]
+response_db_sched_duration = Counter("synapse_http_request_response_db_sched_duration_seconds", "", ["method", "servlet", "tag"]
 )
 
 # size in bytes of the response written
-response_size = metrics.register_counter(
-    "response_size", labels=["method", "servlet", "tag"]
+response_size = Counter("synapse_http_request_response_size", "", ["method", "servlet", "tag"]
 )
 
 
@@ -119,31 +71,19 @@ class RequestMetrics(object):
                 )
                 return
 
-        outgoing_responses_counter.inc(request.method, str(request.code))
+        outgoing_responses_counter.labels(request.method, str(request.code)).inc()
 
-        response_count.inc(request.method, self.name, tag)
+        response_count.labels(request.method, self.name, tag).inc()
 
-        response_timer.inc_by(
-            time_msec - self.start, request.method,
-            self.name, tag
-        )
+        response_timer.labels(request.method, self.name, tag).observe(time_msec - self.start)
 
         ru_utime, ru_stime = context.get_resource_usage()
 
-        response_ru_utime.inc_by(
-            ru_utime, request.method, self.name, tag
-        )
-        response_ru_stime.inc_by(
-            ru_stime, request.method, self.name, tag
-        )
-        response_db_txn_count.inc_by(
-            context.db_txn_count, request.method, self.name, tag
-        )
-        response_db_txn_duration.inc_by(
-            context.db_txn_duration_ms / 1000., request.method, self.name, tag
-        )
-        response_db_sched_duration.inc_by(
-            context.db_sched_duration_ms / 1000., request.method, self.name, tag
-        )
+        response_ru_utime.labels(request.method, self.name, tag).inc(ru_utime)
+        response_ru_stime.labels(request.method, self.name, tag).inc(ru_stime)
+        response_db_txn_count.labels(request.method, self.name, tag).inc(context.db_txn_count)
+        response_db_txn_duration.labels(request.method, self.name, tag).inc(context.db_txn_duration_ms / 1000.)
+        response_db_sched_duration.labels(request.method, self.name, tag).inc(
+            context.db_sched_duration_ms / 1000.)
 
-        response_size.inc_by(request.sentLength, request.method, self.name, tag)
+        response_size.labels(request.method, self.name, tag).inc(request.sentLength)

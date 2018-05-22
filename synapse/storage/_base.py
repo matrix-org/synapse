@@ -18,8 +18,8 @@ from synapse.api.errors import StoreError
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.caches.descriptors import Cache
 from synapse.storage.engines import PostgresEngine
-import synapse.metrics
 
+from prometheus_client import Histogram
 
 from twisted.internet import defer
 
@@ -34,13 +34,10 @@ sql_logger = logging.getLogger("synapse.storage.SQL")
 transaction_logger = logging.getLogger("synapse.storage.txn")
 perf_logger = logging.getLogger("synapse.storage.TIME")
 
+sql_scheduling_timer = Histogram("synapse_storage_schedule_time", "")
 
-metrics = synapse.metrics.get_metrics_for("synapse.storage")
-
-sql_scheduling_timer = metrics.register_distribution("schedule_time")
-
-sql_query_timer = metrics.register_distribution("query_time", labels=["verb"])
-sql_txn_timer = metrics.register_distribution("transaction_time", labels=["desc"])
+sql_query_timer = Histogram("synapse_storage_query_time", "", ["verb"])
+sql_txn_timer = Histogram("synapse_storage_transaction_time", "", ["desc"])
 
 
 class LoggingTransaction(object):
@@ -117,7 +114,7 @@ class LoggingTransaction(object):
         finally:
             msecs = (time.time() * 1000) - start
             sql_logger.debug("[SQL time] {%s} %f", self.name, msecs)
-            sql_query_timer.inc_by(msecs, sql.split()[0])
+            sql_query_timer.labels(sql.split()[0]).observe(msecs)
 
 
 class PerformanceCounters(object):
@@ -287,7 +284,7 @@ class SQLBaseStore(object):
 
             self._current_txn_total_time += duration
             self._txn_perf_counters.update(desc, start, end)
-            sql_txn_timer.inc_by(duration, desc)
+            sql_txn_timer.labels(desc).observe(duration)
 
     @defer.inlineCallbacks
     def runInteraction(self, desc, func, *args, **kwargs):
@@ -349,7 +346,7 @@ class SQLBaseStore(object):
         def inner_func(conn, *args, **kwargs):
             with LoggingContext("runWithConnection") as context:
                 sched_duration_ms = time.time() * 1000 - start_time
-                sql_scheduling_timer.inc_by(sched_duration_ms)
+                sql_scheduling_timer.observe(sched_duration_ms)
                 current_context.add_database_scheduled(sched_duration_ms)
 
                 if self.database_engine.is_connection_closed(conn):
