@@ -230,7 +230,7 @@ class RequestMetrics(object):
         """Updates the in flight metrics with values from this request.
         """
 
-        diff = self._request_stats.update()
+        diff = self._request_stats.update(self.start_context)
 
         in_flight_requests_ru_utime.inc_by(
             diff.ru_utime, self.method, self.name,
@@ -258,13 +258,12 @@ class _RequestStats(object):
     """
 
     __slots__ = [
-        "context", "ru_utime", "ru_stime",
+        "ru_utime", "ru_stime",
         "db_txn_count", "db_txn_duration_ms", "db_sched_duration_ms",
     ]
 
-    def __init__(self, context, ru_utime, ru_stime, db_txn_count,
+    def __init__(self, ru_utime, ru_stime, db_txn_count,
                  db_txn_duration_ms, db_sched_duration_ms):
-        self.context = context
         self.ru_utime = ru_utime
         self.ru_stime = ru_stime
         self.db_txn_count = db_txn_count
@@ -276,24 +275,22 @@ class _RequestStats(object):
         ru_utime, ru_stime = context.get_resource_usage()
 
         return _RequestStats(
-            context,
             ru_utime, ru_stime,
             context.db_txn_count,
             context.db_txn_duration_ms,
             context.db_sched_duration_ms,
         )
 
-    def update(self):
+    def update(self, context):
         """Updates the current values and returns the difference between the
         old and new values.
 
         Returns:
             _RequestStats: The difference between the old and new values
         """
-        new = _RequestStats.from_context(self.context)
+        new = _RequestStats.from_context(context)
 
         diff = _RequestStats(
-            self.context,
             new.ru_utime - self.ru_utime,
             new.ru_stime - self.ru_stime,
             new.db_txn_count - self.db_txn_count,
