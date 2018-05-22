@@ -64,6 +64,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.filter_timeline_limit = 5000
         config.user_directory_search_all_users = False
         config.user_consent_server_notice_content = None
+        config.block_events_without_consent_error = None
 
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.

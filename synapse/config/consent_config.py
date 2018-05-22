@@ -34,6 +34,10 @@ DEFAULT_CONFIG = """\
 # asking them to consent to the privacy policy. The 'server_notices' section
 # must also be configured for this to work.
 #
+# 'block_events_error', if set, will block any attempts to send events
+# until the user consents to the privacy policy. The value of the setting is
+# used as the text of the error.
+#
 # user_consent:
 #   template_dir: res/templates/privacy
 #   version: 1.0
@@ -41,6 +45,8 @@ DEFAULT_CONFIG = """\
 #     msgtype: m.text
 #     body: |
 #       Pls do consent kthx
+#   block_events_error: |
+#     You can't send any messages until you consent to the privacy policy.
 """
 
 
@@ -51,6 +57,7 @@ class ConsentConfig(Config):
         self.user_consent_version = None
         self.user_consent_template_dir = None
         self.user_consent_server_notice_content = None
+        self.block_events_without_consent_error = None
 
     def read_config(self, config):
         consent_config = config.get("user_consent")
@@ -60,6 +67,9 @@ class ConsentConfig(Config):
         self.user_consent_template_dir = consent_config["template_dir"]
         self.user_consent_server_notice_content = consent_config.get(
             "server_notice_content",
+        )
+        self.block_events_without_consent_error = consent_config.get(
+            "block_events_error",
         )
 
     def default_config(self, **kwargs):

@@ -20,10 +20,15 @@ import sys
 from canonicaljson import encode_canonical_json
 import six
 from twisted.internet import defer, reactor
+from twisted.internet.defer import succeed
 from twisted.python.failure import Failure
 
 from synapse.api.constants import EventTypes, Membership, MAX_DEPTH
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import (
+    AuthError, Codes, SynapseError,
+    ConsentNotGivenError,
+)
+from synapse.api.urls import ConsentURIBuilder
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
@@ -431,6 +436,9 @@ class EventCreationHandler(object):
 
         self.spam_checker = hs.get_spam_checker()
 
+        if self.config.block_events_without_consent_error is not None:
+            self._consent_uri_builder = ConsentURIBuilder(self.config)
+
     @defer.inlineCallbacks
     def create_event(self, requester, event_dict, token_id=None, txn_id=None,
                      prev_events_and_hashes=None):
@@ -482,6 +490,10 @@ class EventCreationHandler(object):
                         target, e
                     )
 
+        is_exempt = yield self._is_exempt_from_privacy_policy(builder)
+        if not is_exempt:
+            yield self.assert_accepted_privacy_policy(requester)
+
         if token_id is not None:
             builder.internal_metadata.token_id = token_id
 
@@ -495,6 +507,78 @@ class EventCreationHandler(object):
         )
 
         defer.returnValue((event, context))
+
+    def _is_exempt_from_privacy_policy(self, builder):
+        """"Determine if an event to be sent is exempt from having to consent
+        to the privacy policy
+
+        Args:
+            builder (synapse.events.builder.EventBuilder): event being created
+
+        Returns:
+            Deferred[bool]: true if the event can be sent without the user
+                consenting
+        """
+        # the only thing the user can do is join the server notices room.
+        if builder.type == EventTypes.Member:
+            membership = builder.content.get("membership", None)
+            if membership == Membership.JOIN:
+                return self._is_server_notices_room(builder.room_id)
+        return succeed(False)
+
+    @defer.inlineCallbacks
+    def _is_server_notices_room(self, room_id):
+        if self.config.server_notices_mxid is None:
+            defer.returnValue(False)
+        user_ids = yield self.store.get_users_in_room(room_id)
+        defer.returnValue(self.config.server_notices_mxid in user_ids)
+
+    @defer.inlineCallbacks
+    def assert_accepted_privacy_policy(self, requester):
+        """Check if a user has accepted the privacy policy
+
+        Called when the given user is about to do something that requires
+        privacy consent. We see if the user is exempt and otherwise check that
+        they have given consent. If they have not, a ConsentNotGiven error is
+        raised.
+
+        Args:
+            requester (synapse.types.Requester):
+                The user making the request
+
+        Returns:
+            Deferred[None]: returns normally if the user has consented or is
+                exempt
+
+        Raises:
+            ConsentNotGivenError: if the user has not given consent yet
+        """
+        if self.config.block_events_without_consent_error is None:
+            return
+
+        # exempt AS users from needing consent
+        if requester.app_service is not None:
+            return
+
+        user_id = requester.user.to_string()
+
+        # exempt the system notices user
+        if (
+            self.config.server_notices_mxid is not None and
+            user_id == self.config.server_notices_mxid
+        ):
+            return
+
+        u = yield self.store.get_user_by_id(user_id)
+        assert u is not None
+        if u["consent_version"] == self.config.user_consent_version:
+            return
+
+        consent_uri = self._consent_uri_builder.build_user_consent_uri(user_id)
+        raise ConsentNotGivenError(
+            msg=self.config.block_events_without_consent_error,
+            consent_uri=consent_uri,
+        )
 
     @defer.inlineCallbacks
     def send_nonmember_event(self, requester, event, context, ratelimit=True):
