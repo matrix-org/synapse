@@ -513,7 +513,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
     def on_RDATA(self, cmd):
         stream_name = cmd.stream_name
-        inbound_rdata_count.inc(stream_name)
+        inbound_rdata_count.labels(stream_name).inc()
 
         try:
             row = STREAMS_MAP[stream_name].ROW_TYPE(*cmd.row)
