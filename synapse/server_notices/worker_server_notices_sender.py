@@ -32,7 +32,7 @@ class WorkerServerNoticesSender(object):
         Returns:
             Deferred
         """
-        return defer.succeed()
+        return defer.succeed(None)
 
     def on_user_ip(self, user_id):
         """Called on the master when a worker process saw a client request.
