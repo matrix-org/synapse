@@ -200,7 +200,7 @@ class LoggingContext(object):
             logger.warning("Stopped logcontext %s on different thread", self)
             return
 
-        # When we stop lets record the resource used since we started
+        # When we stop, let's record the resource used since we started
         if self.usage_start:
             usage_end = get_thread_resource_usage()
 
