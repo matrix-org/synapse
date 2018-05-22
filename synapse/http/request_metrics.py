@@ -124,12 +124,8 @@ in_flight_requests_db_sched_duration = metrics.register_counter(
     "in_flight_requests_db_sched_duration_seconds", labels=["method", "servlet"]
 )
 
-_in_flight_requests_count = metrics.register_gauge(
-    "in_flight_requests_count", labels=["method", "servlet"]
-)
 
-
-# The set of all in flight requests.
+# The set of all in flight requests, set[RequestMetrics]
 _in_flight_requests = set()
 
 
@@ -138,20 +134,35 @@ def _collect_in_flight():
     the in flight request metrics
     """
 
-    # Map from (method, name) -> int, the number of in flight requests of that
-    # type
-    counts = {}
-
     for rm in _in_flight_requests:
         rm.update_metrics()
-        key = (rm.method, rm.name,)
-        counts[key] = counts.get(key, 0) + 1
-
-    for (method, name), count in counts.iteritems():
-        _in_flight_requests_count.set(count, method, name)
 
 
 metrics.register_collector(_collect_in_flight)
+
+
+def _get_in_flight_counts():
+    """Returns a count of all in flight requests by (method, server_name)
+
+    Returns:
+        dict[tuple[str, str], int]
+    """
+
+    # Map from (method, name) -> int, the number of in flight requests of that
+    # type
+    counts = {}
+    for rm in _in_flight_requests:
+        key = (rm.method, rm.name,)
+        counts[key] = counts.get(key, 0) + 1
+
+    return counts
+
+
+metrics.register_callback(
+    "in_flight_requests_count",
+    _get_in_flight_counts,
+    labels=["method", "servlet"]
+)
 
 
 class RequestMetrics(object):
