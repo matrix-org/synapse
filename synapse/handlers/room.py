@@ -126,6 +126,10 @@ class RoomCreationHandler(BaseHandler):
             except Exception:
                 raise SynapseError(400, "Invalid user_id: %s" % (i,))
 
+        yield self.event_creation_handler.assert_accepted_privacy_policy(
+            requester,
+        )
+
         invite_3pid_list = config.get("invite_3pid", [])
 
         visibility = config.get("visibility", None)
