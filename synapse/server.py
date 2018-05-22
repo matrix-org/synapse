@@ -73,6 +73,10 @@ from synapse.rest.media.v1.media_repository import (
     MediaRepositoryResource,
 )
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
+from synapse.server_notices.server_notices_sender import ServerNoticesSender
+from synapse.server_notices.worker_server_notices_sender import (
+    WorkerServerNoticesSender,
+)
 from synapse.state import StateHandler, StateResolutionHandler
 from synapse.storage import DataStore
 from synapse.streams.events import EventSources
@@ -158,6 +162,7 @@ class HomeServer(object):
         'room_member_handler',
         'federation_registry',
         'server_notices_manager',
+        'server_notices_sender',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -401,7 +406,14 @@ class HomeServer(object):
         return FederationHandlerRegistry()
 
     def build_server_notices_manager(self):
+        if self.config.worker_app:
+            raise Exception("Workers cannot send server notices")
         return ServerNoticesManager(self)
+
+    def build_server_notices_sender(self):
+        if self.config.worker_app:
+            return WorkerServerNoticesSender(self)
+        return ServerNoticesSender(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

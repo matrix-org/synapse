@@ -10,6 +10,7 @@ import synapse.handlers.e2e_keys
 import synapse.handlers.set_password
 import synapse.rest.media.v1.media_repository
 import synapse.server_notices.server_notices_manager
+import synapse.server_notices.server_notices_sender
 import synapse.state
 import synapse.storage
 
@@ -68,4 +69,7 @@ class HomeServer(object):
         pass
 
     def get_server_notices_manager(self) -> synapse.server_notices.server_notices_manager.ServerNoticesManager:
+        pass
+
+    def get_server_notices_sender(self) -> synapse.server_notices.server_notices_sender.ServerNoticesSender:
         pass

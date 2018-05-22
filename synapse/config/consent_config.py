@@ -18,25 +18,49 @@ from ._base import Config
 DEFAULT_CONFIG = """\
 # User Consent configuration
 #
-# uncomment and configure if enabling the 'consent' resource under 'listeners'.
+# Parts of this section are required if enabling the 'consent' resource under
+# 'listeners', in particular 'template_dir' and 'version'.
 #
 # 'template_dir' gives the location of the templates for the HTML forms.
 # This directory should contain one subdirectory per language (eg, 'en', 'fr'),
 # and each language directory should contain the policy document (named as
 # '<version>.html') and a success page (success.html).
 #
-# 'default_version' gives the version of the policy document to serve up if
-# there is no 'v' parameter.
+# 'version' specifies the 'current' version of the policy document. It defines
+# the version to be served by the consent resource if there is no 'v'
+# parameter.
+#
+# 'server_notice_content', if enabled, will send a user a "Server Notice"
+# asking them to consent to the privacy policy. The 'server_notices' section
+# must also be configured for this to work.
 #
 # user_consent:
 #   template_dir: res/templates/privacy
-#   default_version: 1.0
+#   version: 1.0
+#   server_notice_content:
+#     msgtype: m.text
+#     body: |
+#       Pls do consent kthx
 """
 
 
 class ConsentConfig(Config):
+    def __init__(self):
+        super(ConsentConfig, self).__init__()
+
+        self.user_consent_version = None
+        self.user_consent_template_dir = None
+        self.user_consent_server_notice_content = None
+
     def read_config(self, config):
-        self.consent_config = config.get("user_consent")
+        consent_config = config.get("user_consent")
+        if consent_config is None:
+            return
+        self.user_consent_version = str(consent_config["version"])
+        self.user_consent_template_dir = consent_config["template_dir"]
+        self.user_consent_server_notice_content = consent_config.get(
+            "server_notice_content",
+        )
 
     def default_config(self, **kwargs):
         return DEFAULT_CONFIG
