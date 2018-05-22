@@ -751,6 +751,16 @@ class FederationHandler(BaseHandler):
         curr_state = yield self.state_handler.get_current_state(room_id)
 
         def get_domains_from_state(state):
+            """Get joined domains from state
+
+            Args:
+                state (dict[tuple, FrozenEvent]): State map from type/state
+                    key to event.
+
+            Returns:
+                list[tuple[str, int]]: Returns a list of servers with the
+                lowest depth of their joins. Sorted by lowest depth first.
+            """
             joined_users = [
                 (state_key, int(event.depth))
                 for (e_type, state_key), event in state.items()
@@ -861,13 +871,13 @@ class FederationHandler(BaseHandler):
             likely_domains = get_domains_from_state(states[e_id])
 
             success = yield try_backfill([
-                dom for dom in likely_domains
+                dom for dom, _ in likely_domains
                 if dom not in tried_domains
             ])
             if success:
                 defer.returnValue(True)
 
-            tried_domains.update(likely_domains)
+            tried_domains.update(dom for dom, _ in likely_domains)
 
         defer.returnValue(False)
 
