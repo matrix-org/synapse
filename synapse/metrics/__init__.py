@@ -17,6 +17,7 @@ import logging
 import functools
 import time
 import gc
+import os
 import platform
 import attr
 
@@ -82,6 +83,38 @@ class LaterGauge(object):
 
 
 #
+# Detailed CPU metrics
+#
+
+class CPUMetrics(object):
+
+    def __init__(self):
+        ticks_per_sec = 100
+        try:
+            # Try and get the system config
+            ticks_per_sec = os.sysconf('SC_CLK_TCK')
+        except (ValueError, TypeError, AttributeError):
+            pass
+
+        self.ticks_per_sec = ticks_per_sec
+
+    def collect(self):
+
+        with open("/proc/self/stat") as s:
+            line = s.read()
+            raw_stats = line.split(") ", 1)[1].split(" ")
+
+            user = GaugeMetricFamily("process_cpu_user_seconds_total", "")
+            user.add_metric([], float(raw_stats[11]) / self.ticks_per_sec)
+            yield user
+
+            sys = GaugeMetricFamily("process_cpu_system_seconds_total", "")
+            sys.add_metric([], float(raw_stats[12]) / self.ticks_per_sec)
+            yield sys
+
+REGISTRY.register(CPUMetrics())
+
+#
 # Python GC metrics
 #
 
@@ -90,7 +123,8 @@ gc_time = Histogram(
     "python_gc_time",
     "Time taken to GC (ms)",
     ["gen"],
-    buckets=[1, 2, 5, 10, 25, 50, 100, 250, 500, 1000],
+    buckets=[2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 7500, 15000,
+             30000, 45000, 60000],
 )
 
 
