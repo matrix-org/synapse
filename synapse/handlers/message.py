@@ -577,8 +577,11 @@ class EventCreationHandler(object):
         consent_uri = self._consent_uri_builder.build_user_consent_uri(
             requester.user.localpart,
         )
+        msg = self.config.block_events_without_consent_error % {
+            'consent_uri': consent_uri,
+        }
         raise ConsentNotGivenError(
-            msg=self.config.block_events_without_consent_error,
+            msg=msg,
             consent_uri=consent_uri,
         )
 
