@@ -757,7 +757,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             bounds += " AND " + filter_clause
             args.extend(filter_args)
 
-        args.append(int(limit))
+        limit = int(limit)
+        args.append(limit)
 
         sql = (
             "SELECT event_id, chunk_id, topological_ordering, stream_ordering"
