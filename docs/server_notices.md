@@ -51,3 +51,16 @@ The only compulsory setting is `system_mxid_localpart`, which defines the user
 id of the server notices user, as above. `system_mxid_display_name` and
 `room_name` define the displayname of the system notices user, and of
 the notices room, respectively.
+
+Sending notices
+---------------
+
+As of the current version of synapse, there is no convenient interface for
+sending notices (other than the automated ones sent as part of consent
+tracking).
+
+In the meantime, it is possible to test this feature using the manhole. Having gone into the manhole as described in [manhole.md](manhole.md), a notice can be sent with something like:
+
+```
+>>> hs.get_server_notices_manager().send_notice('@user:server.com', {'msgtype':'m.text', 'body':'foo'})
+```
