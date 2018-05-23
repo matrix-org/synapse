@@ -161,6 +161,12 @@ class SynapseHomeServer(HomeServer):
             )
         logger.info("Synapse now listening on port %d", port)
 
+        if config.enable_metrics and config.metrics_port:
+            from prometheus_client import start_http_server
+            start_http_server(int(config.metrics_port), addr=config.metrics_bind_host)
+            logger.info("Metrics now reporting on %s:%d",
+                        config.metrics_bind_host, config.metrics_port)
+
     def _configure_named_resource(self, name, compress=False):
         """Build a resource map for a named resource
 
