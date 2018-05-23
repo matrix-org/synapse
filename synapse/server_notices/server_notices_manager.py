@@ -35,6 +35,7 @@ class ServerNoticesManager(object):
         self._config = hs.config
         self._room_creation_handler = hs.get_room_creation_handler()
         self._event_creation_handler = hs.get_event_creation_handler()
+        self._is_mine_id = hs.is_mine_id
 
     def is_enabled(self):
         """Checks if server notices are enabled on this server.
@@ -88,6 +89,9 @@ class ServerNoticesManager(object):
         """
         if not self.is_enabled():
             raise Exception("Server notices not enabled")
+
+        assert self._is_mine_id(user_id), \
+            "Cannot send server notices to remote users"
 
         rooms = yield self._store.get_rooms_for_user_where_membership_is(
             user_id, [Membership.INVITE, Membership.JOIN],
