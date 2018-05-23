@@ -59,7 +59,9 @@ As of the current version of synapse, there is no convenient interface for
 sending notices (other than the automated ones sent as part of consent
 tracking).
 
-In the meantime, it is possible to test this feature using the manhole. Having gone into the manhole as described in [manhole.md](manhole.md), a notice can be sent with something like:
+In the meantime, it is possible to test this feature using the manhole. Having
+gone into the manhole as described in [manhole.md](manhole.md), a notice can be
+sent with something like:
 
 ```
 >>> hs.get_server_notices_manager().send_notice('@user:server.com', {'msgtype':'m.text', 'body':'foo'})
