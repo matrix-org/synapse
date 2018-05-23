@@ -56,7 +56,7 @@ class ServerNoticesManager(object):
             event_content (dict): content of event to send
 
         Returns:
-            Deferrred[None]
+            Deferred[None]
         """
         room_id = yield self.get_notice_room_for_user(user_id)
 
