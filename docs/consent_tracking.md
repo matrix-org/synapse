@@ -31,9 +31,9 @@ Note that the templates must be stored under a name giving the language of the
 template - currently this must always be `en` (for "English");
 internationalisation support is intended for the future.
 
-The template for the policy itself should be versioned - for example
-`1.0.html`. The version of the policy which the user has agreed to is stored in
-the database.
+The template for the policy itself should be versioned and named according to 
+the version: for example `1.0.html`. The version of the policy which the user
+has agreed to is stored in the database.
 
 Once the templates are in place, make the following changes to `homeserver.yaml`:
 
@@ -66,7 +66,7 @@ Once the templates are in place, make the following changes to `homeserver.yaml`
  3. Add `consent` wherever the `client` resource is currently enabled in the
     `listeners` configuration. For example:
 
-    ```
+    ```yaml
     listeners:
       - port: 8008
         resources:
@@ -85,8 +85,7 @@ Once this is complete, and the server has been restarted, try visiting
 this should give an error "Missing string query parameter 'u'". It is now
 possible to manually construct URIs where users can give their consent.
 
-Constructing the consent URI
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### Constructing the consent URI
 
 It may be useful to manually construct the "consent URI" for a given user - for
 instance, in order to send them an email asking them to consent. To do this,
@@ -116,7 +115,7 @@ version of the policy. To do so:
 
  * ensure that the consent resource is configured, as in the previous section
 
- * ensure that server notices are configured, as in [server_notices.md].
+ * ensure that server notices are configured, as in [server_notices.md](server_notices.md).
 
  * Add `server_notice_content` under `user_consent` in `homeserver.yaml`. For
    example:
@@ -141,7 +140,7 @@ notices room is exempted from this).
 
 To enable this, add `block_events_error` under `user_consent`. For example:
 
-```
+```yaml
 user_consent:
   block_events_error: >-
     You can't send any messages until you consent to the privacy policy at
