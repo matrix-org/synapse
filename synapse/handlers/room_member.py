@@ -17,11 +17,14 @@
 import abc
 import logging
 
+from six.moves import http_client
+
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 from twisted.internet import defer
 from unpaddedbase64 import decode_base64
 
+import synapse.server
 import synapse.types
 from synapse.api.constants import (
     EventTypes, Membership,
@@ -46,6 +49,11 @@ class RoomMemberHandler(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, hs):
+        """
+
+        Args:
+            hs (synapse.server.HomeServer):
+        """
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
@@ -63,6 +71,7 @@ class RoomMemberHandler(object):
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
+        self._server_notices_mxid = self.config.server_notices_mxid
 
     @abc.abstractmethod
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
@@ -289,12 +298,37 @@ class RoomMemberHandler(object):
             is_blocked = yield self.store.is_room_blocked(room_id)
             if is_blocked:
                 raise SynapseError(403, "This room has been blocked on this server")
+        else:
+            # we don't allow people to reject invites to, or leave, the
+            # server notice room.
+            is_blocked = yield self._is_server_notice_room(room_id)
+            if is_blocked:
+                raise SynapseError(
+                    http_client.FORBIDDEN,
+                    "You cannot leave this room",
+                    errcode=Codes.CANNOT_LEAVE_SERVER_NOTICE_ROOM,
+                )
 
-        if effective_membership_state == "invite":
+        if effective_membership_state == Membership.INVITE:
+            # block any attempts to invite the server notices mxid
+            if target.to_string() == self._server_notices_mxid:
+                raise SynapseError(
+                    http_client.FORBIDDEN,
+                    "Cannot invite this user",
+                )
+
             block_invite = False
-            is_requester_admin = yield self.auth.is_server_admin(
-                requester.user,
-            )
+
+            if (self._server_notices_mxid is not None and
+                    requester.user.to_string() == self._server_notices_mxid):
+                # allow the server notices mxid to send invites
+                is_requester_admin = True
+
+            else:
+                is_requester_admin = yield self.auth.is_server_admin(
+                    requester.user,
+                )
+
             if not is_requester_admin:
                 if self.config.block_non_admin_invites:
                     logger.info(
@@ -843,6 +877,13 @@ class RoomMemberHandler(object):
                 defer.returnValue(True)
 
         defer.returnValue(False)
+
+    @defer.inlineCallbacks
+    def _is_server_notice_room(self, room_id):
+        if self._server_notices_mxid is None:
+            defer.returnValue(False)
+        user_ids = yield self.store.get_users_in_room(room_id)
+        defer.returnValue(self._server_notices_mxid in user_ids)
 
 
 class RoomMemberMasterHandler(RoomMemberHandler):

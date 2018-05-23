@@ -41,7 +41,7 @@ class RoomCreateRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(RoomCreateRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self._room_creation_handler = hs.get_room_creation_handler()
 
     def register(self, http_server):
         PATTERNS = "/createRoom"
@@ -64,8 +64,7 @@ class RoomCreateRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
 
-        handler = self.handlers.room_creation_handler
-        info = yield handler.create_room(
+        info = yield self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
         )
 

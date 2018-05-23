@@ -38,6 +38,7 @@ from .spam_checker import SpamCheckerConfig
 from .groups import GroupsConfig
 from .user_directory import UserDirectoryConfig
 from .consent_config import ConsentConfig
+from .server_notices_config import ServerNoticesConfig
 
 
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
@@ -47,7 +48,9 @@ class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        JWTConfig, PasswordConfig, EmailConfig,
                        WorkerConfig, PasswordAuthProviderConfig, PushConfig,
                        SpamCheckerConfig, GroupsConfig, UserDirectoryConfig,
-                       ConsentConfig):
+                       ConsentConfig,
+                       ServerNoticesConfig,
+                       ):
     pass
 
 

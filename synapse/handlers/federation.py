@@ -81,6 +81,7 @@ class FederationHandler(BaseHandler):
         self.pusher_pool = hs.get_pusherpool()
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self._server_notices_mxid = hs.config.server_notices_mxid
 
         # When joining a room we need to queue any events for that room up
         self.room_queues = {}
@@ -1179,6 +1180,13 @@ class FederationHandler(BaseHandler):
 
         if not self.is_mine_id(event.state_key):
             raise SynapseError(400, "The invite event must be for this server")
+
+        # block any attempts to invite the server notices mxid
+        if event.state_key == self._server_notices_mxid:
+            raise SynapseError(
+                http_client.FORBIDDEN,
+                "Cannot invite this user",
+            )
 
         event.internal_metadata.outlier = True
         event.internal_metadata.invite_from_remote = True

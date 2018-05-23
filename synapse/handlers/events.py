@@ -48,6 +48,7 @@ class EventStreamHandler(BaseHandler):
 
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
+        self._server_notices_sender = hs.get_server_notices_sender()
 
     @defer.inlineCallbacks
     @log_function
@@ -58,6 +59,10 @@ class EventStreamHandler(BaseHandler):
 
         If `only_keys` is not None, events from keys will be sent down.
         """
+
+        # send any outstanding server notices to the user.
+        yield self._server_notices_sender.on_user_syncing(auth_user_id)
+
         auth_user = UserID.from_string(auth_user_id)
         presence_handler = self.hs.get_presence_handler()
 

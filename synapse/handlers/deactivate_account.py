@@ -61,7 +61,7 @@ class DeactivateAccountHandler(BaseHandler):
         yield self.store.user_delete_threepids(user_id)
         yield self.store.user_set_password_hash(user_id, None)
 
-        # Add the user to a table of users penpding deactivation (ie.
+        # Add the user to a table of users pending deactivation (ie.
         # removal from all the rooms they're a member of)
         yield self.store.add_user_pending_deactivation(user_id)
 

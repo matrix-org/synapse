@@ -85,6 +85,7 @@ class SyncRestServlet(RestServlet):
         self.clock = hs.get_clock()
         self.filtering = hs.get_filtering()
         self.presence_handler = hs.get_presence_handler()
+        self._server_notices_sender = hs.get_server_notices_sender()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -148,6 +149,9 @@ class SyncRestServlet(RestServlet):
             since_token = StreamToken.from_string(since)
         else:
             since_token = None
+
+        # send any outstanding server notices to the user.
+        yield self._server_notices_sender.on_user_syncing(user.to_string())
 
         affect_presence = set_presence != PresenceState.OFFLINE
 

@@ -9,7 +9,7 @@ form_secret: <unique but arbitrary secret>
 
 user_consent:
   template_dir: docs/privacy_policy_templates
-  default_version: 1.0
+  version: 1.0
 ```
 
 You should then be able to enable the `consent` resource under a `listener`
