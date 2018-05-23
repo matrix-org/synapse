@@ -1,9 +1,9 @@
 Changes in synapse v0.30.0-rc1 (2018-05-23)
 ==========================================
 
-This version includes support for GDPR consent collection. Users signal their
-consent through responding to a private message from a bot named
-@server:matrix.org For more information see XXXXXX
+This version includes support for Privacy Notice agreement collection. More
+details live at docs/privacy_policy_templates/README.md
+
 
 GDPR Support:
 
@@ -16,6 +16,7 @@ GDPR Support:
 * Fix dependency on jinja2 (PR #3263)
 
 Features:
+
 * Cohort analytics (PR #3163, #3241, #3251)
 * Add lxml to docker image for web previews (PR #3239) Thanks to @ptman!
 * Add in flight request metrics (PR #3252)
