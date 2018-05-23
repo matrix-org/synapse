@@ -63,46 +63,46 @@ response_db_txn_duration = Counter(
 
 # seconds spent waiting for a db connection, when processing this request
 response_db_sched_duration = Counter(
-    "synapse_http_request_response_db_sched_duration_seconds",
+    "synapse_http_server_response_db_sched_duration_seconds",
     "",
     ["method", "servlet", "tag"],
 )
 
 # size in bytes of the response written
 response_size = Counter(
-    "synapse_http_request_response_size", "", ["method", "servlet", "tag"]
+    "synapse_http_server_response_size", "", ["method", "servlet", "tag"]
 )
 
 # In flight metrics are incremented while the requests are in flight, rather
 # than when the response was written.
 
 in_flight_requests_ru_utime = Counter(
-    "synapse_http_request_in_flight_requests_ru_utime_seconds",
+    "synapse_http_server_in_flight_requests_ru_utime_seconds",
     "",
     ["method", "servlet"],
 )
 
 in_flight_requests_ru_stime = Counter(
-    "synapse_http_request_in_flight_requests_ru_stime_seconds",
+    "synapse_http_server_in_flight_requests_ru_stime_seconds",
     "",
     ["method", "servlet"],
 )
 
 in_flight_requests_db_txn_count = Counter(
-    "synapse_http_request_in_flight_requests_db_txn_count", "", ["method", "servlet"]
+    "synapse_http_server_in_flight_requests_db_txn_count", "", ["method", "servlet"]
 )
 
 # seconds spent waiting for db txns, excluding scheduling time, when processing
 # this request
 in_flight_requests_db_txn_duration = Counter(
-    "synapse_http_request_in_flight_requests_db_txn_duration_seconds",
+    "synapse_http_server_in_flight_requests_db_txn_duration_seconds",
     "",
     ["method", "servlet"],
 )
 
 # seconds spent waiting for a db connection, when processing this request
 in_flight_requests_db_sched_duration = Counter(
-    "synapse_http_request_in_flight_requests_db_sched_duration_seconds",
+    "synapse_http_server_in_flight_requests_db_sched_duration_seconds",
     "",
     ["method", "servlet"],
 )

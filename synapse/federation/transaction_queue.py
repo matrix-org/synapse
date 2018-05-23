@@ -41,7 +41,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 sent_pdus_destination_dist = Counter(
-    "synapse_federation_client_sent_pdu_destinations", ""
+    "synapse_federation_transaction_queue_sent_pdu_destinations", ""
 )
 
 
@@ -70,7 +70,7 @@ class TransactionQueue(object):
         self.pending_transactions = {}
 
         LaterGauge(
-            "synapse_federation_client_pending_destinations",
+            "synapse_federation_transaction_queue_pending_destinations",
             "",
             [],
             lambda: len(self.pending_transactions),
@@ -97,13 +97,13 @@ class TransactionQueue(object):
         self.pending_edus_keyed_by_dest = edus_keyed = {}
 
         LaterGauge(
-            "synapse_federation_client_pending_pdus",
+            "synapse_federation_transaction_queue_pending_pdus",
             "",
             [],
             lambda: sum(map(len, pdus.values())),
         )
         LaterGauge(
-            "synapse_federation_client_pending_edus",
+            "synapse_federation_transaction_queue_pending_edus",
             "",
             [],
             lambda: (
