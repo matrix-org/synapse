@@ -81,9 +81,9 @@ should be a matter of `pip install Jinja2`. On debian, try `apt-get install
 python-jinja2`.
 
 Once this is complete, and the server has been restarted, try visiting
-`https://<server>/_matrix/consent`. If configuration has been done correctly,
-this should give an error "Missing string query parameter 'u'". It is now
-possible to manually construct URIs where users can give their consent.
+`https://<server>/_matrix/consent`. If correctly configured, this should give
+an error "Missing string query parameter 'u'". It is now possible to manually
+construct URIs where users can give their consent.
 
 ### Constructing the consent URI
 
