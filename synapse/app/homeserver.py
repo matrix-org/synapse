@@ -242,7 +242,8 @@ class SynapseHomeServer(HomeServer):
     def _listener_metrics(self, config):
         if config.enable_metrics and config.metrics_port:
             from prometheus_client import start_http_server
-            reactor.callInThread(start_http_server, int(config.metrics_port), addr=config.metrics_bind_host, registry=RegistryProxy)
+            reactor.callInThread(start_http_server, int(config.metrics_port),
+                                 addr=config.metrics_bind_host, registry=RegistryProxy)
             logger.info("Metrics now reporting on %s:%d",
                         config.metrics_bind_host, config.metrics_port)
 
