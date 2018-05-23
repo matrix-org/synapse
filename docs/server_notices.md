@@ -5,8 +5,8 @@ Server Notices
 channel whereby server administrators can send messages to users on the server.
 
 They are used as part of the communication of the server polices (see
-[consent_tracking.md]), however the intention is that they may also find a use
-for features such as "Message of the day".
+[consent_tracking.md](consent_tracking.md)), however the intention is that 
+they may also find a use for features such as "Message of the day".
 
 This is a feature specific to Synapse, but it uses standard Matrix
 communication mechanisms, so should work with any Matrix client.
