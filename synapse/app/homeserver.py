@@ -161,12 +161,6 @@ class SynapseHomeServer(HomeServer):
             )
         logger.info("Synapse now listening on port %d", port)
 
-        if config.enable_metrics and config.metrics_port:
-            from prometheus_client import start_http_server
-            start_http_server(int(config.metrics_port), addr=config.metrics_bind_host)
-            logger.info("Metrics now reporting on %s:%d",
-                        config.metrics_bind_host, config.metrics_port)
-
     def _configure_named_resource(self, name, compress=False):
         """Build a resource map for a named resource
 
@@ -238,12 +232,19 @@ class SynapseHomeServer(HomeServer):
             resources[WEB_CLIENT_PREFIX] = build_resource_for_web_client(self)
 
         if name == "metrics" and self.get_config().enable_metrics:
-            resources[METRICS_PREFIX] = MetricsResource(RegistryProxy())
+            resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
 
         if name == "replication":
             resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
 
         return resources
+
+    def _listener_metrics(self, config):
+        if config.enable_metrics and config.metrics_port:
+            from prometheus_client import start_http_server
+            reactor.callInThread(start_http_server, int(config.metrics_port), addr=config.metrics_bind_host, registry=RegistryProxy)
+            logger.info("Metrics now reporting on %s:%d",
+                        config.metrics_bind_host, config.metrics_port)
 
     def start_listening(self):
         config = self.get_config()
@@ -273,6 +274,9 @@ class SynapseHomeServer(HomeServer):
                     )
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
+
+        # Kick off the metrics server.
+        self._listener_metrics(config)
 
     def run_startup_checks(self, db_conn, database_engine):
         all_users_native = are_all_users_on_domain(
