@@ -112,6 +112,7 @@ class CPUMetrics(object):
             sys.add_metric([], float(raw_stats[12]) / self.ticks_per_sec)
             yield sys
 
+
 REGISTRY.register(CPUMetrics())
 
 #
