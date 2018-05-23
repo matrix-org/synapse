@@ -131,6 +131,11 @@ version of the policy. To do so:
    Synapse automatically replaces the placeholder `%(consent_uri)s` with the
    consent uri for that user.
 
+ * ensure that `public_baseurl` is set in `homeserver.yaml`, and gives the base
+   URI that clients use to connect to the server. (It is used to construct
+   `consent_uri` in the server notice.)
+
+
 Blocking users from using the server until they agree to the policy
 -------------------------------------------------------------------
 
@@ -149,3 +154,7 @@ user_consent:
 
 Synapse automatically replaces the placeholder `%(consent_uri)s` with the
 consent uri for that user.
+
+ensure that `public_baseurl` is set in `homeserver.yaml`, and gives the base
+URI that clients use to connect to the server. (It is used to construct
+`consent_uri` in the error.)
