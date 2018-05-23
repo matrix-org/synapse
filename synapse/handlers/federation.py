@@ -505,7 +505,7 @@ class FederationHandler(BaseHandler):
                     # membership states for the requesting server to determine
                     # if the server is either in the room or has been invited
                     # into the room.
-                    for ev in state.values():
+                    for ev in state.itervalues():
                         if ev.type != EventTypes.Member:
                             continue
                         try:
