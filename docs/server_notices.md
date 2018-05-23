@@ -4,8 +4,8 @@ Server Notices
 'Server Notices' are a new feature introduced in Synapse 0.30. They provide a
 channel whereby server administrators can send messages to users on the server.
 
-They are used as part of the communication of Privacy Polices (see
-[privacy_policy.md]), however the intention is that they may also find a use
+They are used as part of the communication of the server polices (see
+[consent_tracking.md]), however the intention is that they may also find a use
 for features such as "Message of the day".
 
 This is a feature specific to Synapse, but it uses standard Matrix
