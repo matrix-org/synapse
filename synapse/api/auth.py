@@ -15,6 +15,8 @@
 
 import logging
 
+from six import itervalues
+
 import pymacaroons
 from twisted.internet import defer
 
@@ -66,7 +68,7 @@ class Auth(object):
         )
         auth_events = yield self.store.get_events(auth_events_ids)
         auth_events = {
-            (e.type, e.state_key): e for e in auth_events.values()
+            (e.type, e.state_key): e for e in itervalues(auth_events)
         }
         self.check(event, auth_events=auth_events, do_sig_check=do_sig_check)
 
@@ -691,7 +693,6 @@ def get_access_token_from_request(request, token_not_found_http_status=401):
     Raises:
         AuthError: If there isn't an access_token in the request.
     """
-
     auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
     query_params = request.args.get(b"access_token")
     if auth_headers:
@@ -709,9 +710,9 @@ def get_access_token_from_request(request, token_not_found_http_status=401):
                 "Too many Authorization headers.",
                 errcode=Codes.MISSING_TOKEN,
             )
-        parts = auth_headers[0].split(" ")
-        if parts[0] == "Bearer" and len(parts) == 2:
-            return parts[1]
+        parts = auth_headers[0].split(b" ")
+        if parts[0] == b"Bearer" and len(parts) == 2:
+            return parts[1].decode('ascii')
         else:
             raise AuthError(
                 token_not_found_http_status,
@@ -727,4 +728,4 @@ def get_access_token_from_request(request, token_not_found_http_status=401):
                 errcode=Codes.MISSING_TOKEN
             )
 
-        return query_params[0]
+        return query_params[0].decode('ascii')

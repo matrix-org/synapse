@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from six import PY3
+
 from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
@@ -25,6 +27,10 @@ import hashlib
 import logging
 
 logger = logging.getLogger(__name__)
+
+if PY3:
+    # Just keep it as a string
+    buffer = lambda x: x
 
 
 class KeyStore(SQLBaseStore):

@@ -15,6 +15,8 @@
 # limitations under the License.
 import logging
 
+from six import string_types, PY2, itervalues
+
 from synapse.util.async import ObservableDeferred
 from synapse.util import unwrapFirstError, logcontext
 from synapse.util.caches import CACHE_SIZE_FACTOR
@@ -205,7 +207,7 @@ class Cache(object):
     def invalidate_all(self):
         self.check_thread()
         self.cache.clear()
-        for entry in self._pending_deferred_cache.itervalues():
+        for entry in itervalues(self._pending_deferred_cache):
             entry.invalidate()
         self._pending_deferred_cache.clear()
 
@@ -394,7 +396,7 @@ class CacheDescriptor(_CacheDescriptorBase):
 
                 # If our cache_key is a string, try to convert to ascii to save
                 # a bit of space in large caches
-                if isinstance(cache_key, basestring):
+                if PY2 and isinstance(cache_key, string_types):
                     cache_key = to_ascii(cache_key)
 
                 result_d = ObservableDeferred(ret, consumeErrors=True)

@@ -15,6 +15,8 @@
 
 from twisted.internet import defer
 
+from six import itervalues
+
 import synapse
 from synapse.api.constants import EventTypes
 from synapse.util.metrics import Measure
@@ -120,7 +122,7 @@ class ApplicationServicesHandler(object):
 
                     yield make_deferred_yieldable(defer.gatherResults([
                         run_in_background(handle_room_events, evs)
-                        for evs in events_by_room.itervalues()
+                        for evs in itervalues(events_by_room)
                     ], consumeErrors=True))
 
                     yield self.store.set_appservice_last_pos(upper_bound)

@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from six import string_types
+
 from frozendict import frozendict
 import simplejson as json
 
@@ -25,7 +27,7 @@ def freeze(o):
     if t is frozendict:
         return o
 
-    if t is str or t is unicode:
+    if t in string_types:
         return o
 
     try:

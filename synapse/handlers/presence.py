@@ -748,7 +748,7 @@ class PresenceHandler(object):
             self._push_to_remotes([state])
         else:
             user_ids = yield self.store.get_users_in_room(room_id)
-            user_ids = filter(self.is_mine_id, user_ids)
+            user_ids = list(filter(self.is_mine_id, user_ids))
 
             states = yield self.current_state_for_users(user_ids)
 

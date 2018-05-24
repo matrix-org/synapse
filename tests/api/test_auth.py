@@ -43,7 +43,7 @@ class AuthTestCase(unittest.TestCase):
         self.auth = Auth(self.hs)
 
         self.test_user = "@foo:bar"
-        self.test_token = "_test_token_"
+        self.test_token = b"_test_token_"
 
         # this is overridden for the appservice tests
         self.store.get_app_service_by_token = Mock(return_value=None)
@@ -58,7 +58,7 @@ class AuthTestCase(unittest.TestCase):
         self.store.get_user_by_access_token = Mock(return_value=user_info)
 
         request = Mock(args={})
-        request.args["access_token"] = [self.test_token]
+        request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = yield self.auth.get_user_by_req(request)
         self.assertEquals(requester.user.to_string(), self.test_user)
@@ -67,7 +67,7 @@ class AuthTestCase(unittest.TestCase):
         self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
-        request.args["access_token"] = [self.test_token]
+        request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
         self.failureResultOf(d, AuthError)
@@ -91,7 +91,7 @@ class AuthTestCase(unittest.TestCase):
         self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
-        request.args["access_token"] = [self.test_token]
+        request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = yield self.auth.get_user_by_req(request)
         self.assertEquals(requester.user.to_string(), self.test_user)
@@ -101,7 +101,7 @@ class AuthTestCase(unittest.TestCase):
         self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
-        request.args["access_token"] = [self.test_token]
+        request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
         self.failureResultOf(d, AuthError)
@@ -125,8 +125,8 @@ class AuthTestCase(unittest.TestCase):
         self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
-        request.args["access_token"] = [self.test_token]
-        request.args["user_id"] = [masquerading_user_id]
+        request.args[b"access_token"] = [self.test_token]
+        request.args[b"user_id"] = [masquerading_user_id]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = yield self.auth.get_user_by_req(request)
         self.assertEquals(requester.user.to_string(), masquerading_user_id)
@@ -139,8 +139,8 @@ class AuthTestCase(unittest.TestCase):
         self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
-        request.args["access_token"] = [self.test_token]
-        request.args["user_id"] = [masquerading_user_id]
+        request.args[b"access_token"] = [self.test_token]
+        request.args[b"user_id"] = [masquerading_user_id]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
         self.failureResultOf(d, AuthError)
@@ -370,7 +370,7 @@ class AuthTestCase(unittest.TestCase):
 
         # check the token works
         request = Mock(args={})
-        request.args["access_token"] = [token]
+        request.args[b"access_token"] = [token.encode('ascii')]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         self.assertEqual(UserID.from_string(USER_ID), requester.user)
@@ -383,7 +383,7 @@ class AuthTestCase(unittest.TestCase):
 
         # the token should *not* work now
         request = Mock(args={})
-        request.args["access_token"] = [guest_tok]
+        request.args[b"access_token"] = [guest_tok.encode('ascii')]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
 
         with self.assertRaises(AuthError) as cm:
