@@ -20,6 +20,8 @@ from twisted.internet import defer, reactor, task
 import time
 import logging
 
+from itertools import islice
+
 logger = logging.getLogger(__name__)
 
 
@@ -79,3 +81,19 @@ class Clock(object):
         except Exception:
             if not ignore_errs:
                 raise
+
+
+def batch_iter(iterable, size):
+    """batch an iterable up into tuples with a maximum size
+
+    Args:
+        iterable (iterable): the iterable to slice
+        size (int): the maximum batch size
+
+    Returns:
+        an iterator over the chunks
+    """
+    # make sure we can deal with iterables like lists too
+    sourceiter = iter(iterable)
+    # call islice until it returns an empty tuple
+    return iter(lambda: tuple(islice(sourceiter, size)), ())
