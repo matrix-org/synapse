@@ -60,17 +60,20 @@ class DeactivateAccountHandler(BaseHandler):
         threepids = yield self.store.user_get_threepids(user_id)
         for threepid in threepids:
             try:
-                yield self._identity_handler.unbind_threepid(user_id,
+                yield self._identity_handler.unbind_threepid(
+                    user_id,
                     {
                         'medium': threepid['medium'],
                         'address': threepid['address'],
                     },
                 )
-            except:
+            except Exception:
                 # Do we want this to be a fatal error or should we carry on?
                 logger.exception("Failed to remove threepid from ID server")
                 raise SynapseError(400, "Failed to remove threepid from ID server")
-            yield self.store.user_delete_threepid(user_id, threepid['medium'], threepid['address'])
+            yield self.store.user_delete_threepid(
+                user_id, threepid['medium'], threepid['address'],
+            )
 
         # first delete any devices belonging to the user, which will also
         # delete corresponding access tokens.

@@ -385,7 +385,7 @@ class ThreepidDeleteRestServlet(RestServlet):
             yield self.auth_handler.delete_threepid(
                 user_id, body['medium'], body['address']
             )
-        except Exception as e:
+        except Exception:
             # NB. This endpoint should succeed if there is nothing to
             # delete, so it should only throw if something is wrong
             # that we ought to care about.

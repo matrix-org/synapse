@@ -148,9 +148,10 @@ class IdentityHandler(BaseHandler):
             logger.warn("Can't unbind threepid: no trusted ID servers set in config")
             defer.returnValue(False)
 
-        # We don't track what ID server we added 3pids on (perhaps we ought to) but we assume
-        # that any of the servers in the trusted list are in the same ID server federation,
-        # so we can pick any one of them to send the deletion request to.
+        # We don't track what ID server we added 3pids on (perhaps we ought to)
+        # but we assume that any of the servers in the trusted list are in the
+        # same ID server federation, so we can pick any one of them to send the
+        # deletion request to.
         id_server = next(iter(self.trusted_id_servers))
 
         url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
