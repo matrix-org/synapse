@@ -124,6 +124,13 @@ class UserDirectoryHandler(object):
         )
 
     @defer.inlineCallbacks
+    def handle_user_deactivated(self, user_id):
+        """Called when a user ID is deactivated
+        """
+        yield self.store.remove_from_user_dir(user_id)
+        yield self.store.remove_from_user_in_public_room(user_id)
+
+    @defer.inlineCallbacks
     def _unsafe_process(self):
         # If self.pos is None then means we haven't fetched it from DB
         if self.pos is None:
