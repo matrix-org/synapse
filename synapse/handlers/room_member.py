@@ -306,6 +306,7 @@ class RoomMemberHandler(object):
                 raise SynapseError(
                     http_client.FORBIDDEN,
                     "You cannot leave this room",
+                    errcode=Codes.CANNOT_LEAVE_SERVER_NOTICE_ROOM,
                 )
 
         if effective_membership_state == Membership.INVITE:

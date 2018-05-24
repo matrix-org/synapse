@@ -14,10 +14,13 @@
 # limitations under the License.
 import logging
 
+from six import (iteritems, string_types)
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
+from synapse.api.urls import ConsentURIBuilder
 from synapse.config import ConfigError
+from synapse.types import get_localpart_from_id
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +55,8 @@ class ConsentServerNotices(object):
                     "key.",
                 )
 
+            self._consent_uri_builder = ConsentURIBuilder(hs.config)
+
     @defer.inlineCallbacks
     def maybe_send_server_notice_to_user(self, user_id):
         """Check if we need to send a notice to this user, and does so if so
@@ -81,10 +86,18 @@ class ConsentServerNotices(object):
                 # we've already sent a notice to the user
                 return
 
-            # need to send a message
+            # need to send a message.
             try:
+                consent_uri = self._consent_uri_builder.build_user_consent_uri(
+                    get_localpart_from_id(user_id),
+                )
+                content = copy_with_str_subst(
+                    self._server_notice_content, {
+                        'consent_uri': consent_uri,
+                    },
+                )
                 yield self._server_notices_manager.send_notice(
-                    user_id, self._server_notice_content,
+                    user_id, content,
                 )
                 yield self._store.user_set_consent_server_notice_sent(
                     user_id, self._current_consent_version,
@@ -93,3 +106,27 @@ class ConsentServerNotices(object):
                 logger.error("Error sending server notice about user consent: %s", e)
         finally:
             self._users_in_progress.remove(user_id)
+
+
+def copy_with_str_subst(x, substitutions):
+    """Deep-copy a structure, carrying out string substitions on any strings
+
+    Args:
+        x (object): structure to be copied
+        substitutions (object): substitutions to be made - passed into the
+            string '%' operator
+
+    Returns:
+        copy of x
+    """
+    if isinstance(x, string_types):
+        return x % substitutions
+    if isinstance(x, dict):
+        return {
+            k: copy_with_str_subst(v, substitutions) for (k, v) in iteritems(x)
+        }
+    if isinstance(x, (list, tuple)):
+        return [copy_with_str_subst(y) for y in x]
+
+    # assume it's uninterested and can be shallow-copied.
+    return x

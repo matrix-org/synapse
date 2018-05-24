@@ -479,18 +479,18 @@ class FederationHandler(BaseHandler):
         # to get all state ids that we're interested in.
         event_map = yield self.store.get_events([
             e_id
-            for key_to_eid in event_to_state_ids.values()
-            for key, e_id in key_to_eid.items()
+            for key_to_eid in event_to_state_ids.itervalues()
+            for key, e_id in key_to_eid.iteritems()
             if key[0] != EventTypes.Member or check_match(key[1])
         ])
 
         event_to_state = {
             e_id: {
                 key: event_map[inner_e_id]
-                for key, inner_e_id in key_to_eid.items()
+                for key, inner_e_id in key_to_eid.iteritems()
                 if inner_e_id in event_map
             }
-            for e_id, key_to_eid in event_to_state_ids.items()
+            for e_id, key_to_eid in event_to_state_ids.iteritems()
         }
 
         def redact_disallowed(event, state):
@@ -505,7 +505,7 @@ class FederationHandler(BaseHandler):
                     # membership states for the requesting server to determine
                     # if the server is either in the room or has been invited
                     # into the room.
-                    for ev in state.values():
+                    for ev in state.itervalues():
                         if ev.type != EventTypes.Member:
                             continue
                         try:
@@ -751,9 +751,19 @@ class FederationHandler(BaseHandler):
         curr_state = yield self.state_handler.get_current_state(room_id)
 
         def get_domains_from_state(state):
+            """Get joined domains from state
+
+            Args:
+                state (dict[tuple, FrozenEvent]): State map from type/state
+                    key to event.
+
+            Returns:
+                list[tuple[str, int]]: Returns a list of servers with the
+                lowest depth of their joins. Sorted by lowest depth first.
+            """
             joined_users = [
                 (state_key, int(event.depth))
-                for (e_type, state_key), event in state.items()
+                for (e_type, state_key), event in state.iteritems()
                 if e_type == EventTypes.Member
                 and event.membership == Membership.JOIN
             ]
@@ -770,7 +780,7 @@ class FederationHandler(BaseHandler):
                 except Exception:
                     pass
 
-            return sorted(joined_domains.items(), key=lambda d: d[1])
+            return sorted(joined_domains.iteritems(), key=lambda d: d[1])
 
         curr_domains = get_domains_from_state(curr_state)
 
@@ -787,7 +797,7 @@ class FederationHandler(BaseHandler):
                     yield self.backfill(
                         dom, room_id,
                         limit=100,
-                        extremities=[e for e in extremities.keys()]
+                        extremities=extremities,
                     )
                     # If this succeeded then we probably already have the
                     # appropriate stuff.
@@ -833,7 +843,7 @@ class FederationHandler(BaseHandler):
         tried_domains = set(likely_domains)
         tried_domains.add(self.server_name)
 
-        event_ids = list(extremities.keys())
+        event_ids = list(extremities.iterkeys())
 
         logger.debug("calling resolve_state_groups in _maybe_backfill")
         resolve = logcontext.preserve_fn(
@@ -843,31 +853,34 @@ class FederationHandler(BaseHandler):
             [resolve(room_id, [e]) for e in event_ids],
             consumeErrors=True,
         ))
+
+        # dict[str, dict[tuple, str]], a map from event_id to state map of
+        # event_ids.
         states = dict(zip(event_ids, [s.state for s in states]))
 
         state_map = yield self.store.get_events(
-            [e_id for ids in states.values() for e_id in ids],
+            [e_id for ids in states.itervalues() for e_id in ids.itervalues()],
             get_prev_content=False
         )
         states = {
             key: {
                 k: state_map[e_id]
-                for k, e_id in state_dict.items()
+                for k, e_id in state_dict.iteritems()
                 if e_id in state_map
-            } for key, state_dict in states.items()
+            } for key, state_dict in states.iteritems()
         }
 
         for e_id, _ in sorted_extremeties_tuple:
             likely_domains = get_domains_from_state(states[e_id])
 
             success = yield try_backfill([
-                dom for dom in likely_domains
+                dom for dom, _ in likely_domains
                 if dom not in tried_domains
             ])
             if success:
                 defer.returnValue(True)
 
-            tried_domains.update(likely_domains)
+            tried_domains.update(dom for dom, _ in likely_domains)
 
         defer.returnValue(False)
 
