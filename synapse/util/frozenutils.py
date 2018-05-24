@@ -16,6 +16,7 @@
 from frozendict import frozendict
 import simplejson as json
 
+from six import string_types
 
 def freeze(o):
     t = type(o)
@@ -25,7 +26,7 @@ def freeze(o):
     if t is frozendict:
         return o
 
-    if t is str or t is unicode:
+    if isinstance(t, string_types):
         return o
 
     try:
@@ -41,7 +42,7 @@ def unfreeze(o):
     if t is dict or t is frozendict:
         return dict({k: unfreeze(v) for k, v in o.items()})
 
-    if t is str or t is unicode:
+    if isinstance(t, string_types):
         return o
 
     try:

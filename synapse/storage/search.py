@@ -18,12 +18,13 @@ import logging
 import re
 import simplejson as json
 
+from six import string_types
+
 from twisted.internet import defer
 
 from .background_updates import BackgroundUpdateStore
 from synapse.api.errors import SynapseError
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
-
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +127,7 @@ class SearchStore(BackgroundUpdateStore):
                     # skip over it.
                     continue
 
-                if not isinstance(value, basestring):
+                if not isinstance(value, string_types):
                     # If the event body, name or topic isn't a string
                     # then skip over it
                     continue
