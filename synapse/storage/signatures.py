@@ -23,6 +23,8 @@ from unpaddedbase64 import encode_base64
 from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.util.caches.descriptors import cached, cachedList
 
+if not PY2:
+    buffer = bytes
 
 class SignatureWorkerStore(SQLBaseStore):
     @cached()
@@ -103,7 +105,7 @@ class SignatureStore(SignatureWorkerStore):
             vals.append({
                 "event_id": event.event_id,
                 "algorithm": ref_alg,
-                "hash": bytes(ref_hash_bytes),
+                "hash": buffer(ref_hash_bytes),
             })
 
         self._simple_insert_many_txn(
