@@ -56,7 +56,7 @@ class SynapseRequest(Request):
 
     def __repr__(self):
         # We overwrite this so that we don't log ``access_token``
-        return '<%s at 0x%x method=%s uri=%s clientproto=%s site=%s>' % (
+        return '<%s at 0x%x method=%r uri=%r clientproto=%r site=%r>' % (
             self.__class__.__name__,
             id(self),
             self.method,
