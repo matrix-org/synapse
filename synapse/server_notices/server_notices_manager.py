@@ -113,6 +113,19 @@ class ServerNoticesManager(object):
         # apparently no existing notice room: create a new one
         logger.info("Creating server notices room for %s", user_id)
 
+        # see if we want to override the profile info for the server user.
+        # note that if we want to override either the display name or the
+        # avatar, we have to use both.
+        join_profile = None
+        if (
+            self._config.server_notices_mxid_display_name is not None or
+            self._config.server_notices_mxid_avatar_url is not None
+        ):
+            join_profile = {
+                "displayname": self._config.server_notices_mxid_display_name,
+                "avatar_url": self._config.server_notices_mxid_avatar_url,
+            }
+
         requester = create_requester(system_mxid)
         info = yield self._room_creation_handler.create_room(
             requester,
@@ -125,9 +138,7 @@ class ServerNoticesManager(object):
                 "invite": (user_id,)
             },
             ratelimit=False,
-            creator_join_profile={
-                "displayname": self._config.server_notices_mxid_display_name,
-            },
+            creator_join_profile=join_profile,
         )
         room_id = info['room_id']
 

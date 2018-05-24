@@ -44,13 +44,16 @@ section, which should look like this:
 server_notices:
    system_mxid_localpart: server
    system_mxid_display_name: "Server Notices"
+   system_mxid_avatar_url: "mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ"
    room_name: "Server Notices"
 ```
 
 The only compulsory setting is `system_mxid_localpart`, which defines the user
-id of the server notices user, as above. `system_mxid_display_name` and
-`room_name` define the displayname of the system notices user, and of
-the notices room, respectively.
+id of the Server Notices user, as above. `room_name` defines the name of the
+room which will be created.
+
+`system_mxid_display_name` and `system_mxid_avatar_url` can be used to set the
+displayname and avatar of the Server Notices user.
 
 Sending notices
 ---------------
