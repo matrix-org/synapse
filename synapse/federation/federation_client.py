@@ -394,7 +394,7 @@ class FederationClient(FederationBase):
         """
         if return_local:
             seen_events = yield self.store.get_events(event_ids, allow_rejected=True)
-            signed_events = seen_events.values()
+            signed_events = list(seen_events.values())
         else:
             seen_events = yield self.store.have_seen_events(event_ids)
             signed_events = []
@@ -592,7 +592,7 @@ class FederationClient(FederationBase):
                 }
 
                 valid_pdus = yield self._check_sigs_and_hash_and_fetch(
-                    destination, pdus.values(),
+                    destination, list(pdus.values()),
                     outlier=True,
                 )
 

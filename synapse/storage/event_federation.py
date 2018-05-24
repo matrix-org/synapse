@@ -209,7 +209,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
         for event_id, depth in txn.fetchall():
             hashes = self._get_event_reference_hashes_txn(txn, event_id)
             prev_hashes = {
-                k: encode_base64(v.encode('ascii')) for k, v in hashes.items()
+                k: encode_base64(bytes(v)) for k, v in hashes.items()
                 if k == "sha256"
             }
             results.append((event_id, prev_hashes, depth))

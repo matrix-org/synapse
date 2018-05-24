@@ -537,11 +537,11 @@ class SyncHandler(object):
 
         state = {}
         if state_ids:
-            state = yield self.store.get_events(state_ids.values())
+            state = yield self.store.get_events(list(state_ids.values()))
 
         defer.returnValue({
             (e.type, e.state_key): e
-            for e in sync_config.filter_collection.filter_room_state(state.values())
+            for e in sync_config.filter_collection.filter_room_state(list(state.values()))
         })
 
     @defer.inlineCallbacks
@@ -890,7 +890,7 @@ class SyncHandler(object):
             presence.extend(states)
 
             # Deduplicate the presence entries so that there's at most one per user
-            presence = {p.user_id: p for p in presence}.values()
+            presence = list({p.user_id: p for p in presence}.values())
 
         presence = sync_config.filter_collection.filter_presence(
             presence

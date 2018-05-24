@@ -682,7 +682,7 @@ class PresenceHandler(object):
         """
 
         updates = yield self.current_state_for_users(target_user_ids)
-        updates = updates.values()
+        updates = list(updates.values())
 
         for user_id in set(target_user_ids) - set(u.user_id for u in updates):
             updates.append(UserPresenceState.default(user_id))
@@ -752,7 +752,7 @@ class PresenceHandler(object):
 
             states = yield self.current_state_for_users(user_ids)
 
-            self._push_to_remotes(states.values())
+            self._push_to_remotes(list(states.values()))
 
     @defer.inlineCallbacks
     def get_presence_list(self, observer_user, accepted=None):
@@ -1046,7 +1046,7 @@ class PresenceEventSource(object):
             updates = yield presence.current_state_for_users(user_ids_changed)
 
         if include_offline:
-            defer.returnValue((updates.values(), max_token))
+            defer.returnValue((list(updates.values()), max_token))
         else:
             defer.returnValue(([
                 s for s in itervalues(updates)
@@ -1107,7 +1107,7 @@ def handle_timeouts(user_states, is_mine_fn, syncing_user_ids, now):
         if new_state:
             changes[state.user_id] = new_state
 
-    return changes.values()
+    return list(changes.values())
 
 
 def handle_timeout(state, is_mine, syncing_user_ids, now):

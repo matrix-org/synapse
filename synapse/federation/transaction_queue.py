@@ -27,6 +27,8 @@ from synapse.util.metrics import measure_func
 from synapse.handlers.presence import format_user_presence_state, get_interested_remotes
 import synapse.metrics
 
+from six import itervalues
+
 import logging
 
 
@@ -228,7 +230,7 @@ class TransactionQueue(object):
                 yield logcontext.make_deferred_yieldable(defer.gatherResults(
                     [
                         logcontext.run_in_background(handle_room_events, evs)
-                        for evs in events_by_room.itervalues()
+                        for evs in itervalues(events_by_room)
                     ],
                     consumeErrors=True
                 ))
@@ -322,7 +324,7 @@ class TransactionQueue(object):
                 if not states_map:
                     break
 
-                yield self._process_presence_inner(states_map.values())
+                yield self._process_presence_inner(list(states_map.values()))
         except Exception:
             logger.exception("Error sending presence states to servers")
         finally:

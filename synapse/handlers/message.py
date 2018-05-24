@@ -45,6 +45,8 @@ from synapse.replication.http.send_event import send_event_to_master
 
 from ._base import BaseHandler
 
+from six import iteritems, itervalues
+
 logger = logging.getLogger(__name__)
 
 
@@ -402,7 +404,7 @@ class MessageHandler(BaseHandler):
                 "avatar_url": profile.avatar_url,
                 "display_name": profile.display_name,
             }
-            for user_id, profile in users_with_profile.iteritems()
+            for user_id, profile in iteritems(users_with_profile)
         })
 
 
@@ -876,7 +878,7 @@ class EventCreationHandler(object):
 
                 state_to_include_ids = [
                     e_id
-                    for k, e_id in context.current_state_ids.iteritems()
+                    for k, e_id in iteritems(context.current_state_ids)
                     if k[0] in self.hs.config.room_invite_state_types
                     or k == (EventTypes.Member, event.sender)
                 ]
@@ -890,7 +892,7 @@ class EventCreationHandler(object):
                         "content": e.content,
                         "sender": e.sender,
                     }
-                    for e in state_to_include.itervalues()
+                    for e in itervalues(state_to_include)
                 ]
 
                 invitee = UserID.from_string(event.state_key)

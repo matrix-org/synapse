@@ -114,7 +114,7 @@ class DeviceHandler(BaseHandler):
             user_id, device_id=None
         )
 
-        devices = device_map.values()
+        devices = list(device_map.values())
         for device in devices:
             _update_device_from_client_ips(device, ips)
 

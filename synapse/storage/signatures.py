@@ -56,7 +56,7 @@ class SignatureWorkerStore(SQLBaseStore):
             for e_id, h in hashes.items()
         }
 
-        defer.returnValue(hashes.items())
+        defer.returnValue(list(hashes.items()))
 
     def _get_event_reference_hashes_txn(self, txn, event_id):
         """Get all the hashes for a given PDU.
@@ -91,7 +91,7 @@ class SignatureStore(SignatureWorkerStore):
             vals.append({
                 "event_id": event.event_id,
                 "algorithm": ref_alg,
-                "hash": buffer(ref_hash_bytes),
+                "hash": bytes(ref_hash_bytes),
             })
 
         self._simple_insert_many_txn(

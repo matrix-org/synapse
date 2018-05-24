@@ -22,6 +22,8 @@ from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
 
+from six import iteritems
+
 import re
 import logging
 

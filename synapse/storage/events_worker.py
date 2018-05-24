@@ -12,6 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from __future__ import division
+
 from ._base import SQLBaseStore
 
 from twisted.internet import defer, reactor
@@ -237,7 +240,7 @@ class EventsWorkerStore(SQLBaseStore):
                             continue
                     i = 0
 
-                event_id_lists = zip(*event_list)[0]
+                event_id_lists = list(zip(*event_list))[0]
                 event_ids = [
                     item for sublist in event_id_lists for item in sublist
                 ]
@@ -270,7 +273,7 @@ class EventsWorkerStore(SQLBaseStore):
                 logger.exception("do_fetch")
 
                 # We only want to resolve deferreds from the main thread
-                def fire(evs):
+                def fire(evs, e):
                     for _, d in evs:
                         if not d.called:
                             with PreserveLoggingContext():
@@ -278,7 +281,7 @@ class EventsWorkerStore(SQLBaseStore):
 
                 if event_list:
                     with PreserveLoggingContext():
-                        reactor.callFromThread(fire, event_list)
+                        reactor.callFromThread(fire, event_list, e)
 
     @defer.inlineCallbacks
     def _enqueue_events(self, events, check_redacted=True, allow_rejected=False):
@@ -337,7 +340,7 @@ class EventsWorkerStore(SQLBaseStore):
     def _fetch_event_rows(self, txn, events):
         rows = []
         N = 200
-        for i in range(1 + len(events) / N):
+        for i in range(1 + len(events) // N):
             evs = events[i * N:(i + 1) * N]
             if not evs:
                 break

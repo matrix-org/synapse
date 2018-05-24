@@ -51,6 +51,7 @@ from synapse.util.retryutils import NotRetryingDestination
 
 from synapse.util.distributor import user_joined_room
 
+from six import iteritems
 
 logger = logging.getLogger(__name__)
 
@@ -479,7 +480,7 @@ class FederationHandler(BaseHandler):
         # to get all state ids that we're interested in.
         event_map = yield self.store.get_events([
             e_id
-            for key_to_eid in event_to_state_ids.values()
+            for key_to_eid in list(event_to_state_ids.values())
             for key, e_id in key_to_eid.items()
             if key[0] != EventTypes.Member or check_match(key[1])
         ])
@@ -1135,13 +1136,13 @@ class FederationHandler(BaseHandler):
                 user = UserID.from_string(event.state_key)
                 yield user_joined_room(self.distributor, user, event.room_id)
 
-        state_ids = context.prev_state_ids.values()
+        state_ids = list(context.prev_state_ids.values())
         auth_chain = yield self.store.get_auth_chain(state_ids)
 
-        state = yield self.store.get_events(context.prev_state_ids.values())
+        state = yield self.store.get_events(list(context.prev_state_ids.values()))
 
         defer.returnValue({
-            "state": state.values(),
+            "state": list(state.values()),
             "auth_chain": auth_chain,
         })
 
@@ -1391,7 +1392,7 @@ class FederationHandler(BaseHandler):
                 else:
                     del results[(event.type, event.state_key)]
 
-            res = results.values()
+            res = list(results.values())
             for event in res:
                 # We sign these again because there was a bug where we
                 # incorrectly signed things the first time round
@@ -1432,7 +1433,7 @@ class FederationHandler(BaseHandler):
                 else:
                     results.pop((event.type, event.state_key), None)
 
-            defer.returnValue(results.values())
+            defer.returnValue(list(results.values()))
         else:
             defer.returnValue([])
 
@@ -1901,7 +1902,7 @@ class FederationHandler(BaseHandler):
                 })
 
                 new_state = self.state_handler.resolve_events(
-                    [local_view.values(), remote_view.values()],
+                    [list(local_view.values()), list(remote_view.values())],
                     event
                 )
 
@@ -2021,7 +2022,7 @@ class FederationHandler(BaseHandler):
                 this will not be included in the current_state in the context.
         """
         state_updates = {
-            k: a.event_id for k, a in auth_events.iteritems()
+            k: a.event_id for k, a in iteritems(auth_events)
             if k != event_key
         }
         context.current_state_ids = dict(context.current_state_ids)
@@ -2031,7 +2032,7 @@ class FederationHandler(BaseHandler):
             context.delta_ids.update(state_updates)
         context.prev_state_ids = dict(context.prev_state_ids)
         context.prev_state_ids.update({
-            k: a.event_id for k, a in auth_events.iteritems()
+            k: a.event_id for k, a in iteritems(auth_events)
         })
         context.state_group = yield self.store.store_state_group(
             event.event_id,
