@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from six import PY2
+
 from twisted.internet import defer
 
 from ._base import SQLBaseStore
@@ -72,7 +74,17 @@ class SignatureWorkerStore(SQLBaseStore):
             " WHERE event_id = ?"
         )
         txn.execute(query, (event_id, ))
-        return {k: v for k, v in txn}
+        if PY2:
+            return {k: v for k, v in txn}
+        else:
+            done = {}
+            for k, v in txn:
+                if not isinstance(v, bytes):
+                    done[k] = v.encode('ascii')
+                else:
+                    done[k] = v
+            return done
+
 
 
 class SignatureStore(SignatureWorkerStore):

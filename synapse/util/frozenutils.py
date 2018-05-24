@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from six import string_types
+from six import binary_type, text_type
 
 from frozendict import frozendict
 import simplejson as json
@@ -27,7 +27,7 @@ def freeze(o):
     if t is frozendict:
         return o
 
-    if t in string_types:
+    if t is binary_type or t is text_type:
         return o
 
     try:

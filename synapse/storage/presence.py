@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from six.moves import range
+
 from ._base import SQLBaseStore
 from synapse.api.constants import PresenceState
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
@@ -117,7 +119,7 @@ class PresenceStore(SQLBaseStore):
 
         batches = (
             presence_states[i:i + 50]
-            for i in xrange(0, len(presence_states), 50)
+            for i in range(0, len(presence_states), 50)
         )
         for states in batches:
             args = [stream_id]
