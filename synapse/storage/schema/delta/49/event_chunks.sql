@@ -47,3 +47,36 @@ CREATE TABLE chunk_linearized (
 
 CREATE UNIQUE INDEX chunk_linearized_id ON chunk_linearized (chunk_id);
 CREATE INDEX chunk_linearized_ordering ON chunk_linearized (room_id, ordering);
+
+
+-- We set chunk IDs and topological orderings for all forwawrd extremities, this
+-- ensure that all joined rooms have at least one chunk that can be used to
+-- calculate initial sync results with.
+--
+-- We just set chunk ID to the stream ordering, since stream ordering happens to
+-- be a unique integer. We also cap the topological ordering, as a) it no longer
+-- needs to match the depth and b) we'll have events with a topological ordering
+-- of MAXINT
+--
+-- (NOTE: sqlite and postgres don't have a common way of doing `min(x,y)`, hence
+-- the case statement.
+UPDATE events
+SET
+    chunk_id = stream_ordering,
+    topological_ordering = CASE
+        WHEN topological_ordering < 100000 THEN topological_ordering
+        ELSE 100000
+        END
+WHERE
+    event_id IN (
+        SELECT event_id FROM event_forward_extremities
+    );
+
+-- We need to ensure that new chunks are given an order. Since we're only doing
+-- extremities we know that the events don't point to each other, so the chunks
+-- are disconnected, meaning the ordering doesn't matter and simply needs to be
+-- unique. Reusing stream_ordering then works
+INSERT INTO chunk_linearized (chunk_id, room_id, ordering)
+SELECT chunk_id, room_id, stream_ordering
+FROM event_forward_extremities
+INNER JOIN events USING (room_id, event_id);
