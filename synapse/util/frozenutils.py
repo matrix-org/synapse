@@ -19,14 +19,13 @@ import simplejson as json
 from six import string_types
 
 def freeze(o):
-    t = type(o)
-    if t is dict:
+    if isinstance(o, dict):
         return frozendict({k: freeze(v) for k, v in o.items()})
 
-    if t is frozendict:
+    if isinstance(o, frozendict):
         return o
 
-    if isinstance(t, string_types):
+    if isinstance(o, string_types):
         return o
 
     try:
@@ -38,11 +37,10 @@ def freeze(o):
 
 
 def unfreeze(o):
-    t = type(o)
-    if t is dict or t is frozendict:
+    if isinstance(o, (dict, frozendict)):
         return dict({k: unfreeze(v) for k, v in o.items()})
 
-    if isinstance(t, string_types):
+    if isinstance(o, string_types):
         return o
 
     try:
