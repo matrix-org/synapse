@@ -24,7 +24,9 @@ import shutil
 import sys
 import traceback
 import simplejson as json
-import urlparse
+
+from six.moves import urllib_parse as urlparse
+from six import string_types
 
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
@@ -590,8 +592,8 @@ def _iterate_over_text(tree, *tags_to_ignore):
     # to be returned.
     elements = iter([tree])
     while True:
-        el = elements.next()
-        if isinstance(el, basestring):
+        el = next(elements)
+        if isinstance(el, string_types):
             yield el
         elif el is not None and el.tag not in tags_to_ignore:
             # el.text is the text before the first child, so we can immediately
