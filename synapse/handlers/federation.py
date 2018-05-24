@@ -24,6 +24,7 @@ from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 import six
 from six.moves import http_client
+from six import iteritems
 from twisted.internet import defer
 from unpaddedbase64 import decode_base64
 
@@ -1376,7 +1377,7 @@ class FederationHandler(BaseHandler):
         )
 
         if state_groups:
-            _, state = state_groups.items().pop()
+            _, state = list(iteritems(state_groups)).pop()
             results = {
                 (e.type, e.state_key): e for e in state
             }
@@ -2084,7 +2085,7 @@ class FederationHandler(BaseHandler):
 
         def get_next(it, opt=None):
             try:
-                return it.next()
+                return next(it)
             except Exception:
                 return opt
 

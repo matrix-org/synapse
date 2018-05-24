@@ -19,6 +19,7 @@ import sys
 
 from canonicaljson import encode_canonical_json
 import six
+from six import string_types, itervalues, iteritems
 from twisted.internet import defer, reactor
 from twisted.internet.defer import succeed
 from twisted.python.failure import Failure
@@ -664,7 +665,7 @@ class EventCreationHandler(object):
 
             spam_error = self.spam_checker.check_event_for_spam(event)
             if spam_error:
-                if not isinstance(spam_error, basestring):
+                if not isinstance(spam_error, string_types):
                     spam_error = "Spam is not permitted here"
                 raise SynapseError(
                     403, spam_error, Codes.FORBIDDEN

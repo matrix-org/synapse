@@ -24,6 +24,8 @@ from six import string_types
 
 logger = logging.getLogger(__name__)
 
+from six import string_types
+
 
 # TODO: Allow users to "knock" or simpkly join depending on rules
 # TODO: Federation admin APIs
