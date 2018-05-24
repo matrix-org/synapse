@@ -26,6 +26,7 @@ from synapse.util.metrics import Measure, measure_func
 import logging
 import synapse.metrics
 
+from six import itervalues
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 stream_updates_counter = metrics.register_counter(
@@ -80,7 +81,7 @@ class ReplicationStreamer(object):
         # We only support federation stream if federation sending hase been
         # disabled on the master.
         self.streams = [
-            stream(hs) for stream in STREAMS_MAP.itervalues()
+            stream(hs) for stream in itervalues(STREAMS_MAP)
             if stream != FederationStream or not hs.config.send_federation
         ]
 
