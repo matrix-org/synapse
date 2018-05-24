@@ -574,9 +574,14 @@ class EventCreationHandler(object):
         if u["consent_version"] == self.config.user_consent_version:
             return
 
-        consent_uri = self._consent_uri_builder.build_user_consent_uri(user_id)
+        consent_uri = self._consent_uri_builder.build_user_consent_uri(
+            requester.user.localpart,
+        )
+        msg = self.config.block_events_without_consent_error % {
+            'consent_uri': consent_uri,
+        }
         raise ConsentNotGivenError(
-            msg=self.config.block_events_without_consent_error,
+            msg=msg,
             consent_uri=consent_uri,
         )
 
