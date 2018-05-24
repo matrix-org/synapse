@@ -152,7 +152,7 @@ class RegistrationHandler(BaseHandler):
             password_hash = yield self.auth_handler().hash(password)
 
         # if this breaks the tests, the tests were wrong
-        # localpart = localpart.decode("utf-8")
+        localpart = localpart.decode("utf-8")
 
         if localpart:
             yield self.check_username(localpart, guest_access_token=guest_access_token)

@@ -32,11 +32,7 @@ from frozendict import frozendict
 import logging
 import hashlib
 
-<<<<<<< HEAD
 from six import itervalues, iteritems
-=======
-from six import iteritems, itervalues
->>>>>>> notafile/py3-scratchpad
 
 logger = logging.getLogger(__name__)
 
@@ -534,11 +530,7 @@ class StateResolutionHandler(object):
 
 def _ordered_events(events):
     def key_func(e):
-<<<<<<< HEAD
         return -int(e.depth), hashlib.sha1(e.event_id.encode('ascii')).hexdigest()
-=======
-        return -int(e.depth), hashlib.sha1(e.event_id.encode()).hexdigest()
->>>>>>> notafile/py3-scratchpad
 
     return sorted(events, key=key_func)
 

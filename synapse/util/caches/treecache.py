@@ -51,10 +51,6 @@ class TreeCache(object):
         if popped is SENTINEL:
             return default
 
-<<<<<<< HEAD
-=======
-        # FIXME: do this properly instead of just converting to list
->>>>>>> notafile/py3-scratchpad
         node_and_keys = list(zip(nodes, key))
         node_and_keys.reverse()
         node_and_keys.append((self.root, None))

@@ -183,7 +183,7 @@ class MockHttpResource(HttpServer):
         self.prefix = prefix
 
     def trigger_get(self, path):
-        return self.trigger("GET", path, None)
+        return self.trigger(b"GET", path, None)
 
     @patch('twisted.web.http.Request')
     @defer.inlineCallbacks

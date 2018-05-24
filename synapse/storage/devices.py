@@ -21,11 +21,7 @@ from synapse.api.errors import StoreError
 from ._base import SQLBaseStore, Cache
 from synapse.util.caches.descriptors import cached, cachedList, cachedInlineCallbacks
 
-<<<<<<< HEAD
 from six import itervalues, iteritems
-=======
-from six import itervalues
->>>>>>> notafile/py3-scratchpad
 
 logger = logging.getLogger(__name__)
 

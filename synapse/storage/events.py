@@ -40,13 +40,8 @@ import synapse.metrics
 from synapse.events import EventBase    # noqa: F401
 from synapse.events.snapshot import EventContext   # noqa: F401
 
-<<<<<<< HEAD
-from six import itervalues, iteritems, PY2
 from six.moves import range
-=======
-from six.moves import range
-from six import string_types, itervalues, iteritems, iterkeys
->>>>>>> notafile/py3-scratchpad
+from six import string_types, itervalues, iteritems, iterkeys, PY2
 
 logger = logging.getLogger(__name__)
 
