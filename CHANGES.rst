@@ -13,11 +13,11 @@ so should work with any Matrix client. For more details see ``docs/server_notice
 
 Further Server Notices/Consent Tracking Support:
 
-* Allow overriding the server_notices user's avatar (#3273)
-* Use the localpart in the consent uri (#3272)
-* Support for putting %(consent_uri)s in messages (#3271)
-* Block attempts to send server notices to remote users (#3270)
-* Docs on consent bits (#3268)
+* Allow overriding the server_notices user's avatar (PR #3273)
+* Use the localpart in the consent uri (PR #3272)
+* Support for putting %(consent_uri)s in messages (PR #3271)
+* Block attempts to send server notices to remote users (PR #3270)
+* Docs on consent bits (PR #3268)
 
 
 
