@@ -479,18 +479,18 @@ class FederationHandler(BaseHandler):
         # to get all state ids that we're interested in.
         event_map = yield self.store.get_events([
             e_id
-            for key_to_eid in event_to_state_ids.values()
-            for key, e_id in key_to_eid.items()
+            for key_to_eid in event_to_state_ids.itervalues()
+            for key, e_id in key_to_eid.iteritems()
             if key[0] != EventTypes.Member or check_match(key[1])
         ])
 
         event_to_state = {
             e_id: {
                 key: event_map[inner_e_id]
-                for key, inner_e_id in key_to_eid.items()
+                for key, inner_e_id in key_to_eid.iteritems()
                 if inner_e_id in event_map
             }
-            for e_id, key_to_eid in event_to_state_ids.items()
+            for e_id, key_to_eid in event_to_state_ids.iteritems()
         }
 
         def redact_disallowed(event, state):
@@ -505,7 +505,7 @@ class FederationHandler(BaseHandler):
                     # membership states for the requesting server to determine
                     # if the server is either in the room or has been invited
                     # into the room.
-                    for ev in state.values():
+                    for ev in state.itervalues():
                         if ev.type != EventTypes.Member:
                             continue
                         try:
