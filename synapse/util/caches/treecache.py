@@ -1,3 +1,5 @@
+from six import itervalues
+
 SENTINEL = object()
 
 
@@ -49,6 +51,10 @@ class TreeCache(object):
         if popped is SENTINEL:
             return default
 
+<<<<<<< HEAD
+=======
+        # FIXME: do this properly instead of just converting to list
+>>>>>>> notafile/py3-scratchpad
         node_and_keys = list(zip(nodes, key))
         node_and_keys.reverse()
         node_and_keys.append((self.root, None))
@@ -76,7 +82,7 @@ def iterate_tree_cache_entry(d):
     can contain dicts.
     """
     if isinstance(d, dict):
-        for value_d in d.itervalues():
+        for value_d in itervalues(d):
             for value in iterate_tree_cache_entry(value_d):
                 yield value
     else:

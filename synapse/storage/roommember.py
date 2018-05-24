@@ -30,7 +30,7 @@ from synapse.types import get_domain_from_id
 import logging
 import simplejson as json
 
-from six import iteritems, itervalues
+from six import itervalues, iteritems
 
 logger = logging.getLogger(__name__)
 

@@ -44,7 +44,11 @@ class FilteringStore(SQLBaseStore):
             desc="get_user_filter",
         )
 
+<<<<<<< HEAD
         defer.returnValue(json.loads(def_json))
+=======
+        defer.returnValue(json.loads(bytes(def_json).decode("utf-8")))
+>>>>>>> notafile/py3-scratchpad
 
     def add_user_filter(self, user_localpart, user_filter):
         def_json = encode_canonical_json(user_filter)

@@ -18,6 +18,7 @@ from six import binary_type, text_type
 from frozendict import frozendict
 import simplejson as json
 
+from six import text_type  # this is a hack, using isinstance() would be better
 
 def freeze(o):
     t = type(o)
@@ -43,7 +44,7 @@ def unfreeze(o):
     if t is dict or t is frozendict:
         return dict({k: unfreeze(v) for k, v in o.items()})
 
-    if t is str or t is unicode:
+    if t is str or t is text_type:
         return o
 
     try:

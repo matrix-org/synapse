@@ -40,8 +40,13 @@ import synapse.metrics
 from synapse.events import EventBase    # noqa: F401
 from synapse.events.snapshot import EventContext   # noqa: F401
 
+<<<<<<< HEAD
 from six import itervalues, iteritems, PY2
 from six.moves import range
+=======
+from six.moves import range
+from six import string_types, itervalues, iteritems, iterkeys
+>>>>>>> notafile/py3-scratchpad
 
 logger = logging.getLogger(__name__)
 
@@ -1125,7 +1130,7 @@ class EventsStore(EventsWorkerStore):
                     "sender": event.sender,
                     "contains_url": (
                         "url" in event.content
-                        and isinstance(event.content["url"], basestring)
+                        and isinstance(event.content["url"], string_types)
                     ),
                 }
                 for event, _ in events_and_contexts
@@ -1516,7 +1521,7 @@ class EventsStore(EventsWorkerStore):
 
                     contains_url = "url" in content
                     if contains_url:
-                        contains_url &= isinstance(content["url"], basestring)
+                        contains_url &= isinstance(content["url"], string_types)
                 except (KeyError, AttributeError):
                     # If the event is missing a necessary field then
                     # skip over it.

@@ -273,11 +273,15 @@ class EventsWorkerStore(SQLBaseStore):
                 logger.exception("do_fetch")
 
                 # We only want to resolve deferreds from the main thread
+<<<<<<< HEAD
                 def fire(evs, e):
+=======
+                def fire(evs, exc):
+>>>>>>> notafile/py3-scratchpad
                     for _, d in evs:
                         if not d.called:
                             with PreserveLoggingContext():
-                                d.errback(e)
+                                d.errback(exc)
 
                 if event_list:
                     with PreserveLoggingContext():
