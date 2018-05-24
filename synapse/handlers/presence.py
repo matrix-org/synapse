@@ -320,7 +320,7 @@ class PresenceHandler(object):
 
             if to_notify:
                 notified_presence_counter.inc_by(len(to_notify))
-                yield self._persist_and_notify(to_notify.values())
+                yield self._persist_and_notify(list(to_notify.values()))
 
             self.unpersisted_users_changes |= set(s.user_id for s in new_states)
             self.unpersisted_users_changes -= set(to_notify.keys())

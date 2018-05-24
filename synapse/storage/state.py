@@ -364,7 +364,7 @@ class StateGroupWorkerStore(SQLBaseStore):
                 for k, v in iteritems(group_to_state[group])
                 if v in state_event_map
             }
-            for event_id, group in iteritmes(event_to_groups)
+            for event_id, group in iteritems(event_to_groups)
         }
 
         defer.returnValue({event: event_to_state[event] for event in event_ids})
