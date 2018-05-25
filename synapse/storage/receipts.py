@@ -369,7 +369,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
         # We don't want to clobber receipts for more recent events, so we
         # have to compare orderings of existing receipts
         sql = (
-            "SELECT topological_ordering, stream_ordering, event_id FROM events"
+            "SELECT stream_ordering FROM events"
             " INNER JOIN receipts_linearized as r USING (event_id, room_id)"
             " WHERE r.room_id = ? AND r.receipt_type = ? AND r.user_id = ?"
         )
@@ -377,10 +377,8 @@ class ReceiptsStore(ReceiptsWorkerStore):
         txn.execute(sql, (room_id, receipt_type, user_id))
 
         if topological_ordering:
-            for to, so, _ in txn:
-                if int(to) > topological_ordering:
-                    return False
-                elif int(to) == topological_ordering and int(so) >= stream_ordering:
+            for so, in txn:
+                if int(so) >= stream_ordering:
                     return False
 
         self._simple_delete_txn(
