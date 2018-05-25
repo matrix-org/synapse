@@ -43,10 +43,13 @@ DEFAULT_CONFIG = """\
 #   version: 1.0
 #   server_notice_content:
 #     msgtype: m.text
-#     body: |
-#       Pls do consent kthx
-#   block_events_error: |
-#     You can't send any messages until you consent to the privacy policy.
+#     body: >-
+#       To continue using this homeserver you must review and agree to the
+#       terms and conditions at %(consent_uri)s
+#   block_events_error: >-
+#     To continue using this homeserver you must review and agree to the
+#     terms and conditions at %(consent_uri)s
+#
 """
 
 

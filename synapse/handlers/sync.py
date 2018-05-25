@@ -28,6 +28,8 @@ import collections
 import logging
 import itertools
 
+from six import itervalues, iteritems
+
 logger = logging.getLogger(__name__)
 
 
@@ -275,7 +277,7 @@ class SyncHandler(object):
                 # result returned by the event source is poor form (it might cache
                 # the object)
                 room_id = event["room_id"]
-                event_copy = {k: v for (k, v) in event.iteritems()
+                event_copy = {k: v for (k, v) in iteritems(event)
                               if k != "room_id"}
                 ephemeral_by_room.setdefault(room_id, []).append(event_copy)
 
@@ -294,7 +296,7 @@ class SyncHandler(object):
             for event in receipts:
                 room_id = event["room_id"]
                 # exclude room id, as above
-                event_copy = {k: v for (k, v) in event.iteritems()
+                event_copy = {k: v for (k, v) in iteritems(event)
                               if k != "room_id"}
                 ephemeral_by_room.setdefault(room_id, []).append(event_copy)
 
@@ -325,7 +327,7 @@ class SyncHandler(object):
                 current_state_ids = frozenset()
                 if any(e.is_state() for e in recents):
                     current_state_ids = yield self.state.get_current_state_ids(room_id)
-                    current_state_ids = frozenset(current_state_ids.itervalues())
+                    current_state_ids = frozenset(itervalues(current_state_ids))
 
                 recents = yield filter_events_for_client(
                     self.store,
@@ -382,7 +384,7 @@ class SyncHandler(object):
                 current_state_ids = frozenset()
                 if any(e.is_state() for e in loaded_recents):
                     current_state_ids = yield self.state.get_current_state_ids(room_id)
-                    current_state_ids = frozenset(current_state_ids.itervalues())
+                    current_state_ids = frozenset(itervalues(current_state_ids))
 
                 loaded_recents = yield filter_events_for_client(
                     self.store,
@@ -984,7 +986,7 @@ class SyncHandler(object):
         if since_token:
             for joined_sync in sync_result_builder.joined:
                 it = itertools.chain(
-                    joined_sync.timeline.events, joined_sync.state.itervalues()
+                    joined_sync.timeline.events, itervalues(joined_sync.state)
                 )
                 for event in it:
                     if event.type == EventTypes.Member:
@@ -1062,7 +1064,7 @@ class SyncHandler(object):
         newly_left_rooms = []
         room_entries = []
         invited = []
-        for room_id, events in mem_change_events_by_room_id.iteritems():
+        for room_id, events in iteritems(mem_change_events_by_room_id):
             non_joins = [e for e in events if e.membership != Membership.JOIN]
             has_join = len(non_joins) != len(events)
 
