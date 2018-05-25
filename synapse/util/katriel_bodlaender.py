@@ -121,6 +121,7 @@ class OrderedListStore(object):
                 to_s_indegree += l_s
 
                 if to_s_neighbours:
+                    to_s_neighbours = list(set(to_s_neighbours))
                     to_s_neighbours.sort()
                     _, s = to_s_neighbours.pop()
                 else:
@@ -132,6 +133,7 @@ class OrderedListStore(object):
                 from_t_outdegree += l_t
 
                 if from_t_neighbours:
+                    from_t_neighbours = list(set(from_t_neighbours))
                     from_t_neighbours.sort(reverse=True)
                     _, t = from_t_neighbours.pop()
                 else:
