@@ -78,7 +78,7 @@ class ConsentConfig(Config):
             "block_events_error",
         )
         self.user_consent_server_notice_to_guests = bool(consent_config.get(
-            "send_server_notice_to_guests", "False"
+            "send_server_notice_to_guests", False,
         ))
 
     def default_config(self, **kwargs):
