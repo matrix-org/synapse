@@ -15,6 +15,8 @@
 
 ALTER TABLE events ADD COLUMN chunk_id BIGINT;
 
+-- FIXME: Add index on contains_url
+
 INSERT INTO background_updates (update_name, progress_json) VALUES
     ('events_chunk_index', '{}');
 
@@ -80,3 +82,7 @@ INSERT INTO chunk_linearized (chunk_id, room_id, ordering)
 SELECT chunk_id, room_id, stream_ordering
 FROM event_forward_extremities
 INNER JOIN events USING (room_id, event_id);
+
+
+INSERT into background_updates (update_name, progress_json)
+    VALUES ('event_fields_chunk_id', '{}');

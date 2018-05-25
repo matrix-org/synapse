@@ -202,6 +202,7 @@ def _retry_on_integrity_error(func):
 class EventsStore(EventsWorkerStore):
     EVENT_ORIGIN_SERVER_TS_NAME = "event_origin_server_ts"
     EVENT_FIELDS_SENDER_URL_UPDATE_NAME = "event_fields_sender_url"
+    EVENT_FIELDS_CHUNK = "event_fields_chunk_id"
 
     def __init__(self, db_conn, hs):
         super(EventsStore, self).__init__(db_conn, hs)
@@ -240,6 +241,11 @@ class EventsStore(EventsWorkerStore):
             columns=["room_id", "chunk_id", "topological_ordering", "stream_ordering"],
             unique=True,
             psql_only=True,
+        )
+
+        self.register_background_update_handler(
+            self.EVENT_FIELDS_CHUNK,
+            self._background_compute_chunks,
         )
 
         self._event_persist_queue = _EventPeristenceQueue()
@@ -1831,6 +1837,69 @@ class EventsStore(EventsWorkerStore):
 
         if not result:
             yield self._end_background_update(self.EVENT_ORIGIN_SERVER_TS_NAME)
+
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _background_compute_chunks(self, progress, batch_size):
+        up_to_stream_id = progress.get("up_to_stream_id")
+        if up_to_stream_id is None:
+            up_to_stream_id = self.get_current_events_token() + 1
+
+        rows_inserted = progress.get("rows_inserted", 0)
+
+        def reindex_chunks_txn(txn):
+            txn.execute("""
+                SELECT stream_ordering, room_id, event_id FROM events
+                WHERE stream_ordering < ? AND outlier = ? AND chunk_id IS NULL
+                ORDER BY stream_ordering DESC
+                LIMIT ?
+            """, (up_to_stream_id, False, batch_size))
+
+            rows = txn.fetchall()
+
+            stream_ordering = up_to_stream_id
+            for stream_ordering, room_id, event_id in rows:
+                prev_events = self._simple_select_onecol_txn(
+                    txn,
+                    table="event_edges",
+                    keyvalues={
+                        "event_id": event_id,
+                    },
+                    retcol="prev_event_id",
+                )
+
+                chunk_id, topo = self._compute_chunk_id_txn(
+                    txn, room_id, event_id, prev_events,
+                )
+
+                self._simple_update_txn(
+                    txn,
+                    table="events",
+                    keyvalues={"event_id": event_id},
+                    updatevalues={
+                        "chunk_id": chunk_id,
+                        "topological_ordering": topo,
+                    },
+                )
+
+            progress = {
+                "up_to_stream_id": stream_ordering,
+                "rows_inserted": rows_inserted + len(rows)
+            }
+
+            self._background_update_progress_txn(
+                txn, self.EVENT_FIELDS_CHUNK, progress
+            )
+
+            return len(rows)
+
+        result = yield self.runInteraction(
+            self.EVENT_FIELDS_CHUNK, reindex_chunks_txn
+        )
+
+        if not result:
+            yield self._end_background_update(self.EVENT_FIELDS_CHUNK)
 
         defer.returnValue(result)
 
