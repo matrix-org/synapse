@@ -135,6 +135,13 @@ class ServerNoticesManager(object):
                 "power_level_content_override": {
                     "users_default": -10,
                 },
+                "initial_state": [{
+                    "type": "im.vector.web.settings",
+                    "state_key": "",
+                    "content": {
+                        "hideJoinLeaves": true
+                    }
+                }],
                 "invite": (user_id,)
             },
             ratelimit=False,
