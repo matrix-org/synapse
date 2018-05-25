@@ -42,6 +42,7 @@ class ConsentServerNotices(object):
 
         self._current_consent_version = hs.config.user_consent_version
         self._server_notice_content = hs.config.user_consent_server_notice_content
+        self._send_to_guests = hs.config.user_consent_server_notice_to_guests
 
         if self._server_notice_content is not None:
             if not self._server_notices_manager.is_enabled():
@@ -77,6 +78,10 @@ class ConsentServerNotices(object):
         self._users_in_progress.add(user_id)
         try:
             u = yield self._store.get_user_by_id(user_id)
+
+            if u["is_guest"] and not self._send_to_guests:
+                # don't send to guests
+                return
 
             if u["consent_version"] == self._current_consent_version:
                 # user has already consented
