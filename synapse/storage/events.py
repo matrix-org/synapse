@@ -1867,6 +1867,7 @@ class EventsStore(EventsWorkerStore):
                     table="event_edges",
                     keyvalues={
                         "event_id": event_id,
+                        "is_state": False,
                     },
                     retcol="prev_event_id",
                 )
@@ -2239,7 +2240,7 @@ class EventsStore(EventsWorkerStore):
             "SELECT DISTINCT e.event_id FROM events_to_purge AS e"
             " INNER JOIN event_edges AS ed ON e.event_id = ed.prev_event_id"
             " LEFT JOIN events_to_purge AS ep2 ON ed.event_id = ep2.event_id"
-            " WHERE ep2.event_id IS NULL",
+            " WHERE ep2.event_id IS NULL AND NOT ed.is_state",
         )
         new_backwards_extrems = txn.fetchall()
 
@@ -2276,7 +2277,7 @@ class EventsStore(EventsWorkerStore):
             INNER JOIN event_edges AS ed ON e.event_id = ed.prev_event_id
             INNER JOIN events AS ee ON ee.event_id = ed.event_id
             LEFT JOIN events_to_purge AS ep2 ON ed.event_id = ep2.event_id
-            WHERE ep2.event_id IS NULL
+            WHERE ep2.event_id IS NULL AND NOT ed.is_state
             """,
         )
 
