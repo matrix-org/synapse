@@ -1535,9 +1535,11 @@ class EventsStore(EventsWorkerStore):
         # We now need to update the backwards extremities for the chunks.
 
         txn.executemany("""
-            INSERT INTO chunk_backwards_extremities (chunk_id, event_id)
-            SELECT ?, ? WHERE ? NOT IN (SELECT event_id FROM events)
-        """, [(chunk_id, eid, eid) for eid in prev_event_ids])
+                INSERT INTO chunk_backwards_extremities (chunk_id, event_id)
+                SELECT ?, ? WHERE NOT EXISTS (
+                    SELECT event_id FROM events WHERE event_id = ?
+                )
+            """, [(chunk_id, eid, eid) for eid in prev_event_ids])
 
         self._simple_delete_txn(
             txn,
