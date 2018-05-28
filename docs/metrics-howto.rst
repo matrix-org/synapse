@@ -34,6 +34,39 @@ How to monitor Synapse metrics using Prometheus
    Restart prometheus.
 
 
+Removal of deprecated metrics & time based counters becoming histograms in 0.30.0
+---------------------------------------------------------------------------------
+
+The duplicated metrics deprecated in Synapse 0.27.0 have been removed.
+
+All time duration-based metrics have been changed to be seconds. This affects:
+
+================================
+msec -> sec metrics
+================================
+python_gc_time
+python_twisted_reactor_tick_time
+synapse_storage_query_time
+synapse_storage_schedule_time
+synapse_storage_transaction_time
+================================
+
+Several metrics have been changed to be histograms, which sort entries into
+buckets and allow better analysis. The following metrics are now histograms:
+
+=========================================
+Altered metrics
+=========================================
+python_gc_time
+python_twisted_reactor_pending_calls
+python_twisted_reactor_tick_time
+synapse_http_server_response_time_seconds
+synapse_storage_query_time
+synapse_storage_schedule_time
+synapse_storage_transaction_time
+=========================================
+
+
 Block and response metrics renamed for 0.27.0
 ---------------------------------------------
 
