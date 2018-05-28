@@ -23,7 +23,10 @@ from twisted.web.resource import Resource
 
 import requests
 
-from synapse.http.server import respond_with_json, request_handler
+from synapse.http.server import (
+    respond_with_json,
+    wrap_json_request_handler
+)
 from synapse.api.errors import (
     SynapseError, Codes,
 )
@@ -57,7 +60,7 @@ class ResolveResource(Resource):
         respond_with_json(request, 200, {}, send_cors=True)
         return NOT_DONE_YET
 
-    @request_handler()
+    @wrap_json_request_handler
     @defer.inlineCallbacks
     def _async_render_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
@@ -82,6 +85,7 @@ class ResolveResource(Resource):
         content_length = headers.get('Content-Length')
         media_type = headers.get("Content-Type")
 
+        print(self.media_repo.__dict__)
         content_uri = yield self.media_repo.create_content(
             media_type, upload_name, response.raw,
             content_length, user

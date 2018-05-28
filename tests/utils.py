@@ -183,7 +183,8 @@ class MockMediaRepo:
 
     @defer.inlineCallbacks
     def create_content(
-        self, _media_type, _upload_name, _content, _content_length, _auth_user):
+        self, _media_type, _upload_name, _content, _content_length,
+            _auth_user):
         media_id = 'testing-media-id'
         defer.returnValue("mxc://%s/%s" % (self.server_name, media_id))
 
