@@ -174,11 +174,12 @@ class FrontendProxyServer(HomeServer):
                     )
                 )
             elif listener["type"] == "metrics":
-                if not config.enable_metrics:
-                    logger.warn(
-                        "Metrics listener configured, but collect_metrics is not enabled!")
+                if not self.get_config().enable_metrics:
+                    logger.warn(("Metrics listener configured, but "
+                                 "collect_metrics is not enabled!"))
                 else:
-                    _base.listen_metrics(listener["bind_addresses"], listener["port"])
+                    _base.listen_metrics(listener["bind_addresses"],
+                                         listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
