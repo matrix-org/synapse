@@ -32,8 +32,10 @@ from synapse.appservice.scheduler import ApplicationServiceScheduler
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.spamcheck import SpamChecker
-from synapse.federation import initialize_http_replication
+from synapse.federation.federation_client import FederationClient
+from synapse.federation.federation_server import FederationServer
 from synapse.federation.send_queue import FederationRemoteSendQueue
+from synapse.federation.federation_server import FederationHandlerRegistry
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.federation.transaction_queue import TransactionQueue
 from synapse.handlers import Handlers
@@ -44,7 +46,10 @@ from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.device import DeviceHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.presence import PresenceHandler
+from synapse.handlers.room import RoomCreationHandler
 from synapse.handlers.room_list import RoomListHandler
+from synapse.handlers.room_member import RoomMemberMasterHandler
+from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import TypingHandler
@@ -55,6 +60,7 @@ from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
 from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.handlers.profile import ProfileHandler
+from synapse.handlers.message import EventCreationHandler
 from synapse.groups.groups_server import GroupsServerHandler
 from synapse.groups.attestations import GroupAttestionRenewer, GroupAttestationSigning
 from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
@@ -66,7 +72,12 @@ from synapse.rest.media.v1.media_repository import (
     MediaRepository,
     MediaRepositoryResource,
 )
-from synapse.state import StateHandler
+from synapse.server_notices.server_notices_manager import ServerNoticesManager
+from synapse.server_notices.server_notices_sender import ServerNoticesSender
+from synapse.server_notices.worker_server_notices_sender import (
+    WorkerServerNoticesSender,
+)
+from synapse.state import StateHandler, StateResolutionHandler
 from synapse.storage import DataStore
 from synapse.streams.events import EventSources
 from synapse.util import Clock
@@ -92,16 +103,21 @@ class HomeServer(object):
     which must be implemented by the subclass. This code may call any of the
     required "get" methods on the instance to obtain the sub-dependencies that
     one requires.
+
+    Attributes:
+        config (synapse.config.homeserver.HomeserverConfig):
     """
 
     DEPENDENCIES = [
         'http_client',
         'db_pool',
-        'replication_layer',
+        'federation_client',
+        'federation_server',
         'handlers',
-        'v1auth',
         'auth',
+        'room_creation_handler',
         'state_handler',
+        'state_resolution_handler',
         'presence_handler',
         'sync_handler',
         'typing_handler',
@@ -117,6 +133,7 @@ class HomeServer(object):
         'application_service_handler',
         'device_message_handler',
         'profile_handler',
+        'event_creation_handler',
         'deactivate_account_handler',
         'set_password_handler',
         'notifier',
@@ -142,6 +159,10 @@ class HomeServer(object):
         'groups_attestation_signing',
         'groups_attestation_renewer',
         'spam_checker',
+        'room_member_handler',
+        'federation_registry',
+        'server_notices_manager',
+        'server_notices_sender',
     ]
 
     def __init__(self, hostname, **kwargs):
@@ -190,8 +211,11 @@ class HomeServer(object):
     def get_ratelimiter(self):
         return self.ratelimiter
 
-    def build_replication_layer(self):
-        return initialize_http_replication(self)
+    def build_federation_client(self):
+        return FederationClient(self)
+
+    def build_federation_server(self):
+        return FederationServer(self)
 
     def build_handlers(self):
         return Handlers(self)
@@ -212,17 +236,14 @@ class HomeServer(object):
     def build_simple_http_client(self):
         return SimpleHttpClient(self)
 
-    def build_v1auth(self):
-        orf = Auth(self)
-        # Matrix spec makes no reference to what HTTP status code is returned,
-        # but the V1 API uses 403 where it means 401, and the webclient
-        # relies on this behaviour, so V1 gets its own copy of the auth
-        # with backwards compat behaviour.
-        orf.TOKEN_NOT_FOUND_HTTP_STATUS = 403
-        return orf
+    def build_room_creation_handler(self):
+        return RoomCreationHandler(self)
 
     def build_state_handler(self):
         return StateHandler(self)
+
+    def build_state_resolution_handler(self):
+        return StateResolutionHandler(self)
 
     def build_presence_handler(self):
         return PresenceHandler(self)
@@ -272,6 +293,9 @@ class HomeServer(object):
     def build_profile_handler(self):
         return ProfileHandler(self)
 
+    def build_event_creation_handler(self):
+        return EventCreationHandler(self)
+
     def build_deactivate_account_handler(self):
         return DeactivateAccountHandler(self)
 
@@ -306,6 +330,23 @@ class HomeServer(object):
             name,
             **self.db_config.get("args", {})
         )
+
+    def get_db_conn(self, run_new_connection=True):
+        """Makes a new connection to the database, skipping the db pool
+
+        Returns:
+            Connection: a connection object implementing the PEP-249 spec
+        """
+        # Any param beginning with cp_ is a parameter for adbapi, and should
+        # not be passed to the database engine.
+        db_params = {
+            k: v for k, v in self.db_config.get("args", {}).items()
+            if not k.startswith("cp_")
+        }
+        db_conn = self.database_engine.module.connect(**db_params)
+        if run_new_connection:
+            self.database_engine.on_new_connection(db_conn)
+        return db_conn
 
     def build_media_repository_resource(self):
         # build the media repo resource. This indirects through the HomeServer
@@ -355,6 +396,24 @@ class HomeServer(object):
 
     def build_spam_checker(self):
         return SpamChecker(self)
+
+    def build_room_member_handler(self):
+        if self.config.worker_app:
+            return RoomMemberWorkerHandler(self)
+        return RoomMemberMasterHandler(self)
+
+    def build_federation_registry(self):
+        return FederationHandlerRegistry()
+
+    def build_server_notices_manager(self):
+        if self.config.worker_app:
+            raise Exception("Workers cannot send server notices")
+        return ServerNoticesManager(self)
+
+    def build_server_notices_sender(self):
+        if self.config.worker_app:
+            return WorkerServerNoticesSender(self)
+        return ServerNoticesSender(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

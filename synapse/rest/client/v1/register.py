@@ -30,6 +30,8 @@ from hashlib import sha1
 import hmac
 import logging
 
+from six import string_types
+
 logger = logging.getLogger(__name__)
 
 
@@ -70,10 +72,15 @@ class RegisterRestServlet(ClientV1RestServlet):
         self.handlers = hs.get_handlers()
 
     def on_GET(self, request):
+
+        require_email = 'email' in self.hs.config.registrations_require_3pid
+        require_msisdn = 'msisdn' in self.hs.config.registrations_require_3pid
+
+        flows = []
         if self.hs.config.enable_registration_captcha:
-            return (
-                200,
-                {"flows": [
+            # only support the email-only flow if we don't require MSISDN 3PIDs
+            if not require_msisdn:
+                flows.extend([
                     {
                         "type": LoginType.RECAPTCHA,
                         "stages": [
@@ -82,27 +89,34 @@ class RegisterRestServlet(ClientV1RestServlet):
                             LoginType.PASSWORD
                         ]
                     },
+                ])
+            # only support 3PIDless registration if no 3PIDs are required
+            if not require_email and not require_msisdn:
+                flows.extend([
                     {
                         "type": LoginType.RECAPTCHA,
                         "stages": [LoginType.RECAPTCHA, LoginType.PASSWORD]
                     }
-                ]}
-            )
+                ])
         else:
-            return (
-                200,
-                {"flows": [
+            # only support the email-only flow if we don't require MSISDN 3PIDs
+            if require_email or not require_msisdn:
+                flows.extend([
                     {
                         "type": LoginType.EMAIL_IDENTITY,
                         "stages": [
                             LoginType.EMAIL_IDENTITY, LoginType.PASSWORD
                         ]
-                    },
+                    }
+                ])
+            # only support 3PIDless registration if no 3PIDs are required
+            if not require_email and not require_msisdn:
+                flows.extend([
                     {
                         "type": LoginType.PASSWORD
                     }
-                ]}
-            )
+                ])
+        return (200, {"flows": flows})
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -321,11 +335,11 @@ class RegisterRestServlet(ClientV1RestServlet):
     def _do_shared_secret(self, request, register_json, session):
         yield run_on_reactor()
 
-        if not isinstance(register_json.get("mac", None), basestring):
+        if not isinstance(register_json.get("mac", None), string_types):
             raise SynapseError(400, "Expected mac.")
-        if not isinstance(register_json.get("user", None), basestring):
+        if not isinstance(register_json.get("user", None), string_types):
             raise SynapseError(400, "Expected 'user' key.")
-        if not isinstance(register_json.get("password", None), basestring):
+        if not isinstance(register_json.get("password", None), string_types):
             raise SynapseError(400, "Expected 'password' key.")
 
         if not self.hs.config.registration_shared_secret:
@@ -336,9 +350,9 @@ class RegisterRestServlet(ClientV1RestServlet):
         admin = register_json.get("admin", None)
 
         # Its important to check as we use null bytes as HMAC field separators
-        if "\x00" in user:
+        if b"\x00" in user:
             raise SynapseError(400, "Invalid user")
-        if "\x00" in password:
+        if b"\x00" in password:
             raise SynapseError(400, "Invalid password")
 
         # str() because otherwise hmac complains that 'unicode' does not
@@ -346,14 +360,14 @@ class RegisterRestServlet(ClientV1RestServlet):
         got_mac = str(register_json["mac"])
 
         want_mac = hmac.new(
-            key=self.hs.config.registration_shared_secret,
+            key=self.hs.config.registration_shared_secret.encode(),
             digestmod=sha1,
         )
         want_mac.update(user)
-        want_mac.update("\x00")
+        want_mac.update(b"\x00")
         want_mac.update(password)
-        want_mac.update("\x00")
-        want_mac.update("admin" if admin else "notadmin")
+        want_mac.update(b"\x00")
+        want_mac.update(b"admin" if admin else b"notadmin")
         want_mac = want_mac.hexdigest()
 
         if compare_digest(want_mac, got_mac):

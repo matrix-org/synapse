@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from frozendict import frozendict
+import simplejson as json
 
 
 def freeze(o):
@@ -49,3 +50,21 @@ def unfreeze(o):
         pass
 
     return o
+
+
+def _handle_frozendict(obj):
+    """Helper for EventEncoder. Makes frozendicts serializable by returning
+    the underlying dict
+    """
+    if type(obj) is frozendict:
+        # fishing the protected dict out of the object is a bit nasty,
+        # but we don't really want the overhead of copying the dict.
+        return obj._dict
+    raise TypeError('Object of type %s is not JSON serializable' %
+                    obj.__class__.__name__)
+
+
+# A JSONEncoder which is capable of encoding frozendics without barfing
+frozendict_json_encoder = json.JSONEncoder(
+    default=_handle_frozendict,
+)

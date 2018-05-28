@@ -19,7 +19,7 @@ from . import engines
 
 from twisted.internet import defer
 
-import ujson as json
+import simplejson as json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -241,6 +241,25 @@ class BackgroundUpdateStore(SQLBaseStore):
             update_handler(function): The function that does the update.
         """
         self._background_update_handlers[update_name] = update_handler
+
+    def register_noop_background_update(self, update_name):
+        """Register a noop handler for a background update.
+
+        This is useful when we previously did a background update, but no
+        longer wish to do the update. In this case the background update should
+        be removed from the schema delta files, but there may still be some
+        users who have the background update queued, so this method should
+        also be called to clear the update.
+
+        Args:
+            update_name (str): Name of update
+        """
+        @defer.inlineCallbacks
+        def noop_update(progress, batch_size):
+            yield self._end_background_update(update_name)
+            defer.returnValue(1)
+
+        self.register_background_update_handler(update_name, noop_update)
 
     def register_background_index_update(self, update_name, index_name,
                                          table, columns, where_clause=None,

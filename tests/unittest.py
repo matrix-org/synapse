@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import twisted
 from twisted.trial import unittest
 
 import logging
@@ -65,6 +65,10 @@ class TestCase(unittest.TestCase):
 
         @around(self)
         def setUp(orig):
+            # enable debugging of delayed calls - this means that we get a
+            # traceback when a unit test exits leaving things on the reactor.
+            twisted.internet.base.DelayedCall.debug = True
+
             old_level = logging.getLogger().level
 
             if old_level != level:

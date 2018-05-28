@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.internet import defer
+from twisted.internet import defer, threads
 
 from ._base import BaseHandler
 from synapse.api.constants import LoginType
@@ -25,6 +25,7 @@ from synapse.module_api import ModuleApi
 from synapse.types import UserID
 from synapse.util.async import run_on_reactor
 from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.logcontext import make_deferred_yieldable
 
 from twisted.web.client import PartialDownloadError
 
@@ -714,7 +715,7 @@ class AuthHandler(BaseHandler):
         if not lookupres:
             defer.returnValue(None)
         (user_id, password_hash) = lookupres
-        result = self.validate_hash(password, password_hash)
+        result = yield self.validate_hash(password, password_hash)
         if not result:
             logger.warn("Failed password login for user %s", user_id)
             defer.returnValue(None)
@@ -842,10 +843,13 @@ class AuthHandler(BaseHandler):
             password (str): Password to hash.
 
         Returns:
-            Hashed password (str).
+            Deferred(str): Hashed password.
         """
-        return bcrypt.hashpw(password.encode('utf8') + self.hs.config.password_pepper,
-                             bcrypt.gensalt(self.bcrypt_rounds))
+        def _do_hash():
+            return bcrypt.hashpw(password.encode('utf8') + self.hs.config.password_pepper,
+                                 bcrypt.gensalt(self.bcrypt_rounds))
+
+        return make_deferred_yieldable(threads.deferToThread(_do_hash))
 
     def validate_hash(self, password, stored_hash):
         """Validates that self.hash(password) == stored_hash.
@@ -855,13 +859,19 @@ class AuthHandler(BaseHandler):
             stored_hash (str): Expected hash value.
 
         Returns:
-            Whether self.hash(password) == stored_hash (bool).
+            Deferred(bool): Whether self.hash(password) == stored_hash.
         """
+
+        def _do_validate_hash():
+            return bcrypt.checkpw(
+                password.encode('utf8') + self.hs.config.password_pepper,
+                stored_hash.encode('utf8')
+            )
+
         if stored_hash:
-            return bcrypt.hashpw(password.encode('utf8') + self.hs.config.password_pepper,
-                                 stored_hash.encode('utf8')) == stored_hash
+            return make_deferred_yieldable(threads.deferToThread(_do_validate_hash))
         else:
-            return False
+            return defer.succeed(False)
 
 
 class MacaroonGeneartor(object):

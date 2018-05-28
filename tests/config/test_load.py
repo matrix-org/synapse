@@ -24,7 +24,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
 
     def setUp(self):
         self.dir = tempfile.mkdtemp()
-        print self.dir
+        print(self.dir)
         self.file = os.path.join(self.dir, "homeserver.yaml")
 
     def tearDown(self):

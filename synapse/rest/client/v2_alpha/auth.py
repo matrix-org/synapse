@@ -129,7 +129,6 @@ class AuthRestServlet(RestServlet):
             html_bytes = html.encode("utf8")
             request.setResponseCode(200)
             request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Server", self.hs.version_string)
             request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
 
             request.write(html_bytes)
@@ -175,7 +174,6 @@ class AuthRestServlet(RestServlet):
             html_bytes = html.encode("utf8")
             request.setResponseCode(200)
             request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Server", self.hs.version_string)
             request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
 
             request.write(html_bytes)

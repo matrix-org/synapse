@@ -38,7 +38,7 @@ def pid_running(pid):
     try:
         os.kill(pid, 0)
         return True
-    except OSError, err:
+    except OSError as err:
         if err.errno == errno.EPERM:
             return True
         return False
@@ -98,7 +98,7 @@ def stop(pidfile, app):
         try:
             os.kill(pid, signal.SIGTERM)
             write("stopped %s" % (app,), colour=GREEN)
-        except OSError, err:
+        except OSError as err:
             if err.errno == errno.ESRCH:
                 write("%s not running" % (app,), colour=YELLOW)
             elif err.errno == errno.EPERM:
@@ -184,6 +184,9 @@ def main():
         worker_configfiles.append(worker_configfile)
 
     if options.all_processes:
+        # To start the main synapse with -a you need to add a worker file
+        # with worker_app == "synapse.app.homeserver"
+        start_stop_synapse = False
         worker_configdir = options.all_processes
         if not os.path.isdir(worker_configdir):
             write(
@@ -200,11 +203,29 @@ def main():
         with open(worker_configfile) as stream:
             worker_config = yaml.load(stream)
         worker_app = worker_config["worker_app"]
-        worker_pidfile = worker_config["worker_pid_file"]
-        worker_daemonize = worker_config["worker_daemonize"]
-        assert worker_daemonize, "In config %r: expected '%s' to be True" % (
-            worker_configfile, "worker_daemonize")
-        worker_cache_factor = worker_config.get("synctl_cache_factor")
+        if worker_app == "synapse.app.homeserver":
+            # We need to special case all of this to pick up options that may
+            # be set in the main config file or in this worker config file.
+            worker_pidfile = (
+                worker_config.get("pid_file")
+                or pidfile
+            )
+            worker_cache_factor = worker_config.get("synctl_cache_factor") or cache_factor
+            daemonize = worker_config.get("daemonize") or config.get("daemonize")
+            assert daemonize, "Main process must have daemonize set to true"
+
+            # The master process doesn't support using worker_* config.
+            for key in worker_config:
+                if key == "worker_app":  # But we allow worker_app
+                    continue
+                assert not key.startswith("worker_"), \
+                    "Main process cannot use worker_* config"
+        else:
+            worker_pidfile = worker_config["worker_pid_file"]
+            worker_daemonize = worker_config["worker_daemonize"]
+            assert worker_daemonize, "In config %r: expected '%s' to be True" % (
+                worker_configfile, "worker_daemonize")
+            worker_cache_factor = worker_config.get("synctl_cache_factor")
         workers.append(Worker(
             worker_app, worker_configfile, worker_pidfile, worker_cache_factor,
         ))
@@ -231,6 +252,7 @@ def main():
             for running_pid in running_pids:
                 while pid_running(running_pid):
                     time.sleep(0.2)
+            write("All processes exited; now restarting...")
 
     if action == "start" or action == "restart":
         if start_stop_synapse:

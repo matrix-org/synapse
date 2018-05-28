@@ -42,7 +42,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
         hs = yield setup_test_homeserver(
             config=config,
             federation_sender=Mock(),
-            replication_layer=Mock(),
+            federation_client=Mock(),
         )
 
         self.as_token = "token1"
@@ -119,7 +119,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         hs = yield setup_test_homeserver(
             config=config,
             federation_sender=Mock(),
-            replication_layer=Mock(),
+            federation_client=Mock(),
         )
         self.db_pool = hs.get_db_pool()
 
@@ -455,7 +455,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
             config=config,
             datastore=Mock(),
             federation_sender=Mock(),
-            replication_layer=Mock(),
+            federation_client=Mock(),
         )
 
         ApplicationServiceStore(None, hs)
@@ -473,16 +473,16 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
             config=config,
             datastore=Mock(),
             federation_sender=Mock(),
-            replication_layer=Mock(),
+            federation_client=Mock(),
         )
 
         with self.assertRaises(ConfigError) as cm:
             ApplicationServiceStore(None, hs)
 
         e = cm.exception
-        self.assertIn(f1, e.message)
-        self.assertIn(f2, e.message)
-        self.assertIn("id", e.message)
+        self.assertIn(f1, str(e))
+        self.assertIn(f2, str(e))
+        self.assertIn("id", str(e))
 
     @defer.inlineCallbacks
     def test_duplicate_as_tokens(self):
@@ -497,13 +497,13 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
             config=config,
             datastore=Mock(),
             federation_sender=Mock(),
-            replication_layer=Mock(),
+            federation_client=Mock(),
         )
 
         with self.assertRaises(ConfigError) as cm:
             ApplicationServiceStore(None, hs)
 
         e = cm.exception
-        self.assertIn(f1, e.message)
-        self.assertIn(f2, e.message)
-        self.assertIn("as_token", e.message)
+        self.assertIn(f1, str(e))
+        self.assertIn(f2, str(e))
+        self.assertIn("as_token", str(e))

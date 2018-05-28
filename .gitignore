@@ -32,6 +32,7 @@ demo/media_store.*
 demo/etc
 
 uploads
+cache
 
 .idea/
 media_store/
@@ -46,3 +47,6 @@ static/client/register/register_config.js
 
 env/
 *.config
+
+.vscode/
+.ropeproject/

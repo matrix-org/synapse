@@ -15,18 +15,39 @@
 
 
 from itertools import chain
+import logging
+import re
+
+logger = logging.getLogger(__name__)
 
 
-# TODO(paul): I can't believe Python doesn't have one of these
-def map_concat(func, items):
-    # flatten a list-of-lists
-    return list(chain.from_iterable(map(func, items)))
+def flatten(items):
+    """Flatten a list of lists
+
+    Args:
+        items: iterable[iterable[X]]
+
+    Returns:
+        list[X]: flattened list
+    """
+    return list(chain.from_iterable(items))
 
 
 class BaseMetric(object):
+    """Base class for metrics which report a single value per label set
+    """
 
-    def __init__(self, name, labels=[]):
-        self.name = name
+    def __init__(self, name, labels=[], alternative_names=[]):
+        """
+        Args:
+            name (str): principal name for this metric
+            labels (list(str)): names of the labels which will be reported
+                for this metric
+            alternative_names (iterable(str)): list of alternative names for
+                 this metric. This can be useful to provide a migration path
+                when renaming metrics.
+        """
+        self._names = [name] + list(alternative_names)
         self.labels = labels  # OK not to clone as we never write it
 
     def dimension(self):
@@ -36,8 +57,7 @@ class BaseMetric(object):
         return not len(self.labels)
 
     def _render_labelvalue(self, value):
-        # TODO: some kind of value escape
-        return '"%s"' % (value)
+        return '"%s"' % (_escape_label_value(value),)
 
     def _render_key(self, values):
         if self.is_scalar():
@@ -47,19 +67,61 @@ class BaseMetric(object):
                       for k, v in zip(self.labels, values)])
         )
 
+    def _render_for_labels(self, label_values, value):
+        """Render this metric for a single set of labels
+
+        Args:
+            label_values (list[object]): values for each of the labels,
+                (which get stringified).
+            value: value of the metric at with these labels
+
+        Returns:
+            iterable[str]: rendered metric
+        """
+        rendered_labels = self._render_key(label_values)
+        return (
+            "%s%s %.12g" % (name, rendered_labels, value)
+            for name in self._names
+        )
+
+    def render(self):
+        """Render this metric
+
+        Each metric is rendered as:
+
+            name{label1="val1",label2="val2"} value
+
+        https://prometheus.io/docs/instrumenting/exposition_formats/#text-format-details
+
+        Returns:
+            iterable[str]: rendered metrics
+        """
+        raise NotImplementedError()
+
 
 class CounterMetric(BaseMetric):
     """The simplest kind of metric; one that stores a monotonically-increasing
-    integer that counts events."""
+    value that counts events or running totals.
+
+    Example use cases for Counters:
+    - Number of requests processed
+    - Number of items that were inserted into a queue
+    - Total amount of data that a system has processed
+    Counters can only go up (and be reset when the process restarts).
+    """
 
     def __init__(self, *args, **kwargs):
         super(CounterMetric, self).__init__(*args, **kwargs)
 
+        # dict[list[str]]: value for each set of label values. the keys are the
+        # label values, in the same order as the labels in self.labels.
+        #
+        # (if the metric is a scalar, the (single) key is the empty tuple).
         self.counts = {}
 
         # Scalar metrics are never empty
         if self.is_scalar():
-            self.counts[()] = 0
+            self.counts[()] = 0.
 
     def inc_by(self, incr, *values):
         if len(values) != self.dimension():
@@ -77,11 +139,41 @@ class CounterMetric(BaseMetric):
     def inc(self, *values):
         self.inc_by(1, *values)
 
-    def render_item(self, k):
-        return ["%s%s %d" % (self.name, self._render_key(k), self.counts[k])]
+    def render(self):
+        return flatten(
+            self._render_for_labels(k, self.counts[k])
+            for k in sorted(self.counts.keys())
+        )
+
+
+class GaugeMetric(BaseMetric):
+    """A metric that can go up or down
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(GaugeMetric, self).__init__(*args, **kwargs)
+
+        # dict[list[str]]: value for each set of label values. the keys are the
+        # label values, in the same order as the labels in self.labels.
+        #
+        # (if the metric is a scalar, the (single) key is the empty tuple).
+        self.guages = {}
+
+    def set(self, v, *values):
+        if len(values) != self.dimension():
+            raise ValueError(
+                "Expected as many values to inc() as labels (%d)" % (self.dimension())
+            )
+
+        # TODO: should assert that the tag values are all strings
+
+        self.guages[values] = v
 
     def render(self):
-        return map_concat(self.render_item, sorted(self.counts.keys()))
+        return flatten(
+            self._render_for_labels(k, self.guages[k])
+            for k in sorted(self.guages.keys())
+        )
 
 
 class CallbackMetric(BaseMetric):
@@ -95,13 +187,19 @@ class CallbackMetric(BaseMetric):
         self.callback = callback
 
     def render(self):
-        value = self.callback()
+        try:
+            value = self.callback()
+        except Exception:
+            logger.exception("Failed to render %s", self.name)
+            return ["# FAILED to render " + self.name]
 
         if self.is_scalar():
-            return ["%s %.12g" % (self.name, value)]
+            return list(self._render_for_labels([], value))
 
-        return ["%s%s %.12g" % (self.name, self._render_key(k), value[k])
-                for k in sorted(value.keys())]
+        return flatten(
+            self._render_for_labels(k, value[k])
+            for k in sorted(value.keys())
+        )
 
 
 class DistributionMetric(object):
@@ -126,7 +224,9 @@ class DistributionMetric(object):
 
 
 class CacheMetric(object):
-    __slots__ = ("name", "cache_name", "hits", "misses", "size_callback")
+    __slots__ = (
+        "name", "cache_name", "hits", "misses", "evicted_size", "size_callback",
+    )
 
     def __init__(self, name, size_callback, cache_name):
         self.name = name
@@ -134,6 +234,7 @@ class CacheMetric(object):
 
         self.hits = 0
         self.misses = 0
+        self.evicted_size = 0
 
         self.size_callback = size_callback
 
@@ -142,6 +243,9 @@ class CacheMetric(object):
 
     def inc_misses(self):
         self.misses += 1
+
+    def inc_evictions(self, size=1):
+        self.evicted_size += size
 
     def render(self):
         size = self.size_callback()
@@ -152,6 +256,9 @@ class CacheMetric(object):
             """%s:hits{name="%s"} %d""" % (self.name, self.cache_name, hits),
             """%s:total{name="%s"} %d""" % (self.name, self.cache_name, total),
             """%s:size{name="%s"} %d""" % (self.name, self.cache_name, size),
+            """%s:evicted_size{name="%s"} %d""" % (
+                self.name, self.cache_name, self.evicted_size
+            ),
         ]
 
 
@@ -193,3 +300,29 @@ class MemoryUsageMetric(object):
             "process_psutil_rss:total %d" % sum_rss,
             "process_psutil_rss:count %d" % len_rss,
         ]
+
+
+def _escape_character(m):
+    """Replaces a single character with its escape sequence.
+
+    Args:
+        m (re.MatchObject): A match object whose first group is the single
+            character to replace
+
+    Returns:
+        str
+    """
+    c = m.group(1)
+    if c == "\\":
+        return "\\\\"
+    elif c == "\"":
+        return "\\\""
+    elif c == "\n":
+        return "\\n"
+    return c
+
+
+def _escape_label_value(value):
+    """Takes a label value and escapes quotes, newlines and backslashes
+    """
+    return re.sub(r"([\n\"\\])", _escape_character, str(value))

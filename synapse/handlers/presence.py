@@ -31,7 +31,7 @@ from synapse.storage.presence import UserPresenceState
 
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.util.async import Linearizer
-from synapse.util.logcontext import preserve_fn
+from synapse.util.logcontext import run_in_background
 from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 from synapse.util.wheel_timer import WheelTimer
@@ -87,35 +87,40 @@ assert LAST_ACTIVE_GRANULARITY < IDLE_TIMER
 class PresenceHandler(object):
 
     def __init__(self, hs):
+        """
+
+        Args:
+            hs (synapse.server.HomeServer):
+        """
         self.is_mine = hs.is_mine
         self.is_mine_id = hs.is_mine_id
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.wheel_timer = WheelTimer()
         self.notifier = hs.get_notifier()
-        self.replication = hs.get_replication_layer()
         self.federation = hs.get_federation_sender()
-
         self.state = hs.get_state_handler()
 
-        self.replication.register_edu_handler(
+        federation_registry = hs.get_federation_registry()
+
+        federation_registry.register_edu_handler(
             "m.presence", self.incoming_presence
         )
-        self.replication.register_edu_handler(
+        federation_registry.register_edu_handler(
             "m.presence_invite",
             lambda origin, content: self.invite_presence(
                 observed_user=UserID.from_string(content["observed_user"]),
                 observer_user=UserID.from_string(content["observer_user"]),
             )
         )
-        self.replication.register_edu_handler(
+        federation_registry.register_edu_handler(
             "m.presence_accept",
             lambda origin, content: self.accept_presence(
                 observed_user=UserID.from_string(content["observed_user"]),
                 observer_user=UserID.from_string(content["observer_user"]),
             )
         )
-        self.replication.register_edu_handler(
+        federation_registry.register_edu_handler(
             "m.presence_deny",
             lambda origin, content: self.deny_presence(
                 observed_user=UserID.from_string(content["observed_user"]),
@@ -254,6 +259,14 @@ class PresenceHandler(object):
         logger.info("Finished _persist_unpersisted_changes")
 
     @defer.inlineCallbacks
+    def _update_states_and_catch_exception(self, new_states):
+        try:
+            res = yield self._update_states(new_states)
+            defer.returnValue(res)
+        except Exception:
+            logger.exception("Error updating presence")
+
+    @defer.inlineCallbacks
     def _update_states(self, new_states):
         """Updates presence of users. Sets the appropriate timeouts. Pokes
         the notifier and federation if and only if the changed presence state
@@ -363,7 +376,7 @@ class PresenceHandler(object):
                     now=now,
                 )
 
-            preserve_fn(self._update_states)(changes)
+            run_in_background(self._update_states_and_catch_exception, changes)
         except Exception:
             logger.exception("Exception in _handle_timeouts loop")
 
@@ -421,20 +434,23 @@ class PresenceHandler(object):
 
         @defer.inlineCallbacks
         def _end():
-            if affect_presence:
+            try:
                 self.user_to_num_current_syncs[user_id] -= 1
 
                 prev_state = yield self.current_state_for_user(user_id)
                 yield self._update_states([prev_state.copy_and_replace(
                     last_user_sync_ts=self.clock.time_msec(),
                 )])
+            except Exception:
+                logger.exception("Error updating presence after sync")
 
         @contextmanager
         def _user_syncing():
             try:
                 yield
             finally:
-                preserve_fn(_end)()
+                if affect_presence:
+                    run_in_background(_end)
 
         defer.returnValue(_user_syncing())
 
@@ -450,61 +466,6 @@ class PresenceHandler(object):
         for user_ids in self.external_process_to_current_syncs.values():
             syncing_user_ids.update(user_ids)
         return syncing_user_ids
-
-    @defer.inlineCallbacks
-    def update_external_syncs(self, process_id, syncing_user_ids):
-        """Update the syncing users for an external process
-
-        Args:
-            process_id(str): An identifier for the process the users are
-                syncing against. This allows synapse to process updates
-                as user start and stop syncing against a given process.
-            syncing_user_ids(set(str)): The set of user_ids that are
-                currently syncing on that server.
-        """
-
-        # Grab the previous list of user_ids that were syncing on that process
-        prev_syncing_user_ids = (
-            self.external_process_to_current_syncs.get(process_id, set())
-        )
-        # Grab the current presence state for both the users that are syncing
-        # now and the users that were syncing before this update.
-        prev_states = yield self.current_state_for_users(
-            syncing_user_ids | prev_syncing_user_ids
-        )
-        updates = []
-        time_now_ms = self.clock.time_msec()
-
-        # For each new user that is syncing check if we need to mark them as
-        # being online.
-        for new_user_id in syncing_user_ids - prev_syncing_user_ids:
-            prev_state = prev_states[new_user_id]
-            if prev_state.state == PresenceState.OFFLINE:
-                updates.append(prev_state.copy_and_replace(
-                    state=PresenceState.ONLINE,
-                    last_active_ts=time_now_ms,
-                    last_user_sync_ts=time_now_ms,
-                ))
-            else:
-                updates.append(prev_state.copy_and_replace(
-                    last_user_sync_ts=time_now_ms,
-                ))
-
-        # For each user that is still syncing or stopped syncing update the
-        # last sync time so that we will correctly apply the grace period when
-        # they stop syncing.
-        for old_user_id in prev_syncing_user_ids:
-            prev_state = prev_states[old_user_id]
-            updates.append(prev_state.copy_and_replace(
-                last_user_sync_ts=time_now_ms,
-            ))
-
-        yield self._update_states(updates)
-
-        # Update the last updated time for the process. We expire the entries
-        # if we don't receive an update in the given timeframe.
-        self.external_process_last_updated_ms[process_id] = self.clock.time_msec()
-        self.external_process_to_current_syncs[process_id] = syncing_user_ids
 
     @defer.inlineCallbacks
     def update_external_syncs_row(self, process_id, user_id, is_syncing, sync_time_msec):

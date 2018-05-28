@@ -12,48 +12,54 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import cgi
+import datetime
+import errno
+import fnmatch
+import itertools
+import logging
+import os
+import re
+import shutil
+import sys
+import traceback
+import simplejson as json
+import urlparse
 
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
 from twisted.web.resource import Resource
 
+from ._base import FileInfo
+
 from synapse.api.errors import (
     SynapseError, Codes,
 )
-from synapse.util.logcontext import preserve_fn, make_deferred_yieldable
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.util.stringutils import random_string
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.http.client import SpiderHttpClient
 from synapse.http.server import (
-    request_handler, respond_with_json_bytes,
+    respond_with_json_bytes,
     respond_with_json,
+    wrap_json_request_handler,
 )
 from synapse.util.async import ObservableDeferred
 from synapse.rest.media.v1._base import validate_url_blacklist, \
     parse_content_disposition_filename
 
-import os
-import re
-import ujson as json
-import urlparse
-import itertools
-import datetime
-import errno
-import shutil
 
-import logging
 logger = logging.getLogger(__name__)
 
 
 class PreviewUrlResource(Resource):
     isLeaf = True
 
-    def __init__(self, hs, media_repo):
+    def __init__(self, hs, media_repo, media_storage):
         Resource.__init__(self)
 
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.version_string = hs.version_string
         self.filepaths = media_repo.filepaths
         self.max_spider_size = hs.config.max_spider_size
         self.server_name = hs.hostname
@@ -61,6 +67,7 @@ class PreviewUrlResource(Resource):
         self.client = SpiderHttpClient(hs)
         self.media_repo = media_repo
         self.primary_base_path = media_repo.primary_base_path
+        self.media_storage = media_storage
 
         self.url_blacklist = hs.config.url_blacklist
 
@@ -85,7 +92,7 @@ class PreviewUrlResource(Resource):
         self._async_render_GET(request)
         return NOT_DONE_YET
 
-    @request_handler()
+    @wrap_json_request_handler
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
 
@@ -112,7 +119,8 @@ class PreviewUrlResource(Resource):
         observable = self._cache.get(url)
 
         if not observable:
-            download = preserve_fn(self._do_preview)(
+            download = run_in_background(
+                self._do_preview,
                 url, requester.user, ts,
             )
             observable = ObservableDeferred(
@@ -154,8 +162,10 @@ class PreviewUrlResource(Resource):
         logger.debug("got media_info of '%s'" % media_info)
 
         if _is_media(media_info['media_type']):
+            file_id = media_info['filesystem_id']
             dims = yield self.media_repo._generate_thumbnails(
-                None, media_info['filesystem_id'], media_info, url_cache=True,
+                None, file_id, file_id, media_info["media_type"],
+                url_cache=True,
             )
 
             og = {
@@ -200,8 +210,10 @@ class PreviewUrlResource(Resource):
 
                 if _is_media(image_info['media_type']):
                     # TODO: make sure we don't choke on white-on-transparent images
+                    file_id = image_info['filesystem_id']
                     dims = yield self.media_repo._generate_thumbnails(
-                        None, image_info['filesystem_id'], image_info, url_cache=True,
+                        None, file_id, file_id, image_info["media_type"],
+                        url_cache=True,
                     )
                     if dims:
                         og["og:image:width"] = dims['width']
@@ -245,21 +257,34 @@ class PreviewUrlResource(Resource):
 
         file_id = datetime.date.today().isoformat() + '_' + random_string(16)
 
-        fpath = self.filepaths.url_cache_filepath_rel(file_id)
-        fname = os.path.join(self.primary_base_path, fpath)
-        self.media_repo._makedirs(fname)
+        file_info = FileInfo(
+            server_name=None,
+            file_id=file_id,
+            url_cache=True,
+        )
 
-        try:
-            with open(fname, "wb") as f:
+        with self.media_storage.store_into_file(file_info) as (f, fname, finish):
+            try:
                 logger.debug("Trying to get url '%s'" % url)
                 length, headers, uri, code = yield self.client.get_file(
                     url, output_stream=f, max_size=self.max_spider_size,
                 )
+            except Exception as e:
                 # FIXME: pass through 404s and other error messages nicely
+                logger.warn("Error downloading %s: %r", url, e)
+                raise SynapseError(
+                    500, "Failed to download content: %s" % (
+                        traceback.format_exception_only(sys.exc_type, e),
+                    ),
+                    Codes.UNKNOWN,
+                )
+            yield finish()
 
-            yield self.media_repo.copy_to_backup(fpath)
-
-            media_type = headers["Content-Type"][0]
+        try:
+            if "Content-Type" in headers:
+                media_type = headers["Content-Type"][0]
+            else:
+                media_type = "application/octet-stream"
             time_now_ms = self.clock.time_msec()
             download_name = parse_content_disposition_filename(headers)
 
@@ -274,11 +299,11 @@ class PreviewUrlResource(Resource):
             )
 
         except Exception as e:
-            os.remove(fname)
-            raise SynapseError(
-                500, ("Failed to download content: %s" % e),
-                Codes.UNKNOWN
-            )
+            logger.error("Error handling downloaded %s: %r", url, e)
+            # TODO: we really ought to delete the downloaded file in this
+            # case, since we won't have recorded it in the db, and will
+            # therefore not expire it.
+            raise
 
         defer.returnValue({
             "media_type": media_type,

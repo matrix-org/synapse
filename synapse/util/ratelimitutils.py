@@ -18,7 +18,10 @@ from twisted.internet import defer
 from synapse.api.errors import LimitExceededError
 
 from synapse.util.async import sleep
-from synapse.util.logcontext import preserve_fn
+from synapse.util.logcontext import (
+    run_in_background, make_deferred_yieldable,
+    PreserveLoggingContext,
+)
 
 import collections
 import contextlib
@@ -150,7 +153,7 @@ class _PerHostRatelimiter(object):
                 "Ratelimit [%s]: sleeping req",
                 id(request_id),
             )
-            ret_defer = preserve_fn(sleep)(self.sleep_msec / 1000.0)
+            ret_defer = run_in_background(sleep, self.sleep_msec / 1000.0)
 
             self.sleeping_requests.add(request_id)
 
@@ -176,6 +179,9 @@ class _PerHostRatelimiter(object):
             return r
 
         def on_err(r):
+            # XXX: why is this necessary? this is called before we start
+            # processing the request so why would the request be in
+            # current_processing?
             self.current_processing.discard(request_id)
             return r
 
@@ -187,7 +193,7 @@ class _PerHostRatelimiter(object):
 
         ret_defer.addCallbacks(on_start, on_err)
         ret_defer.addBoth(on_both)
-        return ret_defer
+        return make_deferred_yieldable(ret_defer)
 
     def _on_exit(self, request_id):
         logger.debug(
@@ -197,7 +203,12 @@ class _PerHostRatelimiter(object):
         self.current_processing.discard(request_id)
         try:
             request_id, deferred = self.ready_request_queue.popitem()
+
+            # XXX: why do we do the following? the on_start callback above will
+            # do it for us.
             self.current_processing.add(request_id)
-            deferred.callback(None)
+
+            with PreserveLoggingContext():
+                deferred.callback(None)
         except KeyError:
             pass

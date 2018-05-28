@@ -51,19 +51,19 @@ from synapse.storage.engines import create_engine
 from synapse.storage.presence import UserPresenceState
 from synapse.storage.roommember import RoomMemberStore
 from synapse.util.httpresourcetree import create_resource_tree
-from synapse.util.logcontext import LoggingContext, preserve_fn
+from synapse.util.logcontext import LoggingContext, run_in_background
 from synapse.util.manhole import manhole
 from synapse.util.stringutils import random_string
 from synapse.util.versionstring import get_version_string
 from twisted.internet import defer, reactor
-from twisted.web.resource import Resource
+from twisted.web.resource import NoResource
+
+from six import iteritems
 
 logger = logging.getLogger("synapse.app.synchrotron")
 
 
 class SynchrotronSlavedStore(
-    SlavedPushRuleStore,
-    SlavedEventStore,
     SlavedReceiptsStore,
     SlavedAccountDataStore,
     SlavedApplicationServiceStore,
@@ -73,14 +73,12 @@ class SynchrotronSlavedStore(
     SlavedGroupServerStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
+    SlavedPushRuleStore,
+    SlavedEventStore,
     SlavedClientIpStore,
     RoomStore,
     BaseSlavedStore,
 ):
-    who_forgot_in_room = (
-        RoomMemberStore.__dict__["who_forgot_in_room"]
-    )
-
     did_forget = (
         RoomMemberStore.__dict__["did_forget"]
     )
@@ -215,7 +213,7 @@ class SynchrotronPresence(object):
 
     def get_currently_syncing_users(self):
         return [
-            user_id for user_id, count in self.user_to_num_current_syncs.iteritems()
+            user_id for user_id, count in iteritems(self.user_to_num_current_syncs)
             if count > 0
         ]
 
@@ -246,19 +244,6 @@ class SynchrotronApplicationService(object):
 
 
 class SynchrotronServer(HomeServer):
-    def get_db_conn(self, run_new_connection=True):
-        # Any param beginning with cp_ is a parameter for adbapi, and should
-        # not be passed to the database engine.
-        db_params = {
-            k: v for k, v in self.db_config.get("args", {}).items()
-            if not k.startswith("cp_")
-        }
-        db_conn = self.database_engine.module.connect(**db_params)
-
-        if run_new_connection:
-            self.database_engine.on_new_connection(db_conn)
-        return db_conn
-
     def setup(self):
         logger.info("Setting up.")
         self.datastore = SynchrotronSlavedStore(self.get_db_conn(), self)
@@ -286,7 +271,7 @@ class SynchrotronServer(HomeServer):
                         "/_matrix/client/api/v1": resource,
                     })
 
-        root_resource = create_resource_tree(resources, Resource())
+        root_resource = create_resource_tree(resources, NoResource())
 
         _base.listen_tcp(
             bind_addresses,
@@ -296,6 +281,7 @@ class SynchrotronServer(HomeServer):
                 site_tag,
                 listener_config,
                 root_resource,
+                self.version_string,
             )
         )
 
@@ -342,8 +328,7 @@ class SyncReplicationHandler(ReplicationClientHandler):
 
     def on_rdata(self, stream_name, token, rows):
         super(SyncReplicationHandler, self).on_rdata(stream_name, token, rows)
-
-        preserve_fn(self.process_and_notify)(stream_name, token, rows)
+        run_in_background(self.process_and_notify, stream_name, token, rows)
 
     def get_streams_to_replicate(self):
         args = super(SyncReplicationHandler, self).get_streams_to_replicate()
@@ -355,55 +340,58 @@ class SyncReplicationHandler(ReplicationClientHandler):
 
     @defer.inlineCallbacks
     def process_and_notify(self, stream_name, token, rows):
-        if stream_name == "events":
-            # We shouldn't get multiple rows per token for events stream, so
-            # we don't need to optimise this for multiple rows.
-            for row in rows:
-                event = yield self.store.get_event(row.event_id)
-                extra_users = ()
-                if event.type == EventTypes.Member:
-                    extra_users = (event.state_key,)
-                max_token = self.store.get_room_max_stream_ordering()
-                self.notifier.on_new_room_event(
-                    event, token, max_token, extra_users
-                )
-        elif stream_name == "push_rules":
-            self.notifier.on_new_event(
-                "push_rules_key", token, users=[row.user_id for row in rows],
-            )
-        elif stream_name in ("account_data", "tag_account_data",):
-            self.notifier.on_new_event(
-                "account_data_key", token, users=[row.user_id for row in rows],
-            )
-        elif stream_name == "receipts":
-            self.notifier.on_new_event(
-                "receipt_key", token, rooms=[row.room_id for row in rows],
-            )
-        elif stream_name == "typing":
-            self.typing_handler.process_replication_rows(token, rows)
-            self.notifier.on_new_event(
-                "typing_key", token, rooms=[row.room_id for row in rows],
-            )
-        elif stream_name == "to_device":
-            entities = [row.entity for row in rows if row.entity.startswith("@")]
-            if entities:
+        try:
+            if stream_name == "events":
+                # We shouldn't get multiple rows per token for events stream, so
+                # we don't need to optimise this for multiple rows.
+                for row in rows:
+                    event = yield self.store.get_event(row.event_id)
+                    extra_users = ()
+                    if event.type == EventTypes.Member:
+                        extra_users = (event.state_key,)
+                    max_token = self.store.get_room_max_stream_ordering()
+                    self.notifier.on_new_room_event(
+                        event, token, max_token, extra_users
+                    )
+            elif stream_name == "push_rules":
                 self.notifier.on_new_event(
-                    "to_device_key", token, users=entities,
+                    "push_rules_key", token, users=[row.user_id for row in rows],
                 )
-        elif stream_name == "device_lists":
-            all_room_ids = set()
-            for row in rows:
-                room_ids = yield self.store.get_rooms_for_user(row.user_id)
-                all_room_ids.update(room_ids)
-            self.notifier.on_new_event(
-                "device_list_key", token, rooms=all_room_ids,
-            )
-        elif stream_name == "presence":
-            yield self.presence_handler.process_replication_rows(token, rows)
-        elif stream_name == "receipts":
-            self.notifier.on_new_event(
-                "groups_key", token, users=[row.user_id for row in rows],
-            )
+            elif stream_name in ("account_data", "tag_account_data",):
+                self.notifier.on_new_event(
+                    "account_data_key", token, users=[row.user_id for row in rows],
+                )
+            elif stream_name == "receipts":
+                self.notifier.on_new_event(
+                    "receipt_key", token, rooms=[row.room_id for row in rows],
+                )
+            elif stream_name == "typing":
+                self.typing_handler.process_replication_rows(token, rows)
+                self.notifier.on_new_event(
+                    "typing_key", token, rooms=[row.room_id for row in rows],
+                )
+            elif stream_name == "to_device":
+                entities = [row.entity for row in rows if row.entity.startswith("@")]
+                if entities:
+                    self.notifier.on_new_event(
+                        "to_device_key", token, users=entities,
+                    )
+            elif stream_name == "device_lists":
+                all_room_ids = set()
+                for row in rows:
+                    room_ids = yield self.store.get_rooms_for_user(row.user_id)
+                    all_room_ids.update(room_ids)
+                self.notifier.on_new_event(
+                    "device_list_key", token, rooms=all_room_ids,
+                )
+            elif stream_name == "presence":
+                yield self.presence_handler.process_replication_rows(token, rows)
+            elif stream_name == "receipts":
+                self.notifier.on_new_event(
+                    "groups_key", token, users=[row.user_id for row in rows],
+                )
+        except Exception:
+            logger.exception("Error processing replication")
 
 
 def start(config_options):

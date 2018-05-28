@@ -21,6 +21,8 @@ from twisted.internet import defer
 import logging
 import re
 
+from six import string_types
+
 logger = logging.getLogger(__name__)
 
 
@@ -146,7 +148,7 @@ class ApplicationService(object):
                         )
 
                 regex = regex_obj.get("regex")
-                if isinstance(regex, basestring):
+                if isinstance(regex, string_types):
                     regex_obj["regex"] = re.compile(regex)  # Pre-compile regex
                 else:
                     raise ValueError(

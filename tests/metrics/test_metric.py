@@ -16,7 +16,8 @@
 from tests import unittest
 
 from synapse.metrics.metric import (
-    CounterMetric, CallbackMetric, DistributionMetric, CacheMetric
+    CounterMetric, CallbackMetric, DistributionMetric, CacheMetric,
+    _escape_label_value,
 )
 
 
@@ -141,6 +142,7 @@ class CacheMetricTestCase(unittest.TestCase):
             'cache:hits{name="cache_name"} 0',
             'cache:total{name="cache_name"} 0',
             'cache:size{name="cache_name"} 0',
+            'cache:evicted_size{name="cache_name"} 0',
         ])
 
         metric.inc_misses()
@@ -150,6 +152,7 @@ class CacheMetricTestCase(unittest.TestCase):
             'cache:hits{name="cache_name"} 0',
             'cache:total{name="cache_name"} 1',
             'cache:size{name="cache_name"} 1',
+            'cache:evicted_size{name="cache_name"} 0',
         ])
 
         metric.inc_hits()
@@ -158,4 +161,32 @@ class CacheMetricTestCase(unittest.TestCase):
             'cache:hits{name="cache_name"} 1',
             'cache:total{name="cache_name"} 2',
             'cache:size{name="cache_name"} 1',
+            'cache:evicted_size{name="cache_name"} 0',
         ])
+
+        metric.inc_evictions(2)
+
+        self.assertEquals(metric.render(), [
+            'cache:hits{name="cache_name"} 1',
+            'cache:total{name="cache_name"} 2',
+            'cache:size{name="cache_name"} 1',
+            'cache:evicted_size{name="cache_name"} 2',
+        ])
+
+
+class LabelValueEscapeTestCase(unittest.TestCase):
+    def test_simple(self):
+        string = "safjhsdlifhyskljfksdfh"
+        self.assertEqual(string, _escape_label_value(string))
+
+    def test_escape(self):
+        self.assertEqual(
+            "abc\\\"def\\nghi\\\\",
+            _escape_label_value("abc\"def\nghi\\"),
+        )
+
+    def test_sequence_of_escapes(self):
+        self.assertEqual(
+            "abc\\\"def\\nghi\\\\\\n",
+            _escape_label_value("abc\"def\nghi\\\n"),
+        )

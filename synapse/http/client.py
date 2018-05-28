@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,8 +19,10 @@ from OpenSSL.SSL import VERIFY_NONE
 from synapse.api.errors import (
     CodeMessageException, MatrixCodeMessageException, SynapseError, Codes,
 )
+from synapse.http import cancelled_to_request_timed_out_error
+from synapse.util.async import add_timeout_to_deferred
+from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.logcontext import make_deferred_yieldable
-from synapse.util import logcontext
 import synapse.metrics
 from synapse.http.endpoint import SpiderEndpoint
 
@@ -30,13 +33,14 @@ from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
 from twisted.web.client import (
     BrowserLikeRedirectAgent, ContentDecoderAgent, GzipDecoder, Agent,
     readBody, PartialDownloadError,
+    HTTPConnectionPool,
 )
 from twisted.web.client import FileBodyProducer as TwistedFileBodyProducer
 from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
 from twisted.web._newclient import ResponseDone
 
-from StringIO import StringIO
+from six import StringIO
 
 import simplejson as json
 import logging
@@ -64,13 +68,23 @@ class SimpleHttpClient(object):
     """
     def __init__(self, hs):
         self.hs = hs
+
+        pool = HTTPConnectionPool(reactor)
+
+        # the pusher makes lots of concurrent SSL connections to sygnal, and
+        # tends to do so in batches, so we need to allow the pool to keep lots
+        # of idle connections around.
+        pool.maxPersistentPerHost = max((100 * CACHE_SIZE_FACTOR, 5))
+        pool.cachedConnectionTimeout = 2 * 60
+
         # The default context factory in Twisted 14.0.0 (which we require) is
         # BrowserLikePolicyForHTTPS which will do regular cert validation
         # 'like a browser'
         self.agent = Agent(
             reactor,
             connectTimeout=15,
-            contextFactory=hs.get_http_client_context_factory()
+            contextFactory=hs.get_http_client_context_factory(),
+            pool=pool,
         )
         self.user_agent = hs.version_string
         self.clock = hs.get_clock()
@@ -83,21 +97,17 @@ class SimpleHttpClient(object):
         # counters to it
         outgoing_requests_counter.inc(method)
 
-        def send_request():
-            request_deferred = self.agent.request(
-                method, uri, *args, **kwargs
-            )
-
-            return self.clock.time_bound_deferred(
-                request_deferred,
-                time_out=60,
-            )
-
         logger.info("Sending request %s %s", method, uri)
 
         try:
-            with logcontext.PreserveLoggingContext():
-                response = yield send_request()
+            request_deferred = self.agent.request(
+                method, uri, *args, **kwargs
+            )
+            add_timeout_to_deferred(
+                request_deferred,
+                60, cancelled_to_request_timed_out_error,
+            )
+            response = yield make_deferred_yieldable(request_deferred)
 
             incoming_responses_counter.inc(method, response.code)
             logger.info(
@@ -497,7 +507,7 @@ class SpiderHttpClient(SimpleHttpClient):
                     reactor,
                     SpiderEndpointFactory(hs)
                 )
-            ), [('gzip', GzipDecoder)]
+            ), [(b'gzip', GzipDecoder)]
         )
         # We could look like Chrome:
         # self.user_agent = ("Mozilla/5.0 (%s) (KHTML, like Gecko)

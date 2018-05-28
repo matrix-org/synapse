@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -64,16 +65,30 @@ class RoomCreationHandler(BaseHandler):
         super(RoomCreationHandler, self).__init__(hs)
 
         self.spam_checker = hs.get_spam_checker()
+        self.event_creation_handler = hs.get_event_creation_handler()
 
     @defer.inlineCallbacks
-    def create_room(self, requester, config, ratelimit=True):
+    def create_room(self, requester, config, ratelimit=True,
+                    creator_join_profile=None):
         """ Creates a new room.
 
         Args:
-            requester (Requester): The user who requested the room creation.
+            requester (synapse.types.Requester):
+                The user who requested the room creation.
             config (dict) : A dict of configuration options.
+            ratelimit (bool): set to False to disable the rate limiter
+
+            creator_join_profile (dict|None):
+                Set to override the displayname and avatar for the creating
+                user in this room. If unset, displayname and avatar will be
+                derived from the user's profile. If set, should contain the
+                values to go in the body of the 'join' event (typically
+                `avatar_url` and/or `displayname`.
+
         Returns:
-            The new room ID.
+            Deferred[dict]:
+                a dict containing the keys `room_id` and, if an alias was
+                requested, `room_alias`.
         Raises:
             SynapseError if the room ID couldn't be stored, or something went
             horribly wrong.
@@ -110,6 +125,10 @@ class RoomCreationHandler(BaseHandler):
                 UserID.from_string(i)
             except Exception:
                 raise SynapseError(400, "Invalid user_id: %s" % (i,))
+
+        yield self.event_creation_handler.assert_accepted_privacy_policy(
+            requester,
+        )
 
         invite_3pid_list = config.get("invite_3pid", [])
 
@@ -163,25 +182,24 @@ class RoomCreationHandler(BaseHandler):
 
         creation_content = config.get("creation_content", {})
 
-        msg_handler = self.hs.get_handlers().message_handler
-        room_member_handler = self.hs.get_handlers().room_member_handler
+        room_member_handler = self.hs.get_room_member_handler()
 
         yield self._send_events_for_new_room(
             requester,
             room_id,
-            msg_handler,
             room_member_handler,
             preset_config=preset_config,
             invite_list=invite_list,
             initial_state=initial_state,
             creation_content=creation_content,
             room_alias=room_alias,
-            power_level_content_override=config.get("power_level_content_override", {})
+            power_level_content_override=config.get("power_level_content_override", {}),
+            creator_join_profile=creator_join_profile,
         )
 
         if "name" in config:
             name = config["name"]
-            yield msg_handler.create_and_send_nonmember_event(
+            yield self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
                 {
                     "type": EventTypes.Name,
@@ -194,7 +212,7 @@ class RoomCreationHandler(BaseHandler):
 
         if "topic" in config:
             topic = config["topic"]
-            yield msg_handler.create_and_send_nonmember_event(
+            yield self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
                 {
                     "type": EventTypes.Topic,
@@ -224,7 +242,7 @@ class RoomCreationHandler(BaseHandler):
             id_server = invite_3pid["id_server"]
             address = invite_3pid["address"]
             medium = invite_3pid["medium"]
-            yield self.hs.get_handlers().room_member_handler.do_3pid_invite(
+            yield self.hs.get_room_member_handler().do_3pid_invite(
                 room_id,
                 requester.user,
                 medium,
@@ -249,7 +267,6 @@ class RoomCreationHandler(BaseHandler):
             self,
             creator,  # A Requester object.
             room_id,
-            msg_handler,
             room_member_handler,
             preset_config,
             invite_list,
@@ -257,6 +274,7 @@ class RoomCreationHandler(BaseHandler):
             creation_content,
             room_alias,
             power_level_content_override,
+            creator_join_profile,
     ):
         def create(etype, content, **kwargs):
             e = {
@@ -272,7 +290,7 @@ class RoomCreationHandler(BaseHandler):
         @defer.inlineCallbacks
         def send(etype, content, **kwargs):
             event = create(etype, content, **kwargs)
-            yield msg_handler.create_and_send_nonmember_event(
+            yield self.event_creation_handler.create_and_send_nonmember_event(
                 creator,
                 event,
                 ratelimit=False
@@ -300,6 +318,7 @@ class RoomCreationHandler(BaseHandler):
             room_id,
             "join",
             ratelimit=False,
+            content=creator_join_profile,
         )
 
         # We treat the power levels override specially as this needs to be one
@@ -476,12 +495,9 @@ class RoomEventSource(object):
             user.to_string()
         )
         if app_service:
-            events, end_key = yield self.store.get_appservice_room_stream(
-                service=app_service,
-                from_key=from_key,
-                to_key=to_key,
-                limit=limit,
-            )
+            # We no longer support AS users using /sync directly.
+            # See https://github.com/matrix-org/matrix-doc/issues/1144
+            raise NotImplementedError()
         else:
             room_events = yield self.store.get_membership_changes_for_user(
                 user.to_string(), from_key, to_key

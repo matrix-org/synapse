@@ -81,7 +81,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                 "get_current_state_deltas",
             ]),
             state_handler=self.state_handler,
-            handlers=None,
+            handlers=Mock(),
             notifier=mock_notifier,
             resource_for_client=Mock(),
             resource_for_federation=self.mock_federation_resource,

@@ -17,12 +17,13 @@ import logging
 import functools
 import time
 import gc
+import platform
 
 from twisted.internet import reactor
 
 from .metric import (
     CounterMetric, CallbackMetric, DistributionMetric, CacheMetric,
-    MemoryUsageMetric,
+    MemoryUsageMetric, GaugeMetric,
 )
 from .process_collector import register_process_collector
 
@@ -30,6 +31,7 @@ from .process_collector import register_process_collector
 logger = logging.getLogger(__name__)
 
 
+running_on_pypy = platform.python_implementation() == 'PyPy'
 all_metrics = []
 all_collectors = []
 
@@ -57,15 +59,38 @@ class Metrics(object):
         return metric
 
     def register_counter(self, *args, **kwargs):
+        """
+        Returns:
+            CounterMetric
+        """
         return self._register(CounterMetric, *args, **kwargs)
 
+    def register_gauge(self, *args, **kwargs):
+        """
+        Returns:
+            GaugeMetric
+        """
+        return self._register(GaugeMetric, *args, **kwargs)
+
     def register_callback(self, *args, **kwargs):
+        """
+        Returns:
+            CallbackMetric
+        """
         return self._register(CallbackMetric, *args, **kwargs)
 
     def register_distribution(self, *args, **kwargs):
+        """
+        Returns:
+            DistributionMetric
+        """
         return self._register(DistributionMetric, *args, **kwargs)
 
     def register_cache(self, *args, **kwargs):
+        """
+        Returns:
+            CacheMetric
+        """
         return self._register(CacheMetric, *args, **kwargs)
 
 
@@ -126,6 +151,32 @@ reactor_metrics = get_metrics_for("python.twisted.reactor")
 tick_time = reactor_metrics.register_distribution("tick_time")
 pending_calls_metric = reactor_metrics.register_distribution("pending_calls")
 
+synapse_metrics = get_metrics_for("synapse")
+
+# Used to track where various components have processed in the event stream,
+# e.g. federation sending, appservice sending, etc.
+event_processing_positions = synapse_metrics.register_gauge(
+    "event_processing_positions", labels=["name"],
+)
+
+# Used to track the current max events stream position
+event_persisted_position = synapse_metrics.register_gauge(
+    "event_persisted_position",
+)
+
+# Used to track the received_ts of the last event processed by various
+# components
+event_processing_last_ts = synapse_metrics.register_gauge(
+    "event_processing_last_ts", labels=["name"],
+)
+
+# Used to track the lag processing events. This is the time difference
+# between the last processed event's received_ts and the time it was
+# finished being processed.
+event_processing_lag = synapse_metrics.register_gauge(
+    "event_processing_lag", labels=["name"],
+)
+
 
 def runUntilCurrentTimer(func):
 
@@ -146,12 +197,20 @@ def runUntilCurrentTimer(func):
             num_pending += 1
 
         num_pending += len(reactor.threadCallQueue)
-
         start = time.time() * 1000
         ret = func(*args, **kwargs)
         end = time.time() * 1000
+
+        # record the amount of wallclock time spent running pending calls.
+        # This is a proxy for the actual amount of time between reactor polls,
+        # since about 25% of time is actually spent running things triggered by
+        # I/O events, but that is harder to capture without rewriting half the
+        # reactor.
         tick_time.inc_by(end - start)
         pending_calls_metric.inc_by(num_pending)
+
+        if running_on_pypy:
+            return ret
 
         # Check if we need to do a manual GC (since its been disabled), and do
         # one if necessary.
@@ -185,6 +244,7 @@ try:
 
     # We manually run the GC each reactor tick so that we can get some metrics
     # about time spent doing GC,
-    gc.disable()
+    if not running_on_pypy:
+        gc.disable()
 except AttributeError:
     pass

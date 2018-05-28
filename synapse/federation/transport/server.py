@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +17,7 @@
 from twisted.internet import defer
 
 from synapse.api.urls import FEDERATION_PREFIX as PREFIX
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, SynapseError, FederationDeniedError
 from synapse.http.server import JsonResource
 from synapse.http.servlet import (
     parse_json_object_from_request, parse_integer_from_args, parse_string_from_args,
@@ -24,7 +25,7 @@ from synapse.http.servlet import (
 )
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.versionstring import get_version_string
-from synapse.util.logcontext import preserve_fn
+from synapse.util.logcontext import run_in_background
 from synapse.types import ThirdPartyInstanceID, get_domain_from_id
 
 import functools
@@ -81,6 +82,7 @@ class Authenticator(object):
         self.keyring = hs.get_keyring()
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
+        self.federation_domain_whitelist = hs.config.federation_domain_whitelist
 
     # A method just so we can pass 'self' as the authenticator to the Servlets
     @defer.inlineCallbacks
@@ -130,6 +132,12 @@ class Authenticator(object):
                 json_request["origin"] = origin
                 json_request["signatures"].setdefault(origin, {})[key] = sig
 
+        if (
+            self.federation_domain_whitelist is not None and
+            origin not in self.federation_domain_whitelist
+        ):
+            raise FederationDeniedError(origin)
+
         if not json_request["signatures"]:
             raise NoAuthenticationError(
                 401, "Missing Authorization headers", Codes.UNAUTHORIZED,
@@ -144,10 +152,17 @@ class Authenticator(object):
         # alive
         retry_timings = yield self.store.get_destination_retry_timings(origin)
         if retry_timings and retry_timings["retry_last_ts"]:
-            logger.info("Marking origin %r as up", origin)
-            preserve_fn(self.store.set_destination_retry_timings)(origin, 0, 0)
+            run_in_background(self._reset_retry_timings, origin)
 
         defer.returnValue(origin)
+
+    @defer.inlineCallbacks
+    def _reset_retry_timings(self, origin):
+        try:
+            logger.info("Marking origin %r as up", origin)
+            yield self.store.set_destination_retry_timings(origin, 0, 0)
+        except Exception:
+            logger.exception("Error resetting retry timings on %s", origin)
 
 
 class BaseFederationServlet(object):
@@ -795,6 +810,23 @@ class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
         defer.returnValue((200, new_content))
 
 
+class FederationGroupsJoinServlet(BaseFederationServlet):
+    """Attempt to join a group
+    """
+    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/join$"
+
+    @defer.inlineCallbacks
+    def on_POST(self, origin, content, query, group_id, user_id):
+        if get_domain_from_id(user_id) != origin:
+            raise SynapseError(403, "user_id doesn't match origin")
+
+        new_content = yield self.handler.join_group(
+            group_id, user_id, content,
+        )
+
+        defer.returnValue((200, new_content))
+
+
 class FederationGroupsRemoveUserServlet(BaseFederationServlet):
     """Leave or kick a user from the group
     """
@@ -1117,6 +1149,24 @@ class FederationGroupsBulkPublicisedServlet(BaseFederationServlet):
         defer.returnValue((200, resp))
 
 
+class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
+    """Sets whether a group is joinable without an invite or knock
+    """
+    PATH = "/groups/(?P<group_id>[^/]*)/settings/m.join_policy$"
+
+    @defer.inlineCallbacks
+    def on_PUT(self, origin, content, query, group_id):
+        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        if get_domain_from_id(requester_user_id) != origin:
+            raise SynapseError(403, "requester_user_id doesn't match origin")
+
+        new_content = yield self.handler.set_group_join_policy(
+            group_id, requester_user_id, content
+        )
+
+        defer.returnValue((200, new_content))
+
+
 FEDERATION_SERVLET_CLASSES = (
     FederationSendServlet,
     FederationPullServlet,
@@ -1156,6 +1206,7 @@ GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsInvitedUsersServlet,
     FederationGroupsInviteServlet,
     FederationGroupsAcceptInviteServlet,
+    FederationGroupsJoinServlet,
     FederationGroupsRemoveUserServlet,
     FederationGroupsSummaryRoomsServlet,
     FederationGroupsCategoriesServlet,
@@ -1165,6 +1216,7 @@ GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsSummaryUsersServlet,
     FederationGroupsAddRoomsServlet,
     FederationGroupsAddRoomsConfigServlet,
+    FederationGroupsSettingJoinPolicyServlet,
 )
 
 
@@ -1183,7 +1235,7 @@ GROUP_ATTESTATION_SERVLET_CLASSES = (
 def register_servlets(hs, resource, authenticator, ratelimiter):
     for servletclass in FEDERATION_SERVLET_CLASSES:
         servletclass(
-            handler=hs.get_replication_layer(),
+            handler=hs.get_federation_server(),
             authenticator=authenticator,
             ratelimiter=ratelimiter,
             server_name=hs.hostname,

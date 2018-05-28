@@ -157,8 +157,9 @@ if you prefer.
 
 In case of problems, please see the _`Troubleshooting` section below.
 
-Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
-above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
+There is an offical synapse image available at https://hub.docker.com/r/matrixdotorg/synapse/tags/ which can be used with the docker-compose file available at `contrib/docker`. Further information on this including configuration options is available in `contrib/docker/README.md`.
+
+Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a Dockerfile to automate a synapse server in a single Docker image, at https://hub.docker.com/r/avhost/docker-matrix/tags/
 
 Also, Martin Giess has created an auto-deployment process with vagrant/ansible,
 tested with VirtualBox/AWS/DigitalOcean - see https://github.com/EMnify/matrix-synapse-auto-deploy
@@ -353,6 +354,10 @@ https://matrix.org/docs/projects/try-matrix-now.html (or build your own with one
 
 Fedora
 ------
+
+Synapse is in the Fedora repositories as ``matrix-synapse``::
+
+    sudo dnf install matrix-synapse
 
 Oleg Girko provides Fedora RPMs at
 https://obs.infoserver.lv/project/monitor/matrix-synapse
@@ -609,6 +614,9 @@ should have the format ``_matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port>
 
     $ dig -t srv _matrix._tcp.example.com
     _matrix._tcp.example.com. 3600    IN      SRV     10 0 8448 synapse.example.com.
+
+Note that the server hostname cannot be an alias (CNAME record): it has to point
+directly to the server hosting the synapse instance.
 
 You can then configure your homeserver to use ``<yourdomain.com>`` as the domain in
 its user-ids, by setting ``server_name``::
@@ -890,6 +898,17 @@ This should end with a 'PASSED' result::
 
     PASSED (successes=143)
 
+Running the Integration Tests
+=============================
+
+Synapse is accompanied by `SyTest <https://github.com/matrix-org/sytest>`_,
+a Matrix homeserver integration testing suite, which uses HTTP requests to
+access the API as a Matrix client would. It is able to run Synapse directly from
+the source tree, so installation of the server is not required.
+
+Testing with SyTest is recommended for verifying that changes related to the
+Client-Server API are functioning correctly. See the `installation instructions
+<https://github.com/matrix-org/sytest#installing>`_ for details.
 
 Building Internal API Documentation
 ===================================

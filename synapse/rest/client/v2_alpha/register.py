@@ -20,12 +20,12 @@ import synapse
 import synapse.types
 from synapse.api.auth import get_access_token_from_request, has_access_token
 from synapse.api.constants import LoginType
-from synapse.types import RoomID, RoomAlias
 from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
 from synapse.http.servlet import (
     RestServlet, parse_json_object_from_request, assert_params_in_request, parse_string
 )
 from synapse.util.msisdn import phone_number_to_msisdn
+from synapse.util.threepids import check_3pid_allowed
 
 from ._base import client_v2_patterns, interactive_auth_handler
 
@@ -34,6 +34,8 @@ import hmac
 from hashlib import sha1
 from synapse.util.async import run_on_reactor
 from synapse.util.ratelimitutils import FederationRateLimiter
+
+from six import string_types
 
 
 # We ought to be using hmac.compare_digest() but on older pythons it doesn't
@@ -70,6 +72,11 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             'id_server', 'client_secret', 'email', 'send_attempt'
         ])
 
+        if not check_3pid_allowed(self.hs, "email", body['email']):
+            raise SynapseError(
+                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+            )
+
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'email', body['email']
         )
@@ -104,6 +111,11 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         ])
 
         msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
+
+        if not check_3pid_allowed(self.hs, "msisdn", msisdn):
+            raise SynapseError(
+                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+            )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'msisdn', msisdn
@@ -172,7 +184,7 @@ class RegisterRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_handlers().registration_handler
         self.identity_handler = hs.get_handlers().identity_handler
-        self.room_member_handler = hs.get_handlers().room_member_handler
+        self.room_member_handler = hs.get_room_member_handler()
         self.device_handler = hs.get_device_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
 
@@ -200,14 +212,14 @@ class RegisterRestServlet(RestServlet):
         # in sessions. Pull out the username/password provided to us.
         desired_password = None
         if 'password' in body:
-            if (not isinstance(body['password'], basestring) or
+            if (not isinstance(body['password'], string_types) or
                     len(body['password']) > 512):
                 raise SynapseError(400, "Invalid password")
             desired_password = body["password"]
 
         desired_username = None
         if 'username' in body:
-            if (not isinstance(body['username'], basestring) or
+            if (not isinstance(body['username'], string_types) or
                     len(body['username']) > 512):
                 raise SynapseError(400, "Invalid username")
             desired_username = body['username']
@@ -233,7 +245,7 @@ class RegisterRestServlet(RestServlet):
 
             access_token = get_access_token_from_request(request)
 
-            if isinstance(desired_username, basestring):
+            if isinstance(desired_username, string_types):
                 result = yield self._do_appservice_registration(
                     desired_username, access_token, body
                 )
@@ -305,30 +317,66 @@ class RegisterRestServlet(RestServlet):
         if 'x_show_msisdn' in body and body['x_show_msisdn']:
             show_msisdn = True
 
+        # FIXME: need a better error than "no auth flow found" for scenarios
+        # where we required 3PID for registration but the user didn't give one
+        require_email = 'email' in self.hs.config.registrations_require_3pid
+        require_msisdn = 'msisdn' in self.hs.config.registrations_require_3pid
+
+        flows = []
         if self.hs.config.enable_registration_captcha:
-            flows = [
-                [LoginType.RECAPTCHA],
-                [LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
-            ]
+            # only support 3PIDless registration if no 3PIDs are required
+            if not require_email and not require_msisdn:
+                flows.extend([[LoginType.RECAPTCHA]])
+            # only support the email-only flow if we don't require MSISDN 3PIDs
+            if not require_msisdn:
+                flows.extend([[LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA]])
+
             if show_msisdn:
+                # only support the MSISDN-only flow if we don't require email 3PIDs
+                if not require_email:
+                    flows.extend([[LoginType.MSISDN, LoginType.RECAPTCHA]])
+                # always let users provide both MSISDN & email
                 flows.extend([
-                    [LoginType.MSISDN, LoginType.RECAPTCHA],
                     [LoginType.MSISDN, LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
                 ])
         else:
-            flows = [
-                [LoginType.DUMMY],
-                [LoginType.EMAIL_IDENTITY],
-            ]
+            # only support 3PIDless registration if no 3PIDs are required
+            if not require_email and not require_msisdn:
+                flows.extend([[LoginType.DUMMY]])
+            # only support the email-only flow if we don't require MSISDN 3PIDs
+            if not require_msisdn:
+                flows.extend([[LoginType.EMAIL_IDENTITY]])
+
             if show_msisdn:
+                # only support the MSISDN-only flow if we don't require email 3PIDs
+                if not require_email or require_msisdn:
+                    flows.extend([[LoginType.MSISDN]])
+                # always let users provide both MSISDN & email
                 flows.extend([
-                    [LoginType.MSISDN],
-                    [LoginType.MSISDN, LoginType.EMAIL_IDENTITY],
+                    [LoginType.MSISDN, LoginType.EMAIL_IDENTITY]
                 ])
 
         auth_result, params, session_id = yield self.auth_handler.check_auth(
             flows, body, self.hs.get_ip_from_request(request)
         )
+
+        # Check that we're not trying to register a denied 3pid.
+        #
+        # the user-facing checks will probably already have happened in
+        # /register/email/requestToken when we requested a 3pid, but that's not
+        # guaranteed.
+
+        if auth_result:
+            for login_type in [LoginType.EMAIL_IDENTITY, LoginType.MSISDN]:
+                if login_type in auth_result:
+                    medium = auth_result[login_type]['medium']
+                    address = auth_result[login_type]['address']
+
+                    if not check_3pid_allowed(self.hs, medium, address):
+                        raise SynapseError(
+                            403, "Third party identifier is not allowed",
+                            Codes.THREEPID_DENIED,
+                        )
 
         if registered_user_id is not None:
             logger.info(
@@ -357,14 +405,6 @@ class RegisterRestServlet(RestServlet):
                 guest_access_token=guest_access_token,
                 generate_token=False,
             )
-
-            # auto-join the user to any rooms we're supposed to dump them into
-            fake_requester = synapse.types.create_requester(registered_user_id)
-            for r in self.hs.config.auto_join_rooms:
-                try:
-                    yield self._join_user_to_room(fake_requester, r)
-                except Exception as e:
-                    logger.error("Failed to join new user to %r: %r", r, e)
 
             # remember that we've now registered that user account, and with
             #  what user ID (since the user may not have specified)
@@ -399,29 +439,6 @@ class RegisterRestServlet(RestServlet):
         return 200, {}
 
     @defer.inlineCallbacks
-    def _join_user_to_room(self, requester, room_identifier):
-        room_id = None
-        if RoomID.is_valid(room_identifier):
-            room_id = room_identifier
-        elif RoomAlias.is_valid(room_identifier):
-            room_alias = RoomAlias.from_string(room_identifier)
-            room_id, remote_room_hosts = (
-                yield self.room_member_handler.lookup_room_alias(room_alias)
-            )
-            room_id = room_id.to_string()
-        else:
-            raise SynapseError(400, "%s was not legal room ID or room alias" % (
-                room_identifier,
-            ))
-
-        yield self.room_member_handler.update_membership(
-            requester=requester,
-            target=requester.user,
-            room_id=room_id,
-            action="join",
-        )
-
-    @defer.inlineCallbacks
     def _do_appservice_registration(self, username, as_token, body):
         user_id = yield self.registration_handler.appservice_register(
             username, as_token
@@ -449,7 +466,7 @@ class RegisterRestServlet(RestServlet):
         # includes the password and admin flag in the hashed text. Why are
         # these different?
         want_mac = hmac.new(
-            key=self.hs.config.registration_shared_secret,
+            key=self.hs.config.registration_shared_secret.encode(),
             msg=user,
             digestmod=sha1,
         ).hexdigest()

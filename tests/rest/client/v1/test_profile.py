@@ -45,14 +45,14 @@ class ProfileTestCase(unittest.TestCase):
             http_client=None,
             resource_for_client=self.mock_resource,
             federation=Mock(),
-            replication_layer=Mock(),
+            federation_client=Mock(),
             profile_handler=self.mock_handler
         )
 
         def _get_user_by_req(request=None, allow_guest=False):
             return synapse.types.create_requester(myid)
 
-        hs.get_v1auth().get_user_by_req = _get_user_by_req
+        hs.get_auth().get_user_by_req = _get_user_by_req
 
         profile.register_servlets(hs, self.mock_resource)
 
