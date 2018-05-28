@@ -183,7 +183,6 @@ class Auth(object):
         # Can optionally look elsewhere in the request (e.g. headers)
         try:
             user_id, app_service = yield self._get_appservice_user_id(request)
-
             if user_id:
                 request.authenticated_entity = user_id
                 defer.returnValue(
@@ -255,7 +254,6 @@ class Auth(object):
                 403,
                 "Application service cannot masquerade as this user."
             )
-
         if not (yield self.store.get_user_by_id(user_id)):
             raise AuthError(
                 403,
