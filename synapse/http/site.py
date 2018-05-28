@@ -83,7 +83,7 @@ class SynapseRequest(Request):
         return Request.render(self, resrc)
 
     def _started_processing(self, servlet_name):
-        self.start_time = int(time.time() * 1000)
+        self.start_time = time.time()
         self.request_metrics = RequestMetrics()
         self.request_metrics.start(
             self.start_time, name=servlet_name, method=self.method,
@@ -102,26 +102,26 @@ class SynapseRequest(Request):
             context = LoggingContext.current_context()
             ru_utime, ru_stime = context.get_resource_usage()
             db_txn_count = context.db_txn_count
-            db_txn_duration_ms = context.db_txn_duration_ms
-            db_sched_duration_ms = context.db_sched_duration_ms
+            db_txn_duration_sec = context.db_txn_duration_sec
+            db_sched_duration_sec = context.db_sched_duration_sec
         except Exception:
             ru_utime, ru_stime = (0, 0)
-            db_txn_count, db_txn_duration_ms = (0, 0)
+            db_txn_count, db_txn_duration_sec = (0, 0)
 
-        end_time = int(time.time() * 1000)
+        end_time = time.time()
 
         self.site.access_logger.info(
             "%s - %s - {%s}"
-            " Processed request: %dms (%dms, %dms) (%dms/%dms/%d)"
+            " Processed request: %.3fsec (%.3fsec, %.3fsec) (%.3fsec/%.3fsec/%d)"
             " %sB %s \"%s %s %s\" \"%s\"",
             self.getClientIP(),
             self.site.site_tag,
             self.authenticated_entity,
             end_time - self.start_time,
-            int(ru_utime * 1000),
-            int(ru_stime * 1000),
-            db_sched_duration_ms,
-            db_txn_duration_ms,
+            ru_utime,
+            ru_stime,
+            db_sched_duration_sec,
+            db_txn_duration_sec,
             int(db_txn_count),
             self.sentLength,
             self.code,

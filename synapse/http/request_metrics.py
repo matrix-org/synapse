@@ -38,15 +38,15 @@ outgoing_responses_counter = Counter(
 )
 
 response_timer = Histogram(
-    "synapse_http_server_response_time_seconds", "", ["method", "servlet", "tag"]
+    "synapse_http_server_response_time_seconds", "sec", ["method", "servlet", "tag"]
 )
 
 response_ru_utime = Counter(
-    "synapse_http_server_response_ru_utime_seconds", "", ["method", "servlet", "tag"]
+    "synapse_http_server_response_ru_utime_seconds", "sec", ["method", "servlet", "tag"]
 )
 
 response_ru_stime = Counter(
-    "synapse_http_server_response_ru_stime_seconds", "", ["method", "servlet", "tag"]
+    "synapse_http_server_response_ru_stime_seconds", "sec", ["method", "servlet", "tag"]
 )
 
 response_db_txn_count = Counter(

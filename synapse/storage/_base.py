@@ -42,10 +42,10 @@ sql_logger = logging.getLogger("synapse.storage.SQL")
 transaction_logger = logging.getLogger("synapse.storage.txn")
 perf_logger = logging.getLogger("synapse.storage.TIME")
 
-sql_scheduling_timer = Histogram("synapse_storage_schedule_time", "")
+sql_scheduling_timer = Histogram("synapse_storage_schedule_time", "sec")
 
-sql_query_timer = Histogram("synapse_storage_query_time", "", ["verb"])
-sql_txn_timer = Histogram("synapse_storage_transaction_time", "", ["desc"])
+sql_query_timer = Histogram("synapse_storage_query_time", "sec", ["verb"])
+sql_txn_timer = Histogram("synapse_storage_transaction_time", "sec", ["desc"])
 
 
 class LoggingTransaction(object):
@@ -110,7 +110,7 @@ class LoggingTransaction(object):
                 # Don't let logging failures stop SQL from working
                 pass
 
-        start = time.time() * 1000
+        start = time.time()
 
         try:
             return func(
@@ -120,9 +120,9 @@ class LoggingTransaction(object):
             logger.debug("[SQL FAIL] {%s} %s", self.name, e)
             raise
         finally:
-            msecs = (time.time() * 1000) - start
-            sql_logger.debug("[SQL time] {%s} %f", self.name, msecs)
-            sql_query_timer.labels(sql.split()[0]).observe(msecs)
+            secs = time.time() - start
+            sql_logger.debug("[SQL time] {%s} %f sec", self.name, secs)
+            sql_query_timer.labels(sql.split()[0]).observe(secs)
 
 
 class PerformanceCounters(object):
@@ -132,7 +132,7 @@ class PerformanceCounters(object):
 
     def update(self, key, start_time, end_time=None):
         if end_time is None:
-            end_time = time.time() * 1000
+            end_time = time.time()
         duration = end_time - start_time
         count, cum_time = self.current_counters.get(key, (0, 0))
         count += 1
@@ -222,7 +222,7 @@ class SQLBaseStore(object):
 
     def _new_transaction(self, conn, desc, after_callbacks, exception_callbacks,
                          logging_context, func, *args, **kwargs):
-        start = time.time() * 1000
+        start = time.time()
         txn_id = self._TXN_ID
 
         # We don't really need these to be unique, so lets stop it from
@@ -282,13 +282,13 @@ class SQLBaseStore(object):
             logger.debug("[TXN FAIL] {%s} %s", name, e)
             raise
         finally:
-            end = time.time() * 1000
+            end = time.time()
             duration = end - start
 
             if logging_context is not None:
                 logging_context.add_database_transaction(duration)
 
-            transaction_logger.debug("[TXN END] {%s} %f", name, duration)
+            transaction_logger.debug("[TXN END] {%s} %f sec", name, duration)
 
             self._current_txn_total_time += duration
             self._txn_perf_counters.update(desc, start, end)
@@ -349,13 +349,13 @@ class SQLBaseStore(object):
         """
         current_context = LoggingContext.current_context()
 
-        start_time = time.time() * 1000
+        start_time = time.time()
 
         def inner_func(conn, *args, **kwargs):
             with LoggingContext("runWithConnection") as context:
-                sched_duration_ms = time.time() * 1000 - start_time
-                sql_scheduling_timer.observe(sched_duration_ms)
-                current_context.add_database_scheduled(sched_duration_ms)
+                sched_duration_sec = time.time() - start_time
+                sql_scheduling_timer.observe(sched_duration_sec)
+                current_context.add_database_scheduled(sched_duration_sec)
 
                 if self.database_engine.is_connection_closed(conn):
                     logger.debug("Reconnecting closed database connection")
