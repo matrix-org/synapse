@@ -34,7 +34,6 @@ How to monitor Synapse metrics using Prometheus
        - type: metrics
          port: 9000
          bind_addresses:
-           - '::'
            - '0.0.0.0'
 
    For both options, you will need to ensure that ``enable_metrics`` is set to
