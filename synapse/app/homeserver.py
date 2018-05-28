@@ -35,7 +35,7 @@ from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import RootRedirect
 from synapse.http.site import SynapseSite
 from synapse.metrics import RegistryProxy
-from synapse.metrics.resource import METRICS_PREFIX
+from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
 from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, \
     check_requirements
 from synapse.replication.http import ReplicationRestResource, REPLICATION_PREFIX
@@ -60,8 +60,6 @@ from twisted.internet import defer, reactor
 from twisted.web.resource import EncodingResourceWrapper, NoResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
-
-from prometheus_client.twisted import MetricsResource
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -270,12 +268,7 @@ class SynapseHomeServer(HomeServer):
                     logger.warn(
                         "Metrics listener configured, but collect_metrics is not enabled!")
                 else:
-                    from prometheus_client import start_http_server
-                    for host in listener["bind_addresses"]:
-                        reactor.callInThread(start_http_server, int(listener["port"]),
-                                             addr=host, registry=RegistryProxy)
-                        logger.info("Metrics now reporting on %s:%d",
-                                    host, listener["port"])
+                    _base.listen_metrics(listener["bind_addresses"], listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
