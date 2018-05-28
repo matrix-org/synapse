@@ -148,8 +148,7 @@ REGISTRY.register(GCCounts())
 tick_time = Histogram(
     "python_twisted_reactor_tick_time",
     "Tick time of the Twisted reactor (sec)",
-    buckets=[0.001, 0.002, 0.005, 0.001, 0.005, 0.01. 0.025, 0.05, 0.1, 0.2,
-             0.5, 1, 2, 5],
+    buckets=[0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.5, 1, 2, 5],
 )
 pending_calls_metric = Histogram(
     "python_twisted_reactor_pending_calls",
