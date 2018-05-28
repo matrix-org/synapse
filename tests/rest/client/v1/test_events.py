@@ -123,6 +123,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
         self.ratelimiter.send_message.return_value = (True, 0)
         hs.config.enable_registration_captcha = False
         hs.config.enable_registration = True
+        hs.config.auto_join_rooms = []
 
         hs.get_handlers().federation_handler = Mock()
 
@@ -147,11 +148,16 @@ class EventStreamPermissionsTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_stream_basic_permissions(self):
-        # invalid token, expect 403
+        # invalid token, expect 401
+        # note: this is in violation of the original v1 spec, which expected
+        # 403. However, since the v1 spec no longer exists and the v1
+        # implementation is now part of the r0 implementation, the newer
+        # behaviour is used instead to be consistent with the r0 spec.
+        # see issue #2602
         (code, response) = yield self.mock_resource.trigger_get(
             "/events?access_token=%s" % ("invalid" + self.token, )
         )
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(401, code, msg=str(response))
 
         # valid token, expect content
         (code, response) = yield self.mock_resource.trigger_get(

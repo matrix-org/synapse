@@ -22,6 +22,8 @@ from synapse.storage import background_updates
 from synapse.storage._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
+from six.moves import range
+
 
 class RegistrationWorkerStore(SQLBaseStore):
     @cached()
@@ -31,7 +33,10 @@ class RegistrationWorkerStore(SQLBaseStore):
             keyvalues={
                 "name": user_id,
             },
-            retcols=["name", "password_hash", "is_guest"],
+            retcols=[
+                "name", "password_hash", "is_guest",
+                "consent_version", "consent_server_notice_sent",
+            ],
             allow_none=True,
             desc="get_user_by_id",
         )
@@ -284,6 +289,53 @@ class RegistrationStore(RegistrationWorkerStore,
             "user_set_password_hash", user_set_password_hash_txn
         )
 
+    def user_set_consent_version(self, user_id, consent_version):
+        """Updates the user table to record privacy policy consent
+
+        Args:
+            user_id (str): full mxid of the user to update
+            consent_version (str): version of the policy the user has consented
+                to
+
+        Raises:
+            StoreError(404) if user not found
+        """
+        def f(txn):
+            self._simple_update_one_txn(
+                txn,
+                table='users',
+                keyvalues={'name': user_id, },
+                updatevalues={'consent_version': consent_version, },
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_user_by_id, (user_id,)
+            )
+        return self.runInteraction("user_set_consent_version", f)
+
+    def user_set_consent_server_notice_sent(self, user_id, consent_version):
+        """Updates the user table to record that we have sent the user a server
+        notice about privacy policy consent
+
+        Args:
+            user_id (str): full mxid of the user to update
+            consent_version (str): version of the policy we have notified the
+                user about
+
+        Raises:
+            StoreError(404) if user not found
+        """
+        def f(txn):
+            self._simple_update_one_txn(
+                txn,
+                table='users',
+                keyvalues={'name': user_id, },
+                updatevalues={'consent_server_notice_sent': consent_version, },
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_user_by_id, (user_id,)
+            )
+        return self.runInteraction("user_set_consent_server_notice_sent", f)
+
     def user_delete_access_tokens(self, user_id, except_token_id=None,
                                   device_id=None):
         """
@@ -460,18 +512,16 @@ class RegistrationStore(RegistrationWorkerStore,
         """
         def _find_next_generated_user_id(txn):
             txn.execute("SELECT name FROM users")
-            rows = self.cursor_to_dict(txn)
 
             regex = re.compile("^@(\d+):")
 
             found = set()
 
-            for r in rows:
-                user_id = r["name"]
+            for user_id, in txn:
                 match = regex.search(user_id)
                 if match:
                     found.add(int(match.group(1)))
-            for i in xrange(len(found) + 1):
+            for i in range(len(found) + 1):
                 if i not in found:
                     return i
 
@@ -526,3 +576,42 @@ class RegistrationStore(RegistrationWorkerStore,
         except self.database_engine.module.IntegrityError:
             ret = yield self.get_3pid_guest_access_token(medium, address)
             defer.returnValue(ret)
+
+    def add_user_pending_deactivation(self, user_id):
+        """
+        Adds a user to the table of users who need to be parted from all the rooms they're
+        in
+        """
+        return self._simple_insert(
+            "users_pending_deactivation",
+            values={
+                "user_id": user_id,
+            },
+            desc="add_user_pending_deactivation",
+        )
+
+    def del_user_pending_deactivation(self, user_id):
+        """
+        Removes the given user to the table of users who need to be parted from all the
+        rooms they're in, effectively marking that user as fully deactivated.
+        """
+        return self._simple_delete_one(
+            "users_pending_deactivation",
+            keyvalues={
+                "user_id": user_id,
+            },
+            desc="del_user_pending_deactivation",
+        )
+
+    def get_user_pending_deactivation(self):
+        """
+        Gets one user from the table of users waiting to be parted from all the rooms
+        they're in.
+        """
+        return self._simple_select_one_onecol(
+            "users_pending_deactivation",
+            keyvalues={},
+            retcol="user_id",
+            allow_none=True,
+            desc="get_users_pending_deactivation",
+        )

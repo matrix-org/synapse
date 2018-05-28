@@ -12,16 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import synapse.http.servlet
-
-from ._base import parse_media_id, respond_404
-from twisted.web.resource import Resource
-from synapse.http.server import request_handler, set_cors_headers
-
-from twisted.web.server import NOT_DONE_YET
-from twisted.internet import defer
-
 import logging
+
+from twisted.internet import defer
+from twisted.web.resource import Resource
+from twisted.web.server import NOT_DONE_YET
+
+from synapse.http.server import (
+    set_cors_headers,
+    wrap_json_request_handler,
+)
+import synapse.http.servlet
+from ._base import parse_media_id, respond_404
 
 logger = logging.getLogger(__name__)
 
@@ -35,15 +37,14 @@ class DownloadResource(Resource):
         self.media_repo = media_repo
         self.server_name = hs.hostname
 
-        # Both of these are expected by @request_handler()
+        # this is expected by @wrap_json_request_handler
         self.clock = hs.get_clock()
-        self.version_string = hs.version_string
 
     def render_GET(self, request):
         self._async_render_GET(request)
         return NOT_DONE_YET
 
-    @request_handler()
+    @wrap_json_request_handler
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
         set_cors_headers(request)

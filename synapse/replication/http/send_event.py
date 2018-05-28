@@ -23,7 +23,6 @@ from synapse.events.snapshot import EventContext
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.util.async import sleep
 from synapse.util.caches.response_cache import ResponseCache
-from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
 from synapse.util.metrics import Measure
 from synapse.types import Requester, UserID
 
@@ -115,20 +114,15 @@ class ReplicationSendEventRestServlet(RestServlet):
         self.clock = hs.get_clock()
 
         # The responses are tiny, so we may as well cache them for a while
-        self.response_cache = ResponseCache(hs, timeout_ms=30 * 60 * 1000)
+        self.response_cache = ResponseCache(hs, "send_event", timeout_ms=30 * 60 * 1000)
 
     def on_PUT(self, request, event_id):
-        result = self.response_cache.get(event_id)
-        if not result:
-            result = self.response_cache.set(
-                event_id,
-                self._handle_request(request)
-            )
-        else:
-            logger.warn("Returning cached response")
-        return make_deferred_yieldable(result)
+        return self.response_cache.wrap(
+            event_id,
+            self._handle_request,
+            request
+        )
 
-    @preserve_fn
     @defer.inlineCallbacks
     def _handle_request(self, request):
         with Measure(self.clock, "repl_send_event_parse"):

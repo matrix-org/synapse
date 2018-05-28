@@ -203,8 +203,8 @@ class RetryDestinationLimiter(object):
                 )
             except Exception:
                 logger.exception(
-                    "Failed to store set_destination_retry_timings",
+                    "Failed to store destination_retry_timings",
                 )
 
         # we deliberately do this in the background.
-        synapse.util.logcontext.preserve_fn(store_retry_timings)()
+        synapse.util.logcontext.run_in_background(store_retry_timings)

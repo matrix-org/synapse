@@ -17,9 +17,11 @@ from twisted.internet import defer
 from synapse.util.caches.descriptors import cached
 
 from canonicaljson import encode_canonical_json
-import ujson as json
+import simplejson as json
 
 from ._base import SQLBaseStore
+
+from six import iteritems
 
 
 class EndToEndKeyStore(SQLBaseStore):
@@ -81,8 +83,8 @@ class EndToEndKeyStore(SQLBaseStore):
             query_list, include_all_devices,
         )
 
-        for user_id, device_keys in results.iteritems():
-            for device_id, device_info in device_keys.iteritems():
+        for user_id, device_keys in iteritems(results):
+            for device_id, device_info in iteritems(device_keys):
                 device_info["keys"] = json.loads(device_info.pop("key_json"))
 
         defer.returnValue(results)

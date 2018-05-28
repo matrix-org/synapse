@@ -1,11 +1,375 @@
-Unreleased
-==========
+Changes in synapse v0.30.0 (2018-05-24)
+==========================================
 
-synctl no longer starts the main synapse when using ``-a`` option with workers.
-A new worker file should be added with ``worker_app: synapse.app.homeserver``.
+'Server Notices' are a new feature introduced in Synapse 0.30. They provide a
+channel whereby server administrators can send messages to users on the server.
+
+They are used as part of communication of the server policies (see ``docs/consent_tracking.md``),
+however the intention is that they may also find a use for features such
+as "Message of the day".
+
+This feature is specific to Synapse, but uses standard Matrix communication mechanisms,
+so should work with any Matrix client. For more details see ``docs/server_notices.md``
+
+Further Server Notices/Consent Tracking Support:
+
+* Allow overriding the server_notices user's avatar (PR #3273)
+* Use the localpart in the consent uri (PR #3272)
+* Support for putting %(consent_uri)s in messages (PR #3271)
+* Block attempts to send server notices to remote users (PR #3270)
+* Docs on consent bits (PR #3268)
+
+
+
+Changes in synapse v0.30.0-rc1 (2018-05-23)
+==========================================
+
+Server Notices/Consent Tracking Support:
+
+* ConsentResource to gather policy consent from users (PR #3213)
+* Move RoomCreationHandler out of synapse.handlers.Handlers (PR #3225)
+* Infrastructure for a server notices room (PR #3232)
+* Send users a server notice about consent (PR #3236)
+* Reject attempts to send event before privacy consent is given (PR #3257)
+* Add a 'has_consented' template var to consent forms (PR #3262)
+* Fix dependency on jinja2 (PR #3263)
+
+Features:
+
+* Cohort analytics (PR #3163, #3241, #3251)
+* Add lxml to docker image for web previews (PR #3239) Thanks to @ptman!
+* Add in flight request metrics (PR #3252)
+
+Changes:
+
+* Remove unused `update_external_syncs` (PR #3233)
+* Use stream rather depth ordering for push actions (PR #3212)
+* Make purge_history operate on tokens (PR #3221)
+* Don't support limitless pagination (PR #3265)
+
+Bug Fixes:
+
+* Fix logcontext resource usage tracking (PR #3258)
+* Fix error in handling receipts (PR #3235)
+* Stop the transaction cache caching failures (PR #3255)
+
+
+Changes in synapse v0.29.1 (2018-05-17)
+==========================================
+Changes:
+
+* Update docker documentation (PR #3222)
+
+Changes in synapse v0.29.0 (2018-05-16)
+===========================================
+Not changes since v0.29.0-rc1
+
+Changes in synapse v0.29.0-rc1 (2018-05-14)
+===========================================
+
+Notable changes, a docker file for running Synapse (Thanks to @kaiyou!) and a
+closed spec bug in the Client Server API. Additionally further prep for Python 3
+migration.
+
+Potentially breaking change:
+
+* Make Client-Server API return 401 for invalid token (PR #3161).
+
+  This changes the Client-server spec to return a 401 error code instead of 403
+  when the access token is unrecognised. This is the behaviour required by the
+  specification, but some clients may be relying on the old, incorrect
+  behaviour.
+
+  Thanks to @NotAFile for fixing this.
+
+Features:
+
+* Add a Dockerfile for synapse (PR #2846) Thanks to @kaiyou!
+
+Changes - General:
+
+* nuke-room-from-db.sh: added postgresql option and help (PR #2337) Thanks to @rubo77!
+* Part user from rooms on account deactivate (PR #3201)
+* Make 'unexpected logging context' into warnings (PR #3007)
+* Set Server header in SynapseRequest (PR #3208)
+* remove duplicates from groups tables (PR #3129)
+* Improve exception handling for background processes (PR #3138)
+* Add missing consumeErrors to improve exception handling (PR #3139)
+* reraise exceptions more carefully (PR #3142)
+* Remove redundant call to preserve_fn (PR #3143)
+* Trap exceptions thrown within run_in_background (PR #3144)
+
+Changes - Refactors:
+
+* Refactor /context to reuse pagination storage functions (PR #3193)
+* Refactor recent events func to use pagination func (PR #3195)
+* Refactor pagination DB API to return concrete type (PR #3196)
+* Refactor get_recent_events_for_room return type (PR #3198)
+* Refactor sync APIs to reuse pagination API (PR #3199)
+* Remove unused code path from member change DB func (PR #3200)
+* Refactor request handling wrappers (PR #3203)
+* transaction_id, destination defined twice (PR #3209) Thanks to @damir-manapov!
+* Refactor event storage to prepare for changes in state calculations (PR #3141)
+* Set Server header in SynapseRequest (PR #3208)
+* Use deferred.addTimeout instead of time_bound_deferred (PR #3127, #3178)
+* Use run_in_background in preference to preserve_fn (PR #3140)
+
+Changes - Python 3 migration:
+
+* Construct HMAC as bytes on py3 (PR #3156) Thanks to @NotAFile!
+* run config tests on py3 (PR #3159) Thanks to @NotAFile!
+* Open certificate files as bytes (PR #3084) Thanks to @NotAFile!
+* Open config file in non-bytes mode (PR #3085) Thanks to @NotAFile!
+* Make event properties raise AttributeError instead (PR #3102) Thanks to @NotAFile!
+* Use six.moves.urlparse (PR #3108) Thanks to @NotAFile!
+* Add py3 tests to tox with folders that work (PR #3145) Thanks to @NotAFile!
+* Don't yield in list comprehensions (PR #3150) Thanks to @NotAFile!
+* Move more xrange to six (PR #3151) Thanks to @NotAFile!
+* make imports local (PR #3152) Thanks to @NotAFile!
+* move httplib import to six (PR #3153) Thanks to @NotAFile!
+* Replace stringIO imports with six (PR #3154, #3168) Thanks to @NotAFile!
+* more bytes strings (PR #3155) Thanks to @NotAFile!
+
+Bug Fixes:
+
+* synapse fails to start under Twisted >= 18.4 (PR #3157)
+* Fix a class of logcontext leaks (PR #3170)
+* Fix a couple of logcontext leaks in unit tests (PR #3172)
+* Fix logcontext leak in media repo (PR #3174)
+* Escape label values in prometheus metrics (PR #3175, #3186)
+* Fix 'Unhandled Error' logs with Twisted 18.4 (PR #3182) Thanks to @Half-Shot!
+* Fix logcontext leaks in rate limiter (PR #3183)
+* notifications: Convert next_token to string according to the spec (PR #3190) Thanks to @mujx!
+* nuke-room-from-db.sh: fix deletion from search table (PR #3194) Thanks to @rubo77!
+* add guard for None on purge_history api (PR #3160) Thanks to @krombel!
+
+Changes in synapse v0.28.1 (2018-05-01)
+=======================================
+
+SECURITY UPDATE
+
+* Clamp the allowed values of event depth received over federation to be
+  [0, 2^63 - 1].  This mitigates an attack where malicious events
+  injected with depth = 2^63 - 1 render rooms unusable.  Depth is used to
+  determine the cosmetic ordering of events within a room, and so the ordering
+  of events in such a room will default to using stream_ordering rather than depth
+  (topological_ordering).
+
+  This is a temporary solution to mitigate abuse in the wild, whilst a long term solution
+  is being implemented to improve how the depth parameter is used.
+
+  Full details at
+  https://docs.google.com/document/d/1I3fi2S-XnpO45qrpCsowZv8P8dHcNZ4fsBsbOW7KABI
+
+* Pin Twisted to <18.4 until we stop using the private _OpenSSLECCurve API.
+
+
+Changes in synapse v0.28.0 (2018-04-26)
+=======================================
+
+Bug Fixes:
+
+* Fix quarantine media admin API and search reindex (PR #3130)
+* Fix media admin APIs (PR #3134)
+
+
+Changes in synapse v0.28.0-rc1 (2018-04-24)
+===========================================
+
+Minor performance improvement to federation sending and bug fixes.
+
+(Note: This release does not include the delta state resolution implementation discussed in matrix live)
+
+
+Features:
+
+* Add metrics for event processing lag (PR #3090)
+* Add metrics for ResponseCache (PR #3092)
+
+Changes:
+
+* Synapse on PyPy (PR #2760) Thanks to @Valodim!
+* move handling of auto_join_rooms to RegisterHandler (PR #2996) Thanks to @krombel!
+* Improve handling of SRV records for federation connections (PR #3016) Thanks to @silkeh!
+* Document the behaviour of ResponseCache (PR #3059)
+* Preparation for py3 (PR #3061, #3073, #3074, #3075, #3103, #3104, #3106, #3107, #3109, #3110) Thanks to @NotAFile!
+* update prometheus dashboard to use new metric names (PR #3069) Thanks to @krombel!
+* use python3-compatible prints (PR #3074) Thanks to @NotAFile!
+* Send federation events concurrently (PR #3078)
+* Limit concurrent event sends for a room (PR #3079)
+* Improve R30 stat definition (PR #3086)
+* Send events to ASes concurrently (PR #3088)
+* Refactor ResponseCache usage (PR #3093)
+* Clarify that SRV may not point to a CNAME (PR #3100) Thanks to @silkeh!
+* Use str(e) instead of e.message (PR #3103) Thanks to @NotAFile!
+* Use six.itervalues in some places (PR #3106) Thanks to @NotAFile!
+* Refactor store.have_events (PR #3117)
+
+Bug Fixes:
+
+* Return 401 for invalid access_token on logout (PR #2938) Thanks to @dklug!
+* Return a 404 rather than a 500 on rejoining empty rooms (PR #3080)
+* fix federation_domain_whitelist (PR #3099)
+* Avoid creating events with huge numbers of prev_events (PR #3113)
+* Reject events which have lots of prev_events (PR #3118)
+
+
+Changes in synapse v0.27.4 (2018-04-13)
+======================================
+
+Changes:
+
+* Update canonicaljson dependency (#3095)
+
+
+Changes in synapse v0.27.3 (2018-04-11)
+======================================
+
+Bug fixes:
+
+* URL quote path segments over federation (#3082)
+
+Changes in synapse v0.27.3-rc2 (2018-04-09)
+==========================================
+
+v0.27.3-rc1 used a stale version of the develop branch so the changelog overstates
+the functionality. v0.27.3-rc2 is up to date, rc1 should be ignored.
+
+Changes in synapse v0.27.3-rc1 (2018-04-09)
+=======================================
+
+Notable changes include API support for joinability of groups. Also new metrics
+and phone home stats. Phone home stats include better visibility of system usage
+so we can tweak synpase to work better for all users rather than our own experience
+with matrix.org. Also, recording 'r30' stat which is the measure we use to track
+overal growth of the Matrix ecosystem. It is defined as:-
+
+Counts the number of native 30 day retained users, defined as:-
+         * Users who have created their accounts more than 30 days
+         * Where last seen at most 30 days ago
+         * Where account creation and last_seen are > 30 days"
+
+
+Features:
+
+* Add joinability for groups (PR #3045)
+* Implement group join API (PR #3046)
+* Add counter metrics for calculating state delta (PR #3033)
+* R30 stats (PR #3041)
+* Measure time it takes to calculate state group ID (PR #3043)
+* Add basic performance statistics to phone home (PR #3044)
+* Add response size metrics (PR #3071)
+* phone home cache size configurations (PR #3063)
+
+Changes:
+
+* Add a blurb explaining the main synapse worker (PR #2886) Thanks to @turt2live!
+* Replace old style error catching with 'as' keyword (PR #3000) Thanks to @NotAFile!
+* Use .iter* to avoid copies in StateHandler (PR #3006)
+* Linearize calls to _generate_user_id (PR #3029)
+* Remove last usage of ujson (PR #3030)
+* Use simplejson throughout (PR #3048)
+* Use static JSONEncoders (PR #3049)
+* Remove uses of events.content (PR #3060)
+* Improve database cache performance (PR #3068)
+
+Bug fixes:
+
+* Add room_id to the response of `rooms/{roomId}/join` (PR #2986) Thanks to @jplatte!
+* Fix replication after switch to simplejson (PR #3015)
+* 404 correctly on missing paths via NoResource (PR #3022)
+* Fix error when claiming e2e keys from offline servers (PR #3034)
+* fix tests/storage/test_user_directory.py (PR #3042)
+* use PUT instead of POST for federating groups/m.join_policy (PR #3070) Thanks to @krombel!
+* postgres port script: fix state_groups_pkey error (PR #3072)
+
+
+Changes in synapse v0.27.2 (2018-03-26)
+=======================================
+
+Bug fixes:
+
+* Fix bug which broke TCP replication between workers (PR #3015)
+
+
+Changes in synapse v0.27.1 (2018-03-26)
+=======================================
+
+Meta release as v0.27.0 temporarily pointed to the wrong commit
+
+
+Changes in synapse v0.27.0 (2018-03-26)
+=======================================
+
+No changes since v0.27.0-rc2
+
+
+Changes in synapse v0.27.0-rc2 (2018-03-19)
+===========================================
+
+Pulls in v0.26.1
+
+Bug fixes:
+
+* Fix bug introduced in v0.27.0-rc1 that causes much increased memory usage in state cache (PR #3005)
+
+
+Changes in synapse v0.26.1 (2018-03-15)
+=======================================
+
+Bug fixes:
+
+* Fix bug where an invalid event caused server to stop functioning correctly,
+  due to parsing and serializing bugs in ujson library (PR #3008)
+
+
+Changes in synapse v0.27.0-rc1 (2018-03-14)
+===========================================
+
+The common case for running Synapse is not to run separate workers, but for those that do, be aware that synctl no longer starts the main synapse when using ``-a`` option with workers. A new worker file should be added with ``worker_app: synapse.app.homeserver``.
 
 This release also begins the process of renaming a number of the metrics
 reported to prometheus. See `docs/metrics-howto.rst <docs/metrics-howto.rst#block-and-response-metrics-renamed-for-0-27-0>`_.
+Note that the v0.28.0 release will remove the deprecated metric names.
+
+Features:
+
+* Add ability for ASes to override message send time (PR #2754)
+* Add support for custom storage providers for media repository (PR #2867, #2777, #2783, #2789, #2791, #2804, #2812, #2814, #2857, #2868, #2767)
+* Add purge API features, see `docs/admin_api/purge_history_api.rst <docs/admin_api/purge_history_api.rst>`_ for full details (PR #2858, #2867, #2882, #2946, #2962, #2943)
+* Add support for whitelisting 3PIDs that users can register. (PR #2813)
+* Add ``/room/{id}/event/{id}`` API (PR #2766)
+* Add an admin API to get all the media in a room (PR #2818) Thanks to @turt2live!
+* Add ``federation_domain_whitelist`` option (PR #2820, #2821)
+
+
+Changes:
+
+* Continue to factor out processing from main process and into worker processes. See updated `docs/workers.rst <docs/workers.rst>`_ (PR #2892 - #2904, #2913, #2920 - #2926, #2947, #2847, #2854, #2872, #2873, #2874, #2928, #2929, #2934, #2856, #2976 - #2984, #2987 - #2989, #2991 - #2993, #2995, #2784)
+* Ensure state cache is used when persisting events (PR #2864, #2871, #2802, #2835, #2836, #2841, #2842, #2849)
+* Change the default config to bind on both IPv4 and IPv6 on all platforms (PR #2435) Thanks to @silkeh!
+* No longer require a specific version of saml2 (PR #2695) Thanks to @okurz!
+* Remove ``verbosity``/``log_file`` from generated config (PR #2755)
+* Add and improve metrics and logging (PR #2770, #2778, #2785, #2786, #2787, #2793, #2794, #2795, #2809, #2810, #2833, #2834, #2844, #2965, #2927, #2975, #2790, #2796, #2838)
+* When using synctl with workers, don't start the main synapse automatically (PR #2774)
+* Minor performance improvements (PR #2773, #2792)
+* Use a connection pool for non-federation outbound connections (PR #2817)
+* Make it possible to run unit tests against postgres (PR #2829)
+* Update pynacl dependency to 1.2.1 or higher (PR #2888) Thanks to @bachp!
+* Remove ability for AS users to call /events and /sync (PR #2948)
+* Use bcrypt.checkpw (PR #2949) Thanks to @krombel!
+
+Bug fixes:
+
+* Fix broken ``ldap_config`` config option (PR #2683) Thanks to @seckrv!
+* Fix error message when user is not allowed to unban (PR #2761) Thanks to @turt2live!
+* Fix publicised groups GET API (singular) over federation (PR #2772)
+* Fix user directory when using ``user_directory_search_all_users`` config option (PR #2803, #2831)
+* Fix error on ``/publicRooms`` when no rooms exist (PR #2827)
+* Fix bug in quarantine_media (PR #2837)
+* Fix url_previews when no Content-Type is returned from URL (PR #2845)
+* Fix rare race in sync API when joining room (PR #2944)
+* Fix slow event search, switch back from GIST to GIN indexes (PR #2769, #2848)
 
 
 Changes in synapse v0.26.0 (2018-01-05)

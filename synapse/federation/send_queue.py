@@ -33,17 +33,16 @@ from .units import Edu
 
 from synapse.storage.presence import UserPresenceState
 from synapse.util.metrics import Measure
-import synapse.metrics
+from synapse.metrics import LaterGauge
 
 from blist import sorteddict
 from collections import namedtuple
 
 import logging
 
+from six import itervalues, iteritems
+
 logger = logging.getLogger(__name__)
-
-
-metrics = synapse.metrics.get_metrics_for(__name__)
 
 
 class FederationRemoteSendQueue(object):
@@ -75,10 +74,8 @@ class FederationRemoteSendQueue(object):
         # lambda binds to the queue rather than to the name of the queue which
         # changes. ARGH.
         def register(name, queue):
-            metrics.register_callback(
-                queue_name + "_size",
-                lambda: len(queue),
-            )
+            LaterGauge("synapse_federation_send_queue_%s_size" % (queue_name,),
+                       "", lambda: len(queue))
 
         for queue_name in [
             "presence_map", "presence_changed", "keyed_edu", "keyed_edu_changed",
@@ -122,7 +119,7 @@ class FederationRemoteSendQueue(object):
 
             user_ids = set(
                 user_id
-                for uids in self.presence_changed.itervalues()
+                for uids in itervalues(self.presence_changed)
                 for user_id in uids
             )
 
@@ -276,7 +273,7 @@ class FederationRemoteSendQueue(object):
         # stream position.
         keyed_edus = {self.keyed_edu_changed[k]: k for k in keys[i:j]}
 
-        for ((destination, edu_key), pos) in keyed_edus.iteritems():
+        for ((destination, edu_key), pos) in iteritems(keyed_edus):
             rows.append((pos, KeyedEduRow(
                 key=edu_key,
                 edu=self.keyed_edu[(destination, edu_key)],
@@ -309,7 +306,7 @@ class FederationRemoteSendQueue(object):
         j = keys.bisect_right(to_token) + 1
         device_messages = {self.device_messages[k]: k for k in keys[i:j]}
 
-        for (destination, pos) in device_messages.iteritems():
+        for (destination, pos) in iteritems(device_messages):
             rows.append((pos, DeviceRow(
                 destination=destination,
             )))
@@ -528,19 +525,19 @@ def process_rows_for_federation(transaction_queue, rows):
     if buff.presence:
         transaction_queue.send_presence(buff.presence)
 
-    for destination, edu_map in buff.keyed_edus.iteritems():
+    for destination, edu_map in iteritems(buff.keyed_edus):
         for key, edu in edu_map.items():
             transaction_queue.send_edu(
                 edu.destination, edu.edu_type, edu.content, key=key,
             )
 
-    for destination, edu_list in buff.edus.iteritems():
+    for destination, edu_list in iteritems(buff.edus):
         for edu in edu_list:
             transaction_queue.send_edu(
                 edu.destination, edu.edu_type, edu.content, key=None,
             )
 
-    for destination, failure_list in buff.failures.iteritems():
+    for destination, failure_list in iteritems(buff.failures):
         for failure in failure_list:
             transaction_queue.send_failure(destination, failure)
 

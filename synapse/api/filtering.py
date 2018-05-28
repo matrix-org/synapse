@@ -17,7 +17,7 @@ from synapse.storage.presence import UserPresenceState
 from synapse.types import UserID, RoomID
 from twisted.internet import defer
 
-import ujson as json
+import simplejson as json
 import jsonschema
 from jsonschema import FormatChecker
 

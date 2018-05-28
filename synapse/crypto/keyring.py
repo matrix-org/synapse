@@ -19,7 +19,8 @@ from synapse.api.errors import SynapseError, Codes
 from synapse.util import unwrapFirstError, logcontext
 from synapse.util.logcontext import (
     PreserveLoggingContext,
-    preserve_fn
+    preserve_fn,
+    run_in_background,
 )
 from synapse.util.metrics import Measure
 
@@ -127,7 +128,7 @@ class Keyring(object):
 
             verify_requests.append(verify_request)
 
-        preserve_fn(self._start_key_lookups)(verify_requests)
+        run_in_background(self._start_key_lookups, verify_requests)
 
         # Pass those keys to handle_key_deferred so that the json object
         # signatures can be verified
@@ -146,52 +147,55 @@ class Keyring(object):
             verify_requests (List[VerifyKeyRequest]):
         """
 
-        # create a deferred for each server we're going to look up the keys
-        # for; we'll resolve them once we have completed our lookups.
-        # These will be passed into wait_for_previous_lookups to block
-        # any other lookups until we have finished.
-        # The deferreds are called with no logcontext.
-        server_to_deferred = {
-            rq.server_name: defer.Deferred()
-            for rq in verify_requests
-        }
+        try:
+            # create a deferred for each server we're going to look up the keys
+            # for; we'll resolve them once we have completed our lookups.
+            # These will be passed into wait_for_previous_lookups to block
+            # any other lookups until we have finished.
+            # The deferreds are called with no logcontext.
+            server_to_deferred = {
+                rq.server_name: defer.Deferred()
+                for rq in verify_requests
+            }
 
-        # We want to wait for any previous lookups to complete before
-        # proceeding.
-        yield self.wait_for_previous_lookups(
-            [rq.server_name for rq in verify_requests],
-            server_to_deferred,
-        )
-
-        # Actually start fetching keys.
-        self._get_server_verify_keys(verify_requests)
-
-        # When we've finished fetching all the keys for a given server_name,
-        # resolve the deferred passed to `wait_for_previous_lookups` so that
-        # any lookups waiting will proceed.
-        #
-        # map from server name to a set of request ids
-        server_to_request_ids = {}
-
-        for verify_request in verify_requests:
-            server_name = verify_request.server_name
-            request_id = id(verify_request)
-            server_to_request_ids.setdefault(server_name, set()).add(request_id)
-
-        def remove_deferreds(res, verify_request):
-            server_name = verify_request.server_name
-            request_id = id(verify_request)
-            server_to_request_ids[server_name].discard(request_id)
-            if not server_to_request_ids[server_name]:
-                d = server_to_deferred.pop(server_name, None)
-                if d:
-                    d.callback(None)
-            return res
-
-        for verify_request in verify_requests:
-            verify_request.deferred.addBoth(
-                remove_deferreds, verify_request,
+            # We want to wait for any previous lookups to complete before
+            # proceeding.
+            yield self.wait_for_previous_lookups(
+                [rq.server_name for rq in verify_requests],
+                server_to_deferred,
             )
+
+            # Actually start fetching keys.
+            self._get_server_verify_keys(verify_requests)
+
+            # When we've finished fetching all the keys for a given server_name,
+            # resolve the deferred passed to `wait_for_previous_lookups` so that
+            # any lookups waiting will proceed.
+            #
+            # map from server name to a set of request ids
+            server_to_request_ids = {}
+
+            for verify_request in verify_requests:
+                server_name = verify_request.server_name
+                request_id = id(verify_request)
+                server_to_request_ids.setdefault(server_name, set()).add(request_id)
+
+            def remove_deferreds(res, verify_request):
+                server_name = verify_request.server_name
+                request_id = id(verify_request)
+                server_to_request_ids[server_name].discard(request_id)
+                if not server_to_request_ids[server_name]:
+                    d = server_to_deferred.pop(server_name, None)
+                    if d:
+                        d.callback(None)
+                return res
+
+            for verify_request in verify_requests:
+                verify_request.deferred.addBoth(
+                    remove_deferreds, verify_request,
+                )
+        except Exception:
+            logger.exception("Error starting key lookups")
 
     @defer.inlineCallbacks
     def wait_for_previous_lookups(self, server_names, server_to_deferred):
@@ -313,7 +317,7 @@ class Keyring(object):
                     if not verify_request.deferred.called:
                         verify_request.deferred.errback(err)
 
-        preserve_fn(do_iterations)().addErrback(on_err)
+        run_in_background(do_iterations).addErrback(on_err)
 
     @defer.inlineCallbacks
     def get_keys_from_store(self, server_name_and_key_ids):
@@ -329,8 +333,9 @@ class Keyring(object):
         """
         res = yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
-                preserve_fn(self.store.get_server_verify_keys)(
-                    server_name, key_ids
+                run_in_background(
+                    self.store.get_server_verify_keys,
+                    server_name, key_ids,
                 ).addCallback(lambda ks, server: (server, ks), server_name)
                 for server_name, key_ids in server_name_and_key_ids
             ],
@@ -352,13 +357,13 @@ class Keyring(object):
                 logger.exception(
                     "Unable to get key from %r: %s %s",
                     perspective_name,
-                    type(e).__name__, str(e.message),
+                    type(e).__name__, str(e),
                 )
                 defer.returnValue({})
 
         results = yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
-                preserve_fn(get_key)(p_name, p_keys)
+                run_in_background(get_key, p_name, p_keys)
                 for p_name, p_keys in self.perspective_servers.items()
             ],
             consumeErrors=True,
@@ -384,7 +389,7 @@ class Keyring(object):
                 logger.info(
                     "Unable to get key %r for %r directly: %s %s",
                     key_ids, server_name,
-                    type(e).__name__, str(e.message),
+                    type(e).__name__, str(e),
                 )
 
             if not keys:
@@ -398,7 +403,7 @@ class Keyring(object):
 
         results = yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
-                preserve_fn(get_key)(server_name, key_ids)
+                run_in_background(get_key, server_name, key_ids)
                 for server_name, key_ids in server_name_and_key_ids
             ],
             consumeErrors=True,
@@ -481,7 +486,8 @@ class Keyring(object):
 
         yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
-                preserve_fn(self.store_keys)(
+                run_in_background(
+                    self.store_keys,
                     server_name=server_name,
                     from_server=perspective_name,
                     verify_keys=response_keys,
@@ -539,7 +545,8 @@ class Keyring(object):
 
         yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
-                preserve_fn(self.store_keys)(
+                run_in_background(
+                    self.store_keys,
                     server_name=key_server_name,
                     from_server=server_name,
                     verify_keys=verify_keys,
@@ -615,7 +622,8 @@ class Keyring(object):
 
         yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
-                preserve_fn(self.store.store_server_keys_json)(
+                run_in_background(
+                    self.store.store_server_keys_json,
                     server_name=server_name,
                     key_id=key_id,
                     from_server=server_name,
@@ -716,7 +724,8 @@ class Keyring(object):
         # TODO(markjh): Store whether the keys have expired.
         return logcontext.make_deferred_yieldable(defer.gatherResults(
             [
-                preserve_fn(self.store.store_server_verify_key)(
+                run_in_background(
+                    self.store.store_server_verify_key,
                     server_name, server_name, key.time_added, key
                 )
                 for key_id, key in verify_keys.items()
@@ -734,7 +743,7 @@ def _handle_key_deferred(verify_request):
     except IOError as e:
         logger.warn(
             "Got IOError when downloading keys for %s: %s %s",
-            server_name, type(e).__name__, str(e.message),
+            server_name, type(e).__name__, str(e),
         )
         raise SynapseError(
             502,
@@ -744,7 +753,7 @@ def _handle_key_deferred(verify_request):
     except Exception as e:
         logger.exception(
             "Got Exception when downloading keys for %s: %s %s",
-            server_name, type(e).__name__, str(e.message),
+            server_name, type(e).__name__, str(e),
         )
         raise SynapseError(
             401,
