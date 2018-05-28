@@ -123,10 +123,10 @@ REGISTRY.register(CPUMetrics())
 gc_unreachable = Gauge("python_gc_unreachable_total", "Unreachable GC objects", ["gen"])
 gc_time = Histogram(
     "python_gc_time",
-    "Time taken to GC (ms)",
+    "Time taken to GC (sec)",
     ["gen"],
-    buckets=[2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 7500, 15000,
-             30000, 45000, 60000],
+    buckets=[0.0025, 0.005, 0.01, 0.025, 0.05, 0.10, 0.25, 0.50, 1.00, 2.50,
+             5.00, 7.50, 15.00, 30.00, 45.00, 60.00],
 )
 
 
@@ -148,8 +148,8 @@ REGISTRY.register(GCCounts())
 
 tick_time = Histogram(
     "python_twisted_reactor_tick_time",
-    "Tick time of the Twisted reactor (ms)",
-    buckets=[1, 2, 5, 10, 50, 100, 250, 500, 1000, 2000],
+    "Tick time of the Twisted reactor (sec)",
+    buckets=[0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.5, 1, 2, 5],
 )
 pending_calls_metric = Histogram(
     "python_twisted_reactor_pending_calls",
@@ -203,9 +203,9 @@ def runUntilCurrentTimer(func):
             num_pending += 1
 
         num_pending += len(reactor.threadCallQueue)
-        start = time.time() * 1000
+        start = time.time()
         ret = func(*args, **kwargs)
-        end = time.time() * 1000
+        end = time.time()
 
         # record the amount of wallclock time spent running pending calls.
         # This is a proxy for the actual amount of time between reactor polls,
@@ -226,9 +226,9 @@ def runUntilCurrentTimer(func):
             if threshold[i] < counts[i]:
                 logger.info("Collecting gc %d", i)
 
-                start = time.time() * 1000
+                start = time.time()
                 unreachable = gc.collect(i)
-                end = time.time() * 1000
+                end = time.time()
 
                 gc_time.labels(i).observe(end - start)
                 gc_unreachable.labels(i).set(unreachable)

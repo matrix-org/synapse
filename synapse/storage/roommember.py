@@ -30,6 +30,8 @@ from synapse.types import get_domain_from_id
 import logging
 import simplejson as json
 
+from six import itervalues, iteritems
+
 logger = logging.getLogger(__name__)
 
 
@@ -272,7 +274,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         users_in_room = {}
         member_event_ids = [
             e_id
-            for key, e_id in current_state_ids.iteritems()
+            for key, e_id in iteritems(current_state_ids)
             if key[0] == EventTypes.Member
         ]
 
@@ -289,7 +291,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                     users_in_room = dict(prev_res)
                     member_event_ids = [
                         e_id
-                        for key, e_id in context.delta_ids.iteritems()
+                        for key, e_id in iteritems(context.delta_ids)
                         if key[0] == EventTypes.Member
                     ]
                     for etype, state_key in context.delta_ids:
@@ -741,7 +743,7 @@ class _JoinedHostsCache(object):
             if state_entry.state_group == self.state_group:
                 pass
             elif state_entry.prev_group == self.state_group:
-                for (typ, state_key), event_id in state_entry.delta_ids.iteritems():
+                for (typ, state_key), event_id in iteritems(state_entry.delta_ids):
                     if typ != EventTypes.Member:
                         continue
 
@@ -771,7 +773,7 @@ class _JoinedHostsCache(object):
                 self.state_group = state_entry.state_group
             else:
                 self.state_group = object()
-            self._len = sum(len(v) for v in self.hosts_to_joined_users.itervalues())
+            self._len = sum(len(v) for v in itervalues(self.hosts_to_joined_users))
         defer.returnValue(frozenset(self.hosts_to_joined_users))
 
     def __len__(self):

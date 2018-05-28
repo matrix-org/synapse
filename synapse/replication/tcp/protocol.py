@@ -67,14 +67,14 @@ from prometheus_client import Counter
 
 from collections import defaultdict
 
+from six import iterkeys, iteritems
+
 import logging
 import struct
 import fcntl
 
 connection_close_counter = Counter(
-    "synapse_replication_tcp_protocol_close_reason", "", ["reason_type"],
-)
-
+    "synapse_replication_tcp_protocol_close_reason", "", ["reason_type"])
 
 # A list of all connected protocols. This allows us to send metrics about the
 # connections.
@@ -389,7 +389,7 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
         if stream_name == "ALL":
             # Subscribe to all streams we're publishing to.
-            for stream in self.streamer.streams_by_name.iterkeys():
+            for stream in iterkeys(self.streamer.streams_by_name):
                 self.subscribe_to_stream(stream, token)
         else:
             self.subscribe_to_stream(stream_name, token)
@@ -495,7 +495,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         BaseReplicationStreamProtocol.connectionMade(self)
 
         # Once we've connected subscribe to the necessary streams
-        for stream_name, token in self.handler.get_streams_to_replicate().iteritems():
+        for stream_name, token in iteritems(self.handler.get_streams_to_replicate()):
             self.replicate(stream_name, token)
 
         # Tell the server if we have any users currently syncing (should only
@@ -622,7 +622,7 @@ tcp_inbound_commands = LaterGauge(
     lambda: {
         (k[0], p.name, p.conn_id): count
         for p in connected_connections
-        for k, count in p.inbound_commands_counter.items()
+        for k, count in iteritems(p.inbound_commands_counter.counts)
     })
 
 tcp_outbound_commands = LaterGauge(
@@ -630,7 +630,7 @@ tcp_outbound_commands = LaterGauge(
     lambda: {
         (k[0], p.name, p.conn_id): count
         for p in connected_connections
-        for k, count in p.outbound_commands_counter.items()
+        for k, count in iteritems(p.outbound_commands_counter.counts)
     })
 
 # number of updates received for each RDATA stream
